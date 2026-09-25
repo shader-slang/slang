@@ -1334,6 +1334,12 @@ typedef uint32_t SlangSizeT;
         // command-line parser.
         GetCompilerPath = 159,
 
+        // New options are always appended immediately before the `CountOf` sentinel below, to
+        // preserve this enum's append-only ABI contract: inserting a value earlier would shift
+        // every later enumerator's integer for code already compiled against an older header.
+        SaveAutodiffModule = 160,
+        SaveAutodiffModuleBinSource = 161,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
@@ -4104,6 +4110,7 @@ enum class BuiltinModuleName
 {
     Core = 0,
     GLSL = 1,
+    Autodiff = 2,
 };
 
 /** A global session for interaction with the Slang library.
@@ -4340,6 +4347,8 @@ struct IGlobalSession : public ISlangUnknown
 
     /** Compile from (embedded source) the builtin module on the session.
     Will return a failure if there is already a builtin module available.
+    Compiling BuiltinModuleName::Autodiff requires BuiltinModuleName::Core to have already been
+    loaded or compiled in this session; otherwise this function returns SLANG_E_INVALID_ARG.
     NOTE! API is experimental and not ready for production code.
     @param module The builtin module name.
     @param flags to control compilation
@@ -4348,6 +4357,8 @@ struct IGlobalSession : public ISlangUnknown
     compileBuiltinModule(BuiltinModuleName module, CompileCoreModuleFlags flags) = 0;
 
     /** Load a builtin module. Currently loads modules from the file system.
+    Loading BuiltinModuleName::Autodiff requires BuiltinModuleName::Core to have already been
+    loaded or compiled in this session; otherwise this function returns SLANG_E_INVALID_ARG.
     @param module The builtin module name
     @param moduleData Start address of the serialized core module
     @param sizeInBytes The size in bytes of the serialized builtin module
@@ -6031,6 +6042,22 @@ NOTE! API is experimental and not ready for production code
 */
 SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
 
+/* Returns a blob that contains the serialized autodiff supplement module.
+Returns nullptr if there isn't an embedded autodiff module.
+The supplement structurally depends on declarations in the serialized core module: deserializing
+it resolves references into the core module by looking up "core" in the target session, the same
+way any other cross-module reference is resolved (see Linkage::findOrImportModule). Consumers must
+therefore load the core archive into the same session (e.g. via loadBuiltinModule with
+BuiltinModuleName::Core) before loading this blob; this getter only returns the blob and does not
+enforce that ordering. compileBuiltinModule/loadBuiltinModule do enforce it and return
+SLANG_E_INVALID_ARG when BuiltinModuleName::Autodiff is requested without core. The compiler's own
+internal use of this blob (Session::loadAutodiffModuleIfNeeded) never violates the ordering,
+because the core module is always compiled or loaded before any code path that could request the
+autodiff module.
+
+NOTE! API is experimental and not ready for production code
+*/
+SLANG_API ISlangBlob* slang_getEmbeddedAutodiffModule();
 
 /* Cleanup all global allocations used by Slang, to prevent memory leak detectors from
  reporting them as leaks. This function should only be called after all Slang objects

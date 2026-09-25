@@ -1723,12 +1723,7 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
 
     // If the name being requested matches the name of a built-in module,
     // then we will special-case the process by loading that builtin
-    // module directly.
-    //
-    // TODO: right now this logic is only considering the built-in `glsl`
-    // module, but it should probably be generalized so that we can more
-    // easily support having multiple built-in modules rather than just
-    // putting everything into `core`.
+    // module directly, rather than searching the file system for it.
     //
     if (moduleName == getSessionImpl()->glslModuleName)
     {
@@ -1748,6 +1743,35 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
             sink->diagnose(Diagnostics::GlslModuleNotAvailable{.location = requestingLoc});
         }
         return glslModule;
+    }
+
+    if (moduleName == getSessionImpl()->autodiffModuleName)
+    {
+        // This is the builtin autodiff supplement, loaded lazily (unlike `glsl` above, which is
+        // always compiled eagerly): a reference to it can reach this point either because a
+        // module currently being checked from source is about to `import` it explicitly (once
+        // that becomes a supported spelling), or because `_readImportedModule` is reconstructing
+        // a dependency that was recorded when some module was originally checked and its checking
+        // triggered an on-demand load of the supplement (see `SemanticsContext::
+        // ensureAutodiffModuleLoaded`, which records that dependency the same way an explicit
+        // `import` does). Either way, resolving the name here just means loading the supplement
+        // if it is not already loaded.
+        Module* autodiffModule = nullptr;
+        const SlangResult loadResult = getSessionImpl()->loadAutodiffModuleIfNeeded(autodiffModule);
+        if (SLANG_FAILED(loadResult))
+        {
+            sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = requestingLoc});
+            return nullptr;
+        }
+
+        // Unlike a semantic trigger, an import/deserialization lookup cannot legitimately occur
+        // while source-compiling a builtin module. Thus the recursion guard's SLANG_OK/null result
+        // is an invariant violation here, not a benign "nothing to merge" result. Diagnose it in
+        // release builds as well as asserting it in debug builds.
+        SLANG_ASSERT(autodiffModule);
+        if (!autodiffModule)
+            sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = requestingLoc});
+        return autodiffModule;
     }
 
     // We are going to use a loop to search for a suitable file to
@@ -2452,6 +2476,17 @@ SlangResult Linkage::loadSerializedModuleContents(
     RefPtr<IRModule> irModule;
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);
+
+    // Note: a module deserialized from a `.slang-module` never passes through semantic checking,
+    // so the on-demand autodiff-supplement load triggers in `SemanticsContext::
+    // ensureAutodiffModuleLoaded` never fire for it directly. That is not a gap here, though: when
+    // the module was originally checked from source and that checking triggered the on-demand
+    // load, `ensureAutodiffModuleLoaded` recorded the supplement as a dependency the same way a
+    // written `import` would (see that function). `readSerializedModuleAST` above already
+    // resolved that recorded dependency while reading the AST chunk, through the same
+    // `ImportedModule`/`findOrImportModule` path any other cross-module reference uses (see
+    // `ASTSerialReadContext::_readImportedModule` and the `autodiffModuleName` case in
+    // `Linkage::findOrImportModule`), which is what actually loads the supplement here.
 
     // The handling of file dependencies is complicated, because of
     // the way that the encoding logic tried to make all of the

@@ -15623,6 +15623,46 @@ static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
 
 void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
 {
+    // We trigger an on-demand load of the autodiff supplement from two places: here, when a
+    // callable's header carries a differentiability attribute, and from
+    // `_checkHigherOrderInvokeExpr`, when a `fwd_diff`/`bwd_diff`/primal-substitute expression is
+    // checked. A callable whose header says it participates in differentiation needs the
+    // supplement's derivative machinery to finish checking its declaration, which is why we
+    // trigger the load here rather than waiting for some later use of the callable.
+    //
+    // `_callableHasDifferentiabilityHeaderModifier` draws that line by base class rather than by
+    // spelling, so it is worth being precise about which declarations land on each side:
+    //
+    //   - Covered: every `DifferentiableAttribute`, which is a larger set than its name suggests.
+    //     Besides the obvious `[Differentiable]`, `[ForwardDifferentiable]`,
+    //     `[BackwardDifferentiable]`, `[TreatAsDifferentiable]` and
+    //     `[HasTrivialForwardDerivative]`, it also covers the custom-derivative attributes
+    //     `[ForwardDerivative]`, `[BackwardDerivative]`, `[ForwardDerivativeOf]` and
+    //     `[BackwardDerivativeOf]`, which reach it through `UserDefinedDerivativeAttribute` and
+    //     `DerivativeOfAttribute` (both in `slang-ast-modifier.h`).
+    //   - Also covered, via `MaybeDifferentiableAttribute`: interface requirements marked as
+    //     optionally conforming to `IForwardDifferentiable`/`IBackwardDifferentiable`. This is the
+    //     one case where the trigger fires on a requirement rather than an implementation.
+    //   - Not covered: `[PrimalSubstitute]` and `[PrimalSubstituteOf]`, which derive directly from
+    //     `Attribute`. Their supplement dependency is driven separately, by the
+    //     `PrimalSubstituteExpr` synthesized when the attribute is checked (see
+    //     `_checkHigherOrderInvokeExpr`, which handles `DifferentiateExpr` the same way).
+    //
+    // So the two triggers overlap by design rather than partitioning the attributes: a
+    // `[ForwardDerivative]` function loads the supplement here, at its header, and the expression
+    // trigger covers the cases this one cannot see. Loading early is harmless -- such a function
+    // needs the supplement anyway -- but a maintainer changing either trigger should know the
+    // other is not the sole path.
+    //
+    // If the load fails, we abort the rest of the differentiable setup below (implicit `no_diff`
+    // synthesis etc.), which reads supplement declarations; `ensureAutodiffModuleLoaded` has
+    // already diagnosed the failure.
+    if (_callableHasDifferentiabilityHeaderModifier(decl) &&
+        SLANG_FAILED(ensureAutodiffModuleLoaded(decl->loc)))
+    {
+        return;
+    }
+
     _maybeAddImplicitNoDiffThisForNonDifferentiableThis(this, decl);
 
     // TODO: Need to make this not depend on the attribute, but rather on differentiability
@@ -18306,16 +18346,6 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     //
     _getCandidateExtensionList(typeDecl, m_mapDeclToCandidateExtensions).add(extDecl);
 
-    bool hasImplicitCastMember = false;
-    for (auto member : extDecl->getDirectMemberDecls())
-    {
-        if (auto ctorDecl = as<ConstructorDecl>(member))
-        {
-            if (ctorDecl->hasModifier<ImplicitConversionModifier>())
-                hasImplicitCastMember = true;
-        }
-    }
-
     // A new extension can affect not only `typeDecl` itself, but also any cached
     // type whose linearized facets reference `typeDecl` transitively. Historically
     // we handled that by scanning the entire inheritance/subtype cache and removing
@@ -18330,6 +18360,23 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     // when they are queried again, without forcing us to iterate the giant global
     // dictionaries up front.
     bumpDeclExtensionEpoch(typeDecl);
+
+    _invalidateImplicitCastCacheForExtension(typeDecl, extDecl);
+}
+
+void SharedSemanticsContext::_invalidateImplicitCastCacheForExtension(
+    Decl* typeDecl,
+    ExtensionDecl* extDecl)
+{
+    bool hasImplicitCastMember = false;
+    for (auto member : extDecl->getDirectMemberDecls())
+    {
+        if (auto ctorDecl = as<ConstructorDecl>(member))
+        {
+            if (ctorDecl->hasModifier<ImplicitConversionModifier>())
+                hasImplicitCastMember = true;
+        }
+    }
 
     if (hasImplicitCastMember)
     {
@@ -18352,12 +18399,71 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     }
 }
 
+// Make the on-demand autodiff supplement `moduleDecl` visible to this context's already-built
+// aggregate views. Post-condition: on return, every candidate extension and decl association the
+// supplement declares appears in any built view exactly once, and every extended decl's extension
+// epoch has advanced. Idempotent under repeated calls and safe regardless of which other linkage
+// loaded the supplement first.
+//
+// Two distinct hazards need two distinct idempotence mechanisms, which is why both exist:
+//   1. The `m_loadedAutodiffModules` set guards against *this* context merging the same supplement
+//      twice (a second differentiability trigger in the same linkage re-calls this).
+//   2. The canonical-identity dedup inside `_mergeCandidateExtensionsFromModule` /
+//      `_mergeDeclAssociationsFromModule` guards a different case: a view that was first built
+//      *after* another linkage loaded the supplement already includes it through
+//      `Session::coreModules`, so a later incremental merge here must not append those entries a
+//      second time.
+bool SharedSemanticsContext::addLoadedAutodiffModule(ModuleDecl* moduleDecl)
+{
+    if (!m_loadedAutodiffModules.add(moduleDecl))
+        return false;
+
+    // This context may already have cached extensions from the base core and the module currently
+    // being checked. Rebuilding the aggregate views would discard those current-module entries;
+    // for example, the neural module would lose its Array<T, N> : IArrayAccessor<T> extension.
+    // Merge the supplement incrementally instead (hazard 2 above): another linkage may have loaded
+    // the supplement before this context built a view, so the merge uses canonical declaration
+    // identity to keep entries that normal construction already included from being appended twice.
+    // If a view has not been built yet, its normal first build will include this module through
+    // `Session::coreModules`. This call runs synchronously: no view can be built between the epoch
+    // updates and the conditional merges below, so each view observes either the state before this
+    // call or the complete state after it.
+    //
+    // Extension epochs are independent of whether either aggregate view has been built. Always
+    // advance them so inheritance and subtype cache entries computed before this load are invalid.
+    for (const auto& entry : moduleDecl->mapDeclToCandidateExtensions)
+        bumpDeclExtensionEpoch(entry.first);
+
+    if (m_candidateExtensionListsBuilt)
+        _mergeCandidateExtensionsFromModule(moduleDecl);
+    if (m_associatedDeclListsBuilt)
+        _mergeDeclAssociationsFromModule(moduleDecl);
+
+    return true;
+}
+
 void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
 {
     for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
     {
         auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
         list.addRange(entryValue->candidateExtensions);
+    }
+}
+
+void SharedSemanticsContext::_mergeCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
+{
+    for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
+    {
+        auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
+        for (auto extension : entryValue->candidateExtensions)
+        {
+            if (!list.contains(extension))
+            {
+                list.add(extension);
+                _invalidateImplicitCastCacheForExtension(entryKey, extension);
+            }
+        }
     }
 }
 
@@ -18385,6 +18491,19 @@ void SharedSemanticsContext::_addDeclAssociationsFromModule(ModuleDecl* moduleDe
     {
         auto& list = _getDeclAssociationList(entry.key, m_mapDeclToAssociatedDecls);
         list.addRange(entry.value->associations);
+    }
+}
+
+void SharedSemanticsContext::_mergeDeclAssociationsFromModule(ModuleDecl* moduleDecl)
+{
+    for (auto& entry : moduleDecl->mapDeclToAssociatedDecls)
+    {
+        auto& list = _getDeclAssociationList(entry.key, m_mapDeclToAssociatedDecls);
+        for (auto association : entry.value->associations)
+        {
+            if (!list.contains(association))
+                list.add(association);
+        }
     }
 }
 
