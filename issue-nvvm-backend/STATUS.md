@@ -3,6 +3,31 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Research255 is accepted
+
+Native `<2 x i16>` storage for BF2 and component arrays for BF3/BF4 match CUDA record/holder layouts.
+All9 source-NVRTC/raw-NVVM controls preserve603980928 bytes (150995232 words), including guarded
+global record-array writes, local reference roundtrips and untouched tails/padding/sentinels.
+Every source/destination lane and record covers all65536 encodings under both permutation flags.
+Read [plan255](plan.slice-255-bf16-physical-storage.md),
+[report255](report.slice-255-bf16-physical-storage.md) and
+[semantic255](semantic-evidence.slice-255.json).
+
+Fresh runtime4 passes; source compiles12 account for6 successes and6 production E52017 preflight
+stops at the helper Ptr<H> parameter. Raw LLVM6 compile/verify and all9 assembly cells pass.
+Independent byte-oracle and path audits verify actual global/local accesses and helper calls.
+NVRTC scalarizes some local helper parameters but retains caller local loads. Raw/source helper
+ABIs differ, and frame extents are not record ABI or kernel-speed evidence. No production support
+or external helper interoperability is claimed. The rejected array2/vector3/vector4 layouts remain
+explicitly recorded; alloca alignment cannot fix their embedded-field alignment.
+
+All132 source/12 artifact/564 input hashes and18 submodule pins remain exact254. Full254's1704/
+1665correct/39unresolved and18 resolved histories remain inherited, with targeted233/cadence0 and
+rolling250/252/254 unchanged. Material runtime contracts remain unavailable. The local fallback
+uses separate oracle/mechanical audits without claiming a fresh independent agent review.
+Closure verifies259 indexed artifacts,132 source snapshots and59 compact references.
+Raw root: `build/nvvm-loop/slice-255-bf16-physical-storage`. No push or system/driver change.
+
 ## Slice254 is accepted
 
 Shared AST and IR CUDA layout producers now match the prelude's BF3/BF4 component structs. The AST
@@ -158,17 +183,18 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Qualify a bounded physical BF16 storage contract using the repaired CUDA metadata and research240/
-253/254 evidence. Compare native-width2 vector storage and component arrays for widths3/4 through
-actual pointer/record/array boundaries, with exact bits, adjacent-field guards and explicit CUDA
-alignment. Preserve every current runtime admission boundary until representation and conversions
-are independently qualified. The original dynamic-dispatch BF2/FP8 aggregate fixture has separate
-boundaries; do not bundle FP8 aggregate support, BF runtime storage and matrix orientation changes.
+Implement one bounded local/reference BF16 vector role using research255's qualified representation:
+native width2 storage and component arrays for widths3/4, preserving register vectors at by-value
+boundaries. Start with a focused local inout-vector source regression and trace the existing role
+checks, representation maps and memory/value conversions before editing. Keep format identity and
+aggregate layout validation strict. Require independently expected output at all3 modes and a full
+checkpoint for the shared role/type-lowering change.
 
-Re-rank this candidate against FP8 runtime conversion/overflow and material compile-time work before
-implementation. Material runtime bindings/textures/LUT/input/output contracts remain unavailable.
-Preserve texture/column-major failures and all existing input/oracle identities. A research result
-or metadata fix is not runtime storage support.
+Do not broaden device-pointer, resource, parameter-group, FP8 aggregate or matrix support in the
+same slice. The Ptr<H> research control is a qualified representation boundary, not a demand to
+admit every role at once. Reconsider material-driven work in the rolling implementation cadence;
+its bindings/textures/LUT/input/output contract remains unavailable. Preserve every existing
+fixture/oracle and all original texture/column-major failure histories.
 
 ## Accepted historical evidence
 

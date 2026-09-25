@@ -208,3 +208,33 @@ packed from corrected reflection equal the previously qualified CUDA-packed inpu
 incorrectly packed inputs remain recorded negative controls. The12 direct storage rejection shapes
 are unchanged. Correct layout metadata is a prerequisite for future storage support, not admission
 of a physical LLVM vector as stored CUDA BF16 data.
+
+## Research255: physical record storage candidates
+
+With254's metadata correction in place, fresh LLVM14.0.6 DataLayout and GPU transport controls
+qualify `<2 x i16>` as BF2 storage and `[3 x i16]`/`[4 x i16]` as BF3/BF4 storage at guarded record-array
+and local-reference boundaries. Their wrapped records are12/4,10/2,12/2, with value offsets4/2/2
+and suffix offsets8/8/10. Three-record holders plus a uint16 tail are40/4,32/2,38/2 with tails36/30/36.
+The BF2 scalar-array alternative still misaligns embedded fields; BF3/BF4 register vectors still
+inflate record layout. Allocation alignment cannot repair either type-level mismatch.
+
+All9 source NVRTC O3/raw NVVM O0/O3 controls preserve603980928 bytes. Each width tests all65536
+encodings at both runtime permutation flags, with complete coverage for every source/destination
+lane and record. The byte oracle includes global destination vector writes, local inout roundtrips,
+source records, prefix/suffix/tail guards and all padding/sentinels. There is no arithmetic or numeric
+conversion, so every NaN payload and signed-zero encoding is preserved exactly.
+
+Actual PTX retains global and local memory accesses and helper calls. NVRTC scalarizes some local
+helper parameters while keeping caller local loads. Raw helpers use generic pointers and volatile
+loads/stores. Source and raw register-helper ABIs differ for component structs; this does not
+qualify cross-module CUDA helper interoperability. Local-frame extent is not a stored-record ABI
+measurement or a kernel-speed result.
+
+No production support changes in255: all6 direct source storage controls still reject the typed
+Ptr<H> helper parameter. A later bounded local/reference slice should preserve the existing
+NVVMTypeUse role checks and representation caches, use native width2 storage and component arrays
+for widths3/4, and convert explicitly at the existing memory/value boundary. Keep aggregate layout
+validation strict. Broader device-pointer/resource/parameter-group admission, FP8 aggregates and
+matrix orientation require their own contracts. Read
+[report255](../../issue-nvvm-backend/report.slice-255-bf16-physical-storage.md) and
+[semantic255](../../issue-nvvm-backend/semantic-evidence.slice-255.json).
