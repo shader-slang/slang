@@ -17,7 +17,7 @@ was added. Scalar239/vector241 behavior and exported BF-vector rejections remain
 
 Latest accepted implementation/full checkpoint:242. Latest targeted acceptance:233. Implementation
 slices since full:zero. Tested source base `d6c26eb4cf5960ac07feff8158d15163cc2757fc`; no push is
-authorized. The slice is ready for its authorized local commit. Rolling implementation history:
+authorized. Implementation242 is locally committed at `bb99ea8c9a414fc4ee854422cbe8827be018f7c3`. Rolling implementation history:
 239scalar/241vectors/242dot.
 
 Re-rank remaining measured corpus boundaries before the next slice. FP8-containing helper resultA,
@@ -28,6 +28,28 @@ BF3 CUDA6/2 versus LLVM8/8 handling. General BF arithmetic/comparison, integer/H
 explicit vector Select, storage/resources/aggregates/globals/parameter groups and external CUDA BF
 helper interoperability remain excluded. Material-driven runtime work remains deferred because
 bindings, textures/LUTs, inputs and output oracle are absent; reconsider before each next slice.
+
+## Latest bounded research
+
+Research243 is independently accepted; no production support was admitted. Read
+[plan243](plan.slice-243-fp8.md), [report243](report.slice-243-fp8.md),
+[evidence243](semantic-evidence.slice-243.json) and [FP8 contract](../docs/design/nvvm-fp8-scalar-contract.md).
+Fourteen qualified SM80 GPU controls pass170,030 complete words: format-distinct i8 scalar/internal
+helper transport and CUDA12.9 RNE/SATFINITE Float32 casts, including actual Slang NVRTC lowering.
+The small smoke gate passes4. All40 source paths,12artifacts,560inputs and prior research indices
+remain exact. Full242/targeted233/cadence0 and1692/1651correct/41unresolved/16resolved histories stand.
+
+Independent parent acceptance verifies all180 indexed artifacts,19 primary sources and all170,030
+qualified runtime words. Nine parent artifacts retain the independent grid, runtime, producer and
+provenance audits. This research is ready for the authorized local commit.
+
+The measured next action is shared FP8 finite/subnormal producer repair before backend admission:
+literal E4M3(256) folds to448 and minimum subnormals misfold on the unchanged compiler. Preserve
+existing unit-tested shared overflow policy; its NaN/Inf behavior differs from CUDA SATFINITE and
+needs a separate policy decision. Known1.25 scalar transport/literal/bitcast remains a smaller future
+admission boundary; qualified runtime casts need format-specific semantic planning. Dynamic-object
+aggregate/storage, vectors and external ABI remain separate. Material runtime was reconsidered but
+still lacks bindings/textures/LUT/input/oracle; support/correctness remains the cadence override.
 
 ## Checkpoint and proof
 

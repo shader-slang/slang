@@ -1,0 +1,756 @@
+{
+  "schema": 1,
+  "slice": 243,
+  "status": "accepted research; no production admission",
+  "source_base": "bb99ea8c9a414fc4ee854422cbe8827be018f7c3",
+  "provider_abi": 40,
+  "scope": "FP8 i8 scalar/internal helper transport and CUDA12.9 runtime Float32 conversion research; no direct-Slang production support",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-242.json",
+    "sha256": "e5e8c2ecf50ce3b1401c6e9519cf5c94ed05e28dbba716beb75ed20adafb9c40"
+  },
+  "checkpoint": {
+    "last_full": 242,
+    "latest_implementation": 242,
+    "latest_targeted": 233,
+    "implementation_slices_since_full": 0,
+    "total_cells": 1692,
+    "correct": 1651,
+    "unresolved": 41,
+    "resolved_histories": 16,
+    "fresh_corpus_cells": 0,
+    "inherited_corpus_cells": 1692,
+    "support_delta": 0
+  },
+  "provenance": {
+    "before": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/identity-before.json",
+      "sha256": "ec220abdf0b19234a36bd0d55829068d76b14c2c09e1b30c03b5e1e6ed517c96"
+    },
+    "after": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/identity-after.json",
+      "sha256": "ec220abdf0b19234a36bd0d55829068d76b14c2c09e1b30c03b5e1e6ed517c96"
+    },
+    "primary_sources": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/primary-source-sha256.json",
+      "sha256": "8adf4c84936f4c3ce9da164b38cedb96b95c1b01c018f20aed80cc8f2b930ad5"
+    },
+    "environment": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/environment.txt",
+      "sha256": "821d20942aec2661c98ef299afb4dc30939540549d53da694c103e93d6857dcb"
+    },
+    "smoke": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/runtime/results.json",
+      "sha256": "51ac55ed2f10e84165b82c90b677a7235ddc6aaa7f7c724c9974e9690e3ddb60"
+    }
+  },
+  "fresh_gates": {
+    "smoke_passed": 4,
+    "smoke_executed": 4,
+    "qualified_runtime_launches": 14,
+    "qualified_ptx_assemblies": 14,
+    "raw_llvm_controls": 8,
+    "public_cuda_nvrtc_controls": 4,
+    "public_slang_nvrtc_controls": 2,
+    "producer_observation_launches": 1,
+    "producer_observation_words": 41,
+    "producer_observation_is_correctness_pass": false
+  },
+  "inputs": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/frozen-inputs.json",
+    "sha256": "1dab38ebffce2a0af62fb4b973797debab55610642ea041bed53641cbd203b9e"
+  },
+  "controls": [
+    {
+      "format": "e4m3",
+      "family": "transport",
+      "mode": "nvrtc-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport.expected.bin",
+        "sha256": "aa737ef1b6a2124451f66880992a7c8153d9cf2c10af9e95dd30e5f1c3ae1668"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-nvrtc-o3.output.bin",
+        "sha256": "aa737ef1b6a2124451f66880992a7c8153d9cf2c10af9e95dd30e5f1c3ae1668"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-nvrtc-o3.ptx",
+        "sha256": "2826e0195108a337ccf06e1852381dacabef94ac5931adbb08880e07304df708"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-nvrtc-o3.cubin",
+        "sha256": "2cfd19c8d2bcb3e455329840ce246ae47d1a4b8a9d210de16de3c95f7bebd165"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [],
+        "7": []
+      }
+    },
+    {
+      "format": "e4m3",
+      "family": "transport",
+      "mode": "nvvm-o0",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport.expected.bin",
+        "sha256": "aa737ef1b6a2124451f66880992a7c8153d9cf2c10af9e95dd30e5f1c3ae1668"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-o0.output.bin",
+        "sha256": "aa737ef1b6a2124451f66880992a7c8153d9cf2c10af9e95dd30e5f1c3ae1668"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-o0.ptx",
+        "sha256": "b87a16041963730745206165e1e2b7538684a8740f2bc23ceae302617c7a6a80"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-o0.cubin",
+        "sha256": "f995dde43827eb8ea1548a2f8bf8cd3a53bb57d4e43f3580150761b215639afc"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [],
+        "7": []
+      }
+    },
+    {
+      "format": "e4m3",
+      "family": "transport",
+      "mode": "nvvm-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport.expected.bin",
+        "sha256": "aa737ef1b6a2124451f66880992a7c8153d9cf2c10af9e95dd30e5f1c3ae1668"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-o3.output.bin",
+        "sha256": "aa737ef1b6a2124451f66880992a7c8153d9cf2c10af9e95dd30e5f1c3ae1668"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-o3.ptx",
+        "sha256": "861b4f838cac75b75a560eb35753b86309f8b81250dbeb25fa75d06060a75591"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-transport-o3.cubin",
+        "sha256": "7e1246d0c393521fb03da8de18795add192e6d9d05ae274a9ad82de9ccd6281e"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [],
+        "7": []
+      }
+    },
+    {
+      "format": "e4m3",
+      "family": "casts",
+      "mode": "nvrtc-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts.expected.bin",
+        "sha256": "3887e8eff41d950d8fe96f1cb2afa41eed3d6b30572992dd2124c2f88d215a3e"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-nvrtc-o3.output.bin",
+        "sha256": "fa376155af1dc243ef030cedb3feb9f691e26ea4b0b37a30411c6041b5798827"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-nvrtc-o3.ptx",
+        "sha256": "d3f5c6c3e9428585890299501ff34495fd1adb83ff7d59c054074229c85ee271"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-nvrtc-o3.cubin",
+        "sha256": "96f8feceb72af187688996e0703a9b239427b805712f157e0f00644cacd0d0d3"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [2147483647],
+        "7": [127]
+      }
+    },
+    {
+      "format": "e4m3",
+      "family": "casts",
+      "mode": "nvvm-o0",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts.expected.bin",
+        "sha256": "3887e8eff41d950d8fe96f1cb2afa41eed3d6b30572992dd2124c2f88d215a3e"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-o0.output.bin",
+        "sha256": "933976a7eb97adc222a9c169bed68239f0cebd664df44f85cf2f1376633bdaac"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-o0.ptx",
+        "sha256": "5ce9a42ecde9cf01d5b08b539b7a7d7e1dd48de61c7b69da300659e9fa11cac3"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-o0.cubin",
+        "sha256": "65eac3e40af6be9ba0eff1bab8b56c2c19c68e1a8f05d30fe1f0712eed5b9761"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [2143289344],
+        "7": [127]
+      }
+    },
+    {
+      "format": "e4m3",
+      "family": "casts",
+      "mode": "nvvm-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts.expected.bin",
+        "sha256": "3887e8eff41d950d8fe96f1cb2afa41eed3d6b30572992dd2124c2f88d215a3e"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-o3.output.bin",
+        "sha256": "933976a7eb97adc222a9c169bed68239f0cebd664df44f85cf2f1376633bdaac"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-o3.ptx",
+        "sha256": "9503f76505b112d02b2fa360daca56ea18d840536cb445278dcc9cd9be1836ef"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts-o3.cubin",
+        "sha256": "ad8cf2bf23220b3d271177b9d178ed9399217167114f158561a93c59276d3d67"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [2143289344],
+        "7": [127]
+      }
+    },
+    {
+      "format": "e5m2",
+      "family": "transport",
+      "mode": "nvrtc-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport.expected.bin",
+        "sha256": "82991e20757d5046134ae3a0428e0b6b966136162b6c92b99e929e8b529f2a31"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-nvrtc-o3.output.bin",
+        "sha256": "82991e20757d5046134ae3a0428e0b6b966136162b6c92b99e929e8b529f2a31"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-nvrtc-o3.ptx",
+        "sha256": "df344f6c436b38541039b21f516fe9717b9fe9ce20372f14dbd39ec9e3bdd9e0"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-nvrtc-o3.cubin",
+        "sha256": "6f9e29d94a26567ec25c0729e7b4a8d85fb645589bb97f09102397589ce2a863"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [],
+        "7": []
+      }
+    },
+    {
+      "format": "e5m2",
+      "family": "transport",
+      "mode": "nvvm-o0",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport.expected.bin",
+        "sha256": "82991e20757d5046134ae3a0428e0b6b966136162b6c92b99e929e8b529f2a31"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-o0.output.bin",
+        "sha256": "82991e20757d5046134ae3a0428e0b6b966136162b6c92b99e929e8b529f2a31"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-o0.ptx",
+        "sha256": "b87a16041963730745206165e1e2b7538684a8740f2bc23ceae302617c7a6a80"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-o0.cubin",
+        "sha256": "f995dde43827eb8ea1548a2f8bf8cd3a53bb57d4e43f3580150761b215639afc"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [],
+        "7": []
+      }
+    },
+    {
+      "format": "e5m2",
+      "family": "transport",
+      "mode": "nvvm-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport.expected.bin",
+        "sha256": "82991e20757d5046134ae3a0428e0b6b966136162b6c92b99e929e8b529f2a31"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-o3.output.bin",
+        "sha256": "82991e20757d5046134ae3a0428e0b6b966136162b6c92b99e929e8b529f2a31"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-o3.ptx",
+        "sha256": "861b4f838cac75b75a560eb35753b86309f8b81250dbeb25fa75d06060a75591"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-transport-o3.cubin",
+        "sha256": "7e1246d0c393521fb03da8de18795add192e6d9d05ae274a9ad82de9ccd6281e"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [],
+        "7": []
+      }
+    },
+    {
+      "format": "e5m2",
+      "family": "casts",
+      "mode": "nvrtc-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts.expected.bin",
+        "sha256": "dbc07a949a65a6277772da6f756340521b8bf3135add8f4392648c4b6b32899f"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-nvrtc-o3.output.bin",
+        "sha256": "6cf9747dfa6ba231359eb7ed0abe58218de70c60767deeef83a944eda319321b"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-nvrtc-o3.ptx",
+        "sha256": "b66d48a1c1dcb58e536ff241650627710e21a7d959a579c0fa9fdab139fe65e5"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-nvrtc-o3.cubin",
+        "sha256": "8a6a51a6d503838c842058645a14db45b92d1af191f4439577dc461feb68b1ac"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [2147483647],
+        "7": [127]
+      }
+    },
+    {
+      "format": "e5m2",
+      "family": "casts",
+      "mode": "nvvm-o0",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts.expected.bin",
+        "sha256": "dbc07a949a65a6277772da6f756340521b8bf3135add8f4392648c4b6b32899f"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-o0.output.bin",
+        "sha256": "d44d382c191ba4400d1ca75f7eb45edca3a56c9e9e38cb16112f3aff72a7e80c"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-o0.ptx",
+        "sha256": "312feba01dcb834922442718509825f8d417ba88b6ae839c0ee5252c8e8b6d12"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-o0.cubin",
+        "sha256": "ae2ab032e8e1cef0a0585a54fc9feb2ef2099fa56033a7a1bd89654dc669fd67"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [2143289344],
+        "7": [127]
+      }
+    },
+    {
+      "format": "e5m2",
+      "family": "casts",
+      "mode": "nvvm-o3",
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts.expected.bin",
+        "sha256": "dbc07a949a65a6277772da6f756340521b8bf3135add8f4392648c4b6b32899f"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-o3.output.bin",
+        "sha256": "d44d382c191ba4400d1ca75f7eb45edca3a56c9e9e38cb16112f3aff72a7e80c"
+      },
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-o3.ptx",
+        "sha256": "edafeccfcba8eac70208d4f19bc410049b1f8b98d492638de930db9d56286451"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts-o3.cubin",
+        "sha256": "742d45cfe0f2609e6bd6be2d993c63e94fbb16d4e6beb5f2fea83d99841df58a"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": [2143289344],
+        "7": [127]
+      }
+    },
+    {
+      "format": "e4m3",
+      "family": "casts",
+      "mode": "source-nvrtc-o3",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.ptx",
+        "-dump-ir"
+      ],
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.ptx",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.cubin"
+      ],
+      "return_code": 0,
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.ptx",
+        "sha256": "9f05d1766f116e33cf5f2fd1ecd35f215c320a8b40bb8d412f44ca6830e2f6a5"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.cubin",
+        "sha256": "3ceb117a9f209b2e12deba0d1e9099b43c8c1ca15e359bc835bc7339d244d7a4"
+      },
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3.input.bin",
+        "sha256": "df1bec08a33831a586748ca255565c99b82deb442789ad94adbc87b5f90a63e3"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e4m3-casts.expected.bin",
+        "sha256": "3887e8eff41d950d8fe96f1cb2afa41eed3d6b30572992dd2124c2f88d215a3e"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e4m3.output.bin",
+        "sha256": "fa376155af1dc243ef030cedb3feb9f691e26ea4b0b37a30411c6041b5798827"
+      },
+      "records": 1536,
+      "words": 12289,
+      "active_words": 3072,
+      "preserved_words": 9217,
+      "mismatch_count": 0,
+      "mismatches": []
+    },
+    {
+      "format": "e5m2",
+      "family": "casts",
+      "mode": "source-nvrtc-o3",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.ptx",
+        "-dump-ir"
+      ],
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.ptx",
+        "-o",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.cubin"
+      ],
+      "return_code": 0,
+      "ptx": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.ptx",
+        "sha256": "9f83fa6c6db450e83664e2bf08c91bc0cfe38b6f71d5aca459038a2bdad69fb8"
+      },
+      "cubin": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.cubin",
+        "sha256": "f4dc5f68eb024bec1f2d5fd0a3f8b750fa6ada09608dc9d8acbdccaf49317a70"
+      },
+      "input": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2.input.bin",
+        "sha256": "5586d4871bf62369e4eefe72aea9cb9bafd1e6da44e845e4905b6d004f1da867"
+      },
+      "expected": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/e5m2-casts.expected.bin",
+        "sha256": "dbc07a949a65a6277772da6f756340521b8bf3135add8f4392648c4b6b32899f"
+      },
+      "output": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/source-replay/e5m2.output.bin",
+        "sha256": "6cf9747dfa6ba231359eb7ed0abe58218de70c60767deeef83a944eda319321b"
+      },
+      "records": 1500,
+      "words": 12001,
+      "active_words": 3000,
+      "preserved_words": 9001,
+      "mismatch_count": 0,
+      "mismatches": []
+    }
+  ],
+  "runtime_totals": {
+    "words": 170030,
+    "active_words": 42504,
+    "preserved_words": 127526,
+    "mismatch_count": 0
+  },
+  "constant_producer_findings": {
+    "evidence": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/constant-probe/results.json",
+      "sha256": "bb46a7b6bceca3859d09246e77ad9099b2c3f4cec7d3697d8f2f757a7444efcf"
+    },
+    "actual_shared_helpers": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/constant-probe/shared-helpers.txt",
+      "sha256": "c7b77788cf5ab06073d9bf38c3bd1709ff0d738db7702d24888699b4d536cd0a"
+    },
+    "classification": "pre-existing finite/subnormal producer defects, separately recorded overflow-policy divergence",
+    "finite_counterexamples": [
+      "E4M3 literal256\u2192448 vsdynamic256",
+      "E4M3 literal2^-9\u2192448 vsdynamic2^-9",
+      "E5M2 literal2^-16\u2192Inf (byte construction saturates57344) vsdynamic2^-16"
+    ],
+    "overflow_policy": "Existing unit tests require shared E4NaN/E5Inf; CUDA runtime SATFINITE differs; no policy changed"
+  },
+  "semantic_contract": {
+    "physical_type": "i8",
+    "format_distinct": true,
+    "internal_helper_only": true,
+    "widening": "exact finite bits and signed zeros; E5 infinities; NaN classification-only",
+    "narrowing": "Float32 RNE SATFINITE; signed zeros; NaN classification-only",
+    "runtime_canonical_source": "FloatCast and equal-width scalar BitCast",
+    "qualified_target": 80,
+    "integer_half_double": false,
+    "storage_aggregate_vector_external_abi": false,
+    "literal_general_contract_qualified": false
+  },
+  "inherited_selected_cells": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/inherited-selected-cells.json",
+    "sha256": "e375c4ffbe909ff90f1e5e027a94683ca94288662582ef59bddd8392d11d34e5"
+  },
+  "first_attempt": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/attempt1-missing-layout/compile-results.json",
+    "sha256": "60980c6656d1613251e21101fc183762ef269ad1b493eecea2229b6511218a64"
+  },
+  "worker_audit": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/audit.json",
+    "sha256": "cf0c15f265959a021a3dec1618a00b5b303e33a82f1876e85f50576b93eeed6e"
+  },
+  "preservation": {
+    "status": "passed",
+    "source_paths": 40,
+    "artifacts": 12,
+    "runtime_inputs": 560,
+    "immutable_indices": {
+      "slice-238-bf16": {
+        "index": {
+          "path": "build/nvvm-loop/slice-238-bf16/artifact-index.json",
+          "sha256": "372a181d3e1d7da267d236da46882057a97fcf4d8d54b44b94b28e083fc98d0d"
+        },
+        "checked": 117
+      },
+      "slice-240-bf16-vectors": {
+        "index": {
+          "path": "build/nvvm-loop/slice-240-bf16-vectors/artifact-index.json",
+          "sha256": "b483a32dbc061dec5506f2bd02d093bc236eace18e4f14c97e16a8a5443fe0e5"
+        },
+        "checked": 132
+      },
+      "slice-241-after": {
+        "index": {
+          "path": "build/nvvm-loop/slice-241-after/artifact-index.json",
+          "sha256": "2da9b00656e34d3a18ad327e28e0f190051285984230fafe8fb079c5fa0a17bf"
+        },
+        "checked": 88
+      },
+      "slice-242-after": {
+        "index": {
+          "path": "build/nvvm-loop/slice-242-after/artifact-index.json",
+          "sha256": "9b41e3a4da4251b4bafd3987c4b2b7bb1b2058e8d680b93e1a433c9cef119c1e"
+        },
+        "checked": 129
+      }
+    },
+    "qualified_controls": 14,
+    "complete_words": 170030,
+    "active_words": 42504,
+    "preserved_words": 127526,
+    "mismatches": 0,
+    "compiler_builds": 0,
+    "production_edits": 0,
+    "abi_changes": 0,
+    "new_corpus_identities": 0,
+    "support_delta": 0,
+    "gpu_loss": false
+  },
+  "commands": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/commands.json",
+    "sha256": "b7975af03a57b41ced9d75ed986a6d300fc99322f478c3e6172568594303b769"
+  },
+  "raw_artifact_index": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-243-fp8/artifact-index.json",
+    "sha256": "8a03bd78d1b5f4d344b1a43b633b165b37a4c3729cbdb45507505fea645c0dab"
+  },
+  "raw_artifact_count": 180,
+  "handoff": {
+    "next_action": "Repair finite/subnormal shared FP8 producer behavior with existing overflow policy preserved before general backend admission",
+    "later_safe_boundary": "format-distinct scalar transport, already-canonical literals and bitcasts; separate CUDA Float32 cast descriptor after producer contract review",
+    "full_checkpoint_required_for_production": true,
+    "material_runtime": "deferred absent bindings/textures/LUT/input/oracle; support/correctness cadence override"
+  },
+  "limitations": [
+    "Raw LLVM success is not direct-Slang production admission",
+    "General literal contract disproven on unchanged compiler",
+    "NaN payload/sign unqualified",
+    "No performance claim",
+    "No exact integer/Half/double constructors, arithmetic, vector/aggregate/storage or external ABI"
+  ],
+  "parent_acceptance": {
+    "status": "accepted",
+    "reviewer": "parent",
+    "summary": "Independent source/recipe review, 66 canonicalized compact references before parent artifacts, 180 indexed artifacts, 19 primary sources, all baseline identities and prior indices, full grid and 170030 runtime words; separate 41-word pre-existing producer observation verified.",
+    "evidence": [
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-oracle-core.py",
+        "sha256": "9f745fb9857a31647d6a5d155aad27b2d9095167d1675f66d188c4ea5f8b388b"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-grid-audit.py",
+        "sha256": "8c16e07085157d242c98d2f66ca600abcc02fd14a1d68cbe683d3f0e7855b797"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-grid-audit.json",
+        "sha256": "c38a006a3a4c9bca1f28e41be54a49a5df855a26fd8a23e836b05ea492b860b4"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-runtime-audit.py",
+        "sha256": "1169a96394ef8828bdf07b6f6097a24693dd2274205c40b73efa5c6b48e2827d"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-runtime-audit.json",
+        "sha256": "1221d36081bab05631340678d9319d03af777631b14b0f84bb55c59f9cbdc3cf"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-producer-audit.py",
+        "sha256": "19964f576691fb44e24ab1117fb333293d9242a336f956112d8be02c5367efd1"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-producer-audit.json",
+        "sha256": "d685355fa1e7d881c13a2ec9fadcbf54badfd9d60f22501aebbe09653b9db877"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-audit.py",
+        "sha256": "e9c70a52c4203adcf597680a27d2bfb95d0edb5c788693f069c7445580d1222a"
+      },
+      {
+        "path": "build/nvvm-loop/slice-243-fp8/parent-acceptance-audit.json",
+        "sha256": "b7f373ac992e1aa6055876d23ceeb952713d50fe98d36c3ebde6c07c15aeea01"
+      }
+    ]
+  }
+}
