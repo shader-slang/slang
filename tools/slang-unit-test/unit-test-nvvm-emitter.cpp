@@ -8952,6 +8952,129 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter:"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
+        // Clocks admit only their exact zero-operand scalar contracts and canonical bodies.
+        {R"SLANG(
+            int probe()
+            {
+                __intrinsic_asm "clock";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock, signature="},
+        {R"SLANG(
+            uint64_t probe()
+            {
+                __intrinsic_asm "clock";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock, signature="},
+        {R"SLANG(
+            float probe()
+            {
+                __intrinsic_asm "clock";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock, signature="},
+        {R"SLANG(
+            uint2 probe()
+            {
+                __intrinsic_asm "clock";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe().x);
+            }
+        )SLANG",
+         "GenericAsm assembly=clock, signature="},
+        {R"SLANG(
+            uint probe(uint p)
+            {
+                __intrinsic_asm "clock";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe(1));
+            }
+        )SLANG",
+         "GenericAsm assembly=clock, signature="},
+        {R"SLANG(
+            uint64_t probe()
+            {
+                __intrinsic_asm "clock64";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock64, signature="},
+        {R"SLANG(
+            int probe()
+            {
+                __intrinsic_asm "clock64";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock64, signature="},
+        {R"SLANG(
+            int64_t probe(uint p)
+            {
+                __intrinsic_asm "clock64";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe(1));
+            }
+        )SLANG",
+         "GenericAsm assembly=clock64, signature="},
+        {R"SLANG(
+            uint probe()
+            {
+                GroupMemoryBarrierWithGroupSync();
+                __intrinsic_asm "clock";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock, signature="},
+        {R"SLANG(
+            int64_t probe()
+            {
+                GroupMemoryBarrierWithGroupSync();
+                __intrinsic_asm "clock64";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                data[cudaThreadIdx().x] = uint(probe());
+            }
+        )SLANG",
+         "GenericAsm assembly=clock64, signature="},
         // Quad helper ownership must not suppress standalone or noncanonical requirements.
         {R"SLANG(
             [CUDAKernel]

@@ -3315,6 +3315,158 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsHardwareActiveMask)
     }
 }
 
+// Counter observations must remain distinct and side-effecting in both LLVM dialects.
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsClock)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const SlangNVVMValueOperationDesc operation = {
+        SLANG_NVVM_VALUE_OP_CLOCK,
+        NVVMSemantics::kUnsignedI32,
+        nullptr,
+        0,
+    };
+    SLANG_CHECK_ABORT(builder.supportsValueOperation(operation));
+    SlangNVVMValueOperationDesc unsupported = operation;
+    unsupported.resultType = NVVMSemantics::kSignedI32;
+    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+    unsupported = operation;
+    unsupported.operandTypes = &NVVMSemantics::kUnsignedI32;
+    unsupported.operandCount = 1;
+    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("live-clock"), scope.module)));
+    SlangNVVMTypeHandle integerType = nullptr;
+    SlangNVVMTypeHandle functionType = nullptr;
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, integerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionType(scope.module, integerType, nullptr, 0, functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("readClock"),
+        function)));
+    SlangNVVMBlockHandle block = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+    SlangNVVMValueHandle invalid = nullptr;
+    SLANG_CHECK(
+        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+    SLANG_CHECK(invalid == nullptr);
+    unsupported = operation;
+    unsupported.resultType = NVVMSemantics::kSignedI32;
+    SLANG_CHECK(
+        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+    SLANG_CHECK(invalid == nullptr);
+    SlangNVVMValueHandle first = nullptr;
+    SlangNVVMValueHandle second = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, first)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, second)));
+    SLANG_CHECK(first != second);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, second)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(
+            _countOccurrences(
+                text.getUnownedSlice(),
+                toSlice("asm sideeffect \"mov.u32 $0, %clock;\", \"=r\"()")) == 2);
+        SLANG_CHECK(text.indexOf("convergent") < 0);
+        SLANG_CHECK(text.indexOf("llvm.nvvm.read.ptx.sreg.clock") < 0);
+    }
+}
+
+// Counter observations must remain distinct and side-effecting in both LLVM dialects.
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsClock64)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const SlangNVVMValueOperationDesc operation = {
+        SLANG_NVVM_VALUE_OP_CLOCK64,
+        NVVMSemantics::kSignedI64,
+        nullptr,
+        0,
+    };
+    SLANG_CHECK_ABORT(builder.supportsValueOperation(operation));
+    SlangNVVMValueOperationDesc unsupported = operation;
+    unsupported.resultType = NVVMSemantics::kUnsignedI64;
+    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+    unsupported = operation;
+    unsupported.operandTypes = &NVVMSemantics::kUnsignedI32;
+    unsupported.operandCount = 1;
+    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("live-clock"), scope.module)));
+    SlangNVVMTypeHandle integerType = nullptr;
+    SlangNVVMTypeHandle functionType = nullptr;
+    SlangNVVMValueHandle function = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, integerType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionType(scope.module, integerType, nullptr, 0, functionType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+        scope.module,
+        functionType,
+        SLANG_NVVM_LINKAGE_EXTERNAL,
+        SLANG_NVVM_FUNCTION_FLAG_NONE,
+        toSlice("readClock"),
+        function)));
+    SlangNVVMBlockHandle block = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+    SlangNVVMValueHandle invalid = nullptr;
+    SLANG_CHECK(
+        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+    SLANG_CHECK(invalid == nullptr);
+    unsupported = operation;
+    unsupported.resultType = NVVMSemantics::kUnsignedI64;
+    SLANG_CHECK(
+        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+    SLANG_CHECK(invalid == nullptr);
+    SlangNVVMValueHandle first = nullptr;
+    SlangNVVMValueHandle second = nullptr;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, first)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, second)));
+    SLANG_CHECK(first != second);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, second)));
+
+    const SlangNVVMSerializationFormat formats[] = {
+        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+    };
+    for (SlangNVVMSerializationFormat format : formats)
+    {
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(
+            _countOccurrences(
+                text.getUnownedSlice(),
+                toSlice("asm sideeffect \"mov.u64 $0, %clock64;\", \"=l\"()")) == 2);
+        SLANG_CHECK(text.indexOf("convergent") < 0);
+        SLANG_CHECK(text.indexOf("llvm.nvvm.read.ptx.sreg.clock") < 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveActiveMaskKernel)
 {
     NVVMIRBuilder builder;

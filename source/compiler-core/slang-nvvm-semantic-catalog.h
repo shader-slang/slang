@@ -567,6 +567,20 @@ inline constexpr CatalogEntry kCatalog[] = {
         "Float64 wave read-lane-at intrinsic",
     },
     {
+        SLANG_NVVM_VALUE_OP_CLOCK,
+        kUnsignedI32,
+        {kNoType, kNoType, kNoType},
+        0,
+        "CUDA clock counter read",
+    },
+    {
+        SLANG_NVVM_VALUE_OP_CLOCK64,
+        kSignedI64,
+        {kNoType, kNoType, kNoType},
+        0,
+        "CUDA clock64 counter read",
+    },
+    {
         SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},

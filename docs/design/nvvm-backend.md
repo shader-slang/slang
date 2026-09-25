@@ -8208,7 +8208,7 @@ contract and [report235](../../issue-nvvm-backend/report.slice-235-quad-helpers.
 negative boundaries and final-source validation. Partial source quads and unmatched shuffle
 sequences remain outside the defined test oracle.
 
-### CUDA clock observations (slice 236 research)
+### CUDA clock observations (research236 and implementation237)
 
 CUDA `getRealtimeClockLow` produces GenericAsm `clock` with `uint()`, while
 `__cudaCppGetRealtimeClock` produces `clock64` with `int64_t()`. The public `uint2` wrapper
@@ -8219,13 +8219,18 @@ wall-time, frequency or memory-fence promises. `%clock` is the low 32 bits of `%
 On CUDA12.9 libNVVM, direct LLVM clock intrinsic declarations common consecutive reads even with
 LLVM14's `inaccessiblememonly nounwind` attributes, and O3 hoists loop observations. Successful
 verification and PTX assembly do not establish the live-read contract. Side-effecting inline PTX
-`mov.u32`/`mov.u64` controls retain distinct observations through the tested pipeline. Future typed
-provider operations must preserve those effects; zero operands do not imply purity. No legacy
-attribute rewrite or source-library change was shown necessary.
+`mov.u32`/`mov.u64` controls retain distinct observations through the tested pipeline. ABI37 adds
+exact zero-operand unsigned32 CLOCK and signed64 CLOCK64 operations to the shared semantic catalog.
+The existing GenericAsm spelling resolver enforces canonical whole-body signatures, and the provider
+emits side-effecting PTX without convergence or fence semantics. Zero operands do not imply purity.
+No legacy attribute rewrite, frontend or source-library change is needed.
 
 The original frozen clock expression cancels observed ticks, so use independent deterministic
 work, low-word bracketing, bounded modular ordering/progress and input/sentinel preservation. Do
 not compare exact ticks between launches. Research236 retains 36 successful source/control
 launches, 18 intrinsic counterexamples and separate signed/unsigned word-reconstruction coverage.
 See [the report](../../issue-nvvm-backend/report.slice-236-clock.md) for limitations and the precise
-implementation handoff. Provider implementation requires a full checkpoint.
+implementation handoff. [Implementation237](../../issue-nvvm-backend/report.slice-237-clock.md)
+adds strict invalid-contract/serialization units and a registered independently expected fixture.
+Unchanged research buffers and relational predicates replay through public NVRTC/direct O0/O3 and
+PTX controls; timestamp equality is never an oracle. The provider change forces a full checkpoint.

@@ -1817,6 +1817,26 @@ static SlangResult _emitIntrinsic(
         operation.operandTypes[1].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
     switch (operation.operation)
     {
+    case SLANG_NVVM_VALUE_OP_CLOCK:
+    case SLANG_NVVM_VALUE_OP_CLOCK64:
+        {
+            if (argumentCount != 0)
+                return SLANG_E_INVALID_ARG;
+            // Preserve every observation of the changing per-SM counter. Consider two clock64()
+            // reads around clock(): libNVVM 12.9 commons LLVM clock intrinsics even at O0, and
+            // hoists loop reads at O3. Side-effecting PTX retains these observations without
+            // promising a memory fence, synchronized lanes, or cross-SM time.
+            const bool is64Bit = operation.operation == SLANG_NVVM_VALUE_OP_CLOCK64;
+            llvm::Type* resultType = is64Bit ? llvm::Type::getInt64Ty(state->context) : int32Type;
+            llvm::FunctionType* functionType = llvm::FunctionType::get(resultType, false);
+            llvm::InlineAsm* assembly = llvm::InlineAsm::get(
+                functionType,
+                is64Bit ? "mov.u64 $0, %clock64;" : "mov.u32 $0, %clock;",
+                is64Bit ? "=l" : "=r",
+                true);
+            *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(assembly));
+            return SLANG_OK;
+        }
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
         {
             if (argumentCount != 0)
@@ -3652,6 +3672,8 @@ static SlangResult _emitCatalogOperation(
         return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_gl, outValue);
     case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
         return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_cta, outValue);
+    case SLANG_NVVM_VALUE_OP_CLOCK:
+    case SLANG_NVVM_VALUE_OP_CLOCK64:
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
