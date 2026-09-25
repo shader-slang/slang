@@ -30,6 +30,9 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical IEEE 16-bit float accepted as a direct NVVM value.
 bool isNVVMFloat16Type(IRInst* type);
 
+/// Returns whether `type` is canonical scalar BF16, distinct from every IEEE format.
+bool isNVVMBFloat16Type(IRInst* type);
+
 /// Returns whether `type` is the canonical IEEE 64-bit float accepted as a direct NVVM value.
 bool isNVVMFloat64Type(IRInst* type);
 
@@ -377,6 +380,7 @@ struct NVVMTypeInfo
     bool isInteger = false;
     bool isFloatingPoint = false;
     bool isFloat16 = false;
+    bool isBFloat16 = false;
     bool isFloat32 = false;
     bool isBool = false;
     bool isHelperValue = false;

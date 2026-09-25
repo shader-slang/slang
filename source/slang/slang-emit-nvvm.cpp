@@ -1171,7 +1171,8 @@ bool _hasNVVMCompatibleHelperValueLayout(CodeGenContext* codeGenContext, IRType*
     }
     if (asNVVMSupportedDeviceHelperValuePointerType(type))
         return true;
-    if (!isNVVMSupportedNumericValueType(type) && !asNVVMSupportedDescriptorHandleType(type))
+    if (!isNVVMSupportedNumericValueType(type) && !isNVVMBFloat16Type(type) &&
+        !asNVVMSupportedDescriptorHandleType(type))
         return false;
 
     // Structured-buffer and aggregate-storage pointer arithmetic use the provider type's physical
@@ -2527,8 +2528,10 @@ IRBoolLit* _asExecutableBoolConstant(IRInst* value)
 IRFloatLit* _asExecutableFloatingPointConstant(IRInst* value)
 {
     auto floatLit = as<IRFloatLit>(value);
-    return floatLit && isNVVMSupportedFloatingPointScalarType(floatLit->getDataType()) ? floatLit
-                                                                                       : nullptr;
+    return floatLit && (isNVVMSupportedFloatingPointScalarType(floatLit->getDataType()) ||
+                        isNVVMBFloat16Type(floatLit->getDataType()))
+               ? floatLit
+               : nullptr;
 }
 
 // Recognizes one finite module-owned constant value tree. Consider this example:
@@ -3439,6 +3442,8 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
             outType = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, elementCount};
         }
     }
+    else if (isNVVMBFloat16Type(type))
+        outType = NVVMSemantics::kBFloat16;
     else if (isNVVMBoolType(type))
         outType = NVVMSemantics::kBool;
     else
@@ -7453,7 +7458,8 @@ SlangResult _validateFloatingPointValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (!value || !isNVVMSupportedFloatingPointScalarType(value->getDataType()))
+    if (!value || (!isNVVMSupportedFloatingPointScalarType(value->getDataType()) &&
+                   !isNVVMBFloat16Type(value->getDataType())))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("floating-point value"));
 
     if (_asExecutableFloatingPointConstant(value))
@@ -7481,7 +7487,8 @@ SlangResult _validateScalarValue(
             availableValues,
             dominatorTree);
     }
-    if (value && isNVVMSupportedFloatingPointScalarType(value->getDataType()))
+    if (value && (isNVVMSupportedFloatingPointScalarType(value->getDataType()) ||
+                  isNVVMBFloat16Type(value->getDataType())))
     {
         return _validateFloatingPointValue(
             codeGenContext,
@@ -7516,13 +7523,13 @@ SlangResult _validateSelectedValue(
         return SLANG_OK;
     IRType* valueType = value ? value->getDataType() : nullptr;
     const bool requiresAvailability =
-        valueType &&
-        (asNVVMSupportedValueVectorType(valueType) ||
-         ((as<IRArrayType>(valueType) || as<IRStructType>(valueType)) &&
-          isNVVMSupportedStructuredBufferStorageType(valueType)) ||
-         (_getNVVMExecutableValueAlignment(valueType) &&
-          !isNVVMSupportedIntegerScalarType(valueType) &&
-          !isNVVMSupportedFloatingPointScalarType(valueType) && !isNVVMBoolType(valueType)));
+        valueType && (asNVVMSupportedValueVectorType(valueType) ||
+                      ((as<IRArrayType>(valueType) || as<IRStructType>(valueType)) &&
+                       isNVVMSupportedStructuredBufferStorageType(valueType)) ||
+                      (_getNVVMExecutableValueAlignment(valueType) &&
+                       !isNVVMSupportedIntegerScalarType(valueType) &&
+                       !isNVVMSupportedFloatingPointScalarType(valueType) &&
+                       !isNVVMBFloat16Type(valueType) && !isNVVMBoolType(valueType)));
     if (requiresAvailability)
     {
         return _validateAvailableValue(
@@ -7834,8 +7841,8 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
     NVVMRawBufferType rawBufferType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return as<IRVoidType>(type) || isNVVMSupportedHelperValueType(type) ||
-           asNVVMSupportedResourceStructType(type) ||
+    return as<IRVoidType>(type) || isNVVMBFloat16Type(type) ||
+           isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
            asNVVMSupportedDeviceHelperValuePointerType(type) ||
@@ -7849,7 +7856,8 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
+    return isNVVMBFloat16Type(type) || isNVVMSupportedHelperValueType(type) ||
+           asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
@@ -10673,6 +10681,22 @@ SlangResult _getLoweredNVVMValue(
     SlangNVVMTypeHandle floatingPointType = nullptr;
     SLANG_RETURN_ON_FAIL(
         typeContext.lowerType(floatLit->getDataType(), NVVMTypeUse::Value, floatingPointType));
+    // IRBuilder::getFloatValue already rounded this canonical BF16 literal. Recover its
+    // checked bits with the same core helper; dynamic Float32 narrowing has a separate
+    // target operation and must not impose a new NaN policy on an existing literal.
+    if (isNVVMBFloat16Type(floatLit->getDataType()))
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "canonical BF16 constant bits",
+            builder.getIntegerConstant(
+                module,
+                floatingPointType,
+                FloatToBFloat16(float(floatLit->getValue())),
+                outValue)));
+        valueMap[irValue] = outValue;
+        return SLANG_OK;
+    }
     uint32_t bitWidth = 0;
     SLANG_RELEASE_ASSERT(
         isNVVMSupportedFloatingPointScalarType(floatLit->getDataType(), &bitWidth));

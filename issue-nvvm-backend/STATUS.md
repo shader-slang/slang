@@ -1,111 +1,79 @@
 # NVVM development handoff
 
-Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming the loop.
+Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before resuming the loop.
 
 ## Current state and next action
 
-**Slice 237 is accepted as the latest full checkpoint.** Read the
-[completed plan](plan.slice-237-clock.md), [five-part report](report.slice-237-clock.md),
-[full validation](runtime-validation.slice-237.json) and raw `slice-237-after/audit.json`.
-Exact GenericAsm `clock` uint() and `clock64` int64_t() now select ABI 37 semantic operations.
-The shared catalog enforces signatures and the existing canonical helper resolver owns admission;
-the provider emits side-effecting inline PTX special-register reads. No frontend/library/runner
-change. Invalid types, arity and noncanonical bodies still reject before provider loading.
+**Slice239 is accepted after independent parent review.** Read
+[plan239](plan.slice-239-bf16-scalar.md), [report239](report.slice-239-bf16-scalar.md),
+[full validation239](runtime-validation.slice-239.json) and raw `slice-239-after/audit.json`.
+ABI38 gives scalar BF16 a distinct semantic format with physical i16 values, constants, helper/local
+storage, bit transport and exact SM80 Float32 conversions. No frontend/library/runner changes.
+All IEEE Half classification remains unchanged; integer/Half/double casts, arithmetic, vectors,
+aggregate/resource BF16 storage remain outside this scalar contract.
 
-Independent parent acceptance passes. Latest accepted implementation/full checkpoint: 237;
-latest targeted acceptance: 233; implementation slices since full: zero. Rolling feature history
-is 233 FP16 MIN/MAX, 235 quad helpers and 237 live clocks. No push is authorized.
+Latest accepted implementation/full checkpoint:239; latest targeted acceptance:233. Implementation
+slices since full:zero. Rolling feature history:235 quad helpers,237 clocks,239 scalar BF16.
+Slice239 is research-backed correctness/support work. Material runtime remains deferred because its
+binding/input/oracle contract is absent; its six support cells were freshly reassessed. Research238 and accepted236/237 remain
+immutable. The next slice should separately qualify the canonical BF16 vector transport/FloatCast
+boundary revealed in frozen scalar-bf16, followed by source-ordered dot; do not infer either from
+scalar correctness. Exact integer construction is also separate due measured double rounding.
+The accepted slice is ready for its authorized local commit. No push is authorized.
 
-**Research slice 238 is accepted.** Read its
-[plan](plan.slice-238-bf16.md), [report](report.slice-238-bf16.md) and
-[semantic evidence](semantic-evidence.slice-238.json). All 35 source, 12 artifact and 557 input
-hashes match 237 before/after; fresh smoke 4/4 and the exact scalar-bf16 frozen three cells preserve
-237 outcomes. Six isolated launches pass 1,174,423 independent output checks and 3,531,423
-input/sentinel checks; six SM80 assemblies and scalar/vector layout assertions pass. Native LLVM
-`bfloat` is rejected by this libNVVM parser. Production support and checkpoint cadence are unchanged.
+## Checkpoint and proof
 
-Next action: select a bounded BF16 semantic-format/provider contract and scalar storage/Float32
-conversion slice. Keep BF16 distinct from IEEE half; physical i16 is transport, not semantic type.
-Integer construction has measured double-rounding counterexamples and needs its own exact recipe.
-The frozen workload additionally needs vector bit transport/casts and source-ordered BF16 dot;
-scalar conversion alone must not claim either frozen direct cell. Shared type/provider changes
-require a full checkpoint. Dynamic-dispatch's struct A/FP8, arbitrary prelude text and textures stay
-separate; the matrix mismatch is CUDA's documented target-wide ignored column-major limitation.
-Material runtime bindings, textures/LUT/input and output oracle remain absent; inherit its six
-237 compile/assembly cells without a runtime or performance claim.
+- Frozen452 identities/1356cells selected explicitly from immutable slice195; discovery109 old
+  identities/327cells plus scalar fixture3. Total1686 fresh cells/1643correct/43unresolved/14resolved
+  histories. All1640 old correct cells preserved; no missing/duplicate/extra cells or baseline reset.
+- Compare classification, return code, complete execution counts, diagnostic and canonical shape.
+  Only two original frozen BF16 direct diagnostic texts move to the next valid vector boundary;
+  neither cell is resolved. Their complete prior failure records and all43 first-known/reproduction
+  histories remain, as do all14 resolved histories.
+- Final smoke4, fixture3, units482 plus one existing Windows-only skip, toolkit18, contracts6 and
+  material compile/assembly6 pass. One new real-provider unit checks semantic exclusions and both
+  LLVM dialects; six frontend-valid negatives reject before provider discovery.
+- Readable fixture is frozen from revised old-compiler before-proof: NVRTC passes; both direct modes
+  reject E52017 helper result BFloat16. Preserved compiler library hash verifies accepted237 bytes.
+  Provider had already rebuilt ABI38 but was never discovered for rejected before cells. Do not
+  interpret that mixed setup as ABI38 success. Final fixture adds input-driven branch/phi selection;
+  emitted IR also proves i16 helper args/results and local alloca/load/store alignment2.
+- All73190 accepted research238 records replay through scalar-only public NVRTC/O0/O3 projection and
+  accepted raw-i16 O0/O3 controls. Original inputs/oracles unchanged, columns4/5/6 active,7/8 inactive.
+  Five assemblies and5,855,205 complete words pass; separate before launch also audited. No universal
+  NaN payload claim: narrowing classification, SM80 expansion exact bits. Constants preserve the
+  canonical IR value through the same core helper used by its producer.
 
-## Checkpoints and evidence
+## Unresolved limitations
 
-- [Full 235](runtime-validation.slice-235.json) remains immutable comparison input: 1,680 cells,
-  1,635 correct, 45 unresolved and 12 resolved histories. Research 236 remains accepted and immutable.
-- Full 237 freshly reruns 452 frozen identities/1,356 cells using explicit immutable slice 195
-  selection: 1,343 correct, five infrastructure and eight preflight outcomes. Only original
-  `slang-extension/realtime-clock.slang#cuda-1` direct O0/O3 cells transition to GPU-correct.
-  [Frozen census](census.slice-237.tsv).
-- Discovery freshly reruns 108 old identities/324 cells plus one new fixture/three correct cells:
-  109 identities/327 cells, 297 correct, 22 infrastructure, four mismatch, four preflight outcomes.
-  [Discovery census](discovery-census.slice-237.tsv). Frozen sources and all old oracles are unchanged.
-- Total 1,683 fresh cells/1,640 correct/43 retained failures/14 resolved histories. All 1,680 old
-  cells compare exactly on classification, return code, complete execution counts, diagnostic and
-  canonical shape except the two clock fixes. No missing/extra/duplicate/inherited cells, lost
-  support or baseline reset. The 12 older resolved histories and each newly resolved whole prior
-  failure record remain intact; all 43 unresolved first-known records/reproductions remain.
-- Final-source smoke 4/4 precedes expensive suites; fixture 3/3, units 481/481 plus one existing
-  Windows-only skip, toolkit 18/18, runner contracts 6/6 and material compile/assembly 6/6 pass.
-  Two new real-provider units check wrong-sign/arity query and emission rejection, distinct
-  sideeffect serialization in both LLVM dialects, and no clock-intrinsic/convergence substitution.
-  Ten negative source cases extend the existing pre-provider rejection matrix.
-- Final readable fixture passed NVRTC and rejected direct O0/O3 before production edits; its
-  source/TEST_INPUT never changed afterward. Dynamic 0/2/5/16-round clock order/bracket/progress
-  checks and independent affine expectations pass on final source in all three modes.
-- Research replay runs 60 launches on all 12 unchanged research 236 buffers: public NVRTC/O0/O3
-  and sideeffect-control O0/O3. A separate checker independently evaluates 11,040 clock tuples,
-  66,240 active words, 184,320 total output words, unchanged 5,760 input words and inactive sentinels.
-  Five assemblies pass. No timestamp equality is required; historical intrinsic countermodel
-  failures remain unchanged research evidence. All 241 indexed research artifacts preserve hashes.
+Frozen BF16 vector transport/casts/dot are not supported by this slice. Integer16842753 proves why
+ordinary int→Float32→BF16 is not an exact constructor. Half/double/general BF→integer, arithmetic,
+BF16 aggregates/resources, FP8/dynamic dispatch and arbitrary prelude/texture work remain separate.
+The matrix mismatch remains CUDA's documented target-wide ignored column-major limitation.
+Material6 freshly pass compile/assembly only; bindings/textures/LUT/input/oracle remain absent,
+so no material runtime/performance claim. The source shader is untouched.
 
-## Unresolved failures and limitations
+## Environment and evidence
 
-- Clock observations are nondeterministic per-SM wrapping counters. The bounded modular predicates
-  make no cross-SM synchronization, frequency, wall-time, memory-fence or performance claim. The
-  tests account mathematically for low-word wrap without claiming observed hardware wrap.
-- BF16/FP8/prelude and existing infrastructure/output gaps remain visible among 43 failures. Other
-  arithmetic/bitwise families, matrix prefix and resource contexts remain independent work.
-- Material's six cells are freshly checked compile/assembly support only. Runtime/performance
-  remain blocked by missing bindings/textures/LUT/input/output oracle. Slice 214 batching is opt-in.
+Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CUDA12.9.2,
+NVRTC12.9.86, LLVM14, providerABI38, matching RelWithDebInfo. Use inspected slice-203-env.sh and
+local build skill. Four CPU workers total, unit servers2, sequential suites,30-minute bounds,
+CMAKE_BUILD_PARALLEL_LEVEL=1. Tested base d7732c6ba2e2978811b628ab5740bdd25e9a273d plus recorded patch.
+Compiler SHA256 a6cd5bd057defd8fc896ebd75813d8b7e5737fe33a095e20840fc73b72233412.
+Provider SHA256 cefb3cd3cb44fb0d2c6a201f210ea3c98e1913c2fcac554ea5ad912d6afbcfd7.
+Each final gate matches37 source paths,12 artifacts,558 inputs; all557 old inputs remain exact.
 
-## Environment and final evidence
+Raw roots `build/nvvm-loop/slice-239-before` and `slice-239-after` retain commands, source/IR/PTX,
+complete replay buffers, identities, exact comparisons and audits. Initial unit-negative failure is
+retained under attempt1: two ambiguous frontend probes were removed from the backend matrix;
+provider rejection coverage remains. Final unit-only rebuild and every gate followed correction.
+Incomplete attempt2 was safely stopped for dynamic Select test strengthening, then every final gate
+restarted. Neither incomplete checkpoint is counted as passing evidence.
+No production fallback, source/oracle weakening, edited executing scripts, GPU loss, system change,
+reboot, worker commit or push. Parent independently checks all replay words and full acceptance.
 
-Native Ubuntu 24.04, branch `nvvm-backend`, repository `/home/skallweit/codex/agent-sandbox/slang`.
-L4 SM89, driver 580.126.09, target SM80, CUDA 12.9.2/NVRTC 12.9.86, LLVM 14, provider ABI 37.
-Use matching optimized `build/RelWithDebInfo/{bin,lib}`, the inspected
-`build/nvvm-loop/slice-203-env.sh` and local
-`build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Maximum four CPU workers, two unit
-servers, sequential suites and 30-minute bounds; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
-
-Tested source_commit/source_revision is actual base `cc0982c68365933cbd6b7885e94cc033d3eea566`
-plus recorded patch. Compiler-library SHA256:
-`a89e9b370b03e62a62fe5f6becaab312399d5cec60bac6d75a53ff649a75c19f`.
-Provider SHA256: `dafc5a557ce6f83d358c89956910af9761e352bb2f70f5efc6d5e7bc7f8a89ea`.
-Before compiler/provider remain full 235's `ca34db1a349ae8716785032a0a3b01b3e6cf8455f3137e9358e9d1ad4eca63cf`
-and `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
-
-Each gate captures 35 source paths (all 31 prior paths plus API header/catalog/builder unit/fixture),
-12 artifacts and 557 registered input hashes. All 556 old input hashes remain exact. Raw roots are
-`build/nvvm-loop/slice-237-before` and `slice-237-after`; final-source patch, gates, provenance,
-replay raw buffers, separate checker and complete history/reference audit are retained there.
-Initial formatter invocation lacked the environment tool paths and changed nothing; the proper
-explicit-path formatter then ran, unrelated historical hunks were exactly reversed, and final build
-and every gate ran afterward. No edited executing scripts, incomplete passing gates, GPU loss,
-driver/system change, reboot, worker commit or push.
-
-Parent acceptance verifies 672 unique compact references and 917 unique references including
-research artifacts, all 35 source/12 artifact/557 input hashes, exact old outcomes and histories,
-and every complete clock replay buffer. See `slice-237-after/parent-acceptance-audit.json`.
-Only two old clock cells resolve and three fixture cells are added; full checkpoint 237 resets
-implementation cadence to zero.
-
-Parent research238 acceptance verified 125 unique evidence references, including all 117 indexed
-raw artifacts, unchanged source/artifact/input identities and exact frozen outcomes. A second oracle
-uses upper-word ties-even carry and exact rational nearest-neighbor rounding to check all six
-launches and all 4,705,846 returned words. See `slice-238-bf16/parent-acceptance-audit.json`.
+Worker audit verifies693 compact references and immutable research238117/research236241 artifacts.
+Independent parent acceptance verifies699 unique compact references and1,073 including accepted
+research artifacts, exact outcomes and complete histories, all37 source/12 artifact/558 input hashes,
+and all5,855,205 final replay words. See `slice-239-after/parent-acceptance-audit.json` and
+`parent-oracle-audit.json`. Full checkpoint239 resets implementation cadence to zero.

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 37u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 38u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -97,6 +97,8 @@ extern "C"
 #define SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ((SlangNVVMValueTypeKind)2u)
 #define SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ((SlangNVVMValueTypeKind)3u)
 #define SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ((SlangNVVMValueTypeKind)4u)
+/** Scalar BF16 semantic format, transported as i16; never IEEE half. */
+#define SLANG_NVVM_VALUE_TYPE_BFLOAT16 ((SlangNVVMValueTypeKind)5u)
 
     typedef struct SlangNVVMValueTypeDesc
     {

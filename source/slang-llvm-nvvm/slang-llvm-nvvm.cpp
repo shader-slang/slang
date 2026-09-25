@@ -3709,6 +3709,10 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
             scalarType = llvm::IntegerType::get(state->context, type.bitWidth);
         }
         break;
+    case SLANG_NVVM_VALUE_TYPE_BFLOAT16:
+        if (type.bitWidth == 16 && type.laneCount == 1)
+            scalarType = llvm::Type::getInt16Ty(state->context);
+        break;
     case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
         if (type.bitWidth == 16)
             scalarType = llvm::Type::getHalfTy(state->context);
@@ -4137,6 +4141,26 @@ static SlangResult _emitValueOperationFamily(
         result = operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
                      ? state->builder.CreateFPToSI(llvmOperands[0], resultType)
                      : state->builder.CreateFPToUI(llvmOperands[0], resultType);
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::BFloat16Convert:
+        if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16)
+        {
+            // SM80 narrows once with round-to-nearest-even, including subnormals.
+            auto signature =
+                llvm::FunctionType::get(resultType, {llvmOperands[0]->getType()}, false);
+            auto assembly =
+                llvm::InlineAsm::get(signature, "cvt.rn.bf16.f32 $0, $1;", "=h,f", false);
+            result = state->builder.CreateCall(assembly, {llvmOperands[0]});
+        }
+        else
+        {
+            // CUDA's SM80 BF16 expansion places every payload, including signaling NaNs,
+            // in the high word of Float32. It is bit transport, not integer conversion.
+            auto int32Type = llvm::Type::getInt32Ty(state->context);
+            auto bits = state->builder.CreateZExt(llvmOperands[0], int32Type);
+            bits = state->builder.CreateShl(bits, llvm::ConstantInt::get(int32Type, 16));
+            result = state->builder.CreateBitCast(bits, resultType);
+        }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatConvert:
         result = operation.resultType.bitWidth < operation.operandTypes[0].bitWidth

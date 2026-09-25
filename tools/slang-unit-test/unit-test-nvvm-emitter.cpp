@@ -8880,6 +8880,56 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
+        // Scalar BF16 does not qualify numeric casts, vectors or storage aggregates.
+        {R"SLANG(
+            [noinline] vector<BFloat16,2> pair(BFloat16 x) { return vector<BFloat16,2>(x,x); }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            { outputBuffer[tid.x] = bit_cast<uint>(pair(bit_cast<BFloat16>(uint16_t(tid.x)))); }
+        )SLANG",
+         "helper function result type"},
+        {R"SLANG(
+            struct Payload { BFloat16 value; }
+            [noinline] Payload copy(Payload x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            { Payload p = {bit_cast<BFloat16>(uint16_t(tid.x))}; outputBuffer[tid.x] = uint(bit_cast<uint16_t>(copy(p).value)); }
+        )SLANG",
+         "helper function result type"},
+        {R"SLANG(
+            RWStructuredBuffer<BFloat16> outputBuffer;
+            [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            { outputBuffer[tid.x] = bit_cast<BFloat16>(uint16_t(tid.x)); }
+        )SLANG",
+         "struct field address result"},
+
+        {R"SLANG(
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = uint(bit_cast<uint16_t>(BFloat16(int(tid.x))));
+            }
+        )SLANG",
+         "castIntToFloat"},
+        {R"SLANG(
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = uint(bit_cast<uint16_t>(BFloat16(double(tid.x))));
+            }
+        )SLANG",
+         "floatCast"},
+        {R"SLANG(
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(32, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[tid.x] = uint(bit_cast<uint16_t>(BFloat16(half(tid.x))));
+            }
+        )SLANG",
+         "floatCast"},
         // Additional scalar widths retain exact mask, lane and result/payload contracts.
         {R"SLANG(
             uint64_t malformedShuffle(uint64_t mask, uint64_t value, int lane)

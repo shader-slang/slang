@@ -28,6 +28,7 @@ enum class ValueOperationFamily : uint32_t
     IntegerToFloat,
     FloatToInteger,
     FloatConvert,
+    BFloat16Convert,
     BitReinterpret,
     Select,
 };
@@ -112,6 +113,7 @@ inline constexpr SlangNVVMValueTypeDesc kFloat16 = {
     16,
     1,
 };
+inline constexpr SlangNVVMValueTypeDesc kBFloat16 = {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 1};
 inline constexpr SlangNVVMValueTypeDesc kFloat64 = {
     SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
     64,
@@ -1139,6 +1141,29 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
+    // BF16 shares neither Half arithmetic nor generic integer/float conversion recipes.
+    // Consider BFloat16(asfloat(bits)): the canonical FloatCast narrows exactly once from
+    // Float32. Integer construction cannot use this path because an intermediate Float32
+    // rounding can change the BF16 result (for example, integer 16842753).
+    if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT && desc.operandCount == 1 &&
+        ((areSameType(desc.resultType, kBFloat16) && areSameType(desc.operandTypes[0], kFloat32)) ||
+         (areSameType(desc.resultType, kFloat32) && areSameType(desc.operandTypes[0], kBFloat16))))
+    {
+        outResolution = {ValueOperationFamily::BFloat16Convert, "scalar BF16/Float32 conversion"};
+        return true;
+    }
+    if (desc.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET && desc.operandCount == 1 &&
+        ((areSameType(desc.resultType, kBFloat16) &&
+          (areSameType(desc.operandTypes[0], kUnsignedI16) ||
+           areSameType(desc.operandTypes[0], kSignedI16))) ||
+         (areSameType(desc.operandTypes[0], kBFloat16) &&
+          (areSameType(desc.resultType, kUnsignedI16) ||
+           areSameType(desc.resultType, kSignedI16)))))
+    {
+        outResolution = {ValueOperationFamily::BitReinterpret, "scalar BF16 bit transport"};
+        return true;
+    }
+
     const bool hasBitResult =
         isSelectedIntegerValue(desc.resultType) || isSelectedFloatValue(desc.resultType);
     const bool hasBitOperand =
@@ -1155,9 +1180,9 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool hasSelectedResult = isSelectedBoolValue(desc.resultType) ||
-                                   isSelectedIntegerValue(desc.resultType) ||
-                                   isSelectedFloatValue(desc.resultType);
+    const bool hasSelectedResult =
+        areSameType(desc.resultType, kBFloat16) || isSelectedBoolValue(desc.resultType) ||
+        isSelectedIntegerValue(desc.resultType) || isSelectedFloatValue(desc.resultType);
     if (desc.operation == SLANG_NVVM_VALUE_OP_SELECT && desc.operandCount == 3 &&
         hasSelectedResult && isSelectedBoolValue(desc.operandTypes[0]) &&
         desc.operandTypes[0].laneCount == desc.resultType.laneCount &&

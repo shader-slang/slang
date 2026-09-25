@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-bf16-scalar.slang	0	helper-generic	Scalar BF16 raw bits, Float32 ties/extremes/NaN classification, noinline helpers and mutable local storage with independent expectations.

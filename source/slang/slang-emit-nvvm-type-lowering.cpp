@@ -71,6 +71,11 @@ bool isNVVMFloat16Type(IRInst* type)
     return basicType && basicType->getBaseType() == BaseType::Half;
 }
 
+bool isNVVMBFloat16Type(IRInst* type)
+{
+    return type && type->getOp() == kIROp_BFloat16Type;
+}
+
 bool isNVVMFloat64Type(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -701,6 +706,8 @@ static uint32_t _getNVVMHelperValueAlignment(IRInst* type, HashSet<IRInst*>& act
 
 uint32_t getNVVMHelperValueAlignment(IRInst* type)
 {
+    if (isNVVMBFloat16Type(type))
+        return 2;
     if (!isNVVMSupportedHelperValueType(type))
         return 0;
     HashSet<IRInst*> activeTypes;
@@ -887,7 +894,7 @@ IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType**
                                      pointerType->getOp() == kIROp_BorrowInOutParamType) &&
                                     pointerType->getOperandCount() == 1;
     if (!pointerType || isNVVMSupportedCopyableValueType(valueType) ||
-        !isNVVMSupportedHelperValueType(valueType) ||
+        (!isNVVMSupportedHelperValueType(valueType) && !isNVVMBFloat16Type(valueType)) ||
         (!isPlainLocalPointer && !isMutableParameter) ||
         pointerType->getAddressSpace() != AddressSpace::Generic)
     {
@@ -2247,6 +2254,14 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
+    // Scalar BF16 has a qualified i16 representation in local and helper roles only.
+    // Do not add it to recursive copyable/storage predicates: that would also admit
+    // unqualified vectors, aggregates, device pointers and resources.
+    if (isBFloat16)
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperValue ||
+               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
+               use == NVVMTypeUse::Storage;
+
     switch (use)
     {
     case NVVMTypeUse::EntryPointResult:
@@ -2297,6 +2312,7 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
     info.isFloatingPoint =
         isNVVMSupportedFloatingPointScalarType(type, &info.floatingPointBitWidth);
     info.isFloat16 = info.floatingPointBitWidth == 16;
+    info.isBFloat16 = isNVVMBFloat16Type(type);
     info.isFloat32 = info.floatingPointBitWidth == 32;
     info.isBool = isNVVMBoolType(type);
     info.valueVectorType =
@@ -2720,6 +2736,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 : use == NVVMTypeUse::StructuredBufferStorage ? 8u
                                                               : 1u,
                 outType)));
+    }
+    else if (typeInfo.isBFloat16)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "physical scalar BF16 type",
+            m_builder.getIntegerType(m_module, 16, outType)));
     }
     else if (isFloatingPoint)
     {

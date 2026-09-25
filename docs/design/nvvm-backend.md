@@ -8268,3 +8268,22 @@ NaN expectations check classification; all measured narrowing/arithmetic NaNs we
 this toolchain, while target SM80 expansion preserved all payload bits. Neither observation is a
 universal NaN encoding rule. The existing host `FloatToBFloat16` helper quiets/preserves payloads
 and needs explicit target semantics before reuse. No BF16 corpus failure resolves in this slice.
+
+### Scalar BF16 transport and Float32 conversion (slice 239)
+
+ABI38 distinguishes scalar BF16 from IEEE FLOATING_POINT width16. The latter remains Half.
+BF16 value/helper/local-storage roles use physical i16, while recursive copyable/helper aggregates,
+vectors, device pointers and resource storage remain independently gated. A local mutable BF16
+pointer reuses existing helper-pointer/cache/storage mechanics with CUDA/LLVM size/alignment proof.
+
+The shared catalog admits only BF16↔Float32 FloatCast, scalar int16 bit transport and selection.
+Provider narrowing uses SM80 `cvt.rn.bf16.f32`; expansion zero-extends the i16, shifts left16 and
+bitcasts the word to Float32, preserving all payloads on this target. Neither generic IEEE conversion
+nor integer conversion is selected from physical width. Integer, Half/double, arithmetic and vector/dot
+families need separate evidence. The frozen vector/dot workload remains unsupported.
+
+IRBuilder::getFloatValue already canonicalizes BF16 literals with the core FloatToBFloat16 helper.
+Emission recovers these checked bits with that same helper, preserving producer-owned NaN behavior;
+dynamic CUDA narrowing has a separate target operation and promises only NaN classification.
+[Implementation239](../../issue-nvvm-backend/report.slice-239-bf16-scalar.md) records the readable
+fixture, exhaustive accepted-research input replay, negative boundaries and full checkpoint.
