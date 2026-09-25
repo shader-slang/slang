@@ -1455,6 +1455,13 @@ err(
     span { loc = "expr:Expr", message = "'~name:Name' is not a member of '~type:Type'." }
 )
 
+standalone_note(
+    "suggest-constraint-for-missing-member",
+    30032,
+    "consider adding a constraint such as 'where ~genericParam:Name : ~interfaceName:Name', since '~member:Name' is declared by that interface",
+    span { loc = "location" }
+)
+
 err(
     "argument-expected-lvalue",
     30047,
