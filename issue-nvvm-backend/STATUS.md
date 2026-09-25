@@ -4,132 +4,96 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 233 is accepted.** Read the
-[completed plan](plan.slice-233-fp16-minmax.md), [five-part report](report.slice-233-fp16-minmax.md)
-and [targeted validation](runtime-validation.slice-233.json). Half masked MIN/MAX reductions and
-inclusive/exclusive prefixes use the existing source-order recipe with finite exclusive seeds
-`0x7bff`/`0xfbff`. No provider/ABI, frontend, aggregate classifier or tree/scan implementation changes.
+**Slice 235 is accepted as the latest full checkpoint.** The full validation and independent parent
+audit pass. Read the [completed plan](plan.slice-235-quad-helpers.md),
+[five-part report](report.slice-235-quad-helpers.md) and
+[full validation](runtime-validation.slice-235.json). Typed CUDA `_slang_quadAny`/`_slang_quadAll`
+helpers now emit the source prelude's four full-mask indexed reads through existing operations.
+Canonical target lookup and exact bool(bool)/whole-body validation own both requirement markers;
+standalone markers, mismatched helpers/signatures and unrelated body instructions still reject.
+No provider/ABI, frontend, standard-library or runner change.
 
-All four original frozen MIN/MAX prefix direct cells are now GPU-correct. The next independent
-boundary in the selected frozen domain is
-`tests/hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang`: both direct modes retain
-`direct NVVM lowering does not support Slang IR instruction or shape 'RequireMaximallyReconverges'`.
-The unchanged first-known record, full diagnostic and reproduction remain in the validation ledger.
-Research 234 is accepted; see the
-[quad contract report](report.slice-234-quad-reconvergence.md) and
-[semantic evidence](semantic-evidence.slice-234.json). The markers are target requirements inside
-a canonical CUDA GenericAsm helper, whose whole body source emission replaces. Standalone markers
-are not CUDA no-ops. The next bounded implementation candidate is typed `_slang_quadAny`/
-`_slang_quadAll` helper admission with both markers accounted for at that boundary, preserving
-standalone rejection and the full-mask shuffle source contract. No compiler change was made.
-Matrix prefix capability and other arithmetic families remain separate candidates.
+The two original frozen quad-control direct cells are now GPU-correct. The new dynamic fixture
+passes all three modes. Latest accepted implementation and full checkpoint: 235. Latest targeted
+acceptance: 233. Implementation slices since full: zero. Rolling feature history is 231 I64 MIN/MAX,
+233 FP16 MIN/MAX and 235 quad helpers.
 
-Latest accepted implementation and targeted acceptance: 233. Latest full checkpoint: 229.
-Implementation slices since full: two. A full checkpoint is required after the third implementation
-before a fourth.
-Rolling feature history: 229 narrow integer MIN/MAX, 231 64-bit integer MIN/MAX,
-233 FP16 MIN/MAX. Research 230/232 does not advance cadence. Research-backed correctness takes
-priority while the material application contract is absent; reconsider material work each slice.
-No push is authorized.
+Next action: select a bounded research slice from the remaining measured gaps, including the
+frozen clock helper rejection, substandard floats, and resource boundaries. Research-backed correctness remains the priority while the material runtime binding,
+texture/LUT/input and output-oracle contract is absent. No push is authorized.
 
 ## Checkpoints and evidence
 
-- [Full checkpoint 229](runtime-validation.slice-229.json): 1,671 cells, 1,620 correct and 51 known
-  failures; six resolved histories. Frozen 452 identities/1,356 cells and discovery 105/315.
-- [Targeted 231](runtime-validation.slice-231.json): 1,674 cumulative cells, 1,623 correct and
-  51 known failures; six resolved histories. This is the comparison baseline for 233.
-- [Research 232](semantic-evidence.slice-232.json): independently derived raw binary16 source
-  semantics, finite seeds and existing-operation controls. All 17,736 accepted raw binaries,
-  source/input/expectation/result manifests and helper scripts remain untouched.
-- [Targeted 233](runtime-validation.slice-233.json): 642 fresh cells and 1,035 explicitly inherited
-  full229 cells; cumulative 1,677 cells, 1,630 correct, 47 unresolved failures and ten resolved
-  histories. The only four old five-field transitions are preflight-to-correct prefix resolutions;
-  complete prior failure records and histories accompany each transition and fresh proof.
-  [Frozen census](census.slice-233.tsv); [discovery census](discovery-census.slice-233.tsv).
-- Selected frozen 107 identities/321 cells: 319 correct, two unchanged quad preflight stops.
-  The remaining 1,035 frozen cells inherit full229; no fresh execution is implied for them.
-  Discovery 107 identities/321 cells: 291 correct, 22 infrastructure, four mismatch and four
-  preflight outcomes. All 318 old discovery outcomes preserve classification, return code,
-  complete execution counts, diagnostic and canonical shape exactly. The new fixture adds three
-  correct cells separately. No missing, duplicate or unexpected cells; no baseline reset.
-- The dynamic raw16 fixture passed NVRTC and rejected both direct modes on the accepted compiler
-  before production edits. Its final source and TEST_INPUT directives stayed unchanged afterward.
-  Closed-form expectations cover finite seeds, infinities, singletons, raw NaNs/ties, signed zero,
-  normal/subnormal boundaries, scalar/vector2/vector4 operations and matrix reductions.
-- Exact research replay passes 8,868 launches and 10,783,488 output words: 4,434 family and 4,434
-  controls. It reads accepted232 input/expectation binaries unchanged and preserves all 192-word
-  input regions and inactive sentinels. All 40 minimal direct family probes compile; six runtime
-  PTX artifacts assemble. Twelve matrix prefix capability rejections remain exact. Six catalog
-  checks retain four admitted half operations and two excluded numeric MIN/MAX descriptors.
-- Fresh smoke 4/4 ran before expensive GPU suites; focused 3/3, units 479/479 plus one existing
-  Windows-only skip, toolkit 18/18, discovery contracts 6/6 and all six material compile/assembly
-  cells pass. All 92 excluded arithmetic signatures and 14 ordinary aggregate shuffle signatures
-  preserve their exact before/after E52017 diagnostics.
-
-All 554 old registered input hashes and all old discovery rows remain unchanged; the fixture adds
-input 555. Historical healthy denominators 427/72 remain fixed. All 51 prior failure records survive
-as 47 unresolved records and four complete newly resolved histories; six earlier resolved histories
-remain unchanged. Compact evidence hash-addresses raw replay indexes instead of embedding every binary.
+- [Full 229](runtime-validation.slice-229.json), [targeted 231](runtime-validation.slice-231.json)
+  and [targeted 233](runtime-validation.slice-233.json) remain immutable comparison inputs.
+  Prior cumulative acceptance was 1,677 cells, 1,630 correct, 47 unresolved and ten resolved histories.
+- Full 235 reruns every frozen identity from the immutable slice-195 inventory: 452 identities /
+  1,356 cells, with 1,341 correct, five infrastructure and ten preflight outcomes. Only the original
+  quad-control O0/O3 cells change, from E52017 preflight to GPU-correct. Every other old five-field
+  outcome is exact. [Frozen census](census.slice-235.tsv).
+- Discovery reruns all 107 old identities and adds one: 108 identities / 324 cells, with 294 correct,
+  22 infrastructure, four mismatch and four preflight outcomes. All 321 old outcomes preserve
+  classification, return code, complete execution counts, diagnostic and canonical shape; the new
+  fixture contributes three separate correct cells. [Discovery census](discovery-census.slice-235.tsv).
+- Total 1,680 fresh cells, 1,635 correct, 45 retained failures and twelve resolved histories.
+  No missing, duplicate, extra or inherited cells, lost support, oracle change or baseline reset.
+  All ten older resolved histories remain intact; each of the two new histories retains its exact
+  whole prior failure record, transition and fresh proof. First-known records and reproductions
+  for the 45 remaining failures remain intact. Historical healthy denominators 427/72 are fixed.
+- Fresh final-source smoke 4/4 precedes expensive suites; focused 3/3, units 479/479 plus one existing
+  Windows-only skip, toolkit 18/18, runner contracts 6/6 and all six material compile/assembly cells
+  pass. Eight negative cases extend the existing unit matrix and prove rejection before provider
+  loading/module creation. Six canonical alias compiles pass; sixteen direct negative probes and
+  four standalone CUDA-source E99999 cases retain exact diagnostics.
+- The final readable dynamic fixture passed NVRTC and rejected both direct modes on the accepted
+  compiler before production edits. Its source and TEST_INPUT directives never changed afterward.
+  It checks all Boolean truth tables, divergent inline/noinline calls and complete-quad exits using
+  independent table-derived expectations.
+- Exact [research 234](semantic-evidence.slice-234.json) replay reads 512 unchanged binary input /
+  expectation pairs. All 3,072 fresh launches pass 196,608 output words, with unchanged 96-word input
+  regions and inactive sentinels. Each public/control × NVRTC/O0/O3 group has 512 cases. All 2,048
+  prior actual-buffer hashes are preserved, with 1,024 additional direct public-helper launches.
+  Twelve replay PTX artifacts assemble. Accepted research raw files remain untouched.
 
 ## Unresolved failures and limitations
 
-- Quad `RequireMaximallyReconverges`, matrix prefix capability, arithmetic/bitwise families,
-  ordinary aggregate shuffle policies and resource-bearing contexts remain independent.
-- Hardware masks remain scheduling-dependent; logical active-mask synthesis is unchanged.
-- FP8/BF16/prelude and existing discovery infrastructure/output gaps remain visible.
-- Material runtime remains blocked by application bindings, texture/LUT/input and output oracle.
-  Its six registered cells are compile/assembly checks only; no runtime or performance claim.
-- Slice 214 batching remains opt-in; no new performance claim.
-- Broad replay covers every binary16 encoding among full-mask lane/component slots, plus 69
-  structured patterns under 14 masks. It is not exhaustive tuples, masks or caller combinations.
+- CUDA requires complete source quads and matching shuffle sequences by named non-exited lanes.
+  SM80 divergent rendezvous is tested; missing source lanes or unmatched sequences have no oracle.
+  There is no CUDA-wide maximal reconvergence, active-only vote or SM6x divergent-behavior claim.
+- Matrix prefix capability, other arithmetic/bitwise families, ordinary aggregate shuffle policies
+  and resource-bearing contexts remain independent. Hardware active-mask synthesis is unchanged.
+- FP8/BF16/prelude and existing discovery infrastructure/output gaps remain visible in the ledger.
+- Material's six cells are freshly checked compile/assembly support only. Runtime/performance claims
+  remain blocked by the missing application contract. Slice 214 batching remains opt-in.
 
 ## Environment and final evidence
 
 Native Ubuntu 24.04, branch `nvvm-backend`, repository `/home/skallweit/codex/agent-sandbox/slang`.
 L4 SM89, driver 580.126.09, target SM80, CUDA 12.9.2/NVRTC 12.9.86, LLVM 14, provider ABI 36.
-Use matching optimized `build/RelWithDebInfo/{bin,lib}`, source
-`build/nvvm-loop/slice-203-env.sh`, and local `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`.
-Sequential GPU suites, at most four CPU workers, two unit servers; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
+Use matching optimized `build/RelWithDebInfo/{bin,lib}`, source the inspected
+`build/nvvm-loop/slice-203-env.sh`, and follow the local
+`build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Maximum four CPU workers, two unit
+servers, sequential suites and 30-minute bounds; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
 
-Slice 233 tested base `54ec1bfe5d92f5f7361ae85a7815ae1767e7a46a` plus the recorded emitter patch;
-both source_commit and source_revision retain that actual base. Final compiler-library SHA-256:
-`92ae81d069aeda9a6ff2a61edec43f572b2af02bb7ec677fc444490ea9a966f1`.
-Before compiler: `948d300ec9f21f9000d242fcd83ee109a97ec63e1a768511553bc64c35b21c08`.
+Both source_commit and source_revision are actual base
+`2cf7d42e0c259c05bc0fd7ab38e9490d05f0155e` plus the recorded patch. Final compiler-library SHA-256:
+`ca34db1a349ae8716785032a0a3b01b3e6cf8455f3137e9358e9d1ad4eca63cf`.
+Before compiler: `92ae81d069aeda9a6ff2a61edec43f572b2af02bb7ec677fc444490ea9a966f1`.
 Provider remains `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
-Every gate captures all 29 old tested-source paths, 12 artifacts and the final fixture hash.
-Only emitter and discovery registration change among the old source paths. Final source/artifact/input
-hashes were rechecked after the gates. Raw evidence lives under `build/nvvm-loop/slice-233-before`
-and `slice-233-after`; `audit.json` records complete history, census and binary verification.
-No device loss, driver/system change, reboot, worker commit or push.
+Every final gate captures all 30 old source paths, 12 artifacts and the new fixture hash; only
+emitter, negative unit source and discovery registration change among old sources. All 555 old
+registered input hashes remain exact; the fixture adds input 556 and source path 31.
 
-Parent acceptance independently verified 669 unique compact evidence references, all current
-source/artifact/input hashes, exact cumulative census preservation and complete failure histories.
-All 8,868 raw GPU output buffers match accepted research expectations with unchanged input regions;
-all 17,736 accepted research binaries remain intact. See `parent-acceptance-audit.json`.
+Raw evidence is under `build/nvvm-loop/slice-235-before` and `slice-235-after`; `audit.json` records
+full inventory/history preservation, immutable research evidence and independent raw-buffer checks.
+The first recipe attempt used the wrong lane signedness in its descriptor; its exact source patch,
+identity and failed focused result remain under `attempt-1`. All gates reran on the corrected source.
+An evidence-script edit later interrupted the gate shell after passing units; a separate recorded
+resume script ran only the still-unrun gates on identical source/artifacts. No incomplete command
+was counted as a pass. No GPU loss, system change, reboot, worker commit or push.
 
-## Research 234 handoff awaiting acceptance
-
-Fresh smoke 4 passes. Exactly three frozen quad cells preserve all five outcome fields: NVRTC correct,
-direct O0/O3 unchanged preflight. Dynamic research passes 2,048 launches/131,072 expected output
-words with 512 shared input/expectation pairs, unchanged 96-word input regions and inactive sentinels.
-Public NVRTC quad helpers and explicit-shuffle controls at NVRTC/direct O0/O3 cover all 16 Boolean
-quad truth tables, 4/16/32-thread blocks, complete-quad exits, divergent work before common calls,
-and divergent inline/noinline calls. Fourteen PTX artifacts assemble. Public direct probes still
-reject; marker-free helpers independently expose `_slang_quadAny/All, signature=bool(bool)`.
-
-SM80 synchronized shuffles support matching rendezvous across divergent branches. The frozen source
-has complete quads and four matching shuffles per branch, so its behavior has a documented basis.
-Partial-quad source reads remain undefined and were not launched or promoted to an oracle.
-No CUDA-wide maximal-reconvergence or active-only-vote promise is inferred. Raw evidence is under
-`build/nvvm-loop/slice-234-quad`; source revision/commit are actual
-`f77142a2e8d54b66482dc85b4e99e2a6e28de777`. All 555 registered inputs, 30 tested source paths and
-12 artifacts preserve 233. No rebuild, production/provider/ABI/runner/corpus changes or device loss.
-Cumulative 233 remains 1,677/1,630/47 with ten resolved histories; full 229/cadence two and rolling
-feature 229/231/233 are unchanged. Six material compile/assembly passes are inherited; its runtime
-contract remains absent. Research does not advance implementation cadence.
-
-Parent acceptance of research 234 verified 3,246 unique evidence files and unchanged source,
-artifact and registered input hashes. Independent Boolean reconstruction of all 512 input cases
-matched every saved expectation and all 2,048 complete GPU output buffers. The next bounded
-implementation is typed CUDA quad helper admission; its acceptance must include the full frozen
-and discovery checkpoint because it will be the third implementation since full 229.
+Parent acceptance verified 689 unique compact evidence references, all 31 current sources, 12
+artifacts and 556 registered inputs, preserving all 555 old input hashes. Exact full census review
+confirmed only two resolved old cells and three additions. All 3,072 raw replay buffers match
+accepted research expectations and preserve every old actual-output hash. Full checkpoint 235
+resets implementation cadence to zero. See `parent-acceptance-audit.json` under the final raw run.

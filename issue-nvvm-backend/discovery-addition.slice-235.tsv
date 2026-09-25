@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-quad-votes.slang	0	wave,helper-generic	Dynamic Boolean quad truth tables, divergent inline/noinline calls and complete-quad exits with independent expectations.

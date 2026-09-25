@@ -8191,9 +8191,19 @@ the corresponding shuffle sequence. Hardware active-mask reads are not a replace
 The existing provider lane-index, integer indexed shuffle and Boolean operations suffice for the
 four-lane source algebra. Its shuffle declarations preserve `convergent`, `inaccessiblememonly`
 and `nounwind`; LLVM convergent constrains optimization and is distinct from SPIR-V maximal
-reconvergence. Direct preflight currently scans the helper body and rejects its first requirement.
-Marker-free controls independently reject the typed GenericAsm helper. A future admission slice
-must therefore own the complete typed helper and both target requirements, preserving rejection of
-standalone markers; a global no-op-marker rule would be too broad. No such support is implemented
-by this research. See [report234](../../issue-nvvm-backend/report.slice-234-quad-reconvergence.md)
-and its hash-addressed specification/probe evidence for the exact source and participation limits.
+reconvergence. Research 234 preserved rejection of both the marked helper and its marker-free
+GenericAsm alias. Slice 235 admits the complete typed helper at function preflight and emission:
+canonical target lookup, exactly bool(bool), one block, and either the intrinsic terminator alone or
+that terminator with both zero-operand requirements. Extra instructions, incomplete requirement
+pairs and mismatched names/signatures remain outside this ownership boundary; standalone markers
+still reject. A shared seven-step typed recipe records requirements before provider creation and
+emits the prelude's four source reads with existing provider operations. No global marker no-op,
+frontend representation change, provider or ABI extension is involved.
+
+The dynamic registered fixture covers all Boolean truth tables, divergent inline/noinline calls and
+complete-quad exits. Exact research replay retains 512 input/expectation pairs and all 2,048 earlier
+output buffers, adding direct public-helper modes for 3,072 launches. See
+[report234](../../issue-nvvm-backend/report.slice-234-quad-reconvergence.md) for the specification
+contract and [report235](../../issue-nvvm-backend/report.slice-235-quad-helpers.md) for admission,
+negative boundaries and final-source validation. Partial source quads and unmatched shuffle
+sequences remain outside the defined test oracle.

@@ -8952,6 +8952,112 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter:"},
         {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
+        // Quad helper ownership must not suppress standalone or noncanonical requirements.
+        {R"SLANG(
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                __requireMaximallyReconverges();
+                data[lane] = lane;
+            }
+        )SLANG",
+         "RequireMaximallyReconverges"},
+        {R"SLANG(
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                __requireQuadDerivatives();
+                data[lane] = lane;
+            }
+        )SLANG",
+         "RequireQuadDerivatives"},
+        {R"SLANG(
+            bool probe(bool p)
+            {
+                __requireMaximallyReconverges();
+                __intrinsic_asm "_slang_quadAny";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                data[lane] = uint(probe(data[lane] != 0));
+            }
+        )SLANG",
+         "RequireMaximallyReconverges"},
+        {R"SLANG(
+            bool probe(bool p)
+            {
+                __requireQuadDerivatives();
+                __intrinsic_asm "_slang_quadAll";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                data[lane] = uint(probe(data[lane] != 0));
+            }
+        )SLANG",
+         "RequireQuadDerivatives"},
+        {R"SLANG(
+            bool probe(bool p)
+            {
+                __requireMaximallyReconverges();
+                __requireQuadDerivatives();
+                __intrinsic_asm "_slang_quadAny_other";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                data[lane] = uint(probe(data[lane] != 0));
+            }
+        )SLANG",
+         "RequireMaximallyReconverges"},
+        {R"SLANG(
+            uint probe(bool p)
+            {
+                __intrinsic_asm "_slang_quadAny";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                data[lane] = probe(data[lane] != 0);
+            }
+        )SLANG",
+         "GenericAsm assembly=_slang_quadAny, signature=uint(bool)"},
+        {R"SLANG(
+            bool probe(uint p)
+            {
+                __intrinsic_asm "_slang_quadAll";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                data[lane] = uint(probe(data[lane]));
+            }
+        )SLANG",
+         "GenericAsm assembly=_slang_quadAll, signature=bool(uint)"},
+        {R"SLANG(
+            bool probe(bool p)
+            {
+                __requireMaximallyReconverges();
+                __requireQuadDerivatives();
+                GroupMemoryBarrierWithGroupSync();
+                __intrinsic_asm "_slang_quadAny";
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> data)
+            {
+                uint lane = cudaThreadIdx().x;
+                data[lane] = uint(probe(data[lane] != 0));
+            }
+        )SLANG",
+         "RequireMaximallyReconverges"},
         {kDirectNVVMUnsupportedScalarTruthinessSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedMinMaxSignatureSource, "assembly=$P_min($0, $1)"},
         {kDirectNVVMUnsupportedIntegerBitSignatureSource, "assembly=$P_countbits($0)"},

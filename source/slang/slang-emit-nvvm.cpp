@@ -4814,6 +4814,150 @@ bool _setNVVMSupportedValueRecipeStep(
     return NVVMSemantics::isSupported(step.getDesc());
 }
 
+struct NVVMQuadVoteOperation
+{
+    enum Step
+    {
+        LaneIndex,
+        QuadBase,
+        SourceLane,
+        EncodePredicate,
+        ReadLane,
+        Combine,
+        DecodePredicate,
+        Count,
+    };
+    IRParam* parameter = nullptr;
+    NVVMValueRecipeStep steps[Count] = {};
+};
+
+// Resolves the entire typed CUDA quad helper, including its target requirements. Consider:
+//
+//     bool voted = QuadAny(predicate);
+//
+// The standard library produces a bool(bool) helper with both requirement markers followed by
+// `_slang_quadAny` GenericAsm. CUDA source emission replaces that entire intrinsic body. Direct
+// emission owns the same boundary, but admits only this body or its marker-free intrinsic alias.
+// Standalone markers, incomplete requirement pairs and unrelated body instructions remain ordinary
+// unsupported IR. The markers do not impose SPIR-V execution modes on CUDA callers.
+bool _resolveNVVMQuadVoteOperation(
+    CodeGenContext* codeGenContext,
+    IRFunc* function,
+    NVVMQuadVoteOperation& outOperation)
+{
+    outOperation = {};
+    IRBlock* block = function->getFirstBlock();
+    if (!block || block->getNextBlock() || function->getParamCount() != 1 ||
+        !isNVVMBoolType(function->getResultType()) || !isNVVMBoolType(function->getParamType(0)))
+    {
+        return false;
+    }
+    IRParam* parameter = function->getFirstParam();
+    if (!parameter || parameter->getNextParam() || !isNVVMBoolType(parameter->getDataType()))
+        return false;
+
+    UnownedStringSlice assembly;
+    IRInst* intrinsic = nullptr;
+    if (!findTargetIntrinsicDefinition(
+            function,
+            codeGenContext->getTargetCaps(),
+            assembly,
+            intrinsic))
+    {
+        return false;
+    }
+    auto genericAsm = as<IRGenericAsm>(intrinsic);
+    if (!genericAsm || genericAsm != block->getTerminator() || genericAsm->getOperandCount() != 1 ||
+        (assembly != toSlice("_slang_quadAny") && assembly != toSlice("_slang_quadAll")))
+    {
+        return false;
+    }
+
+    bool requiresMaximalReconvergence = false;
+    bool requiresQuadDerivatives = false;
+    for (auto inst : block->getOrdinaryInsts())
+    {
+        if (inst == genericAsm)
+            continue;
+        if (inst->getOperandCount() != 0)
+            return false;
+        if (inst->getOp() == kIROp_RequireMaximallyReconverges && !requiresMaximalReconvergence)
+            requiresMaximalReconvergence = true;
+        else if (inst->getOp() == kIROp_RequireQuadDerivatives && !requiresQuadDerivatives)
+            requiresQuadDerivatives = true;
+        else
+            return false;
+    }
+    if (requiresMaximalReconvergence != requiresQuadDerivatives)
+        return false;
+
+    outOperation.parameter = parameter;
+    const SlangNVVMValueTypeDesc unsignedBinary[] = {
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kUnsignedI32,
+    };
+    const SlangNVVMValueTypeDesc encodeOperands[] = {
+        NVVMSemantics::kBool,
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kUnsignedI32,
+    };
+    const SlangNVVMValueTypeDesc shuffleOperands[] = {
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kSignedI32,
+    };
+    return _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::LaneIndex],
+               SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
+               NVVMSemantics::kUnsignedI32,
+               nullptr,
+               0,
+               "quad vote lane index") &&
+           _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::QuadBase],
+               SLANG_NVVM_VALUE_OP_BIT_AND,
+               NVVMSemantics::kUnsignedI32,
+               unsignedBinary,
+               2,
+               "quad vote base lane") &&
+           _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::SourceLane],
+               SLANG_NVVM_VALUE_OP_BIT_OR,
+               NVVMSemantics::kUnsignedI32,
+               unsignedBinary,
+               2,
+               "quad vote source lane") &&
+           _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::EncodePredicate],
+               SLANG_NVVM_VALUE_OP_SELECT,
+               NVVMSemantics::kUnsignedI32,
+               encodeOperands,
+               3,
+               "quad vote predicate encoding") &&
+           _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::ReadLane],
+               SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
+               NVVMSemantics::kUnsignedI32,
+               shuffleOperands,
+               3,
+               "quad vote synchronized source read") &&
+           _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::Combine],
+               assembly == toSlice("_slang_quadAny") ? SLANG_NVVM_VALUE_OP_BIT_OR
+                                                     : SLANG_NVVM_VALUE_OP_BIT_AND,
+               NVVMSemantics::kUnsignedI32,
+               unsignedBinary,
+               2,
+               "quad vote combine") &&
+           _setNVVMSupportedValueRecipeStep(
+               outOperation.steps[NVVMQuadVoteOperation::DecodePredicate],
+               SLANG_NVVM_VALUE_OP_NOT_EQUAL,
+               NVVMSemantics::kBool,
+               unsignedBinary,
+               2,
+               "quad vote predicate decoding");
+}
+
 // Describes the canonical low-word/high-word reconstruction emitted by AnyValue unmarshalling.
 // Both inputs are semantic UInt32 values; zero extension makes the provider's signless i64
 // representation independent of the source words' high bits.
@@ -8263,6 +8407,16 @@ SlangResult _validateNVVMFunction(
             isEntryPoint ? toSlice("entry-point parameter count")
                          : toSlice("helper parameter count"));
     }
+    NVVMQuadVoteOperation quadVote;
+    if (!isEntryPoint && _resolveNVVMQuadVoteOperation(codeGenContext, function, quadVote))
+    {
+        for (const auto& step : quadVote.steps)
+            _requireValueOperation(
+                requirements.valueOperations,
+                step.getDesc(),
+                step.diagnosticName);
+        return SLANG_OK;
+    }
     // Register every accepted block parameter before checking uses because emission creates all
     // phi placeholders before any body. Ordinary values join this set in the second pass, in the
     // same order in which their LLVM instructions will be emitted.
@@ -10925,6 +11079,130 @@ SlangResult _getNVVMRecipeIntegerConstant(
         codeGenContext,
         "scalar intrinsic recipe integer constant",
         builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+// Emits the CUDA prelude's four full-mask indexed reads. Every surviving source quad must be
+// complete, and named non-exited lanes must execute matching shuffle sequences. In particular,
+// this is not a vote over only the callers in the current branch, and no hardware mask is sampled.
+SlangResult _emitNVVMQuadVoteOperation(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    IRFunc* function,
+    const NVVMQuadVoteOperation& operation,
+    NVVMValueMap& valueMap,
+    NVVMTypeLoweringContext& typeContext)
+{
+    SlangNVVMValueHandle predicate = nullptr;
+    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+        codeGenContext,
+        builder,
+        module,
+        operation.parameter,
+        valueMap,
+        typeContext,
+        predicate));
+    SlangNVVMValueHandle zero = nullptr;
+    SlangNVVMValueHandle one = nullptr;
+    SlangNVVMValueHandle fullMask = nullptr;
+    SlangNVVMValueHandle baseMask = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, 0, zero));
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, 1, one));
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, -1, fullMask));
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, -4, baseMask));
+
+    SlangNVVMValueHandle encoded = nullptr;
+    const SlangNVVMValueHandle encodeOperands[] = {predicate, one, zero};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.steps[NVVMQuadVoteOperation::EncodePredicate],
+        encodeOperands,
+        3,
+        encoded));
+    SlangNVVMValueHandle lane = nullptr;
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.steps[NVVMQuadVoteOperation::LaneIndex],
+        nullptr,
+        0,
+        lane));
+    SlangNVVMValueHandle base = nullptr;
+    const SlangNVVMValueHandle baseOperands[] = {lane, baseMask};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.steps[NVVMQuadVoteOperation::QuadBase],
+        baseOperands,
+        2,
+        base));
+
+    SlangNVVMValueHandle combined = nullptr;
+    for (uint32_t index = 0; index < 4; ++index)
+    {
+        SlangNVVMValueHandle offset = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            _getNVVMRecipeIntegerConstant(codeGenContext, builder, module, 32, index, offset));
+        SlangNVVMValueHandle sourceLane = nullptr;
+        const SlangNVVMValueHandle sourceOperands[] = {base, offset};
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.steps[NVVMQuadVoteOperation::SourceLane],
+            sourceOperands,
+            2,
+            sourceLane));
+        SlangNVVMValueHandle read = nullptr;
+        const SlangNVVMValueHandle readOperands[] = {fullMask, encoded, sourceLane};
+        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+            codeGenContext,
+            builder,
+            module,
+            operation.steps[NVVMQuadVoteOperation::ReadLane],
+            readOperands,
+            3,
+            read));
+        if (index == 0)
+            combined = read;
+        else
+        {
+            const SlangNVVMValueHandle combineOperands[] = {combined, read};
+            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                codeGenContext,
+                builder,
+                module,
+                operation.steps[NVVMQuadVoteOperation::Combine],
+                combineOperands,
+                2,
+                combined));
+        }
+    }
+    SlangNVVMValueHandle result = nullptr;
+    const SlangNVVMValueHandle decodeOperands[] = {combined, zero};
+    SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+        codeGenContext,
+        builder,
+        module,
+        operation.steps[NVVMQuadVoteOperation::DecodePredicate],
+        decodeOperands,
+        2,
+        result));
+    return _emitNVVMFunctionValueReturn(
+        codeGenContext,
+        builder,
+        module,
+        function,
+        "quad vote return",
+        result);
 }
 
 SlangResult _emitNVVMUInt64WordConstruction(
@@ -14450,6 +14728,24 @@ SlangResult emitNVVMIRFromLinkedIR(
         }
 
         IRBlock* entryBlock = function->getFirstBlock();
+        NVVMQuadVoteOperation quadVote;
+        if (function != entryPoint &&
+            _resolveNVVMQuadVoteOperation(codeGenContext, function, quadVote))
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "quad helper insertion block",
+                builder.setInsertBlock(moduleScope.module, blockMap.getValue(entryBlock))));
+            SLANG_RETURN_ON_FAIL(_emitNVVMQuadVoteOperation(
+                codeGenContext,
+                builder,
+                moduleScope.module,
+                function,
+                quadVote,
+                valueMap,
+                typeContext));
+            continue;
+        }
         bool hasHalfParameter = false;
         bool hasEntryAggregateValueParameter = false;
         for (auto param : function->getParams())
