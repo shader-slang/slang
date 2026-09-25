@@ -8113,3 +8113,20 @@ the prior 32-bit numeric/Float64 domain. Identity bit patterns must be interpret
 at their destination width before calling the provider's signed-N-bit integer constant API: UInt8
 bits 255 travel as -1, and Int8 minimum bits 128 travel as -128. The emitter subtracts `2^width`
 when the identity sign bit is set; the provider remains unchanged.
+
+### 64-bit integer masked min/max research contract (slice 230)
+
+Signed/unsigned 64-bit masked MIN/MAX reductions and inclusive/exclusive prefixes have the same exact
+member-set extrema algebra as narrower integers. Independent source execution covers scalar,
+vector2/vector4 and existing matrix2x2 reduction leaves, using dynamic raw low/high words. Empty
+exclusive MIN uses signed maximum or unsigned all-ones; MAX uses signed minimum or unsigned zero.
+This is a researched source contract, not new direct recipe support. Matrix prefix capability remains
+separate. See `semantic-evidence.slice-230.json` and the slice 230 report.
+
+The catalog and ABI 36 provider already admit exact scalar 64-bit integer lane reads, MIN/MAX and SELECT.
+The provider shuffles both 32-bit halves with identical mask/lane/clamp and recombines i64; direct
+O0/O3 controls verify both halves and high-bit constants independently. 64-bit integer masked helpers
+still reject at `_getNVVMMaskedWaveScalarIdentity`. An extension must avoid shifting by 64 when
+constructing unsigned maximum and when converting identity bits to the provider's signed 64-bit argument.
+The existing `Slang::bitCast` can preserve a complete 64-bit payload; the narrow identity subtraction
+is valid only in its current admitted widths. No provider/ABI or producer-shape repair is indicated.
