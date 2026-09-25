@@ -11,13 +11,20 @@ to I32_firstbithigh; U32 uses the original word. Signed32/64 and unsigned64 beha
 and the direct provider is unchanged. The independent research222 replay passes all 18 executions
 and 6,912 words, including the 24 previously wrong CUDA source results.
 
-**Next action: research224 isolates the generated KernelContext pointer preflight in masked-prefix
-min/max.** Two frozen workloads still reject a helper parameter
-`Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>`. Trace the producing
-lowering and consuming support check; identify a minimal runnable source with the same boundary,
-retain NVRTC output and exact NVVM diagnostic, and audit whether the shape is canonical. Do not
-widen pointer admission merely to expose another unsupported instruction. Keep independent FP64
-prefix semantics, quad reconvergence and vector-by-value shuffle work separate.
+**Research 224 is accepted: Boolean fields trigger the context-pointer restriction.** Read the
+[report](report.slice-224-kernel-context-research.md), [plan](plan.slice-224-kernel-context-research.md)
+and [evidence](semantic-evidence.slice-224.json). Original KernelContext contains Bool plus three uint
+fields. Minimal Boolean global state reproduces both direct preflight stops, while integer-global
+and local Boolean-struct controls pass all modes. Seven executions/672 output words match; two
+Boolean-global direct cells remain rejected without PTX. Producer/call pointer shapes are canonical.
+
+**Next action: slice 225 admits canonical contexts containing supported copyable-value structs.**
+Replace the older scalar-only pointee restriction with the existing recursive copyable-value
+classification, preserving exact pointer access/address-space/layout checks. Keep explicit contexts
+with resource fields outside this slice. Add dynamic Boolean and representative nested/value state
+coverage, prove before failures and after output, and complete a full checkpoint for helper-type
+admission. Reassess the two frozen prefix workloads, retaining any next independent unsupported
+operation; diagnostic advancement alone does not fix a registered cell.
 
 No push is authorized. Material runtime still needs application bindings, texture/LUT/input and
 output oracle. Fresh-context delegation remains at the app's agent-thread limit; local work uses

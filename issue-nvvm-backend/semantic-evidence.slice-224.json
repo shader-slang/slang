@@ -1,0 +1,845 @@
+{
+  "schema": 1,
+  "slice": 224,
+  "status": "accepted-research",
+  "date_utc": "2026-09-25",
+  "source_revision": "e3e30bd7200016565c00086ee466f75c23ca1fd8",
+  "scope": "Isolate canonical Boolean ThreadLocal context-pointer admission with unchanged compiler/provider/corpus",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-223.json",
+    "sha256": "0401efcaa1123773868f6cb256e5d3a70e9a9fbc4d95d3f22704ab368783492a"
+  },
+  "raw_results": {
+    "path": "build/nvvm-loop/slice-224-context/results.json",
+    "sha256": "faf4a32afa4a28e8585b0adef9581b70505a5dbfced6930529cb68882a79a3cb"
+  },
+  "probe": {
+    "path": "build/nvvm-loop/slice-224-context/probe.py",
+    "sha256": "da2f357ff42b79aa39380beb17ab291c6441221ae1ac5778a6f03cb1bda62fe9"
+  },
+  "cases": [
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/bool-global.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "bool-global",
+      "mode": "nvrtc-o3",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/bool-global.slang",
+        "sha256": "08541236d10584db806376fb5d1b3fe893af5c7a435e231b7a862c4fc172d9ca"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/bool-global.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-global-nvvm-o0.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'\n",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/bool-global-nvvm-o0.log",
+        "sha256": "da1cc93feef5392b24ab260c124515653bde697179f9e6afd844222de1a4f3a6"
+      },
+      "ptx_exists": false,
+      "case": "bool-global",
+      "mode": "nvvm-o0",
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/bool-global.slang",
+        "sha256": "08541236d10584db806376fb5d1b3fe893af5c7a435e231b7a862c4fc172d9ca"
+      }
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/bool-global.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-global-nvvm-o3.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'\n",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/bool-global-nvvm-o3.log",
+        "sha256": "da1cc93feef5392b24ab260c124515653bde697179f9e6afd844222de1a4f3a6"
+      },
+      "ptx_exists": false,
+      "case": "bool-global",
+      "mode": "nvvm-o3",
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/bool-global.slang",
+        "sha256": "08541236d10584db806376fb5d1b3fe893af5c7a435e231b7a862c4fc172d9ca"
+      }
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/int-global.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "int-global",
+      "mode": "nvrtc-o3",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/int-global.slang",
+        "sha256": "f2805ead21f4c72d6527df7a7b9d57130085f1e7736bb79948aabc89a4b65765"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/int-global.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "int-global",
+      "mode": "nvvm-o0",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/int-global.slang",
+        "sha256": "f2805ead21f4c72d6527df7a7b9d57130085f1e7736bb79948aabc89a4b65765"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/int-global.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "int-global",
+      "mode": "nvvm-o3",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/int-global.slang",
+        "sha256": "f2805ead21f4c72d6527df7a7b9d57130085f1e7736bb79948aabc89a4b65765"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/bool-local.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvrtc",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "bool-local",
+      "mode": "nvrtc-o3",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/bool-local.slang",
+        "sha256": "c7d0c48ac2a5cd60155f5ee6f32d224389f998a31c5f44cafb7e7f4f8c6c9980"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/bool-local.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "bool-local",
+      "mode": "nvvm-o0",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/bool-local.slang",
+        "sha256": "c7d0c48ac2a5cd60155f5ee6f32d224389f998a31c5f44cafb7e7f4f8c6c9980"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    },
+    {
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-224-context/bool-local.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.ptx"
+      ],
+      "return_code": 0,
+      "diagnostic": "",
+      "log": {
+        "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "ptx_exists": true,
+      "case": "bool-local",
+      "mode": "nvvm-o3",
+      "assembly_command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "-arch=sm_80",
+        "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.ptx",
+        "-o",
+        "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.cubin"
+      ],
+      "assembly_return_code": 0,
+      "passed": true,
+      "input_words_unchanged": true,
+      "source": {
+        "path": "build/nvvm-loop/slice-224-context/bool-local.slang",
+        "sha256": "c7d0c48ac2a5cd60155f5ee6f32d224389f998a31c5f44cafb7e7f4f8c6c9980"
+      },
+      "checked_words": 96,
+      "equal_words": 96
+    }
+  ],
+  "executions": 7,
+  "correct_executions": 7,
+  "checked_output_words": 672,
+  "equal_output_words": 672,
+  "rejected_compile_cells": 2,
+  "ptx_assemblies": 7,
+  "smoke": {
+    "passed": 4,
+    "executed": 4,
+    "evidence": {
+      "path": "build/nvvm-loop/slice-224-context/runtime/results.json",
+      "sha256": "050d0d7e95aef08abcd44e34dc43495b8b94c063641b7064fec25dae5ba4c4ee"
+    }
+  },
+  "original_registered_failures_inherited": [
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "evidence": {
+        "path": "build/nvvm-loop/slice-223-after/frozen/logs/nvvm-o0/e5f37c0ff921a627e653365848152f3b53bf004e.log",
+        "sha256": "1dbeb94bc63bf56954b37bcdbcbeeb9bddae3d4b50fbcf88f8549532a2f304cb"
+      },
+      "prior_failure_record": {
+        "manifest": "issue-nvvm-backend/runtime-validation.slice-221.json",
+        "key": [
+          "frozen",
+          "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+          "nvvm-o0"
+        ]
+      },
+      "first_known_evidence": {
+        "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+        "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+        "diagnostic_observed_before_this_change": {
+          "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+          "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+          "evidence": {
+            "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+            "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+          }
+        }
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "RelWithDebInfo",
+        "--bin-dir",
+        "build/RelWithDebInfo/bin",
+        "--provider",
+        "build/RelWithDebInfo/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-optimized-reproduce/34f7ace5ea051bf8f778399aa3e576f146694ddc"
+      ],
+      "evidence_status": "fresh-slice223-full"
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "evidence": {
+        "path": "build/nvvm-loop/slice-223-after/frozen/logs/nvvm-o3/1becc24df12c518be6a5fd7c79a22d268c3d692e.log",
+        "sha256": "9c7a18f2dd1cb470abe7cde3f186a219a34a6bd01abf1dbb9f4524f41f542c1f"
+      },
+      "prior_failure_record": {
+        "manifest": "issue-nvvm-backend/runtime-validation.slice-221.json",
+        "key": [
+          "frozen",
+          "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+          "nvvm-o3"
+        ]
+      },
+      "first_known_evidence": {
+        "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+        "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+        "diagnostic_observed_before_this_change": {
+          "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+          "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+          "evidence": {
+            "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+            "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+          }
+        }
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "RelWithDebInfo",
+        "--bin-dir",
+        "build/RelWithDebInfo/bin",
+        "--provider",
+        "build/RelWithDebInfo/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-optimized-reproduce/33ba69eaaf9350d56cd6d11ad2978f3699539feb"
+      ],
+      "evidence_status": "fresh-slice223-full"
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "evidence": {
+        "path": "build/nvvm-loop/slice-223-after/frozen/logs/nvvm-o0/6c792edea7a863b70f6aa58250329ecca3b34888.log",
+        "sha256": "ea84deebc8dcb17cca2f8d17dccf888f60b3acc776999d8fd86395b179ab2e52"
+      },
+      "prior_failure_record": {
+        "manifest": "issue-nvvm-backend/runtime-validation.slice-221.json",
+        "key": [
+          "frozen",
+          "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+          "nvvm-o0"
+        ]
+      },
+      "first_known_evidence": {
+        "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+        "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+        "diagnostic_observed_before_this_change": {
+          "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+          "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+          "evidence": {
+            "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+            "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+          }
+        }
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "RelWithDebInfo",
+        "--bin-dir",
+        "build/RelWithDebInfo/bin",
+        "--provider",
+        "build/RelWithDebInfo/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o0",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-optimized-reproduce/46918d573420fc13dfd213fd9457dd4cdb757631"
+      ],
+      "evidence_status": "fresh-slice223-full"
+    },
+    {
+      "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "classification": "preflight",
+      "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Ptr<KernelContext, addressSpace=1, access=0, operands=4, layout=DefaultLayout>'",
+      "canonical_shape": "helper function parameter",
+      "return_code": 1,
+      "execution_counts": {
+        "passed": 0,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "corpus": "frozen",
+      "evidence": {
+        "path": "build/nvvm-loop/slice-223-after/frozen/logs/nvvm-o3/2dc0d57bfecb5fdb3871166354428e03efda56e2.log",
+        "sha256": "902b1134156f311e4c73bc93231414de0393b63c18e57b000cb5ddc167fa368b"
+      },
+      "prior_failure_record": {
+        "manifest": "issue-nvvm-backend/runtime-validation.slice-221.json",
+        "key": [
+          "frozen",
+          "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+          "nvvm-o3"
+        ]
+      },
+      "first_known_evidence": {
+        "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+        "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+        "diagnostic_observed_before_this_change": {
+          "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+          "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+          "evidence": {
+            "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+            "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+          }
+        }
+      },
+      "reproduction": [
+        "timeout",
+        "--kill-after=30s",
+        "5m",
+        "python3",
+        "issue-nvvm-backend/run-compute-census.py",
+        "--config",
+        "RelWithDebInfo",
+        "--bin-dir",
+        "build/RelWithDebInfo/bin",
+        "--provider",
+        "build/RelWithDebInfo/bin",
+        "--architecture",
+        "80",
+        "--jobs",
+        "1",
+        "--modes",
+        "nvvm-o3",
+        "--match",
+        "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+        "--workload-ids-from",
+        "issue-nvvm-backend/census.slice-195.tsv",
+        "--output",
+        "build/nvvm-optimized-reproduce/576969fe2ca4b209224552fea20794d37d3d2c39"
+      ],
+      "evidence_status": "fresh-slice223-full"
+    }
+  ],
+  "original_workload_source": {
+    "path": "tests/hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang",
+    "sha256": "8efdb38182619ed24ac8fca77815d419ef3212bda6a64a00fc30e1f3d782c125"
+  },
+  "original_ir_dump": {
+    "path": "build/nvvm-loop/slice-224-context/original-min.log",
+    "sha256": "9702d3c99c0589cb9c1d9d8705965e25328c7013b26289968b35cbc29113a773"
+  },
+  "original_compile_return_code": 255,
+  "producer_traces": {
+    "commands": {
+      "path": "build/nvvm-loop/slice-224-context/trace-commands.json",
+      "sha256": "a9d90c393c7b0b51f793f687acf6895902a99703c647c656f3dac3a627363f96"
+    },
+    "logs": [
+      {
+        "path": "build/nvvm-loop/slice-224-context/bool-global-trace.log",
+        "sha256": "06b250edecd664332c166ba78c823b3dab2647629da10922eb7bf2643ab73f36"
+      },
+      {
+        "path": "build/nvvm-loop/slice-224-context/int-global-trace.log",
+        "sha256": "a6e1a55a93955eab21e535799a2a29710ee3392ebbfcfebe62f8c47aecfbea32"
+      },
+      {
+        "path": "build/nvvm-loop/slice-224-context/bool-local-trace.log",
+        "sha256": "53856e70ceb6c54a550c14d2dce7dbad27d141cc7f4d8a75903363ba9814ac41"
+      }
+    ]
+  },
+  "finding": {
+    "id": "research224-bool-thread-local-context-pointee",
+    "original_context_fields": [
+      "isFirstInPartition:Bool",
+      "gLarger:UInt",
+      "gMaxValue:UInt",
+      "gSmaller:UInt"
+    ],
+    "minimal_context_fields": ["flag:Bool"],
+    "control_context_fields": ["flag:UInt"],
+    "producer": "introduceExplicitGlobalContext -> context struct and ThreadLocal pointer -> per-entry compact local var -> explicit helper parameter and call argument",
+    "consumer": "_isSupportedNVVMHelperParameterType -> asNVVMSupportedLocalResourceStructPointerType -> isThreadLocalContextPointer -> asNVVMSupportedScalarStructType",
+    "input_shape": "Canonical and intentional: explicit Slang ThreadLocal pointer with four operands/default layout, compact entry-local argument, same selected pointee. Source addressSpace1 is not LLVM global1.",
+    "responsible_restriction": "Scalar-only context pointee guard rejects Bool although selected copyable/resource-value structs already admit it and ordinary local Bool struct mutation passes both direct modes.",
+    "not_observed": "No malformed producer shape, bad pointer lifetime, GPU wrong output or provider ABI gap established. No direct runtime execution of Boolean global state yet.",
+    "next_slice": "Use existing recursive copyable-value classification to admit canonical ThreadLocal context pointers for already-supported value structs; retain exact pointer access/address-space/layout checks. Dedicated dynamic context fixture must fail before/pass allmodes after; audit nested/value cases and retain resource-bearing explicit contexts as separate scope. Full checkpoint required for helper-type admission.",
+    "original_failures_not_resolved": true,
+    "next_independent_prefix_blocker": "Not probed by admission changes in this research; retain any next unsupported diagnostic separately during next implementation."
+  },
+  "trace_sources": [
+    {
+      "path": "source/slang/slang-ir-explicit-global-context.cpp",
+      "sha256": "94c20aba64d59416c487757c6f124dfd92d6c108498c865a7ccab3c866c5cbff"
+    },
+    {
+      "path": "source/slang/slang-emit.cpp",
+      "sha256": "fe0b51897dce56e7a96e032c7cdcfd7498a949bd71a9b0c724c5ea726bd27bb6"
+    },
+    {
+      "path": "source/slang/slang-emit-nvvm.cpp",
+      "sha256": "c3714364dc97334a0e63a31fcf6aecdace3011319a04c681a3b3157b665d6286"
+    },
+    {
+      "path": "source/slang/slang-emit-nvvm-type-lowering.cpp",
+      "sha256": "8057ca7d0b72b847025b6f57be2f33dffe00303162290c9203531ed93fd7efed"
+    }
+  ],
+  "preservation": {
+    "production_unchanged": true,
+    "tested_sources_verified": 24,
+    "artifacts_verified": 12,
+    "runtime_inputs_verified": 550,
+    "registered_cells": 1662,
+    "registered_correct": 1611,
+    "registered_failures": 51,
+    "resolved_histories": 6,
+    "runtime_evidence": "Inherited223 full; no registered corpus rerun or fresh pass claim.",
+    "last_full_checkpoint": 223,
+    "implementation_slices_since_full": 0
+  },
+  "delegation": "Fresh-context thread limit; local parent fallback, no independent worker review.",
+  "artifacts": [
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.ptx",
+      "sha256": "56d707fb0fc027fabed406c211e7d399a075affdb66427b0e94cca2bfc344564"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.cubin",
+      "sha256": "4fbf4b58575bd5ccec2c2e00e23dc1a5d961526a6d0038675cfeec0548b7f63f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-global-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.ptx",
+      "sha256": "c0d2bb1c4f0fbdb7c59de560b4ca5bb2670e8f5273e382c1ece41062c0a3b201"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.cubin",
+      "sha256": "7eba7154855ab0f82b96b015d844a5ff9667a6714b6619a2908cfabc48251ebd"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.ptx",
+      "sha256": "c7a2b85bd17bda99ad76e11587067a1e5ce92cc5d5bebf7aa77cd58318c7374e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.cubin",
+      "sha256": "82ab7b0863b02b632abdd79bc76d9993cd5bd7990ee98791bc64f90601b79528"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o0.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.ptx",
+      "sha256": "5923a96da42c1cacab89e1432507c4af66a40d4202aaca4be8de3dcd6fd5a107"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.cubin",
+      "sha256": "64d44ac77c11308b12f899ccddb1c0281576817580f06c0bd2c3cb27367d563b"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/int-global-nvvm-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.ptx",
+      "sha256": "e703e66b34d36da4839a5b9b431da83177e49ab4d812ca742b50c4cb71d07f9e"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.cubin",
+      "sha256": "153086d4b2c2acbabeee03aa862c3b8797f415a7f58b710abe37ffa93f0f4cd9"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.ptx",
+      "sha256": "c552fc375868c7ffbbbccf857200036225035853fbffefce623b2ae1c6231e7d"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.cubin",
+      "sha256": "47c8ef0104d560749d4c62162c77eb339ef0baf5e9a76e6492d117dc47096fdf"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o0.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.ptx",
+      "sha256": "4f299ddb2281b1090249f66cf4cf5851a727250dc94514c7097a876c2da8cc44"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.cubin",
+      "sha256": "a284d919cc83d2cd305ec873c6a52cd98cd5208bb86d92ef42bfc85a9d333c77"
+    },
+    {
+      "path": "build/nvvm-loop/slice-224-context/bool-local-nvvm-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "original_compile_command": [
+    "build/RelWithDebInfo/bin/slangc",
+    "tests/hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang",
+    "-entry",
+    "computeMain",
+    "-stage",
+    "compute",
+    "-target",
+    "ptx",
+    "-capability",
+    "cuda_sm_8_0",
+    "-O0",
+    "-emit-cuda-via-nvvm",
+    "-dump-ir-after",
+    "introduceExplicitGlobalContext",
+    "-o",
+    "build/nvvm-loop/slice-224-context/original-min.ptx"
+  ]
+}
