@@ -3,6 +3,34 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Research253 is accepted
+
+Public CUDA reflection and canonical IR CUDA rules disagree with the actual prelude only for BF4
+among36 vector/wrapper/array-holder rows. Reflection packs a wrapped BF4 record at24 bytes with
+value/suffix offsets8/16; CUDA uses12 bytes and2/10. Pointer and StructuredBuffer controls each
+produce17 wrong fields out of18 when packed from reflection, and exact values with actual packing.
+Read [plan253](plan.slice-253-bf16-storage-layout.md),
+[report253](report.slice-253-bf16-storage-layout.md) and
+[semantic253](semantic-evidence.slice-253.json).
+
+A72-value explicit CUDA query control runs in all3 modes. NVRTC is correct; NVVM O0/O3 each return
+five wrong BF4 size/alignment values. The saved accepted250/pre252 compiler emits identical PTX,
+so this correctness boundary predates252. Unqualified sizeof/alignof uses Natural rules; that
+separate policy must remain unchanged. No compiler, provider, ABI, fixture/oracle or manifest changes.
+
+Research includes runtime4,16 final GPU controls with4096 returned words,36 public-reflection rows,
+72 IR rows, and actual CUDA ABI proof. Four final controls retain measured wrong outputs; none is
+relabeled a pass. Two completed preparation launches and their initial oracle failure are retained.
+All119 baseline sources/12 artifacts/563 inputs remain exact252;131 source snapshots cover130 unique
+paths, including the additional layout producers. The closed raw index contains318 artifacts.
+Fresh-agent spawning reached its task limit; the documented local fallback and separate hand-derived
+oracle audit were used, without claiming fresh independent agent review.
+
+Full252/targeted233, implementation cadence0 and rolling249/250/252 remain authoritative. All1701
+registered corpus outcomes (1662correct,39unresolved,18resolved histories) and material6 are inherited,
+not fresh253. The new failures are isolated research controls. Raw research is under
+`build/nvvm-loop/slice-253-bf16-storage-layout`.
+
 ## Slice252 is accepted
 
 The bounded constructor-visibility change passes all performance and correctness gates. Every
@@ -96,18 +124,21 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Qualify the CUDA BF16 vector storage-layout boundary recorded by research240 on the accepted252
-compiler. BF4's reported alignment8 differs from the actual CUDA prelude alignment2; establish an
-observable source-level reflection/storage consequence with independent byte-layout and output
-oracles before choosing a producer-side repair. Cover BF2/BF3/BF4 controls, wrapped fields, array
-stride and neighboring scalar types. Keep this bounded research separate from new NVVM storage
-admission and from the original dynamic-dispatch fixture's other unsupported shapes.
+Repair the shared AST and IR CUDA BF16 vector layout producers as one bounded implementation.
+Preserve canonical BF16 format information through the AST vector query; model BF3/BF4 component
+storage while retaining native BF2 alignment. Do not add a second BF16 type, coerce its semantics
+to Half/UInt16, patch query consumers, weaken aggregate checks or broaden runtime storage admission.
 
-This known producer mismatch has a clearer correctness contract than general FP8 runtime conversion
-(shared overflow differs from CUDA SATFINITE) or texture queries (recorded248 contract/toolkit gaps).
-Further material optimization needs fresh profiling on252; all6 material cells already compile and
-assemble, and runtime bindings/textures/LUT/input/output contracts remain unavailable. Preserve the
-original texture/column-major failures and all existing input/oracle identities.
+Add explicit CUDA query regression coverage (the253 control currently returns five wrong values
+at both direct optimization levels) and public-reflection wrapper/array tests. Preserve all33
+neighboring CUDA layout rows and the separate Natural rules. Shared layout impact requires full
+unit/semantic gates, the complete frozen/discovery checkpoint and all6 material support cells.
+The original dynamic-dispatch BF2/FP8 aggregate fixture has separate boundaries; do not bundle them.
+
+This proven correctness failure takes priority over new FP8 runtime conversions, texture queries
+or another compile-time optimization. Material runtime bindings/textures/LUT/input/output contracts
+remain unavailable. Preserve the original texture/column-major failures and existing input/oracle
+identities. Further storage admission or optimization needs its own evidence and bounded slice.
 
 ## Accepted historical evidence
 

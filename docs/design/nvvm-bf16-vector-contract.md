@@ -152,3 +152,41 @@ replays use those same inputs and independent exact-rational expectations. Provi
 both LLVM dialects, the2N separate BF16 FMA calls, exact constants and malformed semantic/physical
 operands. General BF16 arithmetic/comparison, integer/Half/double conversion, explicit vector Select,
 storage and external CUDA helper interoperability remain outside this dot contract.
+
+## Research253: reflection, CUDA queries and stored records
+
+[Research253](../../issue-nvvm-backend/report.slice-253-bf16-storage-layout.md) makes the recorded
+BF4 layout mismatch observable on accepted252. For `struct W { uint16_t prefix;
+vector<BFloat16,4> value; uint16_t suffix; }`, public CUDA reflection and canonical IR CUDA rules
+report size/alignment24/8 and value/suffix offsets8/16. The actual CUDA prelude gives12/2 and2/10.
+A holder containing `W values[3]` followed by uint16_t reports80/8 with tail offset72 instead of
+38/2 with tail offset36. All33 neighboring rows (scalar BF16, BF2/BF3, Half and ordinary vectors)
+match the actual ABI; only the three BF4 rows disagree.
+
+Source NVRTC pointer and StructuredBuffer controls each read three records. Actual ABI packing
+preserves all18 logical values; reflection-based packing yields17 wrong fields. Every input and
+sentinel byte is preserved. These are isolated research controls, with no existing input/oracle
+change or new storage support. StructuredBuffer uses its actual16-byte pointer/count parameter.
+
+The core `__sizeOf<T>()`/`__alignOf<T>()` queries are compile-time metadata. NVVM's
+`_getNVVMCUDALayoutQueryValue` resolves them through the CUDA rule before runtime type admission.
+A72-value scalar-output control runs in all three modes: NVRTC matches the actual ABI, while each
+direct mode returns five wrong BF4 values (vector alignment, wrapper size/alignment, holder
+size/alignment). The saved accepted250/pre252 compiler emits byte-identical PTX, so these failures
+predate constructor inlining. This supplies a runnable producer-repair regression without needing
+BF16 aggregate/storage admission.
+
+Unqualified Slang `sizeof`/`alignof` instead selects Natural rules in `PeepholeContext::processInst`.
+For example, BF2 has Natural alignment2 and wrapper size8, while its CUDA ABI is4 and12. Preserve
+that distinct observable policy; matching Natural BF4 values does not validate CUDA layout.
+
+The next bounded repair must preserve BF16 format information across the AST vector-layout query
+and correct the IR CUDA rule. `_createTypeLayout` currently passes BaseType::Void for non-basic BF16,
+so the CUDA vector rule cannot distinguish it from other non-basic elements. Repair that producer
+interface rather than introducing another BF16 AST type, using UInt16/Half as a semantic substitute,
+patching reflection output, or weakening downstream aggregate checks. Preserve native BF2, Half
+padding, ordinary vectors, non-CUDA layouts and all storage admission boundaries. Shared layout
+impact requires public-reflection and explicit CUDA-query regressions plus a full checkpoint.
+
+No new physical LLVM storage representation is qualified by253. The role-specific boundaries and
+component-array/vector distinctions recorded240 remain requirements for a separate storage slice.
