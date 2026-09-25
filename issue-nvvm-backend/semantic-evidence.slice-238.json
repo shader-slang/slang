@@ -1,0 +1,1101 @@
+{
+  "schema": "nvvm-semantic-research-v1",
+  "slice": 238,
+  "status": "accepted-research",
+  "validation_date_utc": "2026-09-25",
+  "scope": "Research only: canonical scalar BF16 format/storage/conversion and bounded arithmetic/dot contract; no production support change",
+  "source_commit": "2e21fa2dfa87adbacf8ead26690c26c88896ac55",
+  "provider_abi": 37,
+  "provenance": {
+    "environment": "Native Ubuntu 24.04, L4 SM89, target SM80, driver 580.126.09, CUDA 12.9.2 / NVRTC 12.9.86, LLVM 14, RelWithDebInfo",
+    "before": {
+      "path": "build/nvvm-loop/slice-238-bf16/before.json",
+      "sha256": "4c3de6905459670d0f1423a50d696b5b3f415ccac31c87402b5c18029f92ec75"
+    },
+    "after": {
+      "path": "build/nvvm-loop/slice-238-bf16/after.json",
+      "sha256": "78e72dc588f626c873b712e3b9d048906b68840c0be48ea96de276945f01bfe8"
+    },
+    "gpu_before": {
+      "path": "build/nvvm-loop/slice-238-bf16/gpu-before.csv",
+      "sha256": "d6efb715059e70ff1b5ed59f275d3ca446e85fc576a2d1af29931d59e63bc34b"
+    },
+    "gpu_after": {
+      "path": "build/nvvm-loop/slice-238-bf16/gpu-after.csv",
+      "sha256": "d6efb715059e70ff1b5ed59f275d3ca446e85fc576a2d1af29931d59e63bc34b"
+    },
+    "identity_counts": {
+      "tested_source_sha256": 35,
+      "artifact_sha256": 12,
+      "runtime_input_sha256": 557
+    },
+    "mismatches": [],
+    "primary_source_sha256": {
+      "source/slang/core.meta.slang": "1f22b59c1b557ffe45aa528c70d536a30746d3519153a6710cafa9a7c546c993",
+      "source/slang/hlsl.meta.slang": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e",
+      "source/slang/slang-emit-cuda.cpp": "082c283d95eb860937bcb17601402aff52148997eb36d939e9a439b776b1ff45",
+      "source/slang/slang-ir-layout.cpp": "0d92bd6e68c3d2664a1832ba50e59e43bdcad7dda2874672ecf32c110e888a6c",
+      "source/slang/slang-type-layout.cpp": "7f6d78a9a8968f6ad3dfdd4ca03f30b45185c4f4caaf563c2c0701b9d249d5a5",
+      "source/core/slang-math.h": "8b88e7259774bcc9ffcca95f4a0aad2640086f052dca9f669c0315d51de98eec",
+      "source/slang/slang-emit-nvvm.cpp": "9cd8d8564617d0b3f295a8b6ce165891b16279181bdec0c5f415d13a1709c986",
+      "source/slang/slang-emit-nvvm-type-lowering.cpp": "98224558c7b89eb56f2de3f1c32e54fe4b9794def404977286751a7e23319cd9",
+      "source/compiler-core/slang-nvvm-ir-builder-api.h": "130c499ba03375fedf0ebb9c885ad0f15350d5f4b9d404c5eb43492b13fc73ee",
+      "source/compiler-core/slang-nvvm-semantic-catalog.h": "f606ff7c88c07ee6473d94c7f9e91fcad6fc9e2d3c1a37236e291f4a29b7f138",
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "315d5600af2a55e7d798f05d3b29da4e218d9f6f22cb5875958ddfce36f922e7",
+      "prelude/slang-cuda-prelude.h": "35234d28dc1a168b5956c50ef4ea56c33aad1cc0fe398b796335156bcc665f1b",
+      "/usr/local/cuda-12.9/include/cuda_bf16.h": "565d09e6777e3ad62e551a437cb8cd1ce8e2a178281acabc462087d1b4654e6c",
+      "/usr/local/cuda-12.9/include/cuda_bf16.hpp": "78904455bdfe8b3d55969b6d140e099e123bad2cddfc23d7cd96a0d3f1d13f8b",
+      "/usr/local/cuda-12.9/bin/nvcc": "df9974db233a0b7a6c6d59c0e5d74e011566104098bcb3553495ff1b95bdeaf6"
+    }
+  },
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-237.json",
+    "sha256": "218da7580cc74238a9c7cec04073407d6e6bc8e36360465fa749c96c301a46e0"
+  },
+  "checkpoint": {
+    "last_full": 237,
+    "latest_targeted": 233,
+    "implementation_slices_since_full": 0,
+    "full_counts": {
+      "identities_frozen": 452,
+      "cells_frozen": 1356,
+      "identities_discovery": 109,
+      "cells_discovery": 327,
+      "total": 1683,
+      "correct": 1640,
+      "unresolved": 43,
+      "resolved_histories": 14
+    },
+    "fresh_corpus_cells": 3,
+    "inherited_corpus_cells": 1680,
+    "support_delta": 0,
+    "new_corpus_identities": 0
+  },
+  "fresh_gates": {
+    "runtime_smoke": {
+      "passed": 4,
+      "executed": 4,
+      "return_code": 0,
+      "evidence": {
+        "path": "build/nvvm-loop/slice-238-bf16/runtime/results.json",
+        "sha256": "b3cf13291700ef286716cdc22d40ad37127f1c355a5cae530aa01e6f9c019210"
+      }
+    },
+    "frozen": [
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "source": "hlsl-intrinsic/scalar-bf16.slang",
+        "source_line": 2,
+        "source_test_ordinal": 1,
+        "cuda_ordinal": 1,
+        "mode": "nvrtc-o3",
+        "capability": "cuda_sm_8_0",
+        "reference_derived_from_direct": false,
+        "classification": "correct",
+        "return_code": 0,
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "elapsed_ms": 1761,
+        "diagnostic": "",
+        "canonical_shape": "",
+        "log": "build/nvvm-loop/slice-238-bf16/frozen/logs/nvrtc-o3/8501b061f7e45e3f9b40b2c174b039a4f5ed65c9.log",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-238-bf16/frozen/logs/nvrtc-o3/8501b061f7e45e3f9b40b2c174b039a4f5ed65c9.log",
+          "sha256": "2d324dc03f264fc372d1f58f0955e9b62e48955c9da1367813345e0d3c76a579"
+        }
+      },
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "source": "hlsl-intrinsic/scalar-bf16.slang",
+        "source_line": 2,
+        "source_test_ordinal": 1,
+        "cuda_ordinal": 1,
+        "mode": "nvvm-o0",
+        "capability": "cuda_sm_8_0",
+        "reference_derived_from_direct": false,
+        "classification": "preflight",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "elapsed_ms": 1308,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: BFloat16'",
+        "canonical_shape": "helper function result type",
+        "log": "build/nvvm-loop/slice-238-bf16/frozen/logs/nvvm-o0/e48b3507f473e8ad205bfd22cfb1f5c8e847312e.log",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-238-bf16/frozen/logs/nvvm-o0/e48b3507f473e8ad205bfd22cfb1f5c8e847312e.log",
+          "sha256": "641fe0d988ae474f4bf81a31f021c2953e97224cc1332e7ffbfaa89adc99d539"
+        }
+      },
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "source": "hlsl-intrinsic/scalar-bf16.slang",
+        "source_line": 2,
+        "source_test_ordinal": 1,
+        "cuda_ordinal": 1,
+        "mode": "nvvm-o3",
+        "capability": "cuda_sm_8_0",
+        "reference_derived_from_direct": false,
+        "classification": "preflight",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "elapsed_ms": 1289,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function result type: BFloat16'",
+        "canonical_shape": "helper function result type",
+        "log": "build/nvvm-loop/slice-238-bf16/frozen/logs/nvvm-o3/dfae1229391a0aa15b4241855c06cff3125fe2d5.log",
+        "evidence": {
+          "path": "build/nvvm-loop/slice-238-bf16/frozen/logs/nvvm-o3/dfae1229391a0aa15b4241855c06cff3125fe2d5.log",
+          "sha256": "d95f9bff91332d76c65b0a69f13795946f2c1d5c0a0be49da29a17ff3b3da8a3"
+        }
+      }
+    ],
+    "frozen_comparison": {
+      "expected_cells": 3,
+      "observed_cells": 3,
+      "unique_cells": 3,
+      "fields": [
+        "classification",
+        "return_code",
+        "execution_counts",
+        "diagnostic",
+        "canonical_shape"
+      ],
+      "deltas": []
+    },
+    "compile_controls": [
+      {
+        "name": "convert",
+        "mode": "cuda-o3",
+        "command": [
+          "/usr/local/cuda-12.9/bin/nvcc",
+          "-ptx",
+          "-O3",
+          "-arch=compute_80",
+          "build/nvvm-loop/slice-238-bf16/controls/convert.cu",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.ptx"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.log"
+      },
+      {
+        "name": "arithmetic",
+        "mode": "cuda-o3",
+        "command": [
+          "/usr/local/cuda-12.9/bin/nvcc",
+          "-ptx",
+          "-O3",
+          "-arch=compute_80",
+          "build/nvvm-loop/slice-238-bf16/controls/arithmetic.cu",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.ptx"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.log"
+      },
+      {
+        "name": "convert",
+        "mode": "nvrtc-o3",
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-238-bf16/controls/convert.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvrtc",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.ptx",
+          "-dump-ir"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.log"
+      },
+      {
+        "name": "convert",
+        "mode": "nvvm-o0",
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-238-bf16/controls/convert.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-nvvm-o0.ptx",
+          "-dump-ir"
+        ],
+        "return_code": 255,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/convert-nvvm-o0.log"
+      },
+      {
+        "name": "convert",
+        "mode": "nvvm-o3",
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-238-bf16/controls/convert.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-nvvm-o3.ptx",
+          "-dump-ir"
+        ],
+        "return_code": 255,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/convert-nvvm-o3.log"
+      },
+      {
+        "name": "dot",
+        "mode": "nvrtc-o3",
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-238-bf16/controls/dot.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvrtc",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.ptx",
+          "-dump-ir"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.log"
+      },
+      {
+        "name": "dot",
+        "mode": "nvvm-o0",
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-238-bf16/controls/dot.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/dot-nvvm-o0.ptx",
+          "-dump-ir"
+        ],
+        "return_code": 255,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/dot-nvvm-o0.log"
+      },
+      {
+        "name": "dot",
+        "mode": "nvvm-o3",
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "build/nvvm-loop/slice-238-bf16/controls/dot.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O3",
+          "-emit-cuda-via-nvvm",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/dot-nvvm-o3.ptx",
+          "-dump-ir"
+        ],
+        "return_code": 255,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/dot-nvvm-o3.log"
+      },
+      {
+        "name": "arithmetic-cuda-o3",
+        "mode": "assembly-sm80",
+        "command": [
+          "/usr/local/cuda-12.9/bin/ptxas",
+          "-arch=sm_80",
+          "build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.ptx",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.cubin"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.assembly.log"
+      },
+      {
+        "name": "convert-cuda-o3",
+        "mode": "assembly-sm80",
+        "command": [
+          "/usr/local/cuda-12.9/bin/ptxas",
+          "-arch=sm_80",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.ptx",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.cubin"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.assembly.log"
+      },
+      {
+        "name": "convert-nvrtc-o3",
+        "mode": "assembly-sm80",
+        "command": [
+          "/usr/local/cuda-12.9/bin/ptxas",
+          "-arch=sm_80",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.ptx",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.cubin"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.assembly.log"
+      },
+      {
+        "name": "dot-nvrtc-o3",
+        "mode": "assembly-sm80",
+        "command": [
+          "/usr/local/cuda-12.9/bin/ptxas",
+          "-arch=sm_80",
+          "build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.ptx",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.cubin"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.assembly.log"
+      }
+    ],
+    "llvm_feasibility": [
+      {
+        "family": "raw-nvvm",
+        "name": "physical-i16-o0",
+        "opt": 0,
+        "source": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0.ll",
+        "verify": 0,
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.log",
+        "output": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.ptx",
+        "output_exists": true,
+        "options": ["-arch=compute_80", "-opt=0"],
+        "assembly": {
+          "command": [
+            "/usr/local/cuda-12.9/bin/ptxas",
+            "-arch=sm_80",
+            "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.ptx",
+            "-o",
+            "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.cubin"
+          ],
+          "return_code": 0,
+          "log": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.assembly.log"
+        }
+      },
+      {
+        "family": "raw-nvvm",
+        "name": "physical-i16-o3",
+        "opt": 3,
+        "source": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3.ll",
+        "verify": 0,
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.log",
+        "output": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.ptx",
+        "output_exists": true,
+        "options": ["-arch=compute_80", "-opt=3"],
+        "assembly": {
+          "command": [
+            "/usr/local/cuda-12.9/bin/ptxas",
+            "-arch=sm_80",
+            "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.ptx",
+            "-o",
+            "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.cubin"
+          ],
+          "return_code": 0,
+          "log": "build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.assembly.log"
+        }
+      },
+      {
+        "family": "raw-nvvm",
+        "name": "native-bfloat-o0",
+        "opt": 0,
+        "source": "build/nvvm-loop/slice-238-bf16/llvm/native-bfloat-o0.ll",
+        "verify": 6,
+        "return_code": 6,
+        "log": "build/nvvm-loop/slice-238-bf16/llvm/native-bfloat-o0-o0.log",
+        "output": "build/nvvm-loop/slice-238-bf16/llvm/native-bfloat-o0-o0.ptx",
+        "output_exists": false,
+        "options": ["-arch=compute_80", "-opt=0"]
+      },
+      {
+        "family": "raw-nvvm",
+        "name": "native-bfloat-o3",
+        "opt": 3,
+        "source": "build/nvvm-loop/slice-238-bf16/llvm/native-bfloat-o3.ll",
+        "verify": 6,
+        "return_code": 6,
+        "log": "build/nvvm-loop/slice-238-bf16/llvm/native-bfloat-o3-o3.log",
+        "output": "build/nvvm-loop/slice-238-bf16/llvm/native-bfloat-o3-o3.ptx",
+        "output_exists": false,
+        "options": ["-arch=compute_80", "-opt=3"]
+      }
+    ],
+    "trace_attempts": [
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "tests/hlsl-intrinsic/scalar-bf16.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "cuda",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-dump-ir",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/trace/frozen.cuda"
+        ],
+        "return_code": 0,
+        "log": "build/nvvm-loop/slice-238-bf16/trace/frozen-cuda.log"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "tests/hlsl-intrinsic/scalar-bf16.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "ptx",
+          "-capability",
+          "cuda_sm_8_0",
+          "-O0",
+          "-dump-ir",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/trace/frozen.ptx",
+          "-emit-cuda-via-nvvm"
+        ],
+        "return_code": 255,
+        "log": "build/nvvm-loop/slice-238-bf16/trace/frozen-ptx.log"
+      },
+      {
+        "command": [
+          "build/RelWithDebInfo/bin/slangc",
+          "tests/compute/dynamic-dispatch-substandard-float.slang",
+          "-entry",
+          "computeMain",
+          "-stage",
+          "compute",
+          "-target",
+          "cuda",
+          "-capability",
+          "cuda_sm_8_9",
+          "-O0",
+          "-dump-ir",
+          "-o",
+          "build/nvvm-loop/slice-238-bf16/trace/dynamic.cuda"
+        ],
+        "return_code": 255,
+        "log": "build/nvvm-loop/slice-238-bf16/trace/dynamic-cuda.log"
+      }
+    ],
+    "layout": {
+      "command": [
+        "/usr/local/cuda-12.9/bin/nvcc",
+        "-std=c++17",
+        "-arch=compute_80",
+        "-c",
+        "build/nvvm-loop/slice-238-bf16/controls/layout.cu",
+        "-o",
+        "build/nvvm-loop/slice-238-bf16/controls/layout.o"
+      ],
+      "return_code": 0,
+      "source": {
+        "path": "build/nvvm-loop/slice-238-bf16/controls/layout.cu",
+        "sha256": "a30cc1a85ccfc1da3b7d701d41d5c7ac259865f11c697f405d41722ff9b01a77"
+      },
+      "object": {
+        "path": "build/nvvm-loop/slice-238-bf16/controls/layout.o",
+        "sha256": "2c4537651184067ad39d4d3c8c164f26f54732d7076cf5cdc56fe3b23c62a19b"
+      },
+      "sizeof_alignof": {
+        "scalar": [2, 2],
+        "vector1": [2, 2],
+        "vector2": [4, 4],
+        "vector3": [6, 2],
+        "vector4": [8, 2]
+      }
+    }
+  },
+  "controls": [
+    {
+      "family": "convert",
+      "mode": "cuda-o3",
+      "records": 73190,
+      "words": 1171041,
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.output.bin",
+      "return_code": 0,
+      "checked_outputs": 365950,
+      "preserved_words": 805091,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": ["7fff"]
+      },
+      "integer_double_round_distinct_cases": [
+        {
+          "integer": 3217031166,
+          "correct": "0xce81",
+          "via_float": "0xce80"
+        },
+        {
+          "integer": 3217031167,
+          "correct": "0xce81",
+          "via_float": "0xce80"
+        },
+        {
+          "integer": 3755999230,
+          "correct": "0xce01",
+          "via_float": "0xce00"
+        },
+        {
+          "integer": 3755999231,
+          "correct": "0xce01",
+          "via_float": "0xce00"
+        },
+        {
+          "integer": 4025483262,
+          "correct": "0xcd81",
+          "via_float": "0xcd80"
+        },
+        {
+          "integer": 4025483263,
+          "correct": "0xcd81",
+          "via_float": "0xcd80"
+        },
+        {
+          "integer": 4160225278,
+          "correct": "0xcd01",
+          "via_float": "0xcd00"
+        },
+        {
+          "integer": 4160225279,
+          "correct": "0xcd01",
+          "via_float": "0xcd00"
+        },
+        {
+          "integer": 4227596286,
+          "correct": "0xcc81",
+          "via_float": "0xcc80"
+        },
+        {
+          "integer": 4227596287,
+          "correct": "0xcc81",
+          "via_float": "0xcc80"
+        },
+        {
+          "integer": 4261281790,
+          "correct": "0xcc01",
+          "via_float": "0xcc00"
+        },
+        {
+          "integer": 4261281791,
+          "correct": "0xcc01",
+          "via_float": "0xcc00"
+        },
+        {
+          "integer": 4278124543,
+          "correct": "0xcb81",
+          "via_float": "0xcb80"
+        },
+        {
+          "integer": 16842753,
+          "correct": "0x4b81",
+          "via_float": "0x4b80"
+        },
+        {
+          "integer": 33685505,
+          "correct": "0x4c01",
+          "via_float": "0x4c00"
+        },
+        {
+          "integer": 33685506,
+          "correct": "0x4c01",
+          "via_float": "0x4c00"
+        },
+        {
+          "integer": 67371009,
+          "correct": "0x4c81",
+          "via_float": "0x4c80"
+        },
+        {
+          "integer": 67371010,
+          "correct": "0x4c81",
+          "via_float": "0x4c80"
+        },
+        {
+          "integer": 134742017,
+          "correct": "0x4d01",
+          "via_float": "0x4d00"
+        },
+        {
+          "integer": 134742018,
+          "correct": "0x4d01",
+          "via_float": "0x4d00"
+        },
+        {
+          "integer": 269484033,
+          "correct": "0x4d81",
+          "via_float": "0x4d80"
+        },
+        {
+          "integer": 269484034,
+          "correct": "0x4d81",
+          "via_float": "0x4d80"
+        },
+        {
+          "integer": 538968065,
+          "correct": "0x4e01",
+          "via_float": "0x4e00"
+        },
+        {
+          "integer": 538968066,
+          "correct": "0x4e01",
+          "via_float": "0x4e00"
+        },
+        {
+          "integer": 1077936129,
+          "correct": "0x4e81",
+          "via_float": "0x4e80"
+        },
+        {
+          "integer": 1077936130,
+          "correct": "0x4e81",
+          "via_float": "0x4e80"
+        }
+      ],
+      "output_ref": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/convert-cuda-o3.output.bin",
+        "sha256": "29b2c9ba6df1e14e338813c88660954a8ee6a3eb25627e6bc2fdf5a4573a9a3c"
+      }
+    },
+    {
+      "family": "convert",
+      "mode": "nvrtc-o3",
+      "records": 73190,
+      "words": 1171041,
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.output.bin",
+      "return_code": 0,
+      "checked_outputs": 365950,
+      "preserved_words": 805091,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "6": ["7fff"]
+      },
+      "integer_double_round_distinct_cases": [
+        {
+          "integer": 3217031166,
+          "correct": "0xce81",
+          "via_float": "0xce80"
+        },
+        {
+          "integer": 3217031167,
+          "correct": "0xce81",
+          "via_float": "0xce80"
+        },
+        {
+          "integer": 3755999230,
+          "correct": "0xce01",
+          "via_float": "0xce00"
+        },
+        {
+          "integer": 3755999231,
+          "correct": "0xce01",
+          "via_float": "0xce00"
+        },
+        {
+          "integer": 4025483262,
+          "correct": "0xcd81",
+          "via_float": "0xcd80"
+        },
+        {
+          "integer": 4025483263,
+          "correct": "0xcd81",
+          "via_float": "0xcd80"
+        },
+        {
+          "integer": 4160225278,
+          "correct": "0xcd01",
+          "via_float": "0xcd00"
+        },
+        {
+          "integer": 4160225279,
+          "correct": "0xcd01",
+          "via_float": "0xcd00"
+        },
+        {
+          "integer": 4227596286,
+          "correct": "0xcc81",
+          "via_float": "0xcc80"
+        },
+        {
+          "integer": 4227596287,
+          "correct": "0xcc81",
+          "via_float": "0xcc80"
+        },
+        {
+          "integer": 4261281790,
+          "correct": "0xcc01",
+          "via_float": "0xcc00"
+        },
+        {
+          "integer": 4261281791,
+          "correct": "0xcc01",
+          "via_float": "0xcc00"
+        },
+        {
+          "integer": 4278124543,
+          "correct": "0xcb81",
+          "via_float": "0xcb80"
+        },
+        {
+          "integer": 16842753,
+          "correct": "0x4b81",
+          "via_float": "0x4b80"
+        },
+        {
+          "integer": 33685505,
+          "correct": "0x4c01",
+          "via_float": "0x4c00"
+        },
+        {
+          "integer": 33685506,
+          "correct": "0x4c01",
+          "via_float": "0x4c00"
+        },
+        {
+          "integer": 67371009,
+          "correct": "0x4c81",
+          "via_float": "0x4c80"
+        },
+        {
+          "integer": 67371010,
+          "correct": "0x4c81",
+          "via_float": "0x4c80"
+        },
+        {
+          "integer": 134742017,
+          "correct": "0x4d01",
+          "via_float": "0x4d00"
+        },
+        {
+          "integer": 134742018,
+          "correct": "0x4d01",
+          "via_float": "0x4d00"
+        },
+        {
+          "integer": 269484033,
+          "correct": "0x4d81",
+          "via_float": "0x4d80"
+        },
+        {
+          "integer": 269484034,
+          "correct": "0x4d81",
+          "via_float": "0x4d80"
+        },
+        {
+          "integer": 538968065,
+          "correct": "0x4e01",
+          "via_float": "0x4e00"
+        },
+        {
+          "integer": 538968066,
+          "correct": "0x4e01",
+          "via_float": "0x4e00"
+        },
+        {
+          "integer": 1077936129,
+          "correct": "0x4e81",
+          "via_float": "0x4e80"
+        },
+        {
+          "integer": 1077936130,
+          "correct": "0x4e81",
+          "via_float": "0x4e80"
+        }
+      ],
+      "output_ref": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/convert-nvrtc-o3.output.bin",
+        "sha256": "29b2c9ba6df1e14e338813c88660954a8ee6a3eb25627e6bc2fdf5a4573a9a3c"
+      }
+    },
+    {
+      "family": "arithmetic",
+      "mode": "cuda-o3",
+      "records": 676,
+      "words": 10817,
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.output.bin",
+      "return_code": 0,
+      "checked_outputs": 2704,
+      "preserved_words": 8113,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "7": ["7fff"],
+        "6": ["7fff"],
+        "4": ["7fff"],
+        "5": ["7fff"]
+      },
+      "integer_double_round_distinct_cases": [],
+      "output_ref": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/arithmetic-cuda-o3.output.bin",
+        "sha256": "746d3d6bec6264eeb60ed7dedcc8fd406ba6c0acbed441223f7146d199bd1888"
+      }
+    },
+    {
+      "family": "dot",
+      "mode": "nvrtc-o3",
+      "records": 679,
+      "words": 10865,
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.output.bin",
+      "return_code": 0,
+      "checked_outputs": 679,
+      "preserved_words": 10186,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": {
+        "4": ["7fff"]
+      },
+      "integer_double_round_distinct_cases": [],
+      "output_ref": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/controls/dot-nvrtc-o3.output.bin",
+        "sha256": "1fff0f572f227b4c0d739b04018c1a484412cc6bcfba176434122c91bd994034"
+      }
+    }
+  ],
+  "raw_nvvm_runtime": [
+    {
+      "mode": "nvvm-o0",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.output.bin",
+      "records": 73190,
+      "words": 1171041,
+      "checked_outputs": 219570,
+      "preserved_words": 951471,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": ["0x7fff"],
+      "output_ref": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o0-o0.output.bin",
+        "sha256": "0b313979edf997b66e4ae8fc4d1af4c01e4308a6d53ef15e73febebb15cfe242"
+      }
+    },
+    {
+      "mode": "nvvm-o3",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.output.bin",
+      "records": 73190,
+      "words": 1171041,
+      "checked_outputs": 219570,
+      "preserved_words": 951471,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "nan_observations": ["0x7fff"],
+      "output_ref": {
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-238-bf16/llvm/physical-i16-o3-o3.output.bin",
+        "sha256": "0b313979edf997b66e4ae8fc4d1af4c01e4308a6d53ef15e73febebb15cfe242"
+      }
+    }
+  ],
+  "input_summary": {
+    "datasets": [
+      {
+        "name": "convert",
+        "records": 73190,
+        "words": 1171041,
+        "expected_nan_marker": "ffffffff only at output positions; predicate checks BF16 NaN, not payload"
+      },
+      {
+        "name": "arithmetic",
+        "records": 676,
+        "words": 10817,
+        "expected_nan_marker": "ffffffff only at output positions; predicate checks BF16 NaN, not payload"
+      },
+      {
+        "name": "dot",
+        "records": 679,
+        "words": 10865,
+        "expected_nan_marker": "ffffffff only at output positions; predicate checks BF16 NaN, not payload"
+      }
+    ],
+    "integer_cases": [
+      -2147483648, -1077936130, -1077936129, -1077936128, -1077936127,
+      -1077936126, -538968066, -538968065, -538968064, -538968063, -538968062,
+      -269484034, -269484033, -269484032, -269484031, -269484030, -134742018,
+      -134742017, -134742016, -134742015, -134742014, -67371010, -67371009,
+      -67371008, -67371007, -67371006, -33685506, -33685505, -33685504,
+      -33685503, -33685502, -16842754, -16842753, -16842752, -16842751,
+      -16842750, -1, 0, 1, 16842750, 16842751, 16842752, 16842753, 16842754,
+      33685502, 33685503, 33685504, 33685505, 33685506, 67371006, 67371007,
+      67371008, 67371009, 67371010, 134742014, 134742015, 134742016, 134742017,
+      134742018, 269484030, 269484031, 269484032, 269484033, 269484034,
+      538968062, 538968063, 538968064, 538968065, 538968066, 1077936126,
+      1077936127, 1077936128, 1077936129, 1077936130, 2147483647
+    ],
+    "float_patterns": 73190,
+    "arithmetic_patterns": [
+      0, 32768, 1, 32769, 127, 32895, 128, 32896, 16128, 48896, 16256, 49024,
+      16257, 49025, 16384, 49152, 16448, 16512, 32639, 65407, 32640, 65408,
+      32641, 65409, 32704, 65473
+    ],
+    "dot_fixed_cases": [
+      [
+        [16256, 16384, 16448, 16512],
+        [16128, 16128, 16256, 16256]
+      ],
+      [
+        [16256, 15232, 49024, 0],
+        [16256, 16256, 16256, 16256]
+      ],
+      [
+        [16257, 49024, 0, 0],
+        [16257, 16258, 0, 0]
+      ]
+    ]
+  },
+  "runtime_totals": {
+    "launches": 6,
+    "checked_outputs": 1174423,
+    "preserved_input_sentinel_words": 3531423,
+    "complete_returned_words": 4705846,
+    "mismatches": 0,
+    "successful_sm80_assemblies": 6
+  },
+  "inherited_gates": {
+    "from_full237_only": {
+      "units_passed": 481,
+      "existing_skips": 1,
+      "toolkit_passed": 18,
+      "runner_contracts_passed": 6,
+      "material_compile_assembly_passed": 6,
+      "clock_replay_launches": 60
+    },
+    "freshly_executed_here": false,
+    "all_unresolved_and_resolved_history": "Retained by immutable full237 reference; no ledger edit or baseline reset"
+  },
+  "semantic_contract": {
+    "canonical_source": "core.meta BFloat16Type; CastIntToFloat integer constructor; FloatCast floating constructor and expansion; hlsl.meta canonical _slang_vector_dot; no producer bug",
+    "format_boundary": "FLOATING_POINT 16 and getFloatingPointType(16) are IEEE half; explicit BF format and negotiated ABI required. Physical i16 transport never licenses integer or half semantics.",
+    "f32_to_bf16": "RNE cvt.rn.bf16.f32 at SM80; preserved signed zero/infinity; finite oracle exact rational; NaN classification only expected, measured 0x7fff.",
+    "bf16_to_f32": "Target SM80 CUDA header upper-word bit transport, including every NaN encoding; no general SM90 NaN payload guarantee.",
+    "integer": "CUDA __int2bfloat16_rn at SM80 uses directed FP32 conversion + sticky bit. 16842753\u21924b81; via nearest FP32\u21924b80. 75 cases / 26 distinct counterexamples; integer recipe separate.",
+    "dot": "BF2/3/4 prelude begins +0 and rounds every product and sum in lane order; frozen dot4\u21924108; cancellation controls\u21920000. No FP32 accumulator or contraction substitution.",
+    "hardware": "BF16 FMA and F32 narrowing SM80; native BF add/sub/mul and broad integer/BF conversions SM90. L4 SM89 target80 does not admit SM90 instructions.",
+    "native_bfloat": "Installed libNVVM 12.9 parse_expected_type at O0/O3, rc6; no runtime.",
+    "existing_helpers": "Reuse role-based storage/helper machinery only after format audit; Half i16 ABI is precedent, compact Half vector layout not BF policy. FloatToBFloat16 finite RNE helper has different NaN payload behavior."
+  },
+  "oracle_correction": {
+    "attempt": {
+      "path": "build/nvvm-loop/slice-238-bf16/attempts/oracle-offbyone-attempt1.py",
+      "sha256": "18fdc2a100793031c7bffcb472bc29a1d45fc14d2482d6f7d165b8d011c93ef0"
+    },
+    "log": {
+      "path": "build/nvvm-loop/slice-238-bf16/attempts/oracle-attempt1.log",
+      "sha256": "03876c9e15b07160640263b4af9ceb855dacdaf12042adc1cfd94a7286fec045"
+    },
+    "failure": "Hand assertion failed before input generation/GPU; exponent=step+133 corrected to step+134",
+    "gpu_or_expected_buffers_dependent_on_failed_version": 0,
+    "semantic_control_failures_hidden": 0
+  },
+  "handoff": {
+    "next_bounded_implementation": "Distinct semantic BF16/provider ABI plus scalar constants/exact bit transport/Float32 conversions; prove dynamic scalar fixture and use unchanged oracle buffers. Keep unqualified conversions/roles rejected. Shared type/provider changes require a full checkpoint.",
+    "frozen_dependency": "Original frozen additionally needs vector bit transport/casts and canonical dot; scalar conversion alone is not original workload support.",
+    "dynamic_dispatch": "Full237 rejects helper result A containing FP8; B contains BF2. Source-only CLI without type conformances rejects E50100 and is early IR evidence only.",
+    "candidate_ranking": [
+      "BF16 scalar semantic format/storage/conversion: two frozen measured gaps; selected research",
+      "FP8: separate dynamic/source width boundary",
+      "arbitrary RequirePrelude: separate",
+      "matrix: already documented CUDA column-major ignored target-wide limitation",
+      "textures: separate resource contract"
+    ],
+    "material_reconsidered": "Six accepted237 compile/assembly passes inherited; binding/texture/LUT/input/output oracle absent. No runtime/performance claim."
+  },
+  "limitations": [
+    "No compiler builds or production/provider/ABI/frontend/library/test/corpus/runner changes",
+    "No BF16 failures resolved; direct generated convert/dot controls remain unsupported",
+    "Finite rounding independent, NaN payload observations are not spec defaults",
+    "Exhaustive scalar BF transport/expansion only; Float32 inputs and int/arithmetic/dot cases bounded",
+    "Double/Half and other width conversions, aggregate/resource layout and general BF to int unqualified",
+    "Native bfloat rejected by this dialect; physical i16 prototype not production architecture",
+    "No device loss, driver change, system change, commit or push"
+  ],
+  "primary_contract": {
+    "path": "build/nvvm-loop/slice-238-bf16/source-contract.md",
+    "sha256": "c7d5bdccd8068e3bc518701b863fc64ee370e16ec3dbc3c2168badc748389167"
+  },
+  "raw_artifact_index": {
+    "path": "build/nvvm-loop/slice-238-bf16/artifact-index.json",
+    "sha256": "372a181d3e1d7da267d236da46882057a97fcf4d8d54b44b94b28e083fc98d0d"
+  },
+  "raw_artifact_count": 117,
+  "self_review": {
+    "new_production_helpers_fallbacks_special_cases": [],
+    "input_shape": "Valid canonical BF type retained; consumer backend lacks a distinct format. No AST/IR workaround.",
+    "formatter": "Explicit changed Markdown paths only; unrelated historical design hunks restored by exact reverse patch",
+    "unrelated_reverse_patch": {
+      "path": "build/nvvm-loop/slice-238-bf16/unrelated-formatting.patch",
+      "sha256": "7832f3ca2d7c9807d682f0f2edbf6d68d41ff474058f4f1ba4e74f4f00479965"
+    }
+  },
+  "parent_acceptance": {
+    "status": "passed",
+    "audit": {
+      "path": "build/nvvm-loop/slice-238-bf16/parent-acceptance-audit.json",
+      "sha256": "14940a1f8426cfd06f4a2501c72fd7c13f24e9ab5a4a1b93bc69c75950647a40"
+    },
+    "checker": {
+      "path": "build/nvvm-loop/slice-238-bf16/parent-audit.py",
+      "sha256": "92a201cdc483260beaa5591eb197a553018c0f514295db9199b184c8ee2a0c83"
+    },
+    "independent_oracle": {
+      "path": "build/nvvm-loop/slice-238-bf16/parent-oracle.py",
+      "sha256": "f5d77ca24ece1748c55ca21d53a25ef6a0db9992bb6378015f38a321bbe826c6"
+    },
+    "oracle_audit": {
+      "path": "build/nvvm-loop/slice-238-bf16/parent-oracle-audit.json",
+      "sha256": "660d51a737683254fa86482a00ba355e2acd46e519707f3ac8af6747ff7477a3"
+    },
+    "summary": "125 unique evidence references including all117 indexed raw artifacts; unchanged35source12artifact557inputs plus15primarysources; exact3frozenoutcomes; second oracle verifies all4705846 returned words."
+  }
+}

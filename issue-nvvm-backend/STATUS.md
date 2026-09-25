@@ -16,11 +16,23 @@ Independent parent acceptance passes. Latest accepted implementation/full checkp
 latest targeted acceptance: 233; implementation slices since full: zero. Rolling feature history
 is 233 FP16 MIN/MAX, 235 quad helpers and 237 live clocks. No push is authorized.
 
-Next action: research the measured scalar BF16 boundary and its source conversion/arithmetic
-contract before selecting a bounded implementation. The matrix mismatch is already documented as
-CUDA's target-wide layout limitation; arbitrary prelude text and resource boundaries remain separate.
-Material runtime bindings, textures/LUT/input and output oracle are still absent; retain its six
-compile/assembly support cells without a runtime or performance claim.
+**Research slice 238 is accepted.** Read its
+[plan](plan.slice-238-bf16.md), [report](report.slice-238-bf16.md) and
+[semantic evidence](semantic-evidence.slice-238.json). All 35 source, 12 artifact and 557 input
+hashes match 237 before/after; fresh smoke 4/4 and the exact scalar-bf16 frozen three cells preserve
+237 outcomes. Six isolated launches pass 1,174,423 independent output checks and 3,531,423
+input/sentinel checks; six SM80 assemblies and scalar/vector layout assertions pass. Native LLVM
+`bfloat` is rejected by this libNVVM parser. Production support and checkpoint cadence are unchanged.
+
+Next action: select a bounded BF16 semantic-format/provider contract and scalar storage/Float32
+conversion slice. Keep BF16 distinct from IEEE half; physical i16 is transport, not semantic type.
+Integer construction has measured double-rounding counterexamples and needs its own exact recipe.
+The frozen workload additionally needs vector bit transport/casts and source-ordered BF16 dot;
+scalar conversion alone must not claim either frozen direct cell. Shared type/provider changes
+require a full checkpoint. Dynamic-dispatch's struct A/FP8, arbitrary prelude text and textures stay
+separate; the matrix mismatch is CUDA's documented target-wide ignored column-major limitation.
+Material runtime bindings, textures/LUT/input and output oracle remain absent; inherit its six
+237 compile/assembly cells without a runtime or performance claim.
 
 ## Checkpoints and evidence
 
@@ -92,3 +104,8 @@ research artifacts, all 35 source/12 artifact/557 input hashes, exact old outcom
 and every complete clock replay buffer. See `slice-237-after/parent-acceptance-audit.json`.
 Only two old clock cells resolve and three fixture cells are added; full checkpoint 237 resets
 implementation cadence to zero.
+
+Parent research238 acceptance verified 125 unique evidence references, including all 117 indexed
+raw artifacts, unchanged source/artifact/input identities and exact frozen outcomes. A second oracle
+uses upper-word ties-even carry and exact rational nearest-neighbor rounding to check all six
+launches and all 4,705,846 returned words. See `slice-238-bf16/parent-acceptance-audit.json`.

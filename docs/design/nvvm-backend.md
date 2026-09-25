@@ -8234,3 +8234,37 @@ implementation handoff. [Implementation237](../../issue-nvvm-backend/report.slic
 adds strict invalid-contract/serialization units and a registered independently expected fixture.
 Unchanged research buffers and relational predicates replay through public NVRTC/direct O0/O3 and
 PTX controls; timestamp equality is never an oracle. The provider change forces a full checkpoint.
+
+### CUDA BF16 format boundary (slice 238 research)
+
+`BFloat16Type` is an intentional canonical Slang type. CUDA constructors lower to `FloatCast`
+and `CastIntToFloat`; vector `dot` selects `_slang_vector_dot`. The frozen scalar-bf16 source
+also requires 64-bit-to-four-lane bit transport, vector FloatCast and BF16 constants. The direct
+helper-result rejection is a backend capability gap, not a malformed frontend representation.
+
+Existing provider `FLOATING_POINT` width 16 and `getFloatingPointType(16)` mean IEEE half.
+Type-lowering role information also infers `isFloat16` from width 16. BF16 requires a distinct
+semantic format and negotiated provider contract, even if its physical storage is i16. Do not
+broaden the half classifier or use an integer semantic descriptor for BF16 arithmetic. The
+installed libNVVM 12.9 parser rejects native LLVM `bfloat`; isolated i16 helper/volatile storage
+and BF16 conversion controls pass at O0/O3. This is research evidence, not implemented support.
+
+On CUDA target SM80, Float32 narrowing uses nearest-even `cvt.rn.bf16.f32`; expansion places
+all BF bits in Float32's upper word. CUDA integer construction avoids double rounding: integer
+16842753 must produce 0x4b81, whereas nearest FP32 then BF16 gives 0x4b80. The CUDA header uses
+directed int-to-float conversions plus a sticky bit. Other source widths/conversions require
+separate admission proof. Scalar BF16 size/alignment is 2/2, packed BF2 is 4/4, custom BF3 is 6/2,
+and custom BF4 is 8/2. Existing compact Half storage policy must not silently govern BF vectors.
+
+The CUDA prelude's BF2/3/4 dot starts BF +0 and rounds each product and sum in source lane order.
+SM80 header add/sub/mul use BF16 FMA with 1, -1 and negative zero. Native BF16 add/sub/mul and
+broad integer/BF16 conversions require SM90. Do not replace the source dot with unrestricted
+FP32 accumulation or fused multiply-add. N0/N1 source branches have separate semantics.
+
+[Research 238](../../issue-nvvm-backend/report.slice-238-bf16.md) preserves an independent
+integer/rational oracle, exhaustive 65,536-pattern scalar transport/expansion, selected midpoint
+and special-value conversions, integer counterexamples and bounded arithmetic/dot controls.
+NaN expectations check classification; all measured narrowing/arithmetic NaNs were 0x7fff on
+this toolchain, while target SM80 expansion preserved all payload bits. Neither observation is a
+universal NaN encoding rule. The existing host `FloatToBFloat16` helper quiets/preserves payloads
+and needs explicit target semantics before reuse. No BF16 corpus failure resolves in this slice.
