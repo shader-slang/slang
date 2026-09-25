@@ -4,70 +4,55 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 220 is accepted: discovery capacity is 50 through 128, with the current 100 entries unchanged.**
-Read the [completed plan](plan.slice-220-discovery-capacity.md),
-[five-part report](report.slice-220-discovery-capacity.md) and
-[full result manifest](runtime-validation.slice-220.json). All 1,656 runtime cells freshly preserve
-accepted outcomes: 1,603 correct and 53 registered failures. All six material compile/assembly cells
-pass. An initial unfrozen partial run is explicitly excluded; the accepted run selects all 452
-immutable frozen identities using `census.slice-195.tsv`.
+**Slice 221 is accepted: scalar and aggregate FP64 masked min/max reductions execute correctly.**
+Read the [completed plan](plan.slice-221-fp64-minmax-admission.md),
+[five-part report](report.slice-221-fp64-minmax-admission.md) and
+[result manifest](runtime-validation.slice-221.json). The existing typed source algorithm now admits
+one-lane Float64 leaves, preserving caller seeds, ordered comparison/selection and source butterfly/
+scan order. FP64 arithmetic singleton/seed handling, prefixes and provider numeric min/max are unchanged.
 
-**Slice 218 is accepted: FP32 masked min/max preserves its CUDA source algorithm.** Read the
-[completed plan](plan.slice-218-minmax-algorithm.md), [five-part report](report.slice-218-minmax-algorithm.md)
-and [result manifest](runtime-validation.slice-218.json). Scalar and aggregate leaves use caller-seeded
-ordered comparison/selection, descending XOR butterfly stages for low contiguous power-of-two masks,
-and ascending scans of original inputs otherwise. FP64 sum seed handling shares the mask classifier
-but retains its behavior. Ordinary provider numeric min/max and FP64 admission remain unchanged.
+All 336 cases replayed from [research 219](semantic-evidence.slice-219.json) match their unchanged
+independent integer oracle: 112 per mode, 75, 852 active doubles and 74, 676 inactive double sentinels.
+The earlier FP32 findings from research 215/217 remain covered by their accepted216/218 fixes.
 
-All 288 cases from [research 217](semantic-evidence.slice-217.json) now match their unchanged independent
-raw-word oracle, fixing its 96 mismatching executions. All 65,016 active output words and 64,008 inactive
-sentinels match. The earlier [singleton finding](semantic-evidence.slice-215.json), fixed in 216, remains
-covered. Both research findings are separate from the 53 registered failure histories.
+**Next action: bounded research 222 checks the observed unsigned firstbithigh behavior.** The first
+new-fixture draft showed CUDA `U32_firstbithigh` complements words with bit31 set, producing unexpected
+partition endpoints. Isolate scalar/vector uint and uint64 boundary cases with independent expected
+indices, compare NVRTC/NVVM and inspect source helpers before selecting a fix. Retain the initial
+221 fixture/diagnostic evidence; no established corpus oracle was changed. Do not fold prefix, quad
+or vector-by-value support into this investigation. Material runtime still needs its input contract.
+No push is authorized. Fresh-context delegation remains at the app's agent-thread limit; local work
+uses WORKFLOW's fallback and does not imply independent worker review.
 
-**Slice 219 is accepted research: the FP64 CUDA-helper contract is established.** Read the
-[report](report.slice-219-fp64-minmax.md), [plan](plan.slice-219-fp64-minmax.md) and
-[evidence](semantic-evidence.slice-219.json). All 112 NVRTC scalar/double2/double2x2 cases match an
-independent raw-word oracle, including adjacent finite values, subnormals and both halves of NaN
-payloads. Direct NVVM O0/O3 still rejects the canonical double min helper before PTX output. No
-FP64 NVVM runtime support is claimed, and no production or registered corpus change occurred.
-
-**Next action: slice 221 admits FP64 masked min/max reductions with a dedicated discovery fixture.**
-Use the independent raw-word behavior established in 219 and the typed source algorithm from 218.
-Keep prefixes and provider numeric min/max unchanged. Prove the new fixture fails before admission,
-replay the unchanged research cases on all three modes, and preserve all old identities/oracles.
-Material runtime still needs its application bindings and expected output. No push is authorized.
-Fresh-context delegation remains at the app's agent-thread limit; local work uses WORKFLOW's fallback
-and does not imply an independent worker review.
-
-Latest accepted implementation and full checkpoint: 220. Latest targeted implementation: 218.
-Implementation slices since the full checkpoint: zero. Rolling implementation history 216/218/220
-covers two proven correctness fixes and the capacity prerequisite for explicit new coverage;
-research 215/217/219 does not advance cadence. Material execution remains blocked on its input contract.
+Latest targeted implementation: 221. Latest full checkpoint: 220. Implementation slices since full: one.
+Rolling implementation history218/220/221 covers the FP32 correctness fix, explicit discovery capacity
+and FP64 support admission. Correctness research takes priority; material runtime remains blocked on
+bindings, texture/LUT/input and output oracle. Discovery capacity is 50 through 128; current count 101.
 
 ## Checkpoints and evidence
 
-| Area                        | Record                                                                                                                     | Interpretation                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Slice 220 accepted full     | [Manifest](runtime-validation.slice-220.json), [frozen](census.slice-220.tsv), [discovery](discovery-census.slice-220.tsv) | All 1,656 cells fresh: 1,603 correct and 53 known failures. Latest full checkpoint. |
-| Slice 218 accepted targeted | [Manifest](runtime-validation.slice-218.json)                                                                              | FP32 min/max algorithm correction; all outcomes freshly preserved in 220.           |
-| Slice 214 accepted full     | [Manifest](runtime-validation.slice-214.json)                                                                              | Historical full checkpoint before singleton and source-algorithm fixes.             |
+| Area                        | Record                                                                                                                     | Interpretation                                                                 |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Slice 221 accepted targeted | [Manifest](runtime-validation.slice-221.json), [frozen](census.slice-221.tsv), [discovery](discovery-census.slice-221.tsv) | 624 fresh cells: 588 correct, 36 known failures;1035 frozen cells inherit220.  |
+| Slice 220 accepted full     | [Manifest](runtime-validation.slice-220.json)                                                                              | All 1656 cells fresh: 1603 correct, 53 known failures. Latest full checkpoint. |
+| Slice 218 accepted targeted | [Manifest](runtime-validation.slice-218.json)                                                                              | FP32 source-algorithm correction, preserved through full 220 and targeted221.  |
 
-Frozen remains 452 identities/1,356 cells. Discovery remains 100 identities/300 cells. Every cell's
-classification, return code, complete execution counts, diagnostic and canonical shape matches the
-latest applicable accepted evidence. There are no additions, missing/extra/duplicate cells or inherited
-runtime cells. All 548 runtime input contracts are unchanged. Historical healthy denominators 427/72
-stay fixed; all 53 first-known failure records and four resolved histories remain intact.
+Frozen remains452 identities/1356 cells. Discovery has 101 identities/303 cells. Cumulative 1659 cells have
+1608 correct and51 open failures. Two prior FP64 min/max preflight cells become correct and three new
+fixture cells pass. All other fresh classification/return-code/execution-count/diagnostic/canonical-
+shape fields match220 exactly. There are no missing/extra/duplicate cells. All 548 old runtime inputs
+and100 old manifest rows are unchanged. Historical healthy denominators 427/72 stay fixed.
+All 53 prior first-known records survive: 51 open and2 newly resolved; four earlier resolved histories remain.
 
-Fresh 220 gates: discovery contracts 6/6, routing/reporter 32/32, protocol 15/15, GPU smoke 4/4 and
-material compile/assembly 6/6. Compiler units 478 plus one existing Windows-only skip and toolkit
-18 explicitly inherit 218 because their source, binaries and toolkit are unchanged. Both corpus
-runners return two for retained failures; structured outcomes decide acceptance. No material runtime
-correctness or performance claim is made.
+Fresh221 gates: focused16/16, GPU smoke4/4, units478/478 plus one existing Windows-only skip, toolkit18/18,
+discovery contracts6/6, research 336/336 and material compile/assembly6/6. Frozen diagnostic mode returns
+zero for six retained preflight stops; discovery returns two for known failures. Structured outcomes
+decide acceptance. No material runtime correctness or performance claim is made.
 
 ## Unresolved failures and limitations
 
-- All 53 open failure records and four resolved histories retain first-known evidence and reproduction.
-- FP64 min/max admission, quad reconvergence, prefix-min/max
+- All 51 open failure records and six resolved histories retain first-known evidence and reproduction.
+- Quad reconvergence, prefix-min/max
   KernelContext pointers and ordinary FP64 vector-by-value compound shuffles remain separate work.
 - Hardware masks remain scheduling-dependent; logical active-mask synthesis is unchanged.
 - FP8/BF16/prelude and existing discovery infrastructure/output gaps remain visible.
@@ -84,11 +69,11 @@ optimized `build/RelWithDebInfo/{bin,lib}`, source `build/nvvm-loop/slice-203-en
 `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Sequential suites, four corpus/build
 workers maximum, two unit servers; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
 
-Tested base `c66d533b5b030220abe6ca2411049b68b3365e26` plus the bounded discovery loader/test change.
-Compiler SHA256 `a13354a47acefc8684cbfb5ae52b84bcf0331a83e5310e9675f53a0e030107d7`.
+Tested base `40f19e54124e1b1d88625cfcc94e4e75b98bdec0` plus bounded admission/unit/fixture changes.
+Compiler SHA256 `55bd12f280ee51def87219c767557e198cbd07b9b99f06d118a20209dfb46598`.
 Provider unchanged `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
-Raw evidence: `build/nvvm-loop/slice-220-before` and `slice-220-after`, including the explicitly
-excluded initial partial run and both command snapshots. Parent verified 117 evidence references,
-22 tested source hashes, 12 artifact hashes and 548 runtime input hashes.
+Raw evidence: `build/nvvm-loop/slice-221-before` and `slice-221-after`, including unchanged-source
+research replay and the initial fixture/structural apparatus corrections. Parent verified 132 evidence
+references, 23 tested source hashes, 12artifact hashes and549 runtime input hashes.
 No GPU loss, driver change, reboot or push. Local parent review/acceptance follows the recorded
 fresh-context delegation limitation.

@@ -8449,6 +8449,8 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
                 destination[1] = int(WaveMultiMax(f, members));
                 destination[2] = int(WaveMultiSum(d, members));
                 destination[3] = int(WaveMultiProduct(d, members));
+                destination[4] = int(WaveMultiMin(d, members));
+                destination[5] = int(WaveMultiMax(d, members));
             }
         )";
         ComPtr<slang::IBlob> code;
@@ -8464,12 +8466,15 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        // Float32 min/max seeds its source algorithm with the original operand and uses ordered
-        // comparison/selection. Float64 arithmetic retains its singleton passthrough and sum seed.
+        // Float32/Float64 min/max seeds its source algorithm with the original operand and uses
+        // ordered comparison/selection. Float64 arithmetic retains its singleton passthrough and
+        // sum seed.
         uint32_t float32CompareSelectCount = 0;
+        uint32_t float64CompareSelectCount = 0;
         uint32_t callerSeedCount = 0;
         uint32_t float64PassthroughCount = 0;
         uint32_t float64SeedCount = 0;
+        uint32_t float64ShuffleInputSelectCount = 0;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
             if (operation.key.operation != SLANG_NVVM_VALUE_OP_SELECT ||
@@ -8492,13 +8497,8 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
                 SLANG_CHECK(operation.resultType.bitWidth == 64);
                 ++float64PassthroughCount;
             }
-            else if (operation.resultType.bitWidth == 64)
-            {
-                ++float64SeedCount;
-            }
             else
             {
-                SLANG_CHECK_ABORT(operation.resultType.bitWidth == 32);
                 SLANG_CHECK_ABORT(
                     operation.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
                 SLANG_CHECK_ABORT(operation.operands[0].index >= 0);
@@ -8511,18 +8511,41 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
                 {
                     SLANG_CHECK(
                         predicate.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
-                    SLANG_CHECK(predicate.operandTypes[0].bitWidth == 32);
+                    SLANG_CHECK(
+                        predicate.operandTypes[0].bitWidth == operation.resultType.bitWidth);
                     SLANG_CHECK(operation.operands[1].kind == FakeNVVMBuilderValueKind::ScalarPhi);
-                    ++float32CompareSelectCount;
+                    float32CompareSelectCount += operation.resultType.bitWidth == 32;
+                    float64CompareSelectCount += operation.resultType.bitWidth == 64;
+                }
+                else if (operation.resultType.bitWidth == 64)
+                {
+                    if (operation.operands[1].kind ==
+                        FakeNVVMBuilderValueKind::FloatingPointConstant)
+                    {
+                        SLANG_CHECK(
+                            operation.operands[2].kind ==
+                            FakeNVVMBuilderValueKind::FloatingPointConstant);
+                        ++float64SeedCount;
+                    }
+                    else
+                    {
+                        SLANG_CHECK(
+                            operation.operands[1].kind == FakeNVVMBuilderValueKind::ScalarPhi);
+                        SLANG_CHECK(
+                            operation.operands[2].kind == FakeNVVMBuilderValueKind::Parameter);
+                        ++float64ShuffleInputSelectCount;
+                    }
                 }
             }
         }
         for (const auto& incoming : gFakeNVVMBuilder.scalarPhiIncomingValueRefs)
             callerSeedCount += incoming.kind == FakeNVVMBuilderValueKind::Parameter;
-        SLANG_CHECK(callerSeedCount == 2);
+        SLANG_CHECK(callerSeedCount == 4);
         SLANG_CHECK(float32CompareSelectCount == 2);
+        SLANG_CHECK(float64CompareSelectCount == 2);
         SLANG_CHECK(float64PassthroughCount == 2);
         SLANG_CHECK(float64SeedCount == 1);
+        SLANG_CHECK(float64ShuffleInputSelectCount == 2);
         bool sawFloat64NegativeZero = false;
         for (Index i = 0; i < gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount(); ++i)
         {
@@ -8942,7 +8965,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
             {
                 __target_switch
                 {
-                case cuda: __intrinsic_asm "_waveMin($1.x, $0)";
+                case cuda: __intrinsic_asm "_wavePrefixMin($1.x, $0)";
                 default: return value;
                 }
             }
@@ -8954,13 +8977,13 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
                 *destination = int(unsupportedWave(double(1), uint4(mask)));
             }
         )SLANG",
-         "assembly=_waveMin($1.x, $0)"},
+         "assembly=_wavePrefixMin($1.x, $0)"},
         {R"SLANG(
             double2 unsupportedWave(double2 value, uint4 mask)
             {
                 __target_switch
                 {
-                case cuda: __intrinsic_asm "_waveMinMultiple($1.x, $0)";
+                case cuda: __intrinsic_asm "_wavePrefixMinMultiple($1.x, $0)";
                 default: return value;
                 }
             }
@@ -8972,7 +8995,25 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
                 *destination = int(unsupportedWave(double2(1), uint4(mask)).x);
             }
         )SLANG",
-         "assembly=_waveMinMultiple($1.x, $0)"},
+         "assembly=_wavePrefixMinMultiple($1.x, $0)"},
+        {R"SLANG(
+            double2 unsupportedWave(double2 value, uint4 mask)
+            {
+                __target_switch
+                {
+                case cuda: __intrinsic_asm "_waveMin($1.x, $0)";
+                default: return value;
+                }
+            }
+            [CUDAKernel]
+            void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination,
+                uniform uint mask)
+            {
+                *destination = int(unsupportedWave(double2(1), uint4(mask)).x);
+            }
+        )SLANG",
+         "assembly=_waveMin($1.x, $0)"},
         {kDirectNVVMUnsupportedOpaqueHalfConversionSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},

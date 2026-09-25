@@ -8034,3 +8034,12 @@ overlap, active directive selection, oracle argument preservation and required s
 their existing checks. Increasing capacity from 100 does not select new sources: the current 100
 entries and their three backend/optimization cells remain unchanged. Boundary tests cover 50, 100,
 101 and 128 valid entries, 49 and 129 invalid entries, and duplicate detection at a valid size.
+
+### FP64 masked min/max source reductions (slice 221)
+
+The typed source min/max reduction recipe accepts scalar Float32 and Float64 leaves, including
+leaves reached through canonical vector/matrix helpers. Both widths seed the accumulator with the
+caller value and retain CUDA's ordered comparison/selection and butterfly/scan order. This path
+needs no numeric identity and preserves singleton payloads directly. FP64 arithmetic reductions
+retain their existing singleton passthrough and sum seed; FP64 min/max prefixes remain unsupported.
+Provider numeric min/max and ABI 36 are unchanged.

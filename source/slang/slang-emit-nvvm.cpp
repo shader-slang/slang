@@ -4884,9 +4884,8 @@ bool _getNVVMMaskedWaveScalarIdentity(
     if ((type.bitWidth != 32 && !isFloat64) || type.laneCount != 1)
         return false;
 
-    // Admit Float64 arithmetic without extending the existing min/max contract. CUDA's wave
-    // min/max helpers use comparison and selection, while the numeric min/max recipe has
-    // different NaN and signed-zero behavior that needs its own semantic audit.
+    // Float64 sum/product have arithmetic identities. Source min/max reductions instead seed
+    // with the caller's operand and bypass this helper; Float64 min/max prefixes stay unsupported.
     if (isFloat64 && operation != SLANG_NVVM_VALUE_OP_ADD &&
         operation != SLANG_NVVM_VALUE_OP_MULTIPLY)
     {
@@ -4953,7 +4952,8 @@ bool _initializeNVVMMaskedWaveScalarOperation(
         valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 64;
     outOperation.usesSourceMinMaxReduction =
         spelling.mode == NVVMMaskedWaveScalarMode::Reduction &&
-        valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.bitWidth == 32 &&
+        valueType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && valueType.laneCount == 1 &&
+        (valueType.bitWidth == 32 || valueType.bitWidth == 64) &&
         (spelling.combineOperation == SLANG_NVVM_VALUE_OP_MIN ||
          spelling.combineOperation == SLANG_NVVM_VALUE_OP_MAX);
     const SlangNVVMValueOperation combineOperation =
@@ -4962,10 +4962,10 @@ bool _initializeNVVMMaskedWaveScalarOperation(
                    ? SLANG_NVVM_VALUE_OP_LESS_THAN
                    : SLANG_NVVM_VALUE_OP_GREATER_THAN)
             : spelling.combineOperation;
-    if (!_getNVVMMaskedWaveScalarIdentity(
-            spelling.combineOperation,
-            outOperation.valueType,
-            outOperation.identityBits))
+    if (!outOperation.usesSourceMinMaxReduction && !_getNVVMMaskedWaveScalarIdentity(
+                                                       spelling.combineOperation,
+                                                       outOperation.valueType,
+                                                       outOperation.identityBits))
     {
         return false;
     }
@@ -5066,7 +5066,8 @@ bool _initializeNVVMMaskedWaveScalarOperation(
     }
 
     outOperation.preservesSingletonReduction =
-        spelling.mode == NVVMMaskedWaveScalarMode::Reduction && isFloat64;
+        spelling.mode == NVVMMaskedWaveScalarMode::Reduction && isFloat64 &&
+        !outOperation.usesSourceMinMaxReduction;
     outOperation.usesFloat64SumIdentity = spelling.mode == NVVMMaskedWaveScalarMode::Reduction &&
                                           isFloat64 &&
                                           spelling.combineOperation == SLANG_NVVM_VALUE_OP_ADD;
