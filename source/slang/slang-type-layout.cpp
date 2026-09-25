@@ -2036,29 +2036,42 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
     return &kGLSLAnyValueLayoutRulesImpl_;
 }
 
+// Return the GLSL-family buffer layout rules that a data-layout marker type explicitly selects, or
+// null when `dataLayoutType` is null, or is a type that imposes no explicit choice
+// (DefaultDataLayout, DefaultPushConstantDataLayout), so the caller can apply its own default. This
+// is the single GLSL-family place that maps a `Std430DataLayout` / `Std140DataLayout` /
+// `ScalarDataLayout` / `CDataLayout` marker type to its LayoutRulesImpl, shared by the
+// ConstantBuffer path and the pointer-pointee path so both interpret an explicit data layout the
+// same way; LLVMLayoutRulesFamilyImpl::getConstantBufferRules keeps its own parallel mapping for
+// that family.
+static LayoutRulesImpl* getLayoutRulesForDataLayoutType(Type* dataLayoutType)
+{
+    if (!dataLayoutType)
+        return nullptr;
+    switch (dataLayoutType->astNodeType)
+    {
+    case ASTNodeType::Std140DataLayoutType:
+        return &kStd140LayoutRulesImpl_;
+    case ASTNodeType::Std430DataLayoutType:
+        return &kStd430LayoutRulesImpl_;
+    case ASTNodeType::ScalarDataLayoutType:
+        return &kScalarLayoutRulesImpl_;
+    case ASTNodeType::CDataLayoutType:
+        return &kCLayoutRulesImpl_;
+    default:
+        return nullptr;
+    }
+}
+
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    // Explicit layout rule in ConstantBuffer should take precedence over global options.
+    // An explicit layout rule on the ConstantBuffer takes precedence over global options.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
-        switch (cbufferType->getLayoutType()->astNodeType)
-        {
-        case ASTNodeType::Std140DataLayoutType:
-            return &kStd140LayoutRulesImpl_;
-        case ASTNodeType::Std430DataLayoutType:
-            return &kStd430LayoutRulesImpl_;
-        case ASTNodeType::ScalarDataLayoutType:
-            return &kScalarLayoutRulesImpl_;
-        case ASTNodeType::CDataLayoutType:
-            return &kCLayoutRulesImpl_;
-        case ASTNodeType::DefaultDataLayoutType:
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
-            break;
-        default:
-            break;
-        }
+        if (auto explicitRules = getLayoutRulesForDataLayoutType(cbufferType->getLayoutType()))
+            return explicitRules;
     }
     // Default layout types fall through to global options.
     if (compilerOptions.shouldUseScalarLayout())
@@ -5731,10 +5744,21 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         ptrLayout->addResourceUsage(info.kind, info.size);
 
+        // The pointee is memory addressed through the pointer, so we lay it out with the buffer
+        // layout its data-layout argument selects: `Ptr<T, ..., Std430DataLayout>` lays `T` out in
+        // std430, matching what the SPIR-V emit path produces for a pointer carrying an explicit
+        // marker (getTypeLayoutRuleNameForBuffer, slang-ir-lower-buffer-element-type.cpp). This
+        // selection is target-independent, whereas that emit path is target-gated; a pointer with
+        // no explicit data layout (DefaultDataLayout, or a bare `Ptr<T>`) reflects with scalar
+        // rules, which need not match emit's marker-less default.
+        auto pointeeRules = getLayoutRulesForDataLayoutType(ptrType->getDataLayout());
+        if (!pointeeRules)
+            pointeeRules = &kScalarLayoutRulesImpl_;
+
         TypeLayoutResult valueTypeLayout;
-        if (context.rules != &kScalarLayoutRulesImpl_)
+        if (context.rules != pointeeRules)
         {
-            auto subContext = context.with(&kScalarLayoutRulesImpl_);
+            auto subContext = context.with(pointeeRules);
             valueTypeLayout = _createTypeLayout(subContext, ptrType->getValueType());
         }
         else
