@@ -1,0 +1,606 @@
+{
+  "schema": "nvvm-semantic-research-v1",
+  "slice": 240,
+  "status": "accepted-research",
+  "validation_date_utc": "2026-09-25",
+  "scope": "Research only: BF16 vector values/by-value helpers/bit transport/Float32 component casts; local storage alternatives measured separately. No compiler support or corpus change.",
+  "source_commit": "946f3f3b1dfb6ce2e468afdd707aced032843e2e",
+  "provider_abi": 38,
+  "provenance": {
+    "environment": "Native Ubuntu24.04 / L4 SM89 driver580.126.09 / targetSM80 / CUDA12.9.2 NVRTC12.9.86 / LLVM14 / ABI38 / RelWithDebInfo",
+    "before": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/before.json",
+      "sha256": "abd85634db4517bc77767bdaddae5319ef149f323a26aa046f2cc8f5d85dd919"
+    },
+    "after": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/after.json",
+      "sha256": "abd85634db4517bc77767bdaddae5319ef149f323a26aa046f2cc8f5d85dd919"
+    },
+    "final": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/final-identities.json",
+      "sha256": "abd85634db4517bc77767bdaddae5319ef149f323a26aa046f2cc8f5d85dd919"
+    },
+    "identity_counts": {
+      "tested_source_sha256": 37,
+      "artifact_sha256": 12,
+      "runtime_input_sha256": 558
+    },
+    "mismatches": [],
+    "compiler_sha256": "a6cd5bd057defd8fc896ebd75813d8b7e5737fe33a095e20840fc73b72233412",
+    "provider_sha256": "cefb3cd3cb44fb0d2c6a201f210ea3c98e1913c2fcac554ea5ad912d6afbcfd7",
+    "gpu_after": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/gpu-after.csv",
+      "sha256": "d6efb715059e70ff1b5ed59f275d3ca446e85fc576a2d1af29931d59e63bc34b"
+    },
+    "primary_sources": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/primary-source-sha256.json",
+      "sha256": "26745dc4f0303bc4d2f59479092a53acae533687e837f7ceec588708e78ee71f"
+    }
+  },
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-239.json",
+    "sha256": "7fd3ad3b75adcdf14bd1a375a190ec398325bf192b9ff8d52eea6aa372a7430b"
+  },
+  "accepted_research238": {
+    "path": "issue-nvvm-backend/semantic-evidence.slice-238.json",
+    "sha256": "4aaa812956444b7a6954114b368bd9de819a07c3310f601887c2bd78832c327e"
+  },
+  "checkpoint": {
+    "last_full": 239,
+    "latest_implementation": 239,
+    "latest_targeted": 233,
+    "implementation_slices_since_full": 0,
+    "total_corpus_cells": 1686,
+    "correct": 1643,
+    "unresolved": 43,
+    "resolved_histories": 14,
+    "fresh_corpus_cells": 3,
+    "inherited_corpus_cells": 1683,
+    "support_delta": 0,
+    "new_corpus_identities": 0
+  },
+  "fresh_gates": {
+    "runtime_smoke": {
+      "passed": 4,
+      "executed": 4,
+      "return_code": 0,
+      "evidence": {
+        "path": "build/nvvm-loop/slice-240-bf16-vectors/runtime/results.json",
+        "sha256": "7c1d4f84fdfd20a47f223abac55963dc1875ebdcc1bf7bd4b8563a89da28f77f"
+      }
+    },
+    "frozen": [
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "source": "hlsl-intrinsic/scalar-bf16.slang",
+        "source_line": 2,
+        "source_test_ordinal": 1,
+        "cuda_ordinal": 1,
+        "mode": "nvrtc-o3",
+        "capability": "cuda_sm_8_0",
+        "reference_derived_from_direct": false,
+        "classification": "correct",
+        "return_code": 0,
+        "execution_counts": {
+          "passed": 1,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "elapsed_ms": 1758,
+        "diagnostic": "",
+        "canonical_shape": "",
+        "log": "build/nvvm-loop/slice-240-bf16-vectors/frozen/logs/nvrtc-o3/8501b061f7e45e3f9b40b2c174b039a4f5ed65c9.log"
+      },
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "source": "hlsl-intrinsic/scalar-bf16.slang",
+        "source_line": 2,
+        "source_test_ordinal": 1,
+        "cuda_ordinal": 1,
+        "mode": "nvvm-o0",
+        "capability": "cuda_sm_8_0",
+        "reference_derived_from_direct": false,
+        "classification": "preflight",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "elapsed_ms": 1329,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: vector<BFloat16,4>'",
+        "canonical_shape": "helper function parameter",
+        "log": "build/nvvm-loop/slice-240-bf16-vectors/frozen/logs/nvvm-o0/e48b3507f473e8ad205bfd22cfb1f5c8e847312e.log"
+      },
+      {
+        "id": "hlsl-intrinsic/scalar-bf16.slang#cuda-1",
+        "source": "hlsl-intrinsic/scalar-bf16.slang",
+        "source_line": 2,
+        "source_test_ordinal": 1,
+        "cuda_ordinal": 1,
+        "mode": "nvvm-o3",
+        "capability": "cuda_sm_8_0",
+        "reference_derived_from_direct": false,
+        "classification": "preflight",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "elapsed_ms": 1321,
+        "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: vector<BFloat16,4>'",
+        "canonical_shape": "helper function parameter",
+        "log": "build/nvvm-loop/slice-240-bf16-vectors/frozen/logs/nvvm-o3/dfae1229391a0aa15b4241855c06cff3125fe2d5.log"
+      }
+    ],
+    "frozen_comparison": {
+      "expected": 3,
+      "observed": 3,
+      "unique": 3,
+      "fields": [
+        "classification",
+        "return_code",
+        "execution_counts",
+        "diagnostic",
+        "canonical_shape"
+      ],
+      "deltas": []
+    },
+    "source_compile_inventory": {
+      "expected": 12,
+      "observed": 12,
+      "missing": [],
+      "duplicates": [],
+      "extra": [],
+      "cuda_source_success": 3,
+      "nvrtc_success": 3,
+      "direct_expected_rejections": 6,
+      "evidence": {
+        "path": "build/nvvm-loop/slice-240-bf16-vectors/controls/compile-results.json",
+        "sha256": "9988a188b8708852015c5b23a0df68da40f0db920a2c9478ce77b6baeacfd113"
+      }
+    },
+    "raw_compile_inventory": {
+      "expected": 6,
+      "observed": 6,
+      "missing": [],
+      "duplicates": [],
+      "extra": [],
+      "compiled": 6,
+      "assembled": 6,
+      "evidence": {
+        "path": "build/nvvm-loop/slice-240-bf16-vectors/llvm/results.json",
+        "sha256": "1050b54bc0df1b9076a4675fa0d56091e07d34007222b11c783ada0a42217769"
+      }
+    },
+    "ptx_assemblies": 9
+  },
+  "controls": [
+    {
+      "width": 2,
+      "mode": "nvrtc-o3",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/controls/vector2-nvrtc-o3.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/controls/vector2-nvrtc-o3.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1024660,
+      "preserved_words": 2488461,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "source-nvrtc"
+    },
+    {
+      "width": 2,
+      "mode": "nvvm-o0",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector2-o0.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector2-o0.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1024660,
+      "preserved_words": 2488461,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "raw-llvm-physical-candidate"
+    },
+    {
+      "width": 2,
+      "mode": "nvvm-o3",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector2-o3.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector2-o3.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1024660,
+      "preserved_words": 2488461,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "raw-llvm-physical-candidate"
+    },
+    {
+      "width": 3,
+      "mode": "nvrtc-o3",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/controls/vector3-nvrtc-o3.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/controls/vector3-nvrtc-o3.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1536990,
+      "preserved_words": 1976131,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "source-nvrtc"
+    },
+    {
+      "width": 3,
+      "mode": "nvvm-o0",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector3-o0.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector3-o0.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1536990,
+      "preserved_words": 1976131,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "raw-llvm-physical-candidate"
+    },
+    {
+      "width": 3,
+      "mode": "nvvm-o3",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector3-o3.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector3-o3.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1536990,
+      "preserved_words": 1976131,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "raw-llvm-physical-candidate"
+    },
+    {
+      "width": 4,
+      "mode": "nvrtc-o3",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/controls/vector4-nvrtc-o3.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/controls/vector4-nvrtc-o3.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1976130,
+      "preserved_words": 1536991,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "source-nvrtc"
+    },
+    {
+      "width": 4,
+      "mode": "nvvm-o0",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector4-o0.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector4-o0.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1976130,
+      "preserved_words": 1536991,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "raw-llvm-physical-candidate"
+    },
+    {
+      "width": 4,
+      "mode": "nvvm-o3",
+      "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector4-o3.ptx",
+      "output": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-240-bf16-vectors/llvm/vector4-o3.output.bin",
+      "records": 73190,
+      "words": 3513121,
+      "active_words": 1976130,
+      "preserved_words": 1536991,
+      "mismatch_count": 0,
+      "mismatches": [],
+      "narrow_nan_observations": [
+        32767
+      ],
+      "origin": "raw-llvm-physical-candidate"
+    }
+  ],
+  "input_projection": {
+    "datasets": [
+      {
+        "width": 2,
+        "records": 73190,
+        "stride_words": 48,
+        "words": 3513121,
+        "lane_record_rotation": 19711,
+        "all_accepted_records_per_lane": true,
+        "active_offsets": [
+          9,
+          10,
+          13,
+          14,
+          17,
+          18,
+          21,
+          22,
+          25,
+          26,
+          29,
+          30,
+          33,
+          35
+        ]
+      },
+      {
+        "width": 3,
+        "records": 73190,
+        "stride_words": 48,
+        "words": 3513121,
+        "lane_record_rotation": 19711,
+        "all_accepted_records_per_lane": true,
+        "active_offsets": [
+          9,
+          10,
+          11,
+          13,
+          14,
+          15,
+          17,
+          18,
+          19,
+          21,
+          22,
+          23,
+          25,
+          26,
+          27,
+          29,
+          30,
+          31,
+          33,
+          34,
+          35
+        ]
+      },
+      {
+        "width": 4,
+        "records": 73190,
+        "stride_words": 48,
+        "words": 3513121,
+        "lane_record_rotation": 19711,
+        "all_accepted_records_per_lane": true,
+        "active_offsets": [
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35
+        ]
+      }
+    ],
+    "derived_from": {
+      "build/nvvm-loop/slice-238-bf16/controls/convert.input.bin": "716d22110a808691adde6dfc3fd21b5ff2867627bc958d861020b92ec1ea6880",
+      "build/nvvm-loop/slice-238-bf16/controls/convert.expected.bin": "195abb7b40f0112dad18d16afbaceed4602abf5fb1ae04c5845aad266eb27870"
+    },
+    "nan_marker": "ffffffff only in narrowing outputs; classification-only"
+  },
+  "runtime_totals": {
+    "launches": 9,
+    "source_nvrtc": 3,
+    "raw_llvm": 6,
+    "records_per_launch": 73190,
+    "active_words": 13613340,
+    "preserved_words": 18004749,
+    "complete_words": 31618089,
+    "mismatches": 0
+  },
+  "path_proof": {
+    "path": "build/nvvm-loop/slice-240-bf16-vectors/path-proof.json",
+    "sha256": "181ed946e569c4108e8997d3930b679483dd015b3475f4a68e798d89ef1174f1"
+  },
+  "layout": {
+    "llvm_query": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/layout-results.txt",
+      "sha256": "32c9d182d244a40612493d6fd12d40abfaa81095c2fac53682291efeecb69352"
+    },
+    "cuda_source": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/cuda-layout.cu",
+      "sha256": "2dcd0358e1f71c7b9d27e37ebdef01e459aa9ec8723d485b4b7535ecff7e8a6e"
+    },
+    "cuda_compile_return_code": 0,
+    "cuda_assertions": 7,
+    "rows": [
+      {
+        "lanes": 2,
+        "cuda_size": 4,
+        "cuda_alignment": 4,
+        "llvm_vector_store": 4,
+        "llvm_vector_alloc": 4,
+        "llvm_vector_alignment": 4,
+        "llvm_array_size": 4,
+        "llvm_array_alignment": 2
+      },
+      {
+        "lanes": 3,
+        "cuda_size": 6,
+        "cuda_alignment": 2,
+        "llvm_vector_store": 6,
+        "llvm_vector_alloc": 8,
+        "llvm_vector_alignment": 8,
+        "llvm_array_size": 6,
+        "llvm_array_alignment": 2
+      },
+      {
+        "lanes": 4,
+        "cuda_size": 8,
+        "cuda_alignment": 2,
+        "llvm_vector_store": 8,
+        "llvm_vector_alloc": 8,
+        "llvm_vector_alignment": 8,
+        "llvm_array_size": 8,
+        "llvm_array_alignment": 2
+      }
+    ],
+    "bf2_local_explicit_alloca_alignment": 4,
+    "bf2_array_type_alignment_unchanged": 2,
+    "bf4_layout_model_gap": "AST/IR generic CUDA vector alignment8 differs from actual prelude2; future storage requires producer/model correction"
+  },
+  "semantic_contract": {
+    "widths": [
+      2,
+      3,
+      4
+    ],
+    "canonical_operations": [
+      "makeVector",
+      "MakeVectorFromScalar",
+      "swizzle",
+      "FloatCast",
+      "helper branch/phi",
+      "source bitcast lowered to scalar bit transport"
+    ],
+    "value_representation": "<N x i16>",
+    "helper_abi": "Internal by-value only; BF3 LLVM call8/align8 differs from CUDA6/align2",
+    "narrowing": "SM80 per-component RNE; NaN classification only",
+    "widening": "SM80 exact BF16 payload in Float32 high word",
+    "bit_transport": [
+      "uint32/BF2",
+      "uint64/BF4",
+      "ushort3/BF3"
+    ],
+    "explicit_vector_select_qualified": false,
+    "local_candidate": "[N x i16] with explicit BF2 alloca alignment4 and lane2-byte access; not general storage admission"
+  },
+  "inherited_gates": {
+    "source": "runtime-validation.slice-239.json",
+    "units_passed": 482,
+    "units_existing_windows_skip": 1,
+    "toolkit": 18,
+    "runner_contracts": 6,
+    "scalar_fixture": 3,
+    "material_compile_assembly": 6,
+    "material_runtime_qualified": false
+  },
+  "worker_audit": {
+    "path": "build/nvvm-loop/slice-240-bf16-vectors/audit.json",
+    "sha256": "e97a6a84e8c7adcb644f5dfd6347fade973fa0c9dd5fbd093a0b08b4e0ecedfe"
+  },
+  "preservation": {
+    "sources": 37,
+    "artifacts": 12,
+    "inputs": 558,
+    "immutable_research238_artifacts": 117,
+    "mismatches": []
+  },
+  "handoff": {
+    "next_slice": "BF16 vector register values and by-value internal helper parameters/results, construction/splat/extraction/helper branch-phi and matching-lane-count Float32 conversion; preserve existing bitcast lowering",
+    "reuse": [
+      "NVVMTypeUse caches",
+      "_getNVVMSemanticType",
+      "semantic catalog exact validation",
+      "_getSemanticLLVMType",
+      "BFloat16Convert scalar semantics",
+      "_emitNVVMSequentialElementExtract",
+      "builder vector construction"
+    ],
+    "defer": [
+      "new local/reference/pointer roles",
+      "aggregate/resource/global/parameter-group storage",
+      "BF4 CUDA AST/IR layout producer correction",
+      "dot",
+      "exact integer construction",
+      "explicit vector Select until own focused test"
+    ],
+    "full_checkpoint_required_for_implementation": true
+  },
+  "limitations": [
+    "Raw LLVM success is not production direct-Slang vector support",
+    "Frozen scalar-bf16 still unresolved and needs dot",
+    "Internal helper ABI is not external CUDA interoperability",
+    "No Half/double/integer conversion or arithmetic qualification",
+    "No material runtime contract",
+    "BF3 storage padding and BF2/BF4 alignment forbid blanket vector-storage admission"
+  ],
+  "self_review": {
+    "production_helpers_fallbacks_special_cases": [],
+    "source_producer_shapes_valid": true,
+    "production_edits": 0,
+    "compiler_builds": 0,
+    "corpus_additions": 0,
+    "abi_changes": 0,
+    "commits": 0,
+    "pushes": 0,
+    "gpu_loss": false
+  },
+  "raw_artifact_index": {
+    "path": "build/nvvm-loop/slice-240-bf16-vectors/artifact-index.json",
+    "sha256": "b483a32dbc061dec5506f2bd02d093bc236eace18e4f14c97e16a8a5443fe0e5"
+  },
+  "raw_artifact_count": 132,
+  "commands": {
+    "path": "build/nvvm-loop/slice-240-bf16-vectors/commands.json",
+    "sha256": "1eb6aac06e5eadfa4c52234660e7df23cfdf3d618cc6a1b8fe1b502e2384a977"
+  },
+  "parent_acceptance": {
+    "status": "passed",
+    "metadata_audit": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/parent-acceptance-audit.json",
+      "sha256": "04afe7326818bc379b32e591a1dd0bff23fb0b4b56c60811c7359ca0fa224aac"
+    },
+    "metadata_checker": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/parent-audit.py",
+      "sha256": "9e751f32cca0dd7d644fedfa9776b86824ff65a5a956784d340c0ab5aba4123f"
+    },
+    "independent_oracle": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/parent-oracle.py",
+      "sha256": "8d18a6807a78dd7e156e67602532cb6eb1da5275665b7935c49b92f4b40fe7f8"
+    },
+    "oracle_audit": {
+      "path": "build/nvvm-loop/slice-240-bf16-vectors/parent-oracle-audit.json",
+      "sha256": "25e8a341eec75dd0c0959ef097a69c627289dbde20b4a312407518dcd4307583"
+    },
+    "review": "Canonical vector value/branch/phi and bitcast producers reviewed. Nine complete buffers independently checked. Target DataLayout, actual CUDA prelude layouts and both BF4 layout producers verified; internal helpers are not external ABI/storage qualification."
+  }
+}
