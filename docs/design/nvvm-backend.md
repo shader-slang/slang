@@ -8051,3 +8051,18 @@ signed32 helper complements negative values before delegating, matching the exis
 CUDA64 split. Direct NVVM already uses the operand's signedness descriptor for this operation and
 needs no change. Dynamic scalar/vector32/64 coverage checks independent bit-index expectations;
 source-backend agreement alone is not the correctness oracle.
+
+### Copyable values in explicit thread-local contexts (slice 225)
+
+The CUDA global-context producer initializes one context in each kernel invocation and passes its
+address to helpers. Direct NVVM admits its canonical four-operand read-write ThreadLocal/default-
+layout pointer when the pointee belongs to the existing recursive copyable-value struct algebra.
+Boolean fields, nested structs, numeric vectors, fixed arrays and Float64 leaves use the same
+representation as ordinary local values. Compact entry-local pointers and explicit helper parameter
+pointers retain their established exact-pointee matching and generic provider address space.
+
+This replaces the older flat integer/Float32 restriction at the context admission boundary. It
+introduces no alternate context representation, provider global storage or ABI change. Resource-
+bearing explicit contexts remain outside this copyable-only branch. The dynamic context fixture
+checks initialization, lane-specific helper mutation and subsequent reads against independently
+computed expectations; passing it does not establish support for unrelated masked-prefix operations.

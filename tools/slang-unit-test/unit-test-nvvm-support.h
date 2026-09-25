@@ -2956,6 +2956,13 @@ static bool _isFakeNVVMBuilderBooleanValue(SlangNVVMValueHandle value)
         return _getFakeNVVMBuilderParameterTypeKind(valueRef, parameterTypeKind) &&
                parameterTypeKind == FakeNVVMBuilderParameterTypeKind::Boolean;
     }
+    if (valueRef.kind == FakeNVVMBuilderValueKind::Load)
+    {
+        return valueRef.index >= 0 &&
+               valueRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount() &&
+               gFakeNVVMBuilder.loadResultTypeKinds[valueRef.index] ==
+                   FakeNVVMBuilderScalarTypeKind::Boolean;
+    }
     if (valueRef.kind == FakeNVVMBuilderValueKind::Call)
     {
         return valueRef.index >= 0 &&
@@ -2988,7 +2995,8 @@ static bool _isFakeNVVMBuilderBooleanValue(SlangNVVMValueHandle value)
         gFakeNVVMBuilder.scalarOperations[operationIndex];
     return operation.key.family == FakeNVVMBuilderScalarFamily::Compare ||
            operation.key.family == FakeNVVMBuilderScalarFamily::FloatingCompare ||
-           (operation.key.family == FakeNVVMBuilderScalarFamily::Binary &&
+           ((operation.key.family == FakeNVVMBuilderScalarFamily::Binary ||
+             operation.key.family == FakeNVVMBuilderScalarFamily::Unary) &&
             operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL &&
             operation.resultType.laneCount == 1) ||
            (operation.key.family == FakeNVVMBuilderScalarFamily::Select &&
@@ -3336,7 +3344,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
                 vectorElementCount,
                 vectorElementTypeKind) &&
             vectorElementTypeKind != FakeNVVMBuilderScalarTypeKind::Boolean;
-        isCopyableStruct = fieldTypes[i] == _getFakeNVVMBuilderIntegerType() ||
+        isCopyableStruct = fieldTypes[i] == _getFakeNVVMBuilderBooleanType() ||
+                           fieldTypes[i] == _getFakeNVVMBuilderIntegerType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderHalfType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderFloatType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderDoubleType() ||

@@ -4,69 +4,62 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 223 is accepted: CUDA unsigned firstbithigh preserves unsigned sign-bit inputs.** Read the
-[completed plan](plan.slice-223-firstbithigh-fix.md), [five-part report](report.slice-223-firstbithigh-fix.md)
-and [full result manifest](runtime-validation.slice-223.json). Signed-negative complement now belongs
-to I32_firstbithigh; U32 uses the original word. Signed32/64 and unsigned64 behavior is preserved,
-and the direct provider is unchanged. The independent research222 replay passes all 18 executions
-and 6,912 words, including the 24 previously wrong CUDA source results.
+**Slice 225 is accepted: canonical thread-local contexts admit supported copyable values.** Read the
+[completed plan](plan.slice-225-copyable-context.md), [five-part report](report.slice-225-copyable-context.md)
+and [full result manifest](runtime-validation.slice-225.json). The existing recursive copyable-struct
+classifier replaces the older scalar-only context restriction. Exact pointer qualifiers remain;
+provider ABI 36, storage lifetime, helper pointer matching and resource-bearing context restrictions
+are unchanged. Dynamic Boolean/nested/double/vector/array state passes all three runtime modes.
 
-**Research 224 is accepted: Boolean fields trigger the context-pointer restriction.** Read the
-[report](report.slice-224-kernel-context-research.md), [plan](plan.slice-224-kernel-context-research.md)
-and [evidence](semantic-evidence.slice-224.json). Original KernelContext contains Bool plus three uint
-fields. Minimal Boolean global state reproduces both direct preflight stops, while integer-global
-and local Boolean-struct controls pass all modes. Seven executions/672 output words match; two
-Boolean-global direct cells remain rejected without PTX. Producer/call pointer shapes are canonical.
+**Next action: research FP64 masked exclusive/inclusive min/max prefix semantics.** The two original
+frozen prefix workloads now reject GenericAsm `_wavePrefixExclusiveMin/Max(($1).x, $0)`, signature
+`double(double, vector<uint,4>)`, at both direct optimization levels. Establish the CUDA source
+algorithm, identities, operand order and NaN/signed-zero behavior with independent raw-bit expectations
+before admitting another reduction recipe. Preserve the original prefix sources and output oracles;
+stop at any next independent blocker. The four diagnostic advances in 225 remain known failures.
 
-**Next action: slice 225 admits canonical contexts containing supported copyable-value structs.**
-Replace the older scalar-only pointee restriction with the existing recursive copyable-value
-classification, preserving exact pointer access/address-space/layout checks. Keep explicit contexts
-with resource fields outside this slice. Add dynamic Boolean and representative nested/value state
-coverage, prove before failures and after output, and complete a full checkpoint for helper-type
-admission. Reassess the two frozen prefix workloads, retaining any next independent unsupported
-operation; diagnostic advancement alone does not fix a registered cell.
+No push is authorized. Fresh-context delegation remains at the app's agent-thread limit; local work
+uses WORKFLOW's fallback and does not imply independent worker review. Material runtime still needs
+application bindings, texture/LUT/input and output oracle; independent backend work can continue.
 
-No push is authorized. Material runtime still needs application bindings, texture/LUT/input and
-output oracle. Fresh-context delegation remains at the app's agent-thread limit; local work uses
-WORKFLOW's fallback and does not imply independent worker review.
-
-Latest full checkpoint and implementation: 223. Latest targeted implementation: 221.
-Implementation slices since full: zero. Recent implementation history covers FP64 source reductions
-and the demonstrated CUDA bit-index correctness fix; correctness work took priority over material
-execution, which lacks its application input contract. Discovery capacity is 50 through 128, with
-102 current identities.
+Latest full checkpoint and implementation: 225. Latest targeted implementation: 221.
+Implementation slices since full: zero. Rolling feature history: 221 FP64 source min/max reductions,
+223 CUDA bit-index correctness,225 executable copyable contexts. Correctness and research-backed
+runtime support take priority while material execution lacks its application contract. Reconsider
+material-driven work at each selection. Discovery capacity remains 50–128, with 103 current identities.
 
 ## Checkpoints and evidence
 
-| Area                        | Record                                                                                                                     | Interpretation                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Slice 223 accepted full     | [Manifest](runtime-validation.slice-223.json), [frozen](census.slice-223.tsv), [discovery](discovery-census.slice-223.tsv) | All 1,662 cells fresh: 1,611 correct and 51 known failures. Latest full checkpoint. |
-| Slice 221 accepted targeted | [Manifest](runtime-validation.slice-221.json)                                                                              | FP64 min/max admission; both resolved frozen cells freshly preserved in 223.        |
-| Slice 220 accepted full     | [Manifest](runtime-validation.slice-220.json)                                                                              | Historical full checkpoint before FP64 admission and CUDA bit-index correction.     |
+- [Slice 225 full](runtime-validation.slice-225.json): 1,665 fresh cells, 1,614 correct, 51 known failures.
+  [Frozen census](census.slice-225.tsv); [discovery census](discovery-census.slice-225.tsv).
+- [Research 224](semantic-evidence.slice-224.json): canonical Boolean context restriction isolated;
+  exact replay in 225 now passes all nine executions and 864 checked words.
+- [Slice 223 full](runtime-validation.slice-223.json): previous 1,662-cell preservation checkpoint.
+- [Slice 221 targeted](runtime-validation.slice-221.json): FP64 source min/max admission.
 
-Frozen remains 452 identities/1,356 cells; discovery has 102 identities/306 cells. Every one of the
-1,659 old runtime cells preserves all five stable outcome fields, and the three new cells pass.
-There are no missing, extra, duplicate or inherited runtime cells. All 549 old runtime input hashes
-and 101 old discovery manifest rows are unchanged. Historical healthy denominators 427/72 stay fixed.
-All 51 open first-known failure records and six resolved histories are preserved exactly except for
-fresh evidence references.
+Frozen remains 452 identities/1,356 cells: 1,335 correct, 16 preflight and 5 infrastructure failures.
+Discovery has 103 identities/309 cells: 279 correct, 22 infrastructure, 4 mismatch and 4 preflight failures.
+All 1,611 previously correct cells remain correct; three additions pass. Exactly four old prefix cells
+change only diagnostic/canonical shape; all other 1,658 old cells preserve all five outcome fields.
+All 550 previous runtime input hashes and 102 old discovery rows are unchanged. No missing, extra,
+duplicate or inherited runtime cells. Historical healthy denominators 427/72 stay fixed. All 51 open
+first-known failure records and six resolved histories remain intact, including prior diagnostic
+observations for the four advancing prefix cells.
 
-Fresh final gates: focused 4/4 plus the existing Windows-only skip, GPU smoke 4/4, units 478/478 plus
-the same existing skip, toolkit 18/18, discovery contracts 6/6, research 18/18 and material
-compile/assembly 6/6. The skipped fixture is nvvmSlangIntegerBitHelpersRequestTypedOperations; its
-real-builder neighbor and all three new GPU modes pass. An initial summary count was corrected
-from five requested selectors to four executed passes plus that skip. Both corpus runners return
-two for known failures; structured outcomes decide acceptance. No material runtime claim is made.
+Fresh final gates: focused 6/6, GPU smoke 4/4, units 479/479 plus one existing Windows-only skip,
+toolkit 18/18, discovery contracts 6/6, research 9/9 and material compile/assembly 6/6. Three initial
+fake-provider failures exposed missing Boolean leaf/load/unary bookkeeping; retained logs document
+the repairs, and final gates use the rebuilt test artifact. Both corpus runners return 2 for known
+failures; structured outcomes decide acceptance. No material runtime or performance claim is made.
 
 ## Unresolved failures and limitations
 
 - All 51 open failure records and six resolved histories retain first-known evidence and reproduction.
-- Quad reconvergence, prefix-min/max
-  KernelContext pointers and ordinary FP64 vector-by-value compound shuffles remain separate work.
+- FP64 masked prefix min/max, quad reconvergence and ordinary FP64 vector-by-value compound shuffles
+  remain separate work. Resource-bearing explicit contexts remain outside the copyable-only branch.
 - Hardware masks remain scheduling-dependent; logical active-mask synthesis is unchanged.
 - FP8/BF16/prelude and existing discovery infrastructure/output gaps remain visible.
-- The material lacks application bindings, texture/LUT/input contract and runtime output oracle.
-  Six cells compile/assemble; no material kernel correctness or speed claim.
+- The material lacks its application input/output contract; six cells compile/assemble only.
 - Slice 214 batching remains explicit opt-in. Mandatory fresh reference work made complete invocations
   slower despite 18.02355% paired compilation-lifecycle improvement; it is no routine accelerator.
 
@@ -78,11 +71,10 @@ optimized `build/RelWithDebInfo/{bin,lib}`, source `build/nvvm-loop/slice-203-en
 `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Sequential suites, four corpus/build
 workers maximum, two unit servers; `CMAKE_BUILD_PARALLEL_LEVEL=1`.
 
-Tested base `409ab717d05f1bbabfa24f8df83ce67cf648b47b` plus the CUDA helper/fixture changes.
-Compiler SHA256 `01e06def851b6228dea63d2bbb18cb4c3167ea89542d542623ea79e9d6f3258d`.
+Tested base `5cd4c301896960cf4b834e67dfaf7ad92194d41e` plus recorded context/unit/fixture changes.
+Compiler SHA256 `14e80c03ff1571a2248f935cc795a9465ec963f9d3ac5cf4a7f80ba076a48ae1`.
 Provider unchanged `ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372`.
-Raw evidence: `build/nvvm-loop/slice-223-before` and `slice-223-after`, including exact research222
-replay and the focused-count reporting correction. Parent verified 138 evidence references,
-24 tested source hashes, 12 artifact hashes and 550 runtime input hashes.
-No GPU loss, driver change, reboot or push. Local parent review/acceptance follows the recorded
-fresh-context delegation limitation.
+Raw evidence: `build/nvvm-loop/slice-225-before` and `slice-225-after`, including exact research224
+replay and original prefix probes. Parent verified 203 evidence references, 26 tested source hashes,
+12 artifact hashes and 551 runtime input hashes before recording acceptance. No GPU loss, driver
+change, reboot or push. Local parent review follows the recorded fresh-context delegation limitation.

@@ -1020,9 +1020,11 @@ IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
     // Consider `void set(inout Outer value)`: the helper receives `BorrowInOutParam<Outer>`, while
     // its caller passes the `Ptr<Outer>` produced by a local `var`. Both point at the same selected
     // resource-capable aggregate representation. Explicit-global-context lowering adds the complete
-    // CUDA thread-local pointer spelling, but that established producer remains scalar-struct-only.
+    // CUDA thread-local pointer spelling. For example, `static bool flag` becomes a Bool field in
+    // the entry-local context, and helpers receive its address. Reuse the existing copyable-value
+    // representation for that field and for nested value state, while excluding resource fields.
     const bool isThreadLocalContextPointer =
-        asNVVMSupportedScalarStructType(valueType) && pointerType &&
+        asNVVMSupportedCopyableStructType(valueType) && pointerType &&
         pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 4 &&
         pointerType->getAccessQualifier() == AccessQualifier::ReadWrite &&
         pointerType->getAddressSpace() == AddressSpace::ThreadLocal && dataLayout &&
