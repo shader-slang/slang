@@ -7920,12 +7920,18 @@ caller values. The sequential recipe uses negative zero for its sum identity on 
 retaining all-negative-zero results, and positive zero for other masks as the CUDA sparse loop
 does. Singleton sum/product selects the original caller value without altering payload bits,
 including signaling NaNs. Prefix sum and product identities remain positive zero and one. These
-seed rules remain confined to FP64 reductions. Slice 216 shares the existing singleton predicate
-and original-value selection with FP32 min/max reductions: the CUDA helper returns the sole operand
-without arithmetic, whereas combining a NaN with an injected infinity through numeric min/max
-returns infinity. The FP64 signed-zero seed calculation stays separate; nonsingleton FP32 behavior,
-other 32-bit reductions and all prefixes retain their existing recipes. Dynamic raw-bit scalar,
-vector and matrix coverage checks every singleton lane and preserves NaN payloads/signaling bits.
+seed rules remain confined to FP64 reductions.
+
+FP32 masked min/max reductions preserve the concrete CUDA helper's comparison and order. They
+start from the caller value and use ordered comparison plus typed selection, choosing the second
+operand for ties or unordered NaNs. A low-bit contiguous power-of-two population uses descending
+XOR butterfly stages over previous accumulators; other masks scan original named-lane inputs in
+ascending order. The existing two-phi loop represents both algorithms with an unsigned offset or
+remaining mask and a floating accumulator. Shared mask classification also drives the unchanged
+FP64 sum seed choice. Singleton words survive directly through this source algorithm; FP64 arithmetic
+retains its separate passthrough. Ordinary numeric min/max, prefixes and other reductions keep their
+existing contracts. Dynamic scalar/vector/matrix fixtures and the independent raw-word oracle cover
+NaN payloads, signed zeros, finite values, infinities and source ordering.
 
 Explicit-mask matrix indexed shuffles reuse the same homogeneous leaf transport. Slice 208 retained
 an FP64 implicit-matrix guard because the old full-mask ballot did not establish a divergent active

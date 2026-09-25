@@ -8464,9 +8464,10 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        // A singleton selects the original helper parameter, without arithmetic on its payload.
-        // The separate Float64 sum seed selection must never appear in the Float32 recipes.
-        uint32_t float32PassthroughCount = 0;
+        // Float32 min/max seeds its source algorithm with the original operand and uses ordered
+        // comparison/selection. Float64 arithmetic retains its singleton passthrough and sum seed.
+        uint32_t float32CompareSelectCount = 0;
+        uint32_t callerSeedCount = 0;
         uint32_t float64PassthroughCount = 0;
         uint32_t float64SeedCount = 0;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
@@ -8488,16 +8489,38 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
                 SLANG_CHECK(
                     predicate.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
                 SLANG_CHECK(predicate.operandTypes[0].bitWidth == 32);
-                float32PassthroughCount += operation.resultType.bitWidth == 32;
-                float64PassthroughCount += operation.resultType.bitWidth == 64;
+                SLANG_CHECK(operation.resultType.bitWidth == 64);
+                ++float64PassthroughCount;
+            }
+            else if (operation.resultType.bitWidth == 64)
+            {
+                ++float64SeedCount;
             }
             else
             {
-                SLANG_CHECK(operation.resultType.bitWidth == 64);
-                ++float64SeedCount;
+                SLANG_CHECK_ABORT(operation.resultType.bitWidth == 32);
+                SLANG_CHECK_ABORT(
+                    operation.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                SLANG_CHECK_ABORT(operation.operands[0].index >= 0);
+                SLANG_CHECK_ABORT(
+                    operation.operands[0].index < gFakeNVVMBuilder.scalarOperations.getCount());
+                const auto& predicate =
+                    gFakeNVVMBuilder.scalarOperations[operation.operands[0].index];
+                if (predicate.key.operation == SLANG_NVVM_VALUE_OP_LESS_THAN ||
+                    predicate.key.operation == SLANG_NVVM_VALUE_OP_GREATER_THAN)
+                {
+                    SLANG_CHECK(
+                        predicate.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+                    SLANG_CHECK(predicate.operandTypes[0].bitWidth == 32);
+                    SLANG_CHECK(operation.operands[1].kind == FakeNVVMBuilderValueKind::ScalarPhi);
+                    ++float32CompareSelectCount;
+                }
             }
         }
-        SLANG_CHECK(float32PassthroughCount == 2);
+        for (const auto& incoming : gFakeNVVMBuilder.scalarPhiIncomingValueRefs)
+            callerSeedCount += incoming.kind == FakeNVVMBuilderValueKind::Parameter;
+        SLANG_CHECK(callerSeedCount == 2);
+        SLANG_CHECK(float32CompareSelectCount == 2);
         SLANG_CHECK(float64PassthroughCount == 2);
         SLANG_CHECK(float64SeedCount == 1);
         bool sawFloat64NegativeZero = false;

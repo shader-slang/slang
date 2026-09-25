@@ -98,3 +98,4 @@ cuda/nvvm-implicit-aggregate-mask.slang	0	wave,active-mask,aggregate-pointer	Exi
 cuda/nvvm-double-literal-roundtrip.slang	0	float64,literal,roundtrip	Runtime-loaded IEEE binary64 words independently validate source literals across formatting boundaries and tiny normal/subnormal magnitudes.
 cuda/nvvm-fp64-implicit-shuffle.slang	0	fp64,wave,aggregate,shuffle	Exact-bit implicit matrix shuffles with full-warp indexed transport and divergent self reads.
 cuda/nvvm-fp32-singleton-minmax.slang	0	wave,float32,edge-cases	Dynamic raw-bit scalar/vector/matrix singleton min/max preserves signed zeros and NaN payloads across all lanes, with finite nonsingleton neighbors.
+cuda/nvvm-fp32-minmax-order.slang	0	wave,float32,edge-cases	Dynamic scalar/vector/matrix min/max preserves CUDA butterfly and scan selections for NaNs and signed zeros.
