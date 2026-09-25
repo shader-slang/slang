@@ -299,7 +299,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -312,7 +312,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t rowCount,
         size_t columnCount) override
@@ -398,11 +398,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         const TypeLayoutContext& context) override
     {
         SLANG_UNUSED(elementType);
-        SLANG_UNUSED(context);
 
         // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uintInfo = GetScalarLayout(BaseType::UInt, context);
-        auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
+        auto uint2Info = GetVectorLayout(context.astBuilder->getUIntType(), uintInfo, 2);
         return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2Info.size, uint2Info.alignment));
     }
 };
@@ -413,7 +412,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
     typedef DefaultLayoutRulesImpl Super;
 
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -701,7 +700,7 @@ struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -810,7 +809,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -842,8 +841,20 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Special case 3, as uses alignment of the elementSize
         auto alignment = (elementCount == 3) ? elementSize : size;
 
-        // special case half
-        if (elementType == BaseType::Half && elementCount >= 3)
+        // The CUDA prelude defines BF3 and BF4 as component structs. Consider:
+        //     struct W { uint16_t prefix; vector<BFloat16, 4> value; uint16_t suffix; }
+        // The BF4 field starts at byte 2 and the record occupies 12 bytes. Preserve the
+        // canonical element type here so reflection agrees with those component fields;
+        // a BaseType alone loses BFloat16's identity. Native BF2 keeps its 4-byte alignment.
+        if (as<BFloat16Type>(elementType) && (elementCount == 3 || elementCount == 4))
+        {
+            alignment = elementSize;
+        }
+
+        // Half3 and Half4 are 4-byte-aligned prelude structs, including Half3's tail padding.
+        auto basicElementType = as<BasicExpressionType>(elementType);
+        if (basicElementType && basicElementType->getBaseType() == BaseType::Half &&
+            elementCount >= 3)
         {
             alignment = elementSize * 2;
             size = _roundToAlignment(size, alignment);
@@ -868,7 +879,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t rowCount,
         size_t columnCount) override
@@ -921,7 +932,7 @@ struct CUDAEntryPointParameterLayoutRulesImpl : CUDALayoutRulesImpl
 struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
 {
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -968,7 +979,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
 struct MetalStructuredBufferLayoutRulesImpl : MetalLayoutRulesImpl
 {
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -1019,7 +1030,7 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
         return SimpleLayoutInfo(getKind(), 1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t elementCount)
+    SimpleLayoutInfo GetVectorLayout(Type* elementType, SimpleLayoutInfo, size_t elementCount)
         override
     {
         SLANG_UNUSED(elementType);
@@ -1074,7 +1085,7 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
         return SimpleLayoutInfo(getKind(), 1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t elementCount)
+    SimpleLayoutInfo GetVectorLayout(Type* elementType, SimpleLayoutInfo, size_t elementCount)
         override
     {
         SLANG_UNUSED(elementType);
@@ -2632,7 +2643,7 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
     }
 
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) override
     {
@@ -5520,13 +5531,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         auto element = _createTypeLayout(context, elementType);
 
-        BaseType elementBaseType = BaseType::Void;
-        if (auto elementBasicType = as<BasicExpressionType>(elementType))
-        {
-            elementBaseType = elementBasicType->getBaseType();
-        }
-
-        auto info = rules->GetVectorLayout(elementBaseType, element.info, elementCount);
+        auto info = rules->GetVectorLayout(elementType, element.info, elementCount);
 
         RefPtr<VectorTypeLayout> typeLayout = new VectorTypeLayout();
         typeLayout->type = type;
@@ -5551,12 +5556,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         auto elementTypeLayout = elementResult.layout;
         auto elementInfo = elementResult.info;
 
-        BaseType elementBaseType = BaseType::Void;
-        if (auto elementBasicType = as<BasicExpressionType>(elementType))
-        {
-            elementBaseType = elementBasicType->getBaseType();
-        }
-
         // The `GetMatrixLayout` implementation in the layout rules
         // currently defaults to assuming row-major layout,
         // so if we want column-major layout we achieve it here by
@@ -5575,16 +5574,13 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             layoutMajorCount = layoutMinorCount;
             layoutMinorCount = tmp;
         }
-        auto info = rules->GetMatrixLayout(
-            elementBaseType,
-            elementInfo,
-            layoutMajorCount,
-            layoutMinorCount);
+        auto info =
+            rules->GetMatrixLayout(elementType, elementInfo, layoutMajorCount, layoutMinorCount);
 
         auto rowType = matType->getRowType();
         RefPtr<VectorTypeLayout> rowTypeLayout = new VectorTypeLayout();
 
-        auto rowInfo = rules->GetVectorLayout(elementBaseType, elementInfo, colCount);
+        auto rowInfo = rules->GetVectorLayout(elementType, elementInfo, colCount);
 
         LayoutOffset majorStride = info.elementStride;
         LayoutOffset minorStride = elementInfo.getUniformLayout().size.getFiniteValue();
@@ -6311,7 +6307,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         {
             auto varyingRuleSet = varyingRules[rr];
             auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
-            auto info = varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, elementCount);
+            auto info = varyingRuleSet->GetVectorLayout(elementType, elementInfo, elementCount);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -6367,7 +6363,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
 
             auto info = varyingRuleSet->GetMatrixLayout(
-                elementBaseType,
+                elementType,
                 elementInfo,
                 layoutMajorCount,
                 layoutMinorCount);
@@ -6377,8 +6373,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             {
                 // For row-major matrices only, we can compute an effective
                 // resource usage for the row type.
-                auto rowInfo =
-                    varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
+                auto rowInfo = varyingRuleSet->GetVectorLayout(elementType, elementInfo, colCount);
                 rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
             }
         }

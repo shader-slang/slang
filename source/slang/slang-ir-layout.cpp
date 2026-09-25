@@ -771,6 +771,22 @@ struct CUDALayoutRules : CLayoutRules
 
         auto vectorType = as<IRVectorType>(type);
         auto elementCount = vectorType ? as<IRIntLit>(vectorType->getElementCount()) : nullptr;
+        if (vectorType && vectorType->getElementType()->getOp() == kIROp_BFloat16Type &&
+            elementCount && (elementCount->getValue() == 3 || elementCount->getValue() == 4))
+        {
+            // Match the component structs in the CUDA prelude and AST CUDA layout rules.
+            // For `struct W { uint16_t prefix; vector<BFloat16, 4> value; uint16_t suffix; }`,
+            // the BF4 field starts at byte 2 and the record occupies 12 bytes. Explicit CUDA
+            // size/alignment queries and aggregate offsets must use that same representation.
+            // Native BF2 retains its separate 4-byte alignment.
+            IRSizeAndAlignment elementLayout;
+            SLANG_RETURN_ON_FAIL(
+                getSizeAndAlignment(targetReq, this, vectorType->getElementType(), &elementLayout));
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                elementLayout.size * elementCount->getValue(),
+                elementLayout.alignment);
+            return SLANG_OK;
+        }
         if (vectorType && vectorType->getElementType()->getOp() == kIROp_HalfType && elementCount &&
             elementCount->getValue() >= 3)
         {

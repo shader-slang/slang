@@ -1338,11 +1338,11 @@ struct SimpleLayoutRulesImpl
 
     // Get layout for a vector or matrix type
     virtual SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) = 0;
     virtual SimpleArrayLayoutInfo GetMatrixLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t rowCount,
         size_t columnCount) = 0;
@@ -1402,7 +1402,7 @@ struct LayoutRulesImpl
     }
 
     SimpleLayoutInfo GetVectorLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount)
     {
@@ -1410,7 +1410,7 @@ struct LayoutRulesImpl
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(
-        BaseType elementType,
+        Type* elementType,
         SimpleLayoutInfo elementInfo,
         size_t rowCount,
         size_t columnCount)

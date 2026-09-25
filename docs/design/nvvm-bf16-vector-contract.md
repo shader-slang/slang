@@ -86,14 +86,13 @@ calls; the local BF3 depot is six bytes/alignment2. This establishes a candidate
 not permission to enable local pointers, aggregates, resources, globals or parameter groups through
 a shared numeric classifier. Leave new local/storage admission outside the next value-only slice.
 
-There is also a producer/model issue to resolve before BF4 external storage work. In
-`slang-ir-layout.cpp`, `CUDALayoutRules::calcSizeAndAlignment` special-cases Half, then the generic
-vector rule gives BF4 alignment8. In `slang-type-layout.cpp`, `_createTypeLayout` supplies the BF16
-scalar layout and `CUDALayoutRulesImpl::GetVectorLayout` similarly takes the generic width4 rule;
-it lacks a BF16 format distinction. The actual prelude BF4 alignment is2. A future storage slice
-must make both layout producers agree with the target representation, then use existing role-specific
-lowering, aggregate layout validation and component conversion machinery. Do not bypass
-`_getNVVMAggregateStorageLayout` checks or declare the accidental eight-byte alignment canonical.
+Research240 also identified a producer/model issue before BF4 external storage work: both AST
+and IR CUDA layout producers gave BF4 alignment8 instead of the actual prelude alignment2.
+Research253 qualified its reflection and runtime-query consequences; slice254 repairs both
+producers while preserving canonical BF16 identity, as described below. Future storage support
+must still use existing role-specific lowering, aggregate layout validation and component conversion
+machinery. Do not bypass `_getNVVMAggregateStorageLayout` checks or treat LLVM vector alignment as
+the CUDA component-struct ABI.
 
 Existing `_emitNVVMStructuredBufferStorageConversion`, compact vector load/store paths and
 `NVVMTypeLoweringContext::lowerType` show how values cross array/vector boundaries. Their current
@@ -180,13 +179,32 @@ Unqualified Slang `sizeof`/`alignof` instead selects Natural rules in `PeepholeC
 For example, BF2 has Natural alignment2 and wrapper size8, while its CUDA ABI is4 and12. Preserve
 that distinct observable policy; matching Natural BF4 values does not validate CUDA layout.
 
-The next bounded repair must preserve BF16 format information across the AST vector-layout query
-and correct the IR CUDA rule. `_createTypeLayout` currently passes BaseType::Void for non-basic BF16,
-so the CUDA vector rule cannot distinguish it from other non-basic elements. Repair that producer
-interface rather than introducing another BF16 AST type, using UInt16/Half as a semantic substitute,
-patching reflection output, or weakening downstream aggregate checks. Preserve native BF2, Half
-padding, ordinary vectors, non-CUDA layouts and all storage admission boundaries. Shared layout
-impact requires public-reflection and explicit CUDA-query regressions plus a full checkpoint.
+On the researched252 source, `_createTypeLayout` passes BaseType::Void for non-basic BF16,
+so the CUDA vector rule cannot distinguish it from other non-basic elements. This identified the
+producer boundary repaired by254 below, without introducing another BF16 AST type, using UInt16/Half
+as a semantic substitute, patching reflection output or weakening downstream aggregate checks.
 
 No new physical LLVM storage representation is qualified by253. The role-specific boundaries and
 component-array/vector distinctions recorded240 remain requirements for a separate storage slice.
+
+## Slice254: canonical CUDA BF16 layout
+
+The internal AST vector/matrix query now retains its canonical element Type*. CUDA rules recognize
+`BFloat16Type` directly and preserve the prelude's BF3/BF4 component layout. The IR CUDA rule uses
+canonical `kIROp_BFloat16Type` for the same two widths. BF2 remains native4/4; BF3 is6/2 and BF4 is8/2.
+Half3/Half4 remain8/4, ordinary ushort4 remains8/8, and Natural rules retain their separate behavior.
+Other target layout rules continue ignoring the element-semantics argument; varying scalar rules
+retain their existing BaseType input. No second type or scalar-kind mapping is introduced.
+
+Consequently, the wrapped BF4 record above is12/2 with offsets2/10 and its holder is38/2 with tail36
+in both public reflection and explicit CUDA queries. Row-major BF matrices inherit the corrected
+row-vector layout through existing array construction:2x4 is16/2 and3x4 is24/2. The qualified4x2
+neighbor remains16/4 and4x3 remains24/2. This does not change matrix orientation policy.
+
+The executable96-value regression covers all16 scalar/vector/matrix neighbors, their wrappers and
+three-record holders at NVRTC O3 and NVVM O0/O3. Public-reflection coverage additionally checks
+strides and field offsets. Separate canonical IR controls preserve all36 Natural rows. Host bytes
+packed from corrected reflection equal the previously qualified CUDA-packed inputs; original
+incorrectly packed inputs remain recorded negative controls. The12 direct storage rejection shapes
+are unchanged. Correct layout metadata is a prerequisite for future storage support, not admission
+of a physical LLVM vector as stored CUDA BF16 data.

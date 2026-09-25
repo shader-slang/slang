@@ -3,6 +3,40 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Slice254 is accepted
+
+Shared AST and IR CUDA layout producers now match the prelude's BF3/BF4 component structs. The AST
+vector/matrix interface preserves canonical Type*; no substitute BF16 type, scalar-kind mapping,
+query-consumer workaround or runtime storage admission is added. BF4 is8/2; the uint16-wrapped
+record is12/2 with offsets2/10 and its three-record holder is38/2 with tail36. Native BF2, Half,
+ordinary vectors and Natural rules retain their qualified behavior. Read
+[plan254](plan.slice-254-bf16-cuda-layout.md), [report254](report.slice-254-bf16-cuda-layout.md) and
+[validation254](runtime-validation.slice-254.json).
+
+The unchanged new fixture's15 wrong direct values become correct: all96 outputs match at each mode,
+including row-major matrix neighbors. Public reflection48 and canonical IR CUDA36 agree with actual
+CUDA ABI; all36 Natural rows remain exact. Replay21 GPU controls/5376 words retains2 historical
+bad-input failures,12 direct-storage rejection shapes and7 identical NVRTC PTX outputs. Corrected
+reflection packing produces the immutable qualified CUDA input bytes in6 controls.
+
+Full frozen1356/discovery348 preserves every one of1701 old outcomes and adds3 correct cells:
+1704total/1665correct/39unresolved, with18 resolved histories retained. Units1048pass/13skip and
+semantics1052pass/77skip preserve all1060/1129 old identities, adding one reflection test. Runtime4,
+toolkit18, contracts6 and material6 compile/assembly checks pass. No missing/duplicate requested cells.
+Final identity covers132 source files,12 artifacts and564 inputs; all563 previous inputs are exact.
+Compiler SHA256 `a595092cb50be989df9015d38852946afd599def83b5485ba5188b2a5e4e3f7a`; provider ABI41
+SHA256 remains `5fe0b977e22b80acc5ee39147c69510a01c09563354a1a67bd9573d1cda1aeab`.
+
+Latest implementation/full checkpoint254, targeted233, cadence0. Rolling implementations are250
+BF16 literal correctness,252 material compile-time and254 CUDA layout correctness. This demonstrated
+correctness defect took priority; reassess material work when selecting subsequent implementation
+slices. Material bindings/textures/LUT/input/output contracts remain unavailable. Delegation was
+unavailable at the agent limit; the documented local fallback used one writer and separate oracle/
+mechanical audits, without claiming a fresh independent review. No push or system/driver change.
+Closure verifies3509 indexed raw artifacts,132 final source snapshots and201 compact references.
+All6 material PTX/cubin pairs are byte-identical to252. Raw evidence:
+`build/nvvm-loop/slice-254-before` and `slice-254-after`.
+
 ## Research253 is accepted
 
 Public CUDA reflection and canonical IR CUDA rules disagree with the actual prelude only for BF4
@@ -124,21 +158,17 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Repair the shared AST and IR CUDA BF16 vector layout producers as one bounded implementation.
-Preserve canonical BF16 format information through the AST vector query; model BF3/BF4 component
-storage while retaining native BF2 alignment. Do not add a second BF16 type, coerce its semantics
-to Half/UInt16, patch query consumers, weaken aggregate checks or broaden runtime storage admission.
+Qualify a bounded physical BF16 storage contract using the repaired CUDA metadata and research240/
+253/254 evidence. Compare native-width2 vector storage and component arrays for widths3/4 through
+actual pointer/record/array boundaries, with exact bits, adjacent-field guards and explicit CUDA
+alignment. Preserve every current runtime admission boundary until representation and conversions
+are independently qualified. The original dynamic-dispatch BF2/FP8 aggregate fixture has separate
+boundaries; do not bundle FP8 aggregate support, BF runtime storage and matrix orientation changes.
 
-Add explicit CUDA query regression coverage (the253 control currently returns five wrong values
-at both direct optimization levels) and public-reflection wrapper/array tests. Preserve all33
-neighboring CUDA layout rows and the separate Natural rules. Shared layout impact requires full
-unit/semantic gates, the complete frozen/discovery checkpoint and all6 material support cells.
-The original dynamic-dispatch BF2/FP8 aggregate fixture has separate boundaries; do not bundle them.
-
-This proven correctness failure takes priority over new FP8 runtime conversions, texture queries
-or another compile-time optimization. Material runtime bindings/textures/LUT/input/output contracts
-remain unavailable. Preserve the original texture/column-major failures and existing input/oracle
-identities. Further storage admission or optimization needs its own evidence and bounded slice.
+Re-rank this candidate against FP8 runtime conversion/overflow and material compile-time work before
+implementation. Material runtime bindings/textures/LUT/input/output contracts remain unavailable.
+Preserve texture/column-major failures and all existing input/oracle identities. A research result
+or metadata fix is not runtime storage support.
 
 ## Accepted historical evidence
 
@@ -156,7 +186,8 @@ Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CU
 LLVM14, providerABI41, matching RelWithDebInfo. Inspect/source `build/nvvm-loop/slice-203-env.sh` and
 follow the local slang-build skill. At most4 CPU workers, sequential GPU suites and 30-minute bounds.
 
-Raw roots `build/nvvm-loop/slice-252-before`, `slice-252-prototype` and `slice-252-after` retain
-matched baseline/candidate layouts, all timing attempts, proof and runtime evidence, final snapshots,
-commands, parent audits and the closed worker artifact index.
+Latest raw roots `build/nvvm-loop/slice-254-before` and `slice-254-after` retain the unchanged
+before fixture, qualified CUDA-device matrix ABI, focused reflection/IR/GPU controls, full checkpoint,
+final source snapshots and acceptance/closure audits. Historical252 roots retain matched baseline/
+candidate layouts, timing attempts and AST metadata proofs with their original identities.
 No GPU loss, driver/system change, reboot, push or worker commit occurred.
