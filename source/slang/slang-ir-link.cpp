@@ -2512,13 +2512,13 @@ struct IRPrelinkContext : IRSpecContext
                 else if (auto importDecor = as<IRImportDecoration>(decor))
                 {
                     hasImportDecor = true;
-                    // A clone that arrives already marked [Import] still occupies a mangled
-                    // name in this module and must be registered below, so a later reference to
-                    // that name -- reached through a different external symbol's transitive
-                    // closure during prelink -- reuses this clone rather than producing a second
-                    // linkage-bearing global for one name (which `checkIRDuplicate` rejects).
-                    // Prefer the export name when both are present; they agree, and the export
-                    // branch is the definition we are importing.
+                    // Register [Import]-origin clones too: a clone that arrives marked [Import]
+                    // still occupies a mangled name in this module, so recording it below lets a
+                    // later reference to that name -- reached through a different external
+                    // symbol's transitive closure during prelink -- reuse this clone instead of
+                    // producing a second linkage-bearing global for one name (which
+                    // `checkIRDuplicate` rejects). An [Export] name, when present, is taken by
+                    // the branch above and left untouched here.
                     if (!mangledName.getLength())
                         mangledName = importDecor->getMangledName();
                 }
