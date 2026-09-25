@@ -4,22 +4,44 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before resuming the loop.
 
 ## Current state and next action
 
-**Research247 is independently accepted.** Read
-[plan247](plan.slice-247-column-major.md), [report247](report.slice-247-column-major.md) and
-[evidence247](semantic-evidence.slice-247.json). The original column-major discovery ID still has
-three runtime mismatches (`11,1` actual versus `11,22` graphics oracle); all are retained. Eighteen
-independent CUDA controls prove column stride12 and row stride8 in NVRTC O3/NVVM O0/O3, with six
-PTX assemblies and runtime4 passing. The fixture's ignored-major comment is stale for this shape:
-the mismatch comes from graphics column stride16 input packing. No compiler/runner/fixture change,
-new registered ID, support unlock, full checkpoint or implementation-cadence increment.
+**Research248 is independently accepted.** Read
+[plan248](plan.slice-248-texture-contract.md), [report248](report.slice-248-texture-contract.md),
+[evidence248](semantic-evidence.slice-248.json) and the
+[texture query contract](../docs/design/nvvm-texture-query-contract.md).
+The original texture-dimensions ID retains its NVRTC mismatch and two direct mip-GenericAsm stops.
+Its three visible errors are zeroed array counts; Float32 packing masks all seven zeroed mip counts.
+The CUDA helper also ignores the requested LOD. Twelve supplementary Slang executions check246
+current-CUDA output values; two isolated 1D-array preflight controls retain a separate boundary.
+These are current-helper observations, not claims of desired-API correctness. Five trace assemblies,
+three isolated query assemblies and runtime4 pass. Nine independent CUDA resource probes prove
+nonzero-LOD width support and several shape-specific layer counts; metadata query function lookup
+fails500 on this stack despite successful assembly and matching symbols. Actual harness resource
+semantics are source-traced; the independent probes do not instrument live RHI objects.
 
-After the local commit, re-rank remaining boundaries. The texture-dimension mismatch is the
-remaining unqualified wrong-output case; narrow FP8 admission and arbitrary RequirePrelude remain
-separate support candidates. A future explicit packed CUDA matrix contract must preserve the original ID/oracle and
-complete a full checkpoint for corpus/runner changes. No general host-byte repacking is proposed.
-Latest implementation/full remains246, targeted233, implementation slices since full zero. All41
-unresolved and16 resolved histories remain exact246 records. Tested HEAD for247 is
-`739ead0d725f1075b4d382ec531ebe9070e60ea1`;117 source,12 artifact and561 input hashes match246.
+After the local commit, select the next bounded support slice. Narrow FP8 scalar/internal-helper
+admission has prior transport/conversion qualification and a repaired finite literal producer.
+It is a stronger immediate candidate than texture metadata ABI work or arbitrary RequirePrelude. A partial texture
+feature may use supported LOD/layer queries, but full GetDimensions needs an explicit total-level
+and view contract, including partial mip chains and the fixture's length1 cube-array/nonlayered-cube
+binding distinction. Do not infer count from width, admit the old zero-count mip helper as full
+support, weaken the old oracle, or introduce speculative metadata ABI. Narrow FP8 admission and
+arbitrary RequirePrelude remain separate candidates. Any compiler/library/provider/ABI/runner
+implementation requires its prescribed checkpoint; research248 makes no implementation claim.
+
+Full246 remains1695 cells/1654 correct/41 unresolved and16 resolved histories; all exact histories
+are inherited. Three original classifier cells are fresh,1692 inherited; no registered additions,
+support unlock, full checkpoint or cadence increment. Latest implementation/full246, targeted233,
+cadence0. Tested248 HEAD `7d8cd100aaf29d2334876655fc7c8eee0249a691`;117 source,12 artifact and561 input
+hashes match246 before/after. Raw `build/nvvm-loop/slice-248-before` and `slice-248-research` retain
+158 indexed artifacts and16 local primary-source snapshots plus official PTX/HLSL snapshots.
+Parent-audit.py/json independently verifies all246 uint values, nine mip tables,27 base-query values,
+nine LOD values, four surface values and171 compact references before its own two audit references.
+
+**Research247 remains independently accepted.** Its original column-major ID retains three
+mismatches (`11,1` versus `11,22`). Eighteen controls and six assemblies establish compact CUDA
+column stride12 versus graphics input stride16. See [report247](report.slice-247-column-major.md)
+and [evidence247](semantic-evidence.slice-247.json). A future explicit packed CUDA fixture must
+preserve the original ID/oracle and require a full checkpoint for corpus/runner changes.
 
 **Implementation246 and its full checkpoint are independently accepted.** Read
 [plan246](plan.slice-246-ast-subtype.md), [report246](report.slice-246-ast-subtype.md),

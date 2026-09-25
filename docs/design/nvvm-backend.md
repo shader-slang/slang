@@ -8327,3 +8327,12 @@ controls disambiguate every lane. No production, source fixture, runner or corpu
 A separate explicit CUDA contract can be proposed with a full checkpoint if corpus selection changes;
 do not rewrite the old oracle or reinterpret arbitrary host bytes to hide a portability mismatch.
 See `issue-nvvm-backend/report.slice-247-column-major.md` and `semantic-evidence.slice-247.json`.
+
+### Slice 248: Texture dimensions contract research
+
+The original texture-dimensions mismatch is qualified without changing its oracle or outcomes.
+Array-count zeros cause its three visible mismatches; Float32 packing masks missing mip counts.
+Nonzero-LOD width and some shape-specific layer counts are available on the measured CUDA stack;
+full total-level/view metadata remains a separate contract. See the
+[texture query contract](nvvm-texture-query-contract.md) for generator, RHI, driver and preservation
+boundaries. No library, provider, ABI or supported-query expansion occurs in this research slice.
