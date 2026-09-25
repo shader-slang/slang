@@ -4,6 +4,13 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
+**Research 226 is accepted: FP64 prefix source semantics are established.** Read the
+[report](report.slice-226-fp64-prefix.md), [plan](plan.slice-226-fp64-prefix.md) and
+[evidence](semantic-evidence.slice-226.json). All 196 source cases match 57,624 active binary64
+results and 117,992 inactive sentinels. Eight direct probes reject before PTX. A plain ascending
+scan differs in 8,658 words; preserve the source shuffle-up tree and separate transmitted state.
+Matrix prefix capability rejection is a separate recorded limitation.
+
 **Slice 225 is accepted: canonical thread-local contexts admit supported copyable values.** Read the
 [completed plan](plan.slice-225-copyable-context.md), [five-part report](report.slice-225-copyable-context.md)
 and [full result manifest](runtime-validation.slice-225.json). The existing recursive copyable-struct
@@ -11,12 +18,14 @@ classifier replaces the older scalar-only context restriction. Exact pointer qua
 provider ABI 36, storage lifetime, helper pointer matching and resource-bearing context restrictions
 are unchanged. Dynamic Boolean/nested/double/vector/array state passes all three runtime modes.
 
-**Next action: research FP64 masked exclusive/inclusive min/max prefix semantics.** The two original
-frozen prefix workloads now reject GenericAsm `_wavePrefixExclusiveMin/Max(($1).x, $0)`, signature
-`double(double, vector<uint,4>)`, at both direct optimization levels. Establish the CUDA source
-algorithm, identities, operand order and NaN/signed-zero behavior with independent raw-bit expectations
-before admitting another reduction recipe. Preserve the original prefix sources and output oracles;
-stop at any next independent blocker. The four diagnostic advances in 225 remain known failures.
+**Next action: implement source-order FP64 inclusive/exclusive min/max prefixes in slice 227.**
+Use caller seeds for inclusive prefixes and binary64 ±infinity for exclusive prefixes, ordered
+compare/select, shuffle-up transmitted/returned state for low contiguous power-of-two masks and
+ascending original-input scans otherwise. Reuse existing mask classification and typed operations;
+preserve reduction/arithmetic recipes. Prove before/after output and replay the exact research226
+inputs/oracle. Reassess original frozen min/max workloads; stop at any independent next blocker.
+Matrix capability and resource-bearing contexts stay separate. No direct prefix runtime support
+is claimed yet. Select a justified affected regression domain; full225/cadence0 remain current.
 
 No push is authorized. Fresh-context delegation remains at the app's agent-thread limit; local work
 uses WORKFLOW's fallback and does not imply independent worker review. Material runtime still needs
@@ -54,6 +63,9 @@ failures; structured outcomes decide acceptance. No material runtime or performa
 
 ## Unresolved failures and limitations
 
+- Matrix prefix overloads require glsl_spirv and reject CUDA before emission; research226 retains
+  the exact diagnostic. Scalar/vector prefix experiments do not establish matrix support.
+
 - All 51 open failure records and six resolved histories retain first-known evidence and reproduction.
 - FP64 masked prefix min/max, quad reconvergence and ordinary FP64 vector-by-value compound shuffles
   remain separate work. Resource-bearing explicit contexts remain outside the copyable-only branch.
@@ -78,3 +90,7 @@ Raw evidence: `build/nvvm-loop/slice-225-before` and `slice-225-after`, includin
 replay and original prefix probes. Parent verified 203 evidence references, 26 tested source hashes,
 12 artifact hashes and 551 runtime input hashes before recording acceptance. No GPU loss, driver
 change, reboot or push. Local parent review follows the recorded fresh-context delegation limitation.
+
+Research226 raw evidence: `build/nvvm-loop/slice-226-prefix`. GPU smoke4 and source probe196
+executions are fresh; registered outcomes and other gates inherit unchanged full225. All26 source,
+12 artifact and551 input hashes were rechecked. No binary rebuild or provider/ABI change.

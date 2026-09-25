@@ -1,0 +1,527 @@
+{
+  "schema": 1,
+  "slice": 226,
+  "status": "accepted-research",
+  "date_utc": "2026-09-25",
+  "source_revision": "d3d8a77b85757ca0d6576196dbffde25237ff4df",
+  "scope": "Establish FP64 masked inclusive/exclusive prefix min/max source semantics with integer binary64 expectations; no compiler/corpus changes",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-225.json",
+    "sha256": "cc6c6381f0e18cfacfc8fa5b634f6d5e920c11599a7066886c8bf1c844299759"
+  },
+  "raw_results": {
+    "path": "build/nvvm-loop/slice-226-prefix/results.json",
+    "sha256": "961d8b2eb401ce18dcf9d707d16e5e5b4d0f2ae9550c603425b74cb6bc07c76c"
+  },
+  "probe": {
+    "path": "build/nvvm-loop/slice-226-prefix/probe.py",
+    "sha256": "a4896948c493c10d6771fdc9d15be1bd8e6d138c3a163b1be068ab1b65231b93"
+  },
+  "oracle_output_order": {
+    "path": "build/nvvm-loop/slice-226-prefix/order.json",
+    "sha256": "d7213bef0f1ecd954eb6fa8c2d98af205981d5b05f6bd6241cb715e78eda0f47"
+  },
+  "source": {
+    "path": "build/nvvm-loop/slice-226-prefix/prefix64.slang",
+    "sha256": "7c32e35262a2b5e4206af6f82010d6bbac28505d4e47eb8ac32ed749f26fd339"
+  },
+  "source_compile_commands": [
+    [
+      "build/RelWithDebInfo/bin/slangc",
+      "build/nvvm-loop/slice-226-prefix/prefix64.slang",
+      "-entry",
+      "computeMain",
+      "-stage",
+      "compute",
+      "-target",
+      "ptx",
+      "-capability",
+      "cuda_sm_8_0",
+      "-O3",
+      "-emit-cuda-via-nvrtc",
+      "-o",
+      "build/nvvm-loop/slice-226-prefix/prefix64-nvrtc-o3.ptx"
+    ]
+  ],
+  "executions": 196,
+  "correct_executions": 196,
+  "masks": [
+    "even",
+    "full",
+    "high16",
+    "high17",
+    "low15",
+    "low16",
+    "low2",
+    "low4",
+    "low8",
+    "odd",
+    "singleton0",
+    "singleton31",
+    "singleton7",
+    "sparse-extremes"
+  ],
+  "patterns": [
+    "adjacent-finite",
+    "all-qnan",
+    "all-snan",
+    "finite",
+    "infinities",
+    "mixed-nan",
+    "one-qnan-first",
+    "one-qnan-last",
+    "one-qnan-middle",
+    "one-snan-first",
+    "one-snan-last",
+    "one-snan-middle",
+    "signed-zeros",
+    "subnormals"
+  ],
+  "output_shape": "Four inclusive/exclusive min/max operations, each scalar plus double2 plus double4;28 binary64 results per lane",
+  "active_binary64_comparisons": 57624,
+  "inactive_sentinel_binary64_comparisons": 117992,
+  "total_binary64_comparisons": 175616,
+  "equal_binary64_words": 175616,
+  "equivalent_u32_word_comparisons": 351232,
+  "ptx_assemblies": 1,
+  "rejected_compile_cells": 8,
+  "preflight": [
+    {
+      "style": "exclusive",
+      "operation": "min",
+      "mode": "nvvm-o0",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/exclusive-min.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/exclusive-min-nvvm-o0.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMin(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-min-nvvm-o0.log",
+        "sha256": "e036396e040c2e08cf851c3f6b09266381a0651a412de623ccc541a8bad29042"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-min.slang",
+        "sha256": "d67f59dfde72c49e96e91c1ae434a62a9ab66877b743dbb2ae0df5ae79716390"
+      }
+    },
+    {
+      "style": "exclusive",
+      "operation": "min",
+      "mode": "nvvm-o3",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/exclusive-min.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/exclusive-min-nvvm-o3.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMin(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-min-nvvm-o3.log",
+        "sha256": "e036396e040c2e08cf851c3f6b09266381a0651a412de623ccc541a8bad29042"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-min.slang",
+        "sha256": "d67f59dfde72c49e96e91c1ae434a62a9ab66877b743dbb2ae0df5ae79716390"
+      }
+    },
+    {
+      "style": "exclusive",
+      "operation": "max",
+      "mode": "nvvm-o0",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/exclusive-max.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/exclusive-max-nvvm-o0.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMax(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-max-nvvm-o0.log",
+        "sha256": "d4379056bdbb3965fe2bbe317db91da1aa801513ff88b8b3faced841a1d1a5cb"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-max.slang",
+        "sha256": "8a84d5e981c1add39741f7ff79072d9fadf256eecde7e88d1445546771e0e645"
+      }
+    },
+    {
+      "style": "exclusive",
+      "operation": "max",
+      "mode": "nvvm-o3",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/exclusive-max.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/exclusive-max-nvvm-o3.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixExclusiveMax(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-max-nvvm-o3.log",
+        "sha256": "d4379056bdbb3965fe2bbe317db91da1aa801513ff88b8b3faced841a1d1a5cb"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/exclusive-max.slang",
+        "sha256": "8a84d5e981c1add39741f7ff79072d9fadf256eecde7e88d1445546771e0e645"
+      }
+    },
+    {
+      "style": "inclusive",
+      "operation": "min",
+      "mode": "nvvm-o0",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/inclusive-min.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/inclusive-min-nvvm-o0.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMin(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-min-nvvm-o0.log",
+        "sha256": "bb98ef5bc6ad3e03a8cbc6f19d0f41f4d3607fc605b6abb69d45ea8fdfaad529"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-min.slang",
+        "sha256": "803c596f79d99b83670eb88d69848a945af90b3d9170f83d8c0ac35f6c9c53a2"
+      }
+    },
+    {
+      "style": "inclusive",
+      "operation": "min",
+      "mode": "nvvm-o3",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/inclusive-min.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/inclusive-min-nvvm-o3.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMin(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-min-nvvm-o3.log",
+        "sha256": "bb98ef5bc6ad3e03a8cbc6f19d0f41f4d3607fc605b6abb69d45ea8fdfaad529"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-min.slang",
+        "sha256": "803c596f79d99b83670eb88d69848a945af90b3d9170f83d8c0ac35f6c9c53a2"
+      }
+    },
+    {
+      "style": "inclusive",
+      "operation": "max",
+      "mode": "nvvm-o0",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/inclusive-max.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O0",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/inclusive-max-nvvm-o0.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMax(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-max-nvvm-o0.log",
+        "sha256": "26e5d4c7494586b1890567a7442af785f6cd7f00001023fe98494e77082957d8"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-max.slang",
+        "sha256": "23d8f1d7227950ad44fec48b5414ea5c4e0ae010a3d09fc46e3bc123dde91704"
+      }
+    },
+    {
+      "style": "inclusive",
+      "operation": "max",
+      "mode": "nvvm-o3",
+      "command": [
+        "build/RelWithDebInfo/bin/slangc",
+        "build/nvvm-loop/slice-226-prefix/inclusive-max.slang",
+        "-entry",
+        "computeMain",
+        "-stage",
+        "compute",
+        "-target",
+        "ptx",
+        "-capability",
+        "cuda_sm_8_0",
+        "-O3",
+        "-emit-cuda-via-nvvm",
+        "-o",
+        "build/nvvm-loop/slice-226-prefix/inclusive-max-nvvm-o3.ptx"
+      ],
+      "return_code": 255,
+      "diagnostic": "error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=_wavePrefixInclusiveMax(($1).x, $0), signature=double(double, vector<uint,4>)'\n",
+      "output_exists": false,
+      "log": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-max-nvvm-o3.log",
+        "sha256": "26e5d4c7494586b1890567a7442af785f6cd7f00001023fe98494e77082957d8"
+      },
+      "source": {
+        "path": "build/nvvm-loop/slice-226-prefix/inclusive-max.slang",
+        "sha256": "23d8f1d7227950ad44fec48b5414ea5c4e0ae010a3d09fc46e3bc123dde91704"
+      }
+    }
+  ],
+  "matrix_capability_rejection": {
+    "source": {
+      "path": "build/nvvm-loop/slice-226-prefix/initial-matrix-capability/prefix64.slang",
+      "sha256": "db876953cfd5db4eeeb7a3e2073fd7edc9bce9b0f68951debb685256b2a8ff13"
+    },
+    "log": {
+      "path": "build/nvvm-loop/slice-226-prefix/initial-matrix-capability/prefix64-nvrtc-o3.log",
+      "sha256": "f6fd6a4b6b40ff258d14000b8564da7fd449d07b9305d9eee95f5089ff4bf8ab"
+    },
+    "return_code": 255,
+    "gpu_executions": 0,
+    "finding": "Matrix prefix overload requires glsl_spirv at hlsl.meta.slang:19082; E36100/E36107 on CUDA before PTX. Deferred separate capability issue, not fixed or counted as GPU coverage.",
+    "recheck": {
+      "path": "build/nvvm-loop/slice-226-prefix/initial-matrix-capability/recheck.json",
+      "sha256": "0340d420a811c7123e816c3438dc862eb429b39701485a749e88815ee6321296"
+    }
+  },
+  "smoke": {
+    "results": {
+      "path": "build/nvvm-loop/slice-226-prefix/runtime/results.json",
+      "sha256": "8b76793ded7499322b795c9d1eb88724904984d21edbe020a5f4e3bffc5cea2d"
+    },
+    "passed": 4,
+    "expected": 4
+  },
+  "source_algorithm": {
+    "inclusive_seed": "caller operand",
+    "exclusive_min_seed": "0x7ff0000000000000",
+    "exclusive_max_seed": "0xfff0000000000000",
+    "combine": "ordered a<b?a:b for min, ordered a>b?a:b for max; false comparisons including NaN/ties select second operand",
+    "fast_mask": "Contiguous low lane run whose length is power of two, including full32 and singleton0.",
+    "fast_algorithm": "Ascending shuffle-up offsets1,2,4,...; separately track transmitted inclusive value and returned accumulator; only lane>=offset combines.",
+    "slow_algorithm": "Ascending original-input source-lane scan, combining only source<caller lane.",
+    "singleton": "Inclusive original payload; exclusive infinity identity."
+  },
+  "scan_countermodel": {
+    "evidence": {
+      "path": "build/nvvm-loop/slice-226-prefix/scan-countermodel.json",
+      "sha256": "ddf5560093b58f244e554a5ececa95ecfae8b74e32b82227874013e27f9841a1"
+    },
+    "script": {
+      "path": "build/nvvm-loop/slice-226-prefix/compare-scan.py",
+      "sha256": "445a7f4581bba508b97cbd768441d443c6f77075ffb764ce5847d1f25b1376da"
+    },
+    "cases_different": 32,
+    "binary64_words_different": 8658,
+    "interpretation": "A universal ascending original-input scan changes source results on selected power-of-two masks; it is not the admitted algorithm."
+  },
+  "producer_consumer_trace": [
+    "hlsl.meta.slang:19029 canonical scalar/vector GenericAsm mapping; matrix overload has separate capability restriction",
+    "slang-cuda-prelude.h:3262 WaveOpMin/Max ordered compare/select,3290 Float64 exclusive infinity policy",
+    "slang-cuda-prelude.h:3947 _wavePrefixScalar and4081 _wavePrefixMultiple track transmitted/returned state",
+    "slang-emit-nvvm.cpp:4880 _getNVVMMaskedWaveScalarIdentity rejects Float64 min/max prefixes;4953 source-order recipe only applies to reductions"
+  ],
+  "next_slice": "Implement source-order FP64 prefix recipe with appropriate seeds and separate transmitted state on fast masks; reuse typed comparison/select and mask classification. Prove original frozen outcomes and exact replay; do not merely admit numeric identities. Matrix capability and next independent blocker remain separate.",
+  "preservation": {
+    "evidence_status": "Inherited accepted full225; no fresh full/unit/toolkit/material execution claimed",
+    "runtime_cells": 1665,
+    "correct_cells": 1614,
+    "known_failures": 51,
+    "resolved_failure_histories": 6,
+    "latest_full": 225,
+    "implementation_slices_since_full": 0,
+    "source_hashes_rechecked": {
+      "source/slang/slang-emit-nvvm.cpp": "c3714364dc97334a0e63a31fcf6aecdace3011319a04c681a3b3157b665d6286",
+      "source/slang/hlsl.meta.slang": "3ab28ee36df1e5d5bd42d0d3b9ca414e74477e1d33f498bf16e59ac4061ce92e",
+      "prelude/slang-cuda-prelude.h": "35234d28dc1a168b5956c50ef4ea56c33aad1cc0fe398b796335156bcc665f1b",
+      "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "90ed3600a329edcc060e3da49cafcbc1a87a0135061fdd1460928bc256d427b5",
+      "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "acce3c9b3cf627ee8ad41ad8042e0907fad59538e46a74cb215c63a29328addf",
+      "tools/slang-unit-test/unit-test-nvvm-support.h": "0e53a270ea7200bc451362bb6f0d2f072ba08dedd430a64631458c9b2312425c",
+      "tests/cuda/nvvm-fp64-implicit-shuffle.slang": "e6ed61a825021727de23baf36b6b360c1fbb329ca4b7987b39a8c071d3448616",
+      "issue-nvvm-backend/discovery-corpus.manifest.tsv": "d08121e4ceddc074313232b323018033627070b95a038c92e3afe3ca3fbe882f",
+      "issue-nvvm-backend/selection.slice-208-frozen.tsv": "f6d4ac7a1b3a9f982512287d87dcd77a4f75cfb0e2f819b343da312d8006ffd0",
+      "issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+      "issue-nvvm-backend/complex-test-server.py": "b173839cb958fdcf26c3b57ea3dec09cf26868e3e397f12cf04e5c21c01781e8",
+      "issue-nvvm-backend/test-run-complex-corpus.py": "6e2c88094334856c66c4d56bce50d17b553d4dea2858351808d2c911e0d58972",
+      "tools/test-server/test-server-main.cpp": "b82d0f813a560837b008de72fdaaf011b428396ec78800f4e0bb43cb4feef7de",
+      "source/compiler-core/slang-test-server-protocol.h": "c0ff0e415c4106b9ca799d5ee19f43023e22bc576674de8ef7eab43e17fbbb23",
+      "source/compiler-core/slang-test-server-protocol.cpp": "27e4679da25f4ff5fd245dc027d0b19c167a0bb4781c218ab7031303f5542855",
+      "tests/cuda/nvvm-fp32-singleton-minmax.slang": "d838cc70fe2e4d88bb2b127be48304fce74219bfd6319d25122a8e84815fe381",
+      "tests/cuda/nvvm-fp64-wave-edges.slang": "2df2ac1b0f7d50111154cea0f0c0a2752e125c5f117a1d97cdcb1ddf410fd0e2",
+      "tests/cuda/nvvm-fp32-minmax-order.slang": "a4c91ebc19acbafcf8f6e21ef10eb314c5df7525de1f969e78cd0b52fac976e6",
+      "issue-nvvm-backend/run-compute-census.py": "d464fab86c35e23b38dca664d722a4e79a664ee544da190c669ca51645491113",
+      "issue-nvvm-backend/run-compute-discovery.py": "6bdefee0b8001f4fbb12d89bb20f10912694ed24daa37ba1b4305a4154e75cb9",
+      "issue-nvvm-backend/test-run-compute-discovery.py": "ae59e7775eb77b00e286389a4c3ef34450fbe1f1ee988f500b0a55626d15b1d5",
+      "issue-nvvm-backend/census.slice-195.tsv": "77d335cdb66a54b83cefba9cca90c209ee29ec5d801294a169a244acc0398690",
+      "tests/cuda/nvvm-fp64-minmax-order.slang": "53264fe384c92fdf42261565f4b08049a565d2a1e0c8946c0b7424192da321c1",
+      "tests/cuda/nvvm-firstbithigh-signedness.slang": "a583484d66ab55583d6a71fe4dc056ec3eb2208cfe12c6046db25cd66c033d1b",
+      "source/slang/slang-emit-nvvm-type-lowering.cpp": "98224558c7b89eb56f2de3f1c32e54fe4b9794def404977286751a7e23319cd9",
+      "tests/cuda/nvvm-copyable-kernel-context.slang": "60d1c5d9e4655c13dd63b8074d190eb7f1ec9078dc683f8c060403a8edabd641"
+    },
+    "artifact_hashes_rechecked": {
+      "build/RelWithDebInfo/bin/slangc": "79f46ef0dba116bdfdce8a03b40f7d3bb2c7b481529b452b483d650cf0958e43",
+      "build/RelWithDebInfo/bin/slang-test": "9c83731b05689bbdbd15956198ad10759e4e9142bd663fe2452fda4954d96a69",
+      "build/RelWithDebInfo/bin/test-server": "fd964f03c3c57b4352ce75f720706fdc852e3a0cd231b90cb0c89068190b827e",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ae0e7859f6062a69f191cace4ae8d96340c074815866808c5b43467f41144372",
+      "build/RelWithDebInfo/lib/libslang-compiler.so": "14e80c03ff1571a2248f935cc795a9465ec963f9d3ac5cf4a7f80ba076a48ae1",
+      "build/RelWithDebInfo/lib/slang-core-module.bin": "f124f3a5a299b6f75ec0aa7ec594e465cb14575d5f6f80f45fada04ebcab1bb3",
+      "build/RelWithDebInfo/lib/librender-test-tool.so": "96baec31673b6f33a619eb7cc8fd7a518942da12d9374718f475b84cc94ccbc4",
+      "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e3083388dcdff0e879f480f80d2a2a5b6620bdca3a3fc4658ffa66de73664d71",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/lib64/libnvrtc.so": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461"
+    },
+    "runtime_input_hashes_rechecked": 551,
+    "runtime_input_hash_source": {
+      "path": "issue-nvvm-backend/runtime-validation.slice-225.json",
+      "sha256": "cc6c6381f0e18cfacfc8fa5b634f6d5e920c11599a7066886c8bf1c844299759"
+    },
+    "old_discovery_identities": 103,
+    "manifest_unchanged": true
+  },
+  "environment": {
+    "configuration": "RelWithDebInfo",
+    "target_architecture": 80,
+    "compiler_version": "2026.16-228-g74f227e10",
+    "toolkit": {
+      "path": "/usr/local/cuda-12.9",
+      "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0"
+    },
+    "toolkit_libraries": {
+      "required_libnvvm": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+      "required_nvrtc": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+      "libnvvm_sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "nvrtc_sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "device": {
+      "name": "NVIDIA L4",
+      "ordinal": 0,
+      "visible_device_count": 1,
+      "compute_capability": 89,
+      "driver_api_version": 13000,
+      "cuda_visible_devices": null
+    },
+    "provider_abi": 36
+  },
+  "gpu_after": "NVIDIA L4, 580.126.09, 8.9\n",
+  "delegation": "Fresh-context worker retry226 failed: agent thread limit reached. Local parent fallback, no independent worker review.",
+  "artifacts": [
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/prefix64-nvrtc-o3.ptx",
+      "sha256": "f02600fb446fa9dd3317e297abd2a932fe58b3b1c7c8a900552dafa84cc45a49"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/prefix64-nvrtc-o3.cubin",
+      "sha256": "67b4f0146baa9efa86195485bc64371610cdf46612a1f259c4885850c09d4f54"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/prefix64-nvrtc-o3.ptxas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/probe.log",
+      "sha256": "a64fd0171a10b4f22446532eac0d18bfd5451d1440ce0959a78f0ae7cdef8ba7"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/probe.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/runtime.log",
+      "sha256": "3573f2d327d2fa775f8f730429e7467d192178e45a0278be9e8fa0a9a21eed0f"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/runtime.exit",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "build/nvvm-loop/slice-226-prefix/gpu-final.csv",
+      "sha256": "22420c3ef2f77ce7e95772fcdf47940effd9e12ad7e4e9a864968eaed24b6e8f"
+    }
+  ],
+  "parent_acceptance": {
+    "evidence_refs": 36,
+    "tested_sources": 26,
+    "artifacts": 12,
+    "runtime_inputs": 551,
+    "raw_results_and_exact_diagnostics_reviewed": true,
+    "source_algorithm_and_integer_oracle_reviewed": true
+  }
+}
