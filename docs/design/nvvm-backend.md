@@ -8285,6 +8285,9 @@ families need separate evidence. The frozen vector/dot workload remains unsuppor
 IRBuilder::getFloatValue already canonicalizes BF16 literals with the core FloatToBFloat16 helper.
 Emission recovers these checked bits with that same helper, preserving producer-owned NaN behavior;
 dynamic CUDA narrowing has a separate target operation and promises only NaN classification.
+Slice250 passes the recovered uint16 encoding as its signed16 bit representation to the existing
+integer-constant builder API. For example, BF16 -1.25 has bits 0xbfa0, which must cross that API as
+-16480. This preserves the canonical payload without changing rounding or the provider contract.
 [Implementation239](../../issue-nvvm-backend/report.slice-239-bf16-scalar.md) records the readable
 fixture, exhaustive accepted-research input replay, negative boundaries and full checkpoint.
 

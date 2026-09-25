@@ -10745,13 +10745,15 @@ SlangResult _getLoweredNVVMValue(
     // target operation and must not impose a new NaN policy on an existing literal.
     if (isNVVMBFloat16Type(floatLit->getDataType()))
     {
+        // The builder takes a signed in-width value. For example, -1.25's bits 0xbfa0
+        // must cross the i16 API as -16480 so the sign bit is preserved.
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
             codeGenContext,
             "canonical BF16 constant bits",
             builder.getIntegerConstant(
                 module,
                 floatingPointType,
-                FloatToBFloat16(float(floatLit->getValue())),
+                bitCast<int16_t>(FloatToBFloat16(float(floatLit->getValue()))),
                 outValue)));
         valueMap[irValue] = outValue;
         return SLANG_OK;

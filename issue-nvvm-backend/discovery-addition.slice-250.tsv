@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-bf16-signed-literals.slang	0	bf16,scalar,helper,bitcast	Canonical BF16 literals through a noinline helper with exact signed zero, subnormal, normal and finite maximum encodings.
