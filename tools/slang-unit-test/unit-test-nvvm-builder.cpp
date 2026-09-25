@@ -3464,6 +3464,143 @@ SLANG_UNIT_TEST(nvvmIRBuilderBFloat16Contract)
 }
 
 // Real provider descriptors retain BF16 format identity even though values use i16 lanes.
+// The real provider must preserve the BF16 dot format, shape, and rounding boundaries.
+SLANG_UNIT_TEST(nvvmIRBuilderBFloat16DotContract)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (uint32_t lanes = 2; lanes <= 4; ++lanes)
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("bf16-dot"), scope.module)));
+        SlangNVVMTypeHandle scalar = nullptr;
+        SlangNVVMTypeHandle vector = nullptr;
+        SlangNVVMTypeHandle halfScalar = nullptr;
+        SlangNVVMTypeHandle halfVector = nullptr;
+        SlangNVVMTypeHandle functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 16, scalar)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getVectorType(scope.module, scalar, lanes, vector)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 16, halfScalar)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getVectorType(scope.module, halfScalar, lanes, halfVector)));
+        const SlangNVVMTypeHandle parameters[] = {vector, vector, halfVector};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, scalar, parameters, 3, functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("dot"),
+            function)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        SlangNVVMValueHandle inputs[3] = {};
+        for (uint32_t i = 0; i < 3; ++i)
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionParameter(scope.module, function, i, inputs[i])));
+        const SlangNVVMValueTypeDesc bf = {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, lanes};
+        const SlangNVVMValueTypeDesc operands[] = {bf, bf};
+        const SlangNVVMValueOperationDesc dot =
+            {SLANG_NVVM_VALUE_OP_BFLOAT16_DOT, NVVMSemantics::kBFloat16, operands, 2};
+        SLANG_CHECK_ABORT(builder.supportsValueOperation(dot));
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, dot, inputs, 2, result)));
+        SlangNVVMValueHandle invalid = nullptr;
+        // A semantically qualified descriptor cannot authorize a physically Half operand.
+        const SlangNVVMValueHandle wrongPhysical[] = {inputs[0], inputs[2]};
+        SLANG_CHECK(
+            SLANG_FAILED(builder.emitValueOperation(scope.module, dot, wrongPhysical, 2, invalid)));
+        SLANG_CHECK(invalid == nullptr);
+        SLANG_CHECK(
+            SLANG_FAILED(builder.emitValueOperation(scope.module, dot, inputs, 1, invalid)));
+        SLANG_CHECK(invalid == nullptr);
+        auto rejected = dot;
+        rejected.operandTypes = nullptr;
+        SLANG_CHECK(!builder.supportsValueOperation(rejected));
+        SLANG_CHECK(
+            SLANG_FAILED(builder.emitValueOperation(scope.module, rejected, inputs, 2, invalid)));
+        const SlangNVVMValueTypeDesc excludedOperands[] = {
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 32, lanes},
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 0},
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 1},
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 5},
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, lanes == 2 ? 3u : 2u},
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, lanes},
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, lanes},
+            {SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER, 16, lanes},
+            {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, lanes},
+        };
+        for (auto type : excludedOperands)
+        {
+            for (uint32_t operand = 0; operand < 2; ++operand)
+            {
+                SlangNVVMValueTypeDesc wrongTypes[] = {bf, bf};
+                wrongTypes[operand] = type;
+                rejected = dot;
+                rejected.operandTypes = wrongTypes;
+                SLANG_CHECK(!builder.supportsValueOperation(rejected));
+                SLANG_CHECK(SLANG_FAILED(
+                    builder.emitValueOperation(scope.module, rejected, inputs, 2, invalid)));
+                SLANG_CHECK(invalid == nullptr);
+            }
+        }
+        const SlangNVVMValueTypeDesc excludedResults[] = {
+            bf,
+            NVVMSemantics::kFloat16,
+            NVVMSemantics::kFloat32,
+            NVVMSemantics::kUnsignedI16,
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 32, 1},
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 0},
+        };
+        for (auto type : excludedResults)
+        {
+            rejected = dot;
+            rejected.resultType = type;
+            SLANG_CHECK(!builder.supportsValueOperation(rejected));
+            SLANG_CHECK(SLANG_FAILED(
+                builder.emitValueOperation(scope.module, rejected, inputs, 2, invalid)));
+            SLANG_CHECK(invalid == nullptr);
+        }
+        for (uint32_t arity : {0u, 1u, 3u})
+        {
+            rejected = dot;
+            rejected.operandCount = arity;
+            SLANG_CHECK(!builder.supportsValueOperation(rejected));
+            SLANG_CHECK(SLANG_FAILED(
+                builder.emitValueOperation(scope.module, rejected, inputs, arity, invalid)));
+            SLANG_CHECK(invalid == nullptr);
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, result)));
+        for (auto format :
+             {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+              SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+        {
+            ComPtr<ISlangBlob> assembly;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+            String text = _getBlobText(assembly);
+            SLANG_CHECK(
+                _countOccurrences(text.getUnownedSlice(), toSlice("fma.rn.bf16")) == 2 * lanes);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("i16 -32768")) == lanes);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("i16 16256")) == lanes);
+            SLANG_CHECK(text.indexOf("i16 0)") >= 0);
+            SLANG_CHECK(text.indexOf("extractelement") >= 0);
+            SLANG_CHECK(text.indexOf("fadd") < 0);
+            SLANG_CHECK(text.indexOf("fmul") < 0);
+            SLANG_CHECK(text.indexOf("bfloat") < 0);
+            SLANG_CHECK(text.indexOf("poison") < 0);
+        }
+    }
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderBFloat16VectorContract)
 {
     NVVMIRBuilder builder;

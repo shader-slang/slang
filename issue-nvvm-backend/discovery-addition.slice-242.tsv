@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-bf16-dot.slang	0	vector-matrix,helper-generic	Source-ordered BF16 dot2/3/4 with dynamic lanes, separately rounded products/sums, cancellation, signed zero, subnormal, infinity and NaN expectations.

@@ -3594,6 +3594,7 @@ static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[]
     {"$P_cosh($0)", SLANG_NVVM_VALUE_OP_COSH, 1},
     {"$P_trunc($0)", SLANG_NVVM_VALUE_OP_TRUNC, 1},
     {"__ballot_sync($0, $1)", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT, 2},
+    {"_slang_vector_dot", SLANG_NVVM_VALUE_OP_BFLOAT16_DOT, 2},
     {"clock", SLANG_NVVM_VALUE_OP_CLOCK, 0},
     {"clock64", SLANG_NVVM_VALUE_OP_CLOCK64, 0},
 };

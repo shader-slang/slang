@@ -29,6 +29,7 @@ enum class ValueOperationFamily : uint32_t
     FloatToInteger,
     FloatConvert,
     BFloat16Convert,
+    BFloat16Dot,
     BitReinterpret,
     Select,
 };
@@ -1138,6 +1139,18 @@ inline bool resolveValueOperationFamily(
         desc.resultType.bitWidth != desc.operandTypes[0].bitWidth)
     {
         outResolution = {ValueOperationFamily::FloatConvert, "floating-point width conversion"};
+        return true;
+    }
+
+    // The CUDA prelude owns dot overloads for BF16 widths 2, 3, and 4. Preserve the
+    // specialized signature rather than admitting BF16 through ordinary floating arithmetic.
+    if (desc.operation == SLANG_NVVM_VALUE_OP_BFLOAT16_DOT && desc.operandCount == 2 &&
+        areSameType(desc.resultType, kBFloat16) &&
+        haveSameElementType(desc.operandTypes[0], kBFloat16) &&
+        desc.operandTypes[0].laneCount >= 2 && desc.operandTypes[0].laneCount <= 4 &&
+        areSameType(desc.operandTypes[0], desc.operandTypes[1]))
+    {
+        outResolution = {ValueOperationFamily::BFloat16Dot, "source-ordered BF16 dot"};
         return true;
     }
 

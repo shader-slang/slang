@@ -3717,6 +3717,37 @@ static llvm::Value* _emitBFloat16ConvertLane(
     }
 }
 
+// Evaluates the qualified BF16 dot in CUDA prelude lane order, rounding every product
+// and addition separately. With BF2 denoting vector<BFloat16, 2>, consider
+// dot(BF2(-1, 1.0078125), BF2(1.015625, 1.0078125)):
+// the second product rounds to 1.015625 before addition, so the result is zero. Fusing
+// that product with the accumulated -1.015625 instead gives 2^-14. SM80 has BF16 FMA,
+// but native BF16 add/mul require SM90. These two exact FMA recipes match CUDA's
+// __hmul/__hadd: negative zero preserves the product's sign, and multiplication by one
+// implements addition. Each inline assembly call is a distinct BF16 rounding boundary.
+static llvm::Value* _emitBFloat16Dot(
+    ModuleState* state,
+    llvm::Value* left,
+    llvm::Value* right,
+    uint32_t laneCount)
+{
+    auto scalarType = llvm::Type::getInt16Ty(state->context);
+    auto signature =
+        llvm::FunctionType::get(scalarType, {scalarType, scalarType, scalarType}, false);
+    auto fma = llvm::InlineAsm::get(signature, "fma.rn.bf16 $0, $1, $2, $3;", "=h,h,h,h", false);
+    auto negativeZero = llvm::ConstantInt::get(scalarType, 0x8000);
+    auto one = llvm::ConstantInt::get(scalarType, 0x3f80);
+    llvm::Value* sum = llvm::ConstantInt::get(scalarType, 0);
+    for (uint32_t lane = 0; lane < laneCount; ++lane)
+    {
+        auto leftLane = state->builder.CreateExtractElement(left, lane);
+        auto rightLane = state->builder.CreateExtractElement(right, lane);
+        auto product = state->builder.CreateCall(fma, {leftLane, rightLane, negativeZero});
+        sum = state->builder.CreateCall(fma, {product, one, sum});
+    }
+    return sum;
+}
+
 static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc& type)
 {
     if (!state)
@@ -4191,6 +4222,13 @@ static SlangResult _emitValueOperationFamily(
                 }
             }
         }
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::BFloat16Dot:
+        result = _emitBFloat16Dot(
+            state,
+            llvmOperands[0],
+            llvmOperands[1],
+            operation.operandTypes[0].laneCount);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatConvert:
         result = operation.resultType.bitWidth < operation.operandTypes[0].bitWidth

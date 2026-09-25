@@ -8291,3 +8291,13 @@ fixture, exhaustive accepted-research input replay, negative boundaries and full
 ### BF16 register vectors and internal helper values (slice241)
 
 ABI39 extends the distinct BF16 descriptor to widths2/3/4 in explicit value and internal by-value helper roles. Physical i16 vectors reuse canonical construction/extraction and branch/phi transport; Float32 conversions require matching lanes and apply the scalar239 recipe once per lane. The recursive numeric, copyable, helper-storage and resource classifiers remain unchanged. Exported CUDA BF vector helper signatures reject at preflight because internal provider layout is not the external CUDA ABI. The storage/layout boundary, full source traces, exclusions and replay projection are documented in [the BF16 vector contract](nvvm-bf16-vector-contract.md). Explicit vector Select and source-ordered dot remain separate.
+
+### Source-ordered BF16 dot (slice242)
+
+ABI40 adds a dedicated BF16 dot operation for widths2/3/4. Canonical `_slang_vector_dot` helpers
+reuse the existing signature-based operation planner; exact scalar BF16 result and equal BF16
+vector operand types are qualified centrally. The provider follows CUDA lane order with a
+positive-zero accumulator and separately rounded BF16 products/sums using two SM80 BF16 FMA
+instructions per lane. It does not widen arithmetic, type-role, storage or export admissions.
+See [the BF16 vector contract](nvvm-bf16-vector-contract.md#source-ordered-dot-slice242) for the
+concrete cancellation example, prototype gate, signed-zero recipe and remaining exclusions.

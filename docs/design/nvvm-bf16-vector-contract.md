@@ -115,3 +115,40 @@ The shared catalog requires matching lane counts1..4 and exact BF16/Float32 widt
 Reachable `[CudaDeviceExport]` helpers require a separate external CUDA ABI. `_validateNVVMHelperTarget` rejects BF vector result/parameter types there: BF3's provider eight-byte/alignment-eight signature differs from CUDA six-byte/alignment-two. Ordinary exported integer helpers remain supported. The input is canonical; the target ABI is unqualified, so this boundary belongs in helper preflight, not a producer repair or layout workaround.
 
 The registered `tests/cuda/nvvm-bf16-vector-values.slang` fixture combines independent boundary expectations with dynamic helper branches, bit transport and lane operations. Exhaustive value-only projections retain research240's73190 input records per width. They remove only pointer/local replacement and writes29..29+N-1, preserving those words as original sentinels. Nine production launches and six separate raw controls are checked against independent integer-oracle reconstruction. Neither this value evidence nor compiler diagnostic movement resolves frozen scalar-bf16's source-ordered dot.
+
+## Source-ordered dot (slice242)
+
+Builder ABI40 adds a dedicated BF16 dot semantic for two matching BF16 vector operands of widths
+2, 3 or 4 and an exact scalar BF16 result. `hlsl.meta.slang::dot` already produces the intentional
+one-block CUDA GenericAsm `_slang_vector_dot`; the existing canonical helper validator and spelling
+table map it to this operation. The shared catalog owns signature qualification. Neither the generic
+IEEE arithmetic classifier nor any storage or external helper ABI admission changes.
+
+Consider this concrete cancellation case:
+
+```slang
+let a = vector<BFloat16, 2>(BFloat16(-1.0), BFloat16(1.0078125));
+let b = vector<BFloat16, 2>(BFloat16(1.015625), BFloat16(1.0078125));
+BFloat16 result = dot(a, b);
+```
+
+The CUDA prelude starts with BF16 positive zero. The first product is -1.015625. The exact second
+product is 1.01568603515625, which rounds separately to BF16 1.015625, so addition returns positive
+zero. Fusing that second multiplication with the accumulated negative value instead returns
+2^-14 (BF16 bits0x3880); accumulating products in Float32 also returns that nonzero value. Appending
+zero lanes preserves the counterexample for widths3 and4.
+
+`_emitBFloat16Dot` extracts the already-qualified physical i16 vector lanes in order. On SM80,
+`fma.rn.bf16(a,b,-0)` implements each multiplication and `fma.rn.bf16(product,1,sum)` implements each
+addition, exactly as CUDA's installed `__hmul`/`__hadd` recipes. Negative zero is necessary for
+multiplication's signed-zero behavior. Every inline assembly call is a separate BF16 rounding
+boundary; it cannot become an LLVM Float32 reduction or contract with another call. Native BF16
+add/mul require SM90 and remain unused. NaN outputs promise classification, not a universal payload.
+
+Before promotion, source NVRTC and raw physical-i16-vector LLVM O0/O3 controls each qualified all
+three widths on targetSM80. They preserve research238's679 records and append the reversed
+cancellation case above, retaining the original records and all inactive buffer words. Production
+replays use those same inputs and independent exact-rational expectations. Provider tests check
+both LLVM dialects, the2N separate BF16 FMA calls, exact constants and malformed semantic/physical
+operands. General BF16 arithmetic/comparison, integer/Half/double conversion, explicit vector Select,
+storage and external CUDA helper interoperability remain outside this dot contract.

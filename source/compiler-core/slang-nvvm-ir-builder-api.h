@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 39u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 40u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -192,7 +192,9 @@ extern "C"
 /** Reads the per-multiprocessor cycle counter; each observation remains live. */
 #define SLANG_NVVM_VALUE_OP_CLOCK ((SlangNVVMValueOperation)80u)
 #define SLANG_NVVM_VALUE_OP_CLOCK64 ((SlangNVVMValueOperation)81u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 82u
+/** BF16 dot: positive-zero accumulator, separately rounded products/sums in lane order. */
+#define SLANG_NVVM_VALUE_OP_BFLOAT16_DOT ((SlangNVVMValueOperation)82u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 83u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc

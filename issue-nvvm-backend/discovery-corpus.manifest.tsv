@@ -110,3 +110,4 @@ cuda/nvvm-quad-votes.slang	0	wave,helper-generic	Dynamic Boolean quad truth tabl
 cuda/nvvm-clock-observations.slang	0	helper-generic	Live clock low/full observations with dynamic bounds, modular order/bracket/progress predicates and independently evaluated affine work.
 cuda/nvvm-bf16-scalar.slang	0	helper-generic	Scalar BF16 raw bits, Float32 ties/extremes/NaN classification, noinline helpers and mutable local storage with independent expectations.
 cuda/nvvm-bf16-vector-values.slang	0	vector-matrix,helper-generic	BF16 register widths2/3/4, dynamic by-value helper branches, Float32 lane conversion, splats/extraction and canonical bit transport with independent boundary expectations.
+cuda/nvvm-bf16-dot.slang	0	vector-matrix,helper-generic	Source-ordered BF16 dot2/3/4 with dynamic lanes, separately rounded products/sums, cancellation, signed zero, subnormal, infinity and NaN expectations.
