@@ -115,6 +115,8 @@ inline constexpr SlangNVVMValueTypeDesc kFloat16 = {
     1,
 };
 inline constexpr SlangNVVMValueTypeDesc kBFloat16 = {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 1};
+inline constexpr SlangNVVMValueTypeDesc kFloatE4M3 = {SLANG_NVVM_VALUE_TYPE_FLOAT_E4M3, 8, 1};
+inline constexpr SlangNVVMValueTypeDesc kFloatE5M2 = {SLANG_NVVM_VALUE_TYPE_FLOAT_E5M2, 8, 1};
 inline constexpr SlangNVVMValueTypeDesc kFloat64 = {
     SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
     64,
@@ -1187,11 +1189,16 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool hasBitResult =
-        isSelectedIntegerValue(desc.resultType) || isSelectedFloatValue(desc.resultType);
-    const bool hasBitOperand =
-        desc.operandCount == 1 && (isSelectedIntegerValue(desc.operandTypes[0]) ||
-                                   isSelectedFloatValue(desc.operandTypes[0]));
+    const bool isFloat8Result =
+        areSameType(desc.resultType, kFloatE4M3) || areSameType(desc.resultType, kFloatE5M2);
+    const bool isFloat8Operand =
+        desc.operandCount == 1 && (areSameType(desc.operandTypes[0], kFloatE4M3) ||
+                                   areSameType(desc.operandTypes[0], kFloatE5M2));
+    const bool hasBitResult = isFloat8Result || isSelectedIntegerValue(desc.resultType) ||
+                              isSelectedFloatValue(desc.resultType);
+    const bool hasBitOperand = desc.operandCount == 1 &&
+                               (isFloat8Operand || isSelectedIntegerValue(desc.operandTypes[0]) ||
+                                isSelectedFloatValue(desc.operandTypes[0]));
     const bool hasDistinctEqualWidthBitTypes =
         hasBitResult && hasBitOperand && !areSameType(desc.resultType, desc.operandTypes[0]) &&
         desc.resultType.bitWidth * desc.resultType.laneCount ==
@@ -1203,9 +1210,10 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool hasSelectedResult =
-        areSameType(desc.resultType, kBFloat16) || isSelectedBoolValue(desc.resultType) ||
-        isSelectedIntegerValue(desc.resultType) || isSelectedFloatValue(desc.resultType);
+    const bool hasSelectedResult = isFloat8Result || areSameType(desc.resultType, kBFloat16) ||
+                                   isSelectedBoolValue(desc.resultType) ||
+                                   isSelectedIntegerValue(desc.resultType) ||
+                                   isSelectedFloatValue(desc.resultType);
     if (desc.operation == SLANG_NVVM_VALUE_OP_SELECT && desc.operandCount == 3 &&
         hasSelectedResult && isSelectedBoolValue(desc.operandTypes[0]) &&
         desc.operandTypes[0].laneCount == desc.resultType.laneCount &&

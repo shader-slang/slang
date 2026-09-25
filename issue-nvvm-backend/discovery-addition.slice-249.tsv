@@ -1,0 +1,2 @@
+source	source_test_ordinal	selection_tags	rationale
+cuda/nvvm-fp8-scalar-transport.slang	0	fp8,scalar,helper,bitcast,control-flow	All byte encodings across internal FP8 helper/branch/select transport and finite canonical literals.

@@ -2528,7 +2528,8 @@ IRFloatLit* _asExecutableFloatingPointConstant(IRInst* value)
 {
     auto floatLit = as<IRFloatLit>(value);
     return floatLit && (isNVVMSupportedFloatingPointScalarType(floatLit->getDataType()) ||
-                        isNVVMBFloat16Type(floatLit->getDataType()))
+                        isNVVMBFloat16Type(floatLit->getDataType()) ||
+                        isNVVMFloat8Type(floatLit->getDataType()))
                ? floatLit
                : nullptr;
 }
@@ -3443,6 +3444,9 @@ bool _getNVVMSemanticType(IRType* type, SlangNVVMValueTypeDesc& outType)
             outType = {SLANG_NVVM_VALUE_TYPE_BOOL, 1, elementCount};
         }
     }
+    else if (isNVVMFloat8Type(type))
+        outType = type->getOp() == kIROp_FloatE4M3Type ? NVVMSemantics::kFloatE4M3
+                                                       : NVVMSemantics::kFloatE5M2;
     else if (isNVVMBFloat16Type(type))
         outType = NVVMSemantics::kBFloat16;
     else if (isNVVMBoolType(type))
@@ -7460,12 +7464,16 @@ SlangResult _validateFloatingPointValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    if (!value || (!isNVVMSupportedFloatingPointScalarType(value->getDataType()) &&
-                   !isNVVMBFloat16Type(value->getDataType())))
+    if (!value ||
+        (!isNVVMSupportedFloatingPointScalarType(value->getDataType()) &&
+         !isNVVMBFloat16Type(value->getDataType()) && !isNVVMFloat8Type(value->getDataType())))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("floating-point value"));
 
-    if (_asExecutableFloatingPointConstant(value))
+    if (auto literal = _asExecutableFloatingPointConstant(value))
     {
+        if (isNVVMFloat8Type(literal->getDataType()) &&
+            (Math::IsNaN(literal->getValue()) || Math::IsInf(literal->getValue())))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("nonfinite FP8 literal"));
         return SLANG_OK;
     }
 
@@ -7489,8 +7497,9 @@ SlangResult _validateScalarValue(
             availableValues,
             dominatorTree);
     }
-    if (value && (isNVVMSupportedFloatingPointScalarType(value->getDataType()) ||
-                  isNVVMBFloat16Type(value->getDataType())))
+    if (value &&
+        (isNVVMSupportedFloatingPointScalarType(value->getDataType()) ||
+         isNVVMBFloat16Type(value->getDataType()) || isNVVMFloat8Type(value->getDataType())))
     {
         return _validateFloatingPointValue(
             codeGenContext,
@@ -7525,13 +7534,14 @@ SlangResult _validateSelectedValue(
         return SLANG_OK;
     IRType* valueType = value ? value->getDataType() : nullptr;
     const bool requiresAvailability =
-        valueType && (asNVVMRegisterVectorType(valueType) ||
-                      ((as<IRArrayType>(valueType) || as<IRStructType>(valueType)) &&
-                       isNVVMSupportedStructuredBufferStorageType(valueType)) ||
-                      (_getNVVMExecutableValueAlignment(valueType) &&
-                       !isNVVMSupportedIntegerScalarType(valueType) &&
-                       !isNVVMSupportedFloatingPointScalarType(valueType) &&
-                       !isNVVMBFloat16Type(valueType) && !isNVVMBoolType(valueType)));
+        valueType &&
+        (asNVVMRegisterVectorType(valueType) ||
+         ((as<IRArrayType>(valueType) || as<IRStructType>(valueType)) &&
+          isNVVMSupportedStructuredBufferStorageType(valueType)) ||
+         (_getNVVMExecutableValueAlignment(valueType) &&
+          !isNVVMSupportedIntegerScalarType(valueType) &&
+          !isNVVMSupportedFloatingPointScalarType(valueType) && !isNVVMBFloat16Type(valueType) &&
+          !isNVVMFloat8Type(valueType) && !isNVVMBoolType(valueType)));
     if (requiresAvailability)
     {
         return _validateAvailableValue(
@@ -7843,8 +7853,9 @@ bool _isSupportedNVVMHelperResultType(IRInst* type)
 {
     NVVMRawBufferType rawBufferType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return as<IRVoidType>(type) || isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
-           isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
+    return as<IRVoidType>(type) || isNVVMFloat8Type(type) || isNVVMBFloat16Type(type) ||
+           asNVVMBFloat16VectorType(type) || isNVVMSupportedHelperValueType(type) ||
+           asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
            asNVVMSupportedLocalHelperValuePointerType(type) ||
            asNVVMSupportedDeviceHelperValuePointerType(type) ||
@@ -7858,7 +7869,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
+    return isNVVMFloat8Type(type) || isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
            isNVVMSupportedHelperValueType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
@@ -8123,6 +8134,11 @@ SlangResult _validateNVVMHelperTarget(
     // two in CUDA but eight bytes/alignment eight in the provider. Keep that contract closed.
     const bool isCUDAExport =
         helper->findDecorationImpl(kIROp_CudaDeviceExportDecoration) != nullptr;
+    if (isCUDAExport && isNVVMFloat8Type(helper->getResultType()))
+        return _diagnoseUnsupportedIRType(
+            codeGenContext,
+            "exported FP8 helper result",
+            helper->getResultType());
     if (isCUDAExport && asNVVMBFloat16VectorType(helper->getResultType()))
         return _diagnoseUnsupportedIRType(
             codeGenContext,
@@ -8135,6 +8151,11 @@ SlangResult _validateNVVMHelperTarget(
             helper->getResultType());
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
+        if (isCUDAExport && isNVVMFloat8Type(helper->getParamType(parameterIndex)))
+            return _diagnoseUnsupportedIRType(
+                codeGenContext,
+                "exported FP8 helper parameter",
+                helper->getParamType(parameterIndex));
         if (isCUDAExport && asNVVMBFloat16VectorType(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIRType(
                 codeGenContext,
@@ -10699,6 +10720,26 @@ SlangResult _getLoweredNVVMValue(
     SlangNVVMTypeHandle floatingPointType = nullptr;
     SLANG_RETURN_ON_FAIL(
         typeContext.lowerType(floatLit->getDataType(), NVVMTypeUse::Value, floatingPointType));
+    // IRBuilder::getFloatValue already rounded finite FP8 literals with the shared format
+    // helpers. Recover those checked encodings exactly; no runtime narrowing or saturation
+    // policy participates here. Nonfinite FP8 literals are rejected by operand preflight.
+    if (isNVVMFloat8Type(floatLit->getDataType()))
+    {
+        const float value = float(floatLit->getValue());
+        SLANG_RELEASE_ASSERT(!Math::IsNaN(value) && !Math::IsInf(value));
+        const uint8_t bits = floatLit->getDataType()->getOp() == kIROp_FloatE4M3Type
+                                 ? FloatToFloatE4M3(value)
+                                 : FloatToFloatE5M2(value);
+        // The integer-constant API takes a signed value in the destination width. For
+        // example, negative zero's byte 0x80 must cross that API as -128, preserving its bits.
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "canonical finite FP8 constant bits",
+            builder
+                .getIntegerConstant(module, floatingPointType, bitCast<int8_t>(bits), outValue)));
+        valueMap[irValue] = outValue;
+        return SLANG_OK;
+    }
     // IRBuilder::getFloatValue already rounded this canonical BF16 literal. Recover its
     // checked bits with the same core helper; dynamic Float32 narrowing has a separate
     // target operation and must not impose a new NaN policy on an existing literal.

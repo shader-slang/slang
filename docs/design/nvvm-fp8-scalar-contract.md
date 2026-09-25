@@ -90,11 +90,11 @@ casts. FP8 is eliminated before backend preflight; only ordinary Float/UInt valu
 Consequently this producer correctness change admits no FP8 backend operation or storage role.
 See [report244](../../issue-nvvm-backend/report.slice-244-fp8-finite-producers.md).
 
-## Boundaries and next action
+## Boundaries after producer repair (historical slice244)
 
 Slice244 repairs and exhaustively tests the finite/subnormal shared producers, preserving the
-already-tested overflow policy. Its full checkpoint remains subject to parent acceptance. Then consider
-scalar transport/literals/bitcasts and qualified Float32 casts at their owning backend boundary.
+already-tested overflow policy. Its full checkpoint is accepted. That repair qualified reconsidering
+scalar transport/literals/bitcasts and Float32 casts at their owning backend boundary.
 Do not promote this research by moving a preflight diagnostic alone.
 
 `dynamic-dispatch-substandard-float` remains a separate aggregate/dynamic-object problem. Its
@@ -102,3 +102,22 @@ Do not promote this research by moving a preflight diagnostic alone.
 returning `A`, containing both FP8 fields, plus `B` containing BF16vector2. Scalar qualification does
 not establish those storage/aggregate contracts. Integer/Half/double constructors, arithmetic,
 vectors, external helper ABI and material runtime remain excluded.
+
+## Scalar transport implementation (slice249)
+
+Provider ABI41 adds distinct E4M3 and E5M2 semantic kinds, both represented by scalar i8. Admission
+is confined to SSA registers and internal by-value helper parameters/results. Existing same-width
+bit reinterpretation admits signed/unsigned8 pairs and E4M3/E5M2 cross-format pairs; it preserves
+bits, not numeric values. Select requires the same semantic format in both arms and the result.
+Generic branch/phi and internal helper emission preserve the physical byte.
+
+Canonical finite IRFloatLit values use the shared producer's format helper to recover exact bytes.
+Nonfinite FP8 literals remain rejected before provider discovery: this keeps the unharmonized
+shared overflow policy visible. Transported nonfinite bit encodings are fully supported because
+transport introduces no numerical interpretation. General runtime conversions, arithmetic, FP8
+vectors/storage/pointers/aggregates/resources and external helper ABI remain separate contracts.
+Recursive numeric/copyable/helper-storage classifiers are unchanged.
+
+The registered scalar transport fixture covers all256 encodings per format with both branch choices,
+selection, unsigned/signed bitcasts and12 finite constants. Supplemental raw replay covers both
+cross-format directions. Final acceptance evidence is owned by runtime-validation.slice-249.json.

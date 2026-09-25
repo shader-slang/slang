@@ -76,6 +76,11 @@ bool isNVVMBFloat16Type(IRInst* type)
     return type && type->getOp() == kIROp_BFloat16Type;
 }
 
+bool isNVVMFloat8Type(IRInst* type)
+{
+    return type && (type->getOp() == kIROp_FloatE4M3Type || type->getOp() == kIROp_FloatE5M2Type);
+}
+
 bool isNVVMFloat64Type(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -727,6 +732,8 @@ static uint32_t _getNVVMHelperValueAlignment(IRInst* type, HashSet<IRInst*>& act
 
 uint32_t getNVVMHelperValueAlignment(IRInst* type)
 {
+    if (isNVVMFloat8Type(type))
+        return 1;
     if (isNVVMBFloat16Type(type))
         return 2;
     if (!isNVVMSupportedHelperValueType(type))
@@ -2275,6 +2282,12 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
+    // FP8 is a scalar register and internal by-value helper contract. Keeping it out of
+    // recursive helper/copyable predicates prevents unqualified storage and aggregate ABIs.
+    if (isFloat8)
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperValue ||
+               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult;
+
     // Scalar BF16 has a qualified i16 representation in local and helper roles only.
     // Do not add it to recursive copyable/storage predicates: that would also admit
     // unqualified vectors, aggregates, device pointers and resources.
@@ -2341,6 +2354,7 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
         isNVVMSupportedFloatingPointScalarType(type, &info.floatingPointBitWidth);
     info.isFloat16 = info.floatingPointBitWidth == 16;
     info.isBFloat16 = isNVVMBFloat16Type(type);
+    info.isFloat8 = isNVVMFloat8Type(type);
     info.isFloat32 = info.floatingPointBitWidth == 32;
     info.isBool = isNVVMBoolType(type);
     info.valueVectorType = asNVVMRegisterVectorType(type, &info.valueVectorElementCount);
@@ -2763,6 +2777,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 : use == NVVMTypeUse::StructuredBufferStorage ? 8u
                                                               : 1u,
                 outType)));
+    }
+    else if (typeInfo.isFloat8)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "physical scalar FP8 type",
+            m_builder.getIntegerType(m_module, 8, outType)));
     }
     else if (typeInfo.isBFloat16)
     {

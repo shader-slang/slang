@@ -9448,6 +9448,200 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     }
 }
 
+// Scalar FP8 transport does not establish numeric conversions, storage or an external ABI.
+SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
+{
+    struct UnsupportedCase
+    {
+        const char* source;
+        const char* expectedConstruct;
+    };
+    static const UnsupportedCase cases[] = {
+        {R"SLANG(
+            [noinline]
+            F copy(F v)
+            {
+                return v;
+            }
+
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain()
+            {
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(F(1.0e30f))));
+            }
+        )SLANG",
+         "nonfinite FP8 literal"},
+        {R"SLANG(
+            [noinline]
+            void replace(inout F v, F w)
+            {
+                v = w;
+            }
+
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                F v = bit_cast<F>(uint8_t(tid.x));
+                replace(v, v);
+                outputBuffer[0] = uint(bit_cast<uint8_t>(v));
+            }
+        )SLANG",
+         "helper function parameter"},
+        {R"SLANG(
+            struct Payload
+            {
+                F value;
+            }
+
+            [noinline]
+            Payload copy(Payload v)
+            {
+                return v;
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(p).value));
+            }
+        )SLANG",
+         "helper function result type"},
+        {R"SLANG(
+            [noinline]
+            F copy(F v[2])
+            {
+                return v[1];
+            }
+
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                F v = bit_cast<F>(uint8_t(tid.x));
+                F a[2] = {v, v};
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(a)));
+            }
+        )SLANG",
+         "helper function parameter"},
+        {R"SLANG(
+            RWStructuredBuffer<F> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[0] = bit_cast<F>(uint8_t(tid.x));
+            }
+        )SLANG",
+         "struct field address result"},
+        {R"SLANG(
+            [noinline]
+            vector<F, 2> copy(vector<F, 2> v)
+            {
+                return v;
+            }
+
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                let value = vector<F, 2>(bit_cast<F>(uint8_t(tid.x)));
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(value).x));
+            }
+        )SLANG",
+         "helper function result type"},
+        {R"SLANG(
+            [CudaDeviceExport]
+            [noinline]
+            F copy(uint8_t v)
+            {
+                return bit_cast<F>(v);
+            }
+
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(uint8_t(tid.x))));
+            }
+        )SLANG",
+         "exported FP8 helper result"},
+        {R"SLANG(
+            [CudaDeviceExport]
+            [noinline]
+            uint8_t copy(F v)
+            {
+                return bit_cast<uint8_t>(v);
+            }
+
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[0] = uint(copy(bit_cast<F>(uint8_t(tid.x))));
+            }
+        )SLANG",
+         "exported FP8 helper parameter"},
+        {R"SLANG(
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[0] = uint(bit_cast<uint8_t>(F(asfloat(tid.x))));
+            }
+        )SLANG",
+         "floatCast"},
+        {R"SLANG(
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[0] = asuint(float(bit_cast<F>(uint8_t(tid.x))));
+            }
+        )SLANG",
+         "floatCast"},
+        {R"SLANG(
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                outputBuffer[0] = uint(bit_cast<uint8_t>(F(tid.x)));
+            }
+        )SLANG",
+         "castIntToFloat"},
+    };
+    for (const char* format : {"FloatE4M3", "FloatE5M2"})
+    {
+        for (const auto& unsupported : cases)
+        {
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            StringBuilder source;
+            source << "typealias F = " << format << ";\n" << unsupported.source;
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK(SLANG_FAILED(
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.indexOf(unsupported.expectedConstruct) < 0)
+                getTestReporter()->message(
+                    TestMessageType::TestFailure,
+                    diagnosticText.getBuffer());
+            SLANG_CHECK(diagnosticText.indexOf("E52017") >= 0);
+            SLANG_CHECK(diagnosticText.indexOf(unsupported.expectedConstruct) >= 0);
+            SLANG_CHECK(code == nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangMissingBuilderDoesNotFallback)
 {
     _resetDirectNVVMFakes();

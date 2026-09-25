@@ -3767,6 +3767,11 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
             scalarType = llvm::IntegerType::get(state->context, type.bitWidth);
         }
         break;
+    case SLANG_NVVM_VALUE_TYPE_FLOAT_E4M3:
+    case SLANG_NVVM_VALUE_TYPE_FLOAT_E5M2:
+        if (type.bitWidth == 8 && type.laneCount == 1)
+            scalarType = llvm::Type::getInt8Ty(state->context);
+        break;
     case SLANG_NVVM_VALUE_TYPE_BFLOAT16:
         if (type.bitWidth == 16)
             scalarType = llvm::Type::getInt16Ty(state->context);

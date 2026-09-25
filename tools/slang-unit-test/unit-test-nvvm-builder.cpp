@@ -9663,3 +9663,79 @@ SLANG_UNIT_TEST(nvvmIRBuilderLoadsExactProviderFile)
         invalidLibrary.writeRef())));
     SLANG_CHECK(invalidLibrary == nullptr);
 }
+
+// FP8 descriptors preserve format while physical i8 supports only transport operations.
+SLANG_UNIT_TEST(nvvmIRBuilderFloat8TransportContract)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (auto fp8 : {NVVMSemantics::kFloatE4M3, NVVMSemantics::kFloatE5M2})
+    {
+        for (auto bits :
+             {NVVMSemantics::kSignedI8,
+              NVVMSemantics::kUnsignedI8,
+              NVVMSemantics::kFloatE4M3,
+              NVVMSemantics::kFloatE5M2})
+        {
+            if (NVVMSemantics::areSameType(bits, fp8))
+                continue;
+            SlangNVVMValueOperationDesc decode =
+                {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, fp8, &bits, 1};
+            SlangNVVMValueOperationDesc encode =
+                {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, bits, &fp8, 1};
+            SLANG_CHECK(builder.supportsValueOperation(decode));
+            SLANG_CHECK(builder.supportsValueOperation(encode));
+        }
+        SlangNVVMValueTypeDesc operands[] = {NVVMSemantics::kBool, fp8, fp8};
+        SlangNVVMValueOperationDesc select = {SLANG_NVVM_VALUE_OP_SELECT, fp8, operands, 3};
+        SLANG_CHECK(builder.supportsValueOperation(select));
+        operands[2] = NVVMSemantics::areSameType(fp8, NVVMSemantics::kFloatE4M3)
+                          ? NVVMSemantics::kFloatE5M2
+                          : NVVMSemantics::kFloatE4M3;
+        SLANG_CHECK(!builder.supportsValueOperation(select));
+        operands[2] = fp8;
+        operands[0] = NVVMSemantics::kUnsignedI8;
+        SLANG_CHECK(!builder.supportsValueOperation(select));
+        for (auto numeric :
+             {NVVMSemantics::kFloat16,
+              NVVMSemantics::kFloat32,
+              NVVMSemantics::kFloat64,
+              NVVMSemantics::kBFloat16,
+              NVVMSemantics::kUnsignedI8,
+              NVVMSemantics::kSignedI32})
+        {
+            for (auto operation :
+                 {SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
+                  SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT,
+                  SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER})
+            {
+                SlangNVVMValueOperationDesc narrow = {operation, fp8, &numeric, 1};
+                SlangNVVMValueOperationDesc widen = {operation, numeric, &fp8, 1};
+                SLANG_CHECK(!builder.supportsValueOperation(narrow));
+                SLANG_CHECK(!builder.supportsValueOperation(widen));
+            }
+        }
+        SlangNVVMValueTypeDesc binary[] = {fp8, fp8};
+        for (auto operation :
+             {SLANG_NVVM_VALUE_OP_ADD,
+              SLANG_NVVM_VALUE_OP_SUBTRACT,
+              SLANG_NVVM_VALUE_OP_MULTIPLY,
+              SLANG_NVVM_VALUE_OP_DIVIDE})
+        {
+            SlangNVVMValueOperationDesc arithmetic = {operation, fp8, binary, 2};
+            SLANG_CHECK(!builder.supportsValueOperation(arithmetic));
+        }
+        auto malformed = fp8;
+        malformed.laneCount = 2;
+        SlangNVVMValueOperationDesc vectorBits =
+            {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, malformed, &NVVMSemantics::kUnsignedI16, 1};
+        SLANG_CHECK(!builder.supportsValueOperation(vectorBits));
+        malformed.laneCount = 1;
+        malformed.bitWidth = 16;
+        vectorBits.resultType = malformed;
+        SLANG_CHECK(!builder.supportsValueOperation(vectorBits));
+        SlangNVVMValueOperationDesc wrongWidth =
+            {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, fp8, &NVVMSemantics::kUnsignedI16, 1};
+        SLANG_CHECK(!builder.supportsValueOperation(wrongWidth));
+    }
+}
