@@ -15,7 +15,8 @@ name: PR Board Sync (reusable)
 #   - when a PR has an owner, assigns any still-unassigned linked (closing)
 #     issues to that same owner (the PR's primary assignee, not the co-assigned
 #     community author), and
-#   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
+#   - unrequests auto-assigned reviewers that cannot approve (members of
+#     default_reviewer_team, plus any extra ignored_reviewers logins).
 #
 # Status state machine (two variants that differ ONLY on a CI failure):
 #   - In Review  - default for an open PR; also re-set whenever a new commit
@@ -164,9 +165,9 @@ on:
         type: string
         default: "nv-slang-bot,slang-coworker-nanoclaw,Copilot,copilot-swe-agent"
       ignored_reviewers:
-        description: "Comma-separated auto-assigned reviewers that cannot approve; unrequested on the PR."
+        description: "Optional extra comma-separated logins to unrequest, in addition to default_reviewer_team members."
         type: string
-        default: "bmillsNV"
+        default: ""
       owners_team:
         description: "org/team-slug whose members may be chosen as a Community PR's assignee/reviewer from the committer-signal ranking (not used for linked-issue inheritance; that uses source_internal_team)."
         type: string
@@ -179,10 +180,14 @@ on:
         description: "org/team-slug tracking the current maintainer(s); the fallback assignee when a non-Internal PR has no linked-issue or committer-signal owner."
         type: string
         default: "shader-slang/slang-maintainer"
-      fallback_assignee:
-        description: "Last-resort assignee for a non-Internal PR when maintainer_team is empty/unset/unreadable and no linked-issue or committer-signal owner is found, so PRs are never left unassigned. Never requested as a reviewer (it is typically an ignored non-approver). Empty disables this fallback (the PR is left to the sweep)."
+      default_reviewer_team:
+        description: "org/team-slug whose members are the repo's default auto-requested reviewers: they are unrequested (they typically cannot approve) and the sorted-first member is the last-resort assignee after maintainer_team."
         type: string
-        default: "bmillsNV"
+        default: "shader-slang/default-reviewer"
+      fallback_assignee:
+        description: "Last-resort assignee for a non-Internal PR when maintainer_team and default_reviewer_team are both empty/unset/unreadable and no linked-issue or committer-signal owner is found, so PRs are never left unassigned. Never requested as a reviewer (it is typically an ignored non-approver). Empty disables this fallback (the PR is left to the sweep)."
+        type: string
+        default: ""
     secrets:
       SLANG_PR_BOT_TOKEN:
         description: "Dedicated bot PAT used for org Projects RW + Members read, repo reads, and as a compatibility fallback for repo writes while callers grant GITHUB_TOKEN Issues/Pull requests write."
@@ -526,6 +531,7 @@ jobs:
 
       # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
       - name: Reconcile board (add, Source, Status)
+        id: reconcile
         if: ${{ env.HAS_TOKEN == 'true' }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
@@ -548,6 +554,7 @@ jobs:
           OWNERS_TEAM: ${{ inputs.owners_team }}
           BOT_OWNERS_TEAM: ${{ inputs.bot_owners_team }}
           MAINTAINER_TEAM: ${{ inputs.maintainer_team }}
+          DEFAULT_REVIEWER_TEAM: ${{ inputs.default_reviewer_team }}
           FALLBACK_ASSIGNEE: ${{ inputs.fallback_assignee }}
           # The run's own GITHUB_TOKEN, used for repo-scoped writes so assignments,
           # review requests, and comments show up as github-actions[bot]. Its reach
@@ -578,6 +585,7 @@ jobs:
             const OWNERS_TEAM = process.env.OWNERS_TEAM || "";
             const BOT_OWNERS_TEAM = process.env.BOT_OWNERS_TEAM || "";
             const MAINTAINER_TEAM = process.env.MAINTAINER_TEAM || "";
+            const DEFAULT_REVIEWER_TEAM = process.env.DEFAULT_REVIEWER_TEAM || "";
             const SOURCE_INTERNAL_TEAM = process.env.SOURCE_INTERNAL_TEAM || "";
             const FALLBACK_ASSIGNEE = process.env.FALLBACK_ASSIGNEE || "";
 
@@ -1456,6 +1464,22 @@ jobs:
               warn: (message) => core.warning(message),
             });
 
+            // default-reviewer team members are the logins repo automation
+            // auto-requests: union them into IGNORED (do not keep them as
+            // reviewers) and use them as last-resort assignee after the
+            // maintainer team.
+            const defaultReviewers = await listTeamMembers(DEFAULT_REVIEWER_TEAM);
+            for (const login of defaultReviewers) {
+              if (login) IGNORED.add(login.toLowerCase());
+            }
+            if (FALLBACK_ASSIGNEE) IGNORED.add(FALLBACK_ASSIGNEE.toLowerCase());
+            if (DEFAULT_REVIEWER_TEAM) {
+              console.log(
+                `default-reviewer team ${DEFAULT_REVIEWER_TEAM}: ` +
+                ([...defaultReviewers].join(", ") || "(empty)"));
+            }
+            core.setOutput("ignored-reviewers", [...IGNORED].join(","));
+
             // Logins with write+ access to this repo (the suggested-reviewer pool).
             // Empty on access error (listing collaborators needs repo admin/push),
             // so the suggestion is simply skipped -- never a hard failure.
@@ -1480,10 +1504,11 @@ jobs:
 
             // The fallback assignee for a non-Internal PR that has no linked-issue
             // or committer-signal owner: the (sorted-first) member of the
-            // maintainer team, else FALLBACK_ASSIGNEE (e.g. bmillsNV) when that
-            // team is unset/empty/unreadable, so a PR is never left unassigned.
-            // Only "" if both are unset, in which case selectAssigneeAndReviewers
-            // yields no pick and we leave it to the sweep. Cached per run.
+            // maintainer team, else of default_reviewer_team, else
+            // FALLBACK_ASSIGNEE when those teams are unset/empty/unreadable, so a
+            // PR is never left unassigned. Only "" if all three are unset, in
+            // which case selectAssigneeAndReviewers yields no pick and we leave
+            // it to the sweep. Cached per run.
             let _maintainer;
             async function resolveMaintainer() {
               if (_maintainer !== undefined) return _maintainer;
@@ -1491,7 +1516,15 @@ jobs:
               if (members.length > 1)
                 core.warning(
                   `maintainer team ${MAINTAINER_TEAM} has ${members.length} members; using ${members[0]}`);
-              _maintainer = members[0] || FALLBACK_ASSIGNEE;
+              if (members[0]) {
+                _maintainer = members[0];
+                return _maintainer;
+              }
+              const defaults = [...defaultReviewers].sort();
+              if (defaults.length > 1)
+                core.warning(
+                  `default-reviewer team ${DEFAULT_REVIEWER_TEAM} has ${defaults.length} members; using ${defaults[0]}`);
+              _maintainer = defaults[0] || FALLBACK_ASSIGNEE;
               return _maintainer;
             }
 
@@ -1717,8 +1750,9 @@ jobs:
                 }
               }
 
-              // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
-              // assignment exactly as the sweep does.
+              // Unrequest auto-assigned non-approvers (default-reviewer team,
+              // plus ignored_reviewers), coupled to assignment exactly as the
+              // sweep does.
               const toRemove =
                 info.requestedReviewers.filter(r => IGNORED.has(r.toLowerCase()));
               if (toRemove.length) {
@@ -2123,13 +2157,14 @@ jobs:
             }
 
       # --- Unrequest auto-assigned non-approver reviewers --------------------
-      # Runs only at onboarding (opened/reopened) to strip an auto-assigned
-      # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
-      # deliberately does NOT run on review_requested, so a maintainer manually
-      # requesting that reviewer is never undone. reconcileAssignment also unrequests
-      # these when it freshly assigns an owner; this onboarding step covers PRs
-      # assignment skips (Source not yet known, a human draft, merge-queued, or no
-      # maintainer resolved). Already-assigned PRs are not re-scanned on sweep.
+      # Runs only at onboarding (opened/reopened) to strip auto-assigned
+      # non-approvers (default-reviewer team, plus ignored_reviewers) that repo
+      # automation requests on a new PR. It deliberately does NOT run on
+      # review_requested, so a maintainer manually requesting that reviewer is
+      # never undone. reconcileAssignment also unrequests these when it freshly
+      # assigns an owner; this onboarding step covers PRs assignment skips
+      # (Source not yet known, a human draft, merge-queued, or no maintainer
+      # resolved). Already-assigned PRs are not re-scanned on sweep.
       - name: Unrequest ignored reviewers
         if: >-
           env.HAS_TOKEN == 'true' &&
@@ -2137,7 +2172,7 @@ jobs:
           (github.event.action == 'opened' || github.event.action == 'reopened')
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
+          IGNORED_REVIEWERS: ${{ steps.reconcile.outputs.ignored-reviewers }}
           # Compatibility fallback for cross-repo callers that have not yet
           # granted pull-requests: write to their GITHUB_TOKEN.
           PAT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
