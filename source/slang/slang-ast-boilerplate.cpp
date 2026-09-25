@@ -35,7 +35,7 @@ const SyntaxClassInfo $T::kSyntaxClassInfo = {
 #include "slang-ast-boilerplate.cpp.fiddle"
 #endif // FIDDLE END
 
-static SyntaxClassInfo const* kAllSyntaxClasses[] = {
+SyntaxClassInfo const* kAllSyntaxClasses[] = {
 #if 0 // FIDDLE TEMPLATE:
 %for _,T in ipairs(Slang.NodeBase.subclasses) do
     &$T::kSyntaxClassInfo,
@@ -46,10 +46,6 @@ static SyntaxClassInfo const* kAllSyntaxClasses[] = {
 #endif // FIDDLE END
 };
 
-SyntaxClassBase::SyntaxClassBase(ASTNodeType tag)
-{
-    SLANG_ASSERT(int(tag) >= 0 && int(tag) < SLANG_COUNT_OF(kAllSyntaxClasses));
-    _info = kAllSyntaxClasses[int(tag)];
-}
+static_assert(SLANG_COUNT_OF(kAllSyntaxClasses) == int(ASTNodeType::CountOf));
 
 } // namespace Slang

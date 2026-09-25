@@ -683,13 +683,20 @@ FIDDLE() namespace Slang
         }
     };
 
+    // This generated mapping has one entry for every ASTNodeType, in tag order.
+    extern SyntaxClassInfo const* kAllSyntaxClasses[];
+
     // A reference to a class of syntax node, that can be
     // used to create instances on the fly
     struct SyntaxClassBase
     {
         SyntaxClassBase() {}
 
-        explicit SyntaxClassBase(ASTNodeType tag);
+        explicit SyntaxClassBase(ASTNodeType tag)
+        {
+            SLANG_ASSERT(int(tag) >= 0 && int(tag) < int(ASTNodeType::CountOf));
+            _info = kAllSyntaxClasses[int(tag)];
+        }
 
         SyntaxClassBase(SyntaxClassInfo const* info)
             : _info(info)

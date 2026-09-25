@@ -1,0 +1,6340 @@
+{
+  "schema": 1,
+  "slice": 252,
+  "status": "accepted-performance",
+  "scope": "Paired optimized intact-material compile time; constructor visibility only; no material runtime claim",
+  "source_base_revision": "0c460441c0d539ad2f09f3139ce620a8e6a12dd3",
+  "baseline": {
+    "path": "issue-nvvm-backend/timing-evidence.slice-251.json",
+    "sha256": "9c875e649df664ef08d7313df0de0b115b4855600fd33c64e137c4a6dcf27b9d"
+  },
+  "baseline_runtime": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-250.json",
+    "sha256": "1461b9c473b394bd25ac0d57cb41e942ee22a893a97380d0e1a77d927aa58cb7"
+  },
+  "candidate_patch": {
+    "path": "build/nvvm-loop/slice-252-prototype/source.patch",
+    "sha256": "92f50af6aa988a61a5fc746093151990dc495a54880c54c91e2d5b7c9ddcd3e7"
+  },
+  "configuration": "RelWithDebInfo",
+  "provider_abi": 41,
+  "target_architecture": 80,
+  "protocol": {
+    "rounds": 2,
+    "orders": [
+      "manifest identities; before then candidate",
+      "reverse identities; candidate then before"
+    ],
+    "warmups_per_cell_build_round": 2,
+    "samples_per_cell_build_round": 9,
+    "serial": true,
+    "competing_owned_builds_or_benchmarks": false,
+    "timeout_seconds": 180,
+    "suite_timeout_minutes": 30,
+    "timing_clock": "time.perf_counter Popen.communicate piped output through process exit; logs written afterward",
+    "exclusions": [],
+    "retries": 0,
+    "assembly": "24 independent support assemblies, one per identity/build/round; no assembly performance claim"
+  },
+  "counts": {
+    "identities": 6,
+    "variants": 2,
+    "compile_attempts": 264,
+    "measured_compiles": 216,
+    "compile_warmups": 48,
+    "assembly_attempts": 24,
+    "failed_attempts": 0,
+    "timeouts": 0,
+    "all_ptx_exact250_251": true,
+    "all_cubins_exact250_251": true
+  },
+  "gates": {
+    "semantic_median_reduction_each_percent_min": 5,
+    "sum_six_wall_medians_reduction_percent_min": 2,
+    "wall_regression_each_round_percent_max": 2,
+    "passed": true
+  },
+  "statistics": {
+    "before": {
+      "tiled-brass-material-eval_buffer-nvrtc-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1456.7896584048867,
+          "q1": 1442.1688322909176,
+          "q3": 1537.6009345054626,
+          "minimum": 1427.2519554942846,
+          "maximum": 1596.6623071581125
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 497.255,
+          "q1": 488.0475,
+          "q3": 521.385,
+          "minimum": 484.22,
+          "maximum": 535.86
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1540.0421023368835,
+            "q1": 1516.4176635444164,
+            "q3": 1550.7399383932352,
+            "minimum": 1454.3129689991474,
+            "maximum": 1596.6623071581125
+          },
+          {
+            "n": 9,
+            "median": 1442.0764222741127,
+            "q1": 1434.973381459713,
+            "q3": 1444.0997298806906,
+            "minimum": 1427.2519554942846,
+            "maximum": 1459.266347810626
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 497.255,
+            "q1": 488.0475,
+            "q3": 521.385,
+            "minimum": 484.22,
+            "maximum": 535.86
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 497.255,
+            "q1": 488.0475,
+            "q3": 521.385,
+            "minimum": 484.22,
+            "maximum": 535.86
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1160.495,
+            "q1": 1149.035,
+            "q3": 1236.27,
+            "minimum": 1140.51,
+            "maximum": 1300.39
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 18,
+            "median": 339.92499999999995,
+            "q1": 336.7075,
+            "q3": 361.31999999999994,
+            "minimum": 333.77,
+            "maximum": 428.24
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1160.49,
+            "q1": 1149.035,
+            "q3": 1236.27,
+            "minimum": 1140.51,
+            "maximum": 1300.39
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 676.9300000000001,
+            "q1": 667.65,
+            "q3": 711.6999999999999,
+            "minimum": 662.0,
+            "maximum": 734.82
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 164.125,
+            "q1": 162.8325,
+            "q3": 173.60000000000002,
+            "minimum": 161.12,
+            "maximum": 189.24
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 164.125,
+            "q1": 162.8325,
+            "q3": 173.60000000000002,
+            "minimum": 161.12,
+            "maximum": 189.23
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 483.655,
+            "q1": 479.1325,
+            "q3": 509.805,
+            "minimum": 474.91,
+            "maximum": 584.03
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 332.18,
+            "q1": 329.02750000000003,
+            "q3": 353.6425,
+            "minimum": 326.07,
+            "maximum": 420.5
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 21.075,
+            "q1": 20.74,
+            "q3": 21.512500000000003,
+            "minimum": 20.48,
+            "maximum": 27.82
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 215.47500000000002,
+            "q1": 211.81,
+            "q3": 219.25750000000002,
+            "minimum": 207.47,
+            "maximum": 229.43
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 13.899999999999999,
+            "q1": 13.7925,
+            "q3": 14.04,
+            "minimum": 13.61,
+            "maximum": 19.94
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.3,
+            "q1": 1.29,
+            "q3": 1.34,
+            "minimum": 1.28,
+            "maximum": 1.94
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.345,
+            "q1": 6.25,
+            "q3": 6.7075,
+            "minimum": 6.21,
+            "maximum": 8.56
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 53.254999999999995,
+            "q1": 52.925,
+            "q3": 59.2225,
+            "minimum": 50.83,
+            "maximum": 64.49
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 118.375,
+            "q1": 116.805,
+            "q3": 120.10499999999999,
+            "minimum": 115.59,
+            "maximum": 125.81
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 123.83000000000001,
+            "q1": 122.2875,
+            "q3": 130.9225,
+            "minimum": 121.16,
+            "maximum": 162.63
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 141.845,
+            "q1": 139.51,
+            "q3": 150.7375,
+            "minimum": 138.65,
+            "maximum": 183.16
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.395,
+            "q1": 4.3325,
+            "q3": 4.42,
+            "minimum": 4.3,
+            "maximum": 6.26
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 521.55,
+              "q1": 518.63,
+              "q3": 524.04,
+              "minimum": 489.03,
+              "maximum": 535.86
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 521.55,
+              "q1": 518.63,
+              "q3": 524.04,
+              "minimum": 489.03,
+              "maximum": 535.86
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1241.2,
+              "q1": 1218.76,
+              "q3": 1257.05,
+              "minimum": 1157.32,
+              "maximum": 1300.39
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 361.4,
+              "q1": 358.62,
+              "q3": 362.09,
+              "minimum": 340.2,
+              "maximum": 428.24
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1241.2,
+              "q1": 1218.76,
+              "q3": 1257.05,
+              "minimum": 1157.31,
+              "maximum": 1300.39
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 711.72,
+              "q1": 710.3,
+              "q3": 728.49,
+              "minimum": 670.16,
+              "maximum": 734.82
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 173.61,
+              "q1": 173.09,
+              "q3": 176.24,
+              "minimum": 164.56,
+              "maximum": 189.24
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 173.61,
+              "q1": 173.09,
+              "q3": 176.24,
+              "minimum": 164.56,
+              "maximum": 189.23
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 510.07,
+              "q1": 507.47,
+              "q3": 524.75,
+              "minimum": 484.9,
+              "maximum": 584.03
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 353.77,
+              "q1": 350.88,
+              "q3": 354.49,
+              "minimum": 332.55,
+              "maximum": 420.5
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.74,
+              "q1": 20.67,
+              "q3": 22.4,
+              "minimum": 20.48,
+              "maximum": 27.82
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 219.52,
+              "q1": 218.27,
+              "q3": 223.16,
+              "minimum": 216.68,
+              "maximum": 229.43
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.79,
+              "q1": 13.62,
+              "q3": 14.13,
+              "minimum": 13.61,
+              "maximum": 19.94
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.3,
+              "q1": 1.29,
+              "q3": 1.42,
+              "minimum": 1.28,
+              "maximum": 1.94
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.72,
+              "q1": 6.5,
+              "q3": 6.97,
+              "minimum": 6.25,
+              "maximum": 8.56
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 59.24,
+              "q1": 57.94,
+              "q3": 60.9,
+              "minimum": 50.9,
+              "maximum": 64.49
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 120.03,
+              "q1": 117.93,
+              "q3": 122.04,
+              "minimum": 116.76,
+              "maximum": 125.81
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 130.94,
+              "q1": 129.81,
+              "q3": 131.48,
+              "minimum": 122.46,
+              "maximum": 162.63
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 150.93,
+              "q1": 149.33,
+              "q3": 152.69,
+              "minimum": 142.66,
+              "maximum": 183.16
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.41,
+              "q1": 4.39,
+              "q3": 5.6,
+              "minimum": 4.3,
+              "maximum": 6.26
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 487.87,
+              "q1": 484.92,
+              "q3": 488.67,
+              "minimum": 484.22,
+              "maximum": 501.64
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 487.87,
+              "q1": 484.92,
+              "q3": 488.67,
+              "minimum": 484.22,
+              "maximum": 501.64
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1148.63,
+              "q1": 1142.97,
+              "q3": 1151.74,
+              "minimum": 1140.51,
+              "maximum": 1163.67
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 336.23,
+              "q1": 334.5,
+              "q3": 338.3,
+              "minimum": 333.77,
+              "maximum": 339.65
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1148.63,
+              "q1": 1142.97,
+              "q3": 1151.74,
+              "minimum": 1140.51,
+              "maximum": 1163.67
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 667.28,
+              "q1": 663.68,
+              "q3": 668.77,
+              "minimum": 662.0,
+              "maximum": 682.01
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 162.61,
+              "q1": 162.33,
+              "q3": 163.53,
+              "minimum": 161.12,
+              "maximum": 163.69
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 162.61,
+              "q1": 162.32,
+              "q3": 163.53,
+              "minimum": 161.12,
+              "maximum": 163.69
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 479.11,
+              "q1": 476.37,
+              "q3": 479.32,
+              "minimum": 474.91,
+              "maximum": 482.41
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 328.58,
+              "q1": 326.93,
+              "q3": 330.64,
+              "minimum": 326.07,
+              "maximum": 331.81
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 21.09,
+              "q1": 20.83,
+              "q3": 21.34,
+              "minimum": 20.49,
+              "maximum": 21.62
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 211.49,
+              "q1": 211.1,
+              "q3": 213.36,
+              "minimum": 207.47,
+              "maximum": 214.27
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.94,
+              "q1": 13.87,
+              "q3": 13.95,
+              "minimum": 13.8,
+              "maximum": 14.19
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.3,
+              "q1": 1.29,
+              "q3": 1.33,
+              "minimum": 1.28,
+              "maximum": 1.39
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.26,
+              "q1": 6.24,
+              "q3": 6.34,
+              "minimum": 6.21,
+              "maximum": 6.4
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 53.0,
+              "q1": 52.85,
+              "q3": 53.14,
+              "minimum": 50.83,
+              "maximum": 53.37
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.94,
+              "q1": 116.73,
+              "q3": 118.82,
+              "minimum": 115.59,
+              "maximum": 120.13
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 122.23,
+              "q1": 121.52,
+              "q3": 122.93,
+              "minimum": 121.16,
+              "maximum": 124.15
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 139.51,
+              "q1": 139.16,
+              "q3": 139.8,
+              "minimum": 138.65,
+              "maximum": 141.03
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.35,
+              "q1": 4.32,
+              "q3": 4.4,
+              "minimum": 4.3,
+              "maximum": 4.48
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-eval_buffer-nvvm-o0": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1424.27393887192,
+          "q1": 1406.6423140466213,
+          "q3": 1451.227841898799,
+          "minimum": 1393.101243302226,
+          "maximum": 1513.854667544365
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 498.27,
+          "q1": 486.25750000000005,
+          "q3": 505.86249999999995,
+          "minimum": 477.63,
+          "maximum": 546.5
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1452.1394837647676,
+            "q1": 1446.9613321125507,
+            "q3": 1484.4355527311563,
+            "minimum": 1428.0576799064875,
+            "maximum": 1513.854667544365
+          },
+          {
+            "n": 9,
+            "median": 1406.2159694731236,
+            "q1": 1401.487611234188,
+            "q3": 1411.824719980359,
+            "minimum": 1393.101243302226,
+            "maximum": 1420.4901978373528
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 498.27,
+            "q1": 486.25750000000005,
+            "q3": 505.86249999999995,
+            "minimum": 477.63,
+            "maximum": 546.5
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 498.27,
+            "q1": 486.25750000000005,
+            "q3": 505.855,
+            "minimum": 477.62,
+            "maximum": 546.5
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1139.04,
+            "q1": 1121.9175,
+            "q3": 1164.3449999999998,
+            "minimum": 1118.11,
+            "maximum": 1210.78
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1139.04,
+            "q1": 1121.9175,
+            "q3": 1164.3449999999998,
+            "minimum": 1118.11,
+            "maximum": 1210.78
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 679.4449999999999,
+            "q1": 665.845,
+            "q3": 692.28,
+            "minimum": 656.54,
+            "maximum": 739.45
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 165.01,
+            "q1": 162.5675,
+            "q3": 167.42000000000002,
+            "minimum": 161.47,
+            "maximum": 180.12
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 165.01,
+            "q1": 162.5675,
+            "q3": 167.4125,
+            "minimum": 161.47,
+            "maximum": 180.12
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 459.71500000000003,
+            "q1": 453.01250000000005,
+            "q3": 468.7575,
+            "minimum": 450.91,
+            "maximum": 501.98
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 328.545,
+            "q1": 323.3125,
+            "q3": 333.75,
+            "minimum": 321.54,
+            "maximum": 362.6
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.67,
+            "q1": 20.005000000000003,
+            "q3": 21.0025,
+            "minimum": 19.68,
+            "maximum": 23.33
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 210.97,
+            "q1": 208.53249999999997,
+            "q3": 213.9475,
+            "minimum": 203.94,
+            "maximum": 234.16
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 13.870000000000001,
+            "q1": 13.785,
+            "q3": 14.017499999999998,
+            "minimum": 13.7,
+            "maximum": 19.32
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.29,
+            "q1": 1.28,
+            "q3": 1.2975,
+            "minimum": 1.27,
+            "maximum": 1.46
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.295,
+            "q1": 6.28,
+            "q3": 6.3774999999999995,
+            "minimum": 6.21,
+            "maximum": 6.79
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.86,
+            "q1": 51.0275,
+            "q3": 52.942499999999995,
+            "minimum": 49.01,
+            "maximum": 56.03
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 116.88,
+            "q1": 115.32,
+            "q3": 118.7075,
+            "minimum": 112.87,
+            "maximum": 135.93
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 123.18,
+            "q1": 121.7525,
+            "q3": 125.67,
+            "minimum": 121.43,
+            "maximum": 131.0
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 141.64999999999998,
+            "q1": 140.185,
+            "q3": 144.9075,
+            "minimum": 139.35,
+            "maximum": 171.04
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.38,
+            "q1": 4.31,
+            "q3": 4.4925,
+            "minimum": 4.3,
+            "maximum": 6.28
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 506.52,
+              "q1": 503.34,
+              "q3": 507.26,
+              "minimum": 500.56,
+              "maximum": 546.5
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 506.51,
+              "q1": 503.34,
+              "q3": 507.26,
+              "minimum": 500.56,
+              "maximum": 546.5
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1165.55,
+              "q1": 1153.17,
+              "q3": 1179.66,
+              "minimum": 1149.47,
+              "maximum": 1210.78
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1165.55,
+              "q1": 1153.17,
+              "q3": 1179.66,
+              "minimum": 1149.47,
+              "maximum": 1210.78
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 692.65,
+              "q1": 690.67,
+              "q3": 697.18,
+              "minimum": 684.52,
+              "maximum": 739.45
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 167.65,
+              "q1": 166.67,
+              "q3": 171.43,
+              "minimum": 166.15,
+              "maximum": 180.12
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 167.64,
+              "q1": 166.67,
+              "q3": 171.43,
+              "minimum": 166.15,
+              "maximum": 180.12
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 468.99,
+              "q1": 462.38,
+              "q3": 474.06,
+              "minimum": 459.19,
+              "maximum": 501.98
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 330.69,
+              "q1": 329.49,
+              "q3": 339.9,
+              "minimum": 328.48,
+              "maximum": 362.6
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.98,
+              "q1": 20.52,
+              "q3": 22.92,
+              "minimum": 19.68,
+              "maximum": 23.33
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 212.92,
+              "q1": 209.93,
+              "q3": 220.52,
+              "minimum": 205.18,
+              "maximum": 234.16
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.88,
+              "q1": 13.8,
+              "q3": 17.52,
+              "minimum": 13.74,
+              "maximum": 19.32
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.28,
+              "q1": 1.28,
+              "q3": 1.29,
+              "minimum": 1.27,
+              "maximum": 1.3
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.39,
+              "q1": 6.29,
+              "q3": 6.43,
+              "minimum": 6.25,
+              "maximum": 6.79
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.82,
+              "q1": 50.83,
+              "q3": 53.58,
+              "minimum": 49.01,
+              "maximum": 56.03
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 118.25,
+              "q1": 116.78,
+              "q3": 124.49,
+              "minimum": 114.32,
+              "maximum": 135.93
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 125.92,
+              "q1": 124.33,
+              "q3": 126.49,
+              "minimum": 122.33,
+              "maximum": 131.0
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 144.33,
+              "q1": 142.34,
+              "q3": 145.43,
+              "minimum": 141.48,
+              "maximum": 171.04
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.38,
+              "q1": 4.35,
+              "q3": 4.95,
+              "minimum": 4.3,
+              "maximum": 6.28
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 486.04,
+              "q1": 484.97,
+              "q3": 487.6,
+              "minimum": 477.63,
+              "maximum": 495.98
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 486.04,
+              "q1": 484.97,
+              "q3": 487.6,
+              "minimum": 477.62,
+              "maximum": 495.98
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1121.66,
+              "q1": 1120.11,
+              "q3": 1122.78,
+              "minimum": 1118.11,
+              "maximum": 1128.61
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1121.66,
+              "q1": 1120.11,
+              "q3": 1122.78,
+              "minimum": 1118.11,
+              "maximum": 1128.61
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 665.56,
+              "q1": 664.4,
+              "q3": 666.91,
+              "minimum": 656.54,
+              "maximum": 674.37
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 162.55,
+              "q1": 162.22,
+              "q3": 162.87,
+              "minimum": 161.47,
+              "maximum": 163.87
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 162.55,
+              "q1": 162.22,
+              "q3": 162.87,
+              "minimum": 161.47,
+              "maximum": 163.87
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 452.79,
+              "q1": 452.09,
+              "q3": 453.95,
+              "minimum": 450.91,
+              "maximum": 468.06
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 323.11,
+              "q1": 322.3,
+              "q3": 324.75,
+              "minimum": 321.54,
+              "maximum": 335.43
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.14,
+              "q1": 19.91,
+              "q3": 20.82,
+              "minimum": 19.72,
+              "maximum": 21.01
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 210.39,
+              "q1": 207.87,
+              "q3": 211.15,
+              "minimum": 203.94,
+              "maximum": 214.29
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.86,
+              "q1": 13.78,
+              "q3": 13.94,
+              "minimum": 13.7,
+              "maximum": 14.04
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.29,
+              "q1": 1.29,
+              "q3": 1.3,
+              "minimum": 1.28,
+              "maximum": 1.46
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.29,
+              "q1": 6.28,
+              "q3": 6.3,
+              "minimum": 6.21,
+              "maximum": 6.34
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.9,
+              "q1": 51.08,
+              "q3": 52.39,
+              "minimum": 50.93,
+              "maximum": 52.97
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.41,
+              "q1": 115.22,
+              "q3": 116.98,
+              "minimum": 112.87,
+              "maximum": 119.95
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 121.71,
+              "q1": 121.57,
+              "q3": 121.92,
+              "minimum": 121.43,
+              "maximum": 124.92
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 140.18,
+              "q1": 139.9,
+              "q3": 140.44,
+              "minimum": 139.35,
+              "maximum": 148.28
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.31,
+              "q1": 4.31,
+              "q3": 4.41,
+              "minimum": 4.3,
+              "maximum": 4.69
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-eval_buffer-nvvm-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1521.4709965512156,
+          "q1": 1505.2272290922701,
+          "q3": 1536.733512300998,
+          "minimum": 1496.8405086547136,
+          "maximum": 1555.2263595163822
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 491.23,
+          "q1": 484.05750000000006,
+          "q3": 502.89250000000004,
+          "minimum": 481.05,
+          "maximum": 512.88
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1531.4420238137245,
+            "q1": 1523.5171020030975,
+            "q3": 1546.849312260747,
+            "minimum": 1505.0614643841982,
+            "maximum": 1555.2263595163822
+          },
+          {
+            "n": 9,
+            "median": 1505.724523216486,
+            "q1": 1498.8132882863283,
+            "q3": 1520.1736725866795,
+            "minimum": 1496.8405086547136,
+            "maximum": 1538.4973417967558
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 491.23,
+            "q1": 484.05750000000006,
+            "q3": 502.89250000000004,
+            "minimum": 481.05,
+            "maximum": 512.88
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 491.23,
+            "q1": 484.05,
+            "q3": 502.89250000000004,
+            "minimum": 481.05,
+            "maximum": 512.88
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1235.72,
+            "q1": 1223.9175,
+            "q3": 1252.04,
+            "minimum": 1215.67,
+            "maximum": 1265.53
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1235.72,
+            "q1": 1223.9175,
+            "q3": 1252.04,
+            "minimum": 1215.67,
+            "maximum": 1265.53
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 677.49,
+            "q1": 663.7375,
+            "q3": 687.2125000000001,
+            "minimum": 659.36,
+            "maximum": 697.58
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 164.07999999999998,
+            "q1": 161.9025,
+            "q3": 167.92000000000002,
+            "minimum": 161.34,
+            "maximum": 172.5
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 164.075,
+            "q1": 161.9025,
+            "q3": 167.92000000000002,
+            "minimum": 161.34,
+            "maximum": 172.5
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 557.935,
+            "q1": 555.6824999999999,
+            "q3": 566.3825,
+            "minimum": 552.44,
+            "maximum": 572.13
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 325.40999999999997,
+            "q1": 323.37,
+            "q3": 330.025,
+            "minimum": 322.17,
+            "maximum": 335.33
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.59,
+            "q1": 20.3825,
+            "q3": 20.927500000000002,
+            "minimum": 19.85,
+            "maximum": 22.49
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 209.99,
+            "q1": 207.93,
+            "q3": 213.015,
+            "minimum": 204.01,
+            "maximum": 225.32
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 13.855,
+            "q1": 13.7775,
+            "q3": 13.950000000000001,
+            "minimum": 13.68,
+            "maximum": 14.69
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.28,
+            "q1": 1.28,
+            "q3": 1.29,
+            "minimum": 1.27,
+            "maximum": 1.33
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.275,
+            "q1": 6.2425,
+            "q3": 6.342499999999999,
+            "minimum": 6.21,
+            "maximum": 6.73
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 52.155,
+            "q1": 51.2225,
+            "q3": 53.9825,
+            "minimum": 49.81,
+            "maximum": 57.66
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 116.475,
+            "q1": 114.8525,
+            "q3": 117.905,
+            "minimum": 113.0,
+            "maximum": 125.83
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 122.66499999999999,
+            "q1": 121.73500000000001,
+            "q3": 124.0125,
+            "minimum": 121.0,
+            "maximum": 127.85
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 140.67000000000002,
+            "q1": 139.68,
+            "q3": 142.57,
+            "minimum": 138.89,
+            "maximum": 147.18
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.35,
+            "q1": 4.33,
+            "q3": 4.4375,
+            "minimum": 4.29,
+            "maximum": 4.78
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 503.29,
+              "q1": 490.96,
+              "q3": 505.07,
+              "minimum": 489.8,
+              "maximum": 512.88
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 503.29,
+              "q1": 490.96,
+              "q3": 505.07,
+              "minimum": 489.8,
+              "maximum": 512.88
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1252.33,
+              "q1": 1250.33,
+              "q3": 1263.15,
+              "minimum": 1230.55,
+              "maximum": 1265.53
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1252.33,
+              "q1": 1250.33,
+              "q3": 1263.15,
+              "minimum": 1230.55,
+              "maximum": 1265.53
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 688.49,
+              "q1": 679.07,
+              "q3": 691.18,
+              "minimum": 670.94,
+              "maximum": 697.58
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 168.0,
+              "q1": 165.81,
+              "q3": 170.66,
+              "minimum": 163.67,
+              "maximum": 172.5
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 168.0,
+              "q1": 165.81,
+              "q3": 170.66,
+              "minimum": 163.66,
+              "maximum": 172.5
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 566.36,
+              "q1": 558.57,
+              "q3": 569.18,
+              "minimum": 554.39,
+              "maximum": 572.13
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 330.57,
+              "q1": 328.24,
+              "q3": 333.38,
+              "minimum": 323.31,
+              "maximum": 335.33
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.55,
+              "q1": 20.33,
+              "q3": 20.96,
+              "minimum": 20.04,
+              "maximum": 21.23
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 209.66,
+              "q1": 208.11,
+              "q3": 212.14,
+              "minimum": 204.01,
+              "maximum": 222.02
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.87,
+              "q1": 13.81,
+              "q3": 13.97,
+              "minimum": 13.68,
+              "maximum": 14.69
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.28,
+              "q1": 1.27,
+              "q3": 1.29,
+              "minimum": 1.27,
+              "maximum": 1.33
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.27,
+              "q1": 6.25,
+              "q3": 6.42,
+              "minimum": 6.21,
+              "maximum": 6.73
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 53.28,
+              "q1": 51.22,
+              "q3": 54.86,
+              "minimum": 49.81,
+              "maximum": 55.15
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 115.7,
+              "q1": 114.64,
+              "q3": 116.53,
+              "minimum": 113.0,
+              "maximum": 125.83
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 124.18,
+              "q1": 123.42,
+              "q3": 126.39,
+              "minimum": 122.45,
+              "maximum": 127.85
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 142.64,
+              "q1": 140.66,
+              "q3": 144.25,
+              "minimum": 139.56,
+              "maximum": 147.18
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.35,
+              "q1": 4.33,
+              "q3": 4.42,
+              "minimum": 4.31,
+              "maximum": 4.78
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 483.6,
+              "q1": 483.25,
+              "q3": 491.5,
+              "minimum": 481.05,
+              "maximum": 501.7
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 483.59,
+              "q1": 483.23,
+              "q3": 491.5,
+              "minimum": 481.05,
+              "maximum": 501.7
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1221.96,
+              "q1": 1217.26,
+              "q3": 1230.33,
+              "minimum": 1215.67,
+              "maximum": 1243.09
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1221.96,
+              "q1": 1217.26,
+              "q3": 1230.33,
+              "minimum": 1215.67,
+              "maximum": 1243.09
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 663.67,
+              "q1": 661.11,
+              "q3": 669.64,
+              "minimum": 659.36,
+              "maximum": 683.38
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 161.67,
+              "q1": 161.49,
+              "q3": 163.72,
+              "minimum": 161.34,
+              "maximum": 164.35
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 161.67,
+              "q1": 161.49,
+              "q3": 163.72,
+              "minimum": 161.34,
+              "maximum": 164.35
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 556.05,
+              "q1": 555.02,
+              "q3": 557.46,
+              "minimum": 552.44,
+              "maximum": 566.39
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 323.55,
+              "q1": 322.83,
+              "q3": 324.71,
+              "minimum": 322.17,
+              "maximum": 325.83
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.61,
+              "q1": 20.45,
+              "q3": 20.76,
+              "minimum": 19.85,
+              "maximum": 22.49
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 210.62,
+              "q1": 207.87,
+              "q3": 213.74,
+              "minimum": 205.19,
+              "maximum": 225.32
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.81,
+              "q1": 13.77,
+              "q3": 13.92,
+              "minimum": 13.73,
+              "maximum": 14.61
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.28,
+              "q1": 1.28,
+              "q3": 1.29,
+              "minimum": 1.28,
+              "maximum": 1.3
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.28,
+              "q1": 6.24,
+              "q3": 6.32,
+              "minimum": 6.22,
+              "maximum": 6.42
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.75,
+              "q1": 51.23,
+              "q3": 53.12,
+              "minimum": 50.72,
+              "maximum": 57.66
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 117.24,
+              "q1": 116.42,
+              "q3": 117.94,
+              "minimum": 114.33,
+              "maximum": 121.39
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 121.7,
+              "q1": 121.4,
+              "q3": 121.9,
+              "minimum": 121.0,
+              "maximum": 122.88
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 139.8,
+              "q1": 139.35,
+              "q3": 140.68,
+              "minimum": 138.89,
+              "maximum": 142.36
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.4,
+              "q1": 4.33,
+              "q3": 4.46,
+              "minimum": 4.29,
+              "maximum": 4.55
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-sample_buffer-nvrtc-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1460.1944331079721,
+          "q1": 1451.6031215898693,
+          "q3": 1467.9871778935194,
+          "minimum": 1440.381295979023,
+          "maximum": 1523.8275192677975
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 488.47,
+          "q1": 483.64750000000004,
+          "q3": 492.17999999999995,
+          "minimum": 482.36,
+          "maximum": 546.02
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1451.8473912030458,
+            "q1": 1450.364025309682,
+            "q3": 1459.810495376587,
+            "minimum": 1440.381295979023,
+            "maximum": 1467.1060722321272
+          },
+          {
+            "n": 9,
+            "median": 1468.2808797806501,
+            "q1": 1460.5783708393574,
+            "q3": 1487.5331446528435,
+            "minimum": 1451.521698385477,
+            "maximum": 1523.8275192677975
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 488.47,
+            "q1": 483.64750000000004,
+            "q3": 492.17999999999995,
+            "minimum": 482.36,
+            "maximum": 546.02
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 488.47,
+            "q1": 483.64750000000004,
+            "q3": 492.17999999999995,
+            "minimum": 482.36,
+            "maximum": 546.02
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1173.42,
+            "q1": 1169.6975000000002,
+            "q3": 1180.4525,
+            "minimum": 1161.89,
+            "maximum": 1238.31
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 18,
+            "median": 354.27,
+            "q1": 352.6175,
+            "q3": 355.815,
+            "minimum": 350.14,
+            "maximum": 359.48
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1173.42,
+            "q1": 1169.6975000000002,
+            "q3": 1180.4525,
+            "minimum": 1161.89,
+            "maximum": 1238.31
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 669.55,
+            "q1": 662.8275,
+            "q3": 673.8725,
+            "minimum": 661.13,
+            "maximum": 726.38
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 163.26999999999998,
+            "q1": 162.565,
+            "q3": 164.125,
+            "minimum": 160.53,
+            "maximum": 175.24
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 163.265,
+            "q1": 162.565,
+            "q3": 164.125,
+            "minimum": 160.53,
+            "maximum": 175.23
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 502.65999999999997,
+            "q1": 501.54999999999995,
+            "q3": 505.6575,
+            "minimum": 495.63,
+            "maximum": 509.63
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 345.155,
+            "q1": 343.69,
+            "q3": 346.815,
+            "minimum": 341.32,
+            "maximum": 349.84
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.725,
+            "q1": 20.497500000000002,
+            "q3": 20.947499999999998,
+            "minimum": 20.05,
+            "maximum": 21.33
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 208.32999999999998,
+            "q1": 205.92499999999998,
+            "q3": 211.445,
+            "minimum": 202.91,
+            "maximum": 213.98
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 13.825,
+            "q1": 13.7525,
+            "q3": 13.925,
+            "minimum": 13.69,
+            "maximum": 14.35
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.52,
+            "q1": 1.51,
+            "q3": 1.5274999999999999,
+            "minimum": 1.5,
+            "maximum": 1.66
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.4350000000000005,
+            "q1": 6.42,
+            "q3": 6.4675,
+            "minimum": 6.37,
+            "maximum": 6.59
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.894999999999996,
+            "q1": 51.345,
+            "q3": 52.74,
+            "minimum": 50.21,
+            "maximum": 53.33
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 116.005,
+            "q1": 113.93,
+            "q3": 117.58,
+            "minimum": 112.19,
+            "maximum": 120.33
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 128.775,
+            "q1": 128.0575,
+            "q3": 128.935,
+            "minimum": 127.62,
+            "maximum": 131.97
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 144.885,
+            "q1": 144.025,
+            "q3": 145.39,
+            "minimum": 143.5,
+            "maximum": 147.05
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.31,
+            "q1": 4.29,
+            "q3": 4.327500000000001,
+            "minimum": 4.25,
+            "maximum": 4.37
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 484.41,
+              "q1": 483.11,
+              "q3": 489.69,
+              "minimum": 482.36,
+              "maximum": 503.76
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 484.41,
+              "q1": 483.11,
+              "q3": 489.69,
+              "minimum": 482.36,
+              "maximum": 503.76
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1170.25,
+              "q1": 1165.6,
+              "q3": 1173.38,
+              "minimum": 1161.89,
+              "maximum": 1181.06
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 352.42,
+              "q1": 351.38,
+              "q3": 356.01,
+              "minimum": 350.14,
+              "maximum": 359.12
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1170.25,
+              "q1": 1165.6,
+              "q3": 1173.38,
+              "minimum": 1161.89,
+              "maximum": 1181.06
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 662.77,
+              "q1": 661.37,
+              "q3": 670.12,
+              "minimum": 661.13,
+              "maximum": 683.18
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 162.46,
+              "q1": 161.97,
+              "q3": 163.07,
+              "minimum": 160.53,
+              "maximum": 164.18
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 162.46,
+              "q1": 161.97,
+              "q3": 163.07,
+              "minimum": 160.53,
+              "maximum": 164.18
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 502.0,
+              "q1": 499.57,
+              "q3": 506.16,
+              "minimum": 495.63,
+              "maximum": 508.33
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 343.51,
+              "q1": 342.34,
+              "q3": 347.0,
+              "minimum": 341.32,
+              "maximum": 349.84
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.64,
+              "q1": 20.39,
+              "q3": 20.95,
+              "minimum": 20.05,
+              "maximum": 21.33
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 205.76,
+              "q1": 203.85,
+              "q3": 207.9,
+              "minimum": 202.91,
+              "maximum": 213.41
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.8,
+              "q1": 13.74,
+              "q3": 13.83,
+              "minimum": 13.69,
+              "maximum": 14.09
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.51,
+              "q1": 1.51,
+              "q3": 1.52,
+              "minimum": 1.5,
+              "maximum": 1.66
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.42,
+              "q1": 6.41,
+              "q3": 6.45,
+              "minimum": 6.37,
+              "maximum": 6.55
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.7,
+              "q1": 50.44,
+              "q3": 52.49,
+              "minimum": 50.21,
+              "maximum": 53.13
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 113.89,
+              "q1": 113.62,
+              "q3": 115.75,
+              "minimum": 112.19,
+              "maximum": 120.33
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 127.98,
+              "q1": 127.92,
+              "q3": 128.87,
+              "minimum": 127.62,
+              "maximum": 131.97
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 144.0,
+              "q1": 143.6,
+              "q3": 145.53,
+              "minimum": 143.5,
+              "maximum": 146.13
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.3,
+              "q1": 4.29,
+              "q3": 4.33,
+              "minimum": 4.25,
+              "maximum": 4.37
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 489.73,
+              "q1": 487.09,
+              "q3": 505.14,
+              "minimum": 482.88,
+              "maximum": 546.02
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 489.73,
+              "q1": 487.09,
+              "q3": 505.14,
+              "minimum": 482.87,
+              "maximum": 546.02
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1179.72,
+              "q1": 1173.46,
+              "q3": 1190.58,
+              "minimum": 1169.09,
+              "maximum": 1238.31
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 354.67,
+              "q1": 354.24,
+              "q3": 355.23,
+              "minimum": 353.21,
+              "maximum": 359.48
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1179.72,
+              "q1": 1173.46,
+              "q3": 1190.58,
+              "minimum": 1169.09,
+              "maximum": 1238.31
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 671.06,
+              "q1": 669.12,
+              "q3": 685.85,
+              "minimum": 663.0,
+              "maximum": 726.38
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 163.96,
+              "q1": 163.41,
+              "q3": 164.94,
+              "minimum": 163.11,
+              "maximum": 175.24
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 163.96,
+              "q1": 163.41,
+              "q3": 164.94,
+              "minimum": 163.11,
+              "maximum": 175.23
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 503.45,
+              "q1": 502.4,
+              "q3": 504.15,
+              "minimum": 498.52,
+              "maximum": 509.63
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 345.66,
+              "q1": 345.07,
+              "q3": 346.26,
+              "minimum": 344.23,
+              "maximum": 349.52
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.78,
+              "q1": 20.63,
+              "q3": 20.94,
+              "minimum": 20.34,
+              "maximum": 21.32
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 210.31,
+              "q1": 208.76,
+              "q3": 211.51,
+              "minimum": 207.15,
+              "maximum": 213.98
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.89,
+              "q1": 13.8,
+              "q3": 13.93,
+              "minimum": 13.75,
+              "maximum": 14.35
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.52,
+              "q1": 1.5,
+              "q3": 1.53,
+              "minimum": 1.5,
+              "maximum": 1.66
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.45,
+              "q1": 6.43,
+              "q3": 6.48,
+              "minimum": 6.41,
+              "maximum": 6.59
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 52.33,
+              "q1": 51.87,
+              "q3": 53.13,
+              "minimum": 50.4,
+              "maximum": 53.33
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.95,
+              "q1": 116.03,
+              "q3": 118.17,
+              "minimum": 115.23,
+              "maximum": 119.68
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.81,
+              "q1": 128.77,
+              "q3": 129.03,
+              "minimum": 128.29,
+              "maximum": 130.16
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 145.08,
+              "q1": 144.49,
+              "q3": 145.39,
+              "minimum": 144.1,
+              "maximum": 147.05
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.31,
+              "q1": 4.3,
+              "q3": 4.32,
+              "minimum": 4.27,
+              "maximum": 4.37
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-sample_buffer-nvvm-o0": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1449.6668130159378,
+          "q1": 1442.5276503898203,
+          "q3": 1461.1771432682872,
+          "minimum": 1436.5735352039337,
+          "maximum": 1507.941359654069
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 489.07000000000005,
+          "q1": 487.4075,
+          "q3": 492.4675,
+          "minimum": 484.01,
+          "maximum": 534.52
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1446.0267666727304,
+            "q1": 1439.968477934599,
+            "q3": 1462.4022506177425,
+            "minimum": 1436.5735352039337,
+            "maximum": 1477.3636236786842
+          },
+          {
+            "n": 9,
+            "median": 1449.922339990735,
+            "q1": 1449.0784350782633,
+            "q3": 1457.501821219921,
+            "minimum": 1441.1846045404673,
+            "maximum": 1507.941359654069
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 489.07000000000005,
+            "q1": 487.4075,
+            "q3": 492.4675,
+            "minimum": 484.01,
+            "maximum": 534.52
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 489.07000000000005,
+            "q1": 487.4075,
+            "q3": 492.46500000000003,
+            "minimum": 484.01,
+            "maximum": 534.52
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1165.515,
+            "q1": 1160.8700000000001,
+            "q3": 1171.0625,
+            "minimum": 1156.48,
+            "maximum": 1227.1
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1165.515,
+            "q1": 1160.865,
+            "q3": 1171.0625,
+            "minimum": 1156.48,
+            "maximum": 1227.1
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 668.89,
+            "q1": 666.325,
+            "q3": 674.2125,
+            "minimum": 664.19,
+            "maximum": 718.39
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 163.595,
+            "q1": 163.16,
+            "q3": 164.43,
+            "minimum": 161.06,
+            "maximum": 169.04
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 163.595,
+            "q1": 163.16,
+            "q3": 164.43,
+            "minimum": 161.06,
+            "maximum": 169.04
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 492.55,
+            "q1": 490.23,
+            "q3": 495.15,
+            "minimum": 488.1,
+            "maximum": 508.26
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 340.85,
+            "q1": 339.08250000000004,
+            "q3": 342.67500000000007,
+            "minimum": 337.04,
+            "maximum": 347.0
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.415,
+            "q1": 20.119999999999997,
+            "q3": 20.772499999999997,
+            "minimum": 19.43,
+            "maximum": 23.45
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 208.445,
+            "q1": 207.63,
+            "q3": 211.6925,
+            "minimum": 203.17,
+            "maximum": 215.04
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 13.85,
+            "q1": 13.7925,
+            "q3": 13.87,
+            "minimum": 13.72,
+            "maximum": 13.94
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.5,
+            "q1": 1.49,
+            "q3": 1.5075,
+            "minimum": 1.48,
+            "maximum": 1.6
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.465,
+            "q1": 6.422499999999999,
+            "q3": 6.532500000000001,
+            "minimum": 6.41,
+            "maximum": 6.7
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.845,
+            "q1": 51.2025,
+            "q3": 52.89750000000001,
+            "minimum": 49.62,
+            "maximum": 53.46
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 115.97999999999999,
+            "q1": 114.61,
+            "q3": 116.79,
+            "minimum": 112.96,
+            "maximum": 119.39
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 128.895,
+            "q1": 128.53750000000002,
+            "q3": 129.365,
+            "minimum": 128.05,
+            "maximum": 131.0
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 145.63,
+            "q1": 144.9125,
+            "q3": 146.6275,
+            "minimum": 144.18,
+            "maximum": 150.99
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.41,
+            "q1": 4.39,
+            "q3": 4.4625,
+            "minimum": 4.37,
+            "maximum": 4.72
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 488.13,
+              "q1": 485.3,
+              "q3": 491.11,
+              "minimum": 485.01,
+              "maximum": 495.19
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 488.13,
+              "q1": 485.3,
+              "q3": 491.1,
+              "minimum": 485.01,
+              "maximum": 495.19
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1165.88,
+              "q1": 1160.65,
+              "q3": 1175.41,
+              "minimum": 1156.48,
+              "maximum": 1180.31
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1165.88,
+              "q1": 1160.65,
+              "q3": 1175.41,
+              "minimum": 1156.48,
+              "maximum": 1180.31
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 667.21,
+              "q1": 665.74,
+              "q3": 674.79,
+              "minimum": 664.86,
+              "maximum": 680.89
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 163.68,
+              "q1": 163.32,
+              "q3": 168.31,
+              "minimum": 161.06,
+              "maximum": 169.04
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 163.68,
+              "q1": 163.32,
+              "q3": 168.31,
+              "minimum": 161.06,
+              "maximum": 169.04
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 492.61,
+              "q1": 489.87,
+              "q3": 496.37,
+              "minimum": 488.1,
+              "maximum": 508.26
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 341.0,
+              "q1": 339.04,
+              "q3": 342.85,
+              "minimum": 337.54,
+              "maximum": 346.12
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.43,
+              "q1": 20.08,
+              "q3": 20.66,
+              "minimum": 19.43,
+              "maximum": 20.92
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.0,
+              "q1": 206.51,
+              "q3": 209.05,
+              "minimum": 203.17,
+              "maximum": 214.69
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.83,
+              "q1": 13.76,
+              "q3": 13.87,
+              "minimum": 13.72,
+              "maximum": 13.87
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.5,
+              "q1": 1.5,
+              "q3": 1.51,
+              "minimum": 1.49,
+              "maximum": 1.6
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.51,
+              "q1": 6.47,
+              "q3": 6.57,
+              "minimum": 6.43,
+              "maximum": 6.7
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.66,
+              "q1": 50.36,
+              "q3": 52.19,
+              "minimum": 49.62,
+              "maximum": 53.19
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.0,
+              "q1": 114.36,
+              "q3": 116.81,
+              "minimum": 112.96,
+              "maximum": 119.39
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 129.26,
+              "q1": 128.96,
+              "q3": 130.23,
+              "minimum": 128.05,
+              "maximum": 131.0
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 145.47,
+              "q1": 144.98,
+              "q3": 146.37,
+              "minimum": 144.18,
+              "maximum": 148.79
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.4,
+              "q1": 4.39,
+              "q3": 4.47,
+              "minimum": 4.37,
+              "maximum": 4.72
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 489.23,
+              "q1": 488.57,
+              "q3": 492.92,
+              "minimum": 484.01,
+              "maximum": 534.52
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 489.23,
+              "q1": 488.57,
+              "q3": 492.92,
+              "minimum": 484.01,
+              "maximum": 534.52
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1165.15,
+              "q1": 1161.53,
+              "q3": 1167.65,
+              "minimum": 1158.63,
+              "maximum": 1227.1
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1165.15,
+              "q1": 1161.51,
+              "q3": 1167.65,
+              "minimum": 1158.63,
+              "maximum": 1227.1
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 669.1,
+              "q1": 668.67,
+              "q3": 672.48,
+              "minimum": 664.19,
+              "maximum": 718.39
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 163.51,
+              "q1": 163.12,
+              "q3": 164.24,
+              "minimum": 162.31,
+              "maximum": 167.15
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 163.51,
+              "q1": 163.12,
+              "q3": 164.24,
+              "minimum": 162.31,
+              "maximum": 167.15
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 492.49,
+              "q1": 491.54,
+              "q3": 494.61,
+              "minimum": 488.19,
+              "maximum": 506.19
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 340.7,
+              "q1": 340.0,
+              "q3": 342.15,
+              "minimum": 337.04,
+              "maximum": 347.0
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.4,
+              "q1": 20.36,
+              "q3": 20.84,
+              "minimum": 19.65,
+              "maximum": 23.45
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.57,
+              "q1": 208.37,
+              "q3": 212.7,
+              "minimum": 207.54,
+              "maximum": 215.04
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.85,
+              "q1": 13.81,
+              "q3": 13.94,
+              "minimum": 13.78,
+              "maximum": 13.94
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.49,
+              "q1": 1.49,
+              "q3": 1.5,
+              "minimum": 1.48,
+              "maximum": 1.56
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.42,
+              "q1": 6.41,
+              "q3": 6.46,
+              "minimum": 6.41,
+              "maximum": 6.6
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 52.09,
+              "q1": 51.54,
+              "q3": 53.16,
+              "minimum": 50.87,
+              "maximum": 53.46
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 115.96,
+              "q1": 115.56,
+              "q3": 116.59,
+              "minimum": 112.96,
+              "maximum": 119.19
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.74,
+              "q1": 128.46,
+              "q3": 128.83,
+              "minimum": 128.23,
+              "maximum": 129.55
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 145.79,
+              "q1": 144.89,
+              "q3": 146.65,
+              "minimum": 144.21,
+              "maximum": 150.99
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.42,
+              "q1": 4.39,
+              "q3": 4.44,
+              "minimum": 4.37,
+              "maximum": 4.52
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-sample_buffer-nvvm-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1606.6617853939533,
+          "q1": 1600.0566752627492,
+          "q3": 1611.9378386065364,
+          "minimum": 1594.8096252977848,
+          "maximum": 1632.2355885058641
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 487.395,
+          "q1": 486.0325,
+          "q3": 489.73,
+          "minimum": 479.71,
+          "maximum": 496.11
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1606.7511029541492,
+            "q1": 1604.7822032123804,
+            "q3": 1609.2173904180527,
+            "minimum": 1595.9159042686224,
+            "maximum": 1632.2355885058641
+          },
+          {
+            "n": 9,
+            "median": 1605.387018993497,
+            "q1": 1597.3004009574652,
+            "q3": 1612.1579501777887,
+            "minimum": 1594.8096252977848,
+            "maximum": 1617.7350357174873
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 487.395,
+            "q1": 486.0325,
+            "q3": 489.73,
+            "minimum": 479.71,
+            "maximum": 496.11
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 487.395,
+            "q1": 486.0325,
+            "q3": 489.72249999999997,
+            "minimum": 479.71,
+            "maximum": 496.11
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1327.79,
+            "q1": 1321.9725,
+            "q3": 1331.0325000000003,
+            "minimum": 1314.23,
+            "maximum": 1347.97
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1327.79,
+            "q1": 1321.9650000000001,
+            "q3": 1331.0325000000003,
+            "minimum": 1314.23,
+            "maximum": 1347.97
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 667.9449999999999,
+            "q1": 667.09,
+            "q3": 670.7349999999999,
+            "minimum": 658.75,
+            "maximum": 683.19
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 164.25,
+            "q1": 163.04000000000002,
+            "q3": 164.695,
+            "minimum": 160.51,
+            "maximum": 174.01
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 164.25,
+            "q1": 163.04000000000002,
+            "q3": 164.695,
+            "minimum": 160.51,
+            "maximum": 174.0
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 655.13,
+            "q1": 653.595,
+            "q3": 658.3075,
+            "minimum": 650.09,
+            "maximum": 668.98
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 338.85,
+            "q1": 338.0325,
+            "q3": 339.685,
+            "minimum": 335.69,
+            "maximum": 345.81
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.035,
+            "q1": 19.7975,
+            "q3": 20.115000000000002,
+            "minimum": 19.28,
+            "maximum": 20.7
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 207.805,
+            "q1": 205.79000000000002,
+            "q3": 209.485,
+            "minimum": 202.65,
+            "maximum": 217.23
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 13.8,
+            "q1": 13.75,
+            "q3": 13.905,
+            "minimum": 13.58,
+            "maximum": 14.17
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.51,
+            "q1": 1.5,
+            "q3": 1.5175,
+            "minimum": 1.49,
+            "maximum": 1.56
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.44,
+            "q1": 6.4125,
+            "q3": 6.4575,
+            "minimum": 6.37,
+            "maximum": 6.53
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.489999999999995,
+            "q1": 50.98,
+            "q3": 51.847500000000004,
+            "minimum": 50.45,
+            "maximum": 55.1
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 114.945,
+            "q1": 114.615,
+            "q3": 117.01750000000001,
+            "minimum": 112.49,
+            "maximum": 120.98
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 128.845,
+            "q1": 128.53250000000003,
+            "q3": 129.04500000000002,
+            "minimum": 127.55,
+            "maximum": 132.69
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 144.935,
+            "q1": 144.695,
+            "q3": 145.7025,
+            "minimum": 143.01,
+            "maximum": 149.87
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.39,
+            "q1": 4.362500000000001,
+            "q3": 4.42,
+            "minimum": 4.33,
+            "maximum": 4.53
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 487.75,
+              "q1": 486.7,
+              "q3": 490.04,
+              "minimum": 479.71,
+              "maximum": 495.74
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 487.75,
+              "q1": 486.7,
+              "q3": 490.03,
+              "minimum": 479.71,
+              "maximum": 495.74
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1328.62,
+              "q1": 1323.51,
+              "q3": 1329.9,
+              "minimum": 1314.23,
+              "maximum": 1347.97
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1328.62,
+              "q1": 1323.51,
+              "q3": 1329.9,
+              "minimum": 1314.23,
+              "maximum": 1347.97
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 669.56,
+              "q1": 667.62,
+              "q3": 671.06,
+              "minimum": 658.75,
+              "maximum": 676.61
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 164.29,
+              "q1": 163.48,
+              "q3": 164.71,
+              "minimum": 162.72,
+              "maximum": 165.83
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 164.29,
+              "q1": 163.48,
+              "q3": 164.71,
+              "minimum": 162.72,
+              "maximum": 165.82
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 656.5,
+              "q1": 653.59,
+              "q3": 658.61,
+              "minimum": 652.33,
+              "maximum": 668.98
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 339.1,
+              "q1": 337.99,
+              "q3": 339.69,
+              "minimum": 336.35,
+              "maximum": 345.81
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.08,
+              "q1": 19.82,
+              "q3": 20.27,
+              "minimum": 19.39,
+              "maximum": 20.67
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 207.73,
+              "q1": 205.33,
+              "q3": 208.5,
+              "minimum": 204.68,
+              "maximum": 217.23
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.79,
+              "q1": 13.69,
+              "q3": 13.86,
+              "minimum": 13.58,
+              "maximum": 14.17
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.51,
+              "q1": 1.5,
+              "q3": 1.53,
+              "minimum": 1.49,
+              "maximum": 1.56
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.44,
+              "q1": 6.41,
+              "q3": 6.45,
+              "minimum": 6.37,
+              "maximum": 6.47
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.73,
+              "q1": 51.01,
+              "q3": 51.85,
+              "minimum": 50.58,
+              "maximum": 55.1
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 114.73,
+              "q1": 114.69,
+              "q3": 115.01,
+              "minimum": 112.53,
+              "maximum": 120.98
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.99,
+              "q1": 128.57,
+              "q3": 129.35,
+              "minimum": 127.55,
+              "maximum": 132.69
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 144.86,
+              "q1": 144.69,
+              "q3": 145.47,
+              "minimum": 143.01,
+              "maximum": 145.82
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.38,
+              "q1": 4.36,
+              "q3": 4.42,
+              "minimum": 4.33,
+              "maximum": 4.47
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 486.6,
+              "q1": 485.89,
+              "q3": 488.41,
+              "minimum": 482.16,
+              "maximum": 496.11
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 486.6,
+              "q1": 485.89,
+              "q3": 488.41,
+              "minimum": 482.16,
+              "maximum": 496.11
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1325.37,
+              "q1": 1321.67,
+              "q3": 1331.41,
+              "minimum": 1317.1,
+              "maximum": 1339.27
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1325.37,
+              "q1": 1321.66,
+              "q3": 1331.41,
+              "minimum": 1317.09,
+              "maximum": 1339.27
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 667.77,
+              "q1": 664.88,
+              "q3": 669.76,
+              "minimum": 659.13,
+              "maximum": 683.19
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 163.19,
+              "q1": 162.47,
+              "q3": 164.65,
+              "minimum": 160.51,
+              "maximum": 174.01
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 163.19,
+              "q1": 162.47,
+              "q3": 164.65,
+              "minimum": 160.51,
+              "maximum": 174.0
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 654.58,
+              "q1": 653.75,
+              "q3": 655.79,
+              "minimum": 650.09,
+              "maximum": 660.96
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 338.6,
+              "q1": 338.16,
+              "q3": 339.56,
+              "minimum": 335.69,
+              "maximum": 344.05
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 19.9,
+              "q1": 19.63,
+              "q3": 20.08,
+              "minimum": 19.28,
+              "maximum": 20.7
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.57,
+              "q1": 206.93,
+              "q3": 209.53,
+              "minimum": 202.65,
+              "maximum": 210.36
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 13.81,
+              "q1": 13.75,
+              "q3": 13.92,
+              "minimum": 13.73,
+              "maximum": 14.11
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.51,
+              "q1": 1.5,
+              "q3": 1.51,
+              "minimum": 1.5,
+              "maximum": 1.52
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.45,
+              "q1": 6.44,
+              "q3": 6.46,
+              "minimum": 6.4,
+              "maximum": 6.53
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.41,
+              "q1": 50.97,
+              "q3": 51.84,
+              "minimum": 50.45,
+              "maximum": 52.87
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 115.53,
+              "q1": 113.88,
+              "q3": 117.2,
+              "minimum": 112.49,
+              "maximum": 117.64
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.81,
+              "q1": 128.16,
+              "q3": 128.94,
+              "minimum": 128.01,
+              "maximum": 129.9
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 145.14,
+              "q1": 144.71,
+              "q3": 146.28,
+              "minimum": 143.84,
+              "maximum": 149.87
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.39,
+              "q1": 4.39,
+              "q3": 4.42,
+              "minimum": 4.33,
+              "maximum": 4.53
+            }
+          }
+        ]
+      }
+    },
+    "candidate": {
+      "tiled-brass-material-eval_buffer-nvrtc-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1338.902403600514,
+          "q1": 1333.5215831175447,
+          "q3": 1342.1752694994211,
+          "minimum": 1322.9444697499275,
+          "maximum": 1383.2629788666964
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 403.30499999999995,
+          "q1": 400.99249999999995,
+          "q3": 405.61,
+          "minimum": 398.38,
+          "maximum": 447.58
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1338.8668727129698,
+            "q1": 1331.5635826438665,
+            "q3": 1358.5908357053995,
+            "minimum": 1322.9444697499275,
+            "maximum": 1383.2629788666964
+          },
+          {
+            "n": 9,
+            "median": 1338.937934488058,
+            "q1": 1333.8326718658209,
+            "q3": 1340.6662605702877,
+            "minimum": 1332.5824607163668,
+            "maximum": 1343.7978010624647
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 403.30499999999995,
+            "q1": 400.99249999999995,
+            "q3": 405.61,
+            "minimum": 398.38,
+            "maximum": 447.58
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 403.29999999999995,
+            "q1": 400.99249999999995,
+            "q3": 405.61,
+            "minimum": 398.38,
+            "maximum": 447.58
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1048.6999999999998,
+            "q1": 1042.25,
+            "q3": 1057.3275,
+            "minimum": 1037.3,
+            "maximum": 1095.1
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 18,
+            "median": 334.355,
+            "q1": 332.775,
+            "q3": 337.4175,
+            "minimum": 331.62,
+            "maximum": 350.44
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1048.6999999999998,
+            "q1": 1042.25,
+            "q3": 1057.3275,
+            "minimum": 1037.3,
+            "maximum": 1095.1
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 565.21,
+            "q1": 563.5450000000001,
+            "q3": 573.345,
+            "minimum": 561.91,
+            "maximum": 611.62
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 147.48000000000002,
+            "q1": 147.10750000000002,
+            "q3": 151.7475,
+            "minimum": 146.16,
+            "maximum": 154.52
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 147.48000000000002,
+            "q1": 147.10750000000002,
+            "q3": 151.7475,
+            "minimum": 146.16,
+            "maximum": 154.52
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 476.495,
+            "q1": 474.625,
+            "q3": 482.515,
+            "minimum": 471.7,
+            "maximum": 497.32
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 326.825,
+            "q1": 325.255,
+            "q3": 329.22749999999996,
+            "minimum": 324.15,
+            "maximum": 339.2
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.965,
+            "q1": 20.685000000000002,
+            "q3": 21.21,
+            "minimum": 20.37,
+            "maximum": 26.01
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 211.79,
+            "q1": 208.57750000000001,
+            "q3": 213.6925,
+            "minimum": 206.0,
+            "maximum": 218.22
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 12.405000000000001,
+            "q1": 12.3225,
+            "q3": 12.4825,
+            "minimum": 12.2,
+            "maximum": 13.77
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.28,
+            "q1": 1.28,
+            "q3": 1.31,
+            "minimum": 1.27,
+            "maximum": 1.4
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.27,
+            "q1": 6.235,
+            "q3": 6.34,
+            "minimum": 6.2,
+            "maximum": 6.52
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 52.364999999999995,
+            "q1": 51.345,
+            "q3": 53.1225,
+            "minimum": 49.96,
+            "maximum": 54.18
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 117.53999999999999,
+            "q1": 116.09,
+            "q3": 118.8575,
+            "minimum": 113.54,
+            "maximum": 122.96
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 121.24000000000001,
+            "q1": 120.965,
+            "q3": 122.0325,
+            "minimum": 120.5,
+            "maximum": 126.04
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 138.1,
+            "q1": 137.58249999999998,
+            "q3": 138.8325,
+            "minimum": 137.03,
+            "maximum": 147.21
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.305,
+            "q1": 4.2749999999999995,
+            "q3": 4.3625,
+            "minimum": 4.24,
+            "maximum": 4.79
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 404.16,
+              "q1": 400.9,
+              "q3": 405.87,
+              "minimum": 400.44,
+              "maximum": 447.58
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 404.16,
+              "q1": 400.9,
+              "q3": 405.87,
+              "minimum": 400.44,
+              "maximum": 447.58
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1057.49,
+              "q1": 1047.78,
+              "q3": 1072.8,
+              "minimum": 1037.3,
+              "maximum": 1095.1
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 337.86,
+              "q1": 334.61,
+              "q3": 338.9,
+              "minimum": 331.62,
+              "maximum": 350.44
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1057.49,
+              "q1": 1047.78,
+              "q3": 1072.8,
+              "minimum": 1037.3,
+              "maximum": 1095.1
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 573.2,
+              "q1": 563.48,
+              "q3": 573.41,
+              "minimum": 561.91,
+              "maximum": 611.62
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 148.67,
+              "q1": 147.34,
+              "q3": 153.06,
+              "minimum": 146.16,
+              "maximum": 154.52
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 148.67,
+              "q1": 147.34,
+              "q3": 153.06,
+              "minimum": 146.16,
+              "maximum": 154.52
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 481.81,
+              "q1": 479.39,
+              "q3": 483.47,
+              "minimum": 471.7,
+              "maximum": 497.32
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 329.44,
+              "q1": 327.15,
+              "q3": 331.2,
+              "minimum": 324.15,
+              "maximum": 339.2
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 21.06,
+              "q1": 20.64,
+              "q3": 21.23,
+              "minimum": 20.37,
+              "maximum": 26.01
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.72,
+              "q1": 207.02,
+              "q3": 211.57,
+              "minimum": 206.0,
+              "maximum": 216.51
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.44,
+              "q1": 12.29,
+              "q3": 12.46,
+              "minimum": 12.2,
+              "maximum": 12.8
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.31,
+              "q1": 1.28,
+              "q3": 1.31,
+              "minimum": 1.27,
+              "maximum": 1.33
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.26,
+              "q1": 6.25,
+              "q3": 6.39,
+              "minimum": 6.23,
+              "maximum": 6.52
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.66,
+              "q1": 51.15,
+              "q3": 52.13,
+              "minimum": 49.96,
+              "maximum": 54.18
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.02,
+              "q1": 114.95,
+              "q3": 117.49,
+              "minimum": 113.54,
+              "maximum": 121.62
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 121.84,
+              "q1": 121.34,
+              "q3": 124.67,
+              "minimum": 120.96,
+              "maximum": 126.04
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 138.75,
+              "q1": 137.62,
+              "q3": 138.88,
+              "minimum": 137.12,
+              "maximum": 147.21
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.33,
+              "q1": 4.29,
+              "q3": 4.43,
+              "minimum": 4.24,
+              "maximum": 4.79
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 403.09,
+              "q1": 401.27,
+              "q3": 404.03,
+              "minimum": 398.38,
+              "maximum": 413.86
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 403.09,
+              "q1": 401.27,
+              "q3": 404.03,
+              "minimum": 398.38,
+              "maximum": 413.86
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1042.97,
+              "q1": 1042.18,
+              "q3": 1049.62,
+              "minimum": 1039.07,
+              "maximum": 1056.84
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 332.94,
+              "q1": 332.61,
+              "q3": 334.1,
+              "minimum": 331.69,
+              "maximum": 335.89
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1042.97,
+              "q1": 1042.18,
+              "q3": 1049.62,
+              "minimum": 1039.07,
+              "maximum": 1056.84
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 564.82,
+              "q1": 564.32,
+              "q3": 566.86,
+              "minimum": 563.0,
+              "maximum": 581.37
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 147.25,
+              "q1": 147.06,
+              "q3": 148.39,
+              "minimum": 146.25,
+              "maximum": 152.57
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 147.25,
+              "q1": 147.06,
+              "q3": 148.39,
+              "minimum": 146.25,
+              "maximum": 152.57
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 475.73,
+              "q1": 474.14,
+              "q3": 475.99,
+              "minimum": 473.33,
+              "maximum": 483.43
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 325.39,
+              "q1": 325.13,
+              "q3": 326.5,
+              "minimum": 324.24,
+              "maximum": 328.4
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.84,
+              "q1": 20.73,
+              "q3": 21.18,
+              "minimum": 20.57,
+              "maximum": 21.4
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 213.61,
+              "q1": 212.01,
+              "q3": 214.8,
+              "minimum": 208.22,
+              "maximum": 218.22
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.38,
+              "q1": 12.33,
+              "q3": 12.49,
+              "minimum": 12.22,
+              "maximum": 13.77
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.28,
+              "q1": 1.28,
+              "q3": 1.31,
+              "minimum": 1.27,
+              "maximum": 1.4
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.28,
+              "q1": 6.23,
+              "q3": 6.33,
+              "minimum": 6.2,
+              "maximum": 6.45
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 52.77,
+              "q1": 52.58,
+              "q3": 53.19,
+              "minimum": 50.65,
+              "maximum": 53.43
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 118.64,
+              "q1": 117.69,
+              "q3": 119.94,
+              "minimum": 116.3,
+              "maximum": 122.96
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 120.98,
+              "q1": 120.86,
+              "q3": 121.14,
+              "minimum": 120.5,
+              "maximum": 122.07
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 138.06,
+              "q1": 137.57,
+              "q3": 138.13,
+              "minimum": 137.03,
+              "maximum": 141.51
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.29,
+              "q1": 4.27,
+              "q3": 4.32,
+              "minimum": 4.26,
+              "maximum": 4.37
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-eval_buffer-nvvm-o0": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1312.4380726367235,
+          "q1": 1301.9520076923072,
+          "q3": 1353.0088071711361,
+          "minimum": 1282.391706481576,
+          "maximum": 1390.6654361635447
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 413.405,
+          "q1": 401.8425,
+          "q3": 418.4325,
+          "minimum": 398.3,
+          "maximum": 456.93
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1353.883445262909,
+            "q1": 1336.1015655100346,
+            "q3": 1378.9705596864223,
+            "minimum": 1310.4440495371819,
+            "maximum": 1390.6654361635447
+          },
+          {
+            "n": 9,
+            "median": 1300.9780794382095,
+            "q1": 1293.7012165784836,
+            "q3": 1305.8333527296782,
+            "minimum": 1282.391706481576,
+            "maximum": 1314.4320957362652
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 413.405,
+            "q1": 401.8425,
+            "q3": 418.4325,
+            "minimum": 398.3,
+            "maximum": 456.93
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 413.405,
+            "q1": 401.8425,
+            "q3": 418.4325,
+            "minimum": 398.3,
+            "maximum": 456.93
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1031.63,
+            "q1": 1018.0274999999999,
+            "q3": 1054.85,
+            "minimum": 1008.14,
+            "maximum": 1108.32
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1031.63,
+            "q1": 1018.0274999999999,
+            "q3": 1054.85,
+            "minimum": 1008.14,
+            "maximum": 1108.32
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 576.88,
+            "q1": 563.4475,
+            "q3": 589.1750000000001,
+            "minimum": 559.62,
+            "maximum": 623.93
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 149.83499999999998,
+            "q1": 146.69,
+            "q3": 153.44,
+            "minimum": 144.73,
+            "maximum": 181.17
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 149.83499999999998,
+            "q1": 146.69,
+            "q3": 153.4375,
+            "minimum": 144.73,
+            "maximum": 181.17
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 455.65,
+            "q1": 450.2025,
+            "q3": 465.80749999999995,
+            "minimum": 446.39,
+            "maximum": 487.77
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 323.995,
+            "q1": 320.69,
+            "q3": 330.44500000000005,
+            "minimum": 318.0,
+            "maximum": 355.68
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.085,
+            "q1": 19.8325,
+            "q3": 20.799999999999997,
+            "minimum": 19.62,
+            "maximum": 30.7
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 212.31,
+            "q1": 207.91,
+            "q3": 214.1775,
+            "minimum": 203.24,
+            "maximum": 228.78
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 12.38,
+            "q1": 12.2725,
+            "q3": 12.4725,
+            "minimum": 12.18,
+            "maximum": 17.07
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.275,
+            "q1": 1.2625000000000002,
+            "q3": 1.29,
+            "minimum": 1.26,
+            "maximum": 1.41
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.285,
+            "q1": 6.255,
+            "q3": 6.484999999999999,
+            "minimum": 6.23,
+            "maximum": 8.91
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 52.085,
+            "q1": 50.89,
+            "q3": 53.22,
+            "minimum": 49.82,
+            "maximum": 57.73
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 117.645,
+            "q1": 115.76749999999998,
+            "q3": 119.355,
+            "minimum": 113.55,
+            "maximum": 129.25
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 122.195,
+            "q1": 121.16250000000001,
+            "q3": 125.09,
+            "minimum": 120.43,
+            "maximum": 133.11
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 138.95,
+            "q1": 138.005,
+            "q3": 142.685,
+            "minimum": 137.26,
+            "maximum": 147.74
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.425,
+            "q1": 4.39,
+            "q3": 4.487500000000001,
+            "minimum": 4.34,
+            "maximum": 5.33
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 418.59,
+              "q1": 417.57,
+              "q3": 421.01,
+              "minimum": 414.2,
+              "maximum": 456.93
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 418.59,
+              "q1": 417.57,
+              "q3": 421.01,
+              "minimum": 414.2,
+              "maximum": 456.93
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1055.0,
+              "q1": 1052.2,
+              "q3": 1069.62,
+              "minimum": 1036.05,
+              "maximum": 1108.32
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1055.0,
+              "q1": 1052.2,
+              "q3": 1069.62,
+              "minimum": 1036.05,
+              "maximum": 1108.32
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 589.35,
+              "q1": 585.78,
+              "q3": 596.66,
+              "minimum": 578.84,
+              "maximum": 623.93
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 153.97,
+              "q1": 151.65,
+              "q3": 157.11,
+              "minimum": 149.73,
+              "maximum": 181.17
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 153.97,
+              "q1": 151.65,
+              "q3": 157.11,
+              "minimum": 149.73,
+              "maximum": 181.17
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 466.38,
+              "q1": 461.4,
+              "q3": 476.15,
+              "minimum": 455.1,
+              "maximum": 487.77
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 330.6,
+              "q1": 328.15,
+              "q3": 333.52,
+              "minimum": 322.38,
+              "maximum": 355.68
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.0,
+              "q1": 19.79,
+              "q3": 20.5,
+              "minimum": 19.62,
+              "maximum": 30.7
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 213.18,
+              "q1": 212.24,
+              "q3": 219.07,
+              "minimum": 207.89,
+              "maximum": 228.78
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.41,
+              "q1": 12.26,
+              "q3": 12.53,
+              "minimum": 12.18,
+              "maximum": 17.07
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.27,
+              "q1": 1.26,
+              "q3": 1.29,
+              "minimum": 1.26,
+              "maximum": 1.41
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.53,
+              "q1": 6.28,
+              "q3": 6.78,
+              "minimum": 6.24,
+              "maximum": 8.91
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 53.29,
+              "q1": 50.89,
+              "q3": 54.94,
+              "minimum": 49.82,
+              "maximum": 57.73
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 119.41,
+              "q1": 118.21,
+              "q3": 121.33,
+              "minimum": 113.7,
+              "maximum": 129.25
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 125.21,
+              "q1": 124.51,
+              "q3": 126.48,
+              "minimum": 122.54,
+              "maximum": 133.11
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 140.75,
+              "q1": 139.52,
+              "q3": 143.37,
+              "minimum": 137.68,
+              "maximum": 147.74
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.46,
+              "q1": 4.42,
+              "q3": 4.5,
+              "minimum": 4.38,
+              "maximum": 5.11
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 401.76,
+              "q1": 401.23,
+              "q3": 403.23,
+              "minimum": 398.3,
+              "maximum": 412.61
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 401.76,
+              "q1": 401.23,
+              "q3": 403.23,
+              "minimum": 398.3,
+              "maximum": 412.61
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1017.92,
+              "q1": 1013.86,
+              "q3": 1019.99,
+              "minimum": 1008.14,
+              "maximum": 1027.21
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1017.92,
+              "q1": 1013.86,
+              "q3": 1019.99,
+              "minimum": 1008.14,
+              "maximum": 1027.21
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 562.96,
+              "q1": 561.8,
+              "q3": 565.83,
+              "minimum": 559.62,
+              "maximum": 574.92
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 146.48,
+              "q1": 145.56,
+              "q3": 147.43,
+              "minimum": 144.73,
+              "maximum": 149.94
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 146.48,
+              "q1": 145.56,
+              "q3": 147.43,
+              "minimum": 144.73,
+              "maximum": 149.94
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 450.14,
+              "q1": 448.61,
+              "q3": 451.29,
+              "minimum": 446.39,
+              "maximum": 456.88
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 320.65,
+              "q1": 319.26,
+              "q3": 321.94,
+              "minimum": 318.0,
+              "maximum": 327.81
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.17,
+              "q1": 19.88,
+              "q3": 20.9,
+              "minimum": 19.64,
+              "maximum": 21.45
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 207.97,
+              "q1": 207.04,
+              "q3": 212.38,
+              "minimum": 203.24,
+              "maximum": 214.4
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.38,
+              "q1": 12.28,
+              "q3": 12.43,
+              "minimum": 12.23,
+              "maximum": 12.48
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.28,
+              "q1": 1.27,
+              "q3": 1.29,
+              "minimum": 1.26,
+              "maximum": 1.39
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.28,
+              "q1": 6.25,
+              "q3": 6.29,
+              "minimum": 6.23,
+              "maximum": 6.35
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.42,
+              "q1": 50.89,
+              "q3": 52.7,
+              "minimum": 50.2,
+              "maximum": 53.01
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.77,
+              "q1": 115.12,
+              "q3": 117.08,
+              "minimum": 113.55,
+              "maximum": 118.86
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 121.12,
+              "q1": 120.59,
+              "q3": 121.38,
+              "minimum": 120.43,
+              "maximum": 121.85
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 138.35,
+              "q1": 137.87,
+              "q3": 138.61,
+              "minimum": 137.26,
+              "maximum": 144.27
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.39,
+              "q1": 4.39,
+              "q3": 4.45,
+              "minimum": 4.34,
+              "maximum": 5.33
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-eval_buffer-nvvm-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1394.2590029910207,
+          "q1": 1388.712193351239,
+          "q3": 1402.1882717497647,
+          "minimum": 1376.0665860027075,
+          "maximum": 1419.1681426018476
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 402.86,
+          "q1": 400.52750000000003,
+          "q3": 405.1475,
+          "minimum": 397.71,
+          "maximum": 412.46
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1393.8087541610003,
+            "q1": 1389.6210398525,
+            "q3": 1402.1675921976566,
+            "minimum": 1383.2832723855972,
+            "maximum": 1409.828195348382
+          },
+          {
+            "n": 9,
+            "median": 1397.4513933062553,
+            "q1": 1387.0518319308758,
+            "q3": 1406.3542634248734,
+            "minimum": 1376.0665860027075,
+            "maximum": 1419.1681426018476
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 402.86,
+            "q1": 400.52750000000003,
+            "q3": 405.1475,
+            "minimum": 397.71,
+            "maximum": 412.46
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 402.86,
+            "q1": 400.52750000000003,
+            "q3": 405.1475,
+            "minimum": 397.71,
+            "maximum": 412.46
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1115.74,
+            "q1": 1113.105,
+            "q3": 1122.4725,
+            "minimum": 1107.86,
+            "maximum": 1130.81
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1115.74,
+            "q1": 1113.105,
+            "q3": 1122.4725,
+            "minimum": 1107.86,
+            "maximum": 1130.81
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 564.025,
+            "q1": 561.575,
+            "q3": 568.62,
+            "minimum": 558.61,
+            "maximum": 579.6
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 147.29000000000002,
+            "q1": 146.48000000000002,
+            "q3": 147.79500000000002,
+            "minimum": 144.56,
+            "maximum": 152.36
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 147.29000000000002,
+            "q1": 146.48000000000002,
+            "q3": 147.79500000000002,
+            "minimum": 144.56,
+            "maximum": 152.36
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 549.29,
+            "q1": 547.9200000000001,
+            "q3": 551.9925,
+            "minimum": 546.5,
+            "maximum": 555.41
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 319.54999999999995,
+            "q1": 318.96999999999997,
+            "q3": 320.1825,
+            "minimum": 317.35,
+            "maximum": 323.67
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.055,
+            "q1": 19.8475,
+            "q3": 20.2525,
+            "minimum": 19.66,
+            "maximum": 20.64
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 208.07,
+            "q1": 206.7725,
+            "q3": 209.48000000000002,
+            "minimum": 202.37,
+            "maximum": 221.69
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 12.35,
+            "q1": 12.25,
+            "q3": 12.4,
+            "minimum": 12.14,
+            "maximum": 12.56
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.27,
+            "q1": 1.27,
+            "q3": 1.2774999999999999,
+            "minimum": 1.26,
+            "maximum": 1.3
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.295,
+            "q1": 6.2725,
+            "q3": 6.33,
+            "minimum": 6.22,
+            "maximum": 6.54
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.015,
+            "q1": 50.5075,
+            "q3": 51.397499999999994,
+            "minimum": 49.96,
+            "maximum": 53.93
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 116.56,
+            "q1": 115.3275,
+            "q3": 117.3425,
+            "minimum": 112.61,
+            "maximum": 126.04
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 120.95,
+            "q1": 120.80749999999999,
+            "q3": 121.125,
+            "minimum": 120.36,
+            "maximum": 123.07
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 137.62,
+            "q1": 137.4275,
+            "q3": 137.9,
+            "minimum": 136.33,
+            "maximum": 141.28
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.45,
+            "q1": 4.41,
+            "q3": 4.4775,
+            "minimum": 4.32,
+            "maximum": 4.6
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 401.09,
+              "q1": 399.59,
+              "q3": 403.12,
+              "minimum": 398.28,
+              "maximum": 410.11
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 401.09,
+              "q1": 399.59,
+              "q3": 403.12,
+              "minimum": 398.28,
+              "maximum": 410.11
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1114.32,
+              "q1": 1112.95,
+              "q3": 1117.97,
+              "minimum": 1107.86,
+              "maximum": 1129.95
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1114.32,
+              "q1": 1112.95,
+              "q3": 1117.97,
+              "minimum": 1107.86,
+              "maximum": 1129.95
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 563.23,
+              "q1": 561.32,
+              "q3": 566.08,
+              "minimum": 558.61,
+              "maximum": 572.39
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 146.71,
+              "q1": 146.43,
+              "q3": 147.75,
+              "minimum": 145.36,
+              "maximum": 148.86
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 146.71,
+              "q1": 146.43,
+              "q3": 147.75,
+              "minimum": 145.36,
+              "maximum": 148.86
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 549.39,
+              "q1": 547.12,
+              "q3": 552.36,
+              "minimum": 546.5,
+              "maximum": 555.41
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 319.75,
+              "q1": 318.94,
+              "q3": 319.95,
+              "minimum": 317.82,
+              "maximum": 323.67
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.04,
+              "q1": 19.79,
+              "q3": 20.23,
+              "minimum": 19.67,
+              "maximum": 20.64
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.44,
+              "q1": 206.96,
+              "q3": 209.57,
+              "minimum": 204.34,
+              "maximum": 221.69
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.37,
+              "q1": 12.36,
+              "q3": 12.42,
+              "minimum": 12.14,
+              "maximum": 12.52
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.27,
+              "q1": 1.27,
+              "q3": 1.28,
+              "minimum": 1.26,
+              "maximum": 1.3
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.29,
+              "q1": 6.28,
+              "q3": 6.31,
+              "minimum": 6.22,
+              "maximum": 6.35
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.01,
+              "q1": 50.39,
+              "q3": 51.4,
+              "minimum": 49.96,
+              "maximum": 53.17
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.53,
+              "q1": 115.84,
+              "q3": 119.52,
+              "minimum": 114.64,
+              "maximum": 126.04
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 121.0,
+              "q1": 120.84,
+              "q3": 121.08,
+              "minimum": 120.64,
+              "maximum": 121.41
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 137.47,
+              "q1": 137.42,
+              "q3": 137.84,
+              "minimum": 136.76,
+              "maximum": 141.28
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.45,
+              "q1": 4.38,
+              "q3": 4.47,
+              "minimum": 4.32,
+              "maximum": 4.48
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 403.7,
+              "q1": 400.95,
+              "q3": 407.54,
+              "minimum": 397.71,
+              "maximum": 412.46
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 403.7,
+              "q1": 400.95,
+              "q3": 407.54,
+              "minimum": 397.71,
+              "maximum": 412.46
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1119.98,
+              "q1": 1114.33,
+              "q3": 1122.9,
+              "minimum": 1109.06,
+              "maximum": 1130.81
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1119.98,
+              "q1": 1114.33,
+              "q3": 1122.9,
+              "minimum": 1109.06,
+              "maximum": 1130.81
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 566.86,
+              "q1": 563.02,
+              "q3": 570.26,
+              "minimum": 559.4,
+              "maximum": 579.6
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 147.62,
+              "q1": 146.87,
+              "q3": 148.1,
+              "minimum": 144.56,
+              "maximum": 152.36
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 147.62,
+              "q1": 146.87,
+              "q3": 148.1,
+              "minimum": 144.56,
+              "maximum": 152.36
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 549.19,
+              "q1": 548.76,
+              "q3": 550.31,
+              "minimum": 547.54,
+              "maximum": 553.93
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 319.46,
+              "q1": 319.06,
+              "q3": 320.68,
+              "minimum": 317.35,
+              "maximum": 323.01
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.16,
+              "q1": 19.89,
+              "q3": 20.26,
+              "minimum": 19.66,
+              "maximum": 20.5
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 207.85,
+              "q1": 206.43,
+              "q3": 209.21,
+              "minimum": 202.37,
+              "maximum": 214.93
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.25,
+              "q1": 12.2,
+              "q3": 12.35,
+              "minimum": 12.14,
+              "maximum": 12.56
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.27,
+              "q1": 1.27,
+              "q3": 1.27,
+              "minimum": 1.26,
+              "maximum": 1.29
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.3,
+              "q1": 6.27,
+              "q3": 6.36,
+              "minimum": 6.24,
+              "maximum": 6.54
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.02,
+              "q1": 50.65,
+              "q3": 51.39,
+              "minimum": 50.4,
+              "maximum": 53.93
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.59,
+              "q1": 114.52,
+              "q3": 116.71,
+              "minimum": 112.61,
+              "maximum": 119.96
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 120.89,
+              "q1": 120.8,
+              "q3": 121.14,
+              "minimum": 120.36,
+              "maximum": 123.07
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 137.67,
+              "q1": 137.56,
+              "q3": 137.92,
+              "minimum": 136.33,
+              "maximum": 141.12
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.45,
+              "q1": 4.42,
+              "q3": 4.56,
+              "minimum": 4.34,
+              "maximum": 4.6
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-sample_buffer-nvrtc-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1364.2110424116254,
+          "q1": 1356.9308556616306,
+          "q3": 1368.9834354445338,
+          "minimum": 1348.6306834965944,
+          "maximum": 1489.117132499814
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 405.57,
+          "q1": 402.3225,
+          "q3": 408.275,
+          "minimum": 398.5,
+          "maximum": 513.06
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1358.403181657195,
+            "q1": 1354.3585073202848,
+            "q3": 1362.505404278636,
+            "minimum": 1348.6306834965944,
+            "maximum": 1369.3794682621956
+          },
+          {
+            "n": 9,
+            "median": 1367.7953369915485,
+            "q1": 1365.4617089778185,
+            "q3": 1371.0905835032463,
+            "minimum": 1353.7738975137472,
+            "maximum": 1489.117132499814
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 405.57,
+            "q1": 402.3225,
+            "q3": 408.275,
+            "minimum": 398.5,
+            "maximum": 513.06
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 405.57,
+            "q1": 402.3225,
+            "q3": 408.275,
+            "minimum": 398.5,
+            "maximum": 513.06
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1074.615,
+            "q1": 1069.9950000000001,
+            "q3": 1084.5575,
+            "minimum": 1063.39,
+            "maximum": 1197.73
+          },
+          "emitEntryPointsSourceFromIR": {
+            "n": 18,
+            "median": 352.86,
+            "q1": 352.11,
+            "q3": 354.1875,
+            "minimum": 348.46,
+            "maximum": 364.51
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1074.6100000000001,
+            "q1": 1069.9950000000001,
+            "q3": 1084.5575,
+            "minimum": 1063.39,
+            "maximum": 1197.73
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 569.09,
+            "q1": 565.07,
+            "q3": 574.8199999999999,
+            "minimum": 560.99,
+            "maximum": 680.07
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 148.92000000000002,
+            "q1": 147.565,
+            "q3": 149.8,
+            "minimum": 146.22,
+            "maximum": 152.23
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 148.92000000000002,
+            "q1": 147.565,
+            "q3": 149.8,
+            "minimum": 146.22,
+            "maximum": 152.23
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 503.21500000000003,
+            "q1": 500.6675,
+            "q3": 505.3225,
+            "minimum": 494.89,
+            "maximum": 515.48
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 343.845,
+            "q1": 343.0375,
+            "q3": 345.155,
+            "minimum": 339.59,
+            "maximum": 355.39
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.8,
+            "q1": 20.575,
+            "q3": 21.005,
+            "minimum": 20.39,
+            "maximum": 28.03
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 209.34,
+            "q1": 208.18,
+            "q3": 211.97,
+            "minimum": 203.49,
+            "maximum": 217.15
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 12.379999999999999,
+            "q1": 12.3,
+            "q3": 12.517499999999998,
+            "minimum": 12.2,
+            "maximum": 16.39
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.49,
+            "q1": 1.48,
+            "q3": 1.5,
+            "minimum": 1.47,
+            "maximum": 1.54
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.445,
+            "q1": 6.422499999999999,
+            "q3": 6.4775,
+            "minimum": 6.4,
+            "maximum": 6.71
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.41,
+            "q1": 51.06,
+            "q3": 52.4825,
+            "minimum": 50.21,
+            "maximum": 53.1
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 117.805,
+            "q1": 117.13,
+            "q3": 119.125,
+            "minimum": 113.85,
+            "maximum": 121.08
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 128.465,
+            "q1": 128.08499999999998,
+            "q3": 128.9975,
+            "minimum": 127.37,
+            "maximum": 136.76
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 143.59,
+            "q1": 143.1425,
+            "q3": 144.1,
+            "minimum": 141.38,
+            "maximum": 145.69
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.335,
+            "q1": 4.3225,
+            "q3": 4.41,
+            "minimum": 4.27,
+            "maximum": 4.52
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 403.41,
+              "q1": 403.2,
+              "q3": 407.34,
+              "minimum": 398.5,
+              "maximum": 413.31
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 403.41,
+              "q1": 403.2,
+              "q3": 407.34,
+              "minimum": 398.5,
+              "maximum": 413.31
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1070.3,
+              "q1": 1067.38,
+              "q3": 1080.15,
+              "minimum": 1065.06,
+              "maximum": 1085.52
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 352.04,
+              "q1": 351.58,
+              "q3": 353.88,
+              "minimum": 348.46,
+              "maximum": 359.68
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1070.3,
+              "q1": 1067.38,
+              "q3": 1080.15,
+              "minimum": 1065.06,
+              "maximum": 1085.52
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 567.58,
+              "q1": 564.73,
+              "q3": 570.23,
+              "minimum": 563.23,
+              "maximum": 577.01
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 147.91,
+              "q1": 147.48,
+              "q3": 149.4,
+              "minimum": 146.22,
+              "maximum": 149.84
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 147.91,
+              "q1": 147.48,
+              "q3": 149.4,
+              "minimum": 146.22,
+              "maximum": 149.84
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 502.54,
+              "q1": 500.48,
+              "q3": 504.01,
+              "minimum": 494.89,
+              "maximum": 510.7
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 343.01,
+              "q1": 342.66,
+              "q3": 344.73,
+              "minimum": 339.59,
+              "maximum": 350.72
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.64,
+              "q1": 20.5,
+              "q3": 20.82,
+              "minimum": 20.39,
+              "maximum": 28.03
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 209.14,
+              "q1": 207.78,
+              "q3": 209.68,
+              "minimum": 203.49,
+              "maximum": 214.01
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.31,
+              "q1": 12.29,
+              "q3": 12.43,
+              "minimum": 12.22,
+              "maximum": 12.75
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.49,
+              "q1": 1.48,
+              "q3": 1.5,
+              "minimum": 1.47,
+              "maximum": 1.54
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.44,
+              "q1": 6.41,
+              "q3": 6.49,
+              "minimum": 6.4,
+              "maximum": 6.71
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.16,
+              "q1": 51.0,
+              "q3": 51.85,
+              "minimum": 50.21,
+              "maximum": 53.01
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 117.25,
+              "q1": 116.31,
+              "q3": 118.64,
+              "minimum": 113.85,
+              "maximum": 119.64
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.25,
+              "q1": 127.86,
+              "q3": 128.83,
+              "minimum": 127.4,
+              "maximum": 135.08
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 143.12,
+              "q1": 142.67,
+              "q3": 143.59,
+              "minimum": 141.38,
+              "maximum": 144.1
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.33,
+              "q1": 4.29,
+              "q3": 4.34,
+              "minimum": 4.27,
+              "maximum": 4.52
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 408.01,
+              "q1": 402.03,
+              "q3": 410.64,
+              "minimum": 399.54,
+              "maximum": 513.06
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 408.01,
+              "q1": 402.03,
+              "q3": 410.64,
+              "minimum": 399.54,
+              "maximum": 513.06
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1078.27,
+              "q1": 1072.8,
+              "q3": 1085.87,
+              "minimum": 1063.39,
+              "maximum": 1197.73
+            },
+            "emitEntryPointsSourceFromIR": {
+              "n": 9,
+              "median": 352.94,
+              "q1": 352.45,
+              "q3": 354.27,
+              "minimum": 352.32,
+              "maximum": 364.51
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1078.27,
+              "q1": 1072.8,
+              "q3": 1085.87,
+              "minimum": 1063.39,
+              "maximum": 1197.73
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 572.23,
+              "q1": 566.55,
+              "q3": 577.7,
+              "minimum": 560.99,
+              "maximum": 680.07
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 149.64,
+              "q1": 148.41,
+              "q3": 151.92,
+              "minimum": 146.52,
+              "maximum": 152.23
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 149.64,
+              "q1": 148.41,
+              "q3": 151.92,
+              "minimum": 146.52,
+              "maximum": 152.23
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 503.44,
+              "q1": 501.17,
+              "q3": 505.73,
+              "minimum": 500.28,
+              "maximum": 515.48
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 343.92,
+              "q1": 343.33,
+              "q3": 345.27,
+              "minimum": 343.12,
+              "maximum": 355.39
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.87,
+              "q1": 20.63,
+              "q3": 21.04,
+              "minimum": 20.51,
+              "maximum": 21.21
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 211.37,
+              "q1": 208.57,
+              "q3": 213.37,
+              "minimum": 207.02,
+              "maximum": 217.15
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.45,
+              "q1": 12.33,
+              "q3": 12.54,
+              "minimum": 12.2,
+              "maximum": 16.39
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.49,
+              "q1": 1.49,
+              "q3": 1.5,
+              "minimum": 1.48,
+              "maximum": 1.54
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.45,
+              "q1": 6.43,
+              "q3": 6.47,
+              "minimum": 6.41,
+              "maximum": 6.52
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.94,
+              "q1": 51.26,
+              "q3": 52.82,
+              "minimum": 50.43,
+              "maximum": 53.1
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 118.78,
+              "q1": 117.56,
+              "q3": 119.41,
+              "minimum": 114.9,
+              "maximum": 121.08
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.5,
+              "q1": 128.13,
+              "q3": 129.22,
+              "minimum": 127.37,
+              "maximum": 136.76
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 143.76,
+              "q1": 143.59,
+              "q3": 144.74,
+              "minimum": 143.21,
+              "maximum": 145.69
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.34,
+              "q1": 4.33,
+              "q3": 4.46,
+              "minimum": 4.3,
+              "maximum": 4.5
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-sample_buffer-nvvm-o0": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1340.3468010947108,
+          "q1": 1335.4903631843626,
+          "q3": 1347.5101995281875,
+          "minimum": 1323.4409801661968,
+          "maximum": 1415.0977246463299
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 405.32,
+          "q1": 402.3775,
+          "q3": 406.265,
+          "minimum": 397.65,
+          "maximum": 476.96
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1338.6221267282963,
+            "q1": 1334.7818441689014,
+            "q3": 1340.5503761023283,
+            "minimum": 1323.4409801661968,
+            "maximum": 1371.0302207618952
+          },
+          {
+            "n": 9,
+            "median": 1344.4128427654505,
+            "q1": 1339.3719550222158,
+            "q3": 1349.327215924859,
+            "minimum": 1326.93056948483,
+            "maximum": 1415.0977246463299
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 405.32,
+            "q1": 402.3775,
+            "q3": 406.265,
+            "minimum": 397.65,
+            "maximum": 476.96
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 405.32,
+            "q1": 402.3775,
+            "q3": 406.265,
+            "minimum": 397.65,
+            "maximum": 476.96
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1059.425,
+            "q1": 1054.7525,
+            "q3": 1062.6374999999998,
+            "minimum": 1046.74,
+            "maximum": 1134.99
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1059.425,
+            "q1": 1054.7525,
+            "q3": 1062.6374999999998,
+            "minimum": 1046.74,
+            "maximum": 1134.99
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 569.615,
+            "q1": 566.1875,
+            "q3": 571.645,
+            "minimum": 560.13,
+            "maximum": 644.13
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 149.64499999999998,
+            "q1": 148.845,
+            "q3": 150.32,
+            "minimum": 145.97,
+            "maximum": 152.27
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 149.64499999999998,
+            "q1": 148.845,
+            "q3": 150.3125,
+            "minimum": 145.97,
+            "maximum": 152.27
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 487.72,
+            "q1": 486.1425,
+            "q3": 488.33750000000003,
+            "minimum": 484.46,
+            "maximum": 496.42
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 336.105,
+            "q1": 335.1675,
+            "q3": 337.0975,
+            "minimum": 333.62,
+            "maximum": 338.31
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.09,
+            "q1": 19.655,
+            "q3": 20.23,
+            "minimum": 19.28,
+            "maximum": 20.58
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 208.71499999999997,
+            "q1": 206.7,
+            "q3": 210.26,
+            "minimum": 204.19,
+            "maximum": 218.95
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 12.41,
+            "q1": 12.33,
+            "q3": 12.4375,
+            "minimum": 12.21,
+            "maximum": 12.99
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.48,
+            "q1": 1.47,
+            "q3": 1.49,
+            "minimum": 1.46,
+            "maximum": 1.51
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.485,
+            "q1": 6.452500000000001,
+            "q3": 6.547499999999999,
+            "minimum": 6.38,
+            "maximum": 6.92
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.370000000000005,
+            "q1": 50.37,
+            "q3": 51.857499999999995,
+            "minimum": 49.58,
+            "maximum": 54.35
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 116.815,
+            "q1": 115.155,
+            "q3": 117.8175,
+            "minimum": 114.06,
+            "maximum": 121.74
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 127.845,
+            "q1": 127.58749999999999,
+            "q3": 128.4025,
+            "minimum": 127.09,
+            "maximum": 129.45
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 143.095,
+            "q1": 142.8425,
+            "q3": 143.70499999999998,
+            "minimum": 142.21,
+            "maximum": 144.29
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.3,
+            "q1": 4.29,
+            "q3": 4.35,
+            "minimum": 4.26,
+            "maximum": 4.51
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 403.37,
+              "q1": 402.82,
+              "q3": 405.59,
+              "minimum": 399.1,
+              "maximum": 414.37
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 403.37,
+              "q1": 402.82,
+              "q3": 405.59,
+              "minimum": 399.1,
+              "maximum": 414.36
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1058.02,
+              "q1": 1052.71,
+              "q3": 1060.3,
+              "minimum": 1046.74,
+              "maximum": 1078.21
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1058.01,
+              "q1": 1052.71,
+              "q3": 1060.3,
+              "minimum": 1046.74,
+              "maximum": 1078.21
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 567.91,
+              "q1": 564.4,
+              "q3": 570.47,
+              "minimum": 560.13,
+              "maximum": 579.66
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 149.39,
+              "q1": 147.46,
+              "q3": 150.0,
+              "minimum": 145.97,
+              "maximum": 152.27
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 149.39,
+              "q1": 147.46,
+              "q3": 150.0,
+              "minimum": 145.97,
+              "maximum": 152.27
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 486.18,
+              "q1": 486.0,
+              "q3": 487.75,
+              "minimum": 484.46,
+              "maximum": 496.42
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 335.06,
+              "q1": 333.85,
+              "q3": 336.95,
+              "minimum": 333.62,
+              "maximum": 337.35
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.13,
+              "q1": 19.64,
+              "q3": 20.23,
+              "minimum": 19.28,
+              "maximum": 20.41
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 209.64,
+              "q1": 205.55,
+              "q3": 211.02,
+              "minimum": 205.15,
+              "maximum": 218.95
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.42,
+              "q1": 12.33,
+              "q3": 12.44,
+              "minimum": 12.26,
+              "maximum": 12.57
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.48,
+              "q1": 1.47,
+              "q3": 1.48,
+              "minimum": 1.47,
+              "maximum": 1.51
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.46,
+              "q1": 6.45,
+              "q3": 6.5,
+              "minimum": 6.38,
+              "maximum": 6.62
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.28,
+              "q1": 50.87,
+              "q3": 51.97,
+              "minimum": 49.58,
+              "maximum": 54.35
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.94,
+              "q1": 115.26,
+              "q3": 117.87,
+              "minimum": 114.94,
+              "maximum": 121.74
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 127.73,
+              "q1": 127.15,
+              "q3": 127.97,
+              "minimum": 127.09,
+              "maximum": 129.45
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 142.91,
+              "q1": 142.55,
+              "q3": 142.98,
+              "minimum": 142.34,
+              "maximum": 143.88
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.3,
+              "q1": 4.27,
+              "q3": 4.31,
+              "minimum": 4.26,
+              "maximum": 4.51
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 405.43,
+              "q1": 402.23,
+              "q3": 407.35,
+              "minimum": 397.65,
+              "maximum": 476.96
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 405.43,
+              "q1": 402.23,
+              "q3": 407.35,
+              "minimum": 397.65,
+              "maximum": 476.96
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1060.92,
+              "q1": 1058.55,
+              "q3": 1063.05,
+              "minimum": 1051.39,
+              "maximum": 1134.99
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1060.92,
+              "q1": 1058.55,
+              "q3": 1063.05,
+              "minimum": 1051.39,
+              "maximum": 1134.99
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 570.0,
+              "q1": 568.03,
+              "q3": 571.99,
+              "minimum": 563.66,
+              "maximum": 644.13
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 149.72,
+              "q1": 149.63,
+              "q3": 150.9,
+              "minimum": 148.79,
+              "maximum": 151.6
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 149.72,
+              "q1": 149.63,
+              "q3": 150.9,
+              "minimum": 148.79,
+              "maximum": 151.6
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 488.3,
+              "q1": 487.24,
+              "q3": 488.67,
+              "minimum": 485.46,
+              "maximum": 490.31
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 336.2,
+              "q1": 335.82,
+              "q3": 337.22,
+              "minimum": 335.49,
+              "maximum": 338.31
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.05,
+              "q1": 19.7,
+              "q3": 20.23,
+              "minimum": 19.61,
+              "maximum": 20.58
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.21,
+              "q1": 207.39,
+              "q3": 208.73,
+              "minimum": 204.19,
+              "maximum": 214.73
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.4,
+              "q1": 12.33,
+              "q3": 12.43,
+              "minimum": 12.21,
+              "maximum": 12.99
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.49,
+              "q1": 1.47,
+              "q3": 1.49,
+              "minimum": 1.46,
+              "maximum": 1.51
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.51,
+              "q1": 6.48,
+              "q3": 6.55,
+              "minimum": 6.41,
+              "maximum": 6.92
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 51.46,
+              "q1": 50.36,
+              "q3": 51.64,
+              "minimum": 49.71,
+              "maximum": 53.13
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 116.76,
+              "q1": 115.03,
+              "q3": 116.89,
+              "minimum": 114.06,
+              "maximum": 118.56
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.2,
+              "q1": 127.73,
+              "q3": 128.46,
+              "minimum": 127.57,
+              "maximum": 129.24
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 143.66,
+              "q1": 143.19,
+              "q3": 144.17,
+              "minimum": 142.21,
+              "maximum": 144.29
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.3,
+              "q1": 4.29,
+              "q3": 4.35,
+              "minimum": 4.28,
+              "maximum": 4.43
+            }
+          }
+        ]
+      },
+      "tiled-brass-material-sample_buffer-nvvm-o3": {
+        "wall_ms": {
+          "n": 18,
+          "median": 1512.8792710602283,
+          "q1": 1495.0270606204867,
+          "q3": 1542.5092284567654,
+          "minimum": 1485.569354146719,
+          "maximum": 1594.8736164718866
+        },
+        "semantic_ms": {
+          "n": 18,
+          "median": 405.24,
+          "q1": 401.46,
+          "q3": 413.26,
+          "minimum": 396.56,
+          "maximum": 449.42
+        },
+        "round_wall_ms": [
+          {
+            "n": 9,
+            "median": 1543.2084817439318,
+            "q1": 1513.4950652718544,
+            "q3": 1550.9764924645424,
+            "minimum": 1496.5166691690683,
+            "maximum": 1594.8736164718866
+          },
+          {
+            "n": 9,
+            "median": 1494.9962422251701,
+            "q1": 1490.2892354875803,
+            "q3": 1511.5799754858017,
+            "minimum": 1485.569354146719,
+            "maximum": 1531.0624651610851
+          }
+        ],
+        "phase_ms": {
+          "SemanticChecking": {
+            "n": 18,
+            "median": 405.24,
+            "q1": 401.46,
+            "q3": 413.26,
+            "minimum": 396.56,
+            "maximum": 449.42
+          },
+          "checkAllTranslationUnits": {
+            "n": 18,
+            "median": 405.24,
+            "q1": 401.46,
+            "q3": 413.26,
+            "minimum": 396.56,
+            "maximum": 449.42
+          },
+          "compileInner": {
+            "n": 18,
+            "median": 1229.5100000000002,
+            "q1": 1218.1499999999999,
+            "q3": 1250.0800000000002,
+            "minimum": 1211.02,
+            "maximum": 1299.42
+          },
+          "endToEndActions": {
+            "n": 18,
+            "median": 1229.5100000000002,
+            "q1": 1218.1499999999999,
+            "q3": 1250.0775,
+            "minimum": 1211.02,
+            "maximum": 1299.41
+          },
+          "frontEndExecute": {
+            "n": 18,
+            "median": 570.92,
+            "q1": 565.2025,
+            "q3": 580.69,
+            "minimum": 557.98,
+            "maximum": 618.3
+          },
+          "generateIR": {
+            "n": 18,
+            "median": 149.47,
+            "q1": 147.85750000000002,
+            "q3": 151.3625,
+            "minimum": 145.06,
+            "maximum": 160.52
+          },
+          "generateIRForTranslationUnit": {
+            "n": 18,
+            "median": 149.47,
+            "q1": 147.85750000000002,
+            "q3": 151.3625,
+            "minimum": 145.06,
+            "maximum": 160.52
+          },
+          "generateOutput": {
+            "n": 18,
+            "median": 652.88,
+            "q1": 650.81,
+            "q3": 663.9275,
+            "minimum": 647.93,
+            "maximum": 696.0
+          },
+          "linkAndOptimizeIR": {
+            "n": 18,
+            "median": 336.84000000000003,
+            "q1": 335.15500000000003,
+            "q3": 338.8025,
+            "minimum": 333.64,
+            "maximum": 347.67
+          },
+          "linkIR": {
+            "n": 18,
+            "median": 20.07,
+            "q1": 19.625,
+            "q3": 20.53,
+            "minimum": 19.31,
+            "maximum": 24.68
+          },
+          "loadBuiltinModule": {
+            "n": 18,
+            "median": 209.64,
+            "q1": 208.12,
+            "q3": 217.565,
+            "minimum": 203.27,
+            "maximum": 232.79
+          },
+          "parseTranslationUnit": {
+            "n": 18,
+            "median": 12.34,
+            "q1": 12.305000000000001,
+            "q3": 12.4625,
+            "minimum": 12.24,
+            "maximum": 14.41
+          },
+          "performForceInlining": {
+            "n": 18,
+            "median": 1.4849999999999999,
+            "q1": 1.48,
+            "q3": 1.5,
+            "minimum": 1.46,
+            "maximum": 1.57
+          },
+          "performMandatoryEarlyInlining": {
+            "n": 18,
+            "median": 6.47,
+            "q1": 6.44,
+            "q3": 6.53,
+            "minimum": 6.38,
+            "maximum": 6.64
+          },
+          "readSerializedModuleAST": {
+            "n": 18,
+            "median": 51.94,
+            "q1": 50.935,
+            "q3": 53.8125,
+            "minimum": 49.57,
+            "maximum": 64.52
+          },
+          "readSerializedModuleIR": {
+            "n": 18,
+            "median": 117.33,
+            "q1": 115.24499999999999,
+            "q3": 121.08749999999999,
+            "minimum": 113.12,
+            "maximum": 130.61
+          },
+          "simplifyIR": {
+            "n": 18,
+            "median": 128.12,
+            "q1": 127.7625,
+            "q3": 128.705,
+            "minimum": 126.95,
+            "maximum": 137.99
+          },
+          "specializeModule": {
+            "n": 18,
+            "median": 143.31,
+            "q1": 142.5825,
+            "q3": 144.14,
+            "minimum": 141.82,
+            "maximum": 147.64
+          },
+          "unrollLoopsInModule": {
+            "n": 18,
+            "median": 4.325,
+            "q1": 4.3,
+            "q3": 4.39,
+            "minimum": 4.25,
+            "maximum": 4.6
+          }
+        },
+        "round_phase_ms": [
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 412.54,
+              "q1": 405.98,
+              "q3": 418.34,
+              "minimum": 401.45,
+              "maximum": 449.42
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 412.54,
+              "q1": 405.98,
+              "q3": 418.34,
+              "minimum": 401.45,
+              "maximum": 449.42
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1247.59,
+              "q1": 1227.64,
+              "q3": 1261.05,
+              "minimum": 1218.99,
+              "maximum": 1299.42
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1247.59,
+              "q1": 1227.64,
+              "q3": 1261.05,
+              "minimum": 1218.99,
+              "maximum": 1299.41
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 579.7,
+              "q1": 571.6,
+              "q3": 581.64,
+              "minimum": 564.89,
+              "maximum": 618.3
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 150.89,
+              "q1": 148.39,
+              "q3": 152.23,
+              "minimum": 147.71,
+              "maximum": 160.52
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 150.89,
+              "q1": 148.39,
+              "q3": 152.23,
+              "minimum": 147.71,
+              "maximum": 160.52
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 663.8,
+              "q1": 652.03,
+              "q3": 665.12,
+              "minimum": 651.56,
+              "maximum": 696.0
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 338.45,
+              "q1": 336.63,
+              "q3": 342.36,
+              "minimum": 335.68,
+              "maximum": 347.67
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 20.27,
+              "q1": 20.05,
+              "q3": 20.79,
+              "minimum": 19.57,
+              "maximum": 21.72
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 218.35,
+              "q1": 214.4,
+              "q3": 222.3,
+              "minimum": 207.18,
+              "maximum": 232.79
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.47,
+              "q1": 12.33,
+              "q3": 12.52,
+              "minimum": 12.29,
+              "maximum": 14.41
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.49,
+              "q1": 1.47,
+              "q3": 1.51,
+              "minimum": 1.46,
+              "maximum": 1.56
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.53,
+              "q1": 6.45,
+              "q3": 6.61,
+              "minimum": 6.41,
+              "maximum": 6.64
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 53.16,
+              "q1": 52.57,
+              "q3": 55.01,
+              "minimum": 50.93,
+              "maximum": 64.52
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 121.55,
+              "q1": 119.27,
+              "q3": 123.1,
+              "minimum": 115.13,
+              "maximum": 130.61
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 128.74,
+              "q1": 128.17,
+              "q3": 131.21,
+              "minimum": 127.61,
+              "maximum": 137.99
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 143.78,
+              "q1": 143.18,
+              "q3": 144.51,
+              "minimum": 142.5,
+              "maximum": 146.62
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.39,
+              "q1": 4.32,
+              "q3": 4.42,
+              "minimum": 4.28,
+              "maximum": 4.58
+            }
+          },
+          {
+            "SemanticChecking": {
+              "n": 9,
+              "median": 401.49,
+              "q1": 400.84,
+              "q3": 404.38,
+              "minimum": 396.56,
+              "maximum": 429.18
+            },
+            "checkAllTranslationUnits": {
+              "n": 9,
+              "median": 401.49,
+              "q1": 400.84,
+              "q3": 404.38,
+              "minimum": 396.56,
+              "maximum": 429.18
+            },
+            "compileInner": {
+              "n": 9,
+              "median": 1217.87,
+              "q1": 1214.52,
+              "q3": 1231.38,
+              "minimum": 1211.02,
+              "maximum": 1252.13
+            },
+            "endToEndActions": {
+              "n": 9,
+              "median": 1217.87,
+              "q1": 1214.52,
+              "q3": 1231.38,
+              "minimum": 1211.02,
+              "maximum": 1252.13
+            },
+            "frontEndExecute": {
+              "n": 9,
+              "median": 566.14,
+              "q1": 562.56,
+              "q3": 570.68,
+              "minimum": 557.98,
+              "maximum": 593.0
+            },
+            "generateIR": {
+              "n": 9,
+              "median": 148.85,
+              "q1": 147.01,
+              "q3": 150.53,
+              "minimum": 145.06,
+              "maximum": 151.42
+            },
+            "generateIRForTranslationUnit": {
+              "n": 9,
+              "median": 148.85,
+              "q1": 147.01,
+              "q3": 150.53,
+              "minimum": 145.06,
+              "maximum": 151.42
+            },
+            "generateOutput": {
+              "n": 9,
+              "median": 650.57,
+              "q1": 649.59,
+              "q3": 655.52,
+              "minimum": 647.93,
+              "maximum": 679.31
+            },
+            "linkAndOptimizeIR": {
+              "n": 9,
+              "median": 334.98,
+              "q1": 334.13,
+              "q3": 337.05,
+              "minimum": 333.64,
+              "maximum": 340.6
+            },
+            "linkIR": {
+              "n": 9,
+              "median": 19.67,
+              "q1": 19.44,
+              "q3": 20.12,
+              "minimum": 19.31,
+              "maximum": 24.68
+            },
+            "loadBuiltinModule": {
+              "n": 9,
+              "median": 208.15,
+              "q1": 206.02,
+              "q3": 208.56,
+              "minimum": 203.27,
+              "maximum": 211.06
+            },
+            "parseTranslationUnit": {
+              "n": 9,
+              "median": 12.32,
+              "q1": 12.3,
+              "q3": 12.34,
+              "minimum": 12.24,
+              "maximum": 12.44
+            },
+            "performForceInlining": {
+              "n": 9,
+              "median": 1.48,
+              "q1": 1.48,
+              "q3": 1.49,
+              "minimum": 1.46,
+              "maximum": 1.57
+            },
+            "performMandatoryEarlyInlining": {
+              "n": 9,
+              "median": 6.47,
+              "q1": 6.43,
+              "q3": 6.49,
+              "minimum": 6.38,
+              "maximum": 6.53
+            },
+            "readSerializedModuleAST": {
+              "n": 9,
+              "median": 50.95,
+              "q1": 50.39,
+              "q3": 51.86,
+              "minimum": 49.57,
+              "maximum": 54.03
+            },
+            "readSerializedModuleIR": {
+              "n": 9,
+              "median": 115.32,
+              "q1": 114.9,
+              "q3": 116.72,
+              "minimum": 113.12,
+              "maximum": 118.49
+            },
+            "simplifyIR": {
+              "n": 9,
+              "median": 127.8,
+              "q1": 127.55,
+              "q3": 127.98,
+              "minimum": 126.95,
+              "maximum": 128.6
+            },
+            "specializeModule": {
+              "n": 9,
+              "median": 143.04,
+              "q1": 142.22,
+              "q3": 143.46,
+              "minimum": 141.82,
+              "maximum": 147.64
+            },
+            "unrollLoopsInModule": {
+              "n": 9,
+              "median": 4.3,
+              "q1": 4.3,
+              "q3": 4.33,
+              "minimum": 4.25,
+              "maximum": 4.6
+            }
+          }
+        ]
+      }
+    }
+  },
+  "comparison": {
+    "candidate": {
+      "cells": {
+        "tiled-brass-material-eval_buffer-nvrtc-o3": {
+          "semantic_reduction_percent": 18.893726558807867,
+          "wall_reduction_percent": 8.092263294445235,
+          "round_wall_change_percent": [
+            -13.062969468084507,
+            -7.15208196965097
+          ]
+        },
+        "tiled-brass-material-eval_buffer-nvvm-o0": {
+          "semantic_reduction_percent": 17.031930479458936,
+          "wall_reduction_percent": 7.852131755199765,
+          "round_wall_change_percent": [
+            -6.766294808479656,
+            -7.483764394621706
+          ]
+        },
+        "tiled-brass-material-eval_buffer-nvvm-o3": {
+          "semantic_reduction_percent": 17.989536469678157,
+          "wall_reduction_percent": 8.361118539134294,
+          "round_wall_change_percent": [
+            -8.987168140389567,
+            -7.190766188687736
+          ]
+        },
+        "tiled-brass-material-sample_buffer-nvrtc-o3": {
+          "semantic_reduction_percent": 16.971359551251876,
+          "wall_reduction_percent": 6.573329449835629,
+          "round_wall_change_percent": [
+            -6.436228085130901,
+            -6.843754772868349
+          ]
+        },
+        "tiled-brass-material-sample_buffer-nvvm-o0": {
+          "semantic_reduction_percent": 17.124338029320963,
+          "wall_reduction_percent": 7.541043979188144,
+          "round_wall_change_percent": [
+            -7.427569282937229,
+            -7.276906791156746
+          ]
+        },
+        "tiled-brass-material-sample_buffer-nvvm-o3": {
+          "semantic_reduction_percent": 16.855938202074285,
+          "wall_reduction_percent": 5.8371036882992495,
+          "round_wall_change_percent": [
+            -3.9547270945318735,
+            -6.876271918377452
+          ]
+        }
+      },
+      "sum_wall_medians_reduction_percent": 7.355272934741485,
+      "passed": true
+    }
+  },
+  "raw_measurements": {
+    "path": "build/nvvm-loop/slice-252-prototype/timing/measurements.json",
+    "sha256": "a1ebbba64dc13d73984b443c60d98099ebe0a3963daa627462dfef95a7d004c1"
+  },
+  "summary": {
+    "path": "build/nvvm-loop/slice-252-prototype/timing/summary.json",
+    "sha256": "a5b8883f008601fa66f680c1399aa9f830924f997004c44e5b735cbc682d8d37"
+  },
+  "driver": {
+    "path": "build/nvvm-loop/slice-252-before/measure.py",
+    "sha256": "68a7d2c0d7ac9e36658a3ec86015202ae52589a3f3a6290e61df645d8fc670c2"
+  },
+  "loader_checks": {
+    "path": "build/nvvm-loop/slice-252-before/loader-checks.json",
+    "sha256": "5541fe45473a544221053290b5e952193d499800ad17490b5f484728931852ab"
+  },
+  "before": {
+    "path": "build/nvvm-loop/slice-252-prototype/timing-before/identity.json",
+    "sha256": "d5308cfab4cefdb528d8247ab42408a0a115152772bc5139abdfa05cd7b868d8"
+  },
+  "after": {
+    "path": "build/nvvm-loop/slice-252-prototype/timing-after/identity.json",
+    "sha256": "d5308cfab4cefdb528d8247ab42408a0a115152772bc5139abdfa05cd7b868d8"
+  },
+  "compiler_size": {
+    "before": {
+      "file_bytes": 20606968,
+      "elf_text_bytes": 11371244,
+      "text_section_line": "  [14] .text             PROGBITS        00000000000a3890 0a3890 ad82ec 00  AX  0   0 16",
+      "sha256": "ae6fe92965ed066a02ff9eab550093294b916c6b29f122f02e8a3f2ab8b74f60"
+    },
+    "candidate": {
+      "file_bytes": 20524552,
+      "elf_text_bytes": 11303628,
+      "text_section_line": "  [14] .text             PROGBITS        00000000000a3890 0a3890 ac7acc 00  AX  0   0 16",
+      "sha256": "10ffeb3246d56c9a835b1cd606e35a1a2cd6c8f9fcb3f6bfef36fed26413ea7b"
+    }
+  },
+  "metadata_and_linkage_audit": {
+    "path": "build/nvvm-loop/slice-252-prototype/candidate-audit.json",
+    "sha256": "ef0188f2a42caf30ea2f96f417da998f6d5f23fab18adb60e22273a1e0fa50c9"
+  },
+  "limitations": [
+    "Inclusive named phases overlap and are not additive.",
+    "Qualitative251 profiles motivated this experiment but do not quantify savings.",
+    "Material bindings/textures/LUT inputs and output contract remain unavailable."
+  ],
+  "dispersion": {
+    "path": "build/nvvm-loop/slice-252-after/timing-dispersion.json",
+    "sha256": "536bba919b237bf0ae0e8d4bf8687e43750ac536b494c1416d69bf2dda88de90"
+  },
+  "dispersion_note": "Before eval/NVRTC O3 round1 wall median1540.04ms versus1442.08ms round2 varies across builtin loading, semantic checking, IR and output; candidate round medians1338.87/1338.94ms. Candidate sample/NVVM O3 round1 wall1543.21ms versus1495.00ms round2 also varies. Causes are not established; every sample remains included and every round cell still improves.",
+  "noncompiler_doc_change_after_measurement": {
+    "path": "build/nvvm-loop/slice-252-after/proof-driver-doc-change.json",
+    "sha256": "50d648b8a1e9426a7edd684e337459fe1d11e0d37abb14acf548a628faa98ce8"
+  },
+  "loader_expected_oracle": {
+    "path": "build/nvvm-loop/slice-252-after/loader-oracle-comparison.json",
+    "sha256": "88947b07a98eeece5f694329e7e81dee8eec10c64da9c3eec92d06d8b847037c"
+  },
+  "proof_source_formatting_difference": {
+    "path": "build/nvvm-loop/slice-252-after/proof-source-formatting.diff",
+    "sha256": "4e77a016c8e3cb2f1ac3151ea68716e1fc6d8ea34c10d499f2c881e77e91ff91"
+  },
+  "proof_sources": {
+    "before": "9dbbe2c6c76a74fd07bcf8e9fe7d92cd7f8fd9273e4c688b247a2392a3396793",
+    "candidate": "7e485526e421b6e1ea6325e327b5cbee9deb8ead90506c0a0af0f633cb83ed58"
+  },
+  "source_stability": "All compiler production/generated sources, measured artifacts and563 inputs unchanged after measurement. Only proof-driver module-doc example updated from old boilerplate assertion source to final inline-header source before full gates; exact before/after copies and replacement recorded. Four proof metadata records/counts match; generated proof source hashes differ solely by retained formatting diff.",
+  "retained_pre_timing_audit_failure": {
+    "script": {
+      "path": "build/nvvm-loop/slice-252-prototype/audit-candidate.py",
+      "sha256": "0cfb8e174dbb5e75985843db35b9ead63614e6e9c1e34b2f634d10b99f94df0e"
+    },
+    "log": {
+      "path": "build/nvvm-loop/slice-252-prototype/candidate-audit.log",
+      "sha256": "01b7dfc6156574767812778e194c103321abbe27079360beded972076075e042"
+    },
+    "corrected_script": {
+      "path": "build/nvvm-loop/slice-252-prototype/audit-candidate-v2.py",
+      "sha256": "4976b6c171d99ea9521805e6171c6b0324615ef504ef98251cf6fa545e654df4"
+    },
+    "corrected_log": {
+      "path": "build/nvvm-loop/slice-252-prototype/candidate-audit-v2.log",
+      "sha256": "ef0188f2a42caf30ea2f96f417da998f6d5f23fab18adb60e22273a1e0fa50c9"
+    },
+    "cause": "Expected generated source-line macro names shift exactly+7 after header insertion; metadata/enum definitions unchanged. No production change or timing retry."
+  },
+  "retained_post_timing_audit_preparation_failure": {
+    "path": "build/nvvm-loop/slice-252-after/loader-oracle-initial-error.log",
+    "sha256": "f32c955d720be515b2dbc2a403572ff2a8f62de2246dded6b25a7476ba470e98"
+  },
+  "final_source_snapshots": {
+    "path": "build/nvvm-loop/slice-252-after/final-source-snapshots.json",
+    "sha256": "86e932c4b625d82cf34e02b2dc576e0b906d7d62d5c25f0b395db64d35c0786f"
+  },
+  "isolated_layout_final_comparison": {
+    "path": "build/nvvm-loop/slice-252-after/isolated-layout-final-comparison.json",
+    "sha256": "94d7a0ab54866944203f141b1dfc6ca21e12ff7f923be38df45490e24acba028"
+  },
+  "final_self_review": {
+    "path": "build/nvvm-loop/slice-252-after/source-review-final.json",
+    "sha256": "b2b30b3bb8c41a0d37e5bf66279b1cc4c3321dff871d66ec0ecb13897a2e0ba3"
+  },
+  "raw_artifact_index": {
+    "path": "build/nvvm-loop/slice-252-after/artifact-index.json",
+    "sha256": "41782bb1b8785f132a00596b0784feb297939b4b52c6b7d2a6e7a7657b99f2bb"
+  },
+  "raw_artifact_count": 4224,
+  "post_format_source_and_binary_verification": {
+    "path": "build/nvvm-loop/slice-252-after/final-hash-verification.json",
+    "sha256": "478c9001a3ddaae28b981655a636fcdebb7129b0088755c70e4f92d06b399a76"
+  },
+  "parent_acceptance": {
+    "status": "passed",
+    "summary": "Independently recomputed every pooled and per-round statistic, phase log, ordered sample, artifact hash and unchanged predeclared performance gate.",
+    "audit_script": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-252-after/parent-timing-audit.py",
+      "sha256": "a64f2dd1b456179c7747b617e5111d30a00fd0c6cbfccfc3063ff59283d28c51"
+    },
+    "audit_result": {
+      "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-loop/slice-252-after/parent-timing-audit.json",
+      "sha256": "53d3dde6ce5e5699d192c791b66e7a9b7f94f28070167694efcb2e32bccac3b1"
+    }
+  }
+}

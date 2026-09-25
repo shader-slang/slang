@@ -1,12 +1,15 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "core/slang-exception.h"
+#include "core/slang-signal.h"
 #include "slang-com-ptr.h"
 #include "slang/slang-ast-all.h"
 #include "slang/slang-ast-builder.h"
 #include "slang/slang-global-session.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <type_traits>
 
 using namespace Slang;
@@ -46,6 +49,12 @@ static bool oldPredicate(SyntaxClassBase self, SyntaxClassBase other)
 }
 
 // GENERATED:INDEX_ASSERTIONS
+
+// Typed class metadata is independent of the generated tag lookup initializer.
+static const SyntaxClassInfo* const typedMetadata[] = {
+    // GENERATED:METADATA
+};
+static_assert(sizeof(typedMetadata) / sizeof(typedMetadata[0]) == int(ASTNodeType::CountOf));
 
 // Preserve the concrete pointer type before converting to NodeBase. A void* to NodeBase* cast
 // would bypass the C++ base adjustment and assume a layout property that this test need not assume.
@@ -88,8 +97,29 @@ static void checkTarget(NodeBase* const* nodes)
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc == 2)
+    {
+#if !defined(_DEBUG)
+        std::fprintf(stderr, "Invalid-tag checks require matching assertion-enabled objects.\n");
+        return 2;
+#else
+        try
+        {
+            SyntaxClassBase invalid{ASTNodeType(std::atoi(argv[1]))};
+            // Reaching here means the constructor failed to reject the invalid tag.
+            return invalid.getInfo() ? 3 : 4;
+        }
+        catch (const InternalError& error)
+        {
+            // Slang exceptions do not implement std::exception::what(). Retain the actual
+            // assertion diagnostic before rethrowing to the normal uncaught-exception abort.
+            std::fprintf(stderr, "%s\n", error.Message.getBuffer());
+            throw;
+        }
+#endif
+    }
     ComPtr<slang::IGlobalSession> global;
     CHECK(SLANG_SUCCEEDED(slang::createGlobalSession(global.writeRef())));
     if (failures)
@@ -99,12 +129,27 @@ int main()
     NodeBase* nodes[int(ASTNodeType::CountOf)] = {};
     unsigned concrete = 0, abstract = 0, pairs = 0;
     SyntaxClassBase empty;
+    CHECK(empty.getInfo() == nullptr);
+    CHECK(empty.createInstanceImpl(builder) == nullptr);
+    empty.destructInstanceImpl(nullptr);
     CHECK(!empty.isSubClassOf(empty));
     CHECK(!oldPredicate(empty, empty));
     for (int i = 0; i < int(ASTNodeType::CountOf); ++i)
     {
         SyntaxClassBase source{ASTNodeType(i)};
         CHECK(int(source.getTag()) == i);
+        CHECK(source.getInfo() == typedMetadata[i]);
+        CHECK(source.getInfo()->createFunc == typedMetadata[i]->createFunc);
+        CHECK(source.getInfo()->destructFunc == typedMetadata[i]->destructFunc);
+        std::printf(
+            "metadata %d %s %d %d %d %d %d\n",
+            i,
+            source.getInfo()->name,
+            int(source.getInfo()->debugVisType),
+            int(source.getInfo()->firstTag),
+            int(source.getInfo()->tagCount),
+            source.getInfo()->createFunc != nullptr,
+            source.getInfo()->destructFunc != nullptr);
         CHECK(!empty.isSubClassOf(source));
         CHECK(!source.isSubClassOf(empty));
         CHECK(!oldPredicate(empty, source));
@@ -114,9 +159,16 @@ int main()
         {
             ++concrete;
             CHECK(nodes[i]->astNodeType == ASTNodeType(i));
+            CHECK(nodes[i]->getClass().getInfo() == typedMetadata[i]);
+            CHECK(source.getInfo()->createFunc != nullptr);
+            CHECK(source.getInfo()->destructFunc != nullptr);
         }
         else
+        {
             ++abstract;
+            CHECK(source.getInfo()->createFunc == nullptr);
+            CHECK(source.getInfo()->destructFunc == nullptr);
+        }
         for (int j = 0; j < int(ASTNodeType::CountOf); ++j)
         {
             SyntaxClassBase target{ASTNodeType(j)};
@@ -129,6 +181,9 @@ int main()
     if (failures)
         return 1;
     // GENERATED:TARGET_CHECKS
+    // Release the real ASTBuilder so its metadata destructor path runs for registered nontrivial
+    // nodes.
+    global.setNull();
     std::printf(
         "{\"tags\":%d,\"pairs\":%u,\"concrete\":%u,\"abstract\":%u,\"failures\":%u}\n",
         int(ASTNodeType::CountOf),

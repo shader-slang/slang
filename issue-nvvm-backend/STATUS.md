@@ -3,6 +3,38 @@
 Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
 independent acceptance and local commits. No push is authorized.
 
+## Slice252 is accepted
+
+The bounded constructor-visibility change passes all performance and correctness gates. Every
+semantic median falls 16.86–18.89%, summed wall medians 7.35527%, and all 12 per-round wall comparisons
+improve. All 264 PTX outputs and 24 support cubins exactly match 250/251. Read
+[plan252](plan.slice-252-ast-class-lookup.md), [report252](report.slice-252-ast-class-lookup.md),
+[timing252](timing-evidence.slice-252.json) and [validation252](runtime-validation.slice-252.json).
+
+One generated table remains authoritative. Its incomplete internal declaration and independently
+deduced count preserve pointer identity, bounds, factories/destructors, casts and metadata. Matching
+Debug/optimized proofs pass 702 tags,492804 pairs,636 objects and66 abstract classes, plus specific
+Debug -1/702 assertions. The table remains hidden/local, with unchanged exports and NatVis.
+
+- Runtime smoke4, full units1047pass/13skip, semantic1052pass/77skip, toolkit18 and contracts6 pass.
+  Exact1060 unit/1129 semantic outcomes match before, including all513 relevant250 passes.
+- Full frozen1356 cells/1347 correct and discovery345 cells/315 correct preserve every five-field
+  outcome:1701 cells,1662 correct,39 unresolved and18 resolved histories. No losses or additions.
+- Final6 material compiles/assemblies are exact250/251. All compiler sources,12 artifacts and563
+  inputs remain measured identity. Only a proof-driver help example changes after timing, with an
+  exact doc-only hash record.120 final snapshots also retain unchanged NatVis.
+
+Compiler SHA256 `10ffeb3246d56c9a835b1cd606e35a1a2cd6c8f9fcb3f6bfef36fed26413ea7b`;
+provider unchanged `5fe0b977e22b80acc5ee39147c69510a01c09563354a1a67bd9573d1cda1aeab`, ABI41.
+An initial audit failure is exactly the expected+7 generated FIDDLE line-macro shift; a later local
+loader-oracle suffix typo is retained. Neither changed production code or retried timing.
+
+Latest accepted implementation/full checkpoint252, targeted233 and implementation cadence0.
+Rolling implementation history is249 FP8 scalar transport,250 BF16 literal correctness and252
+material compile-time improvement. Independent parent acceptance verifies all timings, exact corpus
+outcomes and histories, four proofs,120 snapshots,4224 indexed artifacts and226 compact references.
+Material runtime contracts remain unavailable. No push or system/driver change occurred.
+
 ## Research251 is accepted
 
 Fresh accepted250 material measurements preserve all132 PTX and66 cubin outputs, with108 measured
@@ -64,17 +96,18 @@ indexed artifacts. Correctness priority explains this slice; reconsider material
 
 ## Next bounded action
 
-Start one bounded constructor-visibility prototype using
-the report's semantic/performance gates. Preserve one existing generated metadata mapping; do not
-bundle direct-tag casts/dispatch changes or allocation work. Shared AST impact requires exhaustive
-metadata/cast proof, non-NVVM semantic/serialization regressions and a full checkpoint. Benchmark
-paired isolated optimized before/after builds with both identity/build order reversals; reject on
-failed gates and retain negative evidence. All6 material cells already compile/assemble. Absent
-runtime contracts remain a limit on material correctness and kernel-performance claims.
+Qualify the CUDA BF16 vector storage-layout boundary recorded by research240 on the accepted252
+compiler. BF4's reported alignment8 differs from the actual CUDA prelude alignment2; establish an
+observable source-level reflection/storage consequence with independent byte-layout and output
+oracles before choosing a producer-side repair. Cover BF2/BF3/BF4 controls, wrapped fields, array
+stride and neighboring scalar types. Keep this bounded research separate from new NVVM storage
+admission and from the original dynamic-dispatch fixture's other unsupported shapes.
 
-The pre-existing BF16 constant failure recorded by249 is resolved by250. No next independent blocker
-was exposed by the focused literal tests. Shared FP8 overflow still differs from CUDA SATFINITE;
-research243 runtime conversion is not admitted. Known texture and column-major failures remain.
+This known producer mismatch has a clearer correctness contract than general FP8 runtime conversion
+(shared overflow differs from CUDA SATFINITE) or texture queries (recorded248 contract/toolkit gaps).
+Further material optimization needs fresh profiling on252; all6 material cells already compile and
+assemble, and runtime bindings/textures/LUT/input/output contracts remain unavailable. Preserve the
+original texture/column-major failures and all existing input/oracle identities.
 
 ## Accepted historical evidence
 
@@ -92,6 +125,7 @@ Native Ubuntu24.04, branch nvvm-backend, L4SM89 driver580.126.09, targetSM80, CU
 LLVM14, providerABI41, matching RelWithDebInfo. Inspect/source `build/nvvm-loop/slice-203-env.sh` and
 follow the local slang-build skill. At most4 CPU workers, sequential GPU suites and 30-minute bounds.
 
-Raw roots `build/nvvm-loop/slice-250-before` and `slice-250-after` retain accepted249 before identity,
-unchanged failing fixture, final snapshots, exact outputs, IR/PTX audits, commands and artifact index.
+Raw roots `build/nvvm-loop/slice-252-before`, `slice-252-prototype` and `slice-252-after` retain
+matched baseline/candidate layouts, all timing attempts, proof and runtime evidence, final snapshots,
+commands, parent audits and the closed worker artifact index.
 No GPU loss, driver/system change, reboot, push or worker commit occurred.

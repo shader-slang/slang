@@ -226,3 +226,42 @@ result rather than bundling another optimization. No constructor prototype is im
 The existing `source/slang/slang.natvis` NodeBase visualization also names `kAllSyntaxClasses` in
 six conditions. The linkage choice must preserve those lookups or explicitly adapt and validate
 them; retaining the existing name/scope avoids an unnecessary debugger-consumer change.
+
+## Slice252: expose the existing class metadata lookup
+
+The bounded prototype keeps `Slang::kAllSyntaxClasses` as the only generated tag-to-metadata mapping
+and exposes the existing `SyntaxClassBase(ASTNodeType)` body in its internal header. An incomplete
+extern declaration allows the generated definition to deduce its true length; an independent static
+assertion equates that length with CountOf. Both bounds remain, and every valid tag returns the same
+class metadata object. The generated initializer, factories/destructors, predicate, casts and node
+initialization remain unchanged. No direct-tag dispatcher, alternate hierarchy, cache or API change.
+
+The name and namespace preserve existing NatVis references. The object symbol is GLOBAL HIDDEN,
+and the final compiler library localizes it; exported names are unchanged. All702 exact typed
+metadata pointers and492804 C++ inheritance pairs pass in matching before/candidate Debug and
+optimized proofs, including636 real typed objects,66 abstract classes, all four cast overloads,
+null/const/default behavior and strict DeclRefBase restrictions. Real Debug invalid tags-1/702
+produce the specific constructor-bounds diagnostic and abort. Debug and optimized layouts are never
+mixed. Registered nontrivial objects use the actual ASTBuilder destructor path.
+
+Header insertion shifts only generated FIDDLE source-line macro names by exactly+7; metadata/enum
+files remain byte-identical. An initial overly broad generated-byte audit stopped on this difference;
+the exact expected transform passes a retained corrected audit without changing production code.
+
+[Paired timing252](../../issue-nvvm-backend/timing-evidence.slice-252.json) retains264 compiles
+(216 measured,48 warmups), opposite identity/build orders and24 independent support assemblies.
+Every PTX/cubin equals250/251. Semantic medians fall16.86–18.89%; summed six wall medians fall7.35527%,
+and all12 per-round wall comparisons improve. The predeclared5% semantic/2% aggregate wall/2% maximum
+round-regression gates pass. No samples are excluded or retried. Before eval/NVRTC O3 has slower
+round1 values across multiple phases, and candidate sample/NVVM O3 varies between rounds; causes
+are not established. All distributions remain available. The ELF `.text` section shrinks67616bytes,
+and the compiler file shrinks82416bytes. These are compile-time/size observations, not kernel claims.
+
+The [report252](../../issue-nvvm-backend/report.slice-252-ast-class-lookup.md) retains concrete source
+trace and exact proof/source differences. Full shared-AST/corpus checkpoint preserves all1701 outcomes (1662 correct,39 unresolved),
+all18 resolved histories, exact1060 unit/1129 semantic outcomes and all required gates. Independent
+parent acceptance verifies every timing statistic, corpus outcome, failure history and indexed artifact.
+Compiler sources, measured artifacts and inputs remain fixed through acceptance;
+only the proof-driver help example is corrected after timing, with its exact doc-only diff recorded.
+Material runtime still lacks its binding, texture/LUT input and output contract. Any next optimization
+needs fresh evidence on the accepted compiler; direct-tag casts and allocation changes remain separate.
