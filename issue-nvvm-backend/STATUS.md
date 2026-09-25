@@ -4,20 +4,28 @@ Updated 2026-09-25. Read [WORKFLOW.md](WORKFLOW.md) before starting or resuming 
 
 ## Current state and next action
 
-**Slice 227 is accepted: source-order FP64 min/max prefixes execute.** Read the
-[completed plan](plan.slice-227-fp64-prefix.md), [five-part report](report.slice-227-fp64-prefix.md)
-and [targeted result manifest](runtime-validation.slice-227.json). Canonical scalar/vector FP64
-inclusive/exclusive min/max now preserve ordered operand selection, exact infinity/caller seeds,
-and the source shuffle-up/ascending-scan distinction. Separate transmitted inclusive state preserves
-NaN payloads and signed zeros. Existing reduction/arithmetic recipes and FP32 prefixes are unchanged;
-provider ABI 36 is unchanged.
+**Slice 228 narrow-integer prefix research is accepted.** Read the
+[completed plan](plan.slice-228-narrow-prefix.md), [five-part report](report.slice-228-narrow-prefix.md)
+and [semantic evidence](semantic-evidence.slice-228.json). No compiler or corpus changes.
+All 17,472 GPU launches match independently derived integer expectations: 14,672 narrow 8-bit,
+784 narrow 16-bit source launches and 2,016 signed/unsigned 32-bit control launches. Exactly
+15,654,912 output words match, including inactive sentinels; inputs remain unchanged. Every
+8-bit value is covered under all 14 masks, with scalar/vector2/vector4 and four prefix operations.
+All 64 minimal narrow direct O0/O3 compilations retain the expected canonical E52017 rejection.
+Ten runtime PTX artifacts assemble, GPU smoke passes 4/4, and all 27 source/12 artifact/552 input
+hashes match accepted 227. Research counts are separate from registered runtime cells.
 
-**Next action: research narrow-integer masked min/max prefixes in slice 228.** Original frozen min/max tests now reject `int8_t(int8_t, vector<uint,4>)` canonical
-`_wavePrefixExclusiveMin/Max(($1).x, $0)` instead of double. Retain this independent blocker and
-establish its source identities, promoted arithmetic/selection and exact semantics before extending
-admission. Matrix prefix capability, ordinary FP64 vector-by-value shuffles, quad reconvergence and
-resource-bearing contexts remain separate. Reconsider material-driven work; material runtime still
-requires application bindings, texture/LUT/input and an output oracle. No push is authorized.
+**Next action: implement bounded narrow-integer masked prefix min/max admission.** The responsible
+boundary is `_getNVVMMaskedWaveScalarIdentity` rejecting 8/16-bit widths. Preserve signed/unsigned
+exact extrema and reuse existing typed lane transport, integer min/max/select and aggregate leaves;
+the catalog/provider already admit these operations (16/16 checked contracts), ABI 36 unchanged.
+Replay the unchanged 228 independent inputs/expectations at direct O0/O3 and add a focused runtime
+fixture with targeted neighboring preservation. Make the newly admitted prefix domain explicit;
+do not widen arithmetic or reduction support accidentally through the shared identity helper.
+The original frozen int8 exclusive Min/Max blocker remains the motivating case. Stop at the next
+independent blocker. Matrix capability, ordinary FP64 vector-by-value shuffles, quad reconvergence,
+and resource-bearing contexts remain separate. Material runtime still requires application
+bindings, texture/LUT/input and an output oracle. No push is authorized.
 
 Latest full checkpoint: 225. Latest targeted implementation: 227.
 Implementation slices since full: one. Rolling feature history: 223 CUDA bit-index
@@ -27,6 +35,9 @@ capacity remains 50–128, with 104 current identities. One fresh-context worker
 the parent independently reviewed its diff and evidence before the authorized local commit.
 
 ## Checkpoints and evidence
+
+- [Research 228](semantic-evidence.slice-228.json): unchanged compiler, 17,472 exact launches,
+  64 expected direct rejections; registered 1668-cell ledger wholly inherited.
 
 - [Slice 227 targeted](runtime-validation.slice-227.json): 633 fresh cells, 1035 explicitly inherited
   from 225; cumulative 1668 cells, 1617 correct and 51 known failures.
@@ -83,3 +94,11 @@ unchanged. No GPU loss, driver change, reboot or push. Parent acceptance and loc
 
 Parent acceptance verified 216 evidence references, 27 source hashes, 12 artifact hashes and
 552 runtime input hashes, including unchanged prior inputs and complete first-known failure history.
+
+Research 228 tested unchanged source `b7f2541f7a71312a2e7f3d98047e8a09a0453c22`; compiler library
+SHA-256 `9e4b11ac87a9cd4941a4bee64855ae0a8008208680801c0f0c8cabbf51946846`. Raw research is
+`build/nvvm-loop/slice-228-narrow-prefix`. Latest implementation/full evidence and cadence above
+remain unchanged; parent acceptance and local commit are pending.
+
+Parent acceptance independently verified all 17,472 launch identities/output hashes, 64 exact
+rejection logs, 187 evidence references, 27 sources, 12 artifacts and 552 unchanged runtime inputs.
