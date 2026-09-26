@@ -1,12 +1,12 @@
-// Regression test for an interface-returning function reached in two `specializeDynamicInsts`
-// runs, reduced from https://github.com/shader-slang/slang/pull/12935#issuecomment-5827779078.
+// Regression test for merging a value returned from a function reached in two
+// `specializeDynamicInsts` runs with a concrete value.
 //
-// `computeMain` calls `getLight` directly, so an earlier run rewrites its declared return type to a
+// `computeMain` calls `getLight` directly, so an earlier run rewrites its declared result type to a
 // `TaggedUnionType`. `lightIntersect` is reached only in a later run, through the
-// `IGeometry.intersectAndAccept` default method, and its call to `getLight` sees that rewritten
-// type. If `makeInfoForConcreteType` wrapped it as a payload, compilation would stop at
-// `Unhandled info type in analyzeExtractExistentialWitnessTable`. Tolerating that info in the
-// analyzers instead passes the tagged union where the concrete `intersect` expects the payload.
+// `IGeometry.intersectAndAccept` default method, and merges the value its call to `getLight`
+// returns with a concrete `SurfaceLight`. If `makeInfoForConcreteType` wrapped the rewritten type
+// as a payload, merging it with the `SurfaceLight`'s tagged-union info would fail with
+// `Incompatible propagation infos during union`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -conformance Light:ILight=0 -conformance SurfaceLight:ILight=1 -conformance A:IGeometry=0 -conformance B:IGeometry=1
@@ -65,6 +65,11 @@ ILight getLight(uint id)
 bool lightIntersect(float3 origin, out float t)
 {
     ILight light = getLight(uint(origin.x));
+    if (origin.y > 1.0)
+    {
+        SurfaceLight s = { { 1u, 3.0 } };
+        light = s;
+    }
     return light.intersect(t);
 }
 
@@ -121,6 +126,7 @@ bool occluded(uint id, float3 origin)
 //TEST_INPUT: type_conformance A:IGeometry = 0
 //TEST_INPUT: type_conformance B:IGeometry = 1
 
+
 // The concrete `intersect` methods must receive the unpacked `AnyValue` payload, not the tagged
 // union. The SPIR-V and DXIL runs only match the entry point, so they catch ill-typed output only
 // when SPIR-V validation (`SLANG_RUN_SPIRV_VALIDATION=1`, set in CI) and DXC run.
@@ -133,10 +139,6 @@ bool occluded(uint id, float3 origin)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
-    // Thread 0: B hits a Light, which never intersects.
-    // Thread 1: B hits a SurfaceLight (t = 5), so the output is its radiance, 5 * 2.
-    // Thread 2: A intersects at t = length(origin) = 2; the output is SurfaceLight radiance 7 * 2.
-    // Thread 3: B hits a Light, which never intersects.
     float light = getLight(tid.x).radiance();
     outputBuffer[tid.x] = occluded(tid.x, float3(tid)) ? light : 0.0;
     // CHECK: type: float

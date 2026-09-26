@@ -1,13 +1,16 @@
-// A single concrete `ILight` conformance returned through an interface-typed function that is
-// reached from `computeMain` in one type-flow iteration and again, through the generic
-// `IGeometry.intersectAndAccept` callback, in a later one. The second call site's result calls an
-// interface method, so it must resolve to a direct `Light.intersect` call with no dispatcher.
-// Related: https://github.com/shader-slang/slang/pull/12935.
+// Regression test for a single concrete `ILight` conformance returned through an interface-typed
+// function that is reached in two `specializeDynamicInsts` runs.
+//
+// `computeMain` calls `getLight` directly, so an earlier run rewrites its declared result type to a
+// `TaggedUnionType`. `lightIntersect` is reached only in a later run, through the
+// `IGeometry.intersectAndAccept` default method, and its call to `getLight` sees that rewritten
+// type. If `makeInfoForConcreteType` wrapped it as a payload, compilation would stop with an internal
+// error. The later `light.intersect(t)` must resolve to a direct `Light.intersect` call.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute -conformance A:IGeometry=0 -conformance B:IGeometry=1
 //TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute -conformance A:IGeometry=0 -conformance B:IGeometry=1
-//TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -stage compute -profile sm_6_7 -conformance A:IGeometry=0 -conformance B:IGeometry=1
+//TEST:SIMPLE(filecheck=DXIL): -target dxil-assembly -entry computeMain -stage compute -conformance A:IGeometry=0 -conformance B:IGeometry=1
 
 interface ILight
 {
@@ -87,6 +90,9 @@ struct Handler : IHandler
 //TEST_INPUT: type_conformance A:IGeometry = 0
 //TEST_INPUT: type_conformance B:IGeometry = 1
 
+// The HLSL check requires a direct call on the value `getLight` returns rather than witness-based
+// dispatch. The SPIR-V and DXIL runs only match the entry point, so they catch ill-typed output
+// only when SPIR-V validation (`SLANG_RUN_SPIRV_VALIDATION=1`, set in CI) and DXC run.
 // HLSL: = Light_intersect_0(getLight_0(
 // SPV: OpEntryPoint
 // DXIL: define void @computeMain()

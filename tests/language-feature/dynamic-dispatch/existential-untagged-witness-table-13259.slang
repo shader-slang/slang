@@ -1,7 +1,15 @@
 // Regression test for https://github.com/shader-slang/slang/issues/13259
 //
-// A non-autodiff, non-nested-hit companion to the #12934 test; it must compile to SPIR-V. The
-// mechanism this exercises is documented at `shade()` below.
+// A non-autodiff trigger of the same failure as the #12934 test. `shade()` calls `si.properties()`
+// directly, so an earlier `specializeDynamicInsts` run rewrites the declared `IProperty` result type
+// of `Surface.properties()` to a `TaggedUnionType`. `Material.setup` is reached only through the
+// dispatched `mat.setup(...)`, so its call to `si.properties()` is first analyzed in a later run
+// and sees that rewritten type. If `makeInfoForConcreteType` wrapped it as a payload, the `read()`
+// call would stop compilation at `Unhandled info type in analyzeExtractExistentialWitnessTable`.
+// Must compile to SPIR-V.
+//
+// `[__unsafeForceInlineEarly]` on `properties(uint)` and the `Surface.properties()` forwarder come
+// from the issue's reproducer; the late call sees the rewritten type without either.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry compute_main -stage compute
 
@@ -73,10 +81,9 @@ IMaterial material(uint id)
 
 float shade(Surface si, IMaterial mat)
 {
-    // Load-bearing: the dynamically dispatched `mat.setup(...)` (whose result is intentionally
-    // unused) together with the direct `si.properties().read()` are what drive the shared
-    // `IProperty` value to the singleton untagged-union info in the type-flow pass. Keep both;
-    // dropping either makes the object monomorphic and the untagged-union arm is never reached.
+    // The dispatched `mat.setup(...)` (its result is intentionally unused) makes `Material.setup`,
+    // which holds the late call, reachable; the direct `si.properties().read()` is the earlier call
+    // that gets `Surface.properties()` specialized. Without either, no call sees a rewritten type.
     let instance = mat.setup(si, Sampler());
     return si.properties().read();
 }

@@ -1,14 +1,15 @@
 // Regression test for https://github.com/shader-slang/slang/issues/12934
 //
-// Registering two `IMaterial` conformances makes `material.setup(...)` a real dynamic
-// dispatch; the `StandardMaterial` path reaches the shared `resolve_value -> get_value`, which
-// unpacks `IHit` existentials. That gives each `IHit` value a singleton UntaggedUnionType info in
-// the type-flow specialization pass, exercising both analyzers that used to reject that shape:
-//   - `Surface.get_accessor` downcasts it (`unpacked as TriangleHit` -> ExtractExistentialType);
-//   - `get_value` calls an interface method on it (`h.weight()` -> ExtractExistentialWitnessTable
-//     + LookupWitnessMethod), with the result used in the return value so the call stays live.
-// Must compile to SPIR-V. Both conformances are required: either single conformance keeps the
-// material object monomorphic.
+// `compute_main` calls `PackedHit.unpack()` directly, so an earlier `specializeDynamicInsts` run
+// rewrites its declared `IHit` result type to a `TaggedUnionType`. Registering two `IMaterial`
+// conformances makes `material.setup(...)` a real dynamic dispatch, so `Surface.get_accessor` and
+// `get_value`, reached only through `StandardMaterial.setup`, are first analyzed in a later run, and
+// their calls to `unpack()` see that rewritten type. If `makeInfoForConcreteType` wrapped it as a
+// payload, the resulting `UntaggedUnionType` info would stop compilation with an internal error in
+//   - `analyzeExtractExistentialType`, for the downcast in `get_accessor`, and
+//   - `analyzeExtractExistentialWitnessTable`, for the `h.weight()` call in `get_value`.
+// Must compile to SPIR-V. With either single conformance the material object is monomorphic and no
+// call sees a rewritten type.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry compute_main -stage compute -conformance "InvalidMaterial:IMaterial=0" -conformance "StandardMaterial:IMaterial=1"
 
@@ -50,9 +51,8 @@ struct Surface : IDifferentiable
     IAccessor get_accessor()
     {
         IHit unpacked = hit.unpack();
-        // Load-bearing: the `as TriangleHit` downcast produces the ExtractExistentialType over a
-        // singleton UntaggedUnionType info that analyzeExtractExistentialType must handle. The
-        // identical branches are intentional -- do not collapse this into a plain return.
+        // The downcast produces an `ExtractExistentialType` on the value `unpack()` returns, which
+        // keeps this late call site live; the identical branches are intentional.
         if (let triangle = unpacked as TriangleHit)
             return TriangleAccessor();
         return TriangleAccessor();
@@ -63,11 +63,8 @@ struct Surface : IDifferentiable
 float get_value(no_diff Surface surface)
 {
     IAccessor accessor = surface.get_accessor();
-    // Load-bearing: `h.weight()` is an interface-method call on a singleton-untagged `IHit`
-    // value, producing an ExtractExistentialWitnessTable + LookupWitnessMethod that
-    // analyzeExtractExistentialWitnessTable must handle. Its result is used in the returned
-    // value (flows to `output`), so the front-end cannot drop the call as dead code -- the
-    // extraction is genuinely generated for the type-flow pass to resolve.
+    // `h.weight()` produces an `ExtractExistentialWitnessTable` and a `LookupWitnessMethod` on the
+    // value `unpack()` returns. Its result feeds the returned value, so the call is not dead code.
     IHit h = surface.hit.unpack();
     return accessor.get() + h.weight();
 }
@@ -143,8 +140,8 @@ void compute_main()
     IHit hit = packed_hit.unpack();
 
     Surface surface = {};
-    // Load-bearing downcast (see get_accessor): keep it even though surface.hit is already
-    // zero-initialized -- it is required to produce the singleton untagged-union type-flow path.
+    // The downcast keeps the direct `packed_hit.unpack()` call live, so the earlier run specializes
+    // `unpack()` and rewrites its result type; without it, no call sees a rewritten type.
     if (let triangle = hit as TriangleHit)
         surface.hit = PackedHit();
 
