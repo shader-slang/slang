@@ -370,3 +370,48 @@ forwarding has a deliberately limited domain, and SSA promotion excludes partial
 Any extension must preserve nonmutating receiver snapshots and prove safety across mutation,
 aliasing, escapes and control flow. The differential fixture provides a gate for that investigation;
 it does not yet select a production transformation. See [report266](../../issue-nvvm-backend/report.slice-266-material-reproducer.md).
+
+## Slice267: expose the fields a helper consumes
+
+A source counterfactual preserves the normal helper's conditional but replaces its whole Graph
+receiver with explicit hints/direction values. It removes the reduced fixture's three constant NVVM
+exponentials and preserves runtime absorption and both hint branches. The corresponding material
+helper needs only SurfaceInteraction and hints; passing those values explicitly removes all six
+exponentials from each original material entry's source counterfactual. These observations identify
+an opportunity at the internal helper interface; they do not identify a libNVVM pass or prove a
+compiler optimization or runtime speedup.
+
+The canonical receiver is already an SSA value snapshot. Narrowing an internal value interface can
+extract its fields without changing when memory is observed. Existing `deferBufferLoad` can then
+apply its own extraction-use and memory-stability checks. In contrast, replacing the value with the
+address of its original mutable object would change semantics unless the snapshot is preserved.
+Local/inout roots must not be admitted to immutable-buffer argument specialization merely to make
+this case optimize.
+
+The bounded prototype extends the existing parameter-transform machinery with
+`transformAggregateParamsToFields`. It visits internal callees first and replaces a struct value
+parameter only when every use directly extracts a strict subset of its fields. Canonical field keys
+map the new parameters to arguments extracted from the original SSA value. Whole-value uses,
+externally observable signatures and signature-bearing decorations retain their original interface.
+Direct NVVM schedules this transformation immediately before `deferBufferLoad`.
+
+The new interface must also obey the target's existing helper-value policy. A resource-containing
+struct may be legal even when its parameter-block field is illegal as a standalone helper parameter.
+Earlier resource specialization handles supported global roots but deliberately excludes local/phi
+snapshots. Moving decomposition before that pass therefore cannot guarantee legality. The generic
+transformation accepts a required field-type predicate; NVVM supplies
+`isNVVMSupportedHelperValueType`. If any selected field fails that policy, the original parameter
+remains intact. This reuses the emitter's type contract without introducing a second classifier or
+changing resource specialization's provenance rules.
+
+An explicit copied snapshot passed by constref encounters a separate direct-NVVM correctness issue:
+a float3-containing helper struct fails compact vector extraction, whereas float4 succeeds. Read-only
+borrowed helper fields are classified as compact parameter-group storage even though their helper
+layout contains native vectors. That storage-role boundary needs a separate correctness slice; this
+experiment does not repair it. The final optimization passes full correctness preservation and
+the declared O3 resource/timing gates. Both unchanged material entries lose their six exponentials
+and 784-byte stack allocation, with fewer registers and no spills. Paired compile medians decrease
+1.45–2.35%. The O0 controls retain additional existing helpers, increasing entry stacks by 320 bytes
+and module sizes; that tradeoff is explicit. These observations do not establish material GPU speed.
+See [report267](../../issue-nvvm-backend/report.slice-267-receiver-snapshot.md) and its structured
+validation record for accepted scope, exact identities and preserved failed attempts.

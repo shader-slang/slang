@@ -1,69 +1,59 @@
 # NVVM backend status
 
-The general development loop is **stopped**. Bounded [research266](report.slice-266-material-reproducer.md)
-has isolated the material constant-loss difference with a runnable fixture and controls.
-Maintenance261–263 and material research/results264–266 are **complete**. No compiler optimization
-was promoted. No push. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and
-[HANDOFF](HANDOFF.md) for a fresh session.
+The general development loop is **stopped**. Bounded [slice267](report.slice-267-receiver-snapshot.md)
+is complete and accepted: internal NVVM helpers can receive only the struct fields they consume,
+while preserving value snapshots and the existing helper-type contract. No push or further slice
+is authorized. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md).
 
 ## Accepted compiler baseline
 
-[Validation262](runtime-validation.slice-262.json) is authoritative; [report262](report.slice-262-master-integration.md)
-explains the merge, exact deltas and validation. Master `6eb89786ca882d71049c8568638e247f60864b6f`
-is merged at `5294b5ae6`. Compiler source is `49593da724e172838bd65b9eb48b2a3f11334522`,
-version `2026.18.3-275-g49593da72`; runner source is `c3455e606`. All 22 dependency pins are exact.
-Provider ABI42 and qualified support through scalar FP8 widening260 are retained.
+[Validation267](runtime-validation.slice-267.json) is authoritative. It preserves every accepted262
+outcome and failure history and adds the reviewed optimization evidence. The qualified compiler was
+built from `d937c9f5a02fe2bc3e6fcb34ea11c6b9488f8979` plus source patch
+`fe504217967549990a4310645c9903ce321f7b23b3af7f5f5af9b0d17e665635`, version
+`2026.18.3-283-gd937c9f5a`. That exact source is retained by the slice's closing commit.
+Provider ABI42, all 22 dependency pins and support through scalar FP8 widening260 are unchanged.
 
-| Evidence                                       | Accepted262 result                                             |
-| ---------------------------------------------- | -------------------------------------------------------------- |
-| Frozen / discovery                             | 1356 / 357 cells                                               |
-| Combined                                       | 1713 total; 1674 correct; 39 unresolved; 18 resolved histories |
-| Units / semantics                              | 1086 pass + 13 skip /1170 pass + 78 skip                       |
-| Focused / runtime / toolkit / material support | 29 /4 /18 /6 pass                                              |
-| AST proof                                      | 705 tags; 497025 pairs; zero failures (optimized)              |
-| Last full / targeted / implementation cadence  | 262 /233 /0                                                    |
+| Evidence                                          | Accepted267 result                                               |
+| ------------------------------------------------- | ---------------------------------------------------------------- |
+| Frozen / discovery                                | 1356 / 357 exact outcome matches                                 |
+| Combined                                          | 1713 total; 1674 correct; 39 unresolved; 18 resolved histories   |
+| Units / semantics                                 | 1086 pass + 13 skip / 1170 pass + 78 skip; exact test identities |
+| Focused runtime and IR / standalone assembly      | 31 / 18 pass                                                     |
+| Runtime / toolkit / material support              | 4 / 18 / 6 pass                                                  |
+| Last full / targeted / implementations since full | 267 / 233 / 0                                                    |
 
-Acceptance is **full checkpoint plus explicit serial infrastructure closure**. The raw full run had
-1673 correct and one extra NVRTC failure deleting `default_program.pch`. Three declared serial rounds
-passed all three modes (9/9); only that NVRTC outcome is substituted, with original failure retained.
-Concurrent automatic-PCH reliability remains unresolved. Six intentional upstream texture rejections
-change existing unresolved diagnoses; none is new support or a semantic resolution. Known semantic
-mismatches remain the three column-major modes. The other 36 gaps are infrastructure/preflight.
-Material runtime is unassessed: binding, texture/LUT, input and output contracts are unavailable.
+All 567 prior runtime input hashes are unchanged. The three column-major semantic mismatches and
+36 infrastructure/preflight gaps remain. Accepted262's concurrent NVRTC automatic-PCH incident stays
+inherited history; a successful final run does not establish concurrency reliability. Two temporary
+parameter-block regressions in the first267 prototype were fixed before acceptance, with that rejected
+checkpoint retained. The AST subtype proof remains inherited from262, not rerun in267.
 
-Compiler SHA256: `4a207ec0d3f390152dd593a21af81f4b1fe30d9e1c5edd065343bd3590f8bbbc`.
+Loaded compiler library SHA256: `1cba6a5119a4058b449f70ed79a242fc13ddccff382e77132e58bdcbad8d97ed`.
 Provider SHA256: `fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913`.
+The unchanged `slangc` launcher hash alone does not identify the compiler. The accepted267 layout is
+installed at `build/RelWithDebInfo`; accepted262 is preserved under
+`build/nvvm-receiver-snapshot267/baseline-layout`.
 
-## Results and next-session handoff
+## Material result and limits
 
-[Monday package263](results/2026-09-26/README.md) contains measured tables, SVG/PNG charts, a six-slide
-outline and refreshable provenance. NVVM O3 material evaluation is near parity (1355.04ms versus
-NVRTC 1362.76ms); sampling is 5.04% slower (1460.18 versus 1390.16ms). Simple-shader registers are mostly
-equal, with mixed code-size/stack tradeoffs. No general speed or code-quality advantage is claimed.
-[Report263](report.slice-263-results-package.md) records validation and limits. Raw evidence remains
-under `build/nvvm-results/2026-09-26-integration`.
+For both unchanged material entries at NVVM O3, retained exponentials change from 6 to 0 and entry
+stack from 784 to 0 bytes. Evaluation registers change 67 to 52; sampling 86 to 62. Two reversed
+compile-timing rounds show 1.45–2.35% lower medians, satisfying all four declared 5% slowdown limits.
+The fixed 36-cell quality subset has unchanged named resources and module sizes. No measured mode
+adds spills. At NVVM O0, both material entry stacks grow by 320 bytes and modules grow; four existing
+helpers remain separate in each module. This explicit tradeoff is accepted and the raw review flag
+is retained. No general compiler-speed or material GPU-speed claim is made.
 
-[Research264](report.slice-264-material-attribution.md) attributes fresh compile time and stack
-layout; [package265](results/2026-09-26-attribution/README.md) provides explanatory slides and
-refreshable stage reports. Their original measurements remain unchanged.
+Material runtime remains unassessed: binding, texture/LUT, input and output contracts are unavailable.
+An explicit copied constref float3 helper exposes a separate compact-storage classification failure;
+it is recorded for a future authorized correctness slice, not repaired here.
 
-[Research266](report.slice-266-material-reproducer.md) supplies a
-[small differential fixture](experiments/material-reproducer/README.md): constant NVRTC/NVVM O3
-modules contain 0/3 exponentials; the branchless control gives 0/0, while removing the mask alone
-does not help. All 18 exact-entry GPU cells and 12 O3 assemblies pass. The independent oracle also
-checks runtime absorption values 1/2 and both normal/layer outputs. See
-[evidence266](research-evidence.slice-266.json) for provenance, per-cell outcomes and retained failures.
-Canonical aggregate snapshots and stores reach NVVM; optimized code still reloads counters/payload
-after its helper branch disappears. The internal libNVVM pass responsible is not established.
-
-Accepted262 source/build identities remain unchanged; no new full checkpoint or material GPU
-performance claim. Raw266 reductions are under `build/nvvm-material-reproducer266`; older temporary
-instrumentation remains separately under `build/nvvm-material-followup`. The bounded experiment is
-complete. Await discussion of the optimization boundary; no compiler implementation or general-loop
-resumption is authorized. Completion notifications are recorded in task closeouts.
+The bounded [plan267](plan.slice-267-receiver-snapshot.md) is complete. Closing commit and Slack
+delivery are recorded in the ignored task closeout. Raw attempts, binaries and repeated samples are
+under `build/nvvm-receiver-snapshot267`. Historical263/265 presentation packages retain their original
+measurements; [HISTORY](HISTORY.md) links them and the earlier research.
 
 Environment: native Ubuntu24.04, L4 SM89, driver580.126.09, SM80 target, CUDA12.9.2,
 NVRTC12.9.86, LLVM14, RelWithDebInfo. Four CPU workers maximum, two unit servers, sequential GPU
-suites and isolated measurements. Retain the parallel PCH incident when planning future validation.
-Raw maintenance evidence is under `build/nvvm-maintenance`; prior260 evidence remains unchanged.
-[HISTORY](HISTORY.md) navigates earlier architecture, inventories and findings.
+suites and isolated measurements. The next action is to await a new bounded request.

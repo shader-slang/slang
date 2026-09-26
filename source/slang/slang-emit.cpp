@@ -19,6 +19,7 @@
 #include "slang-emit-hlsl.h"
 #include "slang-emit-llvm.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-nvvm-type-lowering.h"
 #include "slang-emit-nvvm.h"
 #include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
@@ -2168,6 +2169,14 @@ Result linkAndOptimizeIR(
     // large values (e.g. arrays) in registers, where most of the elements are not
     // actually used.
     SLANG_PASS(specializeFuncsForBufferLoadArgs, codeGenContext);
+
+    // Expose consumed value fields before the existing load-stability proof. Resource-bearing
+    // aggregates can have a valid helper ABI even when an individual field cannot be a parameter.
+    if (emitNVVMDirectly)
+        SLANG_PASS(
+            transformAggregateParamsToFields,
+            codeGenContext->getSink(),
+            isNVVMSupportedHelperValueType);
 
     // Push `structuredBufferLoad` to the end of access chain to avoid loading unnecessary data.
     SLANG_PASS(deferBufferLoad, codeGenContext);

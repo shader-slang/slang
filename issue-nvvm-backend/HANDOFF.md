@@ -1,53 +1,48 @@
 # Start a fresh NVVM session
 
-Current accepted baseline: [262](runtime-validation.slice-262.json). Latest package:
-[attribution refresh265](results/2026-09-26-attribution/README.md), which retains original263
-compile/quality results and adds qualified264 explanations. Latest research is
-[the differential reproducer266](report.slice-266-material-reproducer.md), with 18 passing GPU cells.
-The bounded experiment is complete and the development loop is **stopped**. Recheck STATUS;
-this header is navigation, not renewed authority.
+Current accepted baseline: [267](runtime-validation.slice-267.json). The bounded
+[helper-value optimization](report.slice-267-receiver-snapshot.md) is complete; the general development
+loop is **stopped**. No next implementation is authorized. STATUS records the qualified source patch,
+actual compiler library, acceptance counts and known gaps. Closing commit and Slack delivery live in
+`build/nvvm-receiver-snapshot267/closeout.json`; check that before sending any completion notification.
 
-1. Read STATUS and WORKFLOW. Confirm the request's authority: results refresh, bounded maintenance,
-   or explicit development resume. The finite maintenance, material follow-up and reproducer266 are complete. Do
-   not choose another compiler slice merely because an old report lists a candidate.
-2. Inspect branch/HEAD, working changes, submodule pins and active plan. Preserve unrelated work.
-   Finish outstanding acceptance before treating a pending checkpoint as a baseline.
-3. Find the `slang-build` skill (`build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md` on this
-   host), read it, and build matching optimized tools when source changed. Native Linux uses native
-   tools; WSL uses Windows tools per AGENTS. Never reuse binaries simply because their paths exist.
-   Refresh CMake's cached version metadata as described in RESULTS and verify `slangc -version`
-   against the compiler source revision before freezing new evidence.
-4. Follow RESULTS for exact refresh/checkpoint commands. Keep new output roots unique, retain failed
-   runs, cap CPU workers at four, run GPU suites sequentially, and isolate all performance work.
-5. Review compiler/provider/toolkit/cache/input identities and exact old per-cell obligations.
-   Keep unknown upstream transitions as review-required until resolved. Update histories rather than
-   resetting the baseline. Report fresh and inherited evidence separately.
-6. Update the bounded plan, compact report, structured results and STATUS; obtain lead acceptance,
-   then make the authorized local commit. Send the slice-completion Slack DM under WORKFLOW's
-   notification policy; the maintainer's authorization persists across sessions. Check prior delivery
-   before resending, and report unavailable delivery in the handoff. Stop at the requested boundary.
-   No push is implied.
+1. Read STATUS and WORKFLOW. Distinguish a results refresh, bounded maintenance and explicit
+   development resume. Do not turn an old report's candidate into an active task.
+2. Inspect branch/HEAD, working changes, submodule pins and any active plan. Preserve unrelated work.
+   The accepted267 layout is installed at `build/RelWithDebInfo`; accepted262 is backed up under
+   `build/nvvm-receiver-snapshot267/baseline-layout`. Paths alone do not establish identity.
+3. For a build, read the platform-specific `slang-build` skill. On this host it is at
+   `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`. Native Linux uses native tools;
+   WSL uses Windows tools per AGENTS. Refresh CMake's cached version metadata as RESULTS describes.
+   The267 build deliberately retains its pre-commit version plus an exact qualified dirty patch.
+4. Follow RESULTS for refresh/checkpoint commands. Use unique raw output roots, retain failures,
+   cap CPU workers at four, use two unit servers, serialize GPU suites and isolate measurements.
+5. Compare exact per-cell outcomes and compiler/provider/toolkit/cache/input identities. Keep all
+   39 unresolved and 18 resolved histories. Accepted267 has a fresh full checkpoint, so the
+   implementations-since-full cadence is zero. AST proof evidence remains inherited from262.
+6. Complete the bounded plan, five-part report and one structured outcome record, then the authorized
+   local commit and once-per-slice Slack notification under WORKFLOW. Check prior delivery first.
+   Stop at the requested boundary; no push is implied.
 
-For a future explicitly resumed development loop, select one workload-driven slice using WORKFLOW's
-correctness priority and material cadence. Use one implementation writer and separate review; stop
-at independent blockers. For a results-only refresh, use the same accepted source and fixed workload
-manifests, and refresh provenance and measurements without extending support or restarting the loop.
+Slice267 narrows eligible internal struct value parameters to directly extracted fields before
+`deferBufferLoad`. It preserves original SSA snapshots, external signatures and unsupported field
+interfaces, using NVVM's existing helper-value classifier. Both original material entries at O3 lose
+six exponentials and their784-byte stack allocation. Registers fall67→52 and86→62; paired compile
+medians fall1.45–2.35%. The36-cell quality subset is unchanged and no spills are added. At O0, entry
+stacks grow320bytes and modules grow because existing helpers remain separate. This reviewed tradeoff
+and the raw resource review flag are retained in the accepted ledger.
 
-The current material follow-up promoted no compiler optimization. The default build is restored to
-accepted262; research instrumentation and its binaries are preserved separately under
-`build/nvvm-material-followup`. Use RESULTS's optional stage reporting and the retained experiment
-patch only for an authorized new attribution run, with fresh boundary/output qualification. Regenerate
-CMake version metadata before the next real compiler build; do not infer identity from the path.
+An explicit copied constref snapshot exposes a separate correctness issue: a float3-containing helper
+struct is mistaken for compact parameter-group storage, while float4 succeeds. If a new bounded
+correctness investigation is requested, start from267's retained minimal probe and audit
+`_getNVVMStructFieldAddress` → `_getNVVMCompactParameterGroupVectorPointer`. Do not broaden this into
+storage-layout or provider support work without a new plan. Material GPU execution still lacks its
+binding/texture/LUT/input/output contract. Concurrent NVRTC automatic-PCH reliability remains open.
 
-Research266 now provides a [differential fixture and commands](experiments/material-reproducer/README.md).
-Constant NVRTC/NVVM O3 has 0/3 exponentials, branchless 0/0; unmasking alone retains 0/3. The exact
-`computeMain` wrappers pass 18/18 GPU cells, including independent nonconstant controls. Initial
-named-entry harness failures and context-sensitive reductions remain recorded in
-[evidence266](research-evidence.slice-266.json). No compiler change was made.
-
-The next research question is where existing field-aware forwarding or downstream optimization
-loses counter/payload constants around canonical receiver snapshots and helper control flow.
-Neither a particular libNVVM pass nor a production transformation has been selected. Do not assume
-whole-graph return, masking, surviving calls or vector padding is individually the cause. One-shot
-serialization remains a separate sub-percent opportunity; compact local storage has broader scope.
-These are discussion items, not active slices. Accepted262's39 gaps and PCH limitation are unchanged.
+[Research266](report.slice-266-material-reproducer.md) and
+[source counterfactuals267](experiments/receiver-snapshot/README.md) retain their accepted262 identities;
+use that preserved compiler to reproduce the historical0/3 exponential difference. The accepted267
+compiler now optimizes the original source too. Earlier instrumentation remains under
+`build/nvvm-material-followup`. Historical [package263](results/2026-09-26/README.md) and
+[attribution package265](results/2026-09-26-attribution/README.md) have not been refreshed; use their
+commands only for a separately requested results refresh. [HISTORY](HISTORY.md) indexes prior evidence.

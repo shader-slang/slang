@@ -299,11 +299,9 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
-    // Process a single function
-    void processFunc(IRFunc* func)
+    // Returns whether every semantic use of this function is a direct call.
+    bool hasOnlyDirectCallUses(IRFunc* func)
     {
-        HashSet<IRParam*> updatedParams;
-
         // If the function is used in any way that is not understood by the
         // compiler, do not modify it.
         // For example, if the function is used as callback, we must preserve
@@ -325,8 +323,18 @@ struct TransformParamsToConstRefContext
             }
             // If we reach here, we encountered a non-call use of the func,
             // we will stop processing.
-            return;
+            return false;
         }
+
+        return true;
+    }
+
+    // Process a single function.
+    virtual void processFunc(IRFunc* func)
+    {
+        if (!hasOnlyDirectCallUses(func))
+            return;
+        HashSet<IRParam*> updatedParams;
 
         // First pass: Transform parameter types
         for (auto param = func->getFirstParam(); param; param = param->getNextParam())
@@ -421,6 +429,202 @@ struct TransformParamsToConstRefContext
         return SLANG_OK;
     }
 };
+
+// Replace a partially read struct value parameter with the fields that the callee consumes.
+// The callers keep extracting from the original SSA snapshot. Consider this example:
+//
+//     Snapshot saved = live;
+//     live.first = 99;
+//     readFirst(saved);
+//
+// The rewritten call receives saved.first, not a new load of live.first. The existing
+// deferBufferLoad pass can narrow the original snapshot load only when its memory-stability
+// proof allows that. This pass never converts a value snapshot into an alias of its source.
+struct TransformAggregateParamsToFieldsContext : TransformParamsToConstRefContext
+{
+    const Func<bool, IRInst*>& isFieldTypeSupported;
+
+    TransformAggregateParamsToFieldsContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        const Func<bool, IRInst*>& inIsFieldTypeSupported)
+        : TransformParamsToConstRefContext(module, sink)
+        , isFieldTypeSupported(inIsFieldTypeSupported)
+    {
+    }
+
+    struct ParamFields
+    {
+        IRParam* original;
+        List<IRStructField*> fields;
+    };
+
+    bool shouldProcessFunction(IRFunc* func) override
+    {
+        if (!TransformParamsToConstRefContext::shouldProcessFunction(func))
+            return false;
+        for (auto decoration : func->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_ImportDecoration:
+            case kIROp_ExternCppDecoration:
+            case kIROp_ExternCDecoration:
+            case kIROp_UserExternDecoration:
+            case kIROp_DownstreamModuleImportDecoration:
+            case kIROp_PublicDecoration:
+            case kIROp_KeepAliveDecoration:
+            case kIROp_DllImportDecoration:
+            case kIROp_DllExportDecoration:
+            case kIROp_HLSLExportDecoration:
+            case kIROp_DownstreamModuleExportDecoration:
+                return false;
+            default:
+                break;
+            }
+        }
+        // Back-end linking leaves ExportDecoration on ordinary internal functions too.
+        // As in DCE's keepExportsAlive distinction, that linkage name alone does not imply
+        // an external ABI. The externally observable roles above retain their signatures.
+        return true;
+    }
+
+    // Collect a strict subset of fields selected directly from an ordinary struct value.
+    // Preserve arrays and pointers as field values; do not inspect their contents or aliases.
+    bool collectFields(IRParam* param, ParamFields& result)
+    {
+        auto structType = as<IRStructType>(param->getDataType());
+        if (!structType || param->getFullType() != param->getDataType())
+            return false;
+        for (auto decoration : param->getDecorations())
+        {
+            if (!as<IRNameHintDecoration>(decoration))
+                return false;
+        }
+
+        HashSet<IRInst*> usedKeys;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            auto extract = as<IRFieldExtract>(use->getUser());
+            if (!extract || !isUseBaseAddrOperand(use, extract) || extract->getFirstDecoration() ||
+                extract->getFullType() != extract->getDataType())
+                return false;
+            usedKeys.add(extract->getField());
+        }
+        if (usedKeys.getCount() == 0)
+            return false;
+
+        Index fieldCount = 0;
+        for (auto field : structType->getFields())
+        {
+            ++fieldCount;
+            if (usedKeys.contains(field->getKey()))
+            {
+                // A valid aggregate parameter need not admit each field as an independent
+                // parameter. Preserve its representation when the target cannot accept a field.
+                if (!isFieldTypeSupported(field->getFieldType()))
+                    return false;
+                result.fields.add(field);
+            }
+        }
+        // Field keys identify the fields; declaration order only makes the new signature stable.
+        SLANG_RELEASE_ASSERT(result.fields.getCount() == usedKeys.getCount());
+        if (result.fields.getCount() == fieldCount)
+            return false;
+        result.original = param;
+        return true;
+    }
+
+    void processFunc(IRFunc* func) override
+    {
+        if (!hasOnlyDirectCallUses(func))
+            return;
+        // Derivative and dispatch decorations can encode another function signature.
+        // Keep those contracts intact even though the ordinary constref pass accepts them.
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (as<IRDecoration>(use->getUser()))
+                return;
+        }
+        List<IRParam*> originalParams;
+        List<ParamFields> plans;
+        Dictionary<IRParam*, Index> planIndices;
+        for (auto param : func->getParams())
+        {
+            originalParams.add(param);
+            ParamFields plan;
+            if (collectFields(param, plan))
+            {
+                planIndices.add(param, plans.getCount());
+                plans.add(_Move(plan));
+            }
+        }
+        if (plans.getCount() == 0)
+            return;
+
+        List<IRCall*> calls;
+        traverseUsers<IRCall>(func, [&](IRCall* call) { calls.add(call); });
+        for (auto& plan : plans)
+        {
+            Dictionary<IRInst*, IRParam*> paramsByKey;
+            builder.setInsertBefore(plan.original);
+            for (auto field : plan.fields)
+            {
+                auto replacement = builder.createParam(field->getFieldType());
+                replacement->insertBefore(plan.original);
+                replacement->sourceLoc = plan.original->sourceLoc;
+                if (auto name = field->getKey()->findDecoration<IRNameHintDecoration>())
+                    builder.addNameHintDecoration(replacement, name->getName());
+                paramsByKey.add(field->getKey(), replacement);
+            }
+            traverseUsers<IRFieldExtract>(
+                plan.original,
+                [&](IRFieldExtract* extract)
+                {
+                    auto replacement = paramsByKey[extract->getField()];
+                    SLANG_RELEASE_ASSERT(
+                        isTypeEqual(replacement->getFullType(), extract->getFullType()));
+                    extract->replaceUsesWith(replacement);
+                    extract->removeAndDeallocate();
+                });
+        }
+
+        for (auto call : calls)
+        {
+            builder.setInsertBefore(call);
+            List<IRInst*> args;
+            for (Index i = 0; i < originalParams.getCount(); ++i)
+            {
+                Index planIndex = 0;
+                auto arg = call->getArg(i);
+                if (!planIndices.tryGetValue(originalParams[i], planIndex))
+                {
+                    args.add(arg);
+                    continue;
+                }
+                for (auto field : plans[planIndex].fields)
+                    args.add(builder.emitFieldExtract(field->getFieldType(), arg, field->getKey()));
+            }
+            auto replacement = builder.emitCallInst(call->getFullType(), func, args);
+            replacement->sourceLoc = call->sourceLoc;
+            call->transferDecorationsTo(replacement);
+            call->replaceUsesWith(replacement);
+            call->removeAndDeallocate();
+        }
+        for (auto& plan : plans)
+            plan.original->removeAndDeallocate();
+        fixUpFuncType(func);
+    }
+};
+
+SlangResult transformAggregateParamsToFields(
+    IRModule* module,
+    DiagnosticSink* sink,
+    const Func<bool, IRInst*>& isFieldTypeSupported)
+{
+    TransformAggregateParamsToFieldsContext context(module, sink, isFieldTypeSupported);
+    return context.processModule();
+}
 
 SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
 {
