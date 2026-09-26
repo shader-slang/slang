@@ -86,7 +86,8 @@ The threads within a wave belong to one of the following classes:
   following reasons:
   - The thread is not executing the [current path](basics-execution-divergence-reconvergence.md#divergence).
   - The wave could not be fully utilized when assigning threads.
-  - The thread has executed a `discard` statement, which disables the thread (fragment shaders only).
+  - The thread has executed a [discard statement](statements-discard.md), which disables the thread (fragment
+    shaders only).
 - *helper thread*---a thread that is used to compute derivatives, typically for fragment quads. A helper
   thread does not produce any other side effects, and it does not participate in wave-tangled functions unless
   otherwise stated.
