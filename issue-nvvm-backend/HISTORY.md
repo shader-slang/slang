@@ -6,7 +6,7 @@ The current handoff belongs in [STATUS](STATUS.md), not in historical reports.
 
 | Topic                                                       | Stable entry points                                                                                                                                                 |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Current compiler capability, outcomes and failure histories | [validation260](runtime-validation.slice-260.json), [report260](report.slice-260-fp8-widening.md)                                                                   |
+| Current compiler capability, outcomes and failure histories | [validation262](runtime-validation.slice-262.json), [integration262](report.slice-262-master-integration.md), [FP8 support260](report.slice-260-fp8-widening.md)    |
 | Runtime inventories                                         | [frozen v1](census.slice-195.tsv), [discovery](discovery-corpus.manifest.tsv)                                                                                       |
 | Material workload contract                                  | [manifest](complex-corpus.manifest.json), [fixed quality subset](quality-corpus.manifest.json)                                                                      |
 | Recent BF16 local storage                                   | [report256](report.slice-256-bf16-local-vectors.md), [report259](report.slice-259-bf16-local-records.md)                                                            |

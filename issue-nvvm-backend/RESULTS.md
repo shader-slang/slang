@@ -21,6 +21,7 @@ in the repository. Commands default to SM80 and matching CUDA12.9 on this host.
 
 ```bash
 export NVVM_RESULTS=build/nvvm-results/2026-09-28-refresh1
+export NVVM_BASELINE=issue-nvvm-backend/runtime-validation.slice-262.json
 export CUDA_PATH=/usr/local/cuda-12.9
 export CUDA_HOME="$CUDA_PATH"
 export LIBNVVM_HOME="$CUDA_PATH"
@@ -39,7 +40,7 @@ After a master/toolchain merge, first run the small GPU gate and full corpus wra
 
 ```bash
 python3 issue-nvvm-backend/nvvm-results.py checkpoint \
-  --baseline issue-nvvm-backend/runtime-validation.slice-260.json \
+  --baseline "$NVVM_BASELINE" \
   --slangc build/RelWithDebInfo/bin/slangc --build-label RelWithDebInfo \
   --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so --cuda-root "$CUDA_PATH" \
   --jobs 4 --output "$NVVM_RESULTS/checkpoint"
@@ -72,7 +73,7 @@ For CPU-only comparison against a durable old compact baseline, even without the
 
 ```bash
 python3 issue-nvvm-backend/nvvm-results.py compare \
-  --baseline issue-nvvm-backend/runtime-validation.slice-260.json \
+  --baseline "$NVVM_BASELINE" \
   --frozen "$NVVM_RESULTS/checkpoint/frozen/results.json" \
   --discovery "$NVVM_RESULTS/checkpoint/discovery/results.json" \
   --output "$NVVM_RESULTS/comparison"
@@ -116,8 +117,15 @@ status edit without that review is not acceptance. The compact schema produced b
 The sample shows field structure only; preserve actual complete rows and histories. Copy the complete
 checkpoint outcomes, add reviewed gate/transition evidence, and change status only after acceptance.
 The harness deliberately has no automatic promotion command: a matching count is not a review.
-The next command examples call this reviewed file
-`issue-nvvm-backend/results.baseline.json`; use its actual path. It must retain `runtime_input_sha256`,
+If a run has an infrastructure failure, retain the failed comparison. A supplemental closure needs
+an explicit, predeclared scope and review: preserve every failed attempt, require all declared rounds
+to pass, identify each substituted cell and its source evidence, and distinguish original counts from
+composite accepted counts. Serial closure never proves concurrent reliability. Accepted262 demonstrates
+this for one NVRTC automatic-PCH deletion incident; its open reliability limitation must remain visible
+until separately resolved. Do not use retries to hide shader-output regressions or failed timing samples.
+
+Set `NVVM_BASELINE` to this newly reviewed file before quality measurement (the setup example uses
+the current accepted262 record; recheck STATUS in later sessions). It must retain `runtime_input_sha256`,
 `provenance.artifact_sha256`, and per-corpus `fresh_cell_outcomes` for the next refresh.
 
 ## Report environment
@@ -182,7 +190,7 @@ the maintained material/quality measurement schema, not this distinct shared-run
 
 ```bash
 python3 issue-nvvm-backend/nvvm-results.py quality \
-  --correctness issue-nvvm-backend/results.baseline.json \
+  --correctness "$NVVM_BASELINE" \
   --slangc build/RelWithDebInfo/bin/slangc --build-label RelWithDebInfo \
   --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so --cuda-root "$CUDA_PATH" \
   --output "$NVVM_RESULTS/quality"
@@ -207,9 +215,41 @@ metrics proves GPU speed, occupancy, numerical equivalence or a particular optim
 ## Package and stop
 
 `report` generates a readable `summary.md`, structured `summary.json`, and standalone SVG/PNG figures (`wall-time` for repeated material timing, `entry-registers` for quality)
-from validated complete measurements. Copy compact summaries/charts and the reviewed correctness
-ledger into the presentation/results package; keep all raw logs/samples under ignored build. Add
+from validated complete measurements. Copy compact summaries/charts and link the reviewed correctness
+ledger from the presentation/results package; keep all raw logs/samples under ignored build. Add
 links to exact source revision, manifests, binaries/toolkit/device, protocol, unresolved cells,
 cache/math settings and limitations. A future refresh follows the same commands with a new output
 root; avoid a new slice-specific benchmark script. Update STATUS with the package path and explicit
 stopped-loop authority. The finite maintenance request ends here.
+
+Use a new package directory for each accepted refresh. For the existing package layout:
+
+```bash
+export NVVM_PACKAGE=issue-nvvm-backend/results/2026-09-28-refresh1
+mkdir -p "$NVVM_PACKAGE/material" "$NVVM_PACKAGE/quality"
+cp "$NVVM_RESULTS/material-report/summary.md" "$NVVM_RESULTS/material-report/summary.json" \
+  "$NVVM_RESULTS/material-report/wall-time.svg" "$NVVM_RESULTS/material-report/wall-time.png" \
+  "$NVVM_PACKAGE/material/"
+cp "$NVVM_RESULTS/quality-report/summary.md" "$NVVM_RESULTS/quality-report/summary.json" \
+  "$NVVM_RESULTS/quality-report/entry-registers.svg" "$NVVM_RESULTS/quality-report/entry-registers.png" \
+  "$NVVM_PACKAGE/quality/"
+```
+
+Copy the narrative/presentation structure from the latest package named in STATUS, then replace every
+result from the new summary rows. Keep the generated summaries/charts unchanged. Derive each material
+ratio as NVRTC O3 median divided by the matching NVVM O3 median, and report both entries. Compare
+quality metrics only for the same fixture and mode; record entry versus whole-module scope. Inspect
+the rendered charts. Update correctness, exact source/binary identities, sample inventory, protocol,
+limitations and raw-root references. Local raw paths in JSON identify evidence on this host; they are
+not portable download links. The summaries, hashes and accepted per-cell ledger remain durable.
+
+If a future source change invalidates the fixed quality manifest's hashes, review that fixture's
+semantics and runtime obligations first. Update the manifest only as part of an accepted change,
+then rerun quality against the matching correctness ledger. Do not simply replace hashes to make a
+measurement pass. If the selected subset or options change, describe it as a changed experiment.
+
+A results-only refresh of unchanged source can use the existing accepted-full ledger after verifying
+its compiler/provider/input identities. A compiler, toolkit, shared runner or configuration change
+requires the correctness gates prescribed by WORKFLOW before new presentation claims. Preserve old
+packages and all failed attempts. Commit the compact completed plan/report and package, update STATUS
+and HANDOFF navigation, and stop unless further work has been explicitly authorized.

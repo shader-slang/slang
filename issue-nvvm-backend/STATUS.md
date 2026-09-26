@@ -1,45 +1,46 @@
 # NVVM backend status
 
-The general development loop is **stopped**. The maintainer authorized only: consolidate reusable
-results tooling, merge master, validate correctness, produce the results package, then stop. No push.
-Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md), and the current
-[maintenance plan261](plan.slice-261-results-harness.md). [HANDOFF](HANDOFF.md) covers a fresh session.
+The general development loop is **stopped**. The authorized finite maintenance sequence has completed
+harness consolidation261 and master integration/acceptance262. Only results package263 remains;
+then stop. No push. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and
+[HANDOFF](HANDOFF.md) for a fresh session.
 
 ## Accepted compiler baseline
 
-Slice260 adds scalar E4M3/E5M2 -> Float32 widening under provider ABI42. Finite values, signed zeros
-and infinities are exact; NaNs preserve classification. Reverse narrowing, aggregate/vector/storage
-and external-helper roles remain excluded. [Report260](report.slice-260-fp8-widening.md) explains the
-change; [validation260](runtime-validation.slice-260.json) is the authoritative outcome/history ledger.
+[Validation262](runtime-validation.slice-262.json) is authoritative; [report262](report.slice-262-master-integration.md)
+explains the merge, exact deltas and validation. Master `6eb89786ca882d71049c8568638e247f60864b6f`
+is merged at `5294b5ae6`. Compiler source is `49593da724e172838bd65b9eb48b2a3f11334522`,
+version `2026.18.3-275-g49593da72`; runner source is `c3455e606`. All22 dependency pins are exact.
+Provider ABI42 and qualified support through scalar FP8 widening260 are retained.
 
-| Evidence                                         | Accepted260 result                                             |
-| ------------------------------------------------ | -------------------------------------------------------------- |
-| Frozen / discovery                               | 1356 / 357 cells                                               |
-| Combined                                         | 1713 total; 1674 correct; 39 unresolved; 18 resolved histories |
-| Units / semantic regressions                     | 1051 pass + 13 skip / 1052 pass + 77 skip                      |
-| Runtime / toolkit / contracts / material support | 4 / 18 / 6 / 6 pass                                            |
-| Last full / targeted / implementation cadence    | 260 / 233 / 0                                                  |
-| Rolling implementations                          | 256 local BF16 vectors; 259 local records; 260 FP8 widening    |
+| Evidence                                       | Accepted262 result                                          |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| Frozen / discovery                             | 1356 / 357 cells                                            |
+| Combined                                       | 1713 total;1674 correct;39 unresolved;18 resolved histories |
+| Units / semantics                              | 1086 pass13 skip /1170 pass78 skip                          |
+| Focused / runtime / toolkit / material support | 29 /4 /18 /6 pass                                           |
+| AST proof                                      | 705 tags;497025 pairs;zero failures (optimized)             |
+| Last full / targeted / implementation cadence  | 262 /233 /0                                                 |
 
-Compiler SHA256: `4b59d082df60a6862e684f63f099105228d0b820113aba456e83abc3661aca7d`.
-Provider SHA256: `2e54768ba323ba86cb7767a0a4405c9d4212e36f67e62786fd812dd59532e9f1`.
-Material PTX/cubins remain exact259. Material runtime is unassessed because binding, texture/LUT,
-input and output contracts are unavailable. The failure ledger retains texture/column-major and
-other existing gaps; unchanged counts do not mean all workloads are supported.
+Acceptance is **full checkpoint plus explicit serial infrastructure closure**. The raw full run had
+1673 correct and one extra NVRTC failure deleting `default_program.pch`. Three declared serial rounds
+passed all three modes (9/9); only that NVRTC outcome is substituted, with original failure retained.
+Concurrent automatic-PCH reliability remains unresolved. Six intentional upstream texture rejections
+change existing unresolved diagnoses; none is new support or a semantic resolution. Known semantic
+mismatches remain the three column-major modes. The other36 gaps are infrastructure/preflight.
+Material runtime is unassessed: binding, texture/LUT, input and output contracts are unavailable.
 
-## Maintenance handoff
+Compiler SHA256: `4a207ec0d3f390152dd593a21af81f4b1fe30d9e1c5edd065343bd3590f8bbbc`.
+Provider SHA256: `fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913`.
 
-Slice261 adds maintained results commands and compact documentation; it changes no compiler behavior.
-Its accepted260 replay is historical validation, not a new GPU checkpoint. Tooling acceptance and
-review are complete; the next authorized step is separately planned master integration. After merging, rebuild matching tools and
-run full acceptance before freezing any new baseline or measurements. Review every upstream input,
-submodule, diagnostic and outcome delta. Do not imply old binaries validate merged source.
+## Current finite action
 
-Environment last measured: native Ubuntu24.04, L4 SM89, driver580.126.09, SM80 target, CUDA12.9.2,
-NVRTC12.9.86, LLVM14, RelWithDebInfo. Recheck it; commands are in RESULTS. Four CPU workers total,
-two unit servers, sequential GPU suites and isolated timings. Raw260 evidence lives under
-`build/nvvm-loop/slice-260-{before,after}`; maintenance evidence under `build/nvvm-maintenance`.
+Execute [results plan263](plan.slice-263-results-package.md) with unchanged accepted binaries.
+Raw measurements go under `build/nvvm-results/2026-09-26-integration`; the reviewed package goes
+under `results/2026-09-26`. No compiler optimization or development-loop restart is authorized.
 
-Research258's discarded material experiment explains the recent capability-cadence exception.
-Historical candidates are evidence, not permission to restart. [HISTORY](HISTORY.md) links durable
-architecture, inventories and selected prior findings without duplicating their reports.
+Environment: native Ubuntu24.04, L4 SM89, driver580.126.09, SM80 target, CUDA12.9.2,
+NVRTC12.9.86, LLVM14, RelWithDebInfo. Four CPU workers maximum, two unit servers, sequential GPU
+suites and isolated measurements. Retain the parallel PCH incident when planning future validation.
+Raw maintenance evidence is under `build/nvvm-maintenance`; prior260 evidence remains unchanged.
+[HISTORY](HISTORY.md) navigates earlier architecture, inventories and findings.
