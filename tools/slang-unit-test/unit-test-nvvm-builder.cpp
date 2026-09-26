@@ -9571,7 +9571,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderCoexistsWithLLVM21)
     // each child invocation below executes the probe in its own fully isolated test-server.
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
-    const SlangResult llvmResult = _queryLLVM21(unitTestContext);
+    RefPtr<DownstreamCompilerSet> llvmCompilers;
+    const SlangResult llvmResult = _queryLLVM21(unitTestContext, llvmCompilers);
     if (llvmResult == SLANG_E_NOT_FOUND)
     {
         getTestReporter()->message(
