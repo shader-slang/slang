@@ -20,7 +20,10 @@ development loop is **stopped**. Recheck STATUS; this header is navigation, not 
    Keep unknown upstream transitions as review-required until resolved. Update histories rather than
    resetting the baseline. Report fresh and inherited evidence separately.
 6. Update the bounded plan, compact report, structured results and STATUS; obtain lead acceptance,
-   then make the authorized local commit. Stop at the requested boundary. No push is implied.
+   then make the authorized local commit. Send the slice-completion Slack DM under WORKFLOW's
+   notification policy; the maintainer's authorization persists across sessions. Check prior delivery
+   before resending, and report unavailable delivery in the handoff. Stop at the requested boundary.
+   No push is implied.
 
 For a future explicitly resumed development loop, select one workload-driven slice using WORKFLOW's
 correctness priority and material cadence. Use one implementation writer and separate review; stop

@@ -86,3 +86,30 @@ Preserve exact per-cell outcomes and failure histories even when that data excee
 Format changed files, inspect the final diff and confirm validation corresponds to final bytes before
 local commit. Commit completed NVVM plans/reports under the explicit maintainer exception in AGENTS.
 At boundaries update STATUS and the plan with remaining acceptance, exact next command and stop state.
+
+## Notify after each completed slice
+
+The maintainer has given standing authorization to send one Slack DM after every completed NVVM
+slice, including implementation, research, maintenance and results slices. The lead sends it after
+review, the closing local commit and the STATUS/plan update, before starting another authorized slice
+or stopping. A completed research slice with no retained compiler change still gets a notification;
+an interrupted or unfinished slice must not be announced as complete. Do not request confirmation
+again for these completion DMs. This notification policy does not authorize starting the loop.
+
+Recipient: Simon Kallweit (`skallweit`, `skallweit@nvidia.com`) in NVIDIA Slack, verified user ID
+`UFX629P4L`. Use an available Slack send-message tool; the current connector accepts that user ID as
+`channel_id`. If recipient lookup is needed, consult the `managing-slack` skill and resolve the email.
+Its `slack-cli` is read-only, so use the connector to send. Discover the current tool rather than
+assuming a particular tool name is installed in every session.
+
+Keep the message short: slice number/title, outcome and practical change, key validation results and
+remaining limitations, closing commit and report path/link, and whether the loop is continuing or
+stopped. Include performance numbers only when supported by accepted measurements; distinguish
+completed research from a supported feature. Local paths identify checkout artifacts, not published
+links. Send only once per completed slice; workers report to the lead instead of sending their own DMs.
+
+Retain the returned message permalink in the task closeout. If resuming around a notification boundary,
+check the prior closeout or Slack DM history before resending. On an uncertain send result, check
+history before retrying. If Slack is unavailable or delivery fails, report the undelivered notification
+in the task and handoff; do not claim delivery or undo acceptance. A notification failure alone does
+not block otherwise authorized development. Respect the recorded stop condition after notifying.
