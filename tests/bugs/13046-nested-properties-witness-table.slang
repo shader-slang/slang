@@ -14,8 +14,8 @@
 //   - default: aborts in `analyzeExtractExistentialWitnessTable` ("Unhandled info type").
 //   - INLINE_HIT_FACTORY=1: inlining `get_hit` moves the refinement so the malformed shape instead
 //     reaches `analyzeExtractExistentialType`, the consumer of the original #13046 top-level repro.
-// We fix this at the producer: `makeInfoForConcreteType` returns the already-lowered union as-is
-// rather than re-lifting it, so the double-wrap never forms upstream of either consumer.
+// Both consumers require the bare tagged union, so the already-lowered union must be reused as-is
+// rather than re-lifted by `makeInfoForConcreteType`.
 //
 // Load-bearing shape (do not "simplify"): both `IMaterial` conformances are required (a monomorphic
 // material never triggers the shared refinement); the nested `IHit.properties() -> IProperty` hop is
