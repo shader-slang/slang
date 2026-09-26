@@ -453,6 +453,12 @@ void sortBlocksInFunc(IRGlobalValueWithCode* func);
 // Remove all linkage decorations from func.
 void removeLinkageDecorations(IRInst* inst);
 
+// Remove the layout decorations from each parameter of `func`. An entry point's parameters carry
+// layouts derived from its entry-point layout, and emitters print varying layouts as
+// stage-interface attributes (e.g. Metal `[[stage_in]]`), so an ordinary function derived from an
+// entry point must not keep them.
+void removeParamLayoutDecorations(IRFunc* func);
+
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);

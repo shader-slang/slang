@@ -390,35 +390,50 @@ static void transferFunctionDecorations(
     }
 }
 
-// Handle cleanup of original function if needed
+// Re-point at `newFunc` every `IREntryPointParamDecoration` that currently names `oldFunc` as
+// its originating entry point. When entry-point `uniform` parameters are hoisted to global scope
+// (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
+// IREntryPointParamDecoration recording the entry-point function it came from. Once the wrapper
+// replaces the entry point those tags must follow it: introduceExplicitGlobalContext binds a
+// global uniform to an entry point only when this decoration names that entry point, and a tag
+// left on `oldFunc` would also count as a use that keeps `oldFunc` alive (see
+// handleOriginalFunction).
+static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
+{
+    traverseUses(
+        oldFunc,
+        [&](IRUse* use)
+        {
+            if (as<IREntryPointParamDecoration>(use->getUser()))
+                use->set(newFunc);
+        });
+}
+
+// An original that other users keep alive must no longer look like an entry point to later passes.
 static void handleOriginalFunction(IRFunc* func, IRCall* callResult)
 {
-    // Count uses of original function
-    UInt useCount = 0;
-    for (auto use = func->firstUse; use; use = use->nextUse)
-        useCount++;
-
-    if (useCount == 1)
+    if (!func->hasMoreThanOneUse())
     {
         inlineCall(callResult);
-
-        // Remove decorations from old function
-        List<IRDecoration*> decorationsToRemove;
-        for (auto decor : func->getDecorations())
-        {
-            if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
-            {
-                decorationsToRemove.add(decor);
-            }
-        }
-
-        for (auto decor : decorationsToRemove)
-        {
-            decor->removeFromParent();
-        }
-
         func->removeAndDeallocate();
+        return;
     }
+
+    List<IRDecoration*> decorationsToRemove;
+    for (auto decor : func->getDecorations())
+    {
+        if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor) ||
+            as<IRLayoutDecoration>(decor))
+        {
+            decorationsToRemove.add(decor);
+        }
+    }
+
+    for (auto decor : decorationsToRemove)
+    {
+        decor->removeFromParent();
+    }
+    removeParamLayoutDecorations(func);
 }
 
 // Main function that orchestrates the transformation
@@ -492,6 +507,8 @@ IRFunc* lowerOutParameters(
         constructReturnValue(builder, callResult, resultKey, returnStruct, outKeys, paramInfos);
 
     builder.emitReturn(returnValue);
+
+    retargetEntryPointParamDecorations(func, newFunc);
 
     // Handle cleanup of original function
     handleOriginalFunction(func, callResult);
