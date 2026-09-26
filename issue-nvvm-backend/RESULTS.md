@@ -9,6 +9,15 @@ When configuring after a revision change, clear cached `SLANG_VERSION_FULL` and
 plus the selected build options on this native Linux host). Verify `slangc -version` identifies
 the compiler source revision; source and binary hashes remain the acceptance identity.
 
+The expanded discovery corpus also requires the standard numerics modules from the same build.
+Ensure the existing `slang-numerics-modules` target is included when building through `slang-build`;
+it produces `slang/numerics.slang-module` and the three serialized modules under
+`slang/numerics/` in the configured standard-module directory. Do not copy serialized modules from
+a different compiler build. For a results-only refresh, verify these artifacts against the accepted
+ledger along with the compiler/core module. Missing modules are a packaging failure, not evidence
+that the shader or backend is unsupported. Preserve such failed attempts before restoring the
+matching layout or rebuilding and requalifying it.
+
 ## Evidence and outputs
 
 Every harness command requires a **new** `--output` directory and refuses to overwrite old evidence.

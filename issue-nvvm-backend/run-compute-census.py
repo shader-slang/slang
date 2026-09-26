@@ -25,21 +25,17 @@ import threading
 import time
 
 
-ACTIVE_CUDA_RE = re.compile(
-    r"^(?P<indent>\s*)//TEST(?P<categories>\([^)]*\))?:"
-    r"(?P<command>COMPARE_COMPUTE(?:_EX)?(?:\([^)]*\))?):(?P<arguments>.*-cuda.*)$",
-    re.IGNORECASE,
+# Match the case-sensitive command extraction in slang-test::_gatherTestsForFile.
+# Only spaces/tabs may surround the contiguous leading comment slashes.
+DIRECTIVE_HEADER_RE = re.compile(
+    r"^[ \t]*//+[ \t]*(?P<directive>[A-Za-z_]+)(?=[:(]|$)"
 )
-# Match executable directives accepted by slang-test, including ///TEST and // TEST. Keep
-# TEST_INPUT/CATEGORY/IGNORE_FILE metadata: only the selected executable directive is replaced.
-EXECUTION_DIRECTIVE_RE = re.compile(
-    r"^\s*//+\s*(?:(?:DISABLE|DISABLED)_)?(?:TEST|DIAGNOSTIC_TEST)\s*(?:\([^)]*\))?\s*:",
-    re.IGNORECASE,
+TEST_OPTIONS_RE = re.compile(
+    r"(?P<categories>\([^)]*\))?:"
+    r"(?P<command>[^(:]*(?:\([^)]*\))?):(?P<arguments>.*)$"
 )
-ACTIVE_EXECUTION_DIRECTIVE_RE = re.compile(
-    r"^\s*//TEST(?:\([^)]*\))?:",
-    re.IGNORECASE,
-)
+COMPARE_COMMAND_RE = re.compile(r"COMPARE_COMPUTE(?:_EX)?(?:\([^)]*\))?$")
+CUDA_ARGUMENT_RE = re.compile(r"(?:^|[ \t])-cuda(?:[ \t]|$)")
 OPTIMIZATION_RE = re.compile(r"\s+(?:-Xslang|-xslang)\s+-O[0-3]\b", re.IGNORECASE)
 DIRECT_NVVM_RE = re.compile(
     r"\s+(?:-Xslang|-xslang)\s+-emit-cuda-via-nvvm\b",
@@ -147,6 +143,65 @@ def _coverage_tier(relative_path: str) -> tuple[str, str]:
     return "mvp", ""
 
 
+def enumerate_test_directives(source_text: str) -> list[dict[str, object]]:
+    """Enumerate authored tests using slang-test's native source indices.
+
+    Consider a disabled TEST followed by a DIAGNOSTIC_TEST and an active TEST.
+    _gatherTestsForFile appends all three to its list, so the active test selects
+    .2.expected.txt, falling back to .expected.txt. Preserve those indices even
+    though the corpus selects only enabled compare-compute tests. Metadata does
+    not occupy an index, and TEST_IGNORE_FILE clears the entire authored list.
+    This interprets directive syntax; slang-test still owns category/API gating.
+    """
+    directives: list[dict[str, object]] = []
+    for line_number, line in enumerate(source_text.splitlines(), start=1):
+        header = DIRECTIVE_HEADER_RE.match(line)
+        if not header:
+            continue
+        name = header.group("directive")
+        if name == "TEST_IGNORE_FILE":
+            return []
+        enabled = not name.startswith("DISABLE_")
+        if not enabled:
+            name = name[len("DISABLE_"):]
+        if name not in ("TEST", "DIAGNOSTIC_TEST"):
+            continue
+        options = TEST_OPTIONS_RE.fullmatch(line[header.end():])
+        if not options:
+            raise ValueError(f"malformed {name} directive on line {line_number}")
+        directives.append(
+            {
+                "line": line_number,
+                "test_ordinal": len(directives),
+                "enabled": enabled,
+                "directive": name,
+                "categories": options.group("categories") or "",
+                "command": options.group("command"),
+                "arguments": options.group("arguments").strip(),
+            }
+        )
+    return directives
+
+
+def is_active_compare_directive(directive: dict[str, object]) -> bool:
+    """Select enabled ordinary compute comparisons, excluding diagnostic tests."""
+    return bool(
+        directive["enabled"]
+        and directive["directive"] == "TEST"
+        and COMPARE_COMMAND_RE.fullmatch(str(directive["command"]))
+    )
+
+
+def source_without_test_directives(source_text: str) -> str:
+    """Remove authored executions while preserving source and harness metadata."""
+    execution_lines = {row["line"] for row in enumerate_test_directives(source_text)}
+    return "".join(
+        line
+        for number, line in enumerate(source_text.splitlines(keepends=True), 1)
+        if number not in execution_lines
+    )
+
+
 def discover_workloads(tests_dir: Path, architecture: int = 80) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
     workloads: list[dict[str, object]] = []
     excluded: list[dict[str, str]] = []
@@ -156,25 +211,17 @@ def discover_workloads(tests_dir: Path, architecture: int = 80) -> tuple[list[di
         relative_path = _normalize_relative(source_path.relative_to(tests_dir))
         native_directives: list[dict[str, object]] = []
         direct_directives: list[dict[str, object]] = []
-        test_ordinal = 0
-        for line_number, line in enumerate(_read_text(source_path).splitlines(), start=1):
-            match = ACTIVE_CUDA_RE.match(line)
-            if match:
-                directive = {
-                    "line": line_number,
-                    "test_ordinal": test_ordinal,
-                    "categories": match.group("categories") or "",
-                    "command": match.group("command"),
-                    "arguments": match.group("arguments").strip(),
-                    "reference_derived_from_direct": False,
-                }
-                if "emit-cuda-via-nvvm" in match.group("arguments").lower():
-                    directive["reference_derived_from_direct"] = True
-                    direct_directives.append(directive)
-                else:
-                    native_directives.append(directive)
-            if ACTIVE_EXECUTION_DIRECTIVE_RE.match(line):
-                test_ordinal += 1
+        for directive in enumerate_test_directives(_read_text(source_path)):
+            if not is_active_compare_directive(directive):
+                continue
+            arguments = str(directive["arguments"])
+            if not CUDA_ARGUMENT_RE.search(arguments):
+                continue
+            directive["reference_derived_from_direct"] = "emit-cuda-via-nvvm" in arguments.lower()
+            if directive["reference_derived_from_direct"]:
+                direct_directives.append(directive)
+            else:
+                native_directives.append(directive)
 
         if not native_directives and direct_directives:
             native_directives = direct_directives
@@ -280,10 +327,9 @@ def prepare_mode(
 
     for workload in workloads:
         original_source = tests_dir / Path(str(workload["source"]))
-        lines = _read_text(original_source).splitlines(keepends=True)
-        filtered = [line for line in lines if not EXECUTION_DIRECTIVE_RE.match(line)]
+        filtered = source_without_test_directives(_read_text(original_source))
         generated_path = mode_root / _generated_relative_path(workload)
-        _write_text(generated_path, _directive_for_mode(workload, mode) + "".join(filtered))
+        _write_text(generated_path, _directive_for_mode(workload, mode) + filtered)
         source_test_ordinal = int(workload["source_test_ordinal"])
         expected_suffix = (
             ".expected.txt"

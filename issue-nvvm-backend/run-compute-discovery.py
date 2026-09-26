@@ -28,15 +28,6 @@ MIN_DISCOVERY_WORKLOADS = 50
 MAX_DISCOVERY_WORKLOADS = 128
 
 
-COMPARE_DIRECTIVE_RE = re.compile(
-    r"^(?P<indent>\s*)//TEST(?P<categories>\([^)]*\))?:"
-    r"(?P<command>COMPARE_COMPUTE(?:_EX)?(?:\([^)]*\))?):(?P<arguments>.*)$",
-    re.IGNORECASE,
-)
-ACTIVE_EXECUTION_DIRECTIVE_RE = re.compile(
-    r"^\s*//TEST(?:\([^)]*\))?:",
-    re.IGNORECASE,
-)
 ARGUMENT_TOKEN_RE = re.compile(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\S+''')
 
 
@@ -172,19 +163,14 @@ def _audit_frozen_v1(path: Path) -> tuple[set[str], dict[str, int]]:
 def _find_compare_directive(
     source_text: str,
     source_test_ordinal: int,
+    census: ModuleType,
 ) -> dict[str, object]:
-    current_ordinal = 0
-    for line_number, line in enumerate(source_text.splitlines(), start=1):
-        match = COMPARE_DIRECTIVE_RE.match(line)
-        if match and current_ordinal == source_test_ordinal:
-            return {
-                "line": line_number,
-                "categories": match.group("categories") or "",
-                "command": match.group("command"),
-                "arguments": match.group("arguments").strip(),
-            }
-        if ACTIVE_EXECUTION_DIRECTIVE_RE.match(line):
-            current_ordinal += 1
+    for directive in census.enumerate_test_directives(source_text):
+        if (
+            directive["test_ordinal"] == source_test_ordinal
+            and census.is_active_compare_directive(directive)
+        ):
+            return directive
     raise ValueError(
         f"no active compare-compute directive at source-test ordinal {source_test_ordinal}"
     )
@@ -245,6 +231,7 @@ def _load_discovery_workloads(
             directive = _find_compare_directive(
                 census._read_text(source_path),
                 source_test_ordinal,
+                census,
             )
             adapted_arguments = _adapt_arguments_to_cuda(str(directive["arguments"]))
         except ValueError as error:
@@ -346,14 +333,11 @@ def _populate_mirror_for_mode(
 ) -> None:
     for workload in workloads:
         original_source = tests_dir / Path(str(workload["source"]))
-        source_lines = census._read_text(original_source).splitlines(keepends=True)
-        filtered_lines = [
-            line for line in source_lines if not census.EXECUTION_DIRECTIVE_RE.match(line)
-        ]
+        filtered_source = census.source_without_test_directives(census._read_text(original_source))
         generated_path = mirror_root / census._generated_relative_path(workload)
         census._write_text(
             generated_path,
-            census._directive_for_mode(workload, mode) + "".join(filtered_lines),
+            census._directive_for_mode(workload, mode) + filtered_source,
         )
 
         source_test_ordinal = int(workload["source_test_ordinal"])

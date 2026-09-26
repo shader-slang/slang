@@ -42,6 +42,20 @@ class DiscoveryContractTests(unittest.TestCase):
                                      selection_tags=tags, rationale="capacity boundary"))
         return tests, manifest
 
+    def test_selection_uses_native_indices_and_rejects_disabled_or_ignored(self):
+        text = ("//DISABLE_TEST:COMPARE_COMPUTE:-cuda\n"
+                "//DIAGNOSTIC_TEST:SIMPLE:-target spirv\n"
+                "//TEST:SIMPLE:-target hlsl\n"
+                "// TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type\n")
+        directive = DISCOVERY._find_compare_directive(text, 3, CENSUS)
+        self.assertEqual(directive["line"], 4)
+        self.assertEqual(directive["arguments"], "-cpu -output-using-type")
+        for ordinal in (0, 1, 2):
+            with self.subTest(ordinal=ordinal), self.assertRaises(ValueError):
+                DISCOVERY._find_compare_directive(text, ordinal, CENSUS)
+        with self.assertRaises(ValueError):
+            DISCOVERY._find_compare_directive(text + "// TEST_IGNORE_FILE\n", 3, CENSUS)
+
     def test_manifest_capacity_accepts_boundaries(self):
         for count in (50, 100, 101, 128):
             with self.subTest(count=count), tempfile.TemporaryDirectory() as directory:

@@ -6,7 +6,7 @@ compute/constexpr.slang	0	parameter-layout,mixed-resources,large	Large constexpr
 compute/func-cbuffer-param.slang	0	parameter-layout,helper-generic	Constant-buffer values crossing helper calls.
 compute/buffer-type-splitting.slang	1	mixed-resources,aggregate-pointer	Buffer type splitting and aggregate storage.
 compute/texture-get-dimensions.slang	1	mixed-resources,helper-generic	Texture queries across ordinary helper lowering.
-compute/texture-subscript-multisample.slang	2	mixed-resources	Multisampled texture access and result comparison.
+compute/texture-subscript-multisample.slang	3	mixed-resources	Multisampled texture access and result comparison.
 optimization/func-resource-result/func-resource-result-complex.slang	0	mixed-resources,helper-generic	Complex resource result crossing helper boundaries.
 optimization/func-resource-result/func-resource-result-simple.slang	0	mixed-resources,helper-generic	Minimal control for resource-valued helper results.
 bugs/empty-struct-parameter-block.slang	0	parameter-layout,aggregate-pointer,large	Empty aggregate inside a parameter-block layout.
@@ -43,7 +43,7 @@ compute/pointer-emit.slang	0	aggregate-pointer,large	Pointer emission across a l
 compute/inout.slang	0	aggregate-pointer,helper-generic	Inout value crossing helper calls.
 compute/struct-make.slang	0	aggregate-pointer	Aggregate construction and storage.
 compute/static-const-matrix-array.slang	0	matrix-layout,aggregate-pointer	Static constant matrix-array transport.
-compute/non-square-column-major.slang	0	matrix-layout,aggregate-pointer	Non-square column-major matrix storage.
+compute/non-square-column-major.slang	1	matrix-layout,aggregate-pointer	Non-square column-major matrix storage.
 language-feature/pointer/data-layouts.slang	1	parameter-layout,aggregate-pointer	Pointer data-layout differences at the entry ABI.
 language-feature/pointer/ptr-to-groupshared.slang	0	aggregate-pointer,shared-barrier	Pointer transport into groupshared storage.
 language-feature/pointer/groupshared-ptr-of-device.slang	1	aggregate-pointer,shared-barrier,mixed-resources	Device pointers stored in groupshared memory.
@@ -60,7 +60,7 @@ bugs/array-of-array-in-sb.slang	0	aggregate-pointer,mixed-resources	Nested array
 language-feature/anyvalue-matrix-layout.slang	0	matrix-layout,aggregate-pointer	AnyValue matrix layout preservation.
 bugs/generic-default-matrix.slang	0	matrix-layout,helper-generic	Generic default matrix transport.
 bugs/matrix-divided-by-scalar.slang	0	matrix-layout	Ordinary non-square matrix arithmetic.
-bugs/op-assignment-unify-mat.slang	0	matrix-layout,helper-generic	Matrix compound assignment and overload unification.
+bugs/op-assignment-unify-mat.slang	1	matrix-layout,helper-generic	Matrix compound assignment and overload unification.
 compute/atomics-buffer.slang	0	atomic-wave,mixed-resources	Buffer atomics combined with resource access.
 bugs/array-size-groupshared.slang	0	shared-barrier,helper-generic,control-flow	Generic array sizing in groupshared storage.
 bugs/atomic-coerce.slang	0	atomic-wave,mixed-resources	Atomic operand coercion on a buffer.
@@ -118,3 +118,12 @@ cuda/nvvm-bf16-cuda-layout.slang	0	bf16,vector-matrix,layout	Explicit CUDA layou
 cuda/nvvm-bf16-local-vectors.slang	0	bf16,vector-matrix,helper-generic,local	Exact raw BF16 local inout/out roundtrips for widths2/3/4, preserving signed zeros, subnormals, infinities and NaN payloads.
 cuda/nvvm-bf16-local-records.slang	0	bf16,local,aggregate-pointer,helper-generic	Exact guarded local BF16 record fields through internal inout/out references, including scalar and vector storage with integer-width neighbors.
 cuda/nvvm-fp8-widening.slang	0	fp8,conversion,helper-generic	Exact scalar FP8-to-Float32 widening for all encodings, preserving signed zeros and infinities with NaN classification only.
+cuda/nvvm-aggregate-param-snapshot.slang	1	aggregate-pointer,helper-generic	Aggregate helper parameters preserve snapshots across writes.
+cuda/nvvm-aggregate-param-resource-snapshot.slang	0	aggregate-pointer,mixed-resources	Resource-bearing aggregate helper parameters retain snapshots.
+cuda/wave-lane-index-multidim.slang	0	atomic-wave,control-flow	Wave lane indices linearize multidimensional thread blocks.
+hlsl-intrinsic/wave-prefix-count-bits-cuda.slang	0	atomic-wave,control-flow	Exclusive wave prefix counts preserve boolean lane contributions.
+numerics/differentiable-from-scalar.slang	2	helper-generic,aggregate-pointer	Scalar-to-shaped differentiable conversion retains its oracle; requires built slang-numerics-modules.
+language-feature/interfaces/conjunction-assoc-type.slang	0	helper-generic,aggregate-pointer	Conjunctive associated-type constraints support generic mutable method flow.
+language-feature/generics/assoc-type-default-init.slang	0	helper-generic,aggregate-pointer	Dynamic dispatch specializes dependent associated-type default initialization.
+language-feature/enums/enum-array-indexing.slang	0	control-flow,aggregate-pointer	Enum values index local arrays without explicit casts.
+language-feature/bitfield/default-init-mixed.slang	0	aggregate-pointer,parameter-layout	Default-layout partial and empty initialization zeros mixed bitfield backing words.
