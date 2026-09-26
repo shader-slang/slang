@@ -11,20 +11,20 @@ This topic covers a series of nice-to-have language features in Slang. These fea
 
 Slang supports automatic variable type inference:
 
-```csharp
+```slang
 var a = 1; // OK, `a` is an `int`.
 var b = float3(0, 1, 2); // OK, `b` is a `float3`.
 ```
 
 Automatic type inference requires an initialization expression to be present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result in a compiler error:
 
-```csharp
+```slang
 var a; // Error, cannot infer the type of `a`.
 ```
 
 You may use the `var` keyword to define a variable in a modern syntax:
 
-```csharp
+```slang
 var a : int = 1; // OK.
 var b : int; // OK.
 ```
@@ -33,14 +33,14 @@ var b : int; // OK.
 
 The `var` syntax and the traditional C-style variable definition introduce a _mutable_ variable whose value can be changed after its definition. If you wish to introduce an immutable or constant value, you may use the `let` keyword:
 
-```rust
+```slang
 let a = 5; // OK, `a` is `int`.
 let b : int = 5; // OK.
 ```
 
 Attempting to change an immutable value will result in a compiler error:
 
-```rust
+```slang
 let a = 5;
 a = 6; // Error, `a` is immutable.
 ```
@@ -49,7 +49,7 @@ a = 6; // Error, `a` is immutable.
 
 You can use the `namespace` syntax to define symbols in a namespace:
 
-```csharp
+```slang
 namespace ns
 {
     int f();
@@ -58,7 +58,7 @@ namespace ns
 
 Slang also supports the abbreviated syntax for defining nested namespaces:
 
-```csharp
+```slang
 namespace ns1.ns2
 {
     int f();
@@ -80,7 +80,7 @@ namespace ns1
 
 To access symbols defined in a namespace, you can use their qualified name with namespace prefixes:
 
-```csharp
+```slang
 void test()
 {
     ns1.ns2.f();
@@ -90,7 +90,7 @@ void test()
 
 Symbols defined in the same namespace can access each other without a qualified name. This is true even if the referenced symbol is defined in a different file or module:
 
-```csharp
+```slang
 namespace ns
 {
     int f();
@@ -101,7 +101,7 @@ namespace ns
 You can also use the `using` keyword to pull symbols defined in a different namespace to
 the current scope, removing the requirement for using fully qualified names.
 
-```cpp
+```slang
 namespace ns1.ns2
 {
     int f();
@@ -118,7 +118,7 @@ void test() { f(); } // OK.
 
 Slang supports defining member functions in `struct`s. For example, it is allowed to write:
 
-```hlsl
+```slang
 struct Foo
 {
     int compute(int a, int b)
@@ -130,14 +130,14 @@ struct Foo
 
 You can use the `.` syntax to invoke member functions:
 
-```hlsl
+```slang
 Foo foo;
 int rs = foo.compute(1,2);
 ```
 
 Slang also supports static member functions. For example:
 
-```
+```slang
 struct Foo
 {
     static int staticMethod(int a, int b)
@@ -149,13 +149,13 @@ struct Foo
 
 Static member functions are accessed the same way as other static members, via either the type name or an instance of the type:
 
-```hlsl
+```slang
 int rs = Foo.staticMethod(a, b);
 ```
 
 or
 
-```hlsl
+```slang
 Foo foo;
 ...
 int rs = foo.staticMethod(a,b);
@@ -165,7 +165,7 @@ int rs = foo.staticMethod(a,b);
 
 For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will result in a compile error. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
 
-```hlsl
+```slang
 struct Foo
 {
     int count;
@@ -188,7 +188,7 @@ void test()
 
 Properties provide a convenient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift.
 
-```csharp
+```slang
 struct MyType
 {
     uint flag;
@@ -203,7 +203,7 @@ struct MyType
 
 Or equivalently in a "modern" syntax:
 
-```csharp
+```slang
 struct MyType
 {
     uint flag;
@@ -218,7 +218,7 @@ struct MyType
 
 You may also use an explicit parameter for the setter method:
 
-```csharp
+```slang
 property uint highBits
 {
     set(uint x) { flag = (flag & 0xFF) + (x << 16); }
@@ -244,7 +244,7 @@ property uint highBits
 
 Slang supports defining constructors in `struct` types. You can write:
 
-```csharp
+```slang
 struct MyType
 {
     int myVal;
@@ -257,19 +257,19 @@ struct MyType
 
 You can use a constructor to construct a new instance by using the type name in a function call expression:
 
-```csharp
+```slang
 MyType instance = MyType(1,2);  // instance.myVal is 3.
 ```
 
 You may also use a C++-style initializer list to invoke a constructor:
 
-```csharp
+```slang
 MyType instance = {1, 2};
 ```
 
 If a constructor does not define any parameters, it will be recognized as a _default_ constructor that will be automatically called at the definition of a variable:
 
-```csharp
+```slang
 struct MyType
 {
     int myVal;
@@ -286,25 +286,32 @@ int test()
 }
 ```
 
-Slang will also implicitly call a _default_ constructor of all parents of a derived struct (same as C++):
+**Slang 2025 and previous language versions only:** Slang will also implicitly call a _default_ constructor of
+all parents of a derived struct (but see caveats):
 
-```csharp
+```slang
 struct MyType_Base
 {
     int myVal1;
-    __init() {myVal1 = 22;}
+
+    __init()
+    {
+        myVal1 = 22;
+    }
 }
 
 struct MyType1 : MyType_Base
 {
     int myVal2;
+
     __init()
     {
         // implicitly calls `MyType_Base::__init()`
         myVal2 = 15;
     }
 }
-testMyType1()
+
+void testMyType1()
 {
     MyType1 a;
     // a.myVal1 == 22
@@ -313,19 +320,32 @@ testMyType1()
 
 struct MyType2 : MyType_Base
 {
+    // Caveat!
+    //
+    // This struct does not have a user-defined constructor. No
+    // constructor is generated, since the base has a user-defined
+    // constructor.
+    //
+    // See also https://github.com/shader-slang/slang/issues/13064
 }
-testMyType2()
+
+void testMyType2()
 {
-    MyType2 b; // implicitly calls `MyType_Base::__init()`
-    // b.myVal1 == 22
+    MyType2 b1; // uninitialized
+
+    // will not compile
+    MyType2 b2 = { };
 }
 ```
+
+> ⚠️ **Warning:** Struct-from-struct inheritance is unstable in Slang 2025 and earlier language versions, and
+> has been removed in Slang 2026. Use composition (a struct as a member) instead.
 
 ### Member Init Expressions
 
 Slang supports member init expressions:
 
-```csharp
+```slang
 struct MyType
 {
     int myVal = 5;
@@ -336,7 +356,7 @@ struct MyType
 
 Slang allows defining operator overloads as global methods:
 
-```csharp
+```slang
 struct MyType
 {
     int val;
@@ -359,7 +379,7 @@ Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`
 
 In addition, you can overload operator `()` as a member method:
 
-```csharp
+```slang
 struct MyFunctor
 {
     int operator()(float v)
@@ -379,7 +399,7 @@ void test()
 
 Slang allows overriding `operator[]` with `__subscript` syntax:
 
-```csharp
+```slang
 struct MyType
 {
     int val[12];
@@ -404,14 +424,14 @@ Tuple types can hold a collection of values of different types.
 Tuple types are defined in Slang with the `Tuple<...>` syntax, and
 constructed with either a constructor or the `makeTuple` function:
 
-```csharp
+```slang
 Tuple<int, float, bool> t0 = Tuple<int, float, bool>(5, 2.0f, false);
 Tuple<int, float, bool> t1 = makeTuple(3, 1.0f, true);
 ```
 
 Tuple elements can be accessed with `_0`, `_1` member names:
 
-```csharp
+```slang
 int i = t0._0; // 5
 bool b = t1._2; // true
 ```
@@ -419,13 +439,13 @@ bool b = t1._2; // true
 You can use the swizzle syntax similar to vectors and matrices to form new
 tuples:
 
-```csharp
+```slang
 t0._0_0_1 // evaluates to (5, 5, 2.0f)
 ```
 
 You can concatenate two tuples:
 
-```csharp
+```slang
 concat(t0, t1) // evaluates to (5, 2.0f, false, 3, 1.0f, true)
 ```
 
@@ -433,14 +453,14 @@ If all element types of a tuple conform to `IComparable`, then the tuple itself
 will conform to `IComparable`, and you can use comparison operators on the tuples
 to compare them:
 
-```csharp
+```slang
 let cmp = t0 < t1; // false
 ```
 
 You can use `countof()` on a tuple type or a tuple value to obtain the number of
 elements in a tuple. This is considered a compile-time constant.
 
-```csharp
+```slang
 int n = countof(Tuple<int, float>); // 2
 int n1 = countof(makeTuple(1,2,3)); // 3
 ```
@@ -454,7 +474,7 @@ Slang supports the `Optional<T>` type to represent a value that may not exist.
 The dedicated `none` value can be used for any `Optional<T>` to represent no value.
 `Optional<T>::value` property can be used to retrieve the value.
 
-```csharp
+```slang
 struct MyType
 {
     int val;
@@ -537,7 +557,7 @@ Vertex<hasNormal, hasColor> vertMain<bool hasNormal, bool hasColor>(VertexIn inp
 Slang supports the `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` or `Conditional<T, hasValue>` value. The syntax is similar to Rust's
 `if let` syntax, the value expression must be an `Optional<T>` or `Conditional<T, hasValue>` type, for example:
 
-```csharp
+```slang
 Optional<int> getOptInt() { ... }
 
 void test()
@@ -554,7 +574,7 @@ void test()
 
 Sometimes it is useful to reinterpret the bits of one type as another type, for example:
 
-```csharp
+```slang
 struct MyType
 {
     int a;
@@ -570,7 +590,7 @@ The `packMyTypeToFloat4` function is usually implemented by bit casting each fie
 by calling `intAsFloat`, `floatAsInt` and using bit operations to shift things in the right place.
 Instead of writing `packMyTypeToFloat4` function yourself, you can use Slang's built-in `reinterpret<T>` to do just that for you:
 
-```
+```slang
 float4 myPackedVector = reinterpret<float4>(myVal);
 ```
 
@@ -580,7 +600,7 @@ float4 myPackedVector = reinterpret<float4>(myVal);
 
 Slang supports pointers when generating code for SPIR-V, C++, and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member from a pointer. For example:
 
-```csharp
+```slang
 struct MyType
 {
     int a;
@@ -691,17 +711,35 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 `ResourceDescriptorHeap` only converts to resource (CBV/SRV/UAV) types and `SamplerDescriptorHeap` only
 to sampler types; a heap-family mismatch (for example `SamplerState s = ResourceDescriptorHeap[i];`, or
-`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. The recovered value rides the
+`Texture2D.Handle th = SamplerDescriptorHeap[j];`) is a compile error. Separately, a combined
+texture-sampler (e.g. `Sampler2D`) needs two distinct heap indices -- one for the texture and one for
+the sampler -- on HLSL and on SPIR-V with the `spvDescriptorHeapEXT` extension, whose lowering keeps
+the two as separate descriptors. A single-index `ResourceDescriptorHeap[i]` handle supplies only one,
+so building a combined sampler from it is a compile-time error on those targets; use the explicit
+`Sampler2D.Handle(uint2(resourceIndex, samplerIndex))` form, which supplies both, instead. The
+single-index form is accepted on the default SPIR-V and GLSL model, where a combined sampler is a
+single native descriptor read by one heap index. (On WGSL, recovering a combined texture-sampler from
+the descriptor heap is not currently supported in either form -- an unrelated limitation of WGSL's
+combined-sampler lowering.) The recovered value rides the
 existing `DescriptorHandle<T>` lowering, so this syntax is available on the same targets as the
 `DescriptorHandle<T>` representation it builds — HLSL, SPIR-V, GLSL, and WGSL — and lowers through the
 bindless path described below. On targets where that representation is unavailable (Metal, CUDA, CPU),
 using the syntax is diagnosed at compile time, exactly as explicit `DescriptorHandle<T>` construction is.
 
+Under `spvBindlessTextureNV`, a texture/sampler `.Handle` is a native `uint64` bindless handle that
+cannot hold a `uint2` heap index, so recovering a `T.Handle` from a heap index is **rejected at compile
+time**. The supported way to index the heap for such a type is to enable `spvDescriptorHeapEXT` and
+recover the resource type `T` directly (`Texture2D t = ResourceDescriptorHeap[i];`), which loads the
+descriptor from the EXT heap. Under `spvBindlessTextureNV` **without** `spvDescriptorHeapEXT` there is no
+heap to load from: recovering the `T.Handle` is likewise rejected, and recovering the resource type `T`
+directly is **not** diagnosed but currently produces incorrect code (the index is reinterpreted as a
+native handle) — avoid it until this direct-resource path is diagnosed too (tracked as follow-up work).
+
 By default, when targeting HLSL, `DescriptorHandle<T>` translates to uses of `ResourceDescriptorHeap[index]` and `SamplerDescriptorHeap[index]`.
 In particular, when combined with combined texture sampler types (e.g. `Sampler2D`), Slang will fetch the texture using the first
 component of the handle, and the sampler state from the second component of the handle. For example:
 
-```
+```slang
 uniform DescriptorHandle<Sampler2D> s;
 void test()
 {
@@ -760,11 +798,21 @@ Default behavior calls `defaultGetDescriptorFromHandle` with its default
 
 When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` command-line option
 or via the compilation API), Slang maps descriptor handles to the `SPV_EXT_descriptor_heap` extension
-without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
+without declaring any explicit descriptor sets. Descriptor handles are lowered to `uint2` (unless
+`spvBindlessTextureNV` is also enabled, in which case native texture/sampler handles keep their `uint64`
+representation — see below).
 For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global
 sampler or resource heap. For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the
 resource heap to obtain the texture, and `uint2.y` to index into the sampler heap to obtain the sampler
 state, and combines the objects with an `OpSampledImage` instruction.
+
+If `spvBindlessTextureNV` is enabled alongside `spvDescriptorHeapEXT`, the two representations coexist:
+a native bindless texture or sampler handle keeps its `uint64` representation and is converted with the
+`SPV_NV_bindless_texture` opcodes, while all other descriptor handles use the `uint2` EXT-heap path
+described above. Because a native `uint64` handle cannot hold a `uint2` heap index, converting an
+explicit `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index into a texture/sampler `.Handle`
+is not supported in this configuration and is diagnosed at compile time; assign the heap entry directly
+to the resource type (which loads it from the EXT heap) instead.
 
 By default, when using the `spvDescriptorHeapEXT` capability, Slang reinterprets the resource or sampler
 heap as an array of the requested resource type, whose stride is defined by the resource type and obtained
@@ -820,6 +868,15 @@ export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqu
 Note that the `getDescriptorFromHandle` is not supposed to be called from the user code directly,
 it will be automatically called by the compiler to dereference a `DescriptorHandle<T>` to get `T`.
 Think about providing `getDescriptorFromHandle` as a way to override `operator->` for `DescriptorHandle<T>`.
+
+> #### Note
+>
+> A custom `getDescriptorFromHandle` override is honored for every conversion except one: when both
+> `spvBindlessTextureNV` and `spvDescriptorHeapEXT` are enabled, a native texture/sampler recovered from
+> an explicit `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index is loaded from the EXT heap
+> directly, bypassing the override. This is required because the explicit index cannot be routed through
+> the override's `(type, capability)`-keyed path without being reinterpreted as a native `uint64` handle.
+> The override still applies to such a type's genuine `DescriptorHandle` values, and to all other types.
 
 The `IOpaqueDescriptor` interface is defined as:
 
@@ -923,7 +980,7 @@ Extensions
 
 Slang allows defining additional methods for a type outside its initial definition. For example, suppose we already have a type defined:
 
-```csharp
+```slang
 struct MyType
 {
     int field;
@@ -933,7 +990,7 @@ struct MyType
 
 You can extend `MyType` with new method members:
 
-```csharp
+```slang
 extension MyType
 {
     float getNewField() { return newField; }
@@ -942,7 +999,7 @@ extension MyType
 
 All locations that see the definition of the `extension` can access the new members:
 
-```csharp
+```slang
 void test()
 {
     MyType t;
@@ -962,7 +1019,7 @@ Multi-level break
 Slang allows `break` statements with a label to jump into any ancestor control flow break points, and not just the immediate parent.
 Example:
 
-```
+```slang
 outer:
 for (int i = 0; i < 5; i++)
 {
@@ -981,7 +1038,7 @@ Force inlining
 Most downstream shader compilers will inline all function calls. However, you can instruct the Slang compiler to do the inlining
 by using the `[ForceInline]` decoration:
 
-```
+```slang
 [ForceInline]
 int f(int x) { return x + 1; }
 ```
@@ -1000,7 +1057,7 @@ the error.
 In order to be able to throw an error, a function must declare the type of that
 error with `throws`:
 
-```
+```slang
 enum MyError
 {
     Failure,
@@ -1019,14 +1076,14 @@ Currently, functions may only throw a single type of error.
 
 To call a function that may throw, you must prepend it with `try`:
 
-```
+```slang
 let result = try f();
 ```
 
 If you don't catch the `try`, related errors are re-thrown and the calling
 function must declare that it `throws` that error type:
 
-```
+```slang
 void g() throws MyError
 {
     // This would not compile if `g()` wasn't declared to throw MyError as well.
@@ -1037,7 +1094,7 @@ void g() throws MyError
 
 To catch an error, you can use a `do-catch` statement:
 
-```
+```slang
 void g()
 {
     do
@@ -1054,6 +1111,10 @@ void g()
 
 You can chain multiple catch statements for different types of errors.
 
+A shader entry point function may not have a `throws` declaration, since it is
+invoked by the pipeline rather than by other Slang code. An entry point that
+calls a throwing function must handle the error with a `do-catch` statement.
+
 Special Scoping Syntax
 -------------------
 
@@ -1063,7 +1124,7 @@ Slang supports three special scoping constructs to allow users to mix in custom 
 
 An ignored block will be parsed and ignored by the compiler:
 
-```
+```slang
 __ignored_block
 {
     arbitrary content in the source file,
@@ -1077,7 +1138,7 @@ __ignored_block
 Symbols defined in a transparent block will be treated as if they are defined
 in the parent scope:
 
-```csharp
+```slang
 struct MyType
 {
     __transparent_block
@@ -1089,7 +1150,7 @@ struct MyType
 
 Is equivalent to:
 
-```csharp
+```slang
 struct MyType
 {
     int myFunc() { return 0; }
@@ -1102,7 +1163,7 @@ Symbols defined in a `__file_decl` will be treated as if they are defined in
 the global scope. However, symbols defined in different `__file_decl`s are not visible
 to each other. For example:
 
-```csharp
+```slang
 __file_decl
 {
     void f1()
@@ -1125,7 +1186,7 @@ Lambda Expressions (Experimental)
 
 Slang supports lambda expressions for passing small callable values to higher-order functions. A lambda has the form:
 
-```csharp
+```slang
 (parameterList) => expression
 (parameterList) => { statements; return expression; }
 ```
@@ -1136,7 +1197,7 @@ Parameter types must be written explicitly. In the single-expression form, the e
 
 Lambdas implement the `IFunc<TReturn, TArgs...>` interface (or `IMutatingFunc<...>` for mutating variants). Any function or method that takes an `IFunc` can be called with a matching lambda:
 
-```csharp
+```slang
 struct Matrix
 {
     float data[16];
@@ -1160,7 +1221,7 @@ void scale(inout Matrix m)
 
 A lambda is implicitly converted to `IFunc<TReturn, TArgs...>` when passed to a function expecting that interface. Lambdas passed as `IFunc` may capture variables from the enclosing scope:
 
-```csharp
+```slang
 func apply(f: IFunc<float, float>) -> float
 {
     return f(2.0);
@@ -1174,7 +1235,7 @@ let result = apply((float x) => x * scale);  // OK: 'scale' is captured
 
 Lambdas can also be passed to functions expecting an explicit function type spelled with the `functype` keyword. Unlike `IFunc`, `functype` is more restrictive: only **non-capturing** lambdas can coerce to `functype`. A lambda that references any variable from the enclosing scope cannot coerce and the compiler reports an error:
 
-```csharp
+```slang
 func sum(f: functype(int, int) -> float) -> float
 {
     return f(2, 3);
@@ -1192,7 +1253,7 @@ Parameter types must also match the `functype` signature exactly. The return typ
 
 A lambda body may reference variables from the enclosing scope. **Captured variables are read-only inside the lambda body.** Attempting to assign to a captured variable is an error:
 
-```csharp
+```slang
 int c = 2;
 let f = (int x) => { c = x; return 0; };  // error: cannot assign to captured 'c'
 ```
@@ -1203,7 +1264,7 @@ If you need to mutate state, pass the state as a parameter or accumulate the res
 
 Lambdas participate in generic-argument inference. A generic function whose parameter is a function type can infer the generic argument from the lambda's return type:
 
-```csharp
+```slang
 func foo<let N : int>(f: functype() -> vector<float, N>) -> vector<float, N>
 {
     return f();
@@ -1226,7 +1287,7 @@ User-Defined Attributes (Experimental)
 
 In addition to many system-defined attributes, users can define their own custom attribute types to be used in the `[UserDefinedAttribute(args...)]` syntax. The following example shows how to define a custom attribute type.
 
-```csharp
+```slang
 [__AttributeUsage(_AttributeTargets.Var)]
 struct MaxValueAttribute
 {

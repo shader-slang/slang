@@ -1056,21 +1056,28 @@ void CompletionContext::createSwizzleCandidates(
     // Hard code members for vector and matrix types.
     if (auto vectorType = as<VectorExpressionType>(type))
     {
-        const char* memberNames[4] = {"x", "y", "z", "w"};
+        const char* memberNameSets[][4] = {{"x", "y", "z", "w"}, {"r", "g", "b", "a"}};
         Type* elementType = nullptr;
         elementType = vectorType->getElementType();
         String typeStr;
         if (elementType)
             typeStr = elementType->toString();
         auto count = Math::Min((int)elementCount[0], 4);
-        for (int i = 0; i < count; i++)
+        for (auto& memberNames : memberNameSets)
         {
-            LanguageServerProtocol::CompletionItem item;
-            item.data = 0;
-            item.detail = typeStr;
-            item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
-            item.label = memberNames[i];
-            result.add(item);
+            for (int i = 0; i < count; i++)
+            {
+                LanguageServerProtocol::CompletionItem item;
+                item.data = 0;
+                item.detail = typeStr;
+                item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+                item.label = memberNames[i];
+                // LSP clients use the label when ordinary members do not provide sortText. The
+                // "0:" prefix ranks swizzles before those labels and sorts the swizzles
+                // alphabetically by label.
+                item.sortText = "0:" + item.label;
+                result.add(item);
+            }
         }
     }
     else if (auto scalarType = as<BasicExpressionType>(type))
@@ -1165,29 +1172,48 @@ LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletion
 CompletionResult CompletionContext::collectAttributes()
 {
     List<LanguageServerProtocol::CompletionItem> result;
+    // A user-defined `[__AttributeUsage]` struct can be surfaced twice in the candidate set: as the
+    // synthesized mirror `AttributeDecl` (Keyword) and as the source struct itself (Struct). The
+    // mirror is already named without the trailing "Attribute" (stripped at synthesis), and the
+    // struct's trailing "Attribute" is stripped below, so both reduce to the same visible label —
+    // hence the duplicate. Deduplicate by that label, preferring the Keyword form (so a
+    // user-defined attribute is shown like every built-in attribute) independently of the order in
+    // which the two forms are enumerated.
+    Dictionary<String, Index> labelToIndex;
     for (auto& item : version->linkage->contentAssistInfo.completionSuggestions.candidateItems)
     {
+        LanguageServerProtocol::CompletionItem resultItem;
         if (auto attrDecl = as<AttributeDecl>(item.declRef.getDecl()))
         {
-            if (attrDecl->getName())
-            {
-                LanguageServerProtocol::CompletionItem resultItem;
-                resultItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
-                resultItem.label = attrDecl->getName()->text;
-                result.add(resultItem);
-            }
+            if (!attrDecl->getName())
+                continue;
+            resultItem.kind = LanguageServerProtocol::kCompletionItemKindKeyword;
+            resultItem.label = attrDecl->getName()->text;
         }
         else if (auto decl = as<AggTypeDecl>(item.declRef.getDecl()))
         {
-            if (decl->getName())
-            {
-                LanguageServerProtocol::CompletionItem resultItem;
-                resultItem.kind = LanguageServerProtocol::kCompletionItemKindStruct;
-                resultItem.label = decl->getName()->text;
-                if (resultItem.label.endsWith("Attribute"))
-                    resultItem.label.reduceLength(resultItem.label.getLength() - 9);
-                result.add(resultItem);
-            }
+            if (!decl->getName())
+                continue;
+            resultItem.kind = LanguageServerProtocol::kCompletionItemKindStruct;
+            resultItem.label = decl->getName()->text;
+            if (resultItem.label.endsWith("Attribute"))
+                resultItem.label.reduceLength(resultItem.label.getLength() - 9);
+        }
+        else
+        {
+            continue;
+        }
+
+        Index existingIndex;
+        if (labelToIndex.tryGetValue(resultItem.label, existingIndex))
+        {
+            if (resultItem.kind == LanguageServerProtocol::kCompletionItemKindKeyword)
+                result[existingIndex] = resultItem;
+        }
+        else
+        {
+            labelToIndex.add(resultItem.label, result.getCount());
+            result.add(resultItem);
         }
     }
 

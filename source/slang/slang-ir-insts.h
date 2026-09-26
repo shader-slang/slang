@@ -2788,15 +2788,14 @@ struct IRDebugScope : IRInst
 {
     FIDDLE(leafInst())
     IRInst* getScope() { return getOperand(0); }
-    IRInst* getInlinedAt() { return getOperand(1); }
-    void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
+    // An absent inline chain denotes an ordinary function scope.
+    IRInst* getInlinedAt() { return operandCount == 2 ? getOperand(1) : nullptr; }
 };
 
 FIDDLE()
 struct IRDebugNoScope : IRInst
 {
     FIDDLE(leafInst())
-    IRInst* getScope() { return getOperand(0); }
 };
 
 FIDDLE()

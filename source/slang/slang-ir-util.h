@@ -231,6 +231,45 @@ inline bool isScalarIntegerType(IRType* type)
     return getTypeStyle(type->getOp()) == kIROp_IntType;
 }
 
+// Returns true for the integer arithmetic and bitwise op-kinds through which a
+// NonUniformResourceIndex mark propagates. Nonuniformity is contagious: an
+// elementwise integer op with a non-uniform operand yields a non-uniform result
+// (Vulkan VUID-RuntimeSpirv-None-10148). This is the single source of truth for
+// that op-set, shared by the SPIR-V float pass that bubbles the wrapper past such
+// an op (slang-ir-float-non-uniform-resource-index.cpp) and by the function-call
+// specializer that detects a non-uniform index passed through arithmetic across a
+// call boundary (slang-ir-specialize-function-call.cpp). Comparison/logical ops
+// are excluded (they yield a bool, not an index); IntCast is handled separately by
+// both consumers.
+//
+// This classifies by op-kind and assumes the operands are the integer index the
+// caller guarantees. That matters because `kIROp_Div` is the type-polymorphic divide
+// (there is no separate integer-divide op, unlike the integer-specific `kIROp_IRem`
+// whose float sibling `kIROp_FRem` is deliberately absent): the set is sound only
+// because the value asked about is always a NonUniformResourceIndex-derived integer
+// index, not because the op-kinds alone are integer-only.
+inline bool isNonUniformIndexArithmeticOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Neg:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // No side effect can take place through a value of a "Value" type.
 bool isValueType(IRInst* type);
 
@@ -375,7 +414,15 @@ bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache);
 
 bool isPtrLikeOrHandleType(IRInst* type);
 
-bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
+// `calleeSideEffectCache` is optional; see `IRDeadCodeEliminationOptions::calleeSideEffectCache`
+// in slang-ir-dce.h for the authoritative sharing/staleness contract this function depends on.
+// Turns the `kIROp_Call` case's `doesCalleeHaveSideEffect` query O(1) after the first lookup per
+// callee.
+bool canInstHaveSideEffectAtAddress(
+    IRGlobalValueWithCode* func,
+    IRInst* inst,
+    IRInst* addr,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
 /// Get a unit-type (aka `void`) value using the `poison` instruction,
 /// which indicates an undefined (and potentially unstable) value.
@@ -586,6 +633,19 @@ IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
 
 IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 
+// Peel `addr` through instructions that forward the address of the same underlying
+// storage without changing which storage it refers to (field/element access, casts,
+// offset computation), stopping at the first instruction that is not one of these.
+// Returns that terminal instruction. This is the shape-independent counterpart to
+// `getRootAddr`: `getRootAddr` only peels `FieldAddress`/`GetElementPtr`/
+// `NodeOutputRecordGetElementPtr`, so a `BitCast`/`Reinterpret`/`PtrCast`/`GetOffsetPtr`
+// inserted by a later legalization pass (e.g. `lowerBufferElementTypeToStorageType`) can
+// make `getRootAddr` stop short of the address's true root. Callers that need to
+// recognize a specific root shape regardless of such legalization (e.g. "is this address
+// into the OptiX SBT" or "is this address into CUDA's `__constant__` global parameter
+// group") should peel with this function first, then test the terminal instruction.
+IRInst* peelAddressForwardingOps(IRInst* addr);
+
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.
 // Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).
@@ -618,6 +678,26 @@ IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 
 bool isReadNoneCallee(IRInst* callee);
+
+/// True iff `callee` is read-none AND every user-supplied derivative variant
+/// of it whose read-none-ness is not already implied by the primary is also
+/// read-none.
+///
+/// In practice this checks the `ForwardDerivative` annotation and the
+/// `BackwardDerivativePropagate` annotation. `BackwardDerivativeApply` is
+/// intentionally not consulted because the apply wrapper inherits
+/// read-none-ness from the primary callee — see the implementation comment
+/// in `slang-ir-util.cpp` for the unwrapping chain.
+///
+/// The carry-set analysis in slang-ir-check-differentiability needs this
+/// stronger property: a primary callee can be `[__readNone]` while its
+/// user-supplied `[ForwardDerivative]` or `[BackwardDerivative]` has side
+/// effects, in which case a call to the primary still produces observable
+/// derivative state through differentiation. Other callers of
+/// `isReadNoneCallee` reason about the local function's own read-none-ness
+/// and should not use this variant.
+bool isReadNoneCalleeAndAllDerivatives(IRInst* callee);
+
 bool isNoSideEffectCallee(IRInst* callee);
 
 bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);

@@ -662,6 +662,11 @@ SlangResult Session::_readBuiltinModule(
     if (!irChunk)
         return SLANG_FAIL;
 
+    UInt64 moduleVersion = 0;
+    SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(irChunk, nullptr, moduleVersion, nullptr));
+    if (!IRModule::isModuleVersionSupported(moduleVersion))
+        return SLANG_FAIL;
+
     auto astChunk = moduleChunk->findAST();
     if (!astChunk)
         return SLANG_FAIL;
@@ -1149,6 +1154,14 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     RefPtr<ParsedCommandLineData> outData = new ParsedCommandLineData();
     RefPtr<EndToEndCompileRequest> tempReq = new EndToEndCompileRequest(this);
     tempReq->processCommandLineArguments(argv, argc);
+
+    // OptionsParser keeps `-allow-glsl` request-local so ordinary slangc compilation cannot leak
+    // it into imported modules. This API is specifically translating command-line options into a
+    // SessionDesc, so preserve the caller's request by materializing it as a session option on the
+    // temporary linkage immediately before serialization.
+    if (tempReq->getLegacyAllowGLSLInput())
+        tempReq->getOptionSet().set(CompilerOptionName::AllowGLSL, true);
+
     outData->options.setCount(1 + tempReq->getLinkage()->targets.getCount());
     int optionDataIndex = 0;
     SerializedOptionsData& optionData = outData->options[optionDataIndex];
