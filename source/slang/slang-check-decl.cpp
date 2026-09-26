@@ -7567,6 +7567,33 @@ void SemanticsVisitor::markOverridingDecl(
     addModifier(memberDecl, overridingModifier);
 }
 
+// Decide whether the non-static-satisfies-static adaptation may bind `firstArg` (the static
+// requirement's first synthesized argument) as the implicit `this` of a non-static method. The
+// synthesized body attaches this argument as the base of candidates that were looked up in the
+// conforming type; nothing downstream re-checks that the base's type actually has those members, so
+// this predicate -- not the later overload resolution -- is what keeps the receiver well-typed.
+//
+// The argument can serve as the receiver when its type is the conforming type. Requirements
+// declared with a direct function type (the `__associatedfunc` autodiff derivatives
+// `fwd_diff`/`bwd_diff`/ `remat`) are also permitted: these conform a *function* to a function
+// interface
+// (`IForwardDifferentiable<FType>` and friends), so `context->conformingType` is that function and
+// never equals the receiver's type even though `firstArg` is in fact the receiver -- the equality
+// test cannot recognize the receiver here, and the adaptation is how those derivatives are wired.
+static bool canBindFirstArgAsReceiver(
+    ConformanceCheckingContext* context,
+    DeclRef<FuncDecl> requiredMemberDeclRef,
+    Expr* firstArg)
+{
+    if (hasDirectFuncType(requiredMemberDeclRef))
+        return true;
+
+    auto firstArgType = firstArg->type.type;
+    SLANG_ASSERT(firstArgType);
+    SLANG_ASSERT(context->conformingType);
+    return firstArgType->getCanonicalType()->equals(context->conformingType->getCanonicalType());
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -7655,34 +7682,15 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
 
         // If no static candidates remain, a non-static method can still satisfy this static
-        // requirement as a fallback: we treat the static requirement's first parameter as the
-        // implicit `this` and call the non-static method on it. For example:
+        // requirement by treating the requirement's first parameter as the implicit `this`:
         //
         //      interface IFoo { static int method(This val, int x); }
         //      struct MyStruct : IFoo { int method(int x) { ... } }
-        //
         // Synthesized:
         //      static int $__syn_method(MyStruct val, int x) { return val.method(x); }
         //
-        // For an ordinary method requirement this adaptation is only valid when the first parameter
-        // really is the receiver, i.e. its type is the conforming (`This`) type; otherwise binding
-        // that parameter as the callee's `this` produces a witness that calls the instance method on
-        // an unrelated value. In #13260 a static `value(Packed)` requirement was bound against an
-        // instance `value()`, passing the `Packed` argument as `Hit`'s `this` and emitting an
-        // invalid forwarder (invalid HLSL/CUDA, SPIR-V assert in `emitFieldAddress`).
-        //
-        // Associated-function requirements -- those declared with a direct function type, such as
-        // the autodiff `fwd_diff`/`bwd_diff` derivatives -- legitimately adapt a non-static method
-        // whose first parameter is not the receiver (it is a `DifferentialPair`), so we exempt them
-        // via `hasDirectFuncType`. For every other requirement we require the first parameter to be
-        // the conforming type; when it is not we decline, so an ordinary requirement with a default
-        // falls through to `findDefaultInterfaceImpl` and one without a default is reported as an
-        // unsatisfied requirement rather than miscompiled.
         if (!baseOverloadedExpr->lookupResult2.isValid() && synArgs.getCount() > 0 &&
-            (hasDirectFuncType(requiredMemberDeclRef) ||
-             (synArgs[0]->type.type && context->conformingType &&
-              synArgs[0]->type.type->getCanonicalType()->equals(
-                  context->conformingType->getCanonicalType()))))
+            canBindFirstArgAsReceiver(context, requiredMemberDeclRef, synArgs[0]))
         {
             // Restore the full lookup result and keep only non-static items.
             baseOverloadedExpr->lookupResult2 = lookupResult;
@@ -10623,6 +10631,12 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // used to synthesize an exact-match witness, by generating the
     // code required to handle all the conversions that might be
     // required on `this`.
+    //
+    // We try synthesis before the interface default below: a member of the conforming type that can
+    // satisfy the requirement takes precedence over an inherited default.
+    // `trySynthesizeRequirementWitness` returning false therefore means "no member satisfies this",
+    // which is what lets an inherited default (or, failing that, an unsatisfied-requirement
+    // diagnostic) take over.
     //
     MethodWitnessSynthesisFailureDetails failureDetails = {};
     if (trySynthesizeRequirementWitness(

@@ -1,11 +1,12 @@
-// Companion to gh-13260: the fix that prefers an inherited default over the
-// non-static-satisfies-static adaptation must still let a genuine receiver-style adaptation win.
-// Here the static requirement's first parameter IS the conforming (`This`) type, so an explicit
-// instance `override` of it binds through the adaptation and takes precedence over the default.
-// A regression would surface as E30854 "'f' marked as 'override' is not overriding any base
-// declarations" when S's conformance is checked.
+// Companion to gh-13260. When a static requirement's first parameter IS the conforming (`This`)
+// type, a same-name instance method still satisfies it through the non-static-satisfies-static
+// adaptation, and an explicit `override` of that requirement is chosen ahead of the interface
+// default. Here `S.f()` (returns 2) must be the witness for `IFoo.f(This)`, not the default
+// (returns 1). If the adaptation were wrongly declined for this shape, `override int f()` would be
+// marked as overriding nothing (E30854) and would also lose to the default.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
 
 interface IFoo
 {
@@ -18,21 +19,22 @@ struct S : IFoo
     override int f() { return 2; }
 }
 
-// Calling the static `f(This)` requirement through a generic uses S's witness for it, forcing the
-// conformance check (and the `override` marking) that the guard must not break.
+// `S : IFoo` is conformance-checked because `S` is declared; this call is what forces the chosen
+// witness to actually be lowered and run, so the selected implementation is observable.
 int callF<T : IFoo>(T v)
 {
     return T.f(v);
 }
 
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
-//CHECK: OpEntryPoint
+//SPV: OpEntryPoint
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     S s;
     s.x = 5;
-    outputBuffer[0] = callF<S>(s);
+    outputBuffer[0] = callF<S>(s); // CHECK: 2
 }

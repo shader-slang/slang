@@ -1,7 +1,9 @@
-// Companion to gh-13260: when a non-receiver static requirement has NO default to fall back to,
-// the fix must report a clean unsatisfied-requirement diagnostic rather than adapting a same-name
-// instance method (which previously bound the argument as `this` and miscompiled / asserted at
-// slang-ir.cpp:5822).
+// Companion to gh-13260. A static requirement whose first parameter is not the conforming (`This`)
+// type is not satisfied by a same-name instance method: binding the argument as the callee's `this`
+// would call the instance method on an unrelated value (in gh-13260 this became an invalid forwarder
+// and an internal assert in `emitFieldAddress`). With no interface default to fall back to,
+// conformance fails with a diagnostic (E38105, reported on the excluded instance `value()`) rather
+// than miscompiling.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
@@ -21,7 +23,7 @@ struct Hit2 : IHit2
     float2 uv;
     static This unpack(Packed p) { return {p.instance, p.uv}; }
     float value() { return float(instance) + uv.x + uv.y; }
-//CHECK:  ^^^^^ interface requirement mismatch
+//CHECK:  ^^^^^ E38105
 //CHECK:  ^^^^^ member 'value' does not match interface requirement.
 }
 
