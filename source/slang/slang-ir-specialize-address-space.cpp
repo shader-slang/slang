@@ -112,7 +112,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // Update the parameter types with new address spaces in the specialized function.
         // Use `getDataType()`/`setDataType()` rather than `getFullType()`/`setFullType()` so a
         // rate-qualified parameter is handled: a `groupshared` by-reference parameter (#10641)
-        // has type `RateQualified(GroupShared, BorrowInOutParam(...))`, and `as<IRPtrTypeBase>`
+        // has type `RateQualified(GroupShared, RefParam(...))`, and `as<IRPtrTypeBase>`
         // on the rate-qualified wrapper is null -- without unwrapping the rate the pointer's
         // address space would never be specialized, so the Metal/WGSL emitter would later see a
         // pointer parameter with the default address space and abort.

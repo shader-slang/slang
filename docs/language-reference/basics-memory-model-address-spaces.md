@@ -95,6 +95,7 @@ The following address spaces are defined:
 > 📝 **Remark 2:** A pointer to memory in one address space is generally not interchangeable with a pointer to
 > memory in another address space. In particular, pointers to group-shared memory are not interchangeable
 > between thread groups. A `groupshared` function parameter is likewise a reference into the group-shared
-> address space, not a per-invocation copy.
+> address space, not a per-invocation copy; it is read-write by default and read-only when declared
+> `const groupshared`.
 
 > 📝 **Remark 3:** Address spaces in Slang are roughly equivalent to SPIR-V storage classes.

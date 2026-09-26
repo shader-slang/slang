@@ -84,19 +84,26 @@ struct ParameterDirectionInfo
     // For Ref and BorrowInOut
     AddressSpace addressSpace;
 
-    ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
-        : kind(kind), addressSpace(addressSpace)
+    // For Ref: a read-only `groupshared` parameter is a `Ref` with `Read` access.
+    AccessQualifier accessQualifier;
+
+    ParameterDirectionInfo(
+        Kind kind,
+        AddressSpace addressSpace = (AddressSpace)0,
+        AccessQualifier accessQualifier = AccessQualifier::ReadWrite)
+        : kind(kind), addressSpace(addressSpace), accessQualifier(accessQualifier)
     {
     }
 
     ParameterDirectionInfo()
-        : kind(Kind::In), addressSpace((AddressSpace)0)
+        : kind(Kind::In), addressSpace((AddressSpace)0), accessQualifier(AccessQualifier::ReadWrite)
     {
     }
 
     bool operator==(const ParameterDirectionInfo& other) const
     {
-        return kind == other.kind && addressSpace == other.addressSpace;
+        return kind == other.kind && addressSpace == other.addressSpace &&
+               accessQualifier == other.accessQualifier;
     }
 };
 

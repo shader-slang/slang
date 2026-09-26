@@ -4311,7 +4311,12 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
                 checkGroupSharedArgumentOfParam(paramDecl, argExpr);
 
-                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
+                // A read-only `groupshared` parameter is a `ref` whose callee cannot write through
+                // it, so its argument need not be mutable: another `const groupshared` parameter is
+                // a valid argument. The check above already requires the argument to name
+                // group-shared storage.
+                if ((as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType)) &&
+                    !isReadOnlyGroupSharedParam(paramDecl))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.

@@ -14666,16 +14666,19 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
                 .modifier = directionModifier});
 
-        // `const groupshared` cannot take `RefModifier`: `ConstModifier` clears `isLeftValue`, and
-        // the invoke check requires a mutable l-value for a `RefParamType` argument, so the
-        // parameter would be uncallable. `BorrowModifier` is what `__constref` carries.
-        if (!paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>())
+        // Every `groupshared` parameter takes the `ref` passing mode, which passes the argument's
+        // own address and, unlike a borrow, has no copy-in fallback: a copy would leave a callee
+        // that reads after a group barrier looking at a stale snapshot. A read-only parameter is a
+        // `const` `ref`, so we rewrite the `__constref` spelling (a `BorrowModifier`) to that form
+        // and both read-only spellings share one representation.
+        if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
         {
-            if (paramDecl->hasModifier<ConstModifier>())
-                addModifier(paramDecl, this->getASTBuilder()->create<BorrowModifier>());
-            else
-                addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());
+            removeModifier(paramDecl, borrowModifier);
+            if (!paramDecl->hasModifier<ConstModifier>())
+                addModifier(paramDecl, this->getASTBuilder()->create<ConstModifier>());
         }
+        if (!paramDecl->hasModifier<RefModifier>())
+            addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());
     }
 
     // Only texture types are allowed to have memory qualifiers on parameters
@@ -15685,9 +15688,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
             {
                 if (isTypeDifferentiable(paramDecl->type.type) &&
-                    !paramDecl->hasModifier<NoDiffModifier>() &&
-                    (paramDecl->hasModifier<RefModifier>() ||
-                     paramDecl->hasModifier<BorrowModifier>()))
+                    !paramDecl->hasModifier<NoDiffModifier>())
                 {
                     getSink()->diagnose(
                         Diagnostics::CannotUseGroupsharedOnDifferentiableFunctionParameter{

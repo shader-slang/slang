@@ -568,6 +568,14 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 
+/// Return whether `decl` is a read-only `groupshared` parameter, i.e. `const groupshared T p`.
+///
+/// Such a parameter takes the `ref` passing mode like a read-write `groupshared` parameter (the
+/// argument's own address is passed, never a copy), but its callee cannot write through it. The
+/// checker rewrites the `__constref groupshared` spelling to this form.
+///
+bool isReadOnlyGroupSharedParam(VarDeclBase* decl);
+
 /// Returns true if `type` or one of its modified-type bases carries `no_diff`.
 bool doesTypeHaveNoDiffModifier(Type* type);
 

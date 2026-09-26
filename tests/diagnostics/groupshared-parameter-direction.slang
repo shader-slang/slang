@@ -4,10 +4,11 @@
 //
 // A `groupshared` parameter names one thread-group-shared storage location and is therefore passed
 // by reference, so the copy-direction modifiers `in`/`out`/`inout` are not applicable and are a
-// compile error on a `groupshared` parameter. Mutability is spelled by `__constref` (read-only)
-// versus the bare read-write default. The three rejected spellings below must each produce error
-// 30705; the bare and `__constref` spellings must still compile with no diagnostic (enforced by
-// the exhaustive diagnostic-test mode -- any stray diagnostic on those lines would fail the test).
+// compile error on a `groupshared` parameter. Mutability is spelled by `const` (read-only, with
+// `__constref` as an equivalent spelling) versus the bare read-write default. The three rejected
+// spellings below must each produce error 30707; the bare, `const` and `__constref` spellings must
+// still compile with no diagnostic (enforced by the exhaustive diagnostic-test mode -- any stray
+// diagnostic on those lines would fail the test).
 //
 // The `//diag:` annotations are caret-less substring matches, so each is matched against one of the
 // produced diagnostics by message text regardless of line/column.
@@ -34,7 +35,7 @@ void badInOut(uint tid, inout groupshared uint s[N])
 }
 //diag: cannot be used with 'groupshared'
 
-// --- Accepted: bare (read-write) and `__constref` (read-only) `groupshared` ---
+// --- Accepted: bare (read-write), and `const` or `__constref` (read-only) `groupshared` ---
 
 void okReadWrite(uint tid, groupshared uint s[N])
 {
@@ -42,6 +43,11 @@ void okReadWrite(uint tid, groupshared uint s[N])
 }
 
 uint okReadOnly(uint tid, __constref groupshared uint s[N])
+{
+    return s[tid];
+}
+
+uint okConstReadOnly(uint tid, const groupshared uint s[N])
 {
     return s[tid];
 }

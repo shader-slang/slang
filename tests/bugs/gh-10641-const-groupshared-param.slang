@@ -1,16 +1,11 @@
 // gh-10641-const-groupshared-param.slang
 
-// A `const groupshared` parameter must lower to a read-only reference, distinct from the
-// read-write reference a bare `groupshared` parameter gets.
-//
-// `getExplicitlyDeclaredParamPassingMode` picks the passing mode from `RefModifier` /
-// `BorrowModifier` and the direction modifiers; it never inspects `ConstModifier`. So before this
-// fix, `const groupshared T p[N]` -- which the checker accepts, and whose writes it rejects --
-// fell through to the read-write groupshared default and lowered to the same `BorrowInOutParam` as
-// a bare `groupshared` parameter. The read-only-ness existed only in the AST and was invisible to
-// every IR pass and emitter: the two spellings produced byte-identical CUDA signatures and the same
-// mangled name. The checker now gives a `const groupshared` parameter the same `BorrowModifier`
-// that the explicit `__constref` spelling carries, so both agree on `BorrowInParam`.
+// A `groupshared` parameter is always a reference to one thread-group-shared location. The
+// read-only spellings (`const groupshared` and `__constref groupshared`) therefore use the same
+// strict `ref` passing mode as the read-write spelling and differ from it only in access. A borrow
+// (`BorrowInParam`) is not enough: lowering may copy a borrowed argument into a temporary when it
+// cannot take its address, and a callee that reads after `GroupMemoryBarrierWithGroupSync()` would
+// then see a stale snapshot instead of the other invocations' writes.
 //
 // `[noinline]` keeps the call boundary alive so the parameter survives to the IR dump.
 
@@ -43,12 +38,12 @@ void main(uint tid : SV_DispatchThreadID)
     readWrite(sh);
 }
 
-// Both read-only spellings lower to `BorrowInParam` ...
-//CHECK-DAG: func %readOnlyConst{{.*}}BorrowInParam
-//CHECK-DAG: func %readOnlyConstRef{{.*}}BorrowInParam
+// Both read-only spellings lower to a `RefParam` with `Read` access (`1`) ...
+//CHECK-DAG: func %readOnlyConst{{.*}}RefParam(Array(UInt, 8 : Int), 1 : UInt64
+//CHECK-DAG: func %readOnlyConstRef{{.*}}RefParam(Array(UInt, 8 : Int), 1 : UInt64
 
-// ... while the bare spelling is the strict read-write reference `RefParam`, which unlike a borrow
-// has no copy-in fallback. This is the other half of the control: injecting the borrow modifier
-// unconditionally would silently make every bare `groupshared` parameter read-only and reintroduce
-// that fallback, which this check would catch.
-//CHECK-DAG: func %readWrite{{.*}}RefParam
+// ... the bare spelling to a `RefParam` with `ReadWrite` access (`0`) ...
+//CHECK-DAG: func %readWrite{{.*}}RefParam(Array(UInt, 8 : Int), 0 : UInt64
+
+// ... and none of them is a borrow, whose lowering has a copy-in fallback.
+//CHECK-NOT: RateQualified(GroupShared, BorrowInParam

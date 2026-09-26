@@ -234,7 +234,9 @@ Writes through such a parameter are visible to every invocation in the group. Th
 uint total(const groupshared uint scratch[N]) { ... }
 ```
 
-`const groupshared` is accepted on a parameter and is equivalent to `__constref groupshared`, which is what the compiler rewrites it to. Prefer the `const` form in Slang source. Because a `groupshared` parameter denotes shared storage rather than a per-invocation value, the copy-direction modifiers `in`, `out`, and `inout` cannot be used with `groupshared` and are reported as an error.
+A `const groupshared` parameter is the same reference as a read-write one, except that the callee cannot write through it. It is never a snapshot: nothing is copied at the call, so a read that follows a group barrier such as `GroupMemoryBarrierWithGroupSync()` sees the other invocations' writes. `__constref groupshared` is an equivalent spelling; prefer `const groupshared` in Slang source.
+
+The argument for any `groupshared` parameter, read-only or read-write, must itself name group-shared storage: a `groupshared` variable, a component of one, or a `groupshared` parameter passed on. Any other argument is an error rather than a copy. A read-only parameter can be passed on to another read-only parameter, but not to a read-write one. Because a `groupshared` parameter denotes shared storage rather than a per-invocation value, the copy-direction modifiers `in`, `out`, and `inout` cannot be used with `groupshared` and are reported as an error.
 
 A `groupshared` parameter may be a whole `struct`, and an argument may name a field of a group-shared variable; either way the group-shared storage is passed by reference rather than copied.
 

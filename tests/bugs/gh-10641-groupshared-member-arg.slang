@@ -75,14 +75,14 @@ void main(uint tid : SV_DispatchThreadID)
     readWriteWholeStruct(go.inner);
 }
 
-// A `const groupshared` parameter is the read-only reference ...
-//CHECK-DAG: func %readOnlyField{{.*}}BorrowInParam
-//CHECK-DAG: func %readOnlyComponent{{.*}}BorrowInParam
-//CHECK-DAG: func %readOnlyWholeStruct{{.*}}BorrowInParam
+// A `const groupshared` parameter is a `RefParam` with `Read` access (`1`) ...
+//CHECK-DAG: func %readOnlyField{{.*}}RefParam({{.*}}1 : UInt64, 2147483647
+//CHECK-DAG: func %readOnlyComponent{{.*}}RefParam({{.*}}1 : UInt64, 2147483647
+//CHECK-DAG: func %readOnlyWholeStruct{{.*}}RefParam({{.*}}1 : UInt64, 2147483647
 
-// ... and a bare `groupshared` parameter is the strict read-write reference.
-//CHECK-DAG: func %readWriteField{{.*}}RefParam
-//CHECK-DAG: func %readWriteWholeStruct{{.*}}RefParam
+// ... and a bare `groupshared` parameter is a `RefParam` with `ReadWrite` access (`0`).
+//CHECK-DAG: func %readWriteField{{.*}}RefParam({{.*}}0 : UInt64, 2147483647
+//CHECK-DAG: func %readWriteWholeStruct{{.*}}RefParam({{.*}}0 : UInt64, 2147483647
 
 // The opposite direction -- a field of a *non*-group-shared variable must still be rejected -- is
 // covered by tests/diagnostics/groupshared-argument-lvalue.slang.
