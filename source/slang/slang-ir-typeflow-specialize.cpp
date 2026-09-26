@@ -602,9 +602,28 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
+// Returns true if `type` is type-flow info that an earlier specialization iteration left as an
+// inst's data type, rather than an ordinary IR type.
+//
+bool isRefinedInfoType(IRInst* type)
+{
+    if (!type)
+        return false;
+    switch (type->getOp())
+    {
+    case kIROp_TaggedUnionType:
+    case kIROp_UntaggedUnionType:
+    case kIROp_ElementOfSetType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // Create info for a concrete type, using `paramType` as a union mask to determine
 // how much structural decomposition to perform.
 //
+// - If `type` is already a refined info type (see `isRefinedInfoType`), return it unchanged.
 // - If `paramType` is concrete, return the bare type (no wrapping needed).
 // - If `paramType` is structural and `type` matches the same structural form,
 //   recurse into sub-components using `paramType`'s sub-types as sub-masks.
@@ -615,6 +634,13 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     SLANG_ASSERT(isConcreteType(type));
     SLANG_ASSERT(paramType);
     IRBuilder builder(module);
+
+    // A later call to `ILight getLight()` can see the `TaggedUnionType` an earlier iteration wrote
+    // onto its return type. We return such info as is: wrapping it in an `UntaggedUnionType` would
+    // describe a payload whose type is itself an existential, which no witness table can realize.
+    //
+    if (isRefinedInfoType(type))
+        return type;
 
     // If paramType is concrete, return the bare type directly.
     // (No wrapping needed since concrete positions can't be further refined.)
@@ -1100,24 +1126,16 @@ struct TypeFlowSpecializationContext
     //
     IRInst* tryGetInfo(IRInst* context, IRInst* inst)
     {
-        if (inst->getDataType())
-        {
-            // If the data-type is already a tagged union or untagged union or
-            // element-of-set type, then the refinement occured during a previous phase.
-            //
-            // For now, we simply re-use that info directly.
-            //
-            // In the future, it makes sense to treat it as non-concrete and use
-            // them as an upper-bound for further refinement.
-            //
-            switch (inst->getDataType()->getOp())
-            {
-            case kIROp_TaggedUnionType:
-            case kIROp_UntaggedUnionType:
-            case kIROp_ElementOfSetType:
-                return inst->getDataType();
-            }
-        }
+        // If the data-type is already a tagged union or untagged union or
+        // element-of-set type, then the refinement occured during a previous phase.
+        //
+        // For now, we simply re-use that info directly.
+        //
+        // In the future, it makes sense to treat it as non-concrete and use
+        // them as an upper-bound for further refinement.
+        //
+        if (isRefinedInfoType(inst->getDataType()))
+            return inst->getDataType();
 
         // A small check for de-allocated insts.
         if (!inst->getParent())
@@ -3697,13 +3715,13 @@ struct TypeFlowSpecializationContext
         IRInst* context,
         IRExtractExistentialWitnessTable* inst)
     {
-        // An ExtractExistentialWitnessTable inst is assumed to be dynamic, so we extract the
-        // witness-table set from the input existential's info and state that the result's info is
-        // an element-of-set of it.
+        // An ExtractExistentialWitnessTable inst is assumed to by dynamic, so we
+        // extract the set of witness tables from the input existential and
+        // state that the info of the result is a tag-type of that set.
         //
-        // The input info is normally a TaggedUnionType (or none/unbounded), but a concrete value
-        // entering an interface merge point yields an UntaggedUnionType (handled below); COM
-        // interfaces are handled separately.
+        // Note that since ExtractExistentialWitnessTable can only be used on
+        // an existential, the input info must be a TaggedUnionType of
+        // concrete table and type sets (or none/unbounded)
         //
 
         auto operand = inst->getOperand(0);
@@ -3743,38 +3761,18 @@ struct TypeFlowSpecializationContext
             return makeElementOfSetType(tableSet);
         }
 
-        // The operand of an ExtractExistentialWitnessTable is always an existential value (a
-        // non-COM interface / associated / bound-interface value), whose refined type-flow info is
-        // a TaggedUnionType. The only UntaggedUnionType that can reach this arm is the singleton
-        // wrapper makeInfoForConcreteType() builds when such an existential -- already lowered to a
-        // tagged union -- crosses a merge point; its sole payload element is that TaggedUnionType,
-        // never a bare struct and never a multi-element set. getLoweredType() unwraps that
-        // singleton back to the inner TaggedUnionType, so a later fixpoint iteration re-reads the
-        // operand through tryGetInfo, takes the tagged branch above, and
-        // specializeExtractExistentialWitnessTable resolves the extraction to its concrete witness
-        // table before lowering. There is thus no witness-table set to recover here, and returning
-        // none() is safe. We rely on that as an emergent invariant, so we assert the shape we
-        // depend on: a violation then fails as a localized contract check here rather than as a
-        // masked SLANG_UNEXPECTED in lowerExtractExistentialWitnessTable.
-        if (auto untaggedUnion = as<IRUntaggedUnionType>(operandInfo))
-        {
-            SLANG_RELEASE_ASSERT(
-                untaggedUnion->getSet()->isSingleton() &&
-                as<IRTaggedUnionType>(untaggedUnion->getSet()->getElement(0)));
-            return none();
-        }
-
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
     }
 
     IRInst* analyzeExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
     {
-        // An ExtractExistentialType inst is assumed to be dynamic, so we extract the type set from
-        // the input existential's info and state that the result's info is an element-of-set of it.
+        // An ExtractExistentialType inst is assumed to be dynamic, so we
+        // extract the set of witness tables from the input existential and
+        // state that the info of the result is a tag-type of that set.
         //
-        // The input info is normally a TaggedUnionType (or none/unbounded), but a concrete value
-        // entering an interface merge point yields an UntaggedUnionType (handled below); COM
-        // interfaces are handled separately.
+        // Note: Since ExtractExistentialType can only be used on
+        // an existential, the input info must be a TaggedUnionType of
+        // concrete table and type sets (or none/unbounded)
         //
 
         auto operand = inst->getOperand(0);
@@ -3797,21 +3795,6 @@ struct TypeFlowSpecializationContext
 
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
             return makeElementOfSetType(taggedUnion->getTypeSet());
-
-        // An UntaggedUnionType operand info (payload TypeSet, no witness-table tag) arises when a
-        // concrete value enters an interface merge point: makeInfoForConcreteType() builds a
-        // singleton one; unionPropagationInfo() can union several into a multi-element one. Refine
-        // a singleton to its element-of-set (same result kind as the tagged-union case, resolved to
-        // the concrete type by specializeExtractExistentialType). Leave a multi-element one
-        // unrefined: its element-of-set would reach that consumer's multi-element path, which emits
-        // GetTypeTagFromTaggedUnion and so requires a runtime tag that an untagged union does not
-        // carry.
-        if (auto untaggedUnion = as<IRUntaggedUnionType>(operandInfo))
-        {
-            if (untaggedUnion->getSet()->isSingleton())
-                return makeElementOfSetType(untaggedUnion->getSet());
-            return none();
-        }
 
         SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialType");
     }
