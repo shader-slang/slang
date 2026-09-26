@@ -297,6 +297,121 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
+    // A lane of a `makeVector` result, described by the operand that supplies it and, when that
+    // operand is a vector, the element of it that holds the lane.
+    struct MakeVectorLane
+    {
+        IRInst* operand = nullptr;
+        IRIntegerValue elementIndex = -1;
+
+        bool isVectorElement() const { return elementIndex >= 0; }
+    };
+
+    // Find the operand of `makeVector` that supplies lane `laneIndex` of its result, where a
+    // scalar operand supplies one lane and a vector operand supplies one lane per element. For
+    // example, lane 2 of `uint4(a, b)` is element 0 of `b`. The returned lane has a null operand
+    // if it cannot be resolved statically.
+    static MakeVectorLane findMakeVectorLane(IRInst* makeVector, IRIntegerValue laneIndex)
+    {
+        SLANG_ASSERT(makeVector->getOp() == kIROp_MakeVector);
+        IRIntegerValue startIndex = 0;
+        for (UInt i = 0; i < makeVector->getOperandCount(); i++)
+        {
+            auto operand = makeVector->getOperand(i);
+            auto operandVectorType = as<IRVectorType>(operand->getDataType());
+            if (!operandVectorType)
+            {
+                if (laneIndex == startIndex)
+                    return {operand, -1};
+                startIndex++;
+                continue;
+            }
+            auto operandSize = as<IRIntLit>(operandVectorType->getElementCount());
+            if (!operandSize)
+                return {};
+            if (laneIndex >= startIndex && laneIndex < startIndex + operandSize->getValue())
+                return {operand, laneIndex - startIndex};
+            startIndex += operandSize->getValue();
+        }
+        return {};
+    }
+
+    static IRInst* emitMakeVectorLaneValue(IRBuilder& builder, MakeVectorLane lane)
+    {
+        if (!lane.isVectorElement())
+            return lane.operand;
+        return builder.emitElementExtract(lane.operand, lane.elementIndex);
+    }
+
+    // Return the value of `swizzle(makeVector(...), ...)` computed directly from the `makeVector`
+    // operands, or nullptr if the selected lanes cannot be resolved statically. For example:
+    //
+    //   uint3(v, 0).xy  ->  v
+    //   uint3(v, 0).yx  ->  v.yx
+    //   uint4(a, b).yz  ->  uint2(a.y, b.x)
+    //
+    IRInst* tryFoldSwizzleOfMakeVector(IRSwizzle* swizzle)
+    {
+        ShortList<MakeVectorLane, 4> lanes;
+        for (UInt i = 0; i < swizzle->getElementCount(); i++)
+        {
+            auto index = as<IRIntLit>(swizzle->getElementIndex(i));
+            if (!index)
+                return nullptr;
+            auto lane = findMakeVectorLane(swizzle->getBase(), index->getValue());
+            if (!lane.operand)
+                return nullptr;
+            lanes.add(lane);
+        }
+
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, swizzle->sourceLoc);
+        builder.setInsertBefore(swizzle);
+
+        auto resultType = swizzle->getDataType();
+        bool isVectorResult = as<IRVectorType>(resultType) != nullptr;
+
+        // When every lane of a vector result comes from one vector operand, we read that operand
+        // directly, whole or through a swizzle of it. Rebuilding it lane by lane would leave
+        // `uint2(v.x, v.y)` in place of `v`, and nothing folds that back.
+        IRInst* vectorOperand = lanes[0].isVectorElement() ? lanes[0].operand : nullptr;
+        for (auto lane : lanes)
+        {
+            if (lane.operand != vectorOperand)
+                vectorOperand = nullptr;
+        }
+        if (isVectorResult && vectorOperand)
+        {
+            bool isWholeOperand = vectorOperand->getDataType() == resultType;
+            for (Index i = 0; isWholeOperand && i < lanes.getCount(); i++)
+                isWholeOperand = lanes[i].elementIndex == i;
+            if (isWholeOperand)
+                return vectorOperand;
+
+            ShortList<IRInst*, 4> indices;
+            for (auto lane : lanes)
+                indices.add(builder.getIntValue(builder.getIntType(), lane.elementIndex));
+            return builder.emitSwizzle(
+                resultType,
+                vectorOperand,
+                (UInt)indices.getCount(),
+                indices.getArrayView().getBuffer());
+        }
+
+        ShortList<IRInst*, 4> vals;
+        for (auto lane : lanes)
+            vals.add(emitMakeVectorLaneValue(builder, lane));
+        if (!isVectorResult)
+        {
+            SLANG_ASSERT(vals.getCount() == 1);
+            return vals[0];
+        }
+        return builder.emitMakeVector(
+            resultType,
+            (UInt)vals.getCount(),
+            vals.getArrayView().getBuffer());
+    }
+
     void processInst(IRInst* inst)
     {
         if (as<IRGlobalValueWithCode>(inst))
@@ -906,47 +1021,15 @@ struct PeepholeContext : InstPassBase
                 auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
                 if (!index)
                     break;
-                auto opCount = inst->getOperand(0)->getOperandCount();
-                IRIntegerValue startIndex = 0;
-                for (UInt i = 0; i < opCount; i++)
-                {
-                    auto element = inst->getOperand(0)->getOperand(i);
-                    if (auto elementVecType = as<IRVectorType>(element->getDataType()))
-                    {
-                        auto vecSize = as<IRIntLit>(elementVecType->getElementCount());
-                        if (!vecSize)
-                            break;
-                        if (index->getValue() >= startIndex &&
-                            index->getValue() < startIndex + vecSize->getValue())
-                        {
-                            IRBuilder builder(module);
-                            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-
-                            builder.setInsertBefore(inst);
-                            auto newElement = builder.emitElementExtract(
-                                element,
-                                builder.getIntValue(
-                                    builder.getIntType(),
-                                    index->getValue() - startIndex));
-                            inst->replaceUsesWith(newElement);
-                            maybeRemoveOldInst(inst);
-                            changed = true;
-                            break;
-                        }
-                        startIndex += vecSize->getValue();
-                    }
-                    else
-                    {
-                        if (startIndex == index->getValue())
-                        {
-                            inst->replaceUsesWith(element);
-                            maybeRemoveOldInst(inst);
-                            changed = true;
-                            break;
-                        }
-                        startIndex++;
-                    }
-                }
+                auto lane = findMakeVectorLane(inst->getOperand(0), index->getValue());
+                if (!lane.operand)
+                    break;
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                inst->replaceUsesWith(emitMakeVectorLaneValue(builder, lane));
+                maybeRemoveOldInst(inst);
+                changed = true;
             }
             else if (
                 inst->getOperand(0)->getOp() == kIROp_MakeArrayFromElement ||
@@ -1738,47 +1821,11 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     break;
                 }
-                // If we see a swizzle(makeVector) then we can replace it with the values from
-                // makeVector.
-                auto makeVector = inst->getOperand(0);
-                if (makeVector->getOp() != kIROp_MakeVector)
+                if (inst->getOperand(0)->getOp() != kIROp_MakeVector)
                     break;
-                auto swizzle = as<IRSwizzle>(inst);
-                List<IRInst*> vals;
-                auto vectorType = as<IRVectorType>(makeVector->getDataType());
-                auto vectorSize = as<IRIntLit>(vectorType->getElementCount());
-                if (!vectorSize)
-                    break;
-                if (makeVector->getOperandCount() != (UInt)vectorSize->getValue())
-                    break;
-                for (UInt i = 0; i < swizzle->getElementCount(); i++)
+                if (auto folded = tryFoldSwizzleOfMakeVector(as<IRSwizzle>(inst)))
                 {
-                    auto index = swizzle->getElementIndex(i);
-                    auto intLitIndex = as<IRIntLit>(index);
-                    if (!intLitIndex)
-                        return;
-                    if (intLitIndex->getValue() < (Int)makeVector->getOperandCount())
-                        vals.add(makeVector->getOperand((UInt)intLitIndex->getValue()));
-                    else
-                        return;
-                }
-                if (vals.getCount() == 1)
-                {
-                    inst->replaceUsesWith(vals[0]);
-                    maybeRemoveOldInst(inst);
-                    changed = true;
-                }
-                else
-                {
-                    IRBuilder builder(module);
-                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-
-                    builder.setInsertBefore(inst);
-                    auto newMakeVector = builder.emitMakeVector(
-                        swizzle->getDataType(),
-                        (UInt)vals.getCount(),
-                        vals.getBuffer());
-                    inst->replaceUsesWith(newMakeVector);
+                    inst->replaceUsesWith(folded);
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
