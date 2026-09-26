@@ -29,8 +29,12 @@ WORKFLOW until a recorded stopping condition. Skip Slack notifications; no push 
    Next: investigate semantic checking (385–397ms) with bounded call-path sampling and reduction.
    Perf monitoring is blocked by host policy; owned-child GDB works. Qualify sampling bias and exact
    outputs; do not change host settings or present debugger sampling durations as benchmark timings.
-   Create a new bounded plan. Next real compiler build must refresh version metadata and rebuild
-   restored six-source objects; current installed accepted270 bytes need no rebuild.
+   [Research273](report.slice-273-semantic-profile.md) completes16 exact-output debugger profiles:
+   982stacks/912sensitivity show generic overload/inheritance paths in every profile. No concrete
+   key/cache-outcome or representative reduction is established. Next bounded gate observes canonical
+   identities, source/candidate context and cold/valid/computing/stale/incomplete cache outcomes.
+   Next real compiler build must refresh version metadata and rebuild restored six-source objects;
+   current installed accepted270 bytes need no rebuild.
 
 The270 compact record preserves the original two-transition review-required comparison and both
 resolved failure histories. Raw artifacts and local closeout are under `build/nvvm-fp8-aggregate270`.

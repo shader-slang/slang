@@ -72,3 +72,9 @@ ledger preserves first-known and resolved histories with their original evidence
   42 exact controls,139 units,132 compiles and66 assemblies pass; full accepted layout restored.
   NVVM O3 evaluation/sample medians1362.80/1454.46ms; semantic checking385–397ms motivates the next
   call-path/profile investigation. No retained compiler change or new correctness baseline; loop active.
+
+- Research273: [semantic call paths](report.slice-273-semantic-profile.md),
+  [evidence](research-evidence.slice-273.json), [plan](plan.slice-273-semantic-profile.md).
+  16 exact-output profiles yield982 stacks; generic overload/inheritance recur in912-stack sensitivity
+  too. Existing caches remain canonical; concrete key/outcome evidence is needed before an optimization.
+  Zero reduction variants or compiler changes; accepted270 remains unchanged and the loop continues.

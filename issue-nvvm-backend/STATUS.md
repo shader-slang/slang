@@ -3,7 +3,9 @@
 The development loop is **active**, resumed on 2026-09-26. Slice270 qualifies FP8/BF16 records;
 [research271](report.slice-271-language-breadth.md) adds twelve focused language passes.
 [Material profile272](report.slice-272-material-profile.md) is accepted and the compiler layout is
-restored exactly. Next: bounded semantic-check call-path sampling/reduction before an optimization.
+restored exactly. [Semantic research273](report.slice-273-semantic-profile.md) qualifies16 profiles
+and two recurring paths; independent review accepts the evidence. Next: bounded canonical-key/cache-outcome
+observation before selecting an optimization.
 Continue reviewed local commits under [WORKFLOW](WORKFLOW.md); skip Slack, no push.
 Read [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md).
 

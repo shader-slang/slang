@@ -1,0 +1,1147 @@
+{
+  "schema": 1,
+  "slice": 273,
+  "status": "accepted-research",
+  "kind": "bounded-semantic-call-path-research",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-270.json",
+    "sha256": "7305cd21c0a8814e9dd1d34f7bee27e4afb70f469a9be2fc015a31dd543ea767"
+  },
+  "material_control": {
+    "path": "issue-nvvm-backend/timing-evidence.slice-272.json",
+    "sha256": "21fd98bbb0f54c2f571cddf3e1e2e2392a8b8d5ecda46e73763ffbc333efbfa2"
+  },
+  "provenance": {
+    "repository_revision": "4c03b2f7d5d56fe341932a23e6810038c08f8f8b",
+    "accepted_compiler_source": "06a26a3f7af603de518cfe82c981d527b580e451",
+    "accepted_compiler_patch_sha256": "a35e26dca958361bc80afb5aa540708ebad7492213fd91d1552957a4150f17e1",
+    "loaded_compiler_sha256": "74bb18f34a900790d7af2b3edf9567c69c8bedd8a347c45d0e08c8adb193667f",
+    "provider_abi": 42,
+    "provider_sha256": "fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913",
+    "compiler_and_dwarf_build_id": "2f44dd5f1164551ecfa262cd950d82d6a8bec0bc",
+    "debugger": "GNU gdb (Ubuntu 15.1-1ubuntu1~24.04.1) 15.1",
+    "material": {
+      "name": "tiled-brass-material",
+      "source": "tests/cuda/complex/tiled_brass_material.slang",
+      "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+      "entry_points": ["eval_buffer", "sample_buffer"],
+      "stage": "compute",
+      "provenance": {
+        "original_filename": "tiled_brass_material.slang",
+        "original_sha256": "924b39e55a521540518d99e6465c7d765600fd6bee752c1326c20231550eb73c",
+        "license": "Apache-2.0",
+        "adaptations": [
+          "Normalize CRLF to LF.",
+          "Add user-approved __TARGET_CUDA__=1 definition and explanatory comment."
+        ]
+      },
+      "features": [
+        "layered-material",
+        "generic-interfaces",
+        "aggregate-arrays",
+        "bindless-textures",
+        "lookup-buffers",
+        "floating-point-math"
+      ],
+      "runtime_status": "not-assessed: material/texture/LUT inputs and expected outputs are not supplied"
+    },
+    "identity_before": {
+      "path": "build/nvvm-semantic-profile273/identity-before.json",
+      "sha256": "edb74c185606606754825049f8372d86c6f9d855dc4e99e0b370f9d5281655d7"
+    },
+    "identity_after": {
+      "path": "build/nvvm-semantic-profile273/identity-after.json",
+      "sha256": "edb74c185606606754825049f8372d86c6f9d855dc4e99e0b370f9d5281655d7"
+    },
+    "identity_exact": true,
+    "verified_counts": {
+      "runtime_artifacts": 37,
+      "input_files": 576,
+      "dependency_pins": 22,
+      "layout_entries": 100,
+      "configuration_files": 3
+    },
+    "compiler_source_diff": ""
+  },
+  "method": {
+    "boundary": "Slang::FrontEndCompileRequest::checkAllTranslationUnits; invocation entry to actual caller return PC",
+    "scope": "Translation-unit checking plus entry-point validation; matches logical272 SemanticChecking scope excluding timer wrapper overhead.",
+    "debugger_policy": "Own compiler child only; init/auto-load/debuginfod/target function calls disabled; ASLR unchanged; SIGINT stop/print/nopass.",
+    "interval_semantics": "Requested resume interval; actual resume-to-stop-notification wall includes scheduling and debugger symbolization, not measured inferior active time.",
+    "inventory": "2 material entries x 2 O3 backends x 2 intervals(5/10ms) x 2 repetitions; second repetition in reverse order",
+    "jobs": 1,
+    "per_profile_timeout_seconds": 180,
+    "batch_timeout_seconds": 1800,
+    "controller": {
+      "path": "build/nvvm-semantic-profile273/sample.main.py",
+      "sha256": "851fdecd64fc850e0b21228cd444e762160c40ef3dc2de29032546eafe82a190"
+    },
+    "batch": {
+      "path": "build/nvvm-semantic-profile273/batch.json",
+      "sha256": "0708b8125c065171eff763e0e1962f0df4457c0b1001d2f6f675ba5d6a10d731"
+    },
+    "leaf_semantics": "Innermost logical GDB frame, including inlining.",
+    "inclusive_semantics": "Function presence deduplicated within each stack; overlapping counts are not additive. Anonymous operator() disambiguated by source file/line.",
+    "sensitivity": "Retain every primary sample; separate view excludes notifications with interval >2x request.",
+    "module_offsets": "Each raw enriched stack records mapped module and relative PC.",
+    "pilot": {
+      "profile": "pilot02",
+      "samples": 40,
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "normal_exit": true,
+      "semantic_entry_seconds": 2.8458356205374002,
+      "semantic_exit_seconds": 8.100393960252404,
+      "setup_stopped_seconds": 0.18976745195686817,
+      "run_seconds_sum": 0.8861459046602249,
+      "stopped_seconds_sum": 4.178644983097911,
+      "run_seconds_median": 0.010696839541196823,
+      "run_seconds_range": [0.01045919582247734, 0.26658812165260315],
+      "interrupt_latency_seconds_max": 0.25641235522925854,
+      "unknown_frames": 0,
+      "all_unwind_reach_main": true,
+      "unwind_roots": ["main"],
+      "thread_ids": ["1"],
+      "max_frames": 162,
+      "hashes": {
+        "build/nvvm-semantic-profile273/sample.pilot01.py": "383f383f79c0c10c065bc835a9511b0b9a2c50637a0e258265b2bcbefccd8e88",
+        "build/nvvm-semantic-profile273/sample.pilot02.py": "1f181bd5272dbefaa4399074a3f431edc0fca26edc4c951be844dfeb4d4a62a5",
+        "build/nvvm-semantic-profile273/pilot01/result.json": "1090dec02b02fba26ffed628c8153517ea3780566c6fbd5dbc014d9cfe4fa576",
+        "build/nvvm-semantic-profile273/pilot02/result.json": "9bb8a4bc3aebc4b52ac26720515a98ce8429b39138249596bfbfb22051fdd39b",
+        "build/nvvm-semantic-profile273/pilot02/mi.jsonl": "765e71f4734b1b41809ae9ec6e85b78f5f020e776756900d0e6ed4ae6038cf32"
+      }
+    }
+  },
+  "profiles": [
+    {
+      "id": "profile-eval_buffer-nvrtc-5ms-r0",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "interval_ms": 5,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 82,
+      "delayed_notifications": 3,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1989971,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 82,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 30,
+          "Slang::SemanticsVisitor::inferGenericArguments": 25,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 20,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 5
+        }
+      },
+      "sensitivity": {
+        "stack_count": 79,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 30,
+          "Slang::SemanticsVisitor::inferGenericArguments": 25,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 20,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 5
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvrtc-5ms-r0/result.json",
+        "sha256": "3d74bfb052834e681f753ab2ec0ed17ada11b51f95f0e62e6d0ea9d975bb02f5"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvvm-5ms-r0",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "interval_ms": 5,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 82,
+      "delayed_notifications": 4,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1989986,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 82,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 32,
+          "Slang::SemanticsVisitor::inferGenericArguments": 30,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 28,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 5
+        }
+      },
+      "sensitivity": {
+        "stack_count": 78,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 31,
+          "Slang::SemanticsVisitor::inferGenericArguments": 29,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 27,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 4
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvvm-5ms-r0/result.json",
+        "sha256": "2bdd5bbf9e854c2a171fcc584fa4aea4df2ff1e1ae513716d10d927ecf171399"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvrtc-5ms-r0",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "interval_ms": 5,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 81,
+      "delayed_notifications": 3,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990028,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 81,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 26,
+          "Slang::SemanticsVisitor::inferGenericArguments": 25,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 31,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 5
+        }
+      },
+      "sensitivity": {
+        "stack_count": 78,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 26,
+          "Slang::SemanticsVisitor::inferGenericArguments": 25,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 31,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 5
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvrtc-5ms-r0/result.json",
+        "sha256": "ed1ba660288136b7055f8b81a59c4d3a537fbdab11de5cdd069b42b4f8a28ba7"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvvm-5ms-r0",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "interval_ms": 5,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "3868c13c4e03ae53cd36a474f0c4f04859b059339af457914e7f185051d26fb9",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 82,
+      "delayed_notifications": 7,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990046,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 82,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 32,
+          "Slang::SemanticsVisitor::inferGenericArguments": 30,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 31,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "sensitivity": {
+        "stack_count": 75,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 31,
+          "Slang::SemanticsVisitor::inferGenericArguments": 29,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 29,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvvm-5ms-r0/result.json",
+        "sha256": "0fea4690a225a28529a5bef6d07215ff1131180bcb006bf51c991372875a6bbf"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvrtc-10ms-r0",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "interval_ms": 10,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 40,
+      "delayed_notifications": 5,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990081,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 40,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 17,
+          "Slang::SemanticsVisitor::inferGenericArguments": 15,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 14,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "sensitivity": {
+        "stack_count": 35,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 15,
+          "Slang::SemanticsVisitor::inferGenericArguments": 13,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 13,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvrtc-10ms-r0/result.json",
+        "sha256": "be62ee97b1125da77820c67050f9e4319c0013fde7379bbd64096f2776f3b03f"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvvm-10ms-r0",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "interval_ms": 10,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 40,
+      "delayed_notifications": 2,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990106,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 40,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 14,
+          "Slang::SemanticsVisitor::inferGenericArguments": 13,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 12,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "sensitivity": {
+        "stack_count": 38,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 13,
+          "Slang::SemanticsVisitor::inferGenericArguments": 12,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 11,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvvm-10ms-r0/result.json",
+        "sha256": "b98a0836c6d23d0fe79d50d7f8fc0ae223029d75dfcb0a878ff91895f75f9590"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvrtc-10ms-r0",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "interval_ms": 10,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 41,
+      "delayed_notifications": 7,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990146,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 41,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 18,
+          "Slang::SemanticsVisitor::inferGenericArguments": 18,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 16,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "sensitivity": {
+        "stack_count": 34,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 14,
+          "Slang::SemanticsVisitor::inferGenericArguments": 14,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 13,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvrtc-10ms-r0/result.json",
+        "sha256": "5f9eafd778e34768146ba233546abf59b689c21f3828a941013de24b7f8fbc43"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvvm-10ms-r0",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "interval_ms": 10,
+      "repetition": 0,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "3868c13c4e03ae53cd36a474f0c4f04859b059339af457914e7f185051d26fb9",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 41,
+      "delayed_notifications": 2,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990171,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 41,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 16,
+          "Slang::SemanticsVisitor::inferGenericArguments": 16,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 12,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "sensitivity": {
+        "stack_count": 39,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 16,
+          "Slang::SemanticsVisitor::inferGenericArguments": 16,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 11,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvvm-10ms-r0/result.json",
+        "sha256": "aafc0ab540e9157dc146b43e1fc0649a4b8a865ca18f49820c990b5b82e7f876"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvvm-10ms-r1",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "interval_ms": 10,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "3868c13c4e03ae53cd36a474f0c4f04859b059339af457914e7f185051d26fb9",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 41,
+      "delayed_notifications": 3,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990229,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 41,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 12,
+          "Slang::SemanticsVisitor::inferGenericArguments": 12,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 12,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "sensitivity": {
+        "stack_count": 38,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 10,
+          "Slang::SemanticsVisitor::inferGenericArguments": 10,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 11,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvvm-10ms-r1/result.json",
+        "sha256": "067fbfe664760a410c743f92f1715db14a282a14737c503a5603bca409201de1"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvrtc-10ms-r1",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "interval_ms": 10,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 40,
+      "delayed_notifications": 4,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990242,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 40,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 18,
+          "Slang::SemanticsVisitor::inferGenericArguments": 18,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 18,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 2
+        }
+      },
+      "sensitivity": {
+        "stack_count": 36,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 17,
+          "Slang::SemanticsVisitor::inferGenericArguments": 17,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 16,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 2
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvrtc-10ms-r1/result.json",
+        "sha256": "acf6402629544ef1aad2cbdb8f074a26eb88b904be84f5585f692e9a4a987701"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvvm-10ms-r1",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "interval_ms": 10,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 40,
+      "delayed_notifications": 5,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990255,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 40,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 9,
+          "Slang::SemanticsVisitor::inferGenericArguments": 8,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 17,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "sensitivity": {
+        "stack_count": 35,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 8,
+          "Slang::SemanticsVisitor::inferGenericArguments": 7,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 14,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvvm-10ms-r1/result.json",
+        "sha256": "68c4089d606594341abd1daad13f3bd2ad0f5b0ee524c081e1ed4d940c978c08"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvrtc-10ms-r1",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "interval_ms": 10,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 41,
+      "delayed_notifications": 4,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990356,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 41,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 15,
+          "Slang::SemanticsVisitor::inferGenericArguments": 14,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 11,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "sensitivity": {
+        "stack_count": 37,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 14,
+          "Slang::SemanticsVisitor::inferGenericArguments": 13,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 9,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 0
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvrtc-10ms-r1/result.json",
+        "sha256": "6234760b595ca2085884db201b5b16d4042b6bfb80dcae90f417f91dedc9f891"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvvm-5ms-r1",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "interval_ms": 5,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "3868c13c4e03ae53cd36a474f0c4f04859b059339af457914e7f185051d26fb9",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 82,
+      "delayed_notifications": 5,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990372,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 82,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 30,
+          "Slang::SemanticsVisitor::inferGenericArguments": 28,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 30,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "sensitivity": {
+        "stack_count": 77,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 29,
+          "Slang::SemanticsVisitor::inferGenericArguments": 27,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 27,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvvm-5ms-r1/result.json",
+        "sha256": "e9896a81b9fca262b318a4267facdfa3178056055213e321bb3ddac100119435"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-sample_buffer-nvrtc-5ms-r1",
+      "entry_mode": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "interval_ms": 5,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 84,
+      "delayed_notifications": 6,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990413,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 84,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 29,
+          "Slang::SemanticsVisitor::inferGenericArguments": 27,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 24,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "sensitivity": {
+        "stack_count": 78,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 27,
+          "Slang::SemanticsVisitor::inferGenericArguments": 25,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 22,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 3
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-sample_buffer-nvrtc-5ms-r1/result.json",
+        "sha256": "0ffeea29142d6adfd60cbd372b9631bb8e3cabe3db9d3fa445c068f39ac10552"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvvm-5ms-r1",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "interval_ms": 5,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 83,
+      "delayed_notifications": 6,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990446,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 83,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 32,
+          "Slang::SemanticsVisitor::inferGenericArguments": 31,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 29,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 2
+        }
+      },
+      "sensitivity": {
+        "stack_count": 77,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 31,
+          "Slang::SemanticsVisitor::inferGenericArguments": 30,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 27,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvvm-5ms-r1/result.json",
+        "sha256": "249b28372a8501a65be1dd15cc1f5cbcbf2b33584644eabcef72f5e31be821cf"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    },
+    {
+      "id": "profile-eval_buffer-nvrtc-5ms-r1",
+      "entry_mode": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "interval_ms": 5,
+      "repetition": 1,
+      "status": "qualified",
+      "normal_exit": true,
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "ptx_matches_accepted272": true,
+      "semantic_stacks": 82,
+      "delayed_notifications": 4,
+      "unknown_frames": 0,
+      "all_unwind_to_main": true,
+      "owned_inferior_cleanup": [
+        {
+          "pid": 1990483,
+          "status": "absent"
+        }
+      ],
+      "observations": {
+        "stack_count": 82,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 29,
+          "Slang::SemanticsVisitor::inferGenericArguments": 29,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 33,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "sensitivity": {
+        "stack_count": 78,
+        "inclusive_presence": {
+          "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 28,
+          "Slang::SemanticsVisitor::inferGenericArguments": 28,
+          "Slang::SharedSemanticsContext::_calcInheritanceInfo": 31,
+          "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 1
+        }
+      },
+      "raw_result": {
+        "path": "build/nvvm-semantic-profile273/profile-eval_buffer-nvrtc-5ms-r1/result.json",
+        "sha256": "5b070e42e7b8a7d5558b5778fb742ed738a049b2669ed5e9bc5f9104ef5dc88d"
+      },
+      "all_module_pcs_resolved": true,
+      "semantic_thread_ids": ["1"],
+      "total_thread_ids": ["1", "2", "3"],
+      "boundary_entries": 1,
+      "boundary_exits": 1
+    }
+  ],
+  "summary": {
+    "qualified_profiles": 16,
+    "all": {
+      "stack_count": 982,
+      "inclusive_presence": {
+        "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 359,
+        "Slang::SemanticsVisitor::inferGenericArguments": 339,
+        "Slang::SharedSemanticsContext::_calcInheritanceInfo": 338,
+        "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 35
+      }
+    },
+    "sensitivity": {
+      "stack_count": 912,
+      "inclusive_presence": {
+        "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 340,
+        "Slang::SemanticsVisitor::inferGenericArguments": 320,
+        "Slang::SharedSemanticsContext::_calcInheritanceInfo": 312,
+        "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 32
+      }
+    },
+    "top_logical_leaves": [
+      ["_int_malloc", 113],
+      ["Slang::SyntaxClassBase::isSubClassOf", 43],
+      [
+        "ankerl::unordered_dense::v4_5_0::detail::table<Slang::ValKey, Slang::Val*, Slang::Hash<Slang::ValKey>, Slang::ValKeyEqual, std::allocator<std::pair<Slang::ValKey, Slang::Val*> >, ankerl::unordered_dense::v4_5_0::bucket_type::standard, ankerl::unordered_dense::v4_5_0::detail::default_container_t, false>::do_find<Slang::ValNodeDesc>",
+        30
+      ],
+      ["Slang::SyntaxClassBase::SyntaxClassBase", 28],
+      ["Slang::ValKey::operator==", 22]
+    ],
+    "groups": {
+      "tiled-brass-material-eval_buffer-nvrtc-o3": {
+        "all": {
+          "stack_count": 245,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 91,
+            "Slang::SemanticsVisitor::inferGenericArguments": 83,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 78,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 9
+          }
+        },
+        "sensitivity": {
+          "stack_count": 229,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 87,
+            "Slang::SemanticsVisitor::inferGenericArguments": 79,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 73,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 9
+          }
+        }
+      },
+      "10ms": {
+        "all": {
+          "stack_count": 324,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 119,
+            "Slang::SemanticsVisitor::inferGenericArguments": 114,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 112,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 8
+          }
+        },
+        "sensitivity": {
+          "stack_count": 292,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 107,
+            "Slang::SemanticsVisitor::inferGenericArguments": 102,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 98,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 7
+          }
+        }
+      },
+      "r0": {
+        "all": {
+          "stack_count": 489,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 185,
+            "Slang::SemanticsVisitor::inferGenericArguments": 172,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 164,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 23
+          }
+        },
+        "sensitivity": {
+          "stack_count": 456,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 176,
+            "Slang::SemanticsVisitor::inferGenericArguments": 163,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 155,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 22
+          }
+        }
+      },
+      "r1": {
+        "all": {
+          "stack_count": 493,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 174,
+            "Slang::SemanticsVisitor::inferGenericArguments": 167,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 174,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 12
+          }
+        },
+        "sensitivity": {
+          "stack_count": 456,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 164,
+            "Slang::SemanticsVisitor::inferGenericArguments": 157,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 157,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 10
+          }
+        }
+      },
+      "5ms": {
+        "all": {
+          "stack_count": 658,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 240,
+            "Slang::SemanticsVisitor::inferGenericArguments": 225,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 226,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 27
+          }
+        },
+        "sensitivity": {
+          "stack_count": 620,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 233,
+            "Slang::SemanticsVisitor::inferGenericArguments": 218,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 214,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 25
+          }
+        }
+      },
+      "tiled-brass-material-eval_buffer-nvvm-o3": {
+        "all": {
+          "stack_count": 245,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 87,
+            "Slang::SemanticsVisitor::inferGenericArguments": 82,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 86,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 9
+          }
+        },
+        "sensitivity": {
+          "stack_count": 228,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 83,
+            "Slang::SemanticsVisitor::inferGenericArguments": 78,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 79,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 6
+          }
+        }
+      },
+      "tiled-brass-material-sample_buffer-nvrtc-o3": {
+        "all": {
+          "stack_count": 246,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 91,
+            "Slang::SemanticsVisitor::inferGenericArguments": 88,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 89,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 11
+          }
+        },
+        "sensitivity": {
+          "stack_count": 226,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 84,
+            "Slang::SemanticsVisitor::inferGenericArguments": 81,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 82,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 11
+          }
+        }
+      },
+      "tiled-brass-material-sample_buffer-nvvm-o3": {
+        "all": {
+          "stack_count": 246,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 90,
+            "Slang::SemanticsVisitor::inferGenericArguments": 86,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 85,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 6
+          }
+        },
+        "sensitivity": {
+          "stack_count": 229,
+          "inclusive_presence": {
+            "Slang::SemanticsVisitor::addOverloadCandidatesForCallToGeneric": 86,
+            "Slang::SemanticsVisitor::inferGenericArguments": 82,
+            "Slang::SharedSemanticsContext::_calcInheritanceInfo": 78,
+            "Slang::SharedSemanticsContext::_specializeInterfaceInheritanceWitness": 6
+          }
+        }
+      }
+    },
+    "analysis": {
+      "path": "build/nvvm-semantic-profile273/analysis.json",
+      "sha256": "6be1a541a22638c79e496b583fe20e58f30f3e0074130801ca7d0bfdf279d6e6"
+    },
+    "executor": {
+      "path": "build/nvvm-semantic-profile273/executor-summary.json",
+      "sha256": "0f2b303d083c50a498e5d22c59bcec5f39ae2879079d9079e8c54544d71469f7"
+    }
+  },
+  "failures": [
+    {
+      "attempt": "pilot01",
+      "classification": "debugger-command-failure-before-sampling",
+      "detail": "Named C++ disassembly could not resolve overload; corrected evidence-only query to numeric address ranges. Inferior terminated; pilot02 retained separately.",
+      "result": {
+        "path": "build/nvvm-semantic-profile273/pilot01/result.json",
+        "sha256": "1090dec02b02fba26ffed628c8153517ea3780566c6fbd5dbc014d9cfe4fa576"
+      }
+    },
+    {
+      "attempt": "initial sandbox reads",
+      "classification": "environment-launch-failure",
+      "detail": "bwrap loopback RTM_NEWADDR Operation not permitted; approved escalated read/execution used. No compiler regression."
+    },
+    {
+      "attempt": "lead record assembly",
+      "classification": "schema-assumption-corrected",
+      "detail": "Initial script read cleanup from raw result instead of analysis profile. KeyError before record write; corrected without any workload rerun."
+    },
+    {
+      "attempt": "independent read-only review scripts",
+      "classification": "schema-assumptions-corrected",
+      "detail": "Symlink entries omit mode; missing Counter function names mean zero. Two KeyErrors corrected without compiler execution, workload reruns or evidence edits."
+    }
+  ],
+  "limitations": [
+    "Unweighted debugger observations are not CPU percentages, call frequencies, allocation volumes or performance improvements.",
+    "Two recurring paths, not a stable winner: repetition1 generic-overload and inheritance counts tie.",
+    "Concrete declaration/type identities, cache outcomes and invalidation causes were not captured.",
+    "No representative reduced source or justified compiler optimization is established; zero reduction variants attempted.",
+    "Material GPU runtime remains unqualified without bindings, texture/LUT inputs and expected outputs."
+  ],
+  "source_trace": {
+    "raw": {
+      "path": "build/nvvm-semantic-profile273/source-trace.md",
+      "sha256": "d401a9adfe2fc30fcfa6980a317735954cd2c3d50e76aa74524cb235802bf0fe"
+    },
+    "non_delayed_exemplar": {
+      "path": "build/nvvm-semantic-profile273/representative-path-sensitivity.json",
+      "sha256": "3cfadfc2d6fd37ef286ae13a0259dc49b8801d4b411010e704364af29312b8f7"
+    },
+    "delayed_exemplar_retained": {
+      "path": "build/nvvm-semantic-profile273/representative-path.json",
+      "sha256": "0ec031f341558449b432b7dd6dd16cc86bc09d93bd85b18dea13836cf1626608"
+    },
+    "chain": [
+      "ResolveInvoke",
+      "addOverloadCandidatesForCallToGeneric",
+      "inferGenericArguments",
+      "TryUnifyTypesByStructuralMatch",
+      "_getInheritanceInfo",
+      "_calcInheritanceInfo",
+      "considerExtension",
+      "applyExtensionToType",
+      "getTargetType",
+      "Val::substituteImpl",
+      "substituteValWithCache"
+    ],
+    "input_shape_audit": "Checked Type/DeclRef values use existing canonical producers and caches. No malformed shape established. Concrete material identities and cache outcomes not observed.",
+    "next_gate": "Observe canonical keys, source/candidate context, extension epochs and cold/valid/computing/stale/incomplete outcomes. Bound detailed events and report overflow; no new equivalence relation. Reduce only a demonstrated repeated same-key/context case."
+  },
+  "acceptance": {
+    "independent_review": {
+      "reviewer": "semantic_review273",
+      "verdict": "approved",
+      "reviewed_candidate_sha256": "ff29f89fe5020840d26bd9a9887afe0d99265fed427e43124368fdddb90ad917",
+      "checks": "Exact16 outcomes/PTX; all per-profile and aggregate counts;28 artifact refs; source trace; live37runtime/576inputs/22pins/100layout/3config; binary/DWARF build ID; threads and claim limits."
+    },
+    "retained_compiler_change": false,
+    "fresh_full_correctness": false,
+    "inherited_full_correctness": 270,
+    "last_targeted": 233,
+    "implementations_since_full": 0,
+    "main_inventory_or_hash_changes": false,
+    "slack": "skipped per user",
+    "loop": "active"
+  }
+}
