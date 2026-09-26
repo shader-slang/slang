@@ -19,6 +19,24 @@ enum class OptimizationLevel : SlangOptimizationLevelIntegral;
 enum class DebugInfoLevel : SlangDebugInfoLevelIntegral;
 enum class CodeGenTarget : SlangCompileTargetIntegral;
 
+/// How `CompilerOptionSet::writeCommandLineArgs` treats a given option when reconstructing the
+/// descriptive command line embedded in debug info (e.g. the SPIR-V `DebugEntryPoint` `OpString`).
+enum class CommandLineOptionClass
+{
+    Serialize,            ///< Emitted: a descriptive option worth recording for reproduction
+                          ///< fidelity (influences the artifact, or documents how it was produced).
+    RepresentedElsewhere, ///< Not emitted directly: derived from / represented through another
+                          ///< option.
+    Omit,                 ///< Not emitted: excluded from the reconstruction (context/I/O/tooling/
+                          ///< diagnostics, or an API-only knob with no CLI spelling to reproduce).
+    Unclassified, ///< No decision recorded — a bug caught by the exhaustiveness unit test.
+};
+
+/// Classify how the reproduction command line should treat `name`. This is the single source of
+/// truth for that decision; `classifyCommandLineOption` must return a non-`Unclassified` value for
+/// every `CompilerOptionName`, which the unit test enforces (see the enum doc above).
+CommandLineOptionClass classifyCommandLineOption(CompilerOptionName name);
+
 struct CompilerOptionValue
 {
     CompilerOptionValueKind kind = CompilerOptionValueKind::Int;
@@ -96,9 +114,10 @@ struct CompilerOptionSet
     static bool allowDuplicate(CompilerOptionName name);
 
     /// Append a CLI-like reconstruction of the stored options to `sb`, for the descriptive command
-    /// line embedded in debug info. Only the option kinds it explicitly handles are emitted; it
+    /// line embedded in debug info. It emits the options present in this set that are classified
+    /// `Serialize` by `classifyCommandLineOption`; every other kind is omitted by design. It
     /// reports what is stored (which for some options is a default materialized during option
-    /// resolution) and does not add implicit defaults for absent options.
+    /// resolution), and does not itself add implicit defaults for absent options.
     void writeCommandLineArgs(Session* globalSession, StringBuilder& sb);
 
     OrderedDictionary<CompilerOptionName, List<CompilerOptionValue>> options;
