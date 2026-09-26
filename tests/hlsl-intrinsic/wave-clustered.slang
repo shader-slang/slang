@@ -5,13 +5,60 @@
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
+int clusteredValue(int lane)
+{
+    switch (lane % 4)
+    {
+    case 0:
+        return 1;
+    case 1:
+        return 2;
+    case 2:
+        return 4;
+    default:
+        return 5;
+    }
+}
+
 __generic<T : __BuiltinLogicalType>
 bool test1Logical()
 {
+    int lane = int(WaveGetLaneIndex());
+
+    if (T is bool)
+    {
+        bool one = lane % 4 == 0;
+        bool two = lane % 4 < 2;
+
+        return true
+            & WaveClusteredBitAnd(one, 4) == false
+            & WaveClusteredBitOr(one, 4) == true
+            & WaveClusteredBitXor(one, 4) == true
+            & WaveClusteredBitAnd(two, 4) == false
+            & WaveClusteredBitOr(two, 4) == true
+            & WaveClusteredBitXor(two, 4) == false
+            ;
+    }
+
+    T v = T(clusteredValue(lane));
     return true
-        & WaveClusteredBitAnd(T(1), 4) == T(1)
-        & WaveClusteredBitOr(T(1), 4) == T(1)
-        & WaveClusteredBitXor(T(1), 4) == T(0)
+        & WaveClusteredBitAnd(v, 4) == T(0)
+        & WaveClusteredBitOr(v, 4) == T(7)
+        & WaveClusteredBitXor(v, 4) == T(2)
+        ;
+}
+
+__generic<T : __BuiltinArithmeticType>
+bool test1Arithmetic()
+{
+    int lane = int(WaveGetLaneIndex());
+
+    T v = T(clusteredValue(lane));
+    return true
+        & WaveClusteredSum(v, 4) == T(12)
+        & WaveClusteredProduct(v, 4) == T(40)
+        & WaveClusteredMin(v, 4) == T(1)
+        & WaveClusteredMax(v, 4) == T(5)
         ;
 }
 
@@ -19,11 +66,44 @@ __generic<T : __BuiltinLogicalType, let N : int>
 bool testVLogical()
 {
     typealias gvec = vector<T, N>;
+    int lane = int(WaveGetLaneIndex());
 
+    if (T is bool)
+    {
+        typealias bvec = vector<bool, N>;
+        bool one = lane % 4 == 0;
+        bool two = lane % 4 < 2;
+
+        return true
+            & all(WaveClusteredBitAnd(bvec(one), 4) == bvec(false))
+            & all(WaveClusteredBitOr(bvec(one), 4) == bvec(true))
+            & all(WaveClusteredBitXor(bvec(one), 4) == bvec(true))
+            & all(WaveClusteredBitAnd(bvec(two), 4) == bvec(false))
+            & all(WaveClusteredBitOr(bvec(two), 4) == bvec(true))
+            & all(WaveClusteredBitXor(bvec(two), 4) == bvec(false))
+            ;
+    }
+
+    T v = T(clusteredValue(lane));
     return true
-        & all(WaveClusteredBitAnd(gvec(T(1)), 4) == gvec(T(1)))
-        & all(WaveClusteredBitOr(gvec(T(1)), 4) == gvec(T(1)))
-        & all(WaveClusteredBitXor(gvec(T(1)), 4) == gvec(T(0)))
+        & all(WaveClusteredBitAnd(gvec(v), 4) == gvec(T(0)))
+        & all(WaveClusteredBitOr(gvec(v), 4) == gvec(T(7)))
+        & all(WaveClusteredBitXor(gvec(v), 4) == gvec(T(2)))
+        ;
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+bool testVArithmetic()
+{
+    typealias gvec = vector<T, N>;
+    int lane = int(WaveGetLaneIndex());
+
+    T v = T(clusteredValue(lane));
+    return true
+        & all(WaveClusteredSum(gvec(v), 4) == gvec(T(12)))
+        & all(WaveClusteredProduct(gvec(v), 4) == gvec(T(40)))
+        & all(WaveClusteredMin(gvec(v), 4) == gvec(T(1)))
+        & all(WaveClusteredMax(gvec(v), 4) == gvec(T(5)))
         ;
 }
 
@@ -66,30 +146,6 @@ bool testLogical()
         & testVLogical<bool, 2>()
         & testVLogical<bool, 3>()
         & testVLogical<bool, 4>()
-        ;
-}
-
-__generic<T : __BuiltinArithmeticType>
-bool test1Arithmetic()
-{
-    return true
-        & WaveClusteredSum(T(1), 4) == T(4)
-        & WaveClusteredProduct(T(1), 4) == T(1)
-        & WaveClusteredMin(T(1), 4) == T(1)
-        & WaveClusteredMax(T(1), 4) == T(1)
-        ;
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-bool testVArithmetic()
-{
-    typealias gvec = vector<T, N>;
-
-    return true
-        & all(WaveClusteredSum(gvec(T(1)), 4) == gvec(T(4)))
-        & all(WaveClusteredProduct(gvec(T(1)), 4) == gvec(T(1)))
-        & all(WaveClusteredMin(gvec(T(1)), 4) == gvec(T(1)))
-        & all(WaveClusteredMax(gvec(T(1)), 4) == gvec(T(1)))
         ;
 }
 
