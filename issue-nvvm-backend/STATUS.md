@@ -41,11 +41,16 @@ equal, with mixed code-size/stack tradeoffs. No general speed or code-quality ad
 [Report263](report.slice-263-results-package.md) records validation and limits. Raw evidence remains
 under `build/nvvm-results/2026-09-26-integration`.
 
-No work remains authorized in this sequence. Do not choose slice264 or enter the development loop.
-A new results-only request follows RESULTS; a future explicit development resume follows WORKFLOW.
-Priorities to discuss: parallel NVRTC PCH ownership, remaining column-major correctness, material
-runtime contracts, sampling output-stage profiling and fixture-driven code-quality improvements.
-Historical candidates are evidence, not authorization. Broad compiler reorganization is not selected.
+The finite material follow-up has completed [research264](report.slice-264-material-attribution.md):
+shared Slang work dominates fresh compile time; vector layout explains evaluation's stack growth;
+missed aggregate constants add arithmetic. No production optimization was promoted. The general
+probe improves when its storage is separated, but does not reproduce the material's backend
+asymmetry. See [evidence264](timing-evidence.slice-264.json) and the reproducible experiment.
+
+Accepted262 source and all27 saved runtime/cache identities are restored in the default build.
+Temporary instrumentation and its binaries are retained separately under `build/nvvm-material-followup`;
+no new full correctness baseline is claimed. The only remaining authorized step is results/reporting
+refresh265, then a detailed Slack DM and stop for discussion. The general loop remains stopped.
 
 Environment: native Ubuntu24.04, L4 SM89, driver580.126.09, SM80 target, CUDA12.9.2,
 NVRTC12.9.86, LLVM14, RelWithDebInfo. Four CPU workers maximum, two unit servers, sequential GPU

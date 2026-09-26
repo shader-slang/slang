@@ -1,0 +1,401 @@
+diff --git a/source/compiler-core/slang-nvrtc-compiler.cpp b/source/compiler-core/slang-nvrtc-compiler.cpp
+index 114d82ea0..ead589f33 100644
+--- a/source/compiler-core/slang-nvrtc-compiler.cpp
++++ b/source/compiler-core/slang-nvrtc-compiler.cpp
+@@ -5,6 +5,7 @@
+ #include "core/slang-char-util.h"
+ #include "core/slang-common.h"
+ #include "core/slang-io.h"
++#include "core/slang-performance-profiler.h"
+ #include "core/slang-semantic-version.h"
+ #include "core/slang-shared-library.h"
+ #include "core/slang-string-slice-pool.h"
+@@ -1162,6 +1163,7 @@ SlangResult NVRTCDownstreamCompiler::compile(
+     const DownstreamCompileOptions& inOptions,
+     IArtifact** outArtifact)
+ {
++    SLANG_PROFILE_SECTION(nvrtcDownstreamCompile);
+     if (!isVersionCompatible(inOptions))
+     {
+         // Not possible to compile with this version of the interface.
+@@ -1415,13 +1417,17 @@ SlangResult NVRTCDownstreamCompiler::compile(
+     }
+
+     nvrtcProgram program = nullptr;
+-    nvrtcResult res = m_nvrtcCreateProgram(
+-        &program,
+-        sourceContents,
+-        String(sourcePath).getBuffer(),
+-        (int)headers.getCount(),
+-        headers.getBuffer(),
+-        headerIncludeNames.getBuffer());
++    nvrtcResult res;
++    {
++        SLANG_PROFILE_SECTION(nvrtcCreateProgram);
++        res = m_nvrtcCreateProgram(
++            &program,
++            sourceContents,
++            String(sourcePath).getBuffer(),
++            (int)headers.getCount(),
++            headers.getBuffer(),
++            headerIncludeNames.getBuffer());
++    }
+     if (res != NVRTC_SUCCESS)
+     {
+         return _asResult(res);
+@@ -1435,7 +1441,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
+         dstOptions[i] = cmdLine.m_args[i].getBuffer();
+     }
+
+-    res = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
++    {
++        SLANG_PROFILE_SECTION(nvrtcCompileProgram);
++        res = m_nvrtcCompileProgram(program, int(dstOptions.getCount()), dstOptions.getBuffer());
++    }
+
+     ComPtr<ISlangBlob> blob;
+
+@@ -1547,12 +1556,18 @@ SlangResult NVRTCDownstreamCompiler::compile(
+     {
+         // We should parse the log to set up the diagnostics
+         size_t ptxSize;
+-        SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTXSize(program, &ptxSize));
++        {
++            SLANG_PROFILE_SECTION(nvrtcGetPTXSize);
++            SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTXSize(program, &ptxSize));
++        }
+
+         List<uint8_t> ptx;
+         ptx.setCount(Index(ptxSize));
+
+-        SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTX(program, (char*)ptx.getBuffer()));
++        {
++            SLANG_PROFILE_SECTION(nvrtcGetPTX);
++            SLANG_NVRTC_RETURN_ON_FAIL(m_nvrtcGetPTX(program, (char*)ptx.getBuffer()));
++        }
+
+         // NVRTC includes its string terminator in ptxSize. The artifact contains PTX text bytes;
+         // serializing the terminator into a .ptx file makes ptxas reject it with unexpected EOF.
+diff --git a/source/compiler-core/slang-nvvm-compiler.cpp b/source/compiler-core/slang-nvvm-compiler.cpp
+index 1b3b21146..6f850bfdb 100644
+--- a/source/compiler-core/slang-nvvm-compiler.cpp
++++ b/source/compiler-core/slang-nvvm-compiler.cpp
+@@ -3,6 +3,7 @@
+
+ #include "core/slang-blob.h"
+ #include "core/slang-io.h"
++#include "core/slang-performance-profiler.h"
+ #include "core/slang-shared-library.h"
+ #include "core/slang-string-slice-pool.h"
+ #include "core/slang-string-util.h"
+@@ -475,6 +476,7 @@ SlangResult NVVMDownstreamCompiler::compile(
+     const DownstreamCompileOptions& inOptions,
+     IArtifact** outArtifact)
+ {
++    SLANG_PROFILE_SECTION(nvvmDownstreamCompile);
+     if (!outArtifact)
+         return SLANG_E_INVALID_ARG;
+     *outArtifact = nullptr;
+@@ -574,7 +576,11 @@ SlangResult NVVMDownstreamCompiler::compile(
+             return _returnArtifact(SLANG_E_NOT_FOUND, artifact, outArtifact);
+         }
+
+-        const SlangResult libdeviceReadResult = File::readAllBytes(m_libdevicePath, libdeviceBytes);
++        SlangResult libdeviceReadResult;
++        {
++            SLANG_PROFILE_SECTION(nvvmReadLibdevice);
++            libdeviceReadResult = File::readAllBytes(m_libdevicePath, libdeviceBytes);
++        }
+         if (SLANG_FAILED(libdeviceReadResult))
+         {
+             StringBuilder message;
+@@ -586,7 +592,11 @@ SlangResult NVVMDownstreamCompiler::compile(
+     }
+
+     nvvmProgram program = nullptr;
+-    nvvmResult nvvmResultCode = m_nvvmCreateProgram(&program);
++    nvvmResult nvvmResultCode;
++    {
++        SLANG_PROFILE_SECTION(nvvmCreateProgram);
++        nvvmResultCode = m_nvvmCreateProgram(&program);
++    }
+     if (nvvmResultCode != NVVM_SUCCESS)
+     {
+         _setNVVMFailure(diagnostics, "program creation", nvvmResultCode, String());
+@@ -603,11 +613,14 @@ SlangResult NVVMDownstreamCompiler::compile(
+     }
+     ScopeProgram scopeProgram(this, program);
+
+-    nvvmResultCode = m_nvvmAddModuleToProgram(
+-        program,
+-        static_cast<const char*>(sourceBlob->getBufferPointer()),
+-        sourceBlob->getBufferSize(),
+-        "slang-nvvm-input");
++    {
++        SLANG_PROFILE_SECTION(nvvmAddModule);
++        nvvmResultCode = m_nvvmAddModuleToProgram(
++            program,
++            static_cast<const char*>(sourceBlob->getBufferPointer()),
++            sourceBlob->getBufferSize(),
++            "slang-nvvm-input");
++    }
+     if (nvvmResultCode != NVVM_SUCCESS)
+     {
+         String log;
+@@ -619,16 +632,19 @@ SlangResult NVVMDownstreamCompiler::compile(
+     if (options.requiresCUDADeviceLibrary)
+     {
+         const char* libdeviceData = reinterpret_cast<const char*>(libdeviceBytes.getBuffer());
+-        nvvmResultCode = m_nvvmLazyAddModuleToProgram ? m_nvvmLazyAddModuleToProgram(
+-                                                            program,
+-                                                            libdeviceData,
+-                                                            size_t(libdeviceBytes.getCount()),
+-                                                            "libdevice.10.bc")
+-                                                      : m_nvvmAddModuleToProgram(
+-                                                            program,
+-                                                            libdeviceData,
+-                                                            size_t(libdeviceBytes.getCount()),
+-                                                            "libdevice.10.bc");
++        {
++            SLANG_PROFILE_SECTION(nvvmAddLibdevice);
++            nvvmResultCode = m_nvvmLazyAddModuleToProgram ? m_nvvmLazyAddModuleToProgram(
++                                                                program,
++                                                                libdeviceData,
++                                                                size_t(libdeviceBytes.getCount()),
++                                                                "libdevice.10.bc")
++                                                          : m_nvvmAddModuleToProgram(
++                                                                program,
++                                                                libdeviceData,
++                                                                size_t(libdeviceBytes.getCount()),
++                                                                "libdevice.10.bc");
++        }
+         if (nvvmResultCode != NVVM_SUCCESS)
+         {
+             String log;
+@@ -643,8 +659,13 @@ SlangResult NVVMDownstreamCompiler::compile(
+     for (Index i = 0; i < commandLine.m_args.getCount(); ++i)
+         optionPointers[i] = commandLine.m_args[i].getBuffer();
+
+-    nvvmResultCode =
+-        m_nvvmVerifyProgram(program, int(optionPointers.getCount()), optionPointers.getBuffer());
++    {
++        SLANG_PROFILE_SECTION(nvvmVerifyProgram);
++        nvvmResultCode = m_nvvmVerifyProgram(
++            program,
++            int(optionPointers.getCount()),
++            optionPointers.getBuffer());
++    }
+     String verifierLog;
+     SlangResult verifierLogResult = _getProgramLog(program, verifierLog);
+     if (nvvmResultCode != NVVM_SUCCESS)
+@@ -665,8 +686,13 @@ SlangResult NVVMDownstreamCompiler::compile(
+     if (verifierLog.getLength())
+         _appendRawDiagnostics(diagnostics, verifierLog.getUnownedSlice());
+
+-    nvvmResultCode =
+-        m_nvvmCompileProgram(program, int(optionPointers.getCount()), optionPointers.getBuffer());
++    {
++        SLANG_PROFILE_SECTION(nvvmCompileProgram);
++        nvvmResultCode = m_nvvmCompileProgram(
++            program,
++            int(optionPointers.getCount()),
++            optionPointers.getBuffer());
++    }
+     String compilerLog;
+     SlangResult compilerLogResult = _getProgramLog(program, compilerLog);
+     if (nvvmResultCode != NVVM_SUCCESS)
+@@ -688,7 +714,10 @@ SlangResult NVVMDownstreamCompiler::compile(
+         _appendRawDiagnostics(diagnostics, compilerLog.getUnownedSlice());
+
+     size_t resultSize = 0;
+-    nvvmResultCode = m_nvvmGetCompiledResultSize(program, &resultSize);
++    {
++        SLANG_PROFILE_SECTION(nvvmGetPTXSize);
++        nvvmResultCode = m_nvvmGetCompiledResultSize(program, &resultSize);
++    }
+     if (nvvmResultCode != NVVM_SUCCESS)
+     {
+         _setNVVMFailure(diagnostics, "result-size query", nvvmResultCode, String());
+@@ -705,7 +734,10 @@ SlangResult NVVMDownstreamCompiler::compile(
+
+     List<uint8_t> ptx;
+     ptx.setCount(Index(resultSize));
+-    nvvmResultCode = m_nvvmGetCompiledResult(program, (char*)ptx.getBuffer());
++    {
++        SLANG_PROFILE_SECTION(nvvmGetPTX);
++        nvvmResultCode = m_nvvmGetCompiledResult(program, (char*)ptx.getBuffer());
++    }
+     if (nvvmResultCode != NVVM_SUCCESS)
+     {
+         _setNVVMFailure(diagnostics, "result retrieval", nvvmResultCode, String());
+diff --git a/source/compiler-core/slang-nvvm-ir-builder.cpp b/source/compiler-core/slang-nvvm-ir-builder.cpp
+index 27f5f8443..734263d5f 100644
+--- a/source/compiler-core/slang-nvvm-ir-builder.cpp
++++ b/source/compiler-core/slang-nvvm-ir-builder.cpp
+@@ -1,6 +1,7 @@
+ #include "slang-nvvm-ir-builder.h"
+
+ #include "core/slang-blob.h"
++#include "core/slang-performance-profiler.h"
+ #include "slang-downstream-compiler-util.h"
+ #include "slang-nvvm-semantic-catalog.h"
+
+@@ -902,6 +903,7 @@ SlangResult NVVMIRBuilder::serializeModule(
+     ComPtr<ISlangBlob>& outBlob,
+     String& outDiagnostics) const
+ {
++    SLANG_PROFILE_SECTION(nvvmSerializeIR);
+     outBlob.setNull();
+     outDiagnostics = String();
+     if (!isInitialized())
+@@ -916,16 +918,19 @@ SlangResult NVVMIRBuilder::serializeModule(
+     size_t requiredSerializedSize = 0;
+     size_t requiredDiagnosticSize = 0;
+     SlangNVVMVerificationStatus queryStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+-    SLANG_RETURN_ON_FAIL(serializeWithDiagnostics(
+-        module,
+-        format,
+-        nullptr,
+-        0,
+-        &requiredSerializedSize,
+-        nullptr,
+-        0,
+-        &requiredDiagnosticSize,
+-        &queryStatus));
++    {
++        SLANG_PROFILE_SECTION(nvvmSerializeQuery);
++        SLANG_RETURN_ON_FAIL(serializeWithDiagnostics(
++            module,
++            format,
++            nullptr,
++            0,
++            &requiredSerializedSize,
++            nullptr,
++            0,
++            &requiredDiagnosticSize,
++            &queryStatus));
++    }
+
+     if (!_isVerificationStatus(queryStatus) || UInt64(requiredSerializedSize) > UInt64(kMaxIndex) ||
+         UInt64(requiredDiagnosticSize) > UInt64(kMaxIndex))
+@@ -950,16 +955,19 @@ SlangResult NVVMIRBuilder::serializeModule(
+     size_t actualSerializedSize = 0;
+     size_t actualDiagnosticSize = 0;
+     SlangNVVMVerificationStatus writeStatus = SLANG_NVVM_VERIFICATION_NOT_RUN;
+-    SLANG_RETURN_ON_FAIL(serializeWithDiagnostics(
+-        module,
+-        format,
+-        serializedStorage.getCount() ? serializedStorage.getBuffer() : nullptr,
+-        requiredSerializedSize,
+-        &actualSerializedSize,
+-        diagnosticStorage.getCount() ? diagnosticStorage.getBuffer() : nullptr,
+-        requiredDiagnosticSize,
+-        &actualDiagnosticSize,
+-        &writeStatus));
++    {
++        SLANG_PROFILE_SECTION(nvvmSerializeWrite);
++        SLANG_RETURN_ON_FAIL(serializeWithDiagnostics(
++            module,
++            format,
++            serializedStorage.getCount() ? serializedStorage.getBuffer() : nullptr,
++            requiredSerializedSize,
++            &actualSerializedSize,
++            diagnosticStorage.getCount() ? diagnosticStorage.getBuffer() : nullptr,
++            requiredDiagnosticSize,
++            &actualDiagnosticSize,
++            &writeStatus));
++    }
+
+     if (actualSerializedSize != requiredSerializedSize ||
+         actualDiagnosticSize != requiredDiagnosticSize || writeStatus != queryStatus)
+diff --git a/source/slang/slang-code-gen.cpp b/source/slang/slang-code-gen.cpp
+index 82499b078..0cb6c8c72 100644
+--- a/source/slang/slang-code-gen.cpp
++++ b/source/slang/slang-code-gen.cpp
+@@ -2,6 +2,7 @@
+ #include "slang-code-gen.h"
+
+ #include "compiler-core/slang-slice-allocator.h"
++#include "core/slang-performance-profiler.h"
+ #include "core/slang-type-convert-util.h"
+ #include "core/slang-type-text-util.h"
+ #include "slang-compiler.h"
+@@ -422,7 +423,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
+     SLANG_ASSERT(compilerType != PassThroughMode::None);
+
+     // Get the required downstream compiler
+-    IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
++    IDownstreamCompiler* compiler;
++    {
++        SLANG_PROFILE_SECTION(loadDownstreamCompiler);
++        compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
++    }
+     if (!compiler)
+     {
+         auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
+diff --git a/source/slang/slang-emit-nvvm.cpp b/source/slang/slang-emit-nvvm.cpp
+index a63b017b0..ccbf89d33 100644
+--- a/source/slang/slang-emit-nvvm.cpp
++++ b/source/slang/slang-emit-nvvm.cpp
+@@ -5,6 +5,7 @@
+ #include "compiler-core/slang-nvvm-semantic-catalog.h"
+ #include "core/slang-dictionary.h"
+ #include "core/slang-math.h"
++#include "core/slang-performance-profiler.h"
+ #include "slang-code-gen.h"
+ #include "slang-diagnostics.h"
+ #include "slang-emit-nvvm-type-lowering.h"
+@@ -14710,6 +14711,7 @@ SlangResult emitNVVMIRFromLinkedIR(
+     const NVVMOperationRequirements& requirements,
+     ComPtr<IArtifact>& outArtifact)
+ {
++    SLANG_PROFILE_SECTION(nvvmEmitIR);
+     outArtifact.setNull();
+     SLANG_RELEASE_ASSERT(linkedIR.entryPoints.getCount() == 1);
+
+diff --git a/source/slang/slang-emit.cpp b/source/slang/slang-emit.cpp
+index f0bb4fcc1..c0dfa5a75 100644
+--- a/source/slang/slang-emit.cpp
++++ b/source/slang/slang-emit.cpp
+@@ -3787,6 +3787,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
+
+ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifact)
+ {
++    SLANG_PROFILE;
+     outArtifact.setNull();
+
+     // Consider this example:
+@@ -3812,17 +3813,27 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
+     // and it can introduce aggregate bit casts that were therefore absent from that inventory.
+     // Normalize those generated helpers at the direct-NVVM handoff so the emitter sees the same
+     // leaf-level casts promised by lowerBitCast's canonical form.
+-    lowerBitCast(linkedIR.module, getTargetProgram(), getSink());
+-    if (getSink()->getErrorCount() != 0)
+-        return SLANG_FAIL;
++    {
++        SLANG_PROFILE_SECTION(nvvmLegalizeIR);
++        lowerBitCast(linkedIR.module, getTargetProgram(), getSink());
++        if (getSink()->getErrorCount() != 0)
++            return SLANG_FAIL;
+
+-    SLANG_RETURN_ON_FAIL(legalizeIRForNVVM(this, linkedIR));
++        SLANG_RETURN_ON_FAIL(legalizeIRForNVVM(this, linkedIR));
++    }
+     NVVMOperationRequirements requirements;
+-    SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));
++    {
++        SLANG_PROFILE_SECTION(nvvmPlanEmission);
++        SLANG_RETURN_ON_FAIL(validateNVVMSupportedIR(this, linkedIR, requirements));
++    }
+
+     NVVMIRBuilder* builder = nullptr;
+     String builderSearchPath;
+-    SlangResult loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &builderSearchPath);
++    SlangResult loadResult;
++    {
++        SLANG_PROFILE_SECTION(nvvmLoadIRBuilder);
++        loadResult = getSession()->getOrLoadNVVMIRBuilder(builder, &builderSearchPath);
++    }
+     if (SLANG_FAILED(loadResult) || !builder || !builder->isInitialized())
+     {
+         StringBuilder location;

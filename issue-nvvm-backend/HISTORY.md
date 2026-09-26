@@ -22,3 +22,7 @@ Earlier slices remain discoverable by number: `plan.slice-N-*.md`, `report.slice
 Use `rg --files issue-nvvm-backend` and filter the topic or slice number. The latest accepted compact
 ledger preserves first-known and resolved histories with their original evidence references; raw
 `build/` directories are local evidence, not prerequisites for comparing durable old outcomes.
+
+- Research264: [material timing/resources](report.slice-264-material-attribution.md),
+  [evidence](timing-evidence.slice-264.json), [reproducible probes](experiments/material-attribution/README.md).
+  No compiler change; aggregate optimization remains a future investigation.

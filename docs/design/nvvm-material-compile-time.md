@@ -315,3 +315,29 @@ Do not select this same hypothesis again without new evidence that changes the e
 See [plan258](../../issue-nvvm-backend/plan.slice-258-ast-context-getter.md),
 [report258](../../issue-nvvm-backend/report.slice-258-ast-context-getter.md) and
 [timing258](../../issue-nvvm-backend/timing-evidence.slice-258.json).
+
+## Material backend attribution and aggregate storage
+
+Research264 isolates vendor calls from host emission. Shared builtin/front-end/Slang IR work takes
+72–76% of NVVM O3 fresh wall time; libNVVM compilation takes13–18%. Evaluation's vendor call is
+slightly faster than NVRTC's, while sampling's is slower. Host preparation/emission takes37–45ms,
+plus vendor verification10–12ms. The size-query/write serializer materializes twice, but its second
+call is under1%wall; a one-shot immutable output API is a general follow-up, not a large speedup.
+
+The retained material graph is592bytes with CUDA local layout and784 with the current LLVM vector
+layout. Three-lane vectors occupy16bytes in ordinary helper/local storage; external structured
+buffers use a different compact storage representation. Evaluation's stack difference is fully
+explained by these layouts. Both O3 paths have zero spills and no retained calls. NVVM reloads
+known-zero absorption and false retroreflection fields and retains exponential/select work eliminated
+by NVRTC. These are concrete sources of extra arithmetic/live values, not exact register attribution.
+
+The input graph is canonical and crosses a helper return before its retained subset is extracted.
+Field GEPs already carry inbounds; blanket array inbounds/noalias is not justified. Existing Slang
+field-key alias analysis should be reused; SSA currently excludes partial field stores. The general
+research probe loses constants on both backends and improves when array and payload storage are
+separated. This source-level counterfactual validates an investigation direction, not a compiler fix
+or a differential reproducer. Prefer a bounded interprocedural/aggregate optimization experiment
+with mutation, alias and escape coverage before undertaking compact local-storage ABI changes.
+
+See [research264](../../issue-nvvm-backend/report.slice-264-material-attribution.md) and its evidence.
+The measurement patch is preserved but reversed; accepted262 remains the compiler baseline.
