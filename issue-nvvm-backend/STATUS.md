@@ -1,52 +1,53 @@
 # NVVM backend status
 
-The finite float3 correction and corpus follow-up are complete. The general development loop remains
-**stopped**. Both slices are local commits; the user requested skipping both Slack notifications.
-Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md). No further slice is active.
+The development loop is **active**, resumed on 2026-09-26. Slice 270 qualifies internal FP8/BF16
+records through dynamic dispatch. Next: a bounded four-source language-breadth probe, then re-rank
+material-driven work using fresh measurements. Continue reviewed local commits under
+[WORKFLOW](WORKFLOW.md); skip Slack notifications, no push. Read [RESULTS](RESULTS.md) and
+[HANDOFF](HANDOFF.md).
 
 ## Accepted baseline
 
-[Validation269](runtime-validation.slice-269.json) preserves all 1,713 accepted268 outcomes and adds
-27 passing cells. [Corpus269](report.slice-269-corpus-enumeration.md) repairs directive enumeration
-and adds five CUDA backfills plus four language cases. [Correction268](report.slice-268-borrowed-vector-storage.md)
-preserves native borrowed float3 storage, with six focused GPU and eight assembly cells passing.
-The two268 regression sources remain focused fixtures outside the main corpora.
+[Validation270](runtime-validation.slice-270.json) preserves 1,738 outcomes and resolves the original
+dynamic-dispatch test at NVVM O0/O3. [Report270](report.slice-270-fp8-aggregate.md) and the
+[record contract](../docs/design/nvvm-substandard-record-contract.md) define the bounded value/local
+storage domain. [Corpus269](report.slice-269-corpus-enumeration.md) and
+[correction268](report.slice-268-borrowed-vector-storage.md) remain prior accepted work.
 
-| Evidence                                          | Accepted269 result                                            |
-| ------------------------------------------------- | ------------------------------------------------------------- |
-| Selected cases / source files / mode cells        | 580 / 576 / 1,740                                             |
-| Frozen / discovery cells                          | 1,356 / 384                                                   |
-| Outcomes                                          | 1,701 correct; 39 unresolved; 18 resolved histories           |
-| Units / semantics                                 | 1,086 pass + 13 skip / 1,170 pass + 78 skip; exact identities |
-| Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                               |
-| Last full / targeted / implementations since full | 269 / 233 / 0                                                 |
+| Evidence                                          | Accepted270 result                                       |
+| ------------------------------------------------- | -------------------------------------------------------- |
+| Selected cases / source files / mode cells        | 580 / 576 / 1,740                                        |
+| Frozen / discovery cells                          | 1,356 / 384                                              |
+| Outcomes                                          | 1,703 correct;37 unresolved;20 resolved histories        |
+| Units / semantics                                 | 1,087 pass+13 skip /1,170 pass+78 skip; exact identities |
+| Runtime / toolkit / material compile and assembly | 4 /18 /6 pass                                            |
+| Last full / targeted / implementations since full | 270 /233 /0                                              |
 
-All 567 prior runtime input hashes remain unchanged; nine new source hashes are recorded explicitly.
-The frozen inventory and all old selection/oracle contracts are unchanged. Discovery now reaches its
-128-source cap. Main selection covers 576/1,852 compute-comparison files and 517/795 explicit CUDA
-files; these are file-selection ratios, not semantic coverage. The original additions-only
-review-required comparison is preserved alongside the reviewed acceptance.
+All576 main input hashes and 22 dependency pins are unchanged. Discovery remains at 128sources.
+Main selection covers576/1,852 compute-comparison files and517/795 explicit CUDA files; these are
+file-selection ratios, not semantic coverage. The new270 fixture remains outside the main corpora,
+as do the two268 fixtures. Original review-required comparisons and resolved failures are preserved.
 
-Compiler/provider bytes are inherited268. Qualified source: `0aff56e26405e08b47971a6c6a46bfc81fca8fd5`
-plus patch `dfb3b91cfd3d36af94c884a5ca08c5c087d5c9576d39d11b4868dac953140883`, version
-`2026.18.3-284-g0aff56e26`. Loaded compiler SHA256:
-`07881e5f945ee7028e1bc913ec127405422cd014ddc624b13a4d308f8670b822`.
-Provider ABI42 SHA256: `fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913`.
-All 22 dependency pins are unchanged. The launcher hash alone is not compiler identity.
+Qualified source: `06a26a3f7af603de518cfe82c981d527b580e451` plus compiler patch
+`a35e26dca958361bc80afb5aa540708ebad7492213fd91d1552957a4150f17e1`, version
+`2026.18.3-286-g06a26a3f7`. Loaded compiler SHA256:
+`74bb18f34a900790d7af2b3edf9567c69c8bedd8a347c45d0e08c8adb193667f`.
+Provider ABI42 unchanged: `fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913`.
+The launcher hash alone is not compiler identity. The final focused fixture refinement is separately
+qualified; full-gate and final-focused input identities are explicit in validation270.
 
-The qualified layout is `build/RelWithDebInfo`. Slice269 supplies four missing standard numerics
-modules, built from its existing graph/bootstrap/core; no preexisting installed artifact changes.
-[RESULTS](RESULTS.md) documents this prerequisite. The original268 layout is preserved under
-`build/nvvm-corpus269/numerics-prerequisite/accepted268-layout`.
+The qualified layout is `build/RelWithDebInfo`, including four269 numerics modules. The accepted269
+layout is preserved under `build/nvvm-fp8-aggregate270/accepted269-layout`; [RESULTS](RESULTS.md)
+documents build/module prerequisites. All270 raw evidence is under `build/nvvm-fp8-aggregate270`.
 
 ## Results and limits
 
-Three column-major semantic mismatches and 36 infrastructure/preflight gaps remain. The inherited262
-concurrent NVRTC automatic-PCH incident remains open. Material GPU runtime still lacks its binding,
-texture/LUT/input/output contracts. AST subtype proof262 and optimization267 timing/quality retain
-their original identities; neither was remeasured here. No new performance claim is made.
+Three column-major host-packing mismatches and 34 infrastructure/preflight gaps remain. Concurrent
+NVRTC automatic-PCH reliability remains open. Material GPU runtime lacks binding, texture/LUT and
+input/output contracts. Generic record-pointer result exclusions are code-reviewed only. Opposite
+Value/Storage cache orders are executed for mixed Payload; AlignedPair is storage-first.
+Earlier262 AST proof and267 timing/quality retain their original identities; no performance claim is
+made here. [HISTORY](HISTORY.md) links prior evidence and presentation packages.
 
-Raw evidence and commit/notification closeouts are under `build/nvvm-borrowed-vector268` and
-`build/nvvm-corpus269`. [HISTORY](HISTORY.md) links earlier evidence and presentation packages.
 Environment: native Ubuntu24.04, L4 SM89/driver580.126.09, SM80 target, CUDA12.9.2,
 NVRTC12.9.86, LLVM14, RelWithDebInfo; max four CPU workers, two unit servers, serial GPU suites.

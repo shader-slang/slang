@@ -409,8 +409,7 @@ static bool _isNVVMSupportedAggregateStorageType(
     if (getNVVMSupportedRawBufferType(type, rawBufferType) ||
         getNVVMSupportedSurfaceType(type, surfaceType) ||
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
-        asNVVMSupportedDescriptorHandleType(type) ||
-        asNVVMSupportedSamplerStorageType(type) ||
+        asNVVMSupportedDescriptorHandleType(type) || asNVVMSupportedSamplerStorageType(type) ||
         asNVVMSupportedDeviceCopyableValuePointerType(type))
     {
         return true;
@@ -683,16 +682,53 @@ bool isNVVMSupportedHelperValueType(IRInst* type)
     return _isNVVMSupportedHelperValueType(type, activeTypes);
 }
 
-IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(
-    IRInst* type,
-    IRType** outValueType)
+IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(IRInst* type, IRType** outValueType)
 {
     HashSet<IRInst*> activeTypes;
     return _asNVVMSupportedDeviceHelperValuePointerType(type, outValueType, activeTypes);
 }
 
+IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type)
+{
+    auto structType = as<IRStructType>(type);
+    if (!structType)
+        return nullptr;
+
+    // Consider `struct Payload { uint8_t tag; FloatE4M3 a; FloatE5M2 b; };`.
+    // The canonical fields have identical register and local storage representations. Keep this
+    // flat proof separate from recursive helper values, which also authorize device storage.
+    bool hasSubstandardField = false;
+    for (auto field : structType->getFields())
+    {
+        IRType* fieldType = field->getFieldType();
+        uint32_t count = 0;
+        if (isNVVMFloat8Type(fieldType) || isNVVMBFloat16Type(fieldType) ||
+            (asNVVMBFloat16VectorType(fieldType, &count) && count == 2))
+        {
+            hasSubstandardField = true;
+        }
+        else if (!isNVVMSupportedIntegerScalarType(fieldType))
+            return nullptr;
+    }
+    return hasSubstandardField ? structType : nullptr;
+}
+
+IRStructType* asNVVMSupportedLocalSubstandardRecordType(IRInst* type)
+{
+    if (auto record = asNVVMSupportedSubstandardRecordType(type))
+        return record;
+    return asNVVMSupportedLocalBFloat16RecordType(type);
+}
+
 static uint32_t _getNVVMHelperValueAlignment(IRInst* type, HashSet<IRInst*>& activeTypes)
 {
+    if (isNVVMFloat8Type(type))
+        return 1;
+    if (isNVVMBFloat16Type(type))
+        return 2;
+    uint32_t count = 0;
+    if (asNVVMBFloat16VectorType(type, &count) && count == 2)
+        return 4;
     if (const uint32_t copyableAlignment = getNVVMCopyableValueAlignment(type))
         return copyableAlignment;
     if (asNVVMSupportedDeviceHelperValuePointerType(type))
@@ -736,7 +772,7 @@ uint32_t getNVVMHelperValueAlignment(IRInst* type)
         return 1;
     if (isNVVMBFloat16Type(type))
         return 2;
-    if (!isNVVMSupportedHelperValueType(type))
+    if (!isNVVMSupportedHelperValueType(type) && !asNVVMSupportedSubstandardRecordType(type))
         return 0;
     HashSet<IRInst*> activeTypes;
     return _getNVVMHelperValueAlignment(type, activeTypes);
@@ -945,7 +981,7 @@ IRPtrTypeBase* asNVVMSupportedLocalHelperValuePointerType(IRInst* type, IRType**
     if (!pointerType || isNVVMSupportedCopyableValueType(valueType) ||
         (!isNVVMSupportedHelperValueType(valueType) && !isNVVMBFloat16Type(valueType) &&
          !asNVVMBFloat16VectorType(valueType) &&
-         !asNVVMSupportedLocalBFloat16RecordType(valueType)) ||
+         !asNVVMSupportedLocalSubstandardRecordType(valueType)) ||
         (!isPlainLocalPointer && !isMutableParameter) ||
         pointerType->getAddressSpace() != AddressSpace::Generic)
     {
@@ -1271,8 +1307,7 @@ bool getNVVMSupportedSharedGlobal(IRInst* inst, NVVMSharedGlobal* outGlobal)
           ptrType->getAccessQualifier() == AccessQualifier::ReadWrite &&
           ptrType->getAddressSpace() == AddressSpace::Generic && !dataLayout));
     if (!globalVar || !as<IRGroupSharedRate>(globalVar->getRate()) || globalVar->getFirstBlock() ||
-        !hasCanonicalPointerType ||
-        (!isAtomic && !isNVVMSupportedHelperValueType(valueType)))
+        !hasCanonicalPointerType || (!isAtomic && !isNVVMSupportedHelperValueType(valueType)))
     {
         return false;
     }
@@ -1734,9 +1769,7 @@ IRSamplerStateTypeBase* asNVVMSupportedSamplerValueType(IRInst* type)
                                                            : nullptr;
 }
 
-IRDescriptorHandleType* asNVVMSupportedDescriptorHandleType(
-    IRInst* type,
-    IRType** outResourceType)
+IRDescriptorHandleType* asNVVMSupportedDescriptorHandleType(IRInst* type, IRType** outResourceType)
 {
     if (outResourceType)
         *outResourceType = nullptr;
@@ -1745,10 +1778,9 @@ IRDescriptorHandleType* asNVVMSupportedDescriptorHandleType(
     IRType* resourceType = handleType ? handleType->getResourceType() : nullptr;
     NVVMRawBufferType rawBufferType;
     NVVMReadOnlyTextureType sampledTextureType;
-    if (!handleType ||
-        (!getNVVMSupportedRawBufferType(resourceType, rawBufferType) &&
-         !getNVVMSupportedReadOnlyTextureType(resourceType, sampledTextureType) &&
-         !asNVVMSupportedSamplerValueType(resourceType)))
+    if (!handleType || (!getNVVMSupportedRawBufferType(resourceType, rawBufferType) &&
+                        !getNVVMSupportedReadOnlyTextureType(resourceType, sampledTextureType) &&
+                        !asNVVMSupportedSamplerValueType(resourceType)))
     {
         return nullptr;
     }
@@ -1818,8 +1850,7 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
     if (getNVVMSupportedRawBufferType(type, rawBufferType) ||
         getNVVMSupportedSurfaceType(type, surfaceType) ||
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
-        asNVVMSupportedDescriptorHandleType(type) ||
-        asNVVMSupportedSamplerValueType(type))
+        asNVVMSupportedDescriptorHandleType(type) || asNVVMSupportedSamplerValueType(type))
     {
         return true;
     }
@@ -1914,9 +1945,8 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
                     ptrType->getAddressSpace() == AddressSpace::StorageBuffer);
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || ptrType->getOperandCount() != 4 ||
         !_isNVVMSupportedResourceElementType(ptrType->getValueType(), activeTypes) ||
-        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite ||
-        !hasResourceAddressSpace || !dataLayout ||
-        dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
+        ptrType->getAccessQualifier() != AccessQualifier::ReadWrite || !hasResourceAddressSpace ||
+        !dataLayout || dataLayout->getOp() != kIROp_ScalarBufferLayoutType)
     {
         return nullptr;
     }
@@ -2134,7 +2164,7 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
         : use == NVVMTypeUse::Storage ? NVVMTypeUse::Storage
         : (asNVVMSupportedHelperStructType(type) && !isNVVMSupportedCopyableValueType(type))
             ? NVVMTypeUse::HelperValue
-        : asNVVMSupportedHelperStructType(type) ||
+        : asNVVMSupportedHelperStructType(type) || asNVVMSupportedSubstandardRecordType(type) ||
                 (use != NVVMTypeUse::Storage && asNVVMSupportedResourceStructType(type))
             ? NVVMTypeUse::Value
             : NVVMTypeUse::Storage;
@@ -2305,11 +2335,18 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
-    // FP8 is a scalar register and internal by-value helper contract. Keeping it out of
-    // recursive helper/copyable predicates prevents unqualified storage and aggregate ABIs.
-    if (isFloat8)
+    // Local record references qualify parameters and allocations, not a new pointer-return ABI.
+    if (use == NVVMTypeUse::HelperResult && localHelperPointer &&
+        asNVVMSupportedSubstandardRecordType(localHelperPointerValueType) &&
+        !asNVVMSupportedLocalBFloat16RecordType(localHelperPointerValueType))
+        return false;
+
+    // FP8 storage is reachable only through a qualified local record field. Recursive helper,
+    // pointer and resource classifiers remain separate from this physical leaf representation.
+    if (isFloat8 || isSubstandardRecord)
         return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperValue ||
-               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult;
+               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
+               use == NVVMTypeUse::Storage;
 
     // Scalar BF16 has a qualified i16 representation in local and helper roles only.
     // Do not add it to recursive copyable/storage predicates: that would also admit
@@ -2387,35 +2424,29 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
     info.scalarStructType = asNVVMSupportedScalarStructType(type);
     info.resourceStructType = asNVVMSupportedResourceStructType(type);
     info.physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
-    info.localResourceStructPointer = asNVVMSupportedLocalResourceStructPointerType(
-        type,
-        &info.localResourceStructValueType);
-    info.localCopyablePointer = asNVVMSupportedLocalCopyableValuePointerType(
-        type,
-        &info.localCopyablePointerValueType);
-    info.localHelperPointer = asNVVMSupportedLocalHelperValuePointerType(
-        type,
-        &info.localHelperPointerValueType);
+    info.localResourceStructPointer =
+        asNVVMSupportedLocalResourceStructPointerType(type, &info.localResourceStructValueType);
+    info.localCopyablePointer =
+        asNVVMSupportedLocalCopyableValuePointerType(type, &info.localCopyablePointerValueType);
+    info.localHelperPointer =
+        asNVVMSupportedLocalHelperValuePointerType(type, &info.localHelperPointerValueType);
     info.helperReferencePointer =
         asNVVMSupportedHelperReferencePointerType(type, &info.helperReferenceValueType);
     info.physicalStorageReferencePointer = asNVVMSupportedPhysicalStorageReferencePointerType(
         type,
         &info.physicalStorageReferenceValueType);
-    info.localPhysicalStoragePointer = asNVVMSupportedLocalPhysicalStoragePointerType(
-        type,
-        &info.localPhysicalStorageValueType);
+    info.localPhysicalStoragePointer =
+        asNVVMSupportedLocalPhysicalStoragePointerType(type, &info.localPhysicalStorageValueType);
     info.sharedHelperPointer =
         asNVVMSupportedSharedHelperPointerType(type, &info.sharedHelperPointerValueType);
-    info.deviceCopyablePointer = asNVVMSupportedDeviceCopyableValuePointerType(
-        type,
-        &info.deviceCopyablePointerValueType);
-    info.deviceHelperPointer = asNVVMSupportedDeviceHelperValuePointerType(
-        type,
-        &info.deviceHelperPointerValueType);
-    info.devicePhysicalStoragePointer = asNVVMSupportedDevicePhysicalStoragePointerType(
-        type,
-        &info.devicePhysicalStorageValueType);
+    info.deviceCopyablePointer =
+        asNVVMSupportedDeviceCopyableValuePointerType(type, &info.deviceCopyablePointerValueType);
+    info.deviceHelperPointer =
+        asNVVMSupportedDeviceHelperValuePointerType(type, &info.deviceHelperPointerValueType);
+    info.devicePhysicalStoragePointer =
+        asNVVMSupportedDevicePhysicalStoragePointerType(type, &info.devicePhysicalStorageValueType);
     info.isHelperValue = isNVVMSupportedHelperValueType(type);
+    info.isSubstandardRecord = asNVVMSupportedSubstandardRecordType(type) != nullptr;
     info.isPointerBearingHelperValue =
         info.isHelperValue && !isNVVMSupportedCopyableValueType(type);
     info.deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
@@ -2427,26 +2458,22 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
     info.deviceArrayPointer = asNVVMSupportedDeviceArrayPointerType(type, &info.deviceArrayType);
     info.isRawBuffer = getNVVMSupportedRawBufferType(type, info.rawBufferType);
     info.isSurface = getNVVMSupportedSurfaceType(type, info.surfaceType);
-    info.isSampledTexture =
-        getNVVMSupportedReadOnlyTextureType(type, info.sampledTextureType);
+    info.isSampledTexture = getNVVMSupportedReadOnlyTextureType(type, info.sampledTextureType);
     info.isBufferDataPointer =
         getNVVMSupportedBufferDataPointerType(type, info.bufferDataPointerType);
-    info.parameterGroup =
-        asNVVMSupportedParameterGroupType(type, &info.parameterGroupElementType);
+    info.parameterGroup = asNVVMSupportedParameterGroupType(type, &info.parameterGroupElementType);
     info.hasParameterGroupValueRepresentation =
         info.parameterGroup &&
         hasNVVMParameterGroupStorageValueRepresentation(info.parameterGroupElementType);
     info.samplerStorage = asNVVMSupportedSamplerStorageType(type);
     info.samplerValue = asNVVMSupportedSamplerValueType(type);
-    info.descriptorHandle =
-        asNVVMSupportedDescriptorHandleType(type, &info.descriptorResourceType);
+    info.descriptorHandle = asNVVMSupportedDescriptorHandleType(type, &info.descriptorResourceType);
     info.unsizedSamplerArrayStorage = asNVVMSupportedUnsizedSamplerArrayStorageType(type);
     info.resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(type);
     info.sharedElementPointer = asNVVMSupportedSharedElementPointerType(type);
     info.atomicType = asNVVMSupportedAtomicType(type, &info.atomicValueType);
     info.isStructuredBufferStorage = isNVVMSupportedStructuredBufferStorageType(type);
-    info.isParameterGroupElementStorage =
-        isNVVMSupportedParameterGroupElementStorageType(type);
+    info.isParameterGroupElementStorage = isNVVMSupportedParameterGroupElementStorageType(type);
 
     m_typeInfoMap[type] = info;
     return info;
@@ -2481,8 +2508,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRPtrTypeBase* localHelperPointer = typeInfo.localHelperPointer;
     IRType* helperReferenceValueType = typeInfo.helperReferenceValueType;
     IRPtrTypeBase* helperReferencePointer = typeInfo.helperReferencePointer;
-    IRStructType* physicalStorageReferenceValueType =
-        typeInfo.physicalStorageReferenceValueType;
+    IRStructType* physicalStorageReferenceValueType = typeInfo.physicalStorageReferenceValueType;
     IRPtrTypeBase* physicalStorageReferencePointer = typeInfo.physicalStorageReferencePointer;
     IRStructType* localPhysicalStorageValueType = typeInfo.localPhysicalStorageValueType;
     IRPtrTypeBase* localPhysicalStoragePointer = typeInfo.localPhysicalStoragePointer;
@@ -2643,8 +2669,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // Keep canonical Half values in LLVM's `half` type inside helper bodies, but transport a Half
     // helper parameter or result as i16. libNVVM's O3 NVPTX lowering can otherwise omit the caller
     // parameter store for a direct `half` argument, leaving the callee's value uninitialized.
-    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
-        isFloat16)
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) && isFloat16)
     {
         if (auto mappedType = m_helperABIRepresentationMap.tryGetValue(type))
         {
@@ -2706,7 +2731,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType,
             asNVVMBFloat16VectorType(localHelperPointerValueType) ||
-                    asNVVMSupportedLocalBFloat16RecordType(localHelperPointerValueType)
+                    asNVVMSupportedLocalSubstandardRecordType(localHelperPointerValueType)
                 ? NVVMTypeUse::Storage
                 : NVVMTypeUse::HelperValue,
             false));

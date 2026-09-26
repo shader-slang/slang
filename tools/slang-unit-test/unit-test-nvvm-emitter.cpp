@@ -3962,11 +3962,10 @@ SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
         for (Index callIndex = 0; callIndex < gFakeNVVMBuilder.callResultKinds.getCount();
              ++callIndex)
         {
-            sawResourceStructCall |=
-                gFakeNVVMBuilder.callResultKinds[callIndex] ==
-                    FakeNVVMBuilderResultTypeKind::ScalarStruct &&
-                gFakeNVVMBuilder.callResultTypes[callIndex] ==
-                    _getFakeNVVMBuilderScalarStructType();
+            sawResourceStructCall |= gFakeNVVMBuilder.callResultKinds[callIndex] ==
+                                         FakeNVVMBuilderResultTypeKind::ScalarStruct &&
+                                     gFakeNVVMBuilder.callResultTypes[callIndex] ==
+                                         _getFakeNVVMBuilderScalarStructType();
         }
         SLANG_CHECK(sawResourceStructCall);
         SLANG_CHECK(gFakeNVVMBuilder.emitLocalStorageCallCount == 1);
@@ -6156,8 +6155,7 @@ SLANG_UNIT_TEST(nvvmSlangResourceViewsCrossHelperResultsByValue)
         SLANG_CHECK_ABORT(rawBufferHelper >= 0);
         SLANG_CHECK_ABORT(textureHelper >= 0);
 
-        const Index rawBufferFunctionType =
-            gFakeNVVMBuilder.functionTypeIndices[rawBufferHelper];
+        const Index rawBufferFunctionType = gFakeNVVMBuilder.functionTypeIndices[rawBufferHelper];
         const Index textureFunctionType = gFakeNVVMBuilder.functionTypeIndices[textureHelper];
         SLANG_CHECK(
             gFakeNVVMBuilder.functionTypeResultKinds[rawBufferFunctionType] ==
@@ -6169,17 +6167,14 @@ SLANG_UNIT_TEST(nvvmSlangResourceViewsCrossHelperResultsByValue)
             gFakeNVVMBuilder.functionTypeResultKinds[textureFunctionType] ==
             FakeNVVMBuilderResultTypeKind::Integer);
         SLANG_CHECK(
-            gFakeNVVMBuilder.functionFlags[rawBufferHelper] ==
-            SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+            gFakeNVVMBuilder.functionFlags[rawBufferHelper] == SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
         SLANG_CHECK(
-            gFakeNVVMBuilder.functionFlags[textureHelper] ==
-            SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+            gFakeNVVMBuilder.functionFlags[textureHelper] == SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
 
         bool sawRawBufferCall = false;
         bool sawTextureCall = false;
         Index rawBufferCall = -1;
-        for (Index callIndex = 0;
-             callIndex < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount();
+        for (Index callIndex = 0; callIndex < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount();
              ++callIndex)
         {
             if (gFakeNVVMBuilder.callCalleeFunctionIndices[callIndex] == rawBufferHelper)
@@ -6780,8 +6775,7 @@ SLANG_UNIT_TEST(nvvmSlangVectorStructuredBuffersUseGenericTransport)
         bool sawResourceVectorLanePointer = false;
         for (auto resultTypeKind : gFakeNVVMBuilder.sequentialElementPointerTypeKinds)
         {
-            sawResourceVectorLanePointer |=
-                resultTypeKind == FakeNVVMBuilderScalarTypeKind::Float;
+            sawResourceVectorLanePointer |= resultTypeKind == FakeNVVMBuilderScalarTypeKind::Float;
         }
         SLANG_CHECK(sawResourceVectorLanePointer);
 
@@ -9006,6 +9000,45 @@ SLANG_UNIT_TEST(nvvmSlangBFloat16LocalRecordsUseQualifiedFields)
     }
 }
 
+SLANG_UNIT_TEST(nvvmSlangSubstandardRecordsUseInternalValues)
+{
+    const char* types[] = {"FloatE4M3", "FloatE5M2", "BFloat16"};
+    for (const char* type : types)
+    {
+        _resetDirectNVVMFakes();
+        StringBuilder source;
+        source << "typealias F = " << type
+               << "; typealias Bits = " << (String(type) == "BFloat16" ? "uint16_t" : "uint8_t")
+               << ";"
+               << R"SLANG(
+            struct Payload { F value; }
+            [noinline] Payload copy(Payload x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {F(1.25f)};
+                outputBuffer[0] = uint(bit_cast<Bits>(copy(p).value));
+            }
+        )SLANG";
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        auto result =
+            _compileSlangWithDirectNVVM(globalSession, source.getBuffer(), code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount >= 1);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 1);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -9014,7 +9047,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         const char* expectedConstruct;
     };
     static const UnsupportedCase kCases[] = {
-        // Local record fields do not admit readonly, nested, by-value or external record roles.
+        // Local BF3/BF4 record fields do not admit readonly, nested, by-value or external roles.
         {R"SLANG(
             struct Payload { vector<BFloat16,3> value; }
             [CudaDeviceExport] [noinline]
@@ -9104,14 +9137,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
             { outputBuffer[tid.x] = vector<BFloat16,4>(bit_cast<BFloat16>(uint16_t(tid.x))); }
         )SLANG",
          "struct field address result"},
-        {R"SLANG(
-            struct Payload { BFloat16 value; }
-            [noinline] Payload copy(Payload x) { return x; }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
-            { Payload p = {bit_cast<BFloat16>(uint16_t(tid.x))}; outputBuffer[tid.x] = uint(bit_cast<uint16_t>(copy(p).value)); }
-        )SLANG",
-         "helper function result type"},
         {R"SLANG(
             RWStructuredBuffer<BFloat16> outputBuffer;
             [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
@@ -9630,6 +9655,72 @@ SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
     };
     static const UnsupportedCase cases[] = {
         {R"SLANG(
+            struct Payload { F value; }
+            [CudaDeviceExport] [noinline] Payload exported(Payload x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                outputBuffer[0] = uint(bit_cast<uint8_t>(exported(p).value));
+            }
+        )SLANG",
+         "exported substandard record helper result"},
+        {R"SLANG(
+            struct Payload { F value; }
+            [CudaDeviceExport] [noinline] uint exported(Payload x) { return uint(bit_cast<uint8_t>(x.value)); }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                outputBuffer[0] = exported(p);
+            }
+        )SLANG",
+         "exported substandard record helper parameter"},
+        {R"SLANG(
+            struct Payload { F value; }
+            [CudaDeviceExport] [noinline] void exported(inout Payload x, F y) { x.value = y; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                exported(p, p.value); outputBuffer[0] = uint(bit_cast<uint8_t>(p.value));
+            }
+        )SLANG",
+         "exported substandard record helper reference"},
+        {R"SLANG(
+            struct Payload { F value; }
+            [noinline] uint read(__constref Payload x) { return uint(bit_cast<uint8_t>(x.value)); }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                outputBuffer[0] = read(p);
+            }
+        )SLANG",
+         "helper function parameter"},
+        {R"SLANG(
+            struct Payload { F value; }
+            struct Outer { Payload value; }; [noinline] Outer copy(Outer x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                Outer o = { p }; outputBuffer[0] = uint(bit_cast<uint8_t>(copy(o).value.value));
+            }
+        )SLANG",
+         "helper function result type"},
+        {R"SLANG(
+            struct Payload { F value; }
+            [noinline] Payload copy(Payload x[2]) { return x[1]; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<F>(uint8_t(tid.x))};
+                Payload a[2] = {p, p}; outputBuffer[0] = uint(bit_cast<uint8_t>(copy(a).value));
+            }
+        )SLANG",
+         "helper function parameter"},
+        {R"SLANG(
             [noinline]
             F copy(F v)
             {
@@ -9661,26 +9752,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
             }
         )SLANG",
          "helper function parameter"},
-        {R"SLANG(
-            struct Payload
-            {
-                F value;
-            }
-
-            [noinline]
-            Payload copy(Payload v)
-            {
-                return v;
-            }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                Payload p = {bit_cast<F>(uint8_t(tid.x))};
-                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(p).value));
-            }
-        )SLANG",
-         "helper function result type"},
         {R"SLANG(
             [noinline]
             F copy(F v[2])

@@ -140,6 +140,13 @@ IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(
 /// pointers.
 bool isNVVMSupportedHelperValueType(IRInst* type);
 
+/// Returns a flat internal record containing FP8, scalar BF16, or BF2 and integer fields.
+/// Its register and local storage representations agree; external storage is not admitted.
+IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type);
+
+/// Returns a qualified local record, including the existing BF3/BF4 component storage family.
+IRStructType* asNVVMSupportedLocalSubstandardRecordType(IRInst* type);
+
 /// Returns the natural alignment of a finite helper value, including device-pointer leaves.
 uint32_t getNVVMHelperValueAlignment(IRInst* type);
 
@@ -257,9 +264,7 @@ struct NVVMSharedGlobal
 };
 
 /// Resolves an uninitialized group-shared global containing a finite helper value or atomic scalar.
-bool getNVVMSupportedSharedGlobal(
-    IRInst* inst,
-    NVVMSharedGlobal* outGlobal = nullptr);
+bool getNVVMSupportedSharedGlobal(IRInst* inst, NVVMSharedGlobal* outGlobal = nullptr);
 
 /// Returns a canonical scalar-layout group-shared pointer to one finite helper value.
 IRPtrTypeBase* asNVVMSupportedSharedElementPointerType(IRInst* type);
@@ -401,6 +406,7 @@ struct NVVMTypeInfo
     bool isFloat32 = false;
     bool isBool = false;
     bool isHelperValue = false;
+    bool isSubstandardRecord = false;
     bool isPointerBearingHelperValue = false;
     bool isRawBuffer = false;
     bool isSurface = false;

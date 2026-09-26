@@ -150,3 +150,10 @@ This does not admit Float32-to-FP8 narrowing, integer/Half/double conversions, a
 vectors, records, resources or external helper ABI. Shared constant-folding overflow policy remains
 separate. The dynamic-object workload still rejects record result A; scalar widening is not proof
 of aggregate or any-value support.
+
+## Internal flat records (slice270)
+
+The [substandard record contract](nvvm-substandard-record-contract.md) adds a separately qualified
+internal value/local-record domain containing FP8 scalar fields, with exact keyed field transport.
+Its layout, reference and export limits do not widen the recursive scalar/copyable classifiers or
+admit general FP8 resource storage. The scalar semantics and conversion exclusions above remain.

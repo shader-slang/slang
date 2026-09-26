@@ -7,11 +7,12 @@ histories. Do not reconstruct decisions from chat or repeat the historical ledge
 
 ## Authority and ownership
 
-The general development loop is **stopped**. The finite maintenance sequence completed harness
-consolidation, master integration, correctness baseline and results package, then stopped. Results
-refreshes do not authorize feature development. A later explicit start/resume request can authorize
-bounded implementation slices and local commits; preparation alone cannot. No push, publication,
-driver change or reboot is implied. Respect newer maintainer scope and stopping instructions.
+The general development loop is **active**, explicitly resumed by the maintainer on 2026-09-26
+following slices268/269. Continue bounded, independently reviewed slices and accepted local commits
+until a recorded stopping condition needs human input. Prioritize FP8 aggregate/dynamic-dispatch
+qualification, language-breadth probes and material-driven work using current evidence. Results-only
+requests do not change loop authority. No push, publication, driver change or reboot is implied.
+Respect newer maintainer scope and stopping instructions.
 
 Use one bounded fresh-context worker per slice when delegation is available. The lead owns scope,
 acceptance and commits; one writer owns the checkout at a time. Read-only review can overlap; builds,
@@ -93,6 +94,10 @@ local commit. Commit completed NVVM plans/reports under the explicit maintainer 
 At boundaries update STATUS and the plan with remaining acceptance, exact next command and stop state.
 
 ## Notify after each completed slice
+
+Current override: the user requested "Skip the Slack notifications" on 2026-09-26. Continue skipping
+completion DMs during the resumed loop unless the user changes this preference. The standing policy
+below is retained for reference and is inactive while this override applies.
 
 The maintainer has given standing authorization to send one Slack DM after every completed NVVM
 slice, including implementation, research, maintenance and results slices. The lead sends it after

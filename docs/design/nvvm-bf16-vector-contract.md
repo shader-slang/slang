@@ -286,3 +286,10 @@ caller local accesses are inspected separately. Original255 device Ptr<H> contro
 FP8 record A result remain unsupported. This local contract does not establish external helper ABI,
 resource storage, record arrays or material runtime behavior. See
 [report259](../../issue-nvvm-backend/report.slice-259-bf16-local-records.md).
+
+## Internal flat record values (slice270)
+
+The [substandard record contract](nvvm-substandard-record-contract.md) qualifies whole values for
+flat integer/scalarBF16/BF2/FP8 records and preserves the existing BF3/BF4 local-only family. BF2
+component addresses require proven local-record field provenance. Separate Natural payload packing
+and CUDA local layout are retained; broader pointer, resource and export roles remain excluded.
