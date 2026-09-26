@@ -84,3 +84,8 @@ ledger preserves first-known and resolved histories with their original evidence
   All8 material runs compute6230canonical keys once; no repeated-key optimization/reducer justified.
   42controls/403resource rows and exact1100unit/1248semantic identities pass. Temporary observer removed,
   accepted270 layout restored exactly; separate local audits used after reviewer-thread limit. Loop active.
+
+- Research275: [PCH ownership reproduction](report.slice-275-pch-reproduction.md),
+  [evidence](research-evidence.slice-275.json), [plan](plan.slice-275-pch-reproduction.md).
+  Shared16 yield6passes/8reuse failures/2crashes; serial8/private16 pass. Exact262 deletion signature
+  remains open. No production change; accepted270 unchanged. Next namespace/lifetime qualification.

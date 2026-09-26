@@ -45,3 +45,13 @@ resolved failure histories. Raw artifacts and local closeout are under `build/nv
 Earlier267 timing/quality and262 AST proof retain their original source identities. Material GPU
 runtime contracts remain unavailable; concurrent NVRTC automatic-PCH reliability remains open.
 Earlier presentation packages were not refreshed. [HISTORY](HISTORY.md) indexes prior evidence.
+
+Research275 completes the bounded PCH reproduction: all40 obligations retained,24 serial/private
+controls pass; shared16 yield6pass/8reuse assertion failures/2SIGSEGV. Same-path cross-process
+replacement/truncation is traced; original262 deletion signature remains unclosed. See
+[report275](report.slice-275-pch-reproduction.md) and [evidence275](research-evidence.slice-275.json).
+Next bounded276 must settle private namespace lifetime and explicit user-directory precedence before
+production changes. Compiler destruction need not unload NVRTC; existing shared-library wrappers do
+not establish ownership across arbitrary loader references. Preserve source identity and same-owner
+reuse. All accepted270 bytes/pins/inputs/configuration remain exact; next real build refreshes version
+metadata and restored observer objects. Root used separate local audits due reviewer thread limit.

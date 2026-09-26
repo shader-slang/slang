@@ -6,7 +6,9 @@ The development loop is **active**, resumed on 2026-09-26. Slice270 qualifies FP
 restored exactly. [Semantic research273](report.slice-273-semantic-profile.md) qualifies16 profiles
 and two recurring paths. [Research274](report.slice-274-inheritance-observation.md) finds each of6230
 canonical inheritance keys computed once; accepted compiler restored exactly and local audits pass.
-Next: investigate the recorded concurrent NVRTC automatic-PCH failure.
+[Research275](report.slice-275-pch-reproduction.md) reproduces shared-directory PCH ownership failures:
+8 native failures+2 crashes/16 shared processes; all24 serial/private controls pass. Next: qualify
+private namespace lifetime/user-option contracts before a bounded production fix.
 Continue reviewed local commits under [WORKFLOW](WORKFLOW.md); skip Slack, no push.
 Read [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md).
 
