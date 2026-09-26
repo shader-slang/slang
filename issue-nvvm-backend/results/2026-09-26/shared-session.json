@@ -1,0 +1,381 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "kind": "bounded-shared-session-appendix",
+  "raw_results": {
+    "path": "build/nvvm-results/2026-09-26-integration/shared-material/results.json",
+    "sha256": "f72927939d3de2607ad6493d59cf3edac79e4185785ce54585e9e1b387056774"
+  },
+  "command_gate": {
+    "command": [
+      "python3",
+      "issue-nvvm-backend/run-complex-corpus.py",
+      "--slangc",
+      "build/RelWithDebInfo/bin/slangc",
+      "--test-server",
+      "build/RelWithDebInfo/bin/test-server",
+      "--build-label",
+      "RelWithDebInfo",
+      "--provider",
+      "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+      "--cuda-root",
+      "/usr/local/cuda-12.9",
+      "--warmup",
+      "2",
+      "--samples",
+      "9",
+      "--output",
+      "build/nvvm-results/2026-09-26-integration/shared-material"
+    ],
+    "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-maintenance/integration-gates/shared-material.log",
+    "return_code": 0,
+    "timed_out": false,
+    "elapsed_seconds": 83.35645739361644,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "revision": "201cea6c96e09345700b77f2837404249bdd2deb"
+  },
+  "identity_basis": {
+    "path": "build/nvvm-results/2026-09-26-integration/quality/provenance.json",
+    "sha256": "d7ee2c5c0fb5a3347e3bafdcca349cb6c5b5914634ec13cc095d89a40d963aa9"
+  },
+  "artifact_sha256": {
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "4a207ec0d3f390152dd593a21af81f4b1fe30d9e1c5edd065343bd3590f8bbbc",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913",
+    "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+    "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+    "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "92924a30620ff99129ac9bb1ab94da0f57bc76123bb6063bcd68182a6fbb1342"
+  },
+  "timing_scope": "Fixed-order six-request batch in a fresh test-server process. Request service time excludes full startup, reference, validation and shutdown costs; first request has different initialization exposure. Not a backend-isolated comparison.",
+  "gpu_execution": false,
+  "warmup_batches": 2,
+  "measured_batches": 9,
+  "fresh_reference_counts": {
+    "requested": 6,
+    "passed": 6,
+    "attempted": 6
+  },
+  "fresh_reference_seconds": 11.130418635904789,
+  "sample_compile_lifecycle_median_seconds": 6.263190416619182,
+  "runner_work_seconds": 83.29564524441957,
+  "whole_command_seconds": 83.35645739361644,
+  "batches": [
+    {
+      "sample_index": 0,
+      "warmup": true,
+      "status": "completed",
+      "elapsed_seconds": 6.241978190839291,
+      "shutdown_seconds": 0.07793054543435574,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 1,
+      "warmup": true,
+      "status": "completed",
+      "elapsed_seconds": 6.2393836956471205,
+      "shutdown_seconds": 0.08195413090288639,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 2,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.282778946682811,
+      "shutdown_seconds": 0.07756330072879791,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 3,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.241824928671122,
+      "shutdown_seconds": 0.07936599291861057,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 4,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.281908098608255,
+      "shutdown_seconds": 0.07865378260612488,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 5,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.216223979368806,
+      "shutdown_seconds": 0.07655356451869011,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 6,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.309056622907519,
+      "shutdown_seconds": 0.07953000254929066,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 7,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.246328487992287,
+      "shutdown_seconds": 0.07832319661974907,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 8,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.262388132512569,
+      "shutdown_seconds": 0.07769032008945942,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 9,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.336656177416444,
+      "shutdown_seconds": 0.08013813942670822,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    },
+    {
+      "sample_index": 10,
+      "warmup": false,
+      "status": "completed",
+      "elapsed_seconds": 6.263190416619182,
+      "shutdown_seconds": 0.07918087393045425,
+      "process_return_code": 0,
+      "retries": 0,
+      "cell_ids": [
+        "tiled-brass-material-eval_buffer-nvrtc-o3",
+        "tiled-brass-material-eval_buffer-nvvm-o0",
+        "tiled-brass-material-eval_buffer-nvvm-o3",
+        "tiled-brass-material-sample_buffer-nvrtc-o3",
+        "tiled-brass-material-sample_buffer-nvvm-o0",
+        "tiled-brass-material-sample_buffer-nvvm-o3"
+      ]
+    }
+  ],
+  "cells": [
+    {
+      "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "status": "passed",
+      "successful_service_median_seconds": 1.2848946079611778,
+      "ptx_bytes": 72360,
+      "cubin_bytes": 70944,
+      "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+      "request_attempts": 11,
+      "measured_requests": 9,
+      "all_ptx_match_fresh_reference": true
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+      "status": "passed",
+      "successful_service_median_seconds": 0.8833826724439859,
+      "ptx_bytes": 733879,
+      "cubin_bytes": 243768,
+      "cubin_sha256": "1ffa90ab6384ef98f55836343681842baa4fc639737f257cb349024426823f92",
+      "request_attempts": 11,
+      "measured_requests": 9,
+      "all_ptx_match_fresh_reference": true
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "status": "passed",
+      "successful_service_median_seconds": 1.067219641059637,
+      "ptx_bytes": 82632,
+      "cubin_bytes": 71336,
+      "cubin_sha256": "bfac2f15a1097116ac7c988b7bc7c8bf4d82a66867670a1465c123a0aa19d151",
+      "request_attempts": 11,
+      "measured_requests": 9,
+      "all_ptx_match_fresh_reference": true
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "status": "passed",
+      "successful_service_median_seconds": 0.9041768573224545,
+      "ptx_bytes": 103321,
+      "cubin_bytes": 92088,
+      "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+      "request_attempts": 11,
+      "measured_requests": 9,
+      "all_ptx_match_fresh_reference": true
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+      "status": "passed",
+      "successful_service_median_seconds": 0.9606917481869459,
+      "ptx_bytes": 906830,
+      "cubin_bytes": 301624,
+      "cubin_sha256": "0260602dcc875ad5ec02b384847b41cab7b65ccd4c49691b6357a8253b7bed53",
+      "request_attempts": 11,
+      "measured_requests": 9,
+      "all_ptx_match_fresh_reference": true
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "status": "passed",
+      "successful_service_median_seconds": 1.0819640308618546,
+      "ptx_bytes": 117109,
+      "cubin_bytes": 94008,
+      "cubin_sha256": "a1d6d4f034e343ee75b4a52fc43bbb8df10b264e7073558c0ec616648b78069c",
+      "request_attempts": 11,
+      "measured_requests": 9,
+      "all_ptx_match_fresh_reference": true
+    }
+  ],
+  "fresh_references": [
+    {
+      "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "status": "passed",
+      "successful_compile_median_seconds": 1.367,
+      "ptx_bytes": 72360,
+      "cubin_bytes": 70944,
+      "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "assembly_seconds": 0.215
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+      "status": "passed",
+      "successful_compile_median_seconds": 1.317,
+      "ptx_bytes": 733879,
+      "cubin_bytes": 243768,
+      "cubin_sha256": "1ffa90ab6384ef98f55836343681842baa4fc639737f257cb349024426823f92",
+      "ptx_sha256": "91a3f87feea0d115f827f4fc7145671a841e9652ecd1c355e80b27c665f2c47a",
+      "assembly_seconds": 0.765
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "status": "passed",
+      "successful_compile_median_seconds": 1.418,
+      "ptx_bytes": 82632,
+      "cubin_bytes": 71336,
+      "cubin_sha256": "bfac2f15a1097116ac7c988b7bc7c8bf4d82a66867670a1465c123a0aa19d151",
+      "ptx_sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac",
+      "assembly_seconds": 0.265
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "status": "passed",
+      "successful_compile_median_seconds": 1.417,
+      "ptx_bytes": 103321,
+      "cubin_bytes": 92088,
+      "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "assembly_seconds": 0.265
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+      "status": "passed",
+      "successful_compile_median_seconds": 1.382,
+      "ptx_bytes": 906830,
+      "cubin_bytes": 301624,
+      "cubin_sha256": "0260602dcc875ad5ec02b384847b41cab7b65ccd4c49691b6357a8253b7bed53",
+      "ptx_sha256": "f58eb3229d66efc3c77bb013c9f0853891f0174d44f757677b5a45acec240c95",
+      "assembly_seconds": 0.916
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "status": "passed",
+      "successful_compile_median_seconds": 1.467,
+      "ptx_bytes": 117109,
+      "cubin_bytes": 94008,
+      "cubin_sha256": "a1d6d4f034e343ee75b4a52fc43bbb8df10b264e7073558c0ec616648b78069c",
+      "ptx_sha256": "5315e6101f95beacf4ed8b251d0b3c3a7fe49f340b24dfecf3fc1021a23d6148",
+      "assembly_seconds": 0.315
+    }
+  ]
+}

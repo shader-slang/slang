@@ -2,7 +2,8 @@
 
 Historical files retain their original names and evidence identities. Git history preserves prior
 STATUS/WORKFLOW wording; accepted260 is commit `e673f646d0b493d7b87d1bb7c078c483595d170f`.
-The current handoff belongs in [STATUS](STATUS.md), not in historical reports.
+The current handoff belongs in [STATUS](STATUS.md), not in historical reports. The latest
+[results package263](results/2026-09-26/README.md) includes refresh commands and presentation figures.
 
 | Topic                                                       | Stable entry points                                                                                                                                                 |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

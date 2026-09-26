@@ -1,0 +1,4055 @@
+{
+  "schema": 1,
+  "kind": "material",
+  "status": "passed",
+  "cells": [
+    {
+      "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
+      "wall_ms": {
+        "n": 18,
+        "median": 1362.7558005973697,
+        "q1": 1355.3845626302063,
+        "q3": 1372.0258972607553,
+        "minimum": 1334.5835991203785,
+        "maximum": 1378.1276401132345
+      },
+      "round_wall_ms": {
+        "0": {
+          "n": 9,
+          "median": 1356.2643732875586,
+          "q1": 1354.8258785158396,
+          "q3": 1361.8001230061054,
+          "minimum": 1334.5835991203785,
+          "maximum": 1367.2885820269585
+        },
+        "1": {
+          "n": 9,
+          "median": 1372.3555244505405,
+          "q1": 1370.072977617383,
+          "q3": 1375.2777092158794,
+          "minimum": 1347.3770469427109,
+          "maximum": 1378.1276401132345
+        }
+      },
+      "phase_ms": {
+        "SemanticChecking": {
+          "n": 18,
+          "median": 388.72,
+          "q1": 383.5775,
+          "q3": 392.13,
+          "minimum": 380.16,
+          "maximum": 400.27
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 388.72,
+          "q1": 383.575,
+          "q3": 392.1225,
+          "minimum": 380.15,
+          "maximum": 400.27
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1061.685,
+          "q1": 1055.895,
+          "q3": 1065.8325,
+          "minimum": 1041.62,
+          "maximum": 1078.3
+        },
+        "emitEntryPointsSourceFromIR": {
+          "n": 18,
+          "median": 312.1,
+          "q1": 309.49,
+          "q3": 314.49,
+          "minimum": 307.78,
+          "maximum": 320.98
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1061.685,
+          "q1": 1055.895,
+          "q3": 1065.8325,
+          "minimum": 1041.62,
+          "maximum": 1078.3
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 547.6600000000001,
+          "q1": 541.77,
+          "q3": 550.11,
+          "minimum": 532.44,
+          "maximum": 553.52
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 142.2,
+          "q1": 139.345,
+          "q3": 143.74,
+          "minimum": 136.38,
+          "maximum": 152.13
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 142.2,
+          "q1": 139.3375,
+          "q3": 143.7375,
+          "minimum": 136.38,
+          "maximum": 152.13
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 513.81,
+          "q1": 510.74249999999995,
+          "q3": 516.61,
+          "minimum": 506.3,
+          "maximum": 529.21
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 304.48,
+          "q1": 302.0125,
+          "q3": 306.9825,
+          "minimum": 300.03,
+          "maximum": 313.45
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.450000000000003,
+          "q1": 20.345,
+          "q3": 20.54,
+          "minimum": 20.02,
+          "maximum": 25.33
+        },
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.45,
+          "q1": 206.435,
+          "q3": 210.31,
+          "minimum": 201.94,
+          "maximum": 217.31
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 12.36,
+          "q1": 12.265,
+          "q3": 12.940000000000001,
+          "minimum": 12.13,
+          "maximum": 19.32
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.27,
+          "q1": 1.2625000000000002,
+          "q3": 1.28,
+          "minimum": 1.25,
+          "maximum": 1.29
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 5.41,
+          "q1": 5.4,
+          "q3": 5.42,
+          "minimum": 5.34,
+          "maximum": 5.56
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 55.955,
+          "q1": 55.085,
+          "q3": 56.61749999999999,
+          "minimum": 54.44,
+          "maximum": 57.57
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 111.275,
+          "q1": 110.12,
+          "q3": 112.005,
+          "minimum": 107.17,
+          "maximum": 118.82
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 121.955,
+          "q1": 121.29,
+          "q3": 123.095,
+          "minimum": 121.0,
+          "maximum": 132.84
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 116.475,
+          "q1": 116.0425,
+          "q3": 117.305,
+          "minimum": 115.21,
+          "maximum": 121.65
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.58,
+          "q1": 4.5375,
+          "q3": 4.61,
+          "minimum": 4.47,
+          "maximum": 5.95
+        }
+      },
+      "assembly_ms": {
+        "n": 9,
+        "median": 174.0940921008587,
+        "q1": 173.46378415822983,
+        "q3": 175.62334798276424,
+        "minimum": 172.53691516816616,
+        "maximum": 187.7901516854763
+      },
+      "ptx_bytes": 72360,
+      "cubin_bytes": 70944,
+      "resources": [
+        {
+          "function": "eval_buffer",
+          "registers": 48,
+          "stack_bytes": 592,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "entry_resources": [
+        {
+          "function": "eval_buffer",
+          "registers": 48,
+          "stack_bytes": 592,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "sass": null,
+      "executable_sections": null
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o0",
+      "wall_ms": {
+        "n": 18,
+        "median": 1254.6957861632109,
+        "q1": 1248.4457003884017,
+        "q3": 1263.5662304237485,
+        "minimum": 1233.0894712358713,
+        "maximum": 1278.5585690289736
+      },
+      "round_wall_ms": {
+        "0": {
+          "n": 9,
+          "median": 1249.6545724570751,
+          "q1": 1248.3746334910393,
+          "q3": 1255.2843634039164,
+          "minimum": 1233.0894712358713,
+          "maximum": 1259.0960282832384
+        },
+        "1": {
+          "n": 9,
+          "median": 1264.2510291188955,
+          "q1": 1250.9574834257364,
+          "q3": 1264.76139575243,
+          "minimum": 1244.7697836905718,
+          "maximum": 1278.5585690289736
+        }
+      },
+      "phase_ms": {
+        "SemanticChecking": {
+          "n": 18,
+          "median": 379.08000000000004,
+          "q1": 377.22999999999996,
+          "q3": 381.65000000000003,
+          "minimum": 372.01,
+          "maximum": 389.04
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 379.08000000000004,
+          "q1": 377.22999999999996,
+          "q3": 381.65000000000003,
+          "minimum": 372.01,
+          "maximum": 389.04
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 959.08,
+          "q1": 955.1475,
+          "q3": 964.4075,
+          "minimum": 948.29,
+          "maximum": 975.25
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 959.08,
+          "q1": 955.1475,
+          "q3": 964.4075,
+          "minimum": 948.29,
+          "maximum": 975.25
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 532.125,
+          "q1": 530.0975000000001,
+          "q3": 535.1525,
+          "minimum": 524.27,
+          "maximum": 544.34
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 139.74,
+          "q1": 139.025,
+          "q3": 140.15,
+          "minimum": 137.45,
+          "maximum": 141.81
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 139.74,
+          "q1": 139.025,
+          "q3": 140.15,
+          "minimum": 137.45,
+          "maximum": 141.81
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 426.0,
+          "q1": 424.725,
+          "q3": 427.39,
+          "minimum": 422.92,
+          "maximum": 435.02
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 295.2,
+          "q1": 294.4175,
+          "q3": 296.8875,
+          "minimum": 292.77,
+          "maximum": 303.8
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 19.759999999999998,
+          "q1": 19.515,
+          "q3": 20.052500000000002,
+          "minimum": 19.07,
+          "maximum": 20.48
+        },
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 204.87,
+          "q1": 202.93,
+          "q3": 205.85500000000002,
+          "minimum": 199.28,
+          "maximum": 211.25
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 12.28,
+          "q1": 12.2225,
+          "q3": 12.407499999999999,
+          "minimum": 12.13,
+          "maximum": 13.89
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.2650000000000001,
+          "q1": 1.2525,
+          "q3": 1.27,
+          "minimum": 1.25,
+          "maximum": 1.32
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 5.4,
+          "q1": 5.3825,
+          "q3": 5.425,
+          "minimum": 5.32,
+          "maximum": 5.87
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 54.42,
+          "q1": 53.8175,
+          "q3": 54.695,
+          "minimum": 53.15,
+          "maximum": 56.51
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 110.07499999999999,
+          "q1": 108.1325,
+          "q3": 110.51249999999999,
+          "minimum": 106.78,
+          "maximum": 112.12
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 120.995,
+          "q1": 120.715,
+          "q3": 121.1575,
+          "minimum": 120.12,
+          "maximum": 121.63
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 116.055,
+          "q1": 115.515,
+          "q3": 116.64750000000001,
+          "minimum": 115.17,
+          "maximum": 124.13
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.615,
+          "q1": 4.59,
+          "q3": 4.6475,
+          "minimum": 4.56,
+          "maximum": 5.94
+        }
+      },
+      "assembly_ms": {
+        "n": 9,
+        "median": 705.1866240799427,
+        "q1": 702.3001611232758,
+        "q3": 710.8361124992371,
+        "minimum": 698.6939646303654,
+        "maximum": 744.4563619792461
+      },
+      "ptx_bytes": 733879,
+      "cubin_bytes": 243768,
+      "resources": [
+        {
+          "function": "eval_buffer",
+          "registers": 128,
+          "stack_bytes": 2960,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material20TiledBrassEvalOutputR8_24xinitp2pi_v3fi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material24make_surface_interactionp2pi_v2fi_v3f20tiled_brass_material6render18SurfaceInteraction",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData23prepare_advanced_framesp1pi_20tiled_brass_material5utils5FrameVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData25prepare_advanced_layeringp1pi_20tiled_brass_material5utils5FrameVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData26apply_advanced_mix_weightsp0pVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData28init_vdf_transmission_scalesp0pVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData8set_bsdfg2TCGP020tiled_brass_material6render5IBSDFp2pi_ii_GP0VmG3959663121812257ac3629f766454668ca2aaded",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData8set_bsdfg2TCGP020tiled_brass_material6render5IBSDFp2pi_ii_GP0VmGa92da8fd8fc4ca69b593d4c436654e17ed969516",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx12MxBsdfSampleR8_24xinitp0p",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx12MxBsdfSampleR8_24xinitp4pi_v3fi_v3fi_fi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx13make_ggx_distp1pi_v2f20tiled_brass_material4mtlx9MxGGXDist",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx13mx_matrix_mulp2pi_m4x4fi_v4fv4f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx13surfaceshaderR8_24xinitp4pi_20tiled_brass_material4mtlx4BSDFi_20tiled_brass_material4mtlx3EDFi_fi_b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx14sample_textureg2TCGP020tiled_brass_material6render11ILodSamplerp4pi_20tiled_brass_material6render13TextureHandleG3v4fk3i_v2fi_GP0i_v4fv4fG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx18MxConductorFresnel3avgp0pv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx18MxConductorFresnelR8_24xinitp2pi_v3fi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx18reflectance_to_iorp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx19MxDielectricFresnelR8_24xinitp2pi_fi_b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx19mx_geomprop_tangentp1pi_20tiled_brass_material6render18SurfaceInteractionv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx20clamp_dielectric_iorp1pi_ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx20microfacet_roughnessp1pi_v2ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx23oriented_dielectric_etap2pi_fi_bf",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx24eval_ggx_reflection_lobep5pi_20tiled_brass_material4mtlx9MxGGXDisti_v3fi_v3fi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSample",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy13eval_with_pdfg2TCGP020tiled_brass_material5utils16ISampleGeneratorp4pi_v3fi_v3fio_GP0i_20tiled_brass_material6render11BSDFContext20tiled_brass_material6render8BSDFEvalGe3e766d62dfdaf8e870c5a7a48ec04953ab84560G7ab1e9aace39194812a1bfb3d48382b4fd1a548c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy16eval_bsdf_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy18ior_as_reflectance3getAgp0pv3fGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicyR8_24xinitp0pGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicyR8_24xinitp3pi_v2fi_GP0i_bGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy13eval_with_pdfg2TCGP020tiled_brass_material5utils16ISampleGeneratorp4pi_v3fi_v3fio_GP0i_20tiled_brass_material6render11BSDFContext20tiled_brass_material6render8BSDFEvalG25af65073ea7191ff044c76b4908a19ea80eee27G7ab1e9aace39194812a1bfb3d48382b4fd1a548c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy16eval_bsdf_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy18ior_as_reflectance3getAgp0pv3fG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy4tintp1pi_fv3fG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy9spec_evalp2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicyR8_24xinitp0pG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicyR8_24xinitp7pi_v2fi_GP0i_v3fi_v3fi_v3fi_bi_bG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx30MxAdvancedWeights_01d3906d90ce17calculate_weightsg4viviTCGP220tiled_brass_material4mtlx22IMaterialXMaterialDatap4pi_GP2i_4core5ArrayG2v3fK10TBsdfCounti_bo_20tiled_brass_material4mtlx9MxWeightsG1K10TBsdfCountVGba4d2339a9367d69934b92caa77c46b74c2b7937",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx31ggx_directional_albedo_analyticp4pi_fi_fi_v3fi_v3fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx33turquin_analytic_reflection_scalep3pi_fi_fi_v3fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler10mx_surfacep5pi_20tiled_brass_material4mtlx4BSDFi_20tiled_brass_material4mtlx3EDFi_fi_bo_20tiled_brass_material4mtlx13surfaceshaderVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler13mx_layer_bsdfp4pi_20tiled_brass_material4mtlx11ClosureDatai_20tiled_brass_material4mtlx4BSDFi_20tiled_brass_material4mtlx4BSDFo_20tiled_brass_material4mtlx4BSDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler14mx_uniform_edfp3pi_20tiled_brass_material4mtlx11ClosureDatai_v3fo_20tiled_brass_material4mtlx3EDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler15mx_artistic_iorp4pi_v3fi_v3fo_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler15mx_multiply_edfp4pi_20tiled_brass_material4mtlx11ClosureDatai_20tiled_brass_material4mtlx3EDFi_v3fo_20tiled_brass_material4mtlx3EDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler16mx_multiply_bsdfp4pi_20tiled_brass_material4mtlx11ClosureDatai_20tiled_brass_material4mtlx4BSDFi_v3fo_20tiled_brass_material4mtlx4BSDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler17eval_shader_graphp0pVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler17mx_rotate_vector3p4pi_v3fi_fi_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19NG_separate3_color3p4pi_v3fo_fo_fo_fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19NG_tiledimage_floatp12pi_20tiled_brass_material6render13TextureHandleG3v4fk3i_fi_v2fi_v2fi_v2fi_v2fi_v2fi_ii_ii_ii_io_fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19direct_prepare_bsdfp3pi_20tiled_brass_material4mtlx4BSDFi_v3fi_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19mx_luminance_color3p3pi_v3fi_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler20NG_tiledimage_color3p12pi_20tiled_brass_material6render13TextureHandleG3v4fk3i_v3fi_v2fi_v2fi_v2fi_v2fi_v2fi_ii_ii_ii_io_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler23NG_convert_float_color3p2pi_fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler23mx_roughness_anisotropyp3pi_fi_fo_v2fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler26mx_generalized_schlick_edfp6pi_20tiled_brass_material4mtlx11ClosureDatai_v3fi_v3fi_fi_20tiled_brass_material4mtlx3EDFo_20tiled_brass_material4mtlx3EDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler36NG_srgb_texture_to_lin_rec709_color3p2pi_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler37NG_standard_surface_surfaceshader_100p43pi_fi_v3fi_fi_fi_fi_v3fi_fi_fi_fi_fi_fi_v3fi_fi_v3fi_fi_fi_fi_fi_v3fi_v3fi_fi_fi_fi_v3fi_fi_fi_v3fi_fi_fi_fi_fi_v3fi_fi_fi_fi_fi_fi_v3fi_v3fi_bi_v3fi_v3fo_20tiled_brass_material4mtlx13surfaceshaderVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx39dielectric_no_compensation_layer_energyp6pi_bi_bi_bi_fi_fi_ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx3EDFR8_24xinitp1pi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF7is_bsdfp0pb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF8set_bsdfp1pi_iVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF9get_indexp0pi",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF9set_layerp1pi_iVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDFR8_24xinitp1pi_u",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx7mx_hmaxp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist1Dp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist2G1p1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist5G2_G1p2pi_v3fi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist8D_refl_Dp2pi_v3fi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDistR8_24xinitp1pi_v2f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxWeightsg1viR8_24xinitp0pGda4b9237bacccdf19c0760cab7aec4a8359010b0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9luminancep1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils14orthonormalizep2pi_v3fio_v3fV",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils21adjust_shading_normalp3pi_v3fi_v3fi_v3fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils26TinyUniformSampleGeneratorR8_24xinitp1pi_u",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils26adjust_shading_normal_implp4pi_v3fi_v3fi_v3fo_bv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils3sqrg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0bG1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5Frame8identityp0p20tiled_brass_material5utils5Frame",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5Frame8to_localp1pi_v3fv3fb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5Frame9to_globalp1pi_v3fv3fb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5FrameR8_24xinitp0p",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils8BitFieldg4TvuvuCGP04core20__BuiltinIntegerType7extractp1pi_GP0GP0G5ceea7a7a0dc82b8297cde5db85e5114a6fb2e8c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils8BitFieldg4TvuvuCGP04core20__BuiltinIntegerType7extractp1pi_GP0GP0G993ae5cfaad70986a546f76a7091c63647f012a0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils9luminancep1pi_v3ffb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render11BSDFContextR8_24xinitp2pi_fi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement12resolve_udimp1pio_v2f20tiled_brass_material6render13TextureHandleG3GP0K11FlagsAsUintG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement13texture_index3getAgp0puGd8a2cd026e031e69e51c41b40ad2e5cffac31a87",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement6sampleg2TCGP020tiled_brass_material6render11ILodSamplerp3pi_GP0i_v2fi_GP0GP0G0e8305e80ad9f612f182d7551cad231ec1b299bbG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement7is_udimp0pbG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement8is_validp0pbG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElementR8_24xinitp0pG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElementR8_24xinitp1pi_uG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18ExplicitLodSampler6sampleg2TCGP04core13ITexelElementp3pi_4core8_TextureG11GP04core9__Shape2Dk0k0k0k0k0k0k0i_4core12SamplerStatei_v2fGP0G85f94db345037991bfa609402736784697280336",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18ExplicitLodSamplerR8_24xinitp1pi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18SurfaceInteraction15front_normal_wsp0pv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18SurfaceInteractionR8_24xinitp0p",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18reflectance_to_iorp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render19AlbedoContributionsR8_24xinitp4pi_v3fi_v3fi_v3fi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb12smith_lambdap1pi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb2G1p1pi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb2G2p2pi_v3fi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb8eval_ndfp1pi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivbR8_24xinitp1pi_v2fbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20geomprop_identity4x4p0pm4x4f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render21DummyGeomPropProvider19get_space_transformp3pi_20tiled_brass_material6render18SurfaceInteractioni_20tiled_brass_material6render13GeomPropSpacei_20tiled_brass_material6render13GeomPropSpacem4x4f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render8BSDFEvalR8_24xinitp2pi_v3fi_fb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core10__max_implg2TCGP04core11IComparablep2pi_GP0i_GP0GP0G82c036692e9e101baa390fcacbf133488f4aa676",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core10__min_implg2TCGP04core11IComparablep2pi_GP0i_GP0GP0G82c036692e9e101baa390fcacbf133488f4aa676",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3absg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bGdb9ce529615472ce6ae6831c1f8ef42c01149c3a",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG665f605b42d62088d40824eb98d46304cfc8e8df",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bGf6ec43807b6e489fe4bd32da33d6b3ebab41acb2",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3cosg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3dotg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0GP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3dotg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0GP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3expg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3expg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3maxg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3maxg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3ming3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3ming3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3mulg4TviviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_mK1NxK1MGP0vK1MGP0G512d703e77bf7beaa2dd64d7c69ec33c6272fca0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3powg2TCGP04core26__BuiltinFloatingPointTypep2pi_GP0i_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3powg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3sing2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4fracg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4fracg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4lerpg2TCGP04core26__BuiltinFloatingPointTypep3pi_GP0i_GP0i_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4lerpg3TviCGP04core26__BuiltinFloatingPointTypep3pi_vK1NGP0i_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4sqrtg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4sqrtg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5clampg2TCGP04core26__BuiltinFloatingPointTypep3pi_GP0i_GP0i_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5clampg3TviCGP04core26__BuiltinFloatingPointTypep3pi_vK1NGP0i_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5clampg3TviCGP04core26__BuiltinFloatingPointTypep3pi_vK1NGP0i_vK1NGP0i_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5crossg2TCGP04core26__BuiltinFloatingPointTypep2pi_v3GP0i_v3GP0v3GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5float5getPip0pfb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5floorg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5floorg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5isinfg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0bG1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5isinfg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NbG55395e95ab7f8077732d4b504f0c023591d56a0b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5isnang2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0bG1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5isnang3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NbG55395e95ab7f8077732d4b504f0c023591d56a0b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core6lengthg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0GP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core7radiansg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core7reflectg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core8saturateg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core9normalizeg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core9transposeg4TviviCGP04core26__BuiltinFloatingPointTypep1pi_mK1NxK1MGP0mK1MxK1NGP0G512d703e77bf7beaa2dd64d7c69ec33c6272fca0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4coreX4core8_TextureG11GP04core9__Shape2Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp2po_io_iVGcbc52b7e7b65225b8552bbfebe2f5682e20c5d69",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4coreX4core8_TextureG11GP0GP1K7isArrayK4isMSK11sampleCountk0K8isShadowk0K6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement11SampleLevelp3pi_4core12SamplerStatei_vKX0211K7isArray111KL10dimensions1fi_fGP0G54122927072c7d03779f609ca8ddaa075c529f8c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0Gc33bb8b839f10cb7953d5f866f0874b8acdc6f90",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_1",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_2",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_3",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "entry_resources": [
+        {
+          "function": "eval_buffer",
+          "registers": 128,
+          "stack_bytes": 2960,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "sass": null,
+      "executable_sections": null
+    },
+    {
+      "id": "tiled-brass-material-eval_buffer-nvvm-o3",
+      "wall_ms": {
+        "n": 18,
+        "median": 1355.0416342914104,
+        "q1": 1351.063667330891,
+        "q3": 1361.7949984036386,
+        "minimum": 1344.4454986602068,
+        "maximum": 1368.3983441442251
+      },
+      "round_wall_ms": {
+        "0": {
+          "n": 9,
+          "median": 1351.0170727968216,
+          "q1": 1349.7023433446884,
+          "q3": 1354.3344754725695,
+          "minimum": 1344.4454986602068,
+          "maximum": 1361.2223081290722
+        },
+        "1": {
+          "n": 9,
+          "median": 1361.8967644870281,
+          "q1": 1355.7487931102514,
+          "q3": 1366.6034527122974,
+          "minimum": 1351.2034509330988,
+          "maximum": 1368.3983441442251
+        }
+      },
+      "phase_ms": {
+        "SemanticChecking": {
+          "n": 18,
+          "median": 380.14,
+          "q1": 378.0625,
+          "q3": 382.6775,
+          "minimum": 373.74,
+          "maximum": 386.7
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 380.14,
+          "q1": 378.0625,
+          "q3": 382.6775,
+          "minimum": 373.74,
+          "maximum": 386.7
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1061.72,
+          "q1": 1059.79,
+          "q3": 1066.7825,
+          "minimum": 1053.38,
+          "maximum": 1071.54
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1061.72,
+          "q1": 1059.7875000000001,
+          "q3": 1066.7825,
+          "minimum": 1053.38,
+          "maximum": 1071.54
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 532.91,
+          "q1": 530.235,
+          "q3": 536.375,
+          "minimum": 527.6,
+          "maximum": 542.33
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 139.60000000000002,
+          "q1": 139.325,
+          "q3": 140.48250000000002,
+          "minimum": 137.43,
+          "maximum": 145.77
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 139.595,
+          "q1": 139.3175,
+          "q3": 140.48250000000002,
+          "minimum": 137.43,
+          "maximum": 145.77
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 528.61,
+          "q1": 526.27,
+          "q3": 529.9825,
+          "minimum": 522.77,
+          "maximum": 535.65
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 295.825,
+          "q1": 294.9475,
+          "q3": 296.9225,
+          "minimum": 292.95,
+          "maximum": 301.8
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 19.925,
+          "q1": 19.7825,
+          "q3": 20.1575,
+          "minimum": 19.31,
+          "maximum": 20.48
+        },
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 206.69,
+          "q1": 205.74249999999998,
+          "q3": 208.16500000000002,
+          "minimum": 204.03,
+          "maximum": 211.22
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 12.295,
+          "q1": 12.22,
+          "q3": 12.337499999999999,
+          "minimum": 12.11,
+          "maximum": 12.5
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.26,
+          "q1": 1.25,
+          "q3": 1.26,
+          "minimum": 1.25,
+          "maximum": 1.52
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 5.41,
+          "q1": 5.39,
+          "q3": 5.45,
+          "minimum": 5.32,
+          "maximum": 5.54
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 55.265,
+          "q1": 54.6325,
+          "q3": 55.980000000000004,
+          "minimum": 54.2,
+          "maximum": 56.68
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 110.49,
+          "q1": 109.245,
+          "q3": 111.19749999999999,
+          "minimum": 108.12,
+          "maximum": 112.4
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 121.015,
+          "q1": 120.725,
+          "q3": 121.5475,
+          "minimum": 120.06,
+          "maximum": 125.66
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 116.35499999999999,
+          "q1": 115.92250000000001,
+          "q3": 117.005,
+          "minimum": 115.55,
+          "maximum": 117.7
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.615,
+          "q1": 4.592499999999999,
+          "q3": 4.7125,
+          "minimum": 4.54,
+          "maximum": 4.92
+        }
+      },
+      "assembly_ms": {
+        "n": 9,
+        "median": 210.80916933715343,
+        "q1": 209.01338569819927,
+        "q3": 213.34510296583176,
+        "minimum": 207.860941067338,
+        "maximum": 215.1634432375431
+      },
+      "ptx_bytes": 82632,
+      "cubin_bytes": 71336,
+      "resources": [
+        {
+          "function": "eval_buffer",
+          "registers": 67,
+          "stack_bytes": 784,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "entry_resources": [
+        {
+          "function": "eval_buffer",
+          "registers": 67,
+          "stack_bytes": 784,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "sass": null,
+      "executable_sections": null
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvrtc-o3",
+      "wall_ms": {
+        "n": 18,
+        "median": 1390.1593247428536,
+        "q1": 1378.517547622323,
+        "q3": 1402.235449757427,
+        "minimum": 1369.445400312543,
+        "maximum": 1450.3115098923445
+      },
+      "round_wall_ms": {
+        "0": {
+          "n": 9,
+          "median": 1389.1231212764978,
+          "q1": 1385.826662182808,
+          "q3": 1401.424566283822,
+          "minimum": 1373.8192114979029,
+          "maximum": 1450.3115098923445
+        },
+        "1": {
+          "n": 9,
+          "median": 1397.0571476966143,
+          "q1": 1376.0811761021614,
+          "q3": 1402.5057442486286,
+          "minimum": 1369.445400312543,
+          "maximum": 1414.612552151084
+        }
+      },
+      "phase_ms": {
+        "SemanticChecking": {
+          "n": 18,
+          "median": 388.9,
+          "q1": 383.24,
+          "q3": 396.3975,
+          "minimum": 377.79,
+          "maximum": 441.62
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 388.895,
+          "q1": 383.24,
+          "q3": 396.3975,
+          "minimum": 377.79,
+          "maximum": 441.62
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1088.15,
+          "q1": 1079.8275,
+          "q3": 1099.1200000000001,
+          "minimum": 1070.35,
+          "maximum": 1142.89
+        },
+        "emitEntryPointsSourceFromIR": {
+          "n": 18,
+          "median": 330.145,
+          "q1": 328.97,
+          "q3": 334.475,
+          "minimum": 327.04,
+          "maximum": 344.25
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1088.15,
+          "q1": 1079.8275,
+          "q3": 1099.1200000000001,
+          "minimum": 1070.35,
+          "maximum": 1142.89
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 545.405,
+          "q1": 537.2625,
+          "q3": 550.6175000000001,
+          "minimum": 533.1,
+          "maximum": 602.52
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 141.98,
+          "q1": 140.515,
+          "q3": 144.0975,
+          "minimum": 139.36,
+          "maximum": 151.22
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 141.98,
+          "q1": 140.515,
+          "q3": 144.08999999999997,
+          "minimum": 139.35,
+          "maximum": 151.22
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 542.89,
+          "q1": 539.7249999999999,
+          "q3": 545.72,
+          "minimum": 533.61,
+          "maximum": 556.43
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 321.275,
+          "q1": 320.1575,
+          "q3": 325.67999999999995,
+          "minimum": 318.41,
+          "maximum": 335.36
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.759999999999998,
+          "q1": 20.475,
+          "q3": 21.03,
+          "minimum": 20.03,
+          "maximum": 23.2
+        },
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 208.35,
+          "q1": 205.51,
+          "q3": 210.75750000000002,
+          "minimum": 201.96,
+          "maximum": 211.9
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 12.25,
+          "q1": 12.1825,
+          "q3": 12.377500000000001,
+          "minimum": 12.13,
+          "maximum": 14.19
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.48,
+          "q1": 1.4725000000000001,
+          "q3": 1.49,
+          "minimum": 1.47,
+          "maximum": 1.62
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 5.5649999999999995,
+          "q1": 5.5200000000000005,
+          "q3": 5.594999999999999,
+          "minimum": 5.5,
+          "maximum": 6.03
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 55.11,
+          "q1": 54.7775,
+          "q3": 56.1975,
+          "minimum": 54.17,
+          "maximum": 58.05
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 111.965,
+          "q1": 109.7875,
+          "q3": 113.5925,
+          "minimum": 107.89,
+          "maximum": 116.04
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 128.825,
+          "q1": 128.28,
+          "q3": 129.84,
+          "minimum": 127.31,
+          "maximum": 139.31
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 122.92,
+          "q1": 122.475,
+          "q3": 123.465,
+          "minimum": 121.95,
+          "maximum": 132.69
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.665,
+          "q1": 4.63,
+          "q3": 4.6875,
+          "minimum": 4.54,
+          "maximum": 6.7
+        }
+      },
+      "assembly_ms": {
+        "n": 9,
+        "median": 254.31024469435215,
+        "q1": 253.51904332637787,
+        "q3": 255.83037920296192,
+        "minimum": 253.2635759562254,
+        "maximum": 264.68001306056976
+      },
+      "ptx_bytes": 103321,
+      "cubin_bytes": 92088,
+      "resources": [
+        {
+          "function": "sample_buffer",
+          "registers": 63,
+          "stack_bytes": 624,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "entry_resources": [
+        {
+          "function": "sample_buffer",
+          "registers": 63,
+          "stack_bytes": 624,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "sass": null,
+      "executable_sections": null
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o0",
+      "wall_ms": {
+        "n": 18,
+        "median": 1295.5451803281903,
+        "q1": 1290.9755483269691,
+        "q3": 1304.4061297550797,
+        "minimum": 1278.2832998782396,
+        "maximum": 1352.2017057985067
+      },
+      "round_wall_ms": {
+        "0": {
+          "n": 9,
+          "median": 1293.068392202258,
+          "q1": 1290.8878084272146,
+          "q3": 1297.5665349513292,
+          "minimum": 1278.2832998782396,
+          "maximum": 1305.7875726372004
+        },
+        "1": {
+          "n": 9,
+          "median": 1297.6897601038218,
+          "q1": 1292.6605325192213,
+          "q3": 1307.6920714229345,
+          "minimum": 1288.0900595337152,
+          "maximum": 1352.2017057985067
+        }
+      },
+      "phase_ms": {
+        "SemanticChecking": {
+          "n": 18,
+          "median": 381.285,
+          "q1": 378.0,
+          "q3": 383.3175,
+          "minimum": 374.87,
+          "maximum": 386.52
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 381.28,
+          "q1": 377.99249999999995,
+          "q3": 383.3175,
+          "minimum": 374.87,
+          "maximum": 386.52
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1000.725,
+          "q1": 995.4425,
+          "q3": 1004.5,
+          "minimum": 987.29,
+          "maximum": 1048.33
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1000.725,
+          "q1": 995.4425,
+          "q3": 1004.5,
+          "minimum": 987.29,
+          "maximum": 1048.33
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 535.04,
+          "q1": 531.0925,
+          "q3": 537.4775,
+          "minimum": 526.22,
+          "maximum": 558.62
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 140.445,
+          "q1": 139.28,
+          "q3": 141.2575,
+          "minimum": 137.04,
+          "maximum": 160.42
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 140.44,
+          "q1": 139.28,
+          "q3": 141.2575,
+          "minimum": 137.04,
+          "maximum": 160.42
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 464.72,
+          "q1": 463.705,
+          "q3": 466.295,
+          "minimum": 460.58,
+          "maximum": 488.95
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 312.13,
+          "q1": 311.5175,
+          "q3": 313.105,
+          "minimum": 308.41,
+          "maximum": 336.13
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 19.884999999999998,
+          "q1": 19.6325,
+          "q3": 20.06,
+          "minimum": 19.37,
+          "maximum": 23.52
+        },
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.05,
+          "q1": 204.94750000000002,
+          "q3": 209.765,
+          "minimum": 200.83,
+          "maximum": 211.81
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 12.28,
+          "q1": 12.195,
+          "q3": 12.337499999999999,
+          "minimum": 12.1,
+          "maximum": 13.97
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.47,
+          "q1": 1.46,
+          "q3": 1.4874999999999998,
+          "minimum": 1.45,
+          "maximum": 1.52
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 5.505,
+          "q1": 5.4725,
+          "q3": 5.53,
+          "minimum": 5.42,
+          "maximum": 5.83
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 55.175,
+          "q1": 54.722500000000004,
+          "q3": 56.165,
+          "minimum": 52.7,
+          "maximum": 57.85
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 110.44,
+          "q1": 108.715,
+          "q3": 111.72749999999999,
+          "minimum": 106.42,
+          "maximum": 112.09
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 127.96,
+          "q1": 127.465,
+          "q3": 128.42,
+          "minimum": 126.42,
+          "maximum": 142.36
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 122.02,
+          "q1": 121.4275,
+          "q3": 122.2375,
+          "minimum": 120.62,
+          "maximum": 127.77
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.625,
+          "q1": 4.5825,
+          "q3": 4.69,
+          "minimum": 4.5,
+          "maximum": 4.84
+        }
+      },
+      "assembly_ms": {
+        "n": 9,
+        "median": 880.2190106362104,
+        "q1": 879.0645059198141,
+        "q3": 881.3764620572329,
+        "minimum": 874.4734097272158,
+        "maximum": 881.9048497825861
+      },
+      "ptx_bytes": 906830,
+      "cubin_bytes": 301624,
+      "resources": [
+        {
+          "function": "sample_buffer",
+          "registers": 168,
+          "stack_bytes": 3200,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material22TiledBrassSampleOutputR8_24xinitp4pi_v3fi_fi_v3fi_u",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material24make_surface_interactionp2pi_v2fi_v3f20tiled_brass_material6render18SurfaceInteraction",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData23prepare_advanced_framesp1pi_20tiled_brass_material5utils5FrameVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData25prepare_advanced_layeringp1pi_20tiled_brass_material5utils5FrameVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData26apply_advanced_mix_weightsp0pVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData28init_vdf_transmission_scalesp0pVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData8set_bsdfg2TCGP020tiled_brass_material6render5IBSDFp2pi_ii_GP0VmG3959663121812257ac3629f766454668ca2aaded",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx11MxStackData8set_bsdfg2TCGP020tiled_brass_material6render5IBSDFp2pi_ii_GP0VmGa92da8fd8fc4ca69b593d4c436654e17ed969516",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx12MxBsdfSampleR8_24xinitp0p",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx12MxBsdfSampleR8_24xinitp4pi_v3fi_v3fi_fi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx13make_ggx_distp1pi_v2f20tiled_brass_material4mtlx9MxGGXDist",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx13mx_matrix_mulp2pi_m4x4fi_v4fv4f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx13surfaceshaderR8_24xinitp4pi_20tiled_brass_material4mtlx4BSDFi_20tiled_brass_material4mtlx3EDFi_fi_b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx14sample_textureg2TCGP020tiled_brass_material6render11ILodSamplerp4pi_20tiled_brass_material6render13TextureHandleG3v4fk3i_v2fi_GP0i_v4fv4fG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx18MxConductorFresnel3avgp0pv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx18MxConductorFresnelR8_24xinitp2pi_v3fi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx18reflectance_to_iorp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx19MxDielectricFresnelR8_24xinitp2pi_fi_b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx19mx_geomprop_tangentp1pi_20tiled_brass_material6render18SurfaceInteractionv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx20clamp_dielectric_iorp1pi_ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx20microfacet_roughnessp1pi_v2ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx21MxSelectedLobePayloadR8_24xinitp8pi_v3fi_v3fi_fi_v3fi_v3fi_fi_v3fi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx23oriented_dielectric_etap2pi_fi_bf",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx24eval_ggx_reflection_lobep5pi_20tiled_brass_material4mtlx9MxGGXDisti_v3fi_v3fi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSample",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy13eval_with_pdfg2TCGP020tiled_brass_material5utils16ISampleGeneratorp4pi_v3fi_v3fio_GP0i_20tiled_brass_material6render11BSDFContext20tiled_brass_material6render8BSDFEvalGe3e766d62dfdaf8e870c5a7a48ec04953ab84560G0cfa5bd6c17dad00463fe537cd92326b54af154f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy16eval_bsdf_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy18ior_as_reflectance3getAgp0pv3fGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy18sample_bsdf_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy6sampleg2TCGP020tiled_brass_material5utils16ISampleGeneratorp4pi_v3fo_20tiled_brass_material6render10BSDFSampleio_GP0i_20tiled_brass_material6render11BSDFContextbGe3e766d62dfdaf8e870c5a7a48ec04953ab84560G7ab1e9aace39194812a1bfb3d48382b4fd1a548c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicy8eval_pdfp3pi_v3fi_v3fi_20tiled_brass_material6render11BSDFContextfGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicyR8_24xinitp0pGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26MxCompensatedConductorBSDFg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx26IMxReflectiveFresnelPolicyR8_24xinitp3pi_v2fi_GP0i_bGe3e766d62dfdaf8e870c5a7a48ec04953ab84560",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26sample_ggx_reflection_lobeg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx16IMxFresnelPolicyp5pi_20tiled_brass_material4mtlx9MxGGXDisti_GP0i_fi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG6d8288895b11c686a72441088a87e5be67a5fb3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx26sample_ggx_reflection_lobeg4TTCGP120tiled_brass_material4mtlx31IMxMicrofacetCompensationPolicyCGP020tiled_brass_material4mtlx16IMxFresnelPolicyp5pi_20tiled_brass_material4mtlx9MxGGXDisti_GP0i_fi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG7c2c5b422445d33ae2648c972dd3a4a0f2ccc232",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy11spec_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy13eval_with_pdfg2TCGP020tiled_brass_material5utils16ISampleGeneratorp4pi_v3fi_v3fio_GP0i_20tiled_brass_material6render11BSDFContext20tiled_brass_material6render8BSDFEvalG25af65073ea7191ff044c76b4908a19ea80eee27G0cfa5bd6c17dad00463fe537cd92326b54af154f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy16eval_bsdf_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy17sample_lobe_typesp2pi_v3fi_v3f20tiled_brass_material6render9BSDFFlagsG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy18ior_as_reflectance3getAgp0pv3fG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy18sample_bsdf_samplep2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy4tintp1pi_fv3fG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy6sampleg2TCGP020tiled_brass_material5utils16ISampleGeneratorp4pi_v3fo_20tiled_brass_material6render10BSDFSampleio_GP0i_20tiled_brass_material6render11BSDFContextbG25af65073ea7191ff044c76b4908a19ea80eee27G7ab1e9aace39194812a1bfb3d48382b4fd1a548c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy8eval_pdfp3pi_v3fi_v3fi_20tiled_brass_material6render11BSDFContextfG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicy9spec_evalp2pi_v3fi_v3f20tiled_brass_material4mtlx12MxBsdfSampleG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicyR8_24xinitp0pG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx27MxCompensatedDielectricBSDFg6TTTCGP220tiled_brass_material4mtlx20IMxScatterModePolicyCGP120tiled_brass_material4mtlx31IMxRefractiveCompensationPolicyCGP020tiled_brass_material4mtlx26IMxRefractiveFresnelPolicyR8_24xinitp7pi_v2fi_GP0i_v3fi_v3fi_v3fi_bi_bG25af65073ea7191ff044c76b4908a19ea80eee27",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx30MxAdvancedWeights_01d3906d90ce17calculate_weightsg4viviTCGP220tiled_brass_material4mtlx22IMaterialXMaterialDatap4pi_GP2i_4core5ArrayG2v3fK10TBsdfCounti_bo_20tiled_brass_material4mtlx9MxWeightsG1K10TBsdfCountVGba4d2339a9367d69934b92caa77c46b74c2b7937",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx31ggx_directional_albedo_analyticp4pi_fi_fi_v3fi_v3fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx33turquin_analytic_reflection_scalep3pi_fi_fi_v3fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler10mx_surfacep5pi_20tiled_brass_material4mtlx4BSDFi_20tiled_brass_material4mtlx3EDFi_fi_bo_20tiled_brass_material4mtlx13surfaceshaderVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler13mx_layer_bsdfp4pi_20tiled_brass_material4mtlx11ClosureDatai_20tiled_brass_material4mtlx4BSDFi_20tiled_brass_material4mtlx4BSDFo_20tiled_brass_material4mtlx4BSDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler14mx_uniform_edfp3pi_20tiled_brass_material4mtlx11ClosureDatai_v3fo_20tiled_brass_material4mtlx3EDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler15mx_artistic_iorp4pi_v3fi_v3fo_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler15mx_multiply_edfp4pi_20tiled_brass_material4mtlx11ClosureDatai_20tiled_brass_material4mtlx3EDFi_v3fo_20tiled_brass_material4mtlx3EDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler16mx_multiply_bsdfp4pi_20tiled_brass_material4mtlx11ClosureDatai_20tiled_brass_material4mtlx4BSDFi_v3fo_20tiled_brass_material4mtlx4BSDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler17eval_shader_graphp0pVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler17mx_rotate_vector3p4pi_v3fi_fi_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19NG_separate3_color3p4pi_v3fo_fo_fo_fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19NG_tiledimage_floatp12pi_20tiled_brass_material6render13TextureHandleG3v4fk3i_fi_v2fi_v2fi_v2fi_v2fi_v2fi_ii_ii_ii_io_fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19direct_prepare_bsdfp3pi_20tiled_brass_material4mtlx4BSDFi_v3fi_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler19mx_luminance_color3p3pi_v3fi_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler20NG_tiledimage_color3p12pi_20tiled_brass_material6render13TextureHandleG3v4fk3i_v3fi_v2fi_v2fi_v2fi_v2fi_v2fi_ii_ii_ii_io_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler23NG_convert_float_color3p2pi_fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler23mx_roughness_anisotropyp3pi_fi_fo_v2fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler26mx_generalized_schlick_edfp6pi_20tiled_brass_material4mtlx11ClosureDatai_v3fi_v3fi_fi_20tiled_brass_material4mtlx3EDFo_20tiled_brass_material4mtlx3EDFVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler36NG_srgb_texture_to_lin_rec709_color3p2pi_v3fo_v3fVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx34Mx_Tiled_Brass1_01d3906d90ce_Graphg2TCGP020tiled_brass_material6render11ILodSampler37NG_standard_surface_surfaceshader_100p43pi_fi_v3fi_fi_fi_fi_v3fi_fi_fi_fi_fi_fi_v3fi_fi_v3fi_fi_fi_fi_fi_v3fi_v3fi_fi_fi_fi_v3fi_fi_fi_v3fi_fi_fi_fi_fi_v3fi_fi_fi_fi_fi_fi_v3fi_v3fi_bi_v3fi_v3fo_20tiled_brass_material4mtlx13surfaceshaderVmG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx39dielectric_no_compensation_layer_energyp6pi_bi_bi_bi_fi_fi_ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx3EDFR8_24xinitp1pi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF7is_bsdfp0pb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF8set_bsdfp1pi_iVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF9get_indexp0pi",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDF9set_layerp1pi_iVm",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx4BSDFR8_24xinitp1pi_u",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx7mx_hmaxp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist15sample_for_reflp3pi_v3fi_fi_fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist1Dp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist2G1p1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist5G2_G1p2pi_v3fi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDist8D_refl_Dp2pi_v3fi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxGGXDistR8_24xinitp1pi_v2f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9MxWeightsg1viR8_24xinitp0pGda4b9237bacccdf19c0760cab7aec4a8359010b0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material4mtlx9luminancep1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils10next_floatg2TCGP020tiled_brass_material5utils16ISampleGeneratorp1pio_GP0fG7ab1e9aace39194812a1bfb3d48382b4fd1a548c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils11next_float3g2TCGP020tiled_brass_material5utils16ISampleGeneratorp1pio_GP0v3fG7ab1e9aace39194812a1bfb3d48382b4fd1a548c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils14orthonormalizep2pi_v3fio_v3fV",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils21adjust_shading_normalp3pi_v3fi_v3fi_v3fv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils26TinyUniformSampleGenerator9next_uintp0pum",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils26TinyUniformSampleGeneratorR8_24xinitp1pi_u",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils26adjust_shading_normal_implp4pi_v3fi_v3fi_v3fo_bv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils3sqrg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0bG1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5Frame8identityp0p20tiled_brass_material5utils5Frame",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5Frame8to_localp1pi_v3fv3fb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5Frame9to_globalp1pi_v3fv3fb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils5FrameR8_24xinitp0p",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils8BitFieldg4TvuvuCGP04core20__BuiltinIntegerType7extractp1pi_GP0GP0G5ceea7a7a0dc82b8297cde5db85e5114a6fb2e8c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils8BitFieldg4TvuvuCGP04core20__BuiltinIntegerType7extractp1pi_GP0GP0G993ae5cfaad70986a546f76a7091c63647f012a0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material5utils9luminancep1pi_v3ffb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render10BSDFSampleR8_24xinitp4pi_v3fi_fi_v3fi_20tiled_brass_material6render9BSDFFlagsfb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render11BSDFContextR8_24xinitp2pi_fi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement12resolve_udimp1pio_v2f20tiled_brass_material6render13TextureHandleG3GP0K11FlagsAsUintG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement13texture_index3getAgp0puGd8a2cd026e031e69e51c41b40ad2e5cffac31a87",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement6sampleg2TCGP020tiled_brass_material6render11ILodSamplerp3pi_GP0i_v2fi_GP0GP0G0e8305e80ad9f612f182d7551cad231ec1b299bbG49534457a73db84e9c04ec69b50d413ffb271dc4",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement7is_udimp0pbG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElement8is_validp0pbG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElementR8_24xinitp0pG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render13TextureHandleg3TvuCGP04core13ITexelElementR8_24xinitp1pi_uG0e8305e80ad9f612f182d7551cad231ec1b299bb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render14MaterialSample8has_flagp1pi_20tiled_brass_material6render9BSDFFlagsb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render14MaterialSampleR8_24xinitp4pi_v3fi_fi_v3fi_20tiled_brass_material6render9BSDFFlags",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18ExplicitLodSampler6sampleg2TCGP04core13ITexelElementp3pi_4core8_TextureG11GP04core9__Shape2Dk0k0k0k0k0k0k0i_4core12SamplerStatei_v2fGP0G85f94db345037991bfa609402736784697280336",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18ExplicitLodSamplerR8_24xinitp1pi_f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18SurfaceInteraction15front_normal_wsp0pv3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18SurfaceInteractionR8_24xinitp0p",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render18reflectance_to_iorp1pi_v3ff",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render19AlbedoContributionsR8_24xinitp4pi_v3fi_v3fi_v3fi_v3f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb12smith_lambdap1pi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb2G1p1pi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb2G2p2pi_v3fi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivb8eval_ndfp1pi_v3ffbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20AnisotropicGGXPolicyg2vivbR8_24xinitp1pi_v2fbG37e4abe98d78fc0d38171eb65911cf782d25555d",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render20geomprop_identity4x4p0pm4x4f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render21DummyGeomPropProvider19get_space_transformp3pi_20tiled_brass_material6render18SurfaceInteractioni_20tiled_brass_material6render13GeomPropSpacei_20tiled_brass_material6render13GeomPropSpacem4x4f",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S20tiled_brass_material6render8BSDFEvalR8_24xinitp2pi_v3fi_fb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core10__max_implg2TCGP04core11IComparablep2pi_GP0i_GP0GP0G82c036692e9e101baa390fcacbf133488f4aa676",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core10__min_implg2TCGP04core11IComparablep2pi_GP0i_GP0GP0G82c036692e9e101baa390fcacbf133488f4aa676",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3absg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3absg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3anyg2TCGP04core13__BuiltinTypep1pi_GP0bGdb9ce529615472ce6ae6831c1f8ef42c01149c3a",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bG665f605b42d62088d40824eb98d46304cfc8e8df",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3anyg3TviCGP04core13__BuiltinTypep1pi_vK1NGP0bGf6ec43807b6e489fe4bd32da33d6b3ebab41acb2",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3cosg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3dotg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0GP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3dotg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0GP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3expg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3expg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3maxg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3maxg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3ming3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3ming3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3mulg4TviviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_mK1NxK1MGP0vK1MGP0G512d703e77bf7beaa2dd64d7c69ec33c6272fca0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3powg2TCGP04core26__BuiltinFloatingPointTypep2pi_GP0i_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3powg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core3sing2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4fracg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4fracg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4lerpg2TCGP04core26__BuiltinFloatingPointTypep3pi_GP0i_GP0i_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4lerpg3TviCGP04core26__BuiltinFloatingPointTypep3pi_vK1NGP0i_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4sqrtg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core4sqrtg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5clampg2TCGP04core26__BuiltinFloatingPointTypep3pi_GP0i_GP0i_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5clampg3TviCGP04core26__BuiltinFloatingPointTypep3pi_vK1NGP0i_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5clampg3TviCGP04core26__BuiltinFloatingPointTypep3pi_vK1NGP0i_vK1NGP0i_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5crossg2TCGP04core26__BuiltinFloatingPointTypep2pi_v3GP0i_v3GP0v3GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5float5getPip0pfb",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5floorg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5floorg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0Gc44a7d9c71cb062e248fdd6d5d78921dd7992e0e",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5isinfg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0bG1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core5isnang2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0bG1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core6lengthg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0GP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core7radiansg2TCGP04core26__BuiltinFloatingPointTypep1pi_GP0GP0G1e79d7ee1e492dc0979781f0df5e5459985bb42c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core7reflectg3TviCGP04core26__BuiltinFloatingPointTypep2pi_vK1NGP0i_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core8saturateg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core9normalizeg3TviCGP04core26__BuiltinFloatingPointTypep1pi_vK1NGP0vK1NGP0G99b255b99be623281be19d07a5c1afa27882d29b",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4core9transposeg4TviviCGP04core26__BuiltinFloatingPointTypep1pi_mK1NxK1MGP0mK1MxK1NGP0G512d703e77bf7beaa2dd64d7c69ec33c6272fca0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4coreX4core8_TextureG11GP04core9__Shape2Dk0k0K11sampleCountK6accessK8isShadowK10isCombinedK6formatg7TviviviviviCGP04core13ITexelElement13GetDimensionsp2po_io_iVGcbc52b7e7b65225b8552bbfebe2f5682e20c5d69",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4coreX4core8_TextureG11GP0GP1K7isArrayK4isMSK11sampleCountk0K8isShadowk0K6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement11SampleLevelp3pi_4core12SamplerStatei_vKX0211K7isArray111KL10dimensions1fi_fGP0G54122927072c7d03779f609ca8ddaa075c529f8c",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "_S4coreX4core8_TextureG11GP0GP1K7isArrayk0K11sampleCountk0K8isShadowK10isCombinedK6formatg9TTviviviviviCGP14core15__ITextureShapeCGP04core13ITexelElement4Loadp1pi_vKX1211K7isArray111KL10dimensions1iGP0Gc33bb8b839f10cb7953d5f866f0874b8acdc6f90",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_0",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_1",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_2",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        },
+        {
+          "function": "__slang_nvvm_internal_3",
+          "registers": null,
+          "stack_bytes": 0,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "entry_resources": [
+        {
+          "function": "sample_buffer",
+          "registers": 168,
+          "stack_bytes": 3200,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "sass": null,
+      "executable_sections": null
+    },
+    {
+      "id": "tiled-brass-material-sample_buffer-nvvm-o3",
+      "wall_ms": {
+        "n": 18,
+        "median": 1460.178635083139,
+        "q1": 1455.4989547468722,
+        "q3": 1465.8331526443362,
+        "minimum": 1447.4235828965902,
+        "maximum": 1475.7883343845606
+      },
+      "round_wall_ms": {
+        "0": {
+          "n": 9,
+          "median": 1465.4618799686432,
+          "q1": 1460.1612444967031,
+          "q3": 1466.8700098991394,
+          "minimum": 1450.2716921269894,
+          "maximum": 1475.7883343845606
+        },
+        "1": {
+          "n": 9,
+          "median": 1459.5822095870972,
+          "q1": 1455.3623627871275,
+          "q3": 1460.1960256695747,
+          "minimum": 1447.4235828965902,
+          "maximum": 1467.356925830245
+        }
+      },
+      "phase_ms": {
+        "SemanticChecking": {
+          "n": 18,
+          "median": 381.21500000000003,
+          "q1": 379.4825,
+          "q3": 383.15999999999997,
+          "minimum": 375.94,
+          "maximum": 388.26
+        },
+        "checkAllTranslationUnits": {
+          "n": 18,
+          "median": 381.21500000000003,
+          "q1": 379.4825,
+          "q3": 383.15999999999997,
+          "minimum": 375.94,
+          "maximum": 388.26
+        },
+        "compileInner": {
+          "n": 18,
+          "median": 1166.125,
+          "q1": 1162.8825,
+          "q3": 1169.455,
+          "minimum": 1157.67,
+          "maximum": 1177.52
+        },
+        "endToEndActions": {
+          "n": 18,
+          "median": 1166.125,
+          "q1": 1162.875,
+          "q3": 1169.455,
+          "minimum": 1157.67,
+          "maximum": 1177.52
+        },
+        "frontEndExecute": {
+          "n": 18,
+          "median": 535.65,
+          "q1": 533.0725,
+          "q3": 538.635,
+          "minimum": 529.08,
+          "maximum": 545.54
+        },
+        "generateIR": {
+          "n": 18,
+          "median": 141.115,
+          "q1": 140.1575,
+          "q3": 141.48,
+          "minimum": 137.42,
+          "maximum": 144.03
+        },
+        "generateIRForTranslationUnit": {
+          "n": 18,
+          "median": 141.11,
+          "q1": 140.1575,
+          "q3": 141.48,
+          "minimum": 137.42,
+          "maximum": 144.03
+        },
+        "generateOutput": {
+          "n": 18,
+          "median": 630.155,
+          "q1": 629.2075,
+          "q3": 631.4025,
+          "minimum": 626.77,
+          "maximum": 636.97
+        },
+        "linkAndOptimizeIR": {
+          "n": 18,
+          "median": 312.91499999999996,
+          "q1": 311.97249999999997,
+          "q3": 313.315,
+          "minimum": 310.46,
+          "maximum": 316.19
+        },
+        "linkIR": {
+          "n": 18,
+          "median": 20.075000000000003,
+          "q1": 19.9025,
+          "q3": 20.2575,
+          "minimum": 19.2,
+          "maximum": 20.49
+        },
+        "loadBuiltinModule": {
+          "n": 18,
+          "median": 207.13,
+          "q1": 205.30249999999998,
+          "q3": 208.1875,
+          "minimum": 201.19,
+          "maximum": 215.71
+        },
+        "parseTranslationUnit": {
+          "n": 18,
+          "median": 12.29,
+          "q1": 12.225000000000001,
+          "q3": 12.3475,
+          "minimum": 12.07,
+          "maximum": 12.56
+        },
+        "performForceInlining": {
+          "n": 18,
+          "median": 1.46,
+          "q1": 1.46,
+          "q3": 1.47,
+          "minimum": 1.45,
+          "maximum": 1.49
+        },
+        "performMandatoryEarlyInlining": {
+          "n": 18,
+          "median": 5.5,
+          "q1": 5.4725,
+          "q3": 5.52,
+          "minimum": 5.45,
+          "maximum": 5.62
+        },
+        "readSerializedModuleAST": {
+          "n": 18,
+          "median": 54.84,
+          "q1": 54.525,
+          "q3": 55.305,
+          "minimum": 53.35,
+          "maximum": 58.14
+        },
+        "readSerializedModuleIR": {
+          "n": 18,
+          "median": 110.88,
+          "q1": 109.8925,
+          "q3": 111.9075,
+          "minimum": 105.99,
+          "maximum": 117.74
+        },
+        "simplifyIR": {
+          "n": 18,
+          "median": 127.67,
+          "q1": 127.36749999999999,
+          "q3": 127.84249999999999,
+          "minimum": 127.0,
+          "maximum": 128.32
+        },
+        "specializeModule": {
+          "n": 18,
+          "median": 122.5,
+          "q1": 122.3375,
+          "q3": 122.75,
+          "minimum": 120.68,
+          "maximum": 126.76
+        },
+        "unrollLoopsInModule": {
+          "n": 18,
+          "median": 4.655,
+          "q1": 4.6075,
+          "q3": 4.7175,
+          "minimum": 4.55,
+          "maximum": 4.83
+        }
+      },
+      "assembly_ms": {
+        "n": 9,
+        "median": 295.17086036503315,
+        "q1": 294.5023588836193,
+        "q3": 298.42289350926876,
+        "minimum": 294.1311579197645,
+        "maximum": 303.9694558829069
+      },
+      "ptx_bytes": 117109,
+      "cubin_bytes": 94008,
+      "resources": [
+        {
+          "function": "sample_buffer",
+          "registers": 86,
+          "stack_bytes": 784,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "entry_resources": [
+        {
+          "function": "sample_buffer",
+          "registers": 86,
+          "stack_bytes": 784,
+          "spill_store_bytes": 0,
+          "spill_load_bytes": 0,
+          "shared_bytes": null
+        }
+      ],
+      "sass": null,
+      "executable_sections": null
+    }
+  ],
+  "compile_attempts": 132,
+  "assembly_attempts": 66,
+  "provenance": {
+    "started_utc": "2026-09-26T10:50:49.157605+00:00",
+    "revision": "201cea6c96e09345700b77f2837404249bdd2deb",
+    "platform": "Linux-6.17.0-1017-aws-x86_64-with-glibc2.39",
+    "build_label": "RelWithDebInfo",
+    "environment": {
+      "CUDA_PATH": "/usr/local/cuda-12.9",
+      "CUDA_HOME": "/usr/local/cuda-12.9",
+      "LIBNVVM_HOME": "/usr/local/cuda-12.9",
+      "SLANG_NVVM_BUILDER_PATH": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+      "LD_LIBRARY_PATH": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin:/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib:/usr/local/cuda-12.9/nvvm/lib64:/usr/local/cuda-12.9/targets/x86_64-linux/lib:/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib:/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin:/usr/local/cuda-12.9/nvvm/lib64:/usr/local/cuda-12.9/lib64",
+      "CUDA_VISIBLE_DEVICES": null,
+      "SLANG_NVVM_TEST_ARCH": "80"
+    },
+    "working-tree": {
+      "command": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/working-tree.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.14841488003730774
+    },
+    "source-diff": {
+      "command": [
+        "git",
+        "diff",
+        "HEAD",
+        "--",
+        "source",
+        "include",
+        "prelude",
+        "external"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/source-diff.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.09509019181132317
+    },
+    "submodules": {
+      "command": [
+        "git",
+        "submodule",
+        "status",
+        "--recursive"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/submodules.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.29457569494843483
+    },
+    "compiler-version": {
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
+        "-version"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/compiler-version.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.24116695299744606
+    },
+    "toolkit-version": {
+      "command": [
+        "/usr/local/cuda-12.9/bin/nvcc",
+        "--version"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/toolkit-version.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.0028342902660369873
+    },
+    "ptxas-version": {
+      "command": [
+        "/usr/local/cuda-12.9/bin/ptxas",
+        "--version"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/ptxas-version.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.0031615309417247772
+    },
+    "device": {
+      "command": [
+        "nvidia-smi",
+        "--query-gpu=name,uuid,driver_version,compute_cap",
+        "--format=csv"
+      ],
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/device.log",
+      "return_code": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.024868639186024666
+    },
+    "artifact_sha256": {
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "41e286de9fcca7d5383c1ef7480d4e3ee6e3e3418ba3c14c74833d51488a06ad",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "526aa0fa08e7868234297d857c390ef8beecd5696cc95ea68c8599ae3648c0ef",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "4a207ec0d3f390152dd593a21af81f4b1fe30d9e1c5edd065343bd3590f8bbbc",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "92924a30620ff99129ac9bb1ab94da0f57bc76123bb6063bcd68182a6fbb1342",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "adb135da699c668fbcc02f63baf648530ecf2f5589b6423c5855993a5e70308e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "98f2e48608111100f424e75a11ab34b7c78fa9718ed93a154b28249e27f06a37",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "8e8b401a8e244d1a604de2b11770d753cec8dd6d11af3bbdf531fed86be53c7b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "8e8b401a8e244d1a604de2b11770d753cec8dd6d11af3bbdf531fed86be53c7b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "3e5ab90d6c559096acaae6bf21ba14f7929cb056b36f9a7c1099048949b6fb76",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "cf461b3777b1f6178b9f3c28268a1bc76d9370a0dc7a8679f5544ff22a0f427e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "cf461b3777b1f6178b9f3c28268a1bc76d9370a0dc7a8679f5544ff22a0f427e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "c7f23600efe703a731c7d4a9b88991897fd234bd70506280b7be5168d4200a19",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "8e8b401a8e244d1a604de2b11770d753cec8dd6d11af3bbdf531fed86be53c7b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "beb239f37e17855c69f449b31784efd96680ae1d3141a6e407ac6deeb633d2ad",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "b43467750b8b038e400bc1f56889b75b2955513c6143048029a3c9bf8a458ed8",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "1e68ad7c868c3b9374004f08ebd66b2fa56ad0981369f8f84792ba03e0c06d88",
+      "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "1d6c90a828fea8c7da35182948e449798901ee9575101186e0c30be996483761",
+      "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "full_identity_count": 7189,
+    "identity_scope": "runtime-and-tools"
+  },
+  "limitations": "Fresh process/session with warmed filesystem and toolkit caches, including NVRTC PCH when enabled. Compile/assembly observations; no kernel-speed inference. PTX bytes include text/symbols; cubin bytes include metadata; SASS counts and executable text sizes cover the whole module.",
+  "measurements": {
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-results/2026-09-26-integration/material/measurements.json",
+    "sha256": "4d18153fc1ea79a86263498c43e21b37909141c4da28dd3373530064a5b35fda"
+  },
+  "plotting": {
+    "matplotlib": "3.11.2"
+  }
+}

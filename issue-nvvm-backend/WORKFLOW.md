@@ -7,8 +7,8 @@ histories. Do not reconstruct decisions from chat or repeat the historical ledge
 
 ## Authority and ownership
 
-The general development loop is **stopped**. The currently authorized finite maintenance sequence is
-harness consolidation, master integration, correctness baseline, results package, then stop. Results
+The general development loop is **stopped**. The finite maintenance sequence completed harness
+consolidation, master integration, correctness baseline and results package, then stopped. Results
 refreshes do not authorize feature development. A later explicit start/resume request can authorize
 bounded implementation slices and local commits; preparation alone cannot. No push, publication,
 driver change or reboot is implied. Respect newer maintainer scope and stopping instructions.

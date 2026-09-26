@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "status": "reviewed-results-package",
+  "accepted_correctness": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-262.json",
+    "sha256": "2c43eb33a0aa1c9f72fd0931caeb042415eee179fe8962ead83d80e58ebf7104"
+  },
+  "measurement_workspace_revision": "201cea6c96e09345700b77f2837404249bdd2deb",
+  "compiler_source_revision": "49593da724e172838bd65b9eb48b2a3f11334522",
+  "runner_source_revision": "c3455e606b52d8ab4d86a9504d690874e7eba730",
+  "compiler_version": "2026.18.3-275-g49593da72",
+  "material_comparison": [
+    {
+      "entry": "eval_buffer",
+      "nvrtc_o3_ms": 1362.7558005973697,
+      "nvvm_o3_ms": 1355.0416342914104,
+      "nvrtc_div_nvvm_ratio": 1.0056929367413816,
+      "nvvm_elapsed_change_percent": -0.5660710673605407
+    },
+    {
+      "entry": "sample_buffer",
+      "nvrtc_o3_ms": 1390.1593247428536,
+      "nvvm_o3_ms": 1460.178635083139,
+      "nvrtc_div_nvvm_ratio": 0.9520474353904661,
+      "nvvm_elapsed_change_percent": 5.036783129389666
+    }
+  ],
+  "raw_roots": "build/nvvm-results/2026-09-26-integration",
+  "measurement_gates": {
+    "material": {
+      "path": "build/nvvm-maintenance/integration-gates/material.json",
+      "sha256": "6cb575657f6d546560f0aed650dbc8803caf38ea1228f2969625538af1fa2616"
+    },
+    "quality": {
+      "path": "build/nvvm-maintenance/integration-gates/quality.json",
+      "sha256": "f8f1f8393afe12a52bf449ab283e6696b78b355699e2e5e800f43bb68bbe4869"
+    },
+    "shared-material": {
+      "path": "build/nvvm-maintenance/integration-gates/shared-material.json",
+      "sha256": "484822adc49919cbb27c81109312b602ff100769c95c9ff25d1228fdcbee9a3d"
+    }
+  },
+  "limitations": [
+    "No material GPU execution contract or kernel-speed measurement.",
+    "No broad compile-speed or code-quality superiority.",
+    "SASS unavailable: selected toolkit has no cuobjdump executable.",
+    "Concurrent NVRTC automatic-PCH reliability unresolved; correctness baseline explicitly includes serial closure."
+  ],
+  "development_loop": "stopped",
+  "material_report": {
+    "path": "material/summary.json",
+    "sha256": "d9169b6027ca0794ef1bb350f3bbdb13e1171108e15f87fea51c94e6ab4ff804"
+  },
+  "quality_report": {
+    "path": "quality/summary.json",
+    "sha256": "394c46b304e5f06146c4e279cece2051f88aac6ca574c4759cab86b4b84b7e3f"
+  },
+  "independent_review": "Numerical inventory, artifact hashes, medians, claims, links and shared complete-cost accounting passed read-only review."
+}

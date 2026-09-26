@@ -1,7 +1,11 @@
 # Start a fresh NVVM session
 
+Current accepted baseline: [262](runtime-validation.slice-262.json). Latest package:
+[2026-09-26](results/2026-09-26/README.md). The finite maintenance sequence is complete and the
+development loop is **stopped**. Recheck STATUS; this header is navigation, not renewed authority.
+
 1. Read STATUS and WORKFLOW. Confirm the request's authority: results refresh, bounded maintenance,
-   or explicit development resume. The finite current sequence ends after the results package. Do
+   or explicit development resume. The finite maintenance sequence is complete. Do
    not choose another compiler slice merely because an old report lists a candidate.
 2. Inspect branch/HEAD, working changes, submodule pins and active plan. Preserve unrelated work.
    Finish outstanding acceptance before treating a pending checkpoint as a baseline.
