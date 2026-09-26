@@ -55,5 +55,12 @@
     "path": "quality/summary.json",
     "sha256": "394c46b304e5f06146c4e279cece2051f88aac6ca574c4759cab86b4b84b7e3f"
   },
-  "independent_review": "Numerical inventory, artifact hashes, medians, claims, links and shared complete-cost accounting passed read-only review."
+  "independent_review": "Numerical inventory, artifact hashes, medians, claims, links and shared complete-cost accounting passed read-only review.",
+  "svg_export_normalization": "Trailing line whitespace removed; recursively parsed XML tags, attributes, text and order match the original after whitespace-token normalization. Summary/PNG copies are byte-identical.",
+  "chart_sha256": {
+    "material/wall-time.svg": "0a3a5d183832ce028a0818118455b5964814634f4853f05c59cc7dab8fbe96d5",
+    "material/wall-time.png": "86ce7d2eb3118191988abf096bd5b4b4d51825d4599065672375376b240395cf",
+    "quality/entry-registers.png": "40ddcb34175ca2363cba62035b8705d51333ad7a78723018a35f793a9966024d",
+    "quality/entry-registers.svg": "d7b448bc1de4b66ef02ab5d52aab5b531e73e63aa885e83dc81993e304424bc0"
+  }
 }

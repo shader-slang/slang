@@ -233,10 +233,17 @@ cp "$NVVM_RESULTS/material-report/summary.md" "$NVVM_RESULTS/material-report/sum
 cp "$NVVM_RESULTS/quality-report/summary.md" "$NVVM_RESULTS/quality-report/summary.json" \
   "$NVVM_RESULTS/quality-report/entry-registers.svg" "$NVVM_RESULTS/quality-report/entry-registers.png" \
   "$NVVM_PACKAGE/quality/"
+# Matplotlib SVG path lines can contain trailing spaces; retain all XML tokens.
+python3 - "$NVVM_PACKAGE" <<'PY_SVG'
+import sys
+from pathlib import Path
+for path in Path(sys.argv[1]).rglob("*.svg"):
+    path.write_text("\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n")
+PY_SVG
 ```
 
 Copy the narrative/presentation structure from the latest package named in STATUS, then replace every
-result from the new summary rows. Keep the generated summaries/charts unchanged. Derive each material
+result from the new summary rows. Keep generated summaries/PNGs unchanged; SVG trailing-whitespace normalization above preserves all XML tokens. Derive each material
 ratio as NVRTC O3 median divided by the matching NVVM O3 median, and report both entries. Compare
 quality metrics only for the same fixture and mode; record entry versus whole-module scope. Inspect
 the rendered charts. Update correctness, exact source/binary identities, sample inventory, protocol,

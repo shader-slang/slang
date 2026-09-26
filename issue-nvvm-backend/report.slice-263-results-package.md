@@ -50,7 +50,8 @@ ranking or paired end-to-end speedup. CLI logs do not establish automatic-PCH ca
 math settings are source-inferred rather than an observed downstream option trace.
 
 Independent review recomputed medians, checked all inventories/output hashes and reviewed quality
-tradeoffs and shared accounting. Both rendered figures were inspected. No new compiler helper,
+tradeoffs and shared accounting. Both rendered figures were inspected. SVG trailing whitespace was normalized; parsed XML tokens
+match the originals, while summaries and PNGs remain byte-identical. No new compiler helper,
 fallback or special case exists in this slice. The package uses maintained commands; the build-local
 export was ordinary copying/summary assembly, not new benchmark machinery. Complete source/tool hashes
 remain in raw evidence, with compact tool identities and hashed references in exported reports.

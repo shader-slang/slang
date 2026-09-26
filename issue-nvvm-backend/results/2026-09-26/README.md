@@ -112,3 +112,6 @@ comparison. It includes references, all batch lifetimes and whole-command cost.
 Refresh using [RESULTS](../../RESULTS.md) with a new output/package directory and the current accepted
 baseline. Preserve previous packages and failed attempts. The development loop is **stopped**;
 measurements did not authorize additional optimization or feature work.
+
+SVG exports have trailing line whitespace normalized for repository formatting; XML tokens and chart
+values are unchanged. Generated summaries and PNGs remain byte-identical to the raw report exports.
