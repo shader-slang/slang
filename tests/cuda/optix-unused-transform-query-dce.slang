@@ -1,10 +1,6 @@
-// Regression test for https://github.com/shader-slang/slang/issues/13262
-//
-// Slang removes an unused ray-tracing transform query itself, so a dead `WorldToObject3x4()`
-// compiles the same as no query. NVRTC cannot remove it after emission, because the OptiX
-// transform-list walk behind the query loads through `asm volatile`. The SPIR-V and HLSL checks
-// show the call is already gone from Slang's output rather than left for spirv-opt or DXC, and
-// the PTX check shows no transform-list walk reaches the compiled code.
+// Regression test for https://github.com/shader-slang/slang/issues/13262.
+// Slang itself must remove an unused transform query: on CUDA the query expands to an OptiX
+// transform-list walk whose loads are `asm volatile`, so NVRTC keeps it once it is emitted.
 
 //TEST:SIMPLE(filecheck=CUDA_DEAD): -target cuda -entry closestHitDead -stage closesthit
 //TEST:SIMPLE(filecheck=CUDA_LIVE): -target cuda -entry closestHitLive -stage closesthit
@@ -20,9 +16,11 @@ struct Payload
     float value;
 };
 
+// CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 // CUDA_DEAD: __closesthit__closestHitDead
 // CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 // CUDA_DEAD: optixSetPayload_0
+// CUDA_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 
 // PTX_DEAD: .version
 // PTX_DEAD-NOT: _optix_get_transform_list
@@ -30,9 +28,11 @@ struct Payload
 // SPIRV_DEAD: OpEntryPoint
 // SPIRV_DEAD-NOT: {{ObjectToWorldKHR|WorldToObjectKHR}}
 
+// HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 // HLSL_DEAD: closestHitDead
 // HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 // HLSL_DEAD: barycentrics
+// HLSL_DEAD-NOT: {{ObjectToWorld|WorldToObject}}
 [shader("closesthit")]
 void closestHitDead(inout Payload payload, BuiltInTriangleIntersectionAttributes attributes)
 {
