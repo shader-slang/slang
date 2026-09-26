@@ -1,8 +1,9 @@
 # NVVM backend status
 
 The development loop is **active**, resumed on 2026-09-26. Slice 270 qualifies internal FP8/BF16
-records through dynamic dispatch. Next: a bounded four-source language-breadth probe, then re-rank
-material-driven work using fresh measurements. Continue reviewed local commits under
+records through dynamic dispatch. [Focused research271](report.slice-271-language-breadth.md) adds twelve passing cells across switch
+fallthrough, lambda capture, tuple mutation and defer/typed-error interactions. Next: refresh material
+profiling/code-quality evidence before choosing the next material-driven optimization. Continue reviewed local commits under
 [WORKFLOW](WORKFLOW.md); skip Slack notifications, no push. Read [RESULTS](RESULTS.md) and
 [HANDOFF](HANDOFF.md).
 

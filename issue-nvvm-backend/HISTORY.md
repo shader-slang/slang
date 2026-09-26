@@ -60,3 +60,9 @@ ledger preserves first-known and resolved histories with their original evidence
   preserved. Units add one pass; all full gates and actual aggregate-phi/raw-bit controls pass.
   Flat internal values and qualified local storage remain separate from external/resource roles.
   Development loop resumed and continuing; notifications skipped at the user's request.
+
+- Research271: [four language interactions](report.slice-271-language-breadth.md),
+  [evidence](research-evidence.slice-271.json), [plan](plan.slice-271-language-breadth.md).
+  Twelve focused cells pass across switch fallthrough, lambda capture, tuple mutation and defer/typed
+  errors. Independent actual-output inspection supplements the weak tuple CHECK. No compiler or
+  inventory change; accepted270 and its failure histories/cadence remain authoritative. Loop continues.

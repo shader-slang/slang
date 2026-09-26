@@ -20,11 +20,13 @@ WORKFLOW until a recorded stopping condition. Skip Slack notifications; no push 
    toolkit18 and material compile/assembly6 pass. Last full270, targeted233, cadence zero.
 6. Keep frozen `census.slice-195.tsv` immutable and discovery at its 128-source cap. The new270 fixture
    and two268 regression sources remain focused tests outside those inventories.
-7. Next bounded research: existing switch-fallthrough, lambda capture, tuple mutation and defer/error
-   handling tests, preserving original source/oracles and executing all three modes. Read-only
-   preparation is at `build/nvvm-fp8-aggregate270/next-breadth-notes.md`; create a new ExecPlan first.
-   Use maintained directive adaptation/mirroring, not manifest replacement or capacity bypasses.
-   Then re-rank material-driven work; refresh profiling before choosing another optimization.
+7. [Research271](report.slice-271-language-breadth.md) completes the four-source breadth probe:
+   all twelve cells pass, with actual output inspection supplementing the weak original tuple CHECK.
+   [Its evidence](research-evidence.slice-271.json) inherits accepted270 and leaves full cadence zero.
+   Next: refresh material profiling and code-quality evidence before selecting an optimization.
+   The existing temporary attribution patch applies cleanly in a read-only check; revalidate its
+   scope boundaries, preserve the accepted layout and qualify unchanged outputs before measurement.
+   Create a new bounded ExecPlan first. Raw271 evidence is under `build/nvvm-breadth271`.
 
 The270 compact record preserves the original two-transition review-required comparison and both
 resolved failure histories. Raw artifacts and local closeout are under `build/nvvm-fp8-aggregate270`.
