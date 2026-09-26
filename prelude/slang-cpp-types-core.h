@@ -9,6 +9,30 @@
 #endif
 #endif
 
+// Marks a code path the Slang compiler has proved dead, such as the default arm of a closed
+// dynamic-dispatch switch. In a release build this is the per-compiler no-return spelling, so the
+// downstream compiler prunes the dead path; in a debug build it is `abort()`, so if a
+// supposedly-dead path is ever reached (for example force-unwrapping a `none`
+// `Optional<Interface>`, which lowers to an unclamped sub-set tag cast) the program fails loudly
+// instead of executing undefined behavior. C++ output may be built by any host compiler, so the
+// release spelling is per-compiler; an unrecognized compiler uses `abort()` (a genuine no-return,
+// never a no-op that would let a value-returning dispatcher fall off the end of a non-void
+// function). This header is shared by the cpp, host, and torch preludes (each of which includes
+// <stdlib.h>, providing `abort`), so defining it here covers every C++ target.
+#ifndef SLANG_PRELUDE_UNREACHABLE
+#ifdef NDEBUG
+#if defined(__clang__) || defined(__GNUC__)
+#define SLANG_PRELUDE_UNREACHABLE() __builtin_unreachable()
+#elif defined(_MSC_VER)
+#define SLANG_PRELUDE_UNREACHABLE() __assume(0)
+#else
+#define SLANG_PRELUDE_UNREACHABLE() abort()
+#endif
+#else
+#define SLANG_PRELUDE_UNREACHABLE() abort()
+#endif
+#endif
+
 // Since we are using unsigned arithmatic care is need in this comparison.
 // It is *assumed* that sizeInBytes >= elemSize. Which means (sizeInBytes >= elemSize) >= 0
 // Which means only a single test is needed

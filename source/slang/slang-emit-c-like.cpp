@@ -3706,6 +3706,17 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion, Region* breakRegionToOmit)
                     // separate `Region`s for them.
                     emitInst(terminator);
                     break;
+
+                case kIROp_Unreachable:
+                    // An `unreachable` terminator marks a block the compiler has proved dead, such
+                    // as the default arm of a closed dynamic-dispatch switch. On targets that can
+                    // spell it we emit `SLANG_PRELUDE_UNREACHABLE()` so the downstream compiler can
+                    // drop the dead path. On other C-like targets we emit nothing, which is valid
+                    // because the terminator itself guarantees control cannot continue past this
+                    // block.
+                    if (doesTargetSupportUnreachableTerminator(getTarget()))
+                        m_writer->emit("SLANG_PRELUDE_UNREACHABLE();\n");
+                    break;
                 }
 
                 // If the terminator required a full region to represent
