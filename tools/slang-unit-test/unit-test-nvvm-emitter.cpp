@@ -9620,7 +9620,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
     }
 }
 
-// Scalar FP8 transport does not establish numeric conversions, storage or an external ABI.
+// Scalar FP8 transport/widening does not establish other casts, storage or an external ABI.
 SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
 {
     struct UnsupportedCase
@@ -9761,15 +9761,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
             void computeMain(uint3 tid : SV_DispatchThreadID)
             {
                 outputBuffer[0] = uint(bit_cast<uint8_t>(F(asfloat(tid.x))));
-            }
-        )SLANG",
-         "floatCast"},
-        {R"SLANG(
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                outputBuffer[0] = asuint(float(bit_cast<F>(uint8_t(tid.x))));
             }
         )SLANG",
          "floatCast"},

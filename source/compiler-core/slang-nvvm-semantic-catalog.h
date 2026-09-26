@@ -29,6 +29,7 @@ enum class ValueOperationFamily : uint32_t
     FloatToInteger,
     FloatConvert,
     BFloat16Convert,
+    Float8Widen,
     BFloat16Dot,
     BitReinterpret,
     Select,
@@ -1194,6 +1195,16 @@ inline bool resolveValueOperationFamily(
     const bool isFloat8Operand =
         desc.operandCount == 1 && (areSameType(desc.operandTypes[0], kFloatE4M3) ||
                                    areSameType(desc.operandTypes[0], kFloatE5M2));
+    // A canonical FP8 scalar widens exactly to Float32. For example, E4M3 byte 1
+    // represents 2^-9, not the integer 1 or an IEEE eight-bit float. Keep reverse
+    // narrowing separate because its CUDA saturation policy is a different contract.
+    if (desc.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT && isFloat8Operand &&
+        areSameType(desc.resultType, kFloat32))
+    {
+        outResolution = {ValueOperationFamily::Float8Widen, "scalar FP8-to-Float32 widening"};
+        return true;
+    }
+
     const bool hasBitResult = isFloat8Result || isSelectedIntegerValue(desc.resultType) ||
                               isSelectedFloatValue(desc.resultType);
     const bool hasBitOperand = desc.operandCount == 1 &&

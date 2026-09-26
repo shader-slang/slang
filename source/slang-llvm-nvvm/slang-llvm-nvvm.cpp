@@ -3717,6 +3717,63 @@ static llvm::Value* _emitBFloat16ConvertLane(
     }
 }
 
+// Widens a qualified scalar FP8 encoding to exact Float32 bits. Consider E4M3 byte 1:
+// its zero exponent selects the subnormal fraction 1 * 2^-9. Multiplying this small
+// integer by a power of two is exact in Float32, and applying the sign afterward also
+// preserves negative zero. Normal encodings only adjust exponent/fraction positions.
+// E4M3's final exponent still has finite values; only magnitude 127 is NaN. E5M2's
+// final exponent distinguishes infinity from NaN. NaN payload and sign are unspecified.
+static llvm::Value* _emitFloat8Widen(
+    ModuleState* state,
+    llvm::Value* operand,
+    llvm::Type* resultType,
+    bool isE4M3)
+{
+    const uint32_t fractionBitCount = isE4M3 ? 3 : 2;
+    const uint32_t exponentBias = isE4M3 ? 7 : 15;
+    const uint32_t lastFiniteMagnitude = isE4M3 ? 126 : 123;
+    auto int32Type = llvm::Type::getInt32Ty(state->context);
+    auto bits = state->builder.CreateZExt(operand, int32Type);
+    auto sign = state->builder.CreateShl(state->builder.CreateAnd(bits, 128), 24);
+    auto magnitude = state->builder.CreateAnd(bits, 127);
+    auto exponent = state->builder.CreateLShr(magnitude, fractionBitCount);
+    auto fraction = state->builder.CreateAnd(magnitude, (1u << fractionBitCount) - 1);
+
+    auto subnormal = state->builder.CreateFMul(
+        state->builder.CreateUIToFP(fraction, resultType),
+        llvm::ConstantFP::get(resultType, isE4M3 ? 0.001953125 : 0.0000152587890625));
+    auto subnormalBits = state->builder.CreateBitCast(subnormal, int32Type);
+    auto normalBits = state->builder.CreateOr(
+        state->builder.CreateShl(
+            state->builder.CreateAdd(
+                exponent,
+                llvm::ConstantInt::get(int32Type, 127 - exponentBias)),
+            23),
+        state->builder.CreateShl(fraction, 23 - fractionBitCount));
+    auto finiteBits = state->builder.CreateOr(
+        state->builder.CreateSelect(
+            state->builder.CreateICmpEQ(exponent, llvm::ConstantInt::get(int32Type, 0)),
+            subnormalBits,
+            normalBits),
+        sign);
+
+    llvm::Value* specialBits = llvm::ConstantInt::get(int32Type, 0x7fc00000);
+    if (!isE4M3)
+    {
+        specialBits = state->builder.CreateSelect(
+            state->builder.CreateICmpEQ(fraction, llvm::ConstantInt::get(int32Type, 0)),
+            state->builder.CreateOr(sign, 0x7f800000),
+            specialBits);
+    }
+    auto resultBits = state->builder.CreateSelect(
+        state->builder.CreateICmpUGT(
+            magnitude,
+            llvm::ConstantInt::get(int32Type, lastFiniteMagnitude)),
+        specialBits,
+        finiteBits);
+    return state->builder.CreateBitCast(resultBits, resultType);
+}
+
 // Evaluates the qualified BF16 dot in CUDA prelude lane order, rounding every product
 // and addition separately. With BF2 denoting vector<BFloat16, 2>, consider
 // dot(BF2(-1, 1.0078125), BF2(1.015625, 1.0078125)):
@@ -4227,6 +4284,13 @@ static SlangResult _emitValueOperationFamily(
                 }
             }
         }
+        break;
+    case Slang::NVVMSemantics::ValueOperationFamily::Float8Widen:
+        result = _emitFloat8Widen(
+            state,
+            llvmOperands[0],
+            resultType,
+            operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOAT_E4M3);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::BFloat16Dot:
         result = _emitBFloat16Dot(

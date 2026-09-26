@@ -1,7 +1,34 @@
 # NVVM backend status
 
-Read [WORKFLOW.md](WORKFLOW.md) before resuming. The autonomous loop is authorized; the parent owns
-independent acceptance and local commits. No push is authorized.
+Read [WORKFLOW.md](WORKFLOW.md) before resuming. Slice260 completes the maintainer's request to
+finish the interrupted slice and stop. Further development requires an explicit resume request.
+No push is authorized.
+
+## Slice260 is accepted; development loop stopped
+
+Scalar FloatE4M3/FloatE5M2 values now widen to Float32 under provider ABI42. Finite values, signed
+zeros and infinities are exact; NaN classification is preserved. Narrowing, storage, vectors,
+aggregates and external helper ABI remain excluded. Read [plan260](plan.slice-260-fp8-widening.md),
+[report260](report.slice-260-fp8-widening.md) and [validation260](runtime-validation.slice-260.json).
+
+All 256 encodings per format passes all 3 modes. The fixture checks 1536 words; six supplemental
+GPU controls check24768 words, including 48 raw NaN classifications, byte echoes and untouched data.
+Runtime4/focused6, units1051pass/13skip, semantics1052pass/77skip, toolkit18/contracts6 and material6
+compile/assembly checks pass. All 1063 old unit and 1129 semantic identities retain exact outcomes.
+
+Full frozen1356/discovery357 preserves all 1710 old five-field outcomes and adds3 correct:
+1713total/1674correct/39unresolved, retaining18 resolved histories. All material PTX/cubins remain
+exact259; no material runtime or performance claim. Final identity is137source/12artifact/567inputs
+and 18 unchanged pins. Compiler SHA256 `4b59d082df60a6862e684f63f099105228d0b820113aba456e83abc3661aca7d`;
+provider ABI42 SHA256 `2e54768ba323ba86cb7767a0a4405c9d4212e36f67e62786fd812dd59532e9f1`.
+
+Full260/targeted233/cadence0; rolling implementations256,259,260. Research258's failed/discarded
+material experiment records the capability cadence exception. Fresh delegation remains unavailable;
+one local writer uses separate audits without independent-agent review. Interrupted frozen evidence
+and the first failed unit attempt are retained under the 260 raw roots. No push or system change.
+
+The maintainer requested finishing this slice and then stopping. The loop is stopped; no slice261
+has been selected or started. Further development requires an explicit resume request.
 
 ## Slice259 is accepted
 
@@ -280,21 +307,11 @@ scalar transport,250 BF16 correctness. Independent parent acceptance verifies ev
 failure history, exact output, final IR/PTX, unit ID and identity, plus119 source snapshots and2132
 indexed artifacts. Correctness priority explains this slice; reconsider material-driven work next.
 
-## Next bounded action
+## Stop after slice260
 
-Compare scalar FP8-to-Float32 widening against broader FP8/BF16 record transport before selecting
-slice260. Research243 qualified every FP8 encoding and exact finite widening;244 repaired finite
-shared producers, and249 admitted distinct scalar transport. A bounded widening operation can use
-that evidence without deciding Float32 narrowing/overflow policy. Dynamic-dispatch-substandard-float
-still stops at record A and additionally needs aggregate/any-value and BF2 record value contracts;
-do not claim scalar widening alone resolves it. Read the FP8 scalar design contract and write the
-ExecPlan before editing. Preserve every original fixture, output oracle and failure history.
-
-Reconsider material-driven work using257/258's current evidence. The getter prototype was fully
-discarded after missing its thresholds; do not repeat it or force a speculative optimization without
-new evidence. Material runtime bindings/textures/LUT/input/output remain unavailable; do not repeat
-the optional request or infer kernel speed from compilation. Texture and column-major histories
-remain unchanged. A newly demonstrated regression still takes priority over these candidates.
+Slice260 is accepted and completes the requested work with its local commit. Keep the loop stopped.
+Do not select or start slice261. An explicit resume request is required for further development.
+Historical candidate discussions above are evidence, not authorization to continue.
 
 ## Accepted historical evidence
 
@@ -313,8 +330,8 @@ LLVM14, providerABI41, matching RelWithDebInfo. Inspect/source `build/nvvm-loop/
 follow the local slang-build skill. At most4 CPU workers, sequential GPU suites and 30-minute bounds.
 
 Latest research roots `build/nvvm-loop/slice-258-before`, `slice-258-prototype` and `slice-258-restored`
-retain the discarded experiment and exact restoration. Full-checkpoint roots `slice-259-before` and
-`slice-259-after` retain the unchanged
+retain the discarded experiment and exact restoration. Full-checkpoint roots `slice-260-before` and
+`slice-260-after` retain the unchanged
 before fixture, exact local storage tests, both all-encoding cache-order controls, full checkpoint,
 final source snapshots and acceptance/closure audits. Historical254/255 roots retain layout and
 physical-record qualification with their original identities. No GPU loss, driver/system change,

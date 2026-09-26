@@ -1,7 +1,8 @@
-# FP8 scalar research contract
+# FP8 scalar contract
 
-Slice243 qualifies a research representation and CUDA12.9 runtime conversions on SM80. It adds no
-production support. Accepted implementation/full checkpoint242 and providerABI40 remain unchanged.
+Slice243 originally qualified a research representation and CUDA12.9 runtime conversions on SM80.
+Slices244 and249 implemented finite producer repair and scalar transport. Slice260 adds scalar
+widening to Float32 under provider ABI42; narrowing and storage remain separate contracts.
 See [report243](../../issue-nvvm-backend/report.slice-243-fp8.md) and its compact semantic evidence.
 
 ## Representation and ownership
@@ -121,3 +122,31 @@ Recursive numeric/copyable/helper-storage classifiers are unchanged.
 The registered scalar transport fixture covers all256 encodings per format with both branch choices,
 selection, unsigned/signed bitcasts and12 finite constants. Supplemental raw replay covers both
 cross-format directions. Final acceptance evidence is owned by runtime-validation.slice-249.json.
+
+## Scalar Float32 widening (slice260)
+
+Consider a dynamic byte loaded from a UInt buffer, bit-cast to `FloatE4M3`, passed through an internal
+helper, and converted with `float(value)`. Ordinary lowering produces canonical `FloatE4M3Type`
+and `FloatCast` to Float. `_getNVVMSemanticType` preserves the format; the shared semantic catalog
+admits exactly scalar E4M3/E5M2 input and Float32 output for FLOAT_CONVERT. Provider ABI42 negotiates
+this additional operation, without changing descriptor layouts, operation IDs or physical i8 transport.
+
+`_emitFloat8Widen` owns the physical conversion. It extracts sign, exponent and fraction, rebiases
+normal values into Float32 bits, and converts subnormal fractions using exact multiplication by
+2^-9 or2^-16. Applying sign afterward preserves negative zero. E4M3 magnitude126 remains finite448;
+magnitude127 is NaN. E5M2 exponent31 represents signed infinity with zero fraction and NaN otherwise.
+Finite values, signed zeros and infinities are exact; NaN payload and sign are unspecified. All
+constant shifts and speculative select operands are defined throughout the byte domain, and the
+recipe requires no native FP8 instruction on SM80.
+
+The source fixture covers every256 encoding per format in NVRTC O3 and NVVM O0/O3. Supplemental
+raw-output controls exercise both selection flags through dynamic helpers, checking NaN classification
+before comparing the whole buffer, including byte echoes, guards and untouched fields. Expectations
+come from rational enumeration independently of the provider's bit-rebias recipe. Provider tests also
+reject malformed descriptors and adjacent unqualified conversions. See
+[report260](../../issue-nvvm-backend/report.slice-260-fp8-widening.md) for acceptance evidence.
+
+This does not admit Float32-to-FP8 narrowing, integer/Half/double conversions, arithmetic, storage,
+vectors, records, resources or external helper ABI. Shared constant-folding overflow policy remains
+separate. The dynamic-object workload still rejects record result A; scalar widening is not proof
+of aggregate or any-value support.

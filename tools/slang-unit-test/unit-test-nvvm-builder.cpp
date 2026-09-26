@@ -9664,7 +9664,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderLoadsExactProviderFile)
     SLANG_CHECK(invalidLibrary == nullptr);
 }
 
-// FP8 descriptors preserve format while physical i8 supports only transport operations.
+// FP8 descriptors preserve format; widening does not admit reverse or generic numeric casts.
 SLANG_UNIT_TEST(nvvmIRBuilderFloat8TransportContract)
 {
     NVVMIRBuilder builder;
@@ -9712,7 +9712,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderFloat8TransportContract)
                 SlangNVVMValueOperationDesc narrow = {operation, fp8, &numeric, 1};
                 SlangNVVMValueOperationDesc widen = {operation, numeric, &fp8, 1};
                 SLANG_CHECK(!builder.supportsValueOperation(narrow));
-                SLANG_CHECK(!builder.supportsValueOperation(widen));
+                const bool isQualifiedWiden =
+                    operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT &&
+                    NVVMSemantics::areSameType(numeric, NVVMSemantics::kFloat32);
+                SLANG_CHECK(builder.supportsValueOperation(widen) == isQualifiedWiden);
             }
         }
         SlangNVVMValueTypeDesc binary[] = {fp8, fp8};
@@ -9737,5 +9740,102 @@ SLANG_UNIT_TEST(nvvmIRBuilderFloat8TransportContract)
         SlangNVVMValueOperationDesc wrongWidth =
             {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, fp8, &NVVMSemantics::kUnsignedI16, 1};
         SLANG_CHECK(!builder.supportsValueOperation(wrongWidth));
+    }
+}
+
+// The real provider accepts scalar FP8 widening and rejects adjacent unqualified descriptors.
+SLANG_UNIT_TEST(nvvmIRBuilderFloat8WideningContract)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (auto fp8 : {NVVMSemantics::kFloatE4M3, NVVMSemantics::kFloatE5M2})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("fp8-widen"), scope.module)));
+        SlangNVVMTypeHandle byteType = nullptr;
+        SlangNVVMTypeHandle floatType = nullptr;
+        SlangNVVMTypeHandle functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr;
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 8, byteType)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 32, floatType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, floatType, &byteType, 1, functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("expand"),
+            function)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        SlangNVVMValueHandle value = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, value)));
+        SlangNVVMValueOperationDesc widen =
+            {SLANG_NVVM_VALUE_OP_FLOAT_CONVERT, NVVMSemantics::kFloat32, &fp8, 1};
+        SLANG_CHECK_ABORT(builder.supportsValueOperation(widen));
+        SlangNVVMValueHandle widened = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, widen, &value, 1, widened)));
+
+        // Rejected descriptors must not produce values or invalidate the eventual function.
+        const SlangNVVMValueTypeDesc wrongOperands[] = {
+            {fp8.kind, 16, 1},
+            {fp8.kind, 8, 0},
+            {fp8.kind, 8, 2},
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 8, 1},
+            NVVMSemantics::kUnsignedI8,
+        };
+        for (const auto& operand : wrongOperands)
+        {
+            auto rejected = widen;
+            rejected.operandTypes = &operand;
+            SLANG_CHECK(!builder.supportsValueOperation(rejected));
+            SlangNVVMValueHandle invalid = nullptr;
+            SLANG_CHECK(SLANG_FAILED(
+                builder.emitValueOperation(scope.module, rejected, &value, 1, invalid)));
+            SLANG_CHECK(invalid == nullptr);
+        }
+        const SlangNVVMValueTypeDesc wrongResults[] = {
+            NVVMSemantics::kFloat16,
+            NVVMSemantics::kFloat64,
+            NVVMSemantics::kBFloat16,
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 0},
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 2},
+        };
+        for (const auto& result : wrongResults)
+        {
+            auto rejected = widen;
+            rejected.resultType = result;
+            SLANG_CHECK(!builder.supportsValueOperation(rejected));
+            SlangNVVMValueHandle invalid = nullptr;
+            SLANG_CHECK(SLANG_FAILED(
+                builder.emitValueOperation(scope.module, rejected, &value, 1, invalid)));
+            SLANG_CHECK(invalid == nullptr);
+        }
+        auto wrongArity = widen;
+        wrongArity.operandCount = 0;
+        SLANG_CHECK(!builder.supportsValueOperation(wrongArity));
+        SlangNVVMValueHandle invalidArity = nullptr;
+        SLANG_CHECK(SLANG_FAILED(
+            builder.emitValueOperation(scope.module, wrongArity, nullptr, 0, invalidArity)));
+        SLANG_CHECK(invalidArity == nullptr);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, widened)));
+        for (auto format :
+             {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+              SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+        {
+            ComPtr<ISlangBlob> assembly;
+            String diagnostics;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.serializeModule(scope.module, format, assembly, diagnostics)));
+            SLANG_CHECK(diagnostics.getLength() == 0);
+        }
     }
 }
