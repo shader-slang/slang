@@ -195,6 +195,7 @@ struct NVVMStructField
     bool isConventionalGlobal = false;
     bool isMutable = false;
     bool isPhysicalStorage = false;
+    bool isParameterGroupStorage = false;
     bool isLocalBFloat16RecordStorage = false;
 };
 
@@ -205,6 +206,7 @@ struct NVVMSequentialElementPointer
     IRType* aggregateType = nullptr;
     IRPtrTypeBase* resultType = nullptr;
     bool isImmutable = false;
+    bool isParameterGroupStorage = false;
 };
 
 bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer& outPointer);
@@ -261,6 +263,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         outAddress.isConventionalGlobal = parentAddress.isConventionalGlobal;
         outAddress.isMutable = parentAddress.isMutable;
         outAddress.isPhysicalStorage = parentAddress.isPhysicalStorage;
+        outAddress.isParameterGroupStorage = parentAddress.isParameterGroupStorage;
     }
     else if (
         auto resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(
@@ -299,12 +302,14 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         {
             structType = physicalStorageReferenceType;
             outAddress.isPhysicalStorage = true;
+            outAddress.isParameterGroupStorage = true;
         }
         else if (localPhysicalStoragePointer)
         {
             structType = localPhysicalStorageType;
             outAddress.isMutable = true;
             outAddress.isPhysicalStorage = true;
+            outAddress.isParameterGroupStorage = true;
         }
         IRType* copyableValueType = nullptr;
         auto localCopyablePointer = structType ? nullptr
@@ -362,6 +367,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
             if (!structType)
                 return false;
             outAddress.isMutable = !parentElement.isImmutable;
+            outAddress.isParameterGroupStorage = parentElement.isParameterGroupStorage;
         }
         else
         {
@@ -410,6 +416,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
                 {
                     return false;
                 }
+                outAddress.isParameterGroupStorage = true;
             }
         }
     }
@@ -909,6 +916,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     bool isSharedGlobalBase = false;
     bool isImmutable = false;
     bool hasImmutablePhysicalStorageFieldBase = false;
+    bool isParameterGroupStorage = false;
     NVVMStructuredBufferElementPointer resourceElement;
     const bool hasResourceElementBase =
         base && _getNVVMStructuredBufferElementPointer(base, resourceElement);
@@ -953,6 +961,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
                 baseType = parentElement.resultType;
                 aggregateType = arrayType;
                 isImmutable = parentElement.isImmutable;
+                isParameterGroupStorage = parentElement.isParameterGroupStorage;
             }
         }
     }
@@ -965,6 +974,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         arrayType = hasParameterGroupBase
                         ? asNVVMSupportedAggregateStorageArrayType(parameterGroupElementType)
                         : nullptr;
+        isParameterGroupStorage = arrayType != nullptr;
         if (!arrayType && base->getOp() == kIROp_FieldAddress)
         {
             NVVMStructField fieldAddress;
@@ -976,6 +986,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
                                       fieldAddress.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
                 isImmutable = !fieldAddress.isMutable;
+                isParameterGroupStorage = fieldAddress.isParameterGroupStorage;
                 hasImmutablePhysicalStorageFieldBase =
                     isImmutable && fieldAddress.isPhysicalStorage && arrayType;
             }
@@ -1012,6 +1023,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
                 numericPointer = as<IRPtrTypeBase>(base->getDataType());
                 valueType = numericPointer ? numericPointer->getValueType() : nullptr;
                 isImmutable = !fieldAddress.isMutable;
+                isParameterGroupStorage = fieldAddress.isParameterGroupStorage;
             }
         }
         NVVMSequentialElementPointer parentElement;
@@ -1020,6 +1032,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
             numericPointer = parentElement.resultType;
             valueType = numericPointer->getValueType();
             isImmutable = parentElement.isImmutable;
+            isParameterGroupStorage = parentElement.isParameterGroupStorage;
         }
         vectorType = asNVVMSupportedNumericVectorType(valueType);
         if (numericPointer && vectorType)
@@ -1063,12 +1076,18 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     outPointer.aggregateType = aggregateType;
     outPointer.resultType = resultType;
     outPointer.isImmutable = isImmutable;
+    outPointer.isParameterGroupStorage = isParameterGroupStorage;
     return true;
 }
 
-// Returns the exact immutable pointer producers whose semantic vector has a distinct compact
-// parameter-group representation. Direct fields and fixed-array elements are canonical producers;
-// aggregate type lowering recursively selects the same storage representation for both.
+// Returns read-only vector pointers with the compact parameter-group representation.
+// Consider this example:
+//     struct Payload { float3 value; };
+//     float3 read(__constref Payload payload) { return payload.value; }
+// Helper parameter lowering gives this borrow a native vector pointee, despite its read-only
+// access. Actual parameter groups and physical-storage references instead select
+// NVVMTypeUse::ParameterGroupStorage. The field and element resolvers preserve that storage role
+// independently of access so loads unpack only vectors that actually use the compact layout.
 IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
 {
     auto pointerType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
@@ -1081,14 +1100,15 @@ IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
     if (auto fieldAddress = as<IRFieldAddress>(value))
     {
         NVVMStructField field;
-        return _getNVVMStructFieldAddress(fieldAddress, field) && !field.isConventionalGlobal &&
+        return _getNVVMStructFieldAddress(fieldAddress, field) && field.isParameterGroupStorage &&
                        !field.isMutable
                    ? vectorType
                    : nullptr;
     }
 
     NVVMSequentialElementPointer elementPointer;
-    if (!_getNVVMSequentialElementPointer(value, elementPointer) || !elementPointer.isImmutable ||
+    if (!_getNVVMSequentialElementPointer(value, elementPointer) ||
+        !elementPointer.isParameterGroupStorage || !elementPointer.isImmutable ||
         !asNVVMSupportedAggregateStorageArrayType(elementPointer.aggregateType))
     {
         return nullptr;
