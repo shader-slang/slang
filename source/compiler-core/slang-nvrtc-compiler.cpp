@@ -15,6 +15,8 @@
 #include "slang-artifact-util.h"
 #include "slang-com-helper.h"
 
+#include <mutex>
+
 namespace nvrtc
 {
 
@@ -123,6 +125,15 @@ public:
     SlangResult init(ISlangSharedLibrary* library);
 
     NVRTCDownstreamCompiler() {}
+    ~NVRTCDownstreamCompiler()
+    {
+        // Each compile destroys its program before returning. Give NVRTC its normal cleanup
+        // opportunity if this is its last library reference, then retire only our directory.
+        // Other owners may keep the library loaded, but their directories remain independent.
+        m_sharedLibrary.setNull();
+        if (m_automaticPchDirectory.getLength())
+            Path::removeNonEmpty(m_automaticPchDirectory);
+    }
 
 protected:
     struct ScopeProgram
@@ -141,6 +152,8 @@ protected:
 
     SlangResult _findOptixIncludePath(String& outIncludePath);
     SlangResult _getOptixIncludePath(String& outIncludePath);
+
+    SlangResult _addAutomaticPchOptions(const CompileOptions& options, CommandLine& cmdLine);
 
     SlangResult _maybeAddHalfSupport(
         const CompileOptions& options,
@@ -184,6 +197,8 @@ protected:
     String m_optixIncludePath;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
+    std::mutex m_automaticPchMutex;
+    String m_automaticPchDirectory;
 };
 
 #define SLANG_NVRTC_RETURN_ON_FAIL(x) \
@@ -1158,6 +1173,42 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddFp8Bf16Support(
     return SLANG_OK;
 }
 
+// Give automatic PCH files the same lifetime as this compiler's cache namespace. Consider two
+// Slang processes compiling unnamed CUDA artifacts in the same working directory: NVRTC names both
+// files default_program.pch, and one process can replace the other's file during compilation. A
+// stable private directory separates their files without changing program names or losing reuse
+// between this compiler's calls. An explicitly selected directory remains the caller's
+// responsibility.
+SlangResult NVRTCDownstreamCompiler::_addAutomaticPchOptions(
+    const CompileOptions& options,
+    CommandLine& cmdLine)
+{
+    cmdLine.addArg("-pch");
+    for (auto argument : options.compilerSpecificArguments)
+    {
+        UnownedStringSlice value(argument);
+        if (value == "--pch-dir" || value == "-pch-dir" || value.startsWith("--pch-dir=") ||
+            value.startsWith("-pch-dir="))
+        {
+            // Preserve malformed arguments too, so NVRTC can report its original option error.
+            return SLANG_OK;
+        }
+    }
+
+    // Only acquisition needs synchronization. Do not serialize compilation or imply that the
+    // adapter's existing include-path caches have acquired new thread-safety guarantees.
+    std::lock_guard<std::mutex> lock(m_automaticPchMutex);
+    if (!m_automaticPchDirectory.getLength())
+    {
+        SLANG_RETURN_ON_FAIL(
+            Path::createTemporaryDirectory(toSlice("slang-nvrtc-pch"), m_automaticPchDirectory));
+    }
+    StringBuilder option;
+    option << "--pch-dir=" << m_automaticPchDirectory;
+    cmdLine.addArg(option);
+    return SLANG_OK;
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(
     const DownstreamCompileOptions& inOptions,
     IArtifact** outArtifact)
@@ -1411,7 +1462,15 @@ SlangResult NVRTCDownstreamCompiler::compile(
         nvrtcSupportsPch && asStringSlice(sourceContents).trimStart().startsWith("#include");
     if (pchRequested)
     {
-        cmdLine.addArg("-pch");
+        if (SLANG_FAILED(_addAutomaticPchOptions(options, cmdLine)))
+        {
+            String message = "Failed to create a private NVRTC automatic-PCH directory.";
+            diagnostics->setRaw(SliceUtil::asCharSlice(message));
+            diagnostics->setResult(SLANG_FAIL);
+            diagnostics->requireErrorDiagnostic();
+            *outArtifact = artifact.detach();
+            return SLANG_FAIL;
+        }
     }
 
     nvrtcProgram program = nullptr;

@@ -1,64 +1,41 @@
 # Start a fresh NVVM session
 
-Current baseline: [validation270](runtime-validation.slice-270.json),
-[FP8/BF16 record report](report.slice-270-fp8-aggregate.md) and
-[completed plan270](plan.slice-270-fp8-aggregate.md).
+Current full baseline: [validation277](runtime-validation.slice-277.json),
+[PCH ownership report](report.slice-277-pch-ownership.md) and
+[completed plan277](plan.slice-277-pch-ownership.md).
 The user resumed the development loop on 2026-09-26. Continue bounded reviewed local commits under
-WORKFLOW until a recorded stopping condition. Skip Slack notifications; no push or system changes.
+WORKFLOW until a recorded stopping condition. Skip Slack; no push or system changes.
 
-1. Read STATUS, WORKFLOW and RESULTS; inspect HEAD, changes and pins before selecting a slice.
-2. Qualified270 compiler/provider/module layout is installed at `build/RelWithDebInfo`. Verify all 37
-   runtime provenance entries and 22pins, including the loaded compiler rather than only its launcher.
-   Version metadata identifies the precommit source plus exact patch. Full gates used the pre-phi
-   focused fixture; its equivalent single-return refinement passed separate fixture/raw GPU gates.
-3. Accepted269 layout is preserved at `build/nvvm-fp8-aggregate270/accepted269-layout`. Builds follow
-   `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`, native tools and RESULTS prerequisites.
-4. Use unique raw roots, max four CPU workers, two unit servers, serial GPU suites and30-minute gate
-   bounds. Preserve failed/review-required attempts and compare exact outcomes/input identities.
-5. Accepted270 has 580cases/576sources/1,740cells:1,703correct,37unresolved and20resolved histories.
-   All576 input hashes remain unchanged. Units1,087pass/13skip; semantics1,170pass/78skip. Runtime4,
-   toolkit18 and material compile/assembly6 pass. Last full270, targeted233, cadence zero.
-6. Keep frozen `census.slice-195.tsv` immutable and discovery at its 128-source cap. The new270 fixture
-   and two268 regression sources remain focused tests outside those inventories.
-7. [Research271](report.slice-271-language-breadth.md) completes the four-source breadth probe:
-   all twelve cells pass, with actual output inspection supplementing the weak original tuple CHECK.
-   [Its evidence](research-evidence.slice-271.json) inherits accepted270 and leaves full cadence zero.
-8. [Material profile272](report.slice-272-material-profile.md) and
-   [timing evidence](timing-evidence.slice-272.json) qualify identical outputs and restore the complete
-   accepted100-entry layout. Raw evidence/snapshots are at `build/nvvm-material-profile272`.
-   Next: investigate semantic checking (385–397ms) with bounded call-path sampling and reduction.
-   Perf monitoring is blocked by host policy; owned-child GDB works. Qualify sampling bias and exact
-   outputs; do not change host settings or present debugger sampling durations as benchmark timings.
-   [Research273](report.slice-273-semantic-profile.md) completes16 exact-output debugger profiles:
-   982stacks/912sensitivity show generic overload/inheritance paths in every profile. No concrete
-   key/cache-outcome or representative reduction is established. Next bounded gate observes canonical
-   identities, source/candidate context and cold/valid/computing/stale/incomplete cache outcomes.
-   [Research274](report.slice-274-inheritance-observation.md) closes that lead: all8 runs compute
-   each of6230canonical inheritance keys once. All42controls and exact1100unit/1248semantic maps
-   pass; accepted100-entry layout is restored exactly. No optimization or reduction. Reviewer-agent
-   thread limit required separate local audits. Next: bounded concurrent NVRTC automatic-PCH incident
-   investigation. Next real compiler build must refresh version metadata and rebuild restored observer
-   objects; current installed accepted270 bytes need no rebuild.
+1. Read STATUS, WORKFLOW and RESULTS; inspect HEAD, working changes and dependency pins.
+2. Qualified277 layout is installed at `build/RelWithDebInfo`. Verify all37 runtime provenance entries,
+   all576 main inputs and22 pins. Actual compiler aa1fe42e/version293-g9210ef5a1 comes from recorded
+   source9210ef5a1 plus patch30e61108; provider ABI42/hash fbef1a9e is unchanged. Do not treat a launcher
+   hash or later commit number as the compiled identity.
+3. Builds follow `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`, native tools and RESULTS
+   prerequisites. Previous270's100-entry installed layout is preserved under
+   `build/nvvm-pch-ownership277/accepted270-layout`. Use fresh ignored artifact roots.
+4. Limit builds/jobs to four CPU workers, units to two servers, and gates to30 minutes. Serialize
+   builds/GPU/suites/benchmarks. Preserve failed attempts and exact comparisons; no retries hiding losses.
+5. Full277 preserves580 cases/576 sources/1740 cells:1703 correct,37 unresolved,20 resolved histories.
+   Units1090pass/13skip preserve1100 old IDs plus3 additions; semantics1170pass/78skip preserve1248 IDs.
+   Runtime4/toolkit18/material6 pass. Material PTX/cubin/resources equal270. Last full277/targeted233,
+   implementation cadence0. Frozen195 is immutable; discovery remains at128 sources.
+6. Research275 reproduced8 native failures+2SIGSEGV among16 shared-cwd processes, with24 controls
+   passing. Lifecycle276 qualified20 processes/100 direct NVRTC compiles. Implementation277 passes the
+   same40-process comparison with40 private retired namespaces and120 PCH creations. Actual-adapter
+   tests cover same-owner reuse, named diagnostics, surviving owners/external library refs and explicit
+   caller directories. Exact262 deletion signature is retained without claiming causal reproduction.
+7. Next bounded slice: existing accessor/generic language-surface probes with original independent
+   oracles, such as interface properties, default generic subscripts, multidimensional setters and
+   variadic value packs. Establish exact source selections and expected outputs before execution.
+   Keep focused evidence separate from the capped main corpora; implement only for a reproduced gap.
+8. Delegation recently hits thread limits. Use a fresh bounded worker when available; otherwise record
+   reuse and separate root local audits. Author self-review is not independent-agent review.
 
-The270 compact record preserves the original two-transition review-required comparison and both
-resolved failure histories. Raw artifacts and local closeout are under `build/nvvm-fp8-aggregate270`.
-Earlier267 timing/quality and262 AST proof retain their original source identities. Material GPU
-runtime contracts remain unavailable; concurrent NVRTC automatic-PCH reliability remains open.
-Earlier presentation packages were not refreshed. [HISTORY](HISTORY.md) indexes prior evidence.
-
-Research275 completes the bounded PCH reproduction: all40 obligations retained,24 serial/private
-controls pass; shared16 yield6pass/8reuse assertion failures/2SIGSEGV. Same-path cross-process
-replacement/truncation is traced; original262 deletion signature remains unclosed. See
-[report275](report.slice-275-pch-reproduction.md) and [evidence275](research-evidence.slice-275.json).
-Next bounded276 must settle private namespace lifetime and explicit user-directory precedence before
-production changes. Compiler destruction need not unload NVRTC; existing shared-library wrappers do
-not establish ownership across arbitrary loader references. Preserve source identity and same-owner
-reuse. All accepted270 bytes/pins/inputs/configuration remain exact; next real build refreshes version
-metadata and restored observer objects. Root used separate local audits due reviewer thread limit.
-
-Research276 qualifies the lifecycle gate:20 fresh serial processes/100compiles pass with named/empty
-programs,12 directory retirements while NVRTC refs survive, exact PTX and clean final unload.
-[Evidence276](research-evidence.slice-276.json) retains all obligations. Select a stable private
-percompiler automatic-PCH directory for277, with explicit user-directory bypass and unchanged source
-names; actual adapter lifecycle/concurrency/full-checkpoint gates remain required. Direct NVRTC tests
-qualify12.9.86 only. Full270 unchanged; original262 deletion signature remains open.
+[HISTORY](HISTORY.md) owns older evidence. FP8/BF16 record scope remains in
+[the contract](../docs/design/nvvm-substandard-record-contract.md) and validation270; focused268/270
+fixtures remain outside the main corpus. Breadth271's12 cells passed. Material272 sampling and273/274
+semantic investigation are complete; each of6230 canonical inheritance keys was computed once, so
+that cache-duplication lead is closed. Earlier267/272 timing retains original identity and does not
+measure277. No new performance claim or material GPU execution; binding/input/output contracts remain
+unavailable. Windows private-directory acquisition and its failure diagnostic are source-audited only.

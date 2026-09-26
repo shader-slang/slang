@@ -583,6 +583,37 @@ bool Path::createDirectory(const String& path)
 #endif
 }
 
+SlangResult Path::createTemporaryDirectory(const UnownedStringSlice& prefix, String& outPath)
+{
+#if defined(_WIN32)
+    // Keep the unique file reserved until we have exclusively acquired the adjacent directory.
+    // Removing the file and creating a directory at the same path would leave an ownership gap.
+    String reservation;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(prefix, reservation));
+    String path = reservation + ".dir";
+    bool created = createDirectory(path);
+    SlangResult releaseResult = File::remove(reservation);
+    if (!created)
+        return SLANG_FAIL;
+    if (SLANG_FAILED(releaseResult))
+    {
+        Path::remove(path);
+        return releaseResult;
+    }
+    outPath = path;
+#else
+    StringBuilder pattern;
+    pattern << "/tmp/" << prefix << "-XXXXXX";
+    List<char> buffer;
+    buffer.setCount(pattern.getLength() + 1);
+    ::memcpy(buffer.getBuffer(), pattern.getBuffer(), size_t(buffer.getCount()));
+    if (!::mkdtemp(buffer.getBuffer()))
+        return SLANG_FAIL;
+    outPath = buffer.getBuffer();
+#endif
+    return SLANG_OK;
+}
+
 bool Path::createDirectoryRecursive(const String& path)
 {
     String finalPath = Path::simplify(path);

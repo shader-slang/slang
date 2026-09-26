@@ -159,6 +159,11 @@ public:
     static bool createDirectory(const String& path);
     static bool createDirectoryRecursive(const String& path);
 
+    /// Creates and exclusively acquires a temporary directory. The caller owns its contents and
+    /// removal. On Unix the directory is accessible only to its owner. Leaves outPath unchanged
+    /// on failure; an existing directory is never returned.
+    static SlangResult createTemporaryDirectory(const UnownedStringSlice& prefix, String& outPath);
+
     /// Accept either style of delimiter
     SLANG_FORCE_INLINE static bool isDelimiter(char c) { return c == '/' || c == '\\'; }
 

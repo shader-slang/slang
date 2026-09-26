@@ -8,8 +8,42 @@
 #include <winioctl.h>
 #endif
 #include <limits>
+#if !SLANG_WINDOWS_FAMILY
+#include <sys/stat.h>
+#endif
 
 using namespace Slang;
+
+SLANG_UNIT_TEST(ioTemporaryDirectory)
+{
+    String first;
+    String second;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(Path::createTemporaryDirectory(toSlice("slang-check"), first)));
+    SlangResult secondResult = Path::createTemporaryDirectory(toSlice("slang-check"), second);
+    if (SLANG_FAILED(secondResult))
+        Path::removeNonEmpty(first);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(secondResult));
+    SLANG_CHECK(first != second);
+    for (const auto& path : {first, second})
+    {
+        SlangPathType type = SLANG_PATH_TYPE_FILE;
+        SLANG_CHECK(SLANG_SUCCEEDED(Path::getPathType(path, &type)));
+        SLANG_CHECK(type == SLANG_PATH_TYPE_DIRECTORY);
+#if !SLANG_WINDOWS_FAMILY
+        struct stat status = {};
+        SLANG_CHECK(::stat(path.getBuffer(), &status) == 0);
+        SLANG_CHECK((status.st_mode & 0777) == 0700);
+#endif
+        String nested = Path::combine(path, "nested");
+        SLANG_CHECK(Path::createDirectory(nested));
+        SLANG_CHECK(SLANG_SUCCEEDED(File::writeAllText(Path::combine(nested, "value"), "owned")));
+    }
+    SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(first)));
+    SLANG_CHECK(File::exists(second));
+    SLANG_CHECK(SLANG_SUCCEEDED(Path::removeNonEmpty(second)));
+    SLANG_CHECK(!File::exists(first) && !File::exists(second));
+}
 
 static SlangResult _checkGenerateTemporary()
 {
