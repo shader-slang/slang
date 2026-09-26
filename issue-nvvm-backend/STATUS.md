@@ -1,11 +1,11 @@
 # NVVM backend status
 
-The development loop is **active**, resumed on 2026-09-26. Slice 270 qualifies internal FP8/BF16
-records through dynamic dispatch. [Focused research271](report.slice-271-language-breadth.md) adds twelve passing cells across switch
-fallthrough, lambda capture, tuple mutation and defer/typed-error interactions. Next: refresh material
-profiling/code-quality evidence before choosing the next material-driven optimization. Continue reviewed local commits under
-[WORKFLOW](WORKFLOW.md); skip Slack notifications, no push. Read [RESULTS](RESULTS.md) and
-[HANDOFF](HANDOFF.md).
+The development loop is **active**, resumed on 2026-09-26. Slice270 qualifies FP8/BF16 records;
+[research271](report.slice-271-language-breadth.md) adds twelve focused language passes.
+[Material profile272](report.slice-272-material-profile.md) is accepted and the compiler layout is
+restored exactly. Next: bounded semantic-check call-path sampling/reduction before an optimization.
+Continue reviewed local commits under [WORKFLOW](WORKFLOW.md); skip Slack, no push.
+Read [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md).
 
 ## Accepted baseline
 
@@ -47,8 +47,10 @@ Three column-major host-packing mismatches and 34 infrastructure/preflight gaps 
 NVRTC automatic-PCH reliability remains open. Material GPU runtime lacks binding, texture/LUT and
 input/output contracts. Generic record-pointer result exclusions are code-reviewed only. Opposite
 Value/Storage cache orders are executed for mixed Payload; AlignedPair is storage-first.
-Earlier262 AST proof and267 timing/quality retain their original identities; no performance claim is
-made here. [HISTORY](HISTORY.md) links prior evidence and presentation packages.
+Fresh272 instrumented wall medians: NVRTC/NVVM O3 evaluation1395.34/1362.80ms and
+sampling1424.52/1454.46ms. Semantic checking costs385–397ms; target preparation/emission about3%.
+These are within-session compile observations, not causal cross-session or GPU-speed claims.
+Earlier262 AST proof and267 timing retain original identities;272 confirms267 static O3 resources. [HISTORY](HISTORY.md) links prior evidence and presentation packages.
 
 Environment: native Ubuntu24.04, L4 SM89/driver580.126.09, SM80 target, CUDA12.9.2,
 NVRTC12.9.86, LLVM14, RelWithDebInfo; max four CPU workers, two unit servers, serial GPU suites.

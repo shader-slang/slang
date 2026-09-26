@@ -23,10 +23,14 @@ WORKFLOW until a recorded stopping condition. Skip Slack notifications; no push 
 7. [Research271](report.slice-271-language-breadth.md) completes the four-source breadth probe:
    all twelve cells pass, with actual output inspection supplementing the weak original tuple CHECK.
    [Its evidence](research-evidence.slice-271.json) inherits accepted270 and leaves full cadence zero.
-   Next: refresh material profiling and code-quality evidence before selecting an optimization.
-   The existing temporary attribution patch applies cleanly in a read-only check; revalidate its
-   scope boundaries, preserve the accepted layout and qualify unchanged outputs before measurement.
-   Create a new bounded ExecPlan first. Raw271 evidence is under `build/nvvm-breadth271`.
+8. [Material profile272](report.slice-272-material-profile.md) and
+   [timing evidence](timing-evidence.slice-272.json) qualify identical outputs and restore the complete
+   accepted100-entry layout. Raw evidence/snapshots are at `build/nvvm-material-profile272`.
+   Next: investigate semantic checking (385–397ms) with bounded call-path sampling and reduction.
+   Perf monitoring is blocked by host policy; owned-child GDB works. Qualify sampling bias and exact
+   outputs; do not change host settings or present debugger sampling durations as benchmark timings.
+   Create a new bounded plan. Next real compiler build must refresh version metadata and rebuild
+   restored six-source objects; current installed accepted270 bytes need no rebuild.
 
 The270 compact record preserves the original two-transition review-required comparison and both
 resolved failure histories. Raw artifacts and local closeout are under `build/nvvm-fp8-aggregate270`.
