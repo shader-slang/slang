@@ -4,6 +4,7 @@
 """Acceptance contracts; no compiler, CUDA or GPU is required."""
 import copy
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -37,6 +38,40 @@ def measurements():
 
 
 class Contracts(unittest.TestCase):
+    def test_exported_provenance_size_is_independent_of_source_inventory(self):
+        runtime = {
+            "/build/RelWithDebInfo/bin/slangc": "compiler-hash",
+            "/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "provider-hash",
+            "/build/RelWithDebInfo/lib/libslang-compiler.so": "library-hash",
+            "/build/RelWithDebInfo/lib/slang-core-module.bin": "cache-hash",
+            "/cuda/lib64/libnvrtc.so": "nvrtc-hash",
+            "/cuda/nvvm/lib64/libnvvm.so": "nvvm-hash",
+            "/cuda/bin/ptxas": "assembler-hash",
+            "/usr/bin/readelf": "inspector-hash",
+        }
+        metadata = {"revision": "accepted-revision", "platform": "Linux", "build_label": "RelWithDebInfo",
+                    "environment": {"CUDA_PATH": "/cuda"}, "device": {"log": "device.log"}}
+        raw = dict(metadata, artifact_sha256=dict(runtime), runtime_artifact_sha256=dict(runtime))
+        raw["artifact_sha256"].update({f"/repo/tests/input-{index}.slang": "f" * 64
+                                       for index in range(7179)})
+        before = copy.deepcopy(raw)
+        exported = results.compact_provenance(raw)
+        self.assertEqual(exported["artifact_sha256"], runtime)
+        for key, value in metadata.items():
+            self.assertEqual(exported[key], value)
+        self.assertEqual(exported["full_identity_count"], 7179 + len(runtime))
+        self.assertEqual(exported["identity_scope"], "runtime-and-tools")
+        self.assertLess(len(json.dumps(exported)), len(json.dumps(raw)) // 100)
+        self.assertEqual(raw, before)
+        exported["artifact_sha256"]["/build/RelWithDebInfo/bin/slangc"] = "changed-export"
+        self.assertEqual(raw, before)
+
+    def test_legacy_export_preserves_available_identity_without_guessing_roles(self):
+        raw = {"revision": "legacy", "artifact_sha256": {"/compiler": "hash", "/source": "hash"}}
+        exported = results.compact_provenance(raw)
+        self.assertEqual(exported["artifact_sha256"], raw["artifact_sha256"])
+        self.assertEqual(exported["identity_scope"], "legacy-full-map")
+
     def test_unreviewed_baseline_cannot_erase_regression(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "baseline.json"

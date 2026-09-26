@@ -191,6 +191,8 @@ def configure(args, output):
         if shutil.which("readelf"):
             paths.add(Path(shutil.which("readelf")).resolve())
     paths.update(args.slangc.parent.glob("slang-test*"))
+    # Freeze the small tool/runtime inventory before adding the exhaustive source/input map.
+    runtime_paths = tuple(paths)
     tracked = subprocess.check_output(["git", "ls-files", "source", "include", "prelude",
                                        "external", "CMakeLists.txt", "cmake", "tests", "issue-nvvm-backend/*.py",
                                        "issue-nvvm-backend/*manifest*", "extras/*nvvm*.py"], cwd=REPO, text=True)
@@ -203,6 +205,8 @@ def configure(args, output):
                       "CUDA_PATH", "CUDA_HOME", "LIBNVVM_HOME", "SLANG_NVVM_BUILDER_PATH",
                       "LD_LIBRARY_PATH", "CUDA_VISIBLE_DEVICES", "SLANG_NVVM_TEST_ARCH")},
                   "artifact_sha256": {str(path): sha(path) for path in sorted(paths)}}
+    provenance["runtime_artifact_sha256"] = {
+        str(path): provenance["artifact_sha256"][str(path)] for path in sorted(runtime_paths)}
     for name, command in (
         ("working-tree", ["git", "status", "--porcelain"]),
         ("source-diff", ["git", "diff", "HEAD", "--", "source", "include", "prelude", "external"]),
@@ -518,9 +522,27 @@ def summarize(measurements):
             "provenance": measurements["provenance"], "limitations": measurements["limitations"]}
 
 
+def compact_provenance(provenance):
+    """Export tool identities without copying the exhaustive source/input map into each report.
+
+    Keep old measurement records readable: their original complete map remains when they predate
+    the explicit runtime inventory. New measurements retain that full map in the hashed raw record.
+    This only changes exported presentation metadata, never validation or acceptance obligations.
+    """
+    result = {key: value for key, value in provenance.items()
+              if key not in ("artifact_sha256", "runtime_artifact_sha256")}
+    complete = provenance.get("artifact_sha256", {})
+    runtime = provenance.get("runtime_artifact_sha256")
+    result["artifact_sha256"] = dict(complete if runtime is None else runtime)
+    result["full_identity_count"] = len(complete)
+    result["identity_scope"] = "legacy-full-map" if runtime is None else "runtime-and-tools"
+    return result
+
+
 def report(args):
     summary = summarize(read(args.measurements))
     summary["measurements"] = reference(args.measurements)
+    summary["provenance"] = compact_provenance(summary["provenance"])
     try:
         import matplotlib
         matplotlib.use("Agg")

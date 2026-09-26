@@ -147,6 +147,18 @@ filesystem/toolkit caches; a fresh process does not imply cold filesystem/PCH st
 math options and compiler/toolkit versions when comparing revisions. Unpaired historical sessions
 are context, not a causal speedup claim. Run no build, GPU suite or profiler concurrently.
 
+Automatic NVRTC PCH status is not necessarily visible in CLI logs: the driver appends its marker
+to raw artifact diagnostics, while the ordinary CLI forwards parsed entries. An absent marker means
+no directly observed PCH state; it does not prove the cache was disabled. Even a `not-created`
+marker alone cannot distinguish reuse from a decision not to create. Label cache evidence as
+observed, source-inferred or unavailable; keep normal cache behavior.
+
+The material command does not explicitly select a floating-point mode. The current source maps this
+to Slang Default, requesting neither `--fmad=false` nor `--use_fast_math`. Upstream adds
+`--fmad=false` only for explicit Precise mode. Record actual commands and distinguish source-inferred
+downstream options from an observed option trace. Changing math flags changes the experiment and
+requires matching correctness evidence.
+
 The existing bounded shared-session runner is a **separate experiment**, not interchangeable timing:
 
 ```bash
