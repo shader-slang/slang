@@ -4,8 +4,9 @@ The development loop is **active**, resumed on 2026-09-26. Slice270 qualifies FP
 [research271](report.slice-271-language-breadth.md) adds twelve focused language passes.
 [Material profile272](report.slice-272-material-profile.md) is accepted and the compiler layout is
 restored exactly. [Semantic research273](report.slice-273-semantic-profile.md) qualifies16 profiles
-and two recurring paths; independent review accepts the evidence. Next: bounded canonical-key/cache-outcome
-observation before selecting an optimization.
+and two recurring paths. [Research274](report.slice-274-inheritance-observation.md) finds each of6230
+canonical inheritance keys computed once; accepted compiler restored exactly and local audits pass.
+Next: investigate the recorded concurrent NVRTC automatic-PCH failure.
 Continue reviewed local commits under [WORKFLOW](WORKFLOW.md); skip Slack, no push.
 Read [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md).
 

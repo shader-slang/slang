@@ -78,3 +78,9 @@ ledger preserves first-known and resolved histories with their original evidence
   16 exact-output profiles yield982 stacks; generic overload/inheritance recur in912-stack sensitivity
   too. Existing caches remain canonical; concrete key/outcome evidence is needed before an optimization.
   Zero reduction variants or compiler changes; accepted270 remains unchanged and the loop continues.
+
+- Research274: [inheritance-cache outcomes](report.slice-274-inheritance-observation.md),
+  [evidence](research-evidence.slice-274.json), [plan](plan.slice-274-inheritance-observation.md).
+  All8 material runs compute6230canonical keys once; no repeated-key optimization/reducer justified.
+  42controls/403resource rows and exact1100unit/1248semantic identities pass. Temporary observer removed,
+  accepted270 layout restored exactly; separate local audits used after reviewer-thread limit. Loop active.

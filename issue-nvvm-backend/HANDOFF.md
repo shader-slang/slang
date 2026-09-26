@@ -33,8 +33,12 @@ WORKFLOW until a recorded stopping condition. Skip Slack notifications; no push 
    982stacks/912sensitivity show generic overload/inheritance paths in every profile. No concrete
    key/cache-outcome or representative reduction is established. Next bounded gate observes canonical
    identities, source/candidate context and cold/valid/computing/stale/incomplete cache outcomes.
-   Next real compiler build must refresh version metadata and rebuild restored six-source objects;
-   current installed accepted270 bytes need no rebuild.
+   [Research274](report.slice-274-inheritance-observation.md) closes that lead: all8 runs compute
+   each of6230canonical inheritance keys once. All42controls and exact1100unit/1248semantic maps
+   pass; accepted100-entry layout is restored exactly. No optimization or reduction. Reviewer-agent
+   thread limit required separate local audits. Next: bounded concurrent NVRTC automatic-PCH incident
+   investigation. Next real compiler build must refresh version metadata and rebuild restored observer
+   objects; current installed accepted270 bytes need no rebuild.
 
 The270 compact record preserves the original two-transition review-required comparison and both
 resolved failure histories. Raw artifacts and local closeout are under `build/nvvm-fp8-aggregate270`.
