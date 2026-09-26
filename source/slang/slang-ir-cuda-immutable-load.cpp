@@ -57,6 +57,34 @@ struct LoadMethod
     }
 };
 
+// Return true if `addr` roots at the CUDA global uniform parameter group: the
+// `IRGlobalParam` that `CUDASourceEmitter::emitParameterGroupImpl` emits as
+// `extern "C" __constant__ GlobalParams_0 SLANG_globalParams;`. For example:
+// ```
+// uniform uint gValue;
+// void main() { ... = gValue; }
+// ```
+// The front end folds module-scope `uniform` globals like `gValue` into a synthesized
+// `ConstantBuffer<GlobalParams>` global, so a load of `gValue` is
+// `Load(FieldAddress(globalParam, gValue))`. `globalParam` is memory
+// `isPointerToImmutableLocation` correctly calls immutable, but it is CUDA `__constant__`
+// memory, not global memory: `__ldg` lowers to PTX `ld.global.nc`, which the ISA requires
+// to address global memory, so `__ldg` on `gValue` is illegal codegen even though `gValue`
+// never changes.
+//
+// A pointer *stored inside* the group (e.g. a `StructuredBuffer<T>` field) is unaffected:
+// reading through it loads the pointer out of `SLANG_globalParams` first, and that `Load`
+// — not `globalParam` — roots the subsequent access, so genuine buffer reads keep `__ldg`.
+// Uses `peelAddressForwardingOps` (see its doc comment) rather than `getRootAddr`. Its
+// cast/offset cases aren't known to be reachable for this particular group today — CUDA
+// doesn't run the legalization pass that produces them for the analogous OptiX SBT case —
+// but are kept for defense in depth.
+static bool isAddressIntoCudaConstantParameterGroup(IRInst* addr)
+{
+    auto globalParam = as<IRGlobalParam>(peelAddressForwardingOps(addr));
+    return globalParam && as<IRUniformParameterGroupType>(globalParam->getDataType());
+}
+
 struct ImmutableBufferLoadLoweringContext : InstPassBase
 {
     Dictionary<IRType*, LoadMethod> loadFuncs;
@@ -289,27 +317,6 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         return loadFunc.apply(builder, valueType, ptr);
     }
 
-    // Returns whether an immutable load can use CUDA's global-memory read-only cache.
-    // Consider this example:
-    //
-    //     uniform uint frame;
-    //     struct Params { uint value; };
-    //     ConstantBuffer<Params> params;
-    //
-    // collectGlobalUniformParameters puts both values in one global parameter group.
-    // CUDASourceEmitter::emitParameterGroupImpl emits that group in __constant__ memory,
-    // so loading frame or the params pointer itself must not use __ldg. Loading params.value
-    // starts from the loaded buffer pointer instead, and still uses the global-memory cache.
-    bool canUseReadOnlyGlobalLoad(IRInst* ptr)
-    {
-        auto root = getRootAddr(ptr);
-        if (!isPointerToImmutableLocation(root))
-            return false;
-        if (as<IRGlobalParam>(root) && as<IRUniformParameterGroupType>(root->getDataType()))
-            return false;
-        return true;
-    }
-
     void processInst(IRInst* inst)
     {
         // For each load from immutable global memory, try to lower it into __ldg calls.
@@ -320,11 +327,18 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_Load:
             {
                 auto load = as<IRLoad>(inst);
-                if (canUseReadOnlyGlobalLoad(load->getPtr()))
+                auto ptr = load->getPtr();
+                auto rootAddr = getRootAddr(ptr);
+                // isAddressIntoCudaConstantParameterGroup must see the unpeeled `ptr`, not
+                // `rootAddr`: `getRootAddr` doesn't peel BitCast/Reinterpret/PtrCast/
+                // GetOffsetPtr, so passing `rootAddr` here could stop short of `globalParam`
+                // and miss the exclusion.
+                if (!isAddressIntoCudaConstantParameterGroup(ptr) &&
+                    isPointerToImmutableLocation(rootAddr))
                 {
                     IRBuilder builder(load);
                     builder.setInsertBefore(load);
-                    if (auto newLoad = emitImmutableLoad(builder, load->getPtr()))
+                    if (auto newLoad = emitImmutableLoad(builder, ptr))
                     {
                         load->replaceUsesWith(newLoad);
                         load->removeAndDeallocate();

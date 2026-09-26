@@ -15,13 +15,24 @@ SLANG_UNIT_TEST(nvvmPassThroughDiscoversInjectedLibrary)
         globalSession->setSharedLibraryLoader(loader);
 
         SLANG_CHECK(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM) == SLANG_OK);
-        int major = -1;
-        int minor = -1;
-        SLANG_CHECK(
-            globalSession->getDownstreamCompilerVersion(SLANG_PASS_THROUGH_NVVM, &major, &minor) ==
-            SLANG_OK);
-        SLANG_CHECK(major == 2);
-        SLANG_CHECK(minor == 0);
+        // The injected version symbol lives in this test module. The query must report that
+        // actual owner rather than the synthetic loader request "nvvm".
+        const String expectedPath =
+            SharedLibraryUtils::getSharedLibraryFileName((void*)_fakeVersion);
+        ComPtr<ISlangBlob> path;
+        const SlangResult result =
+            globalSession->getDownstreamCompilerPath(SLANG_PASS_THROUGH_NVVM, path.writeRef());
+        if (expectedPath.getLength())
+        {
+            SLANG_CHECK(result == SLANG_OK);
+            SLANG_CHECK_ABORT(path != nullptr);
+            SLANG_CHECK(String((const char*)path->getBufferPointer()) == expectedPath);
+        }
+        else
+        {
+            SLANG_CHECK(result == SLANG_E_NOT_AVAILABLE);
+            SLANG_CHECK(path == nullptr);
+        }
         SLANG_CHECK(gFakeNVVM.successfulLoadCount == 1);
         SLANG_CHECK(gFakeNVVM.loadedPath == "nvvm");
     }

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
-//META: doc_section_digest=8f873a7e67bec608b74c11364d191e8a9af0122bb32b3a8409d1b57ac5e3d4bd
+//META: doc_section_digest=3616dae83508b4ffad03f364c704966c745acf49fe621c5856bbbe38e68899eb
 //META: purpose=The -debug-info-include-source flag embeds the source text into DebugSource even at Minimal, the one exception to the debug-level rule.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // same run must still not have gained the records that only Standard brings --
 // which is what shows the flag moved the text operand and not the level.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1 -debug-info-include-source
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1 -debug-info-include-source
 
 uniform RWStructuredBuffer<int> markerBuffer;
 

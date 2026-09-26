@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=fc857e43020ac66546c51043cd77e6a53aea17212ca602e37a98726239622ecc
+//META: doc_section_digest=8db1d44af39131b43cc8258b2bec4dad2a4381ae619907da2e2b6a9de2021028
 //META: purpose=A type modifier is transparent to member lookup, so a field and a method of a value declared no_diff S resolve exactly as they do on the unmodified struct.
 //META: intent=functional
 //META: pipeline_stage=check

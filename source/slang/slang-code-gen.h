@@ -68,6 +68,9 @@ struct RequiredLoweringPassSet
     bool meshOutput;
     bool higherOrderFunc;
     bool globalVaryingVar;
+
+    /// Whether linked IR contains a SPIR-V ray-location operand that requires object resolution.
+    bool rayTracingLocationOperand = false;
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
@@ -82,9 +85,14 @@ struct RequiredLoweringPassSet
     bool barrierFlagValidation;
     bool appendConsumeStructuredBuffer;
     bool taggedUnion;
+    bool assumeAddress;
+    bool untaggedUnion;
+    bool tagOps;
+    bool tagType;
     bool lValueCast;
     bool sumVectorMatrix;
     bool lateRequireCapability;
+    bool unresolvedMatrixLayout;
 };
 
 /// A context for code generation in the compiler back-end

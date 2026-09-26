@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#forwarddifferentiate
-//META: doc_section_digest=c21b0ae05c57902d66f656e2476fa3282420702de64bd927d7d6f0471493563c
+//META: doc_section_digest=e53f314361a478e96b60cbc0243f436e03b658c6e5abee660cbe7f78e96b4285
 //META: purpose=ForwardDifferentiate is hoistable, so two __fwd_diff references to the same function are one IR value that both call sites share.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // closing `###` pattern bounds the whole assertion to the LOWER-TO-IR dump
 // section, since the later per-pass dumps repeat the module.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform float a;
 uniform float d;

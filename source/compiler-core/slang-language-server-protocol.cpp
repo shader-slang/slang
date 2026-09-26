@@ -351,24 +351,12 @@ static const StructRttiInfo _makeInitializeParamsRtti()
     InitializeParams obj;
     StructRttiBuilder builder(&obj, "LanguageServerProtocol::InitializeParams", nullptr);
     builder.addField("workspaceFolders", &obj.workspaceFolders, StructRttiInfo::Flag::Optional);
+    builder.addField("rootUri", &obj.rootUri, StructRttiInfo::Flag::Optional);
+    builder.addField("rootPath", &obj.rootPath, StructRttiInfo::Flag::Optional);
     builder.ignoreUnknownFields();
     return builder.make();
 }
 const StructRttiInfo InitializeParams::g_rttiInfo = _makeInitializeParamsRtti();
-
-static const StructRttiInfo _makeNullResponseRtti()
-{
-    NullResponse obj;
-    StructRttiBuilder builder(&obj, "LanguageServerProtocol::NullResponse", nullptr);
-    return builder.make();
-}
-const StructRttiInfo NullResponse::g_rttiInfo = _makeNullResponseRtti();
-
-NullResponse* NullResponse::get()
-{
-    static NullResponse result = {};
-    return &result;
-}
 
 static const StructRttiInfo _makeLocationRtti()
 {

@@ -27,7 +27,7 @@ appears somewhere" are deliberately avoided; they cannot detect the failure
 mode the doc warns about.
 
 The observation point throughout is `-dump-ir` paired with a text target and
-`-o /dev/null`, because every opcode on this page is either created by
+`-o -`, because every opcode on this page is either created by
 AST-to-IR lowering (the layout, attribute and inline-asm families) or by an
 early IR pass (the remaining `Debug*` records) and is therefore present in the
 platform-neutral snapshot. Three tests that observe records the inliner

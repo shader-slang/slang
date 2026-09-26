@@ -47,3 +47,9 @@ add_subdirectory(neural)
 
 # Build experimental modules
 add_subdirectory(experimental)
+
+# Build the experimental numeric interface modules.
+add_subdirectory(numerics)
+
+# Build the experimental functional module.
+add_subdirectory(functional)

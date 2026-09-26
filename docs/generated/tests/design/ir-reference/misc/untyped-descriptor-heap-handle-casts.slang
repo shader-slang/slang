@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#untyped-descriptor-heap-handle-casts
-//META: doc_section_digest=51b98bcebaf00976e5aa54073dcd0bcd459c0efa9d64525e6e8b578000d65806
+//META: doc_section_digest=2e03545630a1717895da43ef6b961f4fc1c8b3b57a18351b2d16a6d78fcedd10
 //META: purpose=Indexing `ResourceDescriptorHeap` / `SamplerDescriptorHeap` wraps and unwraps the `uint` heap index through the four untyped-handle cast opcodes, none of which reach target code.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // is what "these opcodes should never reach target code" means for a reader of
 // the generated source.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main

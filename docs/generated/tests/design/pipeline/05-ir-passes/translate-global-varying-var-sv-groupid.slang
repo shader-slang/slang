@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#layout-and-binding
-//META: doc_section_digest=7c4335ef62cc708fc063656220fb481b4e3fdbe6592973946fe16a93c217487e
+//META: doc_section_digest=e8a69f877014ca0f8bfc67db36bada005ec4a862dc57ca692609099e2ca800ab
 //META: purpose=Expansion: translate-global-varying-var routes `SV_GroupID` and `SV_GroupThreadID` into per-target stage-input markers on HLSL and GLSL (alternative semantic shapes to SV_DispatchThreadID).
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

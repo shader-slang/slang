@@ -117,7 +117,7 @@ function(copy_fetched_shared_library library_name url)
     endif()
 
     set(dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
+        ${slang_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
     )
     add_custom_command(
         OUTPUT ${dest_object}
@@ -146,7 +146,7 @@ function(install_fetched_shared_library library_name url)
         "${dep_shared_library_prefix}${library_name}${CMAKE_SHARED_LIBRARY_SUFFIX}"
     )
     set(dest_object
-        ${CMAKE_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
+        ${slang_BINARY_DIR}/$<CONFIG>/${module_subdir}/${shared_library_filename}
     )
     if(TARGET ${library_name})
         install(PROGRAMS ${dest_object} DESTINATION ${module_subdir})

@@ -628,13 +628,21 @@ CoverageSummary summarize(
     const std::vector<uint64_t>& hits)
 {
     CoverageSummary s = {};
-    const uint32_t n = coverage->getCounterCount();
+    // Iterate entries ([0, getEntryCount())), not counters: several
+    // entries can share one counterIndex once line coverage coalesces
+    // markers, so a counter-indexed loop both under-visits (stops at
+    // getCounterCount() < getEntryCount()) and misattributes hits (entry
+    // i's counter is not generally counter i). Look each entry's counter
+    // up by its own counterIndex instead.
+    const uint32_t n = coverage->getEntryCount();
     for (uint32_t i = 0; i < n; ++i)
     {
         slang::CoverageEntryInfo entry = {};
         if (SLANG_FAILED(coverage->getEntryInfo(i, &entry)))
             continue;
-        const bool covered = hits[i] > 0;
+        const bool covered = entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+                             entry.counterIndex < (uint32_t)hits.size() &&
+                             hits[entry.counterIndex] > 0;
         switch (entry.kind)
         {
         case slang::CoverageEntryKind::Line:

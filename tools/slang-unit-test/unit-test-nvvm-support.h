@@ -8,6 +8,7 @@
 #include "compiler-core/slang-artifact-representation.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-downstream-compiler-util.h"
+#include "compiler-core/slang-llvm-compiler.h"
 #include "compiler-core/slang-nvrtc-compiler.h"
 #include "compiler-core/slang-nvvm-compiler.h"
 #include "compiler-core/slang-nvvm-ir-builder.h"
@@ -16140,15 +16141,33 @@ static const char kNVVMCoexistenceChildEnv[] = "SLANG_NVVM_COEXISTENCE_CHILD_ORD
 static const char kNVVMCoexistenceTestName[] =
     "slang-unit-test-tool/nvvmIRBuilderCoexistsWithLLVM21";
 
-static SlangResult _queryLLVM21(UnitTestContext* context)
+static SlangResult _queryLLVM21(
+    UnitTestContext* context,
+    RefPtr<DownstreamCompilerSet>& llvmCompilers)
 {
-    int major = 0;
-    int minor = 0;
-    SLANG_RETURN_ON_FAIL(context->slangGlobalSession->getDownstreamCompilerVersion(
-        SLANG_PASS_THROUGH_LLVM,
-        &major,
-        &minor));
-    return major == 21 && minor == 1 ? SLANG_OK : SLANG_FAIL;
+    if (!llvmCompilers)
+    {
+        // These fresh-process probes use the session's default LLVM search configuration.
+        // Retain the compiler set in the caller across both NVVM probes: older prebuilt LLVM
+        // modules support the V4 factory and descriptor but predate the optional path interface.
+        SLANG_RETURN_ON_FAIL(
+            context->slangGlobalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM));
+        auto loader = context->slangGlobalSession->getSharedLibraryLoader();
+        llvmCompilers = new DownstreamCompilerSet;
+        SLANG_RETURN_ON_FAIL(LLVMDownstreamCompilerUtil::locateCompilers(
+            String(),
+            loader ? loader : DefaultSharedLibraryLoader::getSingleton(),
+            llvmCompilers));
+    }
+    const DownstreamCompilerDesc desc(SLANG_PASS_THROUGH_LLVM);
+    auto compiler = DownstreamCompilerUtil::findCompiler(
+        llvmCompilers,
+        DownstreamCompilerUtil::MatchType::Newest,
+        desc);
+    if (!compiler)
+        return SLANG_FAIL;
+    const auto version = compiler->getDesc().version;
+    return version.m_major == 21 && version.m_minor == 1 ? SLANG_OK : SLANG_FAIL;
 }
 
 static SlangResult _buildCoexistenceProbe(
@@ -16168,6 +16187,7 @@ static SlangResult _buildCoexistenceProbe(
 // actual process load order.
 static SlangResult _exerciseNVVMLLVMCoexistence(UnitTestContext* context, NVVMLLVMLoadOrder order)
 {
+    RefPtr<DownstreamCompilerSet> llvmCompilers;
     NVVMIRBuilder builder;
     if (order == NVVMLLVMLoadOrder::NVVMFirst)
     {
@@ -16180,7 +16200,7 @@ static SlangResult _exerciseNVVMLLVMCoexistence(UnitTestContext* context, NVVMLL
             _buildCoexistenceProbe(builder, toSlice("slangSlice3bNVVMBeforeLLVM")));
     }
 
-    SLANG_RETURN_ON_FAIL(_queryLLVM21(context));
+    SLANG_RETURN_ON_FAIL(_queryLLVM21(context, llvmCompilers));
 
     if (order == NVVMLLVMLoadOrder::LLVMFirst)
     {
@@ -16195,7 +16215,7 @@ static SlangResult _exerciseNVVMLLVMCoexistence(UnitTestContext* context, NVVMLL
         builder,
         order == NVVMLLVMLoadOrder::LLVMFirst ? toSlice("slangSlice3bLLVMBeforeNVVM")
                                               : toSlice("slangSlice3bNVVMAfterLLVM")));
-    return _queryLLVM21(context);
+    return _queryLLVM21(context, llvmCompilers);
 }
 
 static void _reportCoexistenceChildFailure(

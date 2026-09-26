@@ -267,6 +267,117 @@ err(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-allow-glsl-option",
+    117,
+    "`-allow-glsl` and `setAllowGLSLInput()` are deprecated and now treat every input translation unit as GLSL; select GLSL for each translation unit instead"
+)
+
+warning(
+    "redundant-glsl-module-import",
+    119,
+    "redundant import of the builtin `glsl` module",
+    span { loc = "location", message = "GLSL input already imports the builtin `glsl` module implicitly" }
+)
+
+warning(
+    "source-language-directive-overrides-selected-language",
+    120,
+    "source-language directive selects ~directiveLanguage and overrides the ~selectionSource ~selectedLanguage source language",
+    span { loc = "location", message = "the source directive selects ~directiveLanguage instead of ~selectedLanguage" }
+)
+
+err(
+    "conflicting-source-language-directives",
+    121,
+    "conflicting source-language directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different source language" },
+    note { message = "the translation unit's first source-language directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "conflicting-source-file-extension-languages",
+    122,
+    "input files '~firstPath' and '~conflictingPath' have extensions that imply different source languages, but belong to the same translation unit"
+)
+
+err(
+    "source-language-directive-conflicts-with-translation-unit",
+    123,
+    "source-language directive conflicts with the effective source language of its translation unit",
+    span { loc = "location", message = "the translation unit has already been parsed using a different source language" }
+)
+
+err(
+    "glsl-module-import-not-allowed-in-slang-202c",
+    124,
+    "importing the builtin `glsl` module is not allowed in Slang 202c or later",
+    span { loc = "location", message = "select GLSL as the source language instead of importing its builtin module into Slang source" }
+)
+
+warning(
+    "glsl-module-import-in-hlsl",
+    125,
+    "importing the builtin `glsl` module into HLSL source may introduce conflicting language semantics",
+    span { loc = "location", message = "the module exposes GLSL declarations and operator rules without enabling GLSL syntax" }
+)
+
+err(
+    "conflicting-slang-language-version-directives",
+    126,
+    "conflicting Slang language-version directives in one translation unit",
+    span { loc = "location", message = "this directive selects a different Slang language version" },
+    note { message = "the translation unit's first Slang language-version directive is here", span { loc = "firstLocation" } }
+)
+
+err(
+    "glsl-atomic-counter-requires-binding",
+    127,
+    "global `atomic_uint` declarations require a GLSL `layout(binding = ...)` qualifier",
+    span { loc = "location", message = "this atomic counter has no GLSL binding layout" }
+)
+
+err(
+    "glsl-atomic-counter-arrays-not-supported",
+    128,
+    "arrays of `atomic_uint` are not supported",
+    span { loc = "location", message = "declare each supported atomic counter as a directly-bound global" }
+)
+
+warning(
+    "legacy-allow-glsl-overrides-explicit-source-language",
+    129,
+    "the deprecated `AllowGLSL` compatibility option selects GLSL and overrides an explicit ~language source-language selection on the same translation unit"
+)
+
+err(
+    "unsupported-serialized-module-version",
+    130,
+    "cannot load IR module version ~actualVersion; this compiler supports IR module versions ~minimumVersion through ~maximumVersion",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-version",
+    131,
+    "ignoring IR module version ~actualVersion because this compiler supports IR module versions ~minimumVersion through ~maximumVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+err(
+    "unsupported-serialized-module-format-version",
+    132,
+    "cannot load serialized module format version ~actualVersion; regenerate the serialized module with this compiler",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-format-version",
+    133,
+    "ignoring unsupported serialized module format version ~actualVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
 err(
     "unknown-source-language",
     19,
@@ -423,6 +534,12 @@ err(
     "unable-to-set-default-downstream-compiler",
     87,
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
+)
+
+standalone_note(
+    "module-format-not-finalized",
+    88,
+    "the Slang module file format is not yet finalized and is not versioned across compiler releases; a compiled Slang module can only be loaded by the exact same Slang compiler version that produced it"
 )
 
 err("expecting-slang-riff-container", 89, "expecting a slang riff container")
@@ -949,6 +1066,20 @@ err(
 )
 
 err(
+    "signed-type-name-in-hlsl",
+    20021,
+    "'signed' is not supported in HLSL",
+    span { loc = "location", message = "'signed' is not supported in HLSL; use 'int' instead" }
+)
+
+err(
+    "unsupported-traditional-integer-type-name-in-hlsl",
+    20022,
+    "traditional integer type name is not supported in HLSL",
+    span { loc = "location", message = "traditional integer type name '~typeName' is not supported in HLSL" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
@@ -1423,6 +1554,13 @@ err(
 )
 
 err(
+    "operator-declared-as-member",
+    30073,
+    "operator declared as a member",
+    span { loc = "decl:Decl", message = "operator '~decl' cannot be declared as a member of a type or extension; a call site for this operator resolves its name by lexical scope lookup rather than by member lookup on the operand type, so member operators are not supported. Declare it as a free function 'operator~decl(...)' at module or namespace scope instead." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
@@ -1858,7 +1996,7 @@ err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
-    span { loc = "expr:Expr", message = "argument to countof can only be a type pack or tuple" }
+    span { loc = "expr:Expr", message = "argument to countof must be a type pack, tuple, value pack, or fixed-size array" }
 )
 
 err(
@@ -2051,7 +2189,7 @@ err(
 )
 
 err(
-    "generic-argument-does-not-satisfy-constraint",
+    "generic-argument-does-not-satisfy-constraint", -- span message kept in sync with note E40023
     30440,
     "generic constraint not satisfied",
     span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
@@ -3199,6 +3337,13 @@ warning(
     span { loc = "modifier:Modifier", message = "constexpr modifier is ignored here" }
 )
 
+err(
+    "builtin-only-modifier-on-non-core-decl",
+    31229,
+    "builtin-only modifier on a non-core-module declaration",
+    span { loc = "modifier:Modifier", message = "'~modifier' can only be applied to declarations in the core module" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -3395,6 +3540,20 @@ err(
     30510,
     "loop in differentiable function needs attributes",
     span { loc = "location", message = "loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute." }
+)
+
+warning(
+    "compile-time-for-is-deprecated",
+    30525,
+    "compile-time for is deprecated",
+    span { loc = "location", message = "compile-time for is deprecated and will be removed in Slang 202c. Use '[ForceUnroll] for' instead." }
+)
+
+err(
+    "compile-time-for-is-removed",
+    30526,
+    "compile-time for has been removed",
+    span { loc = "location", message = "compile-time for has been removed from the language. Use '[ForceUnroll] for' instead." }
 )
 
 -- Switch (306xx)
@@ -4051,6 +4210,36 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Note-severity companions to the E38029 / E30440 constraint-failure errors, attached to the
+-- "no overload applicable" error for a rejected generic candidate. The DSL binds severity at
+-- definition time, so a note cannot reuse an error's text; each message string below is
+-- intentionally identical to the *span* message of E38029 / E30440 respectively (not that error's
+-- top-level header) and MUST be kept in sync — rewording either error's span message should update
+-- its companion note here (and vice versa).
+standalone_note(
+    "overload-candidate-type-argument-does-not-conform", -- keep in sync with E38029's span message
+    40022,
+    "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "overload-candidate-generic-constraint-not-satisfied", -- keep in sync with E30440's span message
+    40023,
+    "could not satisfy the generic constraint '~constraint:String'",
+    span { loc = "location" }
+)
+
+warning(
+    "deprecated-generic-parameter-count-overload-tie-breaker",
+    40021,
+    "deprecated generic-parameter-count overload tie-breaker",
+    span {
+        loc = "location",
+        message = "overload resolution selected an otherwise ambiguous candidate by preferring the single candidate with the fewest required generic parameters; this tie-breaker is removed in Slang 202c"
+    }
+)
+
 err(
     "case-outside-switch",
     39999,
@@ -4290,10 +4479,23 @@ err(
 )
 
 err(
+    "entry-point-cannot-throw",
+    38053,
+    "entry point cannot have a 'throws' clause",
+    span { loc = "location", message = "entry point '~entryPoint:Name' cannot declare a 'throws' clause; a shader entry point has no error return channel, so handle the error inside the entry point with 'do'/'catch' instead" }
+)
+
+err(
     "entry-point-cannot-be-generic",
     38014,
     "generic entry point used without specialization arguments",
     span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
+)
+
+err(
+    "entry-point-index-out-of-range",
+    38015,
+    "entry point index ~entryPointIndex:int is out of range; the program's entry-point count is ~entryPointCount:int"
 )
 
 
@@ -4432,7 +4634,7 @@ err(
 )
 
 err(
-    "type-argument-does-not-conform-to-interface",
+    "type-argument-does-not-conform-to-interface", -- span message kept in sync with note E40022
     38029,
     "type argument doesn't conform to interface",
     span { loc = "location", message = "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'" }
@@ -5286,6 +5488,18 @@ warning(
     "the explicitly requested 64-bit coverage counter width is not executable on Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode coverage counters are capped to uint32 for this compile. Pass `-trace-coverage-counter-width 32` to make the effective width explicit; uint32 counters wrap silently at 2^32 hits per slot."
 )
 
+err(
+    "coverage-bindless-target-not-supported",
+    45116,
+    "`-trace-coverage-bindless-index` is only supported on Khronos targets (SPIR-V and GLSL): it synthesizes `__slang_coverage` as an unbounded descriptor array, which requires descriptor indexing. Omit it to use the single-buffer form, which every coverage-capable target supports."
+)
+
+err(
+    "coverage-bindless-negative-index",
+    45117,
+    "`-trace-coverage-bindless-index` requires a non-negative index, but got a negative one. A negative index selects the single-buffer form, giving one descriptor binding per shader rather than the shared array that was asked for. Pass an index of 0 or greater, or omit the option to use the single-buffer form deliberately."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -5408,6 +5622,13 @@ err(
     span { loc = "location", message = "Invalid output topology '~topology' for stage '~stage', must be one of: ~validTopologies" }
 )
 
+warning(
+    "post-depth-coverage-target-not-supported",
+    50062,
+    "`[postdepthcoverage]` is not supported on this target and will be ignored",
+    span { loc = "location", message = "the `[postdepthcoverage]` attribute has no effect on target '~target'; `SV_Coverage` will report all covered samples (pre-depth), not only those that survived the early depth/stencil test. Post-depth coverage is currently emitted only for SPIR-V and GLSL." }
+)
+
 err(
     "no-type-conformances-found-for-interface",
     50100,
@@ -5526,11 +5747,11 @@ err(
     "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
 )
 
--- Retain E52014 as the historical Slice 5 boundary; Slice 6 no longer emits it.
 err(
-    "nvvm-lowering-not-implemented",
+    "type-not-representable-by-interpreter",
     52014,
-    "direct NVVM emission is selected, but lowering Slang IR to NVVM IR is not implemented yet"
+    "type has no HostVM layout; use 'NativeString' for a null-terminated string, or compile for a host target",
+    span { loc = "location", message = "'~type:IRInst' has no HostVM layout and cannot be used at runtime" }
 )
 
 err(
@@ -5614,6 +5835,13 @@ err(
 )
 
 err(
+    "torch-entry-point-requires-body",
+    55103,
+    "'[TorchEntryPoint]' function requires a body",
+    span { loc = "location", message = "a '[TorchEntryPoint]' function must have a body; a forward declaration cannot be compiled for the torch target." }
+)
+
+err(
     "unsupported-builtin-type",
     55200,
     "unsupported builtin type",
@@ -5625,6 +5853,20 @@ err(
     55213,
     "'String' is not supported on this target",
     span { loc = "location", message = "the 'String' type and its operations are not supported when generating kernel code for this target; use 'NativeString' for a null-terminated string, or compile for a host target" }
+)
+
+err(
+    "multisampled-texture-not-supported-on-target",
+    55215,
+    "multisampled texture is not supported on this target",
+    span { loc = "location", message = "'~type:IRInst' is a multisampled texture, which is not supported by the current code generation target" }
+)
+
+err(
+    "func-type-not-supported-on-target",
+    55216,
+    "function-typed value is not supported on this target",
+    span { loc = "location", message = "a function-typed value cannot be represented when generating code for the current target; it is supported only where the value can be resolved at compile time, so name the function directly at the call site (or pass it as an argument that names a function directly) instead of storing it in a variable or selecting it at runtime" }
 )
 
 err(
@@ -5716,6 +5958,20 @@ err(
     55214,
     "shader-terminating intrinsic in non-inlinable callee",
     span { loc = "location", message = "a shader-terminating intrinsic ('IgnoreHit' or 'AcceptHitAndEndSearch') is reachable from this ray entry point only through a call that could not be inlined (for example, recursion); mark the intervening function(s) '[ForceInline]' or call the intrinsic directly in the entry point so the ray payload is written back before the ray terminates." }
+)
+
+err(
+    "optix-hit-attribute-type-not-supported",
+    55217,
+    "unsupported hit attribute type for ReportHit on OptiX",
+    span { loc = "location", message = "the hit attribute type passed to 'ReportHit' cannot be lowered to OptiX attribute registers; each scalar field must fit in one 32-bit register ('float', 'bool', and 8/16/32-bit signed or unsigned integers, and vectors/arrays/matrices of those) — 'double', 'half', and 64-bit types are not supported." }
+)
+
+err(
+    "optix-hit-attribute-too-large",
+    55218,
+    "hit attribute exceeds the OptiX attribute register limit",
+    span { loc = "location", message = "the hit attribute passed to 'ReportHit' requires ~registerCount:int 32-bit attribute registers, but OptiX supports at most 8 (32 bytes)." }
 )
 
 err(

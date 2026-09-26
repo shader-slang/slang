@@ -1301,10 +1301,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayered<float4>($0, ($1).x, int(($1).y)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($1).x, int(($1).y)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($1).x, int(($1).y)))";
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($1).x, int(($1).y))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($1).x, ($1).y, int(($1).z)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($1).x, ($1).y, int(($1).z)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($1).x, ($1).y, int(($1).z)))";
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
                         __intrinsic_asm "texCubemapLayered<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
                     default: __intrinsic_asm "invalid texture shape";
                     }
@@ -1314,12 +1332,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1D<float4>($0, ($1)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($1)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($1)))";
                         __intrinsic_asm "tex1D<$T0>($0, ($1))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($1).x, ($1).y))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($1).x, ($1).y))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($1).x, ($1).y))";
                         __intrinsic_asm "tex2D<$T0>($0, ($1).x, ($1).y)";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($1).x, ($1).y, ($1).z))";
                         __intrinsic_asm "tex3D<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($1).x, ($1).y, ($1).z))";
                         __intrinsic_asm "texCubemap<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     default: __intrinsic_asm "invalid texture shape";
                     }
@@ -2130,10 +2172,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredLod<float4>($0, ($1).x, int(($1).y), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredLod<int4>($0, ($1).x, int(($1).y), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredLod<uint4>($0, ($1).x, int(($1).y), ($2)))";
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($1).x, int(($1).y), ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredLod<float4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredLod<int4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredLod<uint4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredLod<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredLod<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredLod<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
                         __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2144,12 +2204,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLod<float4>($0, ($1), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLod<int4>($0, ($1), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLod<uint4>($0, ($1), ($2)))";
                         __intrinsic_asm "tex1DLod<$T0>($0, ($1), ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLod<float4>($0, ($1).x, ($1).y, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLod<int4>($0, ($1).x, ($1).y, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLod<uint4>($0, ($1).x, ($1).y, ($2)))";
                         __intrinsic_asm "tex2DLod<$T0>($0, ($1).x, ($1).y, ($2))";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DLod<float4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DLod<int4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DLod<uint4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
                         __intrinsic_asm "tex3DLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLod<float4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLod<int4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLod<uint4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2568,10 +2652,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayered<float4>($0, ($2).x, int(($2).y)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($2).x, int(($2).y)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($2).x, int(($2).y)))";
                         __intrinsic_asm(nvvmTextureSample) "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($2).x, ($2).y, int(($2).z)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($2).x, ($2).y, int(($2).z)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($2).x, ($2).y, int(($2).z)))";
                         __intrinsic_asm(nvvmTextureSample) "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
                         __intrinsic_asm(nvvmTextureSample) "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2582,12 +2684,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1D<float4>($0, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($2)))";
                         __intrinsic_asm(nvvmTextureSample) "tex1D<$T0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($2).x, ($2).y))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($2).x, ($2).y))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($2).x, ($2).y))";
                         __intrinsic_asm(nvvmTextureSample) "tex2D<$T0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($2).x, ($2).y, ($2).z))";
                         __intrinsic_asm(nvvmTextureSample) "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($2).x, ($2).y, ($2).z))";
                         __intrinsic_asm(nvvmTextureSample) "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -3709,10 +3835,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredLod<float4>($0, ($2).x, int(($2).y), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredLod<int4>($0, ($2).x, int(($2).y), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredLod<uint4>($0, ($2).x, int(($2).y), ($3)))";
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredLod<float4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredLod<int4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredLod<uint4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredLod<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredLod<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredLod<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
                         __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -3723,12 +3867,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLod<float4>($0, ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLod<int4>($0, ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLod<uint4>($0, ($2), ($3)))";
                         __intrinsic_asm "tex1DLod<$T0>($0, ($2), ($3))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLod<float4>($0, ($2).x, ($2).y, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLod<int4>($0, ($2).x, ($2).y, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLod<uint4>($0, ($2).x, ($2).y, ($3)))";
                         __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DLod<float4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DLod<int4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DLod<uint4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
                         __intrinsic_asm "tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLod<float4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLod<int4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLod<uint4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -10114,12 +10282,104 @@ T dot(T x, T y)
     }
 }
 
+// Computes a vector dot product with scalar arithmetic for targets without a native operation.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+T __vectorDotFallback(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    [ForceUnroll]
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
+
+// Implements the target-specific vector dot product behavior for the broad builtin-arithmetic
+// overload below. Keep its target arms and `N == 1` rule synchronized with the retained
+// floating-point and integer overloads below. Their pre-existing zero-width behavior remains
+// target-path-specific and is not normalized here.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
+    // Follow the builtin signatures defined by each target language. The HLSL `dot` type table and
+    // WGSL section 17.5.20 include integer and floating-point vectors. GLSL 4.60 section 8.5 and
+    // Metal Shading Language section 6.8 declare `dot` only for floating-point vectors. SPIR-V uses
+    // OpDot for floating-point vectors and SPV_KHR_integer_dot_product for integer vectors. Other
+    // targets use the scalar-arithmetic fallback above.
+    __target_switch
+    {
+    case glsl:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case hlsl: __intrinsic_asm "dot";
+    case metal:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case spirv:
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                OpDot $$T result $x $y
+            };
+        }
+        else
+        {
+            spirv_asm
+            {
+                OpCapability DotProduct;
+                OpCapability DotProductInputAll;
+                OpExtension "SPV_KHR_integer_dot_product";
+            };
+
+            if (__isSignedInt<T>())
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpSDot $x $y;
+                };
+            }
+            else
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpUDot $x $y;
+                };
+            }
+        }
+    case wgsl: __intrinsic_asm "dot";
+    default: return __vectorDotFallback(x, y);
+    }
+}
+
+// Keep the established floating-point and integer overloads so that concrete calls retain their
+// overload ranking and floating-point calls retain the derivative registrations on `__d_dot` in
+// `diff.meta.slang`. Those registrations bind to the floating-point signature by overload
+// resolution, so that overload remains distinct from the broader arithmetic signature.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Handle 1-vector case explicitly since many backends don't support it natively
+    // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
+    // wrapper leaves a helper in textual output, while forcing the worker inline expands it early
+    // enough to perturb existing CUDA caller-control-flow optimization. Keeping this overload's
+    // original target switch preserves both behaviors; `tests/cuda/vector-dot-unroll.slang`
+    // protects the emitted CUDA and C++ structure. Keep this switch and the `N == 1` rule
+    // synchronized with `__vectorDotImpl` above.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10143,37 +10403,14 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
-
-BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
-{
-    // Handle 1-vector case explicitly since many backends don't support it natively
-    if (N == 1)
-    {
-        return BFloat16(float(x[0]) * float(y[0]));
-    }
-    if (N == 0)
-    {
-        return BFloat16(0.0f);
-    }
-
-    __target_switch
-    {
-    case spirv:
-        return spirv_asm {
-            OpCapability BFloat16DotProductKHR;
-            OpDot $$BFloat16 result $x $y
-        };
-    case cuda:
-        __intrinsic_asm "_slang_vector_dot";
-    }
-}
-
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Handle 1-vector case explicitly since many backends don't support it natively
+    // Preserve the established concrete integer intrinsic path for the same reason as the
+    // floating-point overload above. Keep this switch and the `N == 1` rule synchronized with
+    // `__vectorDotImpl`.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10213,6 +10450,44 @@ T dot(vector<T, N> x, vector<T, N> y)
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+// Keep this broad overload below the default-rank family-specific overloads. Slang 202c removes the
+// deprecated generic-parameter-count tie-breaker, so rank -1 preserves those overloads for concrete
+// calls while still making this one available to generic code that can prove only
+// __BuiltinArithmeticType.
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorDotImpl(x, y);
+}
+
+BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return BFloat16(float(x[0]) * float(y[0]));
+    }
+    if (N == 0)
+    {
+        return BFloat16(0.0f);
+    }
+
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm {
+            OpCapability BFloat16DotProductKHR;
+            OpDot $$BFloat16 result $x $y
+        };
+    case cuda:
+        __intrinsic_asm "_slang_vector_dot";
     }
 }
 
@@ -11508,7 +11783,7 @@ void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp
     __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -13503,7 +13778,7 @@ void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
     __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -14973,7 +15248,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
     }
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : MatrixLayoutMode, let L2 : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -17575,6 +17850,7 @@ __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveIsFirstLane))]
 bool WaveIsFirstLane()
 {
     __target_switch
@@ -18119,6 +18395,7 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 T WaveReadLaneFirst(T expr)
 {
     __target_switch
@@ -18141,6 +18418,7 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
@@ -18160,6 +18438,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 {
     __target_switch
@@ -19572,15 +19851,10 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    // Here, we don't require 'raytracing' capability, instead, we add the
-    // extension directly in the generated code. The reason is that this
-    // struct is used in both raytracing and rayquery APIs, our current capability
-    // system cannot represent this struct with raytracing OR rayquery capability.
-    // So, we cannot add capability requirement on the struct itself.
-    // However, any use of this type will definitely require either raytracing or rayquery,
-    // so we have the guarantee that either raytracing or rayquery capability will be present.
-    // But if rayquery want to use this struct that is constructed from a descriptor handle,
-    // we need to make sure the raytracing extension is present.
+    // Shared by the raytracing and rayquery APIs; since the capability system cannot
+    // express "raytracing OR rayquery", this struct carries no capability of its own.
+    // Its SPIR-V type-emit supplies the required extension via the "any" mechanism,
+    // resolving to whichever ray capability is actually in effect.
     __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl_spirv)]
     [__readNone]
@@ -19590,7 +19864,6 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
-                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -19657,11 +19930,14 @@ int __callablePayloadLocation(__ref Payload payload);
 /// @remarks Used to implement dynamic shader calls during ray tracing
 /// @category raytracing
 __generic<Payload>
-[require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+[require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
     {
+    // $0 is the shader index, and $1 is the already-pointer-typed inout payload, matching the
+    // callee's pointer parameter. CallShader always returns void; results flow back through $1.
+    case cuda: __intrinsic_asm "optixDirectCall<void>($0, $1)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:
         {
@@ -19963,6 +20239,16 @@ bool __reportIntersection(float tHit, uint hitKind)
     }
 }
 
+//@hidden:
+// Marker for the OptiX write side of a portable `ReportHit`. The `attributes` aggregate is
+// passed as a single operand; the CUDA varying-param legalization pass flattens it field-wise
+// into scalar attribute leaves before emission (see `legalizeOptiXReportIntersections`).
+__generic<A>
+__intrinsic_op($(kIROp_ReportOptiXIntersection))
+[require(cuda, raytracing_intersection)]
+bool __reportOptiXIntersection(float tHit, uint hitKind, A attributes);
+//@public:
+
 /// Reports a hit from an intersection shader.
 /// @param tHit Distance along the ray where the intersection occurred
 /// @param hitKind User-defined value identifying the type of hit
@@ -19972,7 +20258,7 @@ bool __reportIntersection(float tHit, uint hitKind)
 /// @category raytracing
 __generic<A>
 [ForceInline]
-[require(glsl_hlsl_spirv, raytracing_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     __target_switch
@@ -19985,6 +20271,8 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
         static A a;
         a = attributes;
         return __reportIntersection(tHit, hitKind);
+    case cuda:
+        return __reportOptiXIntersection(tHit, hitKind, attributes);
     }
 }
 
@@ -23842,9 +24130,12 @@ struct HitObject
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
-        /// shader is invoked. (DXR 1.3 variant without AccelerationStructure parameter)
+        /// shader is invoked. (Native SER variant without AccelerationStructure parameter — the accel
+        /// structure is baked into the HitObject. Lowers on every SER target except NVAPI, whose Invoke
+        /// has no AccelerationStructure-free form.)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -23864,6 +24155,55 @@ struct HitObject
                 "NVAPI shader-execution-reordering target call "
                 "HitObject::Invoke(accelerationStructure, hitObject, payload), or compile for a "
                 "native DXR 1.3 SER target.");
+        // These cases match the 3-argument Invoke overload. The SPIR-V/GLSL bodies pass the hit
+        // object and payload to their helpers explicitly and never mention the AccelerationStructure
+        // (it is baked into the HitObject; the explicit TLAS is a pure NVAPI/DXIL artifact). The cuda
+        // case emits `optixInvoke`, whose arguments are forwarded positionally, so this 2-argument
+        // overload emits optixInvoke(hitObject, payload); the matching prelude wrapper ignores the
+        // hit-object handle and reorders on implicit thread state.
+        case _GL_NV_shader_invocation_reorder:
+            {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
+                Payload = p;
+            }
+        case glsl: // use GL_EXT until KHR is available.
+            {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __glslInvokeEXT(HitOrMiss, __rayPayloadLocation(p));
+                Payload = p;
+            }
+        case cuda: __intrinsic_asm "optixInvoke";
+        case spvShaderInvocationReorderNV:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
+                    OpHitObjectExecuteShaderNV
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __spirvExecuteShaderEXT(HitOrMiss, p);
+                Payload = p;
+            }
         }
     }
 
@@ -27393,6 +27733,48 @@ interface IOpaqueDescriptor
     static const DescriptorAccess descriptorAccess;
 }
 
+/// True when `T` lowers to a texture or sampler type — the types whose `DescriptorHandle` is a native
+/// `uint64` handle under `spvBindlessTextureNV` rather than a `uint2` heap index. Folds to a
+/// compile-time constant once `T` is concrete (peephole over `kIROp_IsBindlessTextureNVEncodable`), so
+/// it serves as a `static_assert` condition and lets dead-branch elimination drop the native cast for a
+/// non-encodable `T`. The fold calls the IR classifier `isBindlessTextureNVEncodableResourceType`
+/// (`slang-ir-util.cpp`) — the single source of truth; the AST twin `_isBindlessTextureNVUInt64ElementType`
+/// (`slang-type-layout.cpp`, for layout/reflection) must stay in agreement.
+__generic<T>
+__intrinsic_op($(kIROp_IsBindlessTextureNVEncodable))
+bool __isBindlessTextureNVEncodable_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBindlessTextureNVEncodable()
+{
+    return __isBindlessTextureNVEncodable_impl(__declVal<T>());
+}
+
+/// True when `T`'s `DescriptorHandle` uses the native `SPV_NV_bindless_texture` `uint64` representation
+/// on the current SPIR-V target: `spvBindlessTextureNV` is enabled and `T` is an encodable
+/// texture/sampler. It pairs the capability check with `__isBindlessTextureNVEncodable<T>()` for call
+/// sites not already inside a `case spvBindlessTextureNV:` — e.g. a `static_assert` condition or a
+/// target-agnostic comparison. (The native-cast dispatch in `defaultGetDescriptorFromHandle` calls
+/// `__isBindlessTextureNVEncodable<T>()` directly, since its arms already select the capability.) The
+/// `case spirv:`/`default` arm keeps the switch's inferred SPIR-V
+/// capability at `{spirv}`, so a caller does not inherit a spurious `spvBindlessTextureNV` requirement on
+/// the default model. `[ForceInline]` inlines the `__target_switch` at each call site so it folds to a
+/// compile-time constant — required both to use it as a `static_assert` condition and to let dead-branch
+/// elimination drop the native cast for a non-encodable `T`.
+[ForceInline]
+bool usesNativeSpirvDescriptorHandle<T : IOpaqueDescriptor>()
+{
+    __target_switch
+    {
+    case spvBindlessTextureNV:
+        return __isBindlessTextureNVEncodable<T>();
+    case spirv:
+    default:
+        return false;
+    }
+}
+
 __magic_type(DynamicResourceType)
 __intrinsic_type($(kIROp_DynamicResourceType))
 struct __DynamicResource<let kind = __DynamicResourceKind.General>
@@ -27439,7 +27821,60 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+        // A single `ResourceDescriptorHeap[i]` index carries no sampler index, so building a combined
+        // texture-sampler from it hard-codes the sampler to heap slot 0. Reject that only on the
+        // targets whose `defaultGetDescriptorFromHandle` arm routes a `CombinedTextureSampler`
+        // through `__makeCombinedTextureSamplerFromHandle`, i.e. consumes a separate sampler index:
+        // HLSL and SPIR-V `spvDescriptorHeapEXT`. Default SPIR-V and GLSL instead load one native
+        // combined descriptor by `.x`, where the single index is correct, so they are accepted.
+        // WGSL is not covered here: it splits a combined sampler into two descriptors in the later
+        // `lowerCombinedTextureSamplers` pass, which runs before this `static_assert` is checked and
+        // itself fails on a combined sampler built from the heap, so this guard cannot turn that into
+        // a clean diagnostic. These `case`s mirror the combined-sampler branches in
+        // `defaultGetDescriptorFromHandle`; the two lists are kept in agreement.
+        __target_switch
+        {
+        case hlsl:
+        case spvDescriptorHeapEXT:
+            static_assert(This.kind != DescriptorKind.CombinedTextureSampler, "Cannot initialize a combined texture-sampler from a single ResourceDescriptorHeap index; load the texture and sampler separately from ResourceDescriptorHeap and SamplerDescriptorHeap.");
+            break;
+        case spirv:
+            // Explicit plain-SPIR-V arm: without it the `spvDescriptorHeapEXT` case claims the whole
+            // SPIR-V family, forcing an implicit capability upgrade (E41012) on plain-SPIR-V compiles.
+            break;
+        default:
+            break;
+        }
+        return getDescriptorFromExplicitHeapIndex<This>(uint2(__getUntypedResourceHandleIndex(h), 0));
+    }
+}
+
+// A SubpassInput / SubpassInputMS is an opaque image descriptor, so like `_Texture` above it can be
+// recovered from the `UntypedResourceHandle` that `ResourceDescriptorHeap[i]` yields.
+__generic<T, let isMS : int>
+extension __SubpassImpl<T, isMS> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+
+    typealias Handle = DescriptorHandle<This>;
+
+    static const DescriptorKind kind = DescriptorKind.Texture;
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<This> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromExplicitHeapIndex<This>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
 
@@ -27457,10 +27892,10 @@ const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
     { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "RasterizerOrdered" },
     { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
     { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "RasterizerOrdered" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
     { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
     { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },
@@ -27505,7 +27940,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     [ForceInline]
     __init($(untypedHandleType) h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0)));
+        return getDescriptorFromExplicitHeapIndex<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0));
     }
 }
 
@@ -27554,19 +27989,28 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         }
     }
 
+    // Ordering compares in the handle's native representation. Handles that are `uint64` — all kinds on
+    // `cuda`, and on SPIR-V exactly the types `usesNativeSpirvDescriptorHandle` identifies (an encodable
+    // texture/sampler under `spvBindlessTextureNV`) — compare as `uint64`; everything else uses the
+    // `uint2` lexicographic order. The SPIR-V split keys on `__isBindlessTextureNVEncodable<T>()`, not on
+    // `DescriptorKind`: buffers and acceleration structures are `uint2`, and so are `SubpassInput` and
+    // `TextureBuffer`, which share a texture/texel `DescriptorKind` but are not encodable texture/sampler
+    // types. `equals` needs no such split: bit-equality is the same in either representation.
     [ForceInline]
     bool lessThan(DescriptorHandle<T> other)
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this < (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
+            break;
         }
+        if (usesNativeSpirvDescriptorHandle<T>())
+            return (uint64_t)this < (uint64_t)other;
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
     }
 
     [ForceInline]
@@ -27574,14 +28018,16 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this <= (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
+            break;
         }
+        if (usesNativeSpirvDescriptorHandle<T>())
+            return (uint64_t)this <= (uint64_t)other;
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
     }
 }
 
@@ -27673,6 +28119,48 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
+        // A `ResourceDescriptorHeap[i]` index cannot be stored in a native bindless `.Handle` (a
+        // `uint64` under `spvBindlessTextureNV` for an encodable texture/sampler): there is no faithful
+        // place for the index, so we diagnose rather than reinterpret the bits.
+        // `usesNativeSpirvDescriptorHandle<T>()` is the single source of that decision (see its
+        // definition for the `[ForceInline]`/capability-scoping rationale). Non-native and
+        // heap-index-only representations (including `spvDescriptorHeapEXT` alone) convert normally and
+        // are not diagnosed here.
+        static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
+        // A single `ResourceDescriptorHeap[i]` index also cannot build a combined texture-sampler on the
+        // targets whose `defaultGetDescriptorFromHandle` combined-sampler branch consumes a separate
+        // sampler index (HLSL, SPIR-V `spvDescriptorHeapEXT`). Under NV+EXT the native-handle assertion
+        // above already owns the diagnosis, so the check below is refined to `spvDescriptorHeapEXT`
+        // without NV (the nested switch).
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+            break;
+        case spvDescriptorHeapEXT:
+            // With `spvBindlessTextureNV` also enabled, an encodable combined sampler is a native handle
+            // and the native-handle assertion above already rejects it with the single message; adding
+            // the combined-sampler message too would be a contradictory second diagnostic (the explicit
+            // `uint2` form it recommends is itself invalid for a native handle). The check is therefore
+            // restricted to `spvDescriptorHeapEXT` without NV. The outer `case spirv:` sibling below still
+            // collapses this switch's SPIR-V capability to `{spirv}`, so the inner `spvBindlessTextureNV`
+            // arm does not leak NV onto a plain-SPIR-V compile.
+            __target_switch
+            {
+            case spvBindlessTextureNV:
+                break;
+            default:
+                static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+                break;
+            }
+            break;
+        case spirv:
+            // Explicit plain-SPIR-V arm (see the `_Texture` conversion above): avoids the implicit
+            // `spvDescriptorHeapEXT` capability upgrade (E41012) on plain-SPIR-V compiles.
+            break;
+        default:
+            break;
+        }
         return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
@@ -27684,6 +28172,10 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedSamplerHandle h)
     {
+        // As in the resource constructor: a `SamplerDescriptorHeap[j]` index cannot be stored in a native
+        // bindless sampler `.Handle` (a `uint64` under `spvBindlessTextureNV`), so diagnose via the same
+        // `usesNativeSpirvDescriptorHandle<T>()` decision and the same common message.
+        static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
         return DescriptorHandle<T>(uint2(__getUntypedSamplerHandleIndex(h), 0));
     }
 }
@@ -27755,25 +28247,19 @@ public enum BindlessDescriptorOptions
     VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
 
-/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
-/// to a descriptor object.
+/// Look up `handleValue` in the Vulkan dynamic-resource heap and return the descriptor. This is the
+/// `uint2`-handle path used directly on plain SPIR-V / GLSL (the `spirv`/`glsl` arm of
+/// `defaultGetDescriptorFromHandle`); the descriptors `spvBindlessTextureNV` does not convert (buffers
+/// and acceleration structures) reach it via that same `spirv` arm when only `spvBindlessTextureNV` is
+/// enabled (that capability implies `spirv`) — with `spvDescriptorHeapEXT` also enabled they take the
+/// EXT arm instead. So the dynamic-heap lowering lives in exactly one place. Capabilities are
+/// inferred from the body (as for `defaultGetDescriptorFromHandle`) rather than declared, so the
+/// acceleration-structure path's `__asuint64` / ray-tracing requirements are picked up automatically.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+T getDescriptorFromDynamicResourceHeap<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions)
 {
-    __target_switch
+    switch(bindlessOptions)
     {
-    case hlsl:
-        if (T.kind == DescriptorKind.Sampler)
-            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
-        else if (T.kind == DescriptorKind.CombinedTextureSampler)
-            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
-        else
-            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spirv:
-    case glsl:
-
-        switch(bindlessOptions)
-        {
 ${
 {
     static const struct
@@ -27843,17 +28329,101 @@ $}
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     }
     }
-    case wgsl:
-        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
-    case spvDescriptorHeapEXT:
+}
+
+/// Load a descriptor from the `spvDescriptorHeapEXT` descriptor heap. The single-descriptor kinds use
+/// only `handle.x` as the heap index: samplers load from the sampler heap, every other kind from the
+/// resource heap. A combined texture-sampler is the exception — it is assembled from both components of
+/// the handle (a combined descriptor carries a texture part and a sampler part), so
+/// `__makeCombinedTextureSamplerFromHandle` receives the whole `uint2` rather than just `.x`. This is
+/// the single lowering for the EXT heap, shared by the `spvDescriptorHeapEXT` arm of
+/// `defaultGetDescriptorFromHandle` and by the untyped-handle→resource constructors that convert a
+/// `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index directly to a resource, so the two
+/// paths stay in agreement.
+[ForceInline]
+T getDescriptorFromDescriptorHeapEXT<T:IOpaqueDescriptor>(uint2 handle)
+{
+    if (T.kind == DescriptorKind.Sampler)
+        return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), handle.x);
+    else if (T.kind == DescriptorKind.CombinedTextureSampler)
+        return __makeCombinedTextureSamplerFromHandle<T>(handle);
+    else
+        return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), handle.x);
+}
+
+/// Convert an explicit descriptor-heap index (from `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]`,
+/// packed as `handle.x`) into a descriptor `T`. Shared by every untyped-handle→resource constructor.
+///
+/// When the handle would use the native SPIR-V representation — `usesNativeSpirvDescriptorHandle<T>()`,
+/// i.e. `spvBindlessTextureNV` enabled and `T` an encodable texture/sampler — routing the index through the
+/// `(type, capability)`-keyed `getDescriptorFromHandle` would let the NV dispatch in
+/// `defaultGetDescriptorFromHandle` reinterpret it as a native `uint64` handle (issue #13070). In that
+/// case, load directly from the EXT heap when one also exists (`spvBindlessTextureNV + spvDescriptorHeapEXT`);
+/// when it does not (plain `spvBindlessTextureNV`), there is no heap to load from and the index conversion
+/// is unsupported — fall through to `getDescriptorFromHandle` (whose `.Handle` counterpart is diagnosed in
+/// the constructors above). In every other case defer to `getDescriptorFromHandle`, which is correct for
+/// the index and preserves a user override — this includes `spvDescriptorHeapEXT` alone
+/// (`usesNativeSpirvDescriptorHandle` is false without NV, so the override is honored) and non-native types
+/// on any target. The EXT-direct load is deliberately nested inside the `usesNativeSpirvDescriptorHandle`
+/// guard rather than keyed on `spvDescriptorHeapEXT` alone: gating it behind NV is what lets
+/// `spvDescriptorHeapEXT`-only compiles keep honoring a user `getDescriptorFromHandle` override, since only
+/// the NV+EXT combination must bypass it to avoid the `uint64` reinterpretation.
+[ForceInline]
+T getDescriptorFromExplicitHeapIndex<T:IOpaqueDescriptor>(uint2 handle)
+{
+    if (usesNativeSpirvDescriptorHandle<T>())
+    {
+        __target_switch
+        {
+        case spvDescriptorHeapEXT:
+            return getDescriptorFromDescriptorHeapEXT<T>(handle);
+        case spirv:
+        default:
+            break;
+        }
+    }
+    return getDescriptorFromHandle(DescriptorHandle<T>(handle));
+}
+
+/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
+/// to a descriptor object.
+[ForceInline]
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+{
+    __target_switch
+    {
+    case hlsl:
         if (T.kind == DescriptorKind.Sampler)
-            return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);
+            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
         else if (T.kind == DescriptorKind.CombinedTextureSampler)
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
-            return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), ((uint2)handleValue).x);
+            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spirv:
+    case glsl:
+        // This arm also collapses the switch's inferred SPIR-V requirement to `{spirv}`, so the
+        // `spvBindlessTextureNV` cases below do not force that capability onto a plain-SPIR-V compile.
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case wgsl:
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        if (__isBindlessTextureNVEncodable<T>())
+            return __castDescriptorHandleToResource<T>(handleValue);
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case spvDescriptorHeapEXT:
+        // `spvDescriptorHeapEXT` is more specific than `spvBindlessTextureNV`, so re-check NV here to
+        // keep an encodable texture/sampler on its native `uint64` cast rather than a `uint2` heap index
+        // (#13070); everything else falls through to the EXT heap.
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            if (__isBindlessTextureNVEncodable<T>())
+                return __castDescriptorHandleToResource<T>(handleValue);
+            break;
+        default:
+            break;
+        }
+        return getDescriptorFromDescriptorHeapEXT<T>((uint2)handleValue);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
     }
@@ -32395,6 +32965,18 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecExp2($0)";
     }
+}
+
+// [ForceInline]
+[require(cooperative_vector)]
+CoopVec<T, N> exp10<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    // No cooperative-vector backend provides a dedicated exp10 intrinsic, so map the scalar
+    // operation across the lanes.
+    CoopVec<T, N> ret;
+    for(int i = 0; i < N; ++i)
+        ret[i] = exp10(x[i]);
+    return ret;
 }
 
 // [ForceInline]

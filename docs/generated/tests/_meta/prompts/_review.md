@@ -50,13 +50,13 @@ For each test in the bundle:
    Does the shader body look like it should compile under `slangc` with
    the declared target? (You do not actually run `slangc`; this is a
    reading review.)
-4b. **CHECK patterns are robust** (see `_common.md` § "FileCheck / CHECK
+   4b. **CHECK patterns are robust** (see `_common.md` § "FileCheck / CHECK
    pattern hygiene"). Flag any of these — they are the most common cause
    of a test that passes lint but fails under FileCheck:
    - a pinned generated id/name — literal `%29`/`_S3`/`main_0`, or a
      numeric-only capture `%{{[0-9]+}}` for an operand (SPIR-V is
      disassembled with friendly names like `%f_0`; use `%{{[A-Za-z0-9_]+}}`);
-   - an unescaped `[[...]]` or `{{` in an expected *literal* (Metal/HLSL
+   - an unescaped `[[...]]` or `{{` in an expected _literal_ (Metal/HLSL
      attributes emit literal `[[...]]` — must be `{{\[\[}}...{{\]\]}}`);
    - a short unanchored CHECK/CHECK-NOT that is a substring of a real
      token (`OpFunction` ⊂ `OpFunctionEnd`; `StructuredBuffer` ⊂

@@ -5,6 +5,14 @@
 //NVVM-DAG: txq.width.b32
 //NVVM-DAG: txq.height.b32
 //NVVM-DAG: txq.depth.b32
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
+
+//CHECK-DAG: txq.width.b32 %0, [%1];
+//CHECK-DAG: txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];
+//CHECK-DAG: txq.width.b32 %0, [%3];
+//CHECK-DAG: txq.height.b32 %1, [%3];
+//CHECK-DAG: txq.depth.b32 %2, [%3];
+//CHECK-DAG: txq.array_size not available in CUDA
 
 // Only testing the dimensions available in CUDA via txq:
 // - txq.width.b32
@@ -35,7 +43,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     uint width = 0;
     uint height = 0;
     uint depth = 0;
-    
+    uint elements = 0;
+
     switch (idx)
     {
         case 0:
@@ -70,7 +79,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         {
             // Test 2D array texture width and height
             // Note: We don't test array size since txq.array_size is not implemented
-            cudaT2DArray.GetDimensions(width, height, depth);
+            cudaT2DArray.GetDimensions(width, height, elements);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
@@ -78,7 +87,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         {
             // Test Cube array texture width and height
             // Note: We don't test array size since txq.array_size is not implemented
-            cudaTCubeArray.GetDimensions(width, height, depth);
+            cudaTCubeArray.GetDimensions(width, height, elements);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }

@@ -89,6 +89,7 @@ bool isSimpleDecoration(IROp op)
     switch (op)
     {
     case kIROp_EarlyDepthStencilDecoration:
+    case kIROp_PostDepthCoverageDecoration:
     case kIROp_GLSLFragDepthGreaterDecoration:
     case kIROp_GLSLFragDepthLessDecoration:
     case kIROp_Shader64BitIndexingDecoration:
@@ -172,7 +173,7 @@ void IRUse::init(IRInst* u, IRInst* v)
 
         v->firstUse = this;
     }
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 }
@@ -189,13 +190,13 @@ void IRUse::clear()
 {
     // This `IRUse` is part of the linked list
     // of uses for  `usedValue`.
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
     debugValidate();
 #endif
 
     if (usedValue)
     {
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         auto uv = usedValue;
 #endif
         *prevLink = nextUse;
@@ -209,7 +210,7 @@ void IRUse::clear()
         nextUse = nullptr;
         prevLink = nullptr;
 
-#ifdef SLANG_ENABLE_FULL_IR_VALIDATION
+#ifdef SLANG_ENABLE_VALIDATION_IR
         if (uv->firstUse)
             uv->firstUse->debugValidate();
 #endif
@@ -1686,7 +1687,16 @@ IRInst* IRModule::_allocateInst(IROp op, Int operandCount, size_t minSizeInBytes
     // We handle the combination of the two cases by just taking the maximum of the two
     // different sizes.
     //
-    size_t defaultSize = sizeof(IRInst) + (operandCount) * sizeof(IRUse);
+    // The operand count is in-contract only when it is non-negative and small enough that the
+    // trailing operand array can be sized without wrapping `size_t`. That is trivially true for
+    // counts the compiler itself computes, but deserialization derives the count from a file, so
+    // we assert rather than silently allocating a buffer smaller than the operands written into
+    // it (`size_t` is 32 bits on WebAssembly and other 32-bit targets).
+    //
+    SLANG_RELEASE_ASSERT(operandCount >= 0);
+    SLANG_RELEASE_ASSERT(size_t(operandCount) <= (~size_t(0) - sizeof(IRInst)) / sizeof(IRUse));
+
+    size_t defaultSize = sizeof(IRInst) + size_t(operandCount) * sizeof(IRUse);
     size_t totalSize = minSizeInBytes > defaultSize ? minSizeInBytes : defaultSize;
 
     IRInst* inst = (IRInst*)m_memoryArena.allocateAndZero(totalSize);
@@ -3681,7 +3691,8 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
     IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    SLANG_RELEASE_ASSERT(scope);
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, inlinedAt ? 2 : 1, args);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
@@ -7574,6 +7585,59 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
     return setBaseInst;
 }
 
+IRSetBase* IRBuilder::getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements)
+{
+    // Produces the same canonical form as `getSet`, but the caller has already
+    // put the elements in unique-ID order with duplicates removed, so neither
+    // the intermediate hash set nor the sort is needed.
+    //
+    // Violating the precondition is not benign: a non-canonical operand list
+    // produces a set inst that hash-consing cannot dedupe against its
+    // structural equals, which silently breaks the pointer-identity that
+    // `areInfosEqual` relies on. Each clause is checked as far as it can be,
+    // but the checks are best-effort and the clauses are not independent:
+    //
+    //   * globality is a cheap pointer-level test and its loop runs in every
+    //     build. It reports through `SLANG_ASSERT_FAILURE`, so it is silenced
+    //     under `SLANG_ASSERT=release-asserts-only`.
+    //   * duplicate-freedom also runs in every build, and reports through
+    //     `SLANG_RELEASE_ASSERT`, which still fires in that mode. But it
+    //     compares only *adjacent* elements, so it is a complete duplicate
+    //     check only given the ordering clause below. A mis-ordered list whose
+    //     duplicates are not adjacent passes both loops in a release build --
+    //     which is precisely the case this contract exists to warn about.
+    //   * strict ordering is checked in debug builds only, and only by
+    //     *reading* the module's unique-ID map. `getUniqueID` assigns IDs
+    //     lazily, so calling it here would hand out IDs earlier than the
+    //     normal path does and perturb the canonical order of unrelated sets.
+    //     Elements of an already-built set always have IDs, so for real
+    //     callers the read-only lookup is a hit.
+    //
+    // So the caller owns the contract: these checks catch the easy violations
+    // and cannot substitute for it.
+    for (UInt i = 0; i < count; ++i)
+        if (sortedElements[i]->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("getSetFromSortedElements called with non-global operands");
+
+    for (UInt i = 1; i < count; ++i)
+        SLANG_RELEASE_ASSERT(sortedElements[i] != sortedElements[i - 1]);
+
+#ifdef _DEBUG
+    {
+        auto uniqueIDMap = getModule()->getUniqueIdMap();
+        for (UInt i = 1; i < count; ++i)
+        {
+            auto prevID = uniqueIDMap->tryGetValue(sortedElements[i - 1]);
+            auto curID = uniqueIDMap->tryGetValue(sortedElements[i]);
+            if (prevID && curID)
+                SLANG_ASSERT(*prevID < *curID);
+        }
+    }
+#endif
+
+    return as<IRSetBase>(emitIntrinsicInst(nullptr, op, count, sortedElements));
+}
+
 IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
 {
     return getSet(op, {element});
@@ -9744,6 +9808,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_IsSignedInt:
     case kIROp_IsUnsignedInt:
     case kIROp_IsHalf:
+    case kIROp_IsBindlessTextureNVEncodable:
     case kIROp_IsType:
         return false;
     }

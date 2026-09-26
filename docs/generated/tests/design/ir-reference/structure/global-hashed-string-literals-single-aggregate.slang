@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#global-state
-//META: doc_section_digest=bac7a68db1c6b53451394d29992a7f98fbf3c396ea3952da1944aa99947d725a
+//META: doc_section_digest=8c6eae7c2fbeb81e2aa53b0b571a66020f7197ad1677c38daf0d744e65bab956
 //META: purpose=Two hashed string literals in one module share a single global_hashed_string_literals aggregate rather than getting one container each.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // one `global_hashed_string_literals` inst, which would be impossible if each
 // literal had produced its own container.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int seed;
 uniform RWStructuredBuffer<int> buf;

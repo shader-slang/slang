@@ -15,7 +15,7 @@
 // same opcodes are produced (the doc's Comparison table does not
 // list separate float opcodes).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float fa;
 uniform float fb;

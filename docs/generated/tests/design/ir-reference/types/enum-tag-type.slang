@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#enum
-//META: doc_section_digest=fbad40c77316c6d0ccecadf6b095a69b22c020abbd874fb88074e1b5f0aa454f
+//META: doc_section_digest=8b107bd2829f38620fc858c791f681dad7a588b3f99937d0bad39271de7ca887
 //META: purpose=An enum declaration lowers to the Enum parent opcode whose single operand is its integer tag type.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -17,7 +17,7 @@
 // members' signatures), which pins both the opcode and its single
 // default-Int tag-type operand.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 enum Color
 {

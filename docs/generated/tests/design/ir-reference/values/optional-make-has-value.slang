@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#result--optional--conditional-helpers
-//META: doc_section_digest=2070b804ffe429adfe07337c383110c2410beb4263e104117d5308624fabdfed
+//META: doc_section_digest=c6530a50486d7dbd37de911a5b051159a9daacde724b2a9b71968138031143b2
 //META: purpose=`Optional<T>` constructors (`return x;` and `return none;`) lower to `makeOptionalValue` / `makeOptionalNone`, and accessors `o.hasValue` / `o.value` lower to `optionalHasValue` / `getOptionalValue`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // `Optional<int>` (with both success and `none` branches) plus a
 // caller that inspects `.hasValue` and `.value` surfaces all four.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform bool c;

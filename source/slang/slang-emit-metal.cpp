@@ -724,6 +724,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 {
     switch (inst->getOp())
     {
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // Metal spells an array as `metal::array<T,N>`, a struct wrapping a `T[N]` member, so
+            // its initializer needs two brace levels — the struct and its member array — whereas
+            // the base emitter emits one and relies on brace-elision, which is ambiguous for nested
+            // arrays (same shape and handling as the C++ `FixedArray` target).
+            m_writer->emit("{ ");
+            defaultEmitInstExpr(inst, inOuterPrec);
+            m_writer->emit(" }");
+            return true;
+        }
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeVectorFromScalar:
@@ -773,12 +785,19 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         {
             if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
             {
-                // Metal does not support negate operator on matrices,
-                // we should emit "(matrix(0) - op0)" instead.
+                // Metal has no unary '-' on matrices, so lower matrix negation to
+                // "(matrix(0) - op0)". The explicit parentheses wrap the whole subtraction, so its
+                // outer context is effectively lowest-precedence: pass EmitOp::General (not the
+                // incoming outerPrec) and emit op0 as the subtraction's right-hand side. This wraps
+                // an operand that binds no tighter than '-' -- the additive "m1 + m2" (its
+                // left-associative RHS, at equal precedence) -- but not a tighter operand or an
+                // atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }
@@ -842,19 +861,27 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         {
             // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(ulong)(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_CastUInt64ToDescriptorHandle:
         {
             // Metal: cast integer back to pointer type.
+            // Precedence-wrapped like the kIROp_BitCast case below (#12732).
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(");
             emitType(inst->getDataType());
             m_writer->emit(")(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_BitCast:
@@ -869,12 +896,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             if (toIsPointer || fromIsPointer)
             {
-                // C-style cast for pointer conversions
+                // C-style cast for pointer conversions. A cast is a prefix expression
+                // and binds looser than a postfix member access, so wrap it by
+                // precedence; otherwise `(T*)p->field` binds `->` to `p`, not the cast
+                // result, and Metal rejects it (#12732).
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
                 m_writer->emit("(");
                 emitType(toType);
                 m_writer->emit(")(");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
+                maybeCloseParens(needClose);
             }
             else
             {
@@ -1044,21 +1077,30 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_MetalSetIndices:
         {
             auto setIndices = as<IRMetalSetIndices>(inst);
-            const auto indices = as<IRVectorType>(setIndices->getElementValue()->getDataType());
-            UInt numIndices = as<IRIntLit>(indices->getElementCount())->getValue();
-            for (UInt i = 0; i < numIndices; ++i)
+            auto value = setIndices->getElementValue();
+            // Scalar for point topology, uint2/uint3 for lines/triangles.
+            auto vectorType = as<IRVectorType>(value->getDataType());
+            SLANG_ASSERT(vectorType || as<IRBasicType>(value->getDataType()));
+            IRIntegerValue numIndices = vectorType ? getIntVal(vectorType->getElementCount()) : 1;
+            for (IRIntegerValue i = 0; i < numIndices; ++i)
             {
                 m_writer->emit("_slang_mesh.set_index(");
-                emitOperand(setIndices->getIndex(), getInfo(EmitOp::General));
+                emitOperand(
+                    setIndices->getIndex(),
+                    leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Mul)));
                 m_writer->emit("*");
-                m_writer->emitUInt64(numIndices);
+                m_writer->emitInt64(numIndices);
                 m_writer->emit("+");
-                m_writer->emitUInt64(i);
-                m_writer->emit(",(");
-                emitOperand(setIndices->getElementValue(), getInfo(EmitOp::General));
-                m_writer->emit(")[");
-                m_writer->emitUInt64(i);
-                m_writer->emit("]);\n");
+                m_writer->emitInt64(i);
+                m_writer->emit(",");
+                emitOperand(value, leftSide(getInfo(EmitOp::General), getInfo(EmitOp::Postfix)));
+                if (vectorType)
+                {
+                    m_writer->emit("[");
+                    m_writer->emitInt64(i);
+                    m_writer->emit("]");
+                }
+                m_writer->emit(");\n");
             }
             return true;
         }
@@ -1155,8 +1197,15 @@ void MetalSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
 
 void MetalSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
-    // Does not apply to metal.
-    SLANG_UNUSED(decoration);
+    switch (decoration->getOp())
+    {
+    case kIROp_NoInlineDecoration:
+        m_writer->emit("__attribute__((noinline))\n");
+        break;
+
+    default:
+        break;
+    }
 }
 
 void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
