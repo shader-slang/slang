@@ -741,14 +741,6 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     }
 
     // Non-structural or mismatched structural paramType: produce a flat UntaggedUnion.
-    //
-    // Note: `isConcreteType` also recurses through `IRDifferentialPairType`/`IRConditionalType`,
-    // but the structural cases above do not decompose them, so a `DiffPair`/`Conditional` whose
-    // value type is an already-refined info type would be flat-wrapped here (the #13046 double-wrap
-    // class) rather than preserved. Current lift points are not known to produce such a shape (a
-    // `DifferentialPair` reaching here wraps a concrete value type; a `ConditionalType` does not
-    // reach here), so the matching recursion is deliberately omitted; add the two cases for
-    // symmetry with `isConcreteType` if such a shape is ever produced.
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
