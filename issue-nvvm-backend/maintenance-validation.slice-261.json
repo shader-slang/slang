@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "slice": 261,
+  "status": "validated-tooling",
+  "compiler_changed": false,
+  "fresh_gpu_execution": false,
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-260.json",
+    "sha256": "edead9d5e1ee49e87c59d195b13ad7d8d17e4164b9e085eee8c699b511363fbf"
+  },
+  "tests": {
+    "results_contracts": {
+      "passed": 11,
+      "command": "python3 issue-nvvm-backend/test-nvvm-results.py"
+    },
+    "discovery_contracts": {
+      "passed": 6,
+      "command": "python3 issue-nvvm-backend/test-run-compute-discovery.py"
+    },
+    "complex_contracts": {
+      "passed": 14,
+      "skipped": 1,
+      "command": "python3 issue-nvvm-backend/test-run-complex-corpus.py"
+    }
+  },
+  "historical260_replay": {
+    "comparison": {
+      "path": "build/nvvm-maintenance/slice-261-final-replay260/comparison.json",
+      "sha256": "42cd9cbbb78f6c050685b35ddae0a5197049222c3656ce47eca080b8225c77d8"
+    },
+    "cells": 1713,
+    "correct": 1674,
+    "unresolved": 39,
+    "unresolved_history_exact": true,
+    "resolved_history_exact": true
+  },
+  "historical257_report": {
+    "summary": {
+      "path": "build/nvvm-maintenance/slice-261-historical257-matplotlib-report/summary.json",
+      "sha256": "1c9c65d185dca0a4afe7638831737380630fb78512b67dc8965506b25a053a37"
+    },
+    "compile_attempts": 132,
+    "assembly_attempts": 66,
+    "new_measurement": false
+  },
+  "quality_render_contract": {
+    "synthetic": true,
+    "summary": {
+      "path": "build/nvvm-maintenance/slice-261-quality-report-contract/report/summary.json",
+      "sha256": "21219f6a1ed70ae6ba57b6eef9424d713077b1a3d976c2f7c67e56fd0255a82d"
+    }
+  },
+  "review": "Separate read-only review; identified and fixed provenance, inventory, numeric, false-pass and baseline-laundering issues.",
+  "formatting": "Repository formatting passed with existing build/nvvm-setup tools; git diff --check passed.",
+  "limitations": [
+    "No fresh checkpoint/material/quality execution until postmerge slice262/263.",
+    "General development loop remains stopped.",
+    "Raw evidence stays under ignored build; old raw baseline files are not required for comparison."
+  ]
+}

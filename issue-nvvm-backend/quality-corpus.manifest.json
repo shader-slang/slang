@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "scope": "compile-and-assemble-only",
+  "architecture": 80,
+  "selection": "Fixed representative subset of accepted260 frozen runtime cells; not the whole corpus. Runtime correctness must reference the current checkpoint.",
+  "workloads": [
+    {
+      "name": "hlsl-intrinsic-scalar-int",
+      "source": "tests/hlsl-intrinsic/scalar-int.slang",
+      "source_sha256": "75127653aa50695a4ce69786f8d2c5e0dbba30b1b8d3a96d54c34a30e4a3faed",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "hlsl-intrinsic/scalar-int.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "hlsl-intrinsic-vector-int-runtime-index",
+      "source": "tests/hlsl-intrinsic/vector-int-runtime-index.slang",
+      "source_sha256": "b6529dc16cd5d7d5faa92ba4038ab769503250e09cb812c6e745c4d57470e853",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "hlsl-intrinsic/vector-int-runtime-index.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "hlsl-intrinsic-vector-dot-int",
+      "source": "tests/hlsl-intrinsic/vector-dot-int.slang",
+      "source_sha256": "689b2884dc36768796bef1573e88df84657d16bb3ed4acc6424fdf4fef90fcb8",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "hlsl-intrinsic/vector-dot-int.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "cuda-nvvm-half-values",
+      "source": "tests/cuda/nvvm-half-values.slang",
+      "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "cuda/nvvm-half-values.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "cuda-nvvm-float-matrix-values",
+      "source": "tests/cuda/nvvm-float-matrix-values.slang",
+      "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "cuda/nvvm-float-matrix-values.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "cuda-nvvm-helper-copyable-values",
+      "source": "tests/cuda/nvvm-helper-copyable-values.slang",
+      "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "cuda/nvvm-helper-copyable-values.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "cuda-nvvm-conventional-global-multi-resource",
+      "source": "tests/cuda/nvvm-conventional-global-multi-resource.slang",
+      "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "cuda/nvvm-conventional-global-multi-resource.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "compute-matrix-layout-structured-buffer",
+      "source": "tests/compute/matrix-layout-structured-buffer.slang",
+      "source_sha256": "1736b0bb4ebe4f69ba08ca4ca7680e0a6e856bd7fcf50a7e159054cbd3b38bb8",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "compute/matrix-layout-structured-buffer.slang#cuda-1",
+      "compiler_options": ["-matrix-layout-row-major"]
+    },
+    {
+      "name": "compute-groupshared",
+      "source": "tests/compute/groupshared.slang",
+      "source_sha256": "d7d9ad7be3109b285c9ab87f035cb74992314d4a78c23e57fd4bf5bef7e13156",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "compute/groupshared.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "compute-switch-stmt",
+      "source": "tests/compute/switch-stmt.slang",
+      "source_sha256": "4c082c011ed34ec31261febdd27ebf198e1e62f3ec07a7b7bf2fd45ea3638f60",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "compute/switch-stmt.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "compute-loop-unroll",
+      "source": "tests/compute/loop-unroll.slang",
+      "source_sha256": "839d23620aeaa5bf16b7828d2535e882c94be5ba471e1df8451067c177e4a657",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "compute/loop-unroll.slang#cuda-1",
+      "compiler_options": []
+    },
+    {
+      "name": "compute-mutating-and-inout",
+      "source": "tests/compute/mutating-and-inout.slang",
+      "source_sha256": "c80f8874f639fa278dea06e6d331672d52104596439f76c6a9055fe57b07c893",
+      "entry_points": ["computeMain"],
+      "stage": "compute",
+      "runtime_id": "compute/mutating-and-inout.slang#cuda-1",
+      "compiler_options": []
+    }
+  ]
+}

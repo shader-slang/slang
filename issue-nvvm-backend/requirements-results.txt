@@ -1,0 +1,2 @@
+# Only report generation needs third-party packages. Execution/comparison use the standard library.
+matplotlib>=3.8,<4

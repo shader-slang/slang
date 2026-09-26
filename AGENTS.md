@@ -63,7 +63,12 @@ For NVVM development, read `issue-nvvm-backend/WORKFLOW.md` and
 `issue-nvvm-backend/STATUS.md` before selecting or resuming a slice. They define the agreed loop,
 current acceptance evidence, and next action. A request to prepare the loop does not start it;
 an explicit start/resume request authorizes continuing through accepted local commits until a
-recorded stopping condition requires human input.
+recorded stopping condition requires human input. Finite maintenance or results-refresh requests do
+not restart the general loop. Future NVVM slices use compact plans/five-part reports and one
+structured outcome/comparison/provenance record; retain per-cell obligations and failure histories,
+but keep raw logs, source snapshots, repeated samples and exhaustive artifact indexes under ignored
+`build/`. Keep STATUS short and link historical evidence through `issue-nvvm-backend/HISTORY.md`.
+Use `issue-nvvm-backend/RESULTS.md` for refresh commands and `HANDOFF.md` for a fresh session.
 
 ## WSL and Windows Tooling
 
