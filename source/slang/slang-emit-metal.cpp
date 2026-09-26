@@ -1414,7 +1414,9 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            if (type->getOp() == kIROp_BorrowInParamType)
+            if (type->getOp() == kIROp_BorrowInParamType ||
+                (type->getOp() == kIROp_RefParamType &&
+                 ptrType->getAccessQualifier() == AccessQualifier::Read))
             {
                 m_writer->emit("const ");
             }

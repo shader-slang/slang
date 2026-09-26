@@ -4309,8 +4309,14 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
+                checkGroupSharedArgumentOfParam(paramDecl, argExpr);
 
-                if (as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType))
+                // A read-only `groupshared` parameter is a `ref` whose callee cannot write through
+                // it, so its argument need not be mutable: another `const groupshared` parameter is
+                // a valid argument. The check above already requires the argument to name
+                // group-shared storage.
+                if ((as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType)) &&
+                    !isReadOnlyGroupSharedParam(paramDecl))
                 {
                     // `out`, `inout`, and `ref` parameters currently require
                     // an *exact* match on the type of the argument.
@@ -5912,11 +5918,15 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             }
         case ParamPassingMode::Ref:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
-            }
+                // A `no_diff` `ref` parameter legitimately uses this no-diff type; the same mapping
+                // also keeps an unsupported differentiable `ref` parameter (which autodiff cannot
+                // lower) from aborting here.
+                paramTypes.add(m_astBuilder->getModifiedType(
+                    paramValType,
+                    {m_astBuilder->getNoDiffModifierVal()}));
 
-            break;
+                break;
+            }
         }
     }
 
@@ -7590,6 +7600,20 @@ static PtrType* getValidTypeForAddressOf(
         // Check if the base expression is something we can get the address-of.
         return getValidTypeForAddressOf(visitor, m_astBuilder, swizzleExpr->base, targetType);
     }
+    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(baseExpr))
+    {
+        // As with vector swizzles, only a single matrix component (e.g. `m._m00`) is a
+        // contiguous, addressable location; a multi-element matrix swizzle is not.
+        if (matrixSwizzleExpr->elementCount > 1)
+            return nullptr;
+
+        return getValidTypeForAddressOf(visitor, m_astBuilder, matrixSwizzleExpr->base, targetType);
+    }
+    else if (auto parenExpr = as<ParenExpr>(baseExpr))
+    {
+        // Parentheses are value-preserving, so `(x)` is addressable exactly when `x` is.
+        return getValidTypeForAddressOf(visitor, m_astBuilder, parenExpr->base, targetType);
+    }
     return nullptr;
 }
 
@@ -7607,6 +7631,87 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
+}
+
+// Strip the projections that read a part of an object -- `.field`, `[i]`, `.xy`, `._m00`, `(...)`
+// -- to reach the object whose declaration carries the address space. `groupshared` sits on that
+// object, never on the part.
+//
+// Anything reached through a pointer stops the walk, because there the pointer's own type carries
+// the address space.
+static Expr* getBaseObjectOfProjection(Expr* expr)
+{
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        else if (auto indexExpr = as<IndexExpr>(expr))
+            expr = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            // A multi-element swizzle may be non-contiguous, so it has no address of its own and
+            // the caller materializes a private temporary for it. Stop, so that such an argument is
+            // judged on its own and rejected rather than inheriting the base's address space.
+            if (swizzleExpr->elementIndices.getCount() > 1)
+                return expr;
+            expr = swizzleExpr->base;
+        }
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            if (matrixSwizzleExpr->elementCount > 1)
+                return expr;
+            expr = matrixSwizzleExpr->base;
+        }
+        else if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            auto memberDecl = memberExpr->declRef.getDecl();
+            if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
+                (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
+                return expr;
+            expr = memberExpr->baseExpression;
+        }
+        else
+            return expr;
+    }
+}
+
+// Return whether `arg` names thread-group-shared storage: strip the projections that read a part of
+// an object to reach the addressed object, then ask `getValidTypeForAddressOf` for its addressable
+// pointer type and inspect that pointer's address space. `getValidTypeForAddressOf` already
+// computes the addressable pointer type -- carrying its address space -- for an addressable
+// expression, so it is reused as the source of truth rather than re-deriving addressability here.
+bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
+{
+    if (!arg)
+        return false;
+
+    auto addressedExpr = getBaseObjectOfProjection(arg);
+
+    if (auto ptrType = getValidTypeForAddressOf(
+            this,
+            m_astBuilder,
+            addressedExpr,
+            getType(m_astBuilder, addressedExpr)))
+    {
+        if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
+            return (AddressSpace)addrSpaceVal->getValue() == AddressSpace::GroupShared;
+    }
+    return false;
+}
+
+// A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
+// its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
+// rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
+// semantics HLSL requires (DXC rejects it outright with error 0043).
+void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
+{
+    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
+        return;
+
+    if (!argumentNamesGroupSharedStorage(argIn))
+        getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
+            .param = getText(paramIn->getName()),
+            .arg = argIn});
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)

@@ -3679,6 +3679,13 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
+    // The checker gives every `groupshared` parameter a `RefModifier` and no `BorrowModifier` (in
+    // `SemanticsDeclHeaderVisitor::visitParamDecl`), so it always takes the `ref` branch below. Any
+    // other mode could copy thread-group-shared storage at the call boundary, so we assert in
+    // release builds too.
+    SLANG_RELEASE_ASSERT(
+        !paramDecl->hasModifier<HLSLGroupSharedModifier>() ||
+        (paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>()));
     if (paramDecl->hasModifier<RefModifier>())
     {
         return ParamPassingMode::Ref;
@@ -3752,6 +3759,12 @@ ParamPassingMode getParamPassingMode(ParamDecl* paramDecl)
     auto declaredMode = getExplicitlyDeclaredParamPassingMode(paramDecl);
     auto actualMode = adjustParamPassingModeBasedOnParamType(declaredMode, paramDecl->getType());
     return actualMode;
+}
+
+bool isReadOnlyGroupSharedParam(VarDeclBase* decl)
+{
+    return decl && decl->hasModifier<HLSLGroupSharedModifier>() &&
+           decl->hasModifier<ConstModifier>();
 }
 
 /// The default parameter-passing mode to use for a `this` parameter,
@@ -4750,7 +4763,11 @@ void _lowerInfoFromFuncParameters(
             irParamType = builder->getBorrowInOutParamType(irParamType);
             break;
         case ParamPassingMode::Ref:
-            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
+            irParamType = builder->getRefParamType(
+                irParamType,
+                isReadOnlyGroupSharedParam(paramInfo.decl) ? AccessQualifier::Read
+                                                           : AccessQualifier::ReadWrite,
+                AddressSpace::Generic);
             break;
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);

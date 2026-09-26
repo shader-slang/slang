@@ -927,8 +927,10 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                 }
             case ParamPassingMode::Ref:
                 {
-                    // Ref parameters not allowed in backward diff.
-                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    // A `no_diff` `ref` parameter legitimately uses this no-diff type; the same
+                    // mapping also keeps an unsupported differentiable `ref` parameter (which
+                    // autodiff cannot lower) from aborting here.
+                    newParamTypes.add(_getNoDiffType(astBuilder, paramInfo.type));
                     break;
                 }
             default:

@@ -950,7 +950,7 @@ ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction)
     case ParameterDirectionInfo::Kind::BorrowInOut:
         return ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut);
     case ParameterDirectionInfo::Kind::Ref:
-        return ParameterDirectionInfo(ParameterDirectionInfo::Kind::Ref, direction.addressSpace);
+        return direction;
     case ParameterDirectionInfo::Kind::BorrowIn:
         return ParameterDirectionInfo(
             ParameterDirectionInfo::Kind::BorrowIn,
