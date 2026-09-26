@@ -55,3 +55,10 @@ production changes. Compiler destruction need not unload NVRTC; existing shared-
 not establish ownership across arbitrary loader references. Preserve source identity and same-owner
 reuse. All accepted270 bytes/pins/inputs/configuration remain exact; next real build refreshes version
 metadata and restored observer objects. Root used separate local audits due reviewer thread limit.
+
+Research276 qualifies the lifecycle gate:20 fresh serial processes/100compiles pass with named/empty
+programs,12 directory retirements while NVRTC refs survive, exact PTX and clean final unload.
+[Evidence276](research-evidence.slice-276.json) retains all obligations. Select a stable private
+percompiler automatic-PCH directory for277, with explicit user-directory bypass and unchanged source
+names; actual adapter lifecycle/concurrency/full-checkpoint gates remain required. Direct NVRTC tests
+qualify12.9.86 only. Full270 unchanged; original262 deletion signature remains open.

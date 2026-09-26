@@ -8,7 +8,9 @@ and two recurring paths. [Research274](report.slice-274-inheritance-observation.
 canonical inheritance keys computed once; accepted compiler restored exactly and local audits pass.
 [Research275](report.slice-275-pch-reproduction.md) reproduces shared-directory PCH ownership failures:
 8 native failures+2 crashes/16 shared processes; all24 serial/private controls pass. Next: qualify
-private namespace lifetime/user-option contracts before a bounded production fix.
+private namespace implementation and actual adapter qualification.
+[Research276](report.slice-276-pch-lifetime.md) qualifies20 lifecycle processes/100compiles: retiring
+an owner directory while NVRTC remains loaded preserves other-owner reuse and final cleanup.
 Continue reviewed local commits under [WORKFLOW](WORKFLOW.md); skip Slack, no push.
 Read [RESULTS](RESULTS.md) and [HANDOFF](HANDOFF.md).
 

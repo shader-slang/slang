@@ -89,3 +89,8 @@ ledger preserves first-known and resolved histories with their original evidence
   [evidence](research-evidence.slice-275.json), [plan](plan.slice-275-pch-reproduction.md).
   Shared16 yield6passes/8reuse failures/2crashes; serial8/private16 pass. Exact262 deletion signature
   remains open. No production change; accepted270 unchanged. Next namespace/lifetime qualification.
+
+- Research276: [PCH directory lifetime](report.slice-276-pch-lifetime.md),
+  [evidence](research-evidence.slice-276.json), [plan](plan.slice-276-pch-lifetime.md).
+  All20 processes/100compiles pass, including held-library retirement and surviving-owner reuse.
+  No production change; stable percompiler namespace selected for actual adapter qualification.
