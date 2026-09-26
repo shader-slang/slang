@@ -1,11 +1,12 @@
 # Start a fresh NVVM session
 
 Current accepted baseline: [262](runtime-validation.slice-262.json). Latest package:
-[2026-09-26](results/2026-09-26/README.md). The finite maintenance sequence is complete and the
+[attribution refresh265](results/2026-09-26-attribution/README.md), which retains original263
+compile/quality results and adds qualified264 explanations. The finite follow-up is complete and the
 development loop is **stopped**. Recheck STATUS; this header is navigation, not renewed authority.
 
 1. Read STATUS and WORKFLOW. Confirm the request's authority: results refresh, bounded maintenance,
-   or explicit development resume. The finite maintenance sequence is complete. Do
+   or explicit development resume. The finite maintenance and material follow-up sequences are complete. Do
    not choose another compiler slice merely because an old report lists a candidate.
 2. Inspect branch/HEAD, working changes, submodule pins and active plan. Preserve unrelated work.
    Finish outstanding acceptance before treating a pending checkpoint as a baseline.
@@ -29,3 +30,15 @@ For a future explicitly resumed development loop, select one workload-driven sli
 correctness priority and material cadence. Use one implementation writer and separate review; stop
 at independent blockers. For a results-only refresh, use the same accepted source and fixed workload
 manifests, and refresh provenance and measurements without extending support or restarting the loop.
+
+The current material follow-up promoted no compiler optimization. The default build is restored to
+accepted262; research instrumentation and its binaries are preserved separately under
+`build/nvvm-material-followup`. Use RESULTS's optional stage reporting and the retained experiment
+patch only for an authorized new attribution run, with fresh boundary/output qualification. Regenerate
+CMake version metadata before the next real compiler build; do not infer identity from the path.
+
+The strongest future material question is a differential reproducer for lost aggregate constants
+across helper boundaries. The general grouped/separated probes demonstrate an opportunity but do
+not reproduce the NVRTC/NVVM asymmetry. One-shot serialization is a separate sub-percent opportunity;
+compact local storage has broader ABI/representation scope. These are discussion items, not active
+slices. Accepted262's39 gaps and PCH concurrency limitation remain unchanged.

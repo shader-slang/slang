@@ -76,6 +76,11 @@ latency is not successful compile time. PTX/cubin bytes, registers, stack/spills
 sections are observations with explicit entry/module scope, not kernel speed. Material runtime needs
 binding, texture/LUT/input and expected-output contracts before any runtime/performance claim.
 
+For temporary profiling, preserve the accepted compiler/module/cache layout and qualify unchanged
+outputs before interpreting timers. Keep experimental identities separate and restore the accepted
+layout at closeout. Compute disjoint residuals and percentages per sample, not from marginal medians.
+Unpaired sessions and source-level counterfactuals do not establish compiler optimization wins.
+
 Future accepted slices retain a compact five-part report (normally 1–2 pages), completed bounded plan,
 one structured outcome/comparison/provenance record and relevant manifest/design deltas. Keep STATUS
 short: current accepted state, known gaps, current action, authority, and links. Raw logs, repeated

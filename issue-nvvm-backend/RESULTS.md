@@ -214,6 +214,36 @@ metrics proves GPU speed, occupancy, numerical equivalence or a particular optim
 
 ## Package and stop
 
+### Optional compiler-stage attribution
+
+For a qualified instrumented material run, use the same reporter with an explicit option:
+
+```bash
+build/nvvm-results-tools/bin/python issue-nvvm-backend/nvvm-results.py report \
+  --stage-attribution --measurements "$NVVM_RESULTS/material/measurements.json" \
+  --output "$NVVM_RESULTS/attribution-report"
+```
+
+This adds `stage-attribution.json`, `.md`, `.svg` and `.png`. Keep the raw scope logs: the reporter
+requires matching names, invocation counts and values, plus nested and outer interval containment.
+It forms disjoint durations, remaining wall time and percentages per sample before computing medians
+and inclusive IQRs; warmups are excluded and both rounds retained. Do not stack or sum marginal
+medians. NVRTC exposes no separate verification call; its zero in that category is not proof of no
+internal verification. The opaque vendor compile API is not pure optimization time.
+
+[The attribution experiment](experiments/material-attribution/README.md) preserves the temporary
+profiler patch and its scope definitions. Revalidate boundaries after compiler changes, preserve the
+accepted binary/module/cache layout, and prove output preservation before interpreting new profiling
+results. Discarded measurement-only changes do not create a new full correctness baseline. Restore
+the accepted layout exactly and preserve the experimental build separately at closeout.
+
+The [explanatory265 package](results/2026-09-26-attribution/README.md) is an example that explicitly
+inherits baseline263 quality/timing while adding qualified264 research. A later compiler optimization
+must use new accepted correctness and paired before/after measurements; unrelated timing sessions
+cannot establish its effect. Label source-level counterfactual probes separately from compiler wins.
+Copy the four stage artifacts into a new package, retaining generated JSON/Markdown/PNG bytes and
+using the SVG whitespace normalization below. Preserve original packages and raw records.
+
 `report` generates a readable `summary.md`, structured `summary.json`, and standalone SVG/PNG figures (`wall-time` for repeated material timing, `entry-registers` for quality)
 from validated complete measurements. Copy compact summaries/charts and link the reviewed correctness
 ledger from the presentation/results package; keep all raw logs/samples under ignored build. Add

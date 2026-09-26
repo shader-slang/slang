@@ -38,6 +38,94 @@ def measurements():
 
 
 class Contracts(unittest.TestCase):
+    def _stage_fixture(self, directory):
+        """Use independently chosen durations; inventory validation is tested separately."""
+        cell = {"id": "fixture-nvrtc-o3", "backend": "nvrtc", "optimization": 3,
+                "workload": "fixture", "entry": "main"}
+        rows = []
+        for rd, scale in ((0, 1), (1, 2)):
+            for wall, builtin in ((100, 10), (200, 80), (300, 30), (10000, 999)):
+                phases = {"loadBuiltinModule": builtin * scale, "frontEndExecute": 10 * scale,
+                          "generateOutput": 27 * scale, "linkAndOptimizeIR": 5 * scale,
+                          "loadDownstreamCompiler": 0, "emitEntryPointsSourceFromIR": 7 * scale,
+                          "nvrtcDownstreamCompile": 20 * scale, "nvrtcCompileProgram": 20 * scale,
+                          "nvrtcCreateProgram": 0, "nvrtcGetPTXSize": 0, "nvrtcGetPTX": 0}
+                log = Path(directory) / f"{len(rows)}.log"
+                log.write_text("".join(f"[*] {name} {2 if name == 'loadBuiltinModule' else 1} {value:.2f}ms\n"
+                                       for name, value in phases.items()))
+                rows.append({"id": cell["id"], "round": rd, "warmup": wall == 10000,
+                             "elapsed_seconds": wall * scale / 1000,
+                             "phase_ms": phases, "log": str(log)})
+        return {"kind": "material", "cells": [cell], "samples": rows}
+
+    def test_stage_residuals_and_percentages_are_aggregated_per_sample(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = results.stage_attribution(self._stage_fixture(directory))
+        groups = data["cells"][0]["groups"]
+        # Round0 residuals are [53,83,233]; subtracting marginal medians gives133.
+        self.assertEqual(groups["0"]["stages"]["other"]["ms"]["median"], 83)
+        self.assertNotEqual(groups["0"]["stages"]["other"]["ms"]["median"], 200 - 30 - 37)
+        # Builtin percentages are [10,40,10]; ratio of marginal medians gives15%.
+        self.assertEqual(groups["0"]["stages"]["builtin"]["percent_wall"]["median"], 10)
+        self.assertNotEqual(groups["0"]["stages"]["builtin"]["percent_wall"]["median"], 100 * 30 / 200)
+        self.assertEqual(groups["1"]["stages"]["other"]["ms"]["median"], 166)
+        self.assertEqual(groups["combined"]["wall_ms"]["n"], 6)
+        self.assertEqual(groups["0"]["wall_ms"]["n"], 3)
+        self.assertEqual(groups["1"]["wall_ms"]["n"], 3)
+        self.assertEqual(groups["0"]["stages"]["other"]["ms"]["q1"], 68)
+        self.assertEqual(groups["0"]["stages"]["other"]["ms"]["q3"], 158)
+        self.assertEqual(data["rounded_residual_count"], 0)
+
+    def test_nvvm_stage_partition_excludes_nested_serialization(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data = self._stage_fixture(directory)
+            data["cells"][0].update(id="fixture-nvvm-o3", backend="nvvm")
+            row = data["samples"][0]
+            row["id"] = "fixture-nvvm-o3"
+            data["samples"] = [row]
+            phases = {name: value for name, value in row["phase_ms"].items()
+                      if not name.startswith("nvrtc") and name != "emitEntryPointsSourceFromIR"}
+            phases.update(generateOutput=41, emitNVVMForEntryPoints=41, nvvmLegalizeIR=2,
+                          nvvmPlanEmission=3, nvvmLoadIRBuilder=1, nvvmEmitIR=10,
+                          nvvmSerializeIR=6, nvvmSerializeQuery=3, nvvmSerializeWrite=3,
+                          nvvmDownstreamCompile=20, nvvmVerifyProgram=4, nvvmCompileProgram=16)
+            for name in ("nvvmReadLibdevice", "nvvmCreateProgram", "nvvmAddModule", "nvvmAddLibdevice",
+                         "nvvmGetPTXSize", "nvvmGetPTX"):
+                phases[name] = 0
+            row["phase_ms"] = phases
+            Path(row["log"]).write_text("".join(
+                f"[*] {name} {2 if name == 'loadBuiltinModule' else 1} {value:.2f}ms\n"
+                for name, value in phases.items()))
+            stages = results.stage_attribution(data)["cells"][0]["groups"]["combined"]["stages"]
+            self.assertEqual(stages["direct_host"]["ms"]["median"], 16)
+            self.assertEqual(stages["vendor_verify"]["ms"]["median"], 4)
+            self.assertEqual(stages["vendor_compile"]["ms"]["median"], 16)
+            self.assertEqual(stages["other"]["ms"]["median"], 39)
+
+    def test_stage_report_rejects_inconsistent_and_impossible_evidence(self):
+        for fault in ("count", "missing", "mismatch", "containment", "root", "wall", "nan", "zero"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as directory:
+                data = self._stage_fixture(directory)
+                row = data["samples"][0]
+                log = Path(row["log"])
+                if fault == "count":
+                    log.write_text(log.read_text().replace("nvrtcCompileProgram 1", "nvrtcCompileProgram 2"))
+                elif fault == "missing":
+                    log.write_text(log.read_text().replace("[*] nvrtcCompileProgram 1 20.00ms\n", ""))
+                elif fault == "mismatch":
+                    row["phase_ms"]["nvrtcCompileProgram"] = 19
+                elif fault == "root":
+                    row["phase_ms"]["generateOutput"] = 90
+                    log.write_text(log.read_text().replace("generateOutput 1 27.00ms", "generateOutput 1 90.00ms"))
+                elif fault == "containment":
+                    # Both sources agree, but the parent is shorter than its child.
+                    row["phase_ms"]["nvrtcDownstreamCompile"] = 19
+                    log.write_text(log.read_text().replace("nvrtcDownstreamCompile 1 20.00ms", "nvrtcDownstreamCompile 1 19.00ms"))
+                else:
+                    row["elapsed_seconds"] = {"wall": .001, "nan": float("nan"), "zero": 0}[fault]
+                with self.assertRaises(ValueError):
+                    results.stage_attribution(data)
+
     def test_exported_provenance_size_is_independent_of_source_inventory(self):
         runtime = {
             "/build/RelWithDebInfo/bin/slangc": "compiler-hash",

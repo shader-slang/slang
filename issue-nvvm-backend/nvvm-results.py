@@ -542,8 +542,134 @@ def compact_provenance(provenance):
     return result
 
 
+def stage_attribution(measurements):
+    """Partition each validated material sample before summarizing disjoint timing scopes."""
+    if measurements["kind"] != "material":
+        raise ValueError("stage attribution requires material measurements")
+    definitions = {
+        "builtin": "Built-in module loading",
+        "front_end": "Slang front end (includes semantic checking and IR generation)",
+        "link": "Slang IR linking and optimization",
+        "direct_host": "Target preparation/emission, including NVVM serialization",
+        "vendor_verify": "Separate libNVVM verification call (none exposed for NVRTC)",
+        "vendor_compile": "Vendor compile API call, including NVRTC source compilation",
+        "other": "Remaining fresh-process wall time, including startup/teardown and library loading",
+    }
+    common = "loadBuiltinModule frontEndExecute generateOutput linkAndOptimizeIR loadDownstreamCompiler".split()
+    nvvm = ("emitNVVMForEntryPoints nvvmLegalizeIR nvvmPlanEmission nvvmLoadIRBuilder "
+            "nvvmEmitIR nvvmSerializeIR nvvmSerializeQuery nvvmSerializeWrite nvvmDownstreamCompile "
+            "nvvmReadLibdevice nvvmCreateProgram nvvmAddModule nvvmAddLibdevice nvvmVerifyProgram "
+            "nvvmCompileProgram nvvmGetPTXSize nvvmGetPTX").split()
+    nvrtc = ("emitEntryPointsSourceFromIR nvrtcDownstreamCompile nvrtcCreateProgram "
+             "nvrtcCompileProgram nvrtcGetPTXSize nvrtcGetPTX").split()
+    children = {
+        "nvvmSerializeIR": "nvvmSerializeQuery nvvmSerializeWrite",
+        "nvvmEmitIR": "nvvmSerializeIR",
+        "nvvmDownstreamCompile": "nvvmReadLibdevice nvvmCreateProgram nvvmAddModule nvvmAddLibdevice nvvmVerifyProgram nvvmCompileProgram nvvmGetPTXSize nvvmGetPTX",
+        "emitNVVMForEntryPoints": "linkAndOptimizeIR nvvmLegalizeIR nvvmPlanEmission nvvmLoadIRBuilder nvvmEmitIR loadDownstreamCompiler nvvmDownstreamCompile",
+        "nvrtcDownstreamCompile": "nvrtcCreateProgram nvrtcCompileProgram nvrtcGetPTXSize nvrtcGetPTX",
+        "emitEntryPointsSourceFromIR": "linkAndOptimizeIR",
+    }
+    cells, rounded = [], 0
+    for cell in measurements["cells"]:
+        is_nvvm = cell["backend"] == "nvvm"
+        if cell["backend"] not in ("nvvm", "nvrtc"):
+            raise ValueError("unsupported stage-attribution backend")
+        required = common + (nvvm if is_nvvm else nvrtc)
+        rows = []
+        for sample in (row for row in measurements["samples"] if row["id"] == cell["id"]):
+            phases = sample["phase_ms"]
+            entries = re.findall(r"^\[\*\]\s+(\w+)\s+(\d+)\s+([\d.]+)ms", Path(sample["log"]).read_text(), re.M)
+            parsed = {name: (int(count), float(value)) for name, count, value in entries}
+            if len(parsed) != len(entries) or any(name not in phases or name not in parsed
+                    or parsed[name] != (2 if name == "loadBuiltinModule" else 1, phases[name])
+                    or not math.isfinite(phases[name]) or phases[name] < 0 for name in required):
+                raise ValueError("missing, invalid or inconsistent attribution scopes: " + sample["log"])
+            if any(name in phases for name in (nvrtc if is_nvvm else nvvm)):
+                raise ValueError("mixed backend attribution scopes")
+            local_children = dict(children)
+            local_children["generateOutput"] = ("emitNVVMForEntryPoints" if is_nvvm else
+                "emitEntryPointsSourceFromIR nvrtcDownstreamCompile loadDownstreamCompiler")
+            for parent, names in local_children.items():
+                if parent in phases and phases[parent] - sum(phases[n] for n in names.split()) < -0.01 * (len(names.split()) + 1):
+                    raise ValueError("impossible attribution containment: " + parent)
+            wall = sample["elapsed_seconds"] * 1000
+            if not math.isfinite(wall) or wall <= 0:
+                raise ValueError("invalid attribution wall duration")
+            # These three outer intervals are disjoint in the instrumented CLI path.
+            if wall - sum(phases[name] for name in
+                          ("loadBuiltinModule", "frontEndExecute", "generateOutput")) < -0.04:
+                raise ValueError("impossible attribution root containment")
+            parts = {"builtin": phases["loadBuiltinModule"], "front_end": phases["frontEndExecute"],
+                     "link": phases["linkAndOptimizeIR"],
+                     "direct_host": sum(phases[n] for n in ("nvvmLegalizeIR", "nvvmPlanEmission", "nvvmLoadIRBuilder", "nvvmEmitIR")) if is_nvvm else phases["emitEntryPointsSourceFromIR"] - phases["linkAndOptimizeIR"],
+                     "vendor_verify": phases["nvvmVerifyProgram"] if is_nvvm else 0.0,
+                     "vendor_compile": phases["nvvmCompileProgram" if is_nvvm else "nvrtcCompileProgram"]}
+            parts["other"] = wall - sum(parts.values())
+            if any(not math.isfinite(value) or value < -0.08 for value in parts.values()):
+                raise ValueError("impossible attribution residual")
+            rounded += sum(value < 0 for value in parts.values())
+            parts = {name: max(0.0, value) for name, value in parts.items()}
+            if not sample["warmup"]:
+                rows.append({"round": sample["round"], "wall": wall, "parts": parts})
+        groups = {"combined": rows, **{str(rd): [row for row in rows if row["round"] == rd]
+                                      for rd in sorted({row["round"] for row in rows})}}
+        cells.append({**cell, "groups": {group: {"wall_ms": stats([row["wall"] for row in values]),
+            "stages": {name: {"ms": stats([row["parts"][name] for row in values]),
+                               "percent_wall": stats([100 * row["parts"][name] / row["wall"] for row in values])}
+                       for name in definitions}} for group, values in groups.items()}})
+    return {"schema": 1, "kind": "material-stage-attribution", "status": "passed",
+            "definitions": definitions, "cells": cells, "rounded_residual_count": rounded,
+            "method": "Partition every sample before computing inclusive quartiles and medians; warmups excluded. Both rounds retained. Displayed phase resolution is 0.01ms; residuals within 0.08ms of zero are rounded to zero. Medians and percentages need not add up across stages.",
+            "limitations": "NVVM target work includes legalization, planning, provider loading, capability checks, construction, serialization and module teardown; NVRTC target work is source emission excluding linking. Vendor compile is an opaque API duration, not pure optimization. Zero separate NVRTC verification means no separate exposed call, not absence of internal validation. No assembly or GPU time is included."}
+
+
+def write_stage_attribution(result, output, plt):
+    """Render independent stage medians and IQRs; do not stack marginal medians."""
+    write(output / "stage-attribution.json", result)
+    lines = ["# Material compilation stage attribution", "", result["method"], "", result["limitations"], "",
+             "| Cell / round | Stage | Median ms (IQR) | Median % wall (IQR) |",
+             "| --- | --- | ---: | ---: |"]
+    for cell in result["cells"]:
+        for group, values in cell["groups"].items():
+            for name, stage in values["stages"].items():
+                ms, pct = stage["ms"], stage["percent_wall"]
+                lines.append(f"| {cell['id']} / {group} | {result['definitions'][name]} | "
+                             f"{ms['median']:.2f} ({ms['q1']:.2f}–{ms['q3']:.2f}) | "
+                             f"{pct['median']:.2f} ({pct['q1']:.2f}–{pct['q3']:.2f}) |")
+    lines += ["", "![Independent stage medians](stage-attribution.svg)", "",
+              "Full statistics and provenance: [stage-attribution.json](stage-attribution.json)."]
+    (output / "stage-attribution.md").write_text("\n".join(lines) + "\n")
+    entries = list(dict.fromkeys((cell["workload"], cell["entry"]) for cell in result["cells"]))
+    figure, axes = plt.subplots(len(entries), 1, figsize=(12, 5 * len(entries)), squeeze=False)
+    labels = ["Built-in loading", "Front end", "Link/optimize IR", "Target preparation/emission",
+              "Separate vendor verify", "Vendor compile API", "Other wall time"]
+    for axis, entry in zip(axes[:, 0], entries):
+        selected = [cell for cell in result["cells"] if (cell["workload"], cell["entry"]) == entry]
+        for index, cell in enumerate(selected):
+            stages = list(cell["groups"]["combined"]["stages"].values())
+            values = [stage["ms"] for stage in stages]
+            axis.barh([pos + (index - 1) * 0.24 for pos in range(len(labels))],
+                      [value["median"] for value in values], height=0.22,
+                      xerr=[[value["median"] - value["q1"] for value in values],
+                            [value["q3"] - value["median"] for value in values]], capsize=2,
+                      label=f"{cell['backend'].upper()} O{cell['optimization']}")
+        axis.set_yticks(range(len(labels)), labels)
+        axis.invert_yaxis()
+        axis.set_title(" / ".join(entry))
+        axis.set_xlabel("Independent stage duration (ms), median and IQR; bars are not additive")
+        axis.grid(axis="x", alpha=0.2)
+        axis.legend()
+    figure.tight_layout()
+    for suffix in ("svg", "png"):
+        figure.savefig(output / ("stage-attribution." + suffix), dpi=150)
+    plt.close(figure)
+
+
 def report(args):
-    summary = summarize(read(args.measurements))
+    measurements = read(args.measurements)
+    summary = summarize(measurements)
+    attribution = stage_attribution(measurements) if getattr(args, "stage_attribution", False) else None
     summary["measurements"] = reference(args.measurements)
     summary["provenance"] = compact_provenance(summary["provenance"])
     try:
@@ -553,6 +679,11 @@ def report(args):
     except ImportError as error:
         raise ValueError("report requires matplotlib; see RESULTS.md report environment") from error
     summary["plotting"] = {"matplotlib": matplotlib.__version__}
+    if attribution is not None:
+        attribution.update(measurements=summary["measurements"], provenance=summary["provenance"],
+                           plotting=summary["plotting"])
+        write_stage_attribution(attribution, args.output, plt)
+        summary["stage_attribution"] = "stage-attribution.json"
     write(args.output / "summary.json", summary)
     lines = ["# NVVM " + summary["kind"] + " observations", "",
              "Revision: `" + summary["provenance"]["revision"] + "`.", "",
@@ -660,6 +791,8 @@ def main():
             command.add_argument("--jobs", type=int, choices=range(1, 5), default=4)
         if name == "report":
             command.add_argument("--measurements", type=Path, required=True)
+            command.add_argument("--stage-attribution", action="store_true",
+                                 help="report disjoint material stages; requires instrumented phase logs")
     args = parser.parse_args()
     args.output = args.output.resolve()
     try:

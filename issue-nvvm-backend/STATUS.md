@@ -1,7 +1,7 @@
 # NVVM backend status
 
-The general development loop is **stopped**. The finite maintenance sequence is **complete**: harness
-consolidation261, master integration/acceptance262 and results package263. No push. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and
+The general development loop is **stopped**. Maintenance261–263 and the finite material
+follow-up264–265 are **complete**. No compiler optimization was promoted in the follow-up. No push. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and
 [HANDOFF](HANDOFF.md) for a fresh session.
 
 ## Accepted compiler baseline
@@ -49,8 +49,12 @@ asymmetry. See [evidence264](timing-evidence.slice-264.json) and the reproducibl
 
 Accepted262 source and all27 saved runtime/cache identities are restored in the default build.
 Temporary instrumentation and its binaries are retained separately under `build/nvvm-material-followup`;
-no new full correctness baseline is claimed. The only remaining authorized step is results/reporting
-refresh265, then a detailed Slack DM and stop for discussion. The general loop remains stopped.
+no new full correctness baseline is claimed. [Explanatory package265](results/2026-09-26-attribution/README.md) adds a six-slide outline and
+reproducible stage reports while retaining original263 timing/quality. Research264 was notified at
+[its completion DM](https://nvidia.slack.com/archives/DFWJHPXNU/p1790432323512469).
+The finite follow-up is complete; await maintainer discussion. Completion notifications are recorded
+in the task closeout under WORKFLOW's once-per-slice policy.
+No subsequent implementation or general-loop resumption is authorized.
 
 Environment: native Ubuntu24.04, L4 SM89, driver580.126.09, SM80 target, CUDA12.9.2,
 NVRTC12.9.86, LLVM14, RelWithDebInfo. Four CPU workers maximum, two unit servers, sequential GPU

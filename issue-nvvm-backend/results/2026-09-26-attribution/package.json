@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "status": "reviewed-results-package",
+  "scope": "report-only explanatory refresh; no new compiler optimization",
+  "accepted_correctness": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-262.json",
+    "sha256": "2c43eb33a0aa1c9f72fd0931caeb042415eee179fe8962ead83d80e58ebf7104"
+  },
+  "inherited_package": {
+    "path": "issue-nvvm-backend/results/2026-09-26/package.json",
+    "sha256": "15ec09dd5ea5d4288f32f3744781de0dfcb511ff132e0a4408cbb994bd12f586"
+  },
+  "new_research": {
+    "path": "issue-nvvm-backend/timing-evidence.slice-264.json",
+    "sha256": "c185a751b441cb6179b63b17b30a8b31ca31abe92c178141d10f3495b818f99e"
+  },
+  "research_commit": "f7cd017c9",
+  "instrumentation": {
+    "path": "issue-nvvm-backend/experiments/material-attribution/instrumentation.patch",
+    "sha256": "7f880c5b3685bec75d2e98270489e18c72a4e0a7a09bc71928ceb4374f32222c"
+  },
+  "reports": {
+    "wall-time.svg": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/wall-time.svg",
+      "sha256": "7c232a774090653f60c49c04cec802016f52337f219fd38c748467df428821cb"
+    },
+    "summary.md": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/summary.md",
+      "sha256": "679e35188cd91eaf49ea4d70393a69fb2ab4f64320239fcb4dd7fdde3cd3ab6e"
+    },
+    "stage-attribution.png": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/stage-attribution.png",
+      "sha256": "5380a829abb68fdf8ce21695c20f502796e691756224958f203baacea93cc6e9"
+    },
+    "stage-attribution.json": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/stage-attribution.json",
+      "sha256": "df75361934742b5d37eed38d3c00c71bd250c3a44316673426d85820628e2bb0"
+    },
+    "stage-attribution.svg": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/stage-attribution.svg",
+      "sha256": "6e234aca75f6b1e7524ae0242d8d6eda4196c726115a73baa9466419bef83090"
+    },
+    "summary.json": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/summary.json",
+      "sha256": "47004790c2bfd5be3cc48b1278b8860ddfde1b7147bfe9c357ca5ae1e8897def"
+    },
+    "stage-attribution.md": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/stage-attribution.md",
+      "sha256": "e2a6f39b8158acff18265e6f714a38e42b888df256b315b119bc5962b71b801c"
+    },
+    "wall-time.png": {
+      "path": "issue-nvvm-backend/results/2026-09-26-attribution/attribution/wall-time.png",
+      "sha256": "d93fa1ee386686635e16d77905a2b4624656e8c49fe552389568b0429c84dacb"
+    }
+  },
+  "validation": {
+    "harness_contracts": {
+      "path": "build/nvvm-material-followup/package265/contracts-final.log",
+      "sha256": "ce3d85f41b3550a576c9ecfe0cf52dec08444f98ff71f3d8136c1cf130f5e917"
+    },
+    "legacy_material_and_quality_summaries": "byte-identical JSON/Markdown and PNG replays; SVG contains nondeterministic metadata/IDs so semantic/chart inspection applies",
+    "stage_math": "per-sample disjoint durations/residuals/percentages; median and inclusive IQR; warmups excluded; both rounds retained",
+    "svg_normalization": "trailing whitespace only, recursive XML tokens verified equivalent",
+    "independent_review": "Passed: 252 stage distributions, final containment/NVVM contracts, 13 package references, 8 exports, exact legacy replays and bounded narrative."
+  },
+  "limitations": [
+    "Inherited263 and instrumented264 wall times are not a paired optimization experiment.",
+    "No new accepted-full compiler checkpoint; default262 compiler restored.",
+    "No material runtime contract, GPU speed claim or exact causal register attribution.",
+    "Source-separated probe is not a compiler improvement or differential material reproducer.",
+    "Concurrent NVRTC PCH reliability remains unresolved; accepted262 contains explicit serial closure."
+  ],
+  "development_loop": "stopped",
+  "report_source_sha256": {
+    "issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
+    "issue-nvvm-backend/test-nvvm-results.py": "ae763dd26dc0b5d0f89e6e81dfdc626c52528e635c8566163647b260ac5228ce"
+  }
+}

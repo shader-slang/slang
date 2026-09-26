@@ -26,3 +26,7 @@ ledger preserves first-known and resolved histories with their original evidence
 - Research264: [material timing/resources](report.slice-264-material-attribution.md),
   [evidence](timing-evidence.slice-264.json), [reproducible probes](experiments/material-attribution/README.md).
   No compiler change; aggregate optimization remains a future investigation.
+
+- Results265: [explanatory Monday package](results/2026-09-26-attribution/README.md),
+  [report](report.slice-265-attribution-package.md), [plan](plan.slice-265-attribution-package.md).
+  Reusable optional stage attribution; accepted compiler unchanged; finite follow-up stopped.
