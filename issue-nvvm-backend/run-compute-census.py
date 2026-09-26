@@ -347,9 +347,11 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
         return "preflight", diagnostic, shape
     if diagnostic_code == "E52018" or "NVVM IR verification" in output or "libNVVM" in output:
         return "provider", diagnostic, shape
-    # render-test wraps compiler aborts in EXPECTED/ACTUAL output too. That wrapper does not
-    # imply a kernel executed: preserve the upstream compilation failure classification.
-    if diagnostic_code == "E99997":
+    # render-test wraps compiler failures in EXPECTED/ACTUAL output and may then compare an
+    # empty output buffer. Neither wrapper proves that a kernel executed. Preserve explicit
+    # compiler errors before considering output mismatches; the NVVM-specific categories above
+    # retain their more precise classification.
+    if diagnostic_match:
         return "infrastructure", diagnostic, shape
     infrastructure_markers = (
         "E52016",

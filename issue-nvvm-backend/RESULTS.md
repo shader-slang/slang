@@ -4,6 +4,10 @@ This is a results-only workflow. It does not restart the development loop. Run f
 root on native Linux, with matching optimized compiler, provider and test tools. Read STATUS and
 WORKFLOW first. Rebuild through `slang-build` after source changes; never benchmark stale binaries.
 The maintained entry point is `python3 issue-nvvm-backend/nvvm-results.py --help`.
+When configuring after a revision change, clear cached `SLANG_VERSION_FULL` and
+`SLANG_VERSION_NUMERIC` (`cmake --preset default -U SLANG_VERSION_FULL -U SLANG_VERSION_NUMERIC`
+plus the selected build options on this native Linux host). Verify `slangc -version` identifies
+the compiler source revision; source and binary hashes remain the acceptance identity.
 
 ## Evidence and outputs
 
@@ -53,6 +57,7 @@ build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-re
 python3 extras/validate-nvvm-toolkit.py --slangc build/RelWithDebInfo/bin/slangc \
   --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so --cuda-root "$CUDA_PATH" \
   --expected-toolkit 12.9 --architectures 80 --output "$NVVM_RESULTS/toolkit"
+python3 issue-nvvm-backend/test-run-compute-census.py
 python3 issue-nvvm-backend/test-run-compute-discovery.py
 python3 issue-nvvm-backend/test-run-complex-corpus.py
 python3 issue-nvvm-backend/test-nvvm-results.py

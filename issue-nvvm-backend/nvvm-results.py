@@ -184,6 +184,9 @@ def configure(args, output):
     paths.update(path for path in (args.slangc.parent.parent / "lib").glob("*.so*")
                  if not path.name.endswith(".dwarf"))
     paths.update((args.slangc.parent.parent / "lib").glob("*.bin"))
+    # Installed standard modules may live in versioned namespace subdirectories.
+    for directory in (args.slangc.parent, args.slangc.parent.parent / "lib"):
+        paths.update(directory.rglob("*.slang-module"))
     paths.add(args.slangc.parent / "test-server")
     if args.command == "quality":
         if (args.cuda_root / "bin/cuobjdump").is_file():
