@@ -2,11 +2,13 @@
 
 Current accepted baseline: [262](runtime-validation.slice-262.json). Latest package:
 [attribution refresh265](results/2026-09-26-attribution/README.md), which retains original263
-compile/quality results and adds qualified264 explanations. The finite follow-up is complete and the
-development loop is **stopped**. Recheck STATUS; this header is navigation, not renewed authority.
+compile/quality results and adds qualified264 explanations. Latest research is
+[the differential reproducer266](report.slice-266-material-reproducer.md), with 18 passing GPU cells.
+The bounded experiment is complete and the development loop is **stopped**. Recheck STATUS;
+this header is navigation, not renewed authority.
 
 1. Read STATUS and WORKFLOW. Confirm the request's authority: results refresh, bounded maintenance,
-   or explicit development resume. The finite maintenance and material follow-up sequences are complete. Do
+   or explicit development resume. The finite maintenance, material follow-up and reproducer266 are complete. Do
    not choose another compiler slice merely because an old report lists a candidate.
 2. Inspect branch/HEAD, working changes, submodule pins and active plan. Preserve unrelated work.
    Finish outstanding acceptance before treating a pending checkpoint as a baseline.
@@ -37,8 +39,15 @@ accepted262; research instrumentation and its binaries are preserved separately 
 patch only for an authorized new attribution run, with fresh boundary/output qualification. Regenerate
 CMake version metadata before the next real compiler build; do not infer identity from the path.
 
-The strongest future material question is a differential reproducer for lost aggregate constants
-across helper boundaries. The general grouped/separated probes demonstrate an opportunity but do
-not reproduce the NVRTC/NVVM asymmetry. One-shot serialization is a separate sub-percent opportunity;
-compact local storage has broader ABI/representation scope. These are discussion items, not active
-slices. Accepted262's39 gaps and PCH concurrency limitation remain unchanged.
+Research266 now provides a [differential fixture and commands](experiments/material-reproducer/README.md).
+Constant NVRTC/NVVM O3 has 0/3 exponentials, branchless 0/0; unmasking alone retains 0/3. The exact
+`computeMain` wrappers pass 18/18 GPU cells, including independent nonconstant controls. Initial
+named-entry harness failures and context-sensitive reductions remain recorded in
+[evidence266](research-evidence.slice-266.json). No compiler change was made.
+
+The next research question is where existing field-aware forwarding or downstream optimization
+loses counter/payload constants around canonical receiver snapshots and helper control flow.
+Neither a particular libNVVM pass nor a production transformation has been selected. Do not assume
+whole-graph return, masking, surviving calls or vector padding is individually the cause. One-shot
+serialization remains a separate sub-percent opportunity; compact local storage has broader scope.
+These are discussion items, not active slices. Accepted262's39 gaps and PCH limitation are unchanged.

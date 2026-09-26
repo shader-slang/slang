@@ -1,7 +1,9 @@
 # NVVM backend status
 
-The general development loop is **stopped**. Maintenance261–263 and the finite material
-follow-up264–265 are **complete**. No compiler optimization was promoted in the follow-up. No push. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and
+The general development loop is **stopped**. Bounded [research266](report.slice-266-material-reproducer.md)
+has isolated the material constant-loss difference with a runnable fixture and controls.
+Maintenance261–263 and material research/results264–266 are **complete**. No compiler optimization
+was promoted. No push. Read [WORKFLOW](WORKFLOW.md), [RESULTS](RESULTS.md) and
 [HANDOFF](HANDOFF.md) for a fresh session.
 
 ## Accepted compiler baseline
@@ -41,20 +43,24 @@ equal, with mixed code-size/stack tradeoffs. No general speed or code-quality ad
 [Report263](report.slice-263-results-package.md) records validation and limits. Raw evidence remains
 under `build/nvvm-results/2026-09-26-integration`.
 
-The finite material follow-up has completed [research264](report.slice-264-material-attribution.md):
-shared Slang work dominates fresh compile time; vector layout explains evaluation's stack growth;
-missed aggregate constants add arithmetic. No production optimization was promoted. The general
-probe improves when its storage is separated, but does not reproduce the material's backend
-asymmetry. See [evidence264](timing-evidence.slice-264.json) and the reproducible experiment.
+[Research264](report.slice-264-material-attribution.md) attributes fresh compile time and stack
+layout; [package265](results/2026-09-26-attribution/README.md) provides explanatory slides and
+refreshable stage reports. Their original measurements remain unchanged.
 
-Accepted262 source and all27 saved runtime/cache identities are restored in the default build.
-Temporary instrumentation and its binaries are retained separately under `build/nvvm-material-followup`;
-no new full correctness baseline is claimed. [Explanatory package265](results/2026-09-26-attribution/README.md) adds a six-slide outline and
-reproducible stage reports while retaining original263 timing/quality. Research264 was notified at
-[its completion DM](https://nvidia.slack.com/archives/DFWJHPXNU/p1790432323512469).
-The finite follow-up is complete; await maintainer discussion. Completion notifications are recorded
-in the task closeout under WORKFLOW's once-per-slice policy.
-No subsequent implementation or general-loop resumption is authorized.
+[Research266](report.slice-266-material-reproducer.md) supplies a
+[small differential fixture](experiments/material-reproducer/README.md): constant NVRTC/NVVM O3
+modules contain 0/3 exponentials; the branchless control gives 0/0, while removing the mask alone
+does not help. All 18 exact-entry GPU cells and 12 O3 assemblies pass. The independent oracle also
+checks runtime absorption values 1/2 and both normal/layer outputs. See
+[evidence266](research-evidence.slice-266.json) for provenance, per-cell outcomes and retained failures.
+Canonical aggregate snapshots and stores reach NVVM; optimized code still reloads counters/payload
+after its helper branch disappears. The internal libNVVM pass responsible is not established.
+
+Accepted262 source/build identities remain unchanged; no new full checkpoint or material GPU
+performance claim. Raw266 reductions are under `build/nvvm-material-reproducer266`; older temporary
+instrumentation remains separately under `build/nvvm-material-followup`. The bounded experiment is
+complete. Await discussion of the optimization boundary; no compiler implementation or general-loop
+resumption is authorized. Completion notifications are recorded in task closeouts.
 
 Environment: native Ubuntu24.04, L4 SM89, driver580.126.09, SM80 target, CUDA12.9.2,
 NVRTC12.9.86, LLVM14, RelWithDebInfo. Four CPU workers maximum, two unit servers, sequential GPU

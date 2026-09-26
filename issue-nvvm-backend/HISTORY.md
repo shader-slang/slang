@@ -30,3 +30,8 @@ ledger preserves first-known and resolved histories with their original evidence
 - Results265: [explanatory Monday package](results/2026-09-26-attribution/README.md),
   [report](report.slice-265-attribution-package.md), [plan](plan.slice-265-attribution-package.md).
   Reusable optional stage attribution; accepted compiler unchanged; finite follow-up stopped.
+
+- Research266: [differential material reduction](report.slice-266-material-reproducer.md),
+  [evidence](research-evidence.slice-266.json), [runnable fixtures](experiments/material-reproducer/README.md).
+  Constant NVRTC/NVVM exponential counts 0/3; branchless 0/0; 18 GPU cells pass. No compiler change;
+  exact downstream pass cause remains open. Bounded experiment complete, loop stopped.

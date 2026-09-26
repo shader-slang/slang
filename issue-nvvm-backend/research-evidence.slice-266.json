@@ -1,0 +1,839 @@
+{
+  "schema": 1,
+  "status": "accepted-research-no-compiler-change",
+  "scope": "bounded differential reproducer; no general-loop restart",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-262.json",
+    "sha256": "2c43eb33a0aa1c9f72fd0931caeb042415eee179fe8962ead83d80e58ebf7104",
+    "inherited": {
+      "full_cells": 1713,
+      "correct": 1674,
+      "unresolved": 39,
+      "new_full_checkpoint": false
+    }
+  },
+  "provenance": {
+    "workspace_revision": "95da2a79b354700f5907b5000771efac839099f8",
+    "compiler_source_revision": "49593da724e172838bd65b9eb48b2a3f11334522",
+    "compiler_source_unchanged": true,
+    "environment": {
+      "os": "Ubuntu 24.04 native Linux",
+      "configuration": "RelWithDebInfo",
+      "target": "SM80",
+      "provider_abi": 42,
+      "llvm": 14,
+      "cuda": "12.9.2",
+      "nvrtc": "12.9.86",
+      "device_query": "name, uuid, driver_version, compute_cap\nNVIDIA L4, GPU-502ada78-9ff3-cb9f-3e8e-e60d8c98c5a9, 580.126.09, 8.9"
+    },
+    "matching_artifact_sha256": {
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "fbef1a9e22f3ac0cd42d3ffbade22470f7143930608924fc39b5bc57e40eb913",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "41e286de9fcca7d5383c1ef7480d4e3ee6e3e3418ba3c14c74833d51488a06ad",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "526aa0fa08e7868234297d857c390ef8beecd5696cc95ea68c8599ae3648c0ef",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "4a207ec0d3f390152dd593a21af81f4b1fe30d9e1c5edd065343bd3590f8bbbc",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "92924a30620ff99129ac9bb1ab94da0f57bc76123bb6063bcd68182a6fbb1342",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "adb135da699c668fbcc02f63baf648530ecf2f5589b6423c5855993a5e70308e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "98f2e48608111100f424e75a11ab34b7c78fa9718ed93a154b28249e27f06a37",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "8e8b401a8e244d1a604de2b11770d753cec8dd6d11af3bbdf531fed86be53c7b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "8e8b401a8e244d1a604de2b11770d753cec8dd6d11af3bbdf531fed86be53c7b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "3e5ab90d6c559096acaae6bf21ba14f7929cb056b36f9a7c1099048949b6fb76",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "cf461b3777b1f6178b9f3c28268a1bc76d9370a0dc7a8679f5544ff22a0f427e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "cf461b3777b1f6178b9f3c28268a1bc76d9370a0dc7a8679f5544ff22a0f427e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "c7f23600efe703a731c7d4a9b88991897fd234bd70506280b7be5168d4200a19",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "8e8b401a8e244d1a604de2b11770d753cec8dd6d11af3bbdf531fed86be53c7b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "beb239f37e17855c69f449b31784efd96680ae1d3141a6e407ac6deeb633d2ad",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "b43467750b8b038e400bc1f56889b75b2955513c6143048029a3c9bf8a458ed8",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "1e68ad7c868c3b9374004f08ebd66b2fa56ad0981369f8f84792ba03e0c06d88",
+      "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+      "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+      "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+      "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+      "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+    },
+    "expected_prior_reporter_change": {
+      "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": {
+        "expected": "1d6c90a828fea8c7da35182948e449798901ee9575101186e0c30be996483761",
+        "actual": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184"
+      }
+    },
+    "submodules": [
+      {
+        "revision": "9dc178a86fcbbf13c94b4cd4cb046f238d26c8da",
+        "path": "external/WindowsToolchain"
+      },
+      {
+        "revision": "69e0473f6e98d47c93518424c08ee69ee632c0f0",
+        "path": "external/catch2"
+      },
+      {
+        "revision": "924936d0427cb25a61169739a7660230bffa6ea6",
+        "path": "external/cmark"
+      },
+      {
+        "revision": "e0b53eaf63c6d00e0725788ef1dbb759aa321d79",
+        "path": "external/fast_float"
+      },
+      {
+        "revision": "efec5db081e3aad807d0731e172ac597f6a39447",
+        "path": "external/glm"
+      },
+      {
+        "revision": "d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4",
+        "path": "external/glslang"
+      },
+      {
+        "revision": "8936b58fe26e8c3da834b8f60b06511d537b4c63",
+        "path": "external/imgui"
+      },
+      {
+        "revision": "3fe7be956f23385aa1950dc31e2f25127ccfc0ea",
+        "path": "external/lua"
+      },
+      {
+        "revision": "7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4",
+        "path": "external/lz4"
+      },
+      {
+        "revision": "a63bd172ddcba73a3d87ca32032b66ad41ddb9a6",
+        "path": "external/metal-cpp"
+      },
+      {
+        "revision": "8c532c32c3c96e5ba1f2283e032f69ead8add00f",
+        "path": "external/mimalloc"
+      },
+      {
+        "revision": "6ef6c68f4fcbb8287aa8edf9c6670804932f41c6",
+        "path": "external/miniz"
+      },
+      {
+        "revision": "d96329f8d6dee5da67c5ebd861acab25445d0ddb",
+        "path": "external/nlohmann-json"
+      },
+      {
+        "revision": "a1280c1863ff19d87f8e827468a4cc906ba9032a",
+        "path": "external/optix-dev"
+      },
+      {
+        "revision": "1f149bfe20bf6e49c1afd4154eaf0032c8c2fda2",
+        "path": "external/replxx"
+      },
+      {
+        "revision": "079b75b54c49e6546fd611c9a91a25307c279668",
+        "path": "external/slang-rhi"
+      },
+      {
+        "revision": "5bf94dc23702a8fe699c1a834c7a59b7d0daf232",
+        "path": "external/slang-user-skills"
+      },
+      {
+        "revision": "496543121ce6419f23d6fa5d7194ba66c36212d2",
+        "path": "external/spirv-headers"
+      },
+      {
+        "revision": "ef96ed763b43b59b33b31b362f09a02b729fa1c9",
+        "path": "external/spirv-tools"
+      },
+      {
+        "revision": "d541711a794343de4ef5ea76f037c9fb9c127a55",
+        "path": "external/tinyobjloader"
+      },
+      {
+        "revision": "73f3cbb237e84d483afafc743f1f14ec53e12314",
+        "path": "external/unordered_dense"
+      },
+      {
+        "revision": "387259ecf4b0fe0cfac161b1d0b0a74e42796710",
+        "path": "external/vulkan"
+      }
+    ],
+    "loaded_libraries": {
+      "nvrtc": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so",
+        "/usr/local/cuda-12.9/lib64/libnvrtc.so",
+        "/usr/local/cuda-12.9/lib64/libnvrtc-builtins.so.12.9"
+      ],
+      "nvvm": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so"
+      ]
+    }
+  },
+  "input_sha256": {
+    "issue-nvvm-backend/experiments/material-reproducer/branchless-constant.slang": "383831d54fb98051278821882a9704fefebd88342af41f81c2b8d9c5d9c50767",
+    "issue-nvvm-backend/experiments/material-reproducer/branchless-control.slang": "24d13a9c500fe48f6ee98f23b4b7eb22e0ffe12bf0ad78b0158064ee0eba234b",
+    "issue-nvvm-backend/experiments/material-reproducer/graph.slangh": "96d27032a453a65c5ace91b23e7b8773838eed3f46e592c983b1e06c72912a01",
+    "issue-nvvm-backend/experiments/material-reproducer/masked-constant.slang": "b64071f2a355f5d899dbab210a6eddf53c8a7b53795352131482b5e2b295ee5a",
+    "issue-nvvm-backend/experiments/material-reproducer/masked-control.slang": "e32c887e198fe6658efa21a72c1a4e9aec1071722c677dc5f7cbd6a72c21e456",
+    "issue-nvvm-backend/experiments/material-reproducer/unmasked-constant.slang": "9e982350766ce77a237bf877f118a30962984fd1b4bfb1dbe52c935510c0bad7",
+    "issue-nvvm-backend/experiments/material-reproducer/unmasked-control.slang": "9ca9cd42ae4ab17eb7ad183d83f05cbc0616b37d767b9809ed6d4dd7e396548c"
+  },
+  "compile_assembly_outcomes": [
+    {
+      "source": "tests/cuda/complex/tiled_brass_material.slang",
+      "entry": "eval_buffer",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 0,
+      "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+      "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4"
+    },
+    {
+      "source": "tests/cuda/complex/tiled_brass_material.slang",
+      "entry": "eval_buffer",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 6,
+      "ptx_sha256": "9ef3444ab015be99299f49f2e416474780d7985f6662a38d8d058cca58e810ac",
+      "cubin_sha256": "bfac2f15a1097116ac7c988b7bc7c8bf4d82a66867670a1465c123a0aa19d151"
+    },
+    {
+      "source": "tests/cuda/complex/tiled_brass_material.slang",
+      "entry": "sample_buffer",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 0,
+      "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+      "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666"
+    },
+    {
+      "source": "tests/cuda/complex/tiled_brass_material.slang",
+      "entry": "sample_buffer",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 6,
+      "ptx_sha256": "5315e6101f95beacf4ed8b251d0b3c3a7fe49f340b24dfecf3fc1021a23d6148",
+      "cubin_sha256": "a1d6d4f034e343ee75b4a52fc43bbb8df10b264e7073558c0ec616648b78069c"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-constant.slang",
+      "entry": "computeMain",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 0,
+      "ptx_sha256": "8cfadf5e5f846158191049e6fc42f69559b5e6e55bcfbb913c6de4f3c1e5ec0a",
+      "cubin_sha256": "a462086b04f4b2c97e2cfdad379619bec0461a4b8bc5264db41938b519f7efd0"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-constant.slang",
+      "entry": "computeMain",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 0,
+      "ptx_sha256": "0dd88761eef894e703c1020f85cf2a543f95caf3b2bd692618fc96b0a142d11c",
+      "cubin_sha256": "5d6dc31b66247e064152e26bc56f019001fdfd8b59432ab9091b8f15a65aead9"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-control.slang",
+      "entry": "computeMain",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 2,
+      "ptx_sha256": "feb900664f854931ce6f52732aecb0f310c6b2918af37db703e29f7b6e88067d",
+      "cubin_sha256": "953c20bfaf8839f433a90f638a67d24618c8824f463bed5a701653be25d6bac7"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-control.slang",
+      "entry": "computeMain",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 2,
+      "ptx_sha256": "8b6c58fc6c2e6508aa434e25e7cb1928556b83025d21caab37f2469c386b6cc0",
+      "cubin_sha256": "cef4f76fa5b2efcb33aabb1dcf5d3634ba026ba50131406fb65722b24a82e714"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-constant.slang",
+      "entry": "computeMain",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 0,
+      "ptx_sha256": "8cfadf5e5f846158191049e6fc42f69559b5e6e55bcfbb913c6de4f3c1e5ec0a",
+      "cubin_sha256": "a462086b04f4b2c97e2cfdad379619bec0461a4b8bc5264db41938b519f7efd0"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-constant.slang",
+      "entry": "computeMain",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 3,
+      "ptx_sha256": "96e0dc63e2a25f0b49f20c759b5af7e7bc4ccabe5d431d642babdaa769aba066",
+      "cubin_sha256": "25aba74d6faaeb6070fe3cf638526cb3205450c91cd3a5a8d9dcc3d3b47e09fc"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-control.slang",
+      "entry": "computeMain",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 2,
+      "ptx_sha256": "feb900664f854931ce6f52732aecb0f310c6b2918af37db703e29f7b6e88067d",
+      "cubin_sha256": "953c20bfaf8839f433a90f638a67d24618c8824f463bed5a701653be25d6bac7"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-control.slang",
+      "entry": "computeMain",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 6,
+      "ptx_sha256": "ab0e647c8cd20f10f93bf1df31f4f0db52310164a4d2d23e9d2c491b262e4418",
+      "cubin_sha256": "4020fb76d2421f428527cdac04aebf4a4fc70a19b40b85666484f4fcde4aefaa"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-constant.slang",
+      "entry": "computeMain",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 0,
+      "ptx_sha256": "8cfadf5e5f846158191049e6fc42f69559b5e6e55bcfbb913c6de4f3c1e5ec0a",
+      "cubin_sha256": "a462086b04f4b2c97e2cfdad379619bec0461a4b8bc5264db41938b519f7efd0"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-constant.slang",
+      "entry": "computeMain",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 3,
+      "ptx_sha256": "726100dfc74c998258a8364ed97a804a281d6fb59721ab77210537ad83f52bd8",
+      "cubin_sha256": "0af68fc5bbed754a0f41104e8405597ea5e0015b4d9d5a3567f25baed734b9e4"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-control.slang",
+      "entry": "computeMain",
+      "mode": "nvrtc-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 2,
+      "ptx_sha256": "feb900664f854931ce6f52732aecb0f310c6b2918af37db703e29f7b6e88067d",
+      "cubin_sha256": "953c20bfaf8839f433a90f638a67d24618c8824f463bed5a701653be25d6bac7"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-control.slang",
+      "entry": "computeMain",
+      "mode": "nvvm-O3",
+      "compile_return_code": 0,
+      "assembly_return_code": 0,
+      "ex2_in_module": 6,
+      "ptx_sha256": "3f9d823d6a73d2f0d1ed55c73bba8db1d9f5751967618f837facb2f0fbee2425",
+      "cubin_sha256": "3807676403e741958cdcdb3be3924160afaaeea7ae91bd710089e2b55fa5cd38"
+    }
+  ],
+  "runtime_counts": {
+    "executed": 18,
+    "passed": 18,
+    "ignored": 0
+  },
+  "runtime_oracle": {
+    "constant": [24, 1, 1, 1, 0, 0, 0, 0],
+    "control": [12, 1, 1, 1, 6, 1, 1, 1]
+  },
+  "runtime_outcomes": [
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": "",
+      "mode": "nvrtc-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": ".1",
+      "mode": "nvvm-O0",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": ".2",
+      "mode": "nvvm-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-control.slang",
+      "entry": "computeMain",
+      "test_suffix": "",
+      "mode": "nvrtc-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-control.slang",
+      "entry": "computeMain",
+      "test_suffix": ".1",
+      "mode": "nvvm-O0",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/branchless-control.slang",
+      "entry": "computeMain",
+      "test_suffix": ".2",
+      "mode": "nvvm-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": "",
+      "mode": "nvrtc-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": ".1",
+      "mode": "nvvm-O0",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": ".2",
+      "mode": "nvvm-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-control.slang",
+      "entry": "computeMain",
+      "test_suffix": "",
+      "mode": "nvrtc-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-control.slang",
+      "entry": "computeMain",
+      "test_suffix": ".1",
+      "mode": "nvvm-O0",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/masked-control.slang",
+      "entry": "computeMain",
+      "test_suffix": ".2",
+      "mode": "nvvm-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": "",
+      "mode": "nvrtc-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": ".1",
+      "mode": "nvvm-O0",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-constant.slang",
+      "entry": "computeMain",
+      "test_suffix": ".2",
+      "mode": "nvvm-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-control.slang",
+      "entry": "computeMain",
+      "test_suffix": "",
+      "mode": "nvrtc-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-control.slang",
+      "entry": "computeMain",
+      "test_suffix": ".1",
+      "mode": "nvvm-O0",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    },
+    {
+      "source": "issue-nvvm-backend/experiments/material-reproducer/unmasked-control.slang",
+      "entry": "computeMain",
+      "test_suffix": ".2",
+      "mode": "nvvm-O3",
+      "classification": "correct",
+      "return_code": 0,
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "diagnostic": null,
+      "canonical_shape": "initialized graph; in-range counters; typed sibling fields"
+    }
+  ],
+  "selected_exploratory_comparisons": [
+    {
+      "experiment": "probe-prior",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 6
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 6
+        }
+      ]
+    },
+    {
+      "experiment": "probe-counter",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    },
+    {
+      "experiment": "material-simple-consumer",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 3
+        }
+      ]
+    },
+    {
+      "experiment": "material-no-layer",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    },
+    {
+      "experiment": "material-no-normal",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    },
+    {
+      "experiment": "material-layer-constant-index",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    },
+    {
+      "experiment": "mini-no-layer",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 3
+        }
+      ]
+    },
+    {
+      "experiment": "mini-payload-return",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 3
+        }
+      ]
+    },
+    {
+      "experiment": "mini-scalar",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 1
+        }
+      ]
+    },
+    {
+      "experiment": "mini-no-counter-mask",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    },
+    {
+      "experiment": "mini-no-branch",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    },
+    {
+      "experiment": "minimal",
+      "results": [
+        {
+          "mode": "nvrtc",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        },
+        {
+          "mode": "nvvm",
+          "compile_return_code": 0,
+          "ex2_in_module": 0
+        }
+      ]
+    }
+  ],
+  "failure_history": [
+    {
+      "phase": "initial-provenance-assertion",
+      "cause": "nvvm-results.py changed during reporting265; all executable/toolkit identities match",
+      "path": "build/nvvm-material-reproducer266/identities-initial.json"
+    },
+    {
+      "phase": "graph-return-generation",
+      "cause": "automatic replacement erroneously appended .payload to evaluate(uint) result; compile error in two variants",
+      "paths": ["probe-graphreturn", "probe-countergraph"]
+    },
+    {
+      "phase": "initial-runtime",
+      "cause": "render-test ignores -entry in the compile request and hardcodes computeMain; 18 missing-entry failures, no GPU shader outputs",
+      "path": "build/nvvm-material-reproducer266/final-runtime.log",
+      "resolved_by": "six wrappers each exposing the exact compiled computeMain entry"
+    }
+  ],
+  "failed_fixture_snapshot_note": "Three failed wrapper reconstructions match pre-overwrite hashes exactly; initial graph formatting was not snapshotted before reformat. A semantically equivalent graph reconstruction and raw compiler dumps are retained; final2 and final3 exact headers are snapshotted.",
+  "prior_successful_runtime_round": {
+    "log": "build/nvvm-material-reproducer266/final2-runtime.log",
+    "executed": 18,
+    "passed": 18,
+    "ignored": 0,
+    "reason": "Repeated after formatting-only correction; final3 owns final-byte acceptance."
+  },
+  "raw_evidence": {
+    "record": {
+      "path": "build/nvvm-material-reproducer266/evidence.json",
+      "sha256": "933ac7191003e72467eb7ce8716a5dfa2d1c9d04ec58edaa80a52c2b460a9fe7"
+    },
+    "runtime_log": {
+      "path": "build/nvvm-material-reproducer266/final3-runtime.log",
+      "sha256": "bcd468964ab4a2e6c57152d2d2917403d2aaca2f2c95609271947fa75a28b28d"
+    },
+    "reduction_index": {
+      "path": "build/nvvm-material-reproducer266/experiment-index.json",
+      "sha256": "ae0c34176ea9184755a2c04f9a5333869cf7484d52be10c49ddf12b1e9c99164"
+    },
+    "compiler_identities": {
+      "path": "build/nvvm-material-reproducer266/identities-final.json",
+      "sha256": "93b8e8c8f7c471301c98830951eca30f218637a559cf45e1efa45f3c612d1f3e"
+    },
+    "shared_ir": {
+      "nvrtc": {
+        "path": "build/nvvm-material-reproducer266/final3-ir-nvrtc.log",
+        "sha256": "142a95570e91cde3f49b41eab7bca8165d5806bfed3364127a6ba859f5eac0c7"
+      },
+      "nvvm": {
+        "path": "build/nvvm-material-reproducer266/final3-ir-nvvm.log",
+        "sha256": "5791672cddf5647bf8b21c02117dcc409022a63abe2be8d31afa5a634a33a52f"
+      }
+    }
+  },
+  "acceptance": {
+    "independent_review": "review_reproducer: seven source/include hashes, twelve final PTX/cubin pairs, eighteen exact-entry runtime cells, source bounds/oracles and qualified claims; no blocking findings",
+    "lead_audit": "Rehashed source and all sixteen original/final PTX/cubin pairs, recounted exponentials, verified 22 exact submodule pins and unchanged compiler source/artifact identities.",
+    "implementation_cadence": 0,
+    "general_loop": "stopped",
+    "next_implementation_authorized": false
+  },
+  "limits": [
+    "No compiler changes or material runtime/performance claims.",
+    "Final unmasked control remains differential; earlier mask sensitivity was context-specific.",
+    "No exact libNVVM optimization pass or ordering cause identified.",
+    "Static ex2 counts describe entire one-entry PTX modules, not executed instruction counts."
+  ]
+}

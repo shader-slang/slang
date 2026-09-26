@@ -341,3 +341,32 @@ with mutation, alias and escape coverage before undertaking compact local-storag
 
 See [research264](../../issue-nvvm-backend/report.slice-264-material-attribution.md) and its evidence.
 The measurement patch is preserved but reversed; accepted262 remains the compiler baseline.
+
+## Research266: a differential aggregate fixture
+
+The [retained fixture](../../issue-nvvm-backend/experiments/material-reproducer/README.md) reduces
+the material's constant-loss difference to a small graph with initialized counters, indexed normal
+stores, a nonmutating helper branch, and an absorption payload. NVRTC removes the constant
+exponentials; NVVM retains them. Runtime-dependent absorption supplies an independent positive
+control. No compiler change is part of this research.
+
+`makeGraph` initializes the object; `populate` prepares two normals and one layer. `prepare` loads
+the receiver by value before calling `adjust`, whose inactive branch reads graph fields. This is
+canonical Slang semantics. The emitted LLVM retains typed aggregate memory and calls. Optimized
+NVVM PTX eventually eliminates the branch and calls but still reloads the initialized counters,
+uses dynamic store addresses, and reloads absorption before the exponential calculation. The
+precise libNVVM optimization pass where forwarding is missed is not established.
+
+The final branchless control eliminates the difference, while removing the index mask alone does
+not. Earlier larger reductions had different mask sensitivity. Payload-only return, scalar
+absorption and omission of layer writes can each retain the difference in exploratory variants;
+whole-graph return and one particular array store are not necessary causes. Object layout and
+combined reductions also affect the outcome. The fixture is an explanatory example, not a proven
+minimum or a license to force-inline all helpers or attach blanket pointer annotations.
+
+Future work should investigate the existing field-key alias and load-forwarding contracts first.
+Whole-object mutating calls are conservatively treated as possible field writes, same-block store
+forwarding has a deliberately limited domain, and SSA promotion excludes partial aggregate stores.
+Any extension must preserve nonmutating receiver snapshots and prove safety across mutation,
+aliasing, escapes and control flow. The differential fixture provides a gate for that investigation;
+it does not yet select a production transformation. See [report266](../../issue-nvvm-backend/report.slice-266-material-reproducer.md).
