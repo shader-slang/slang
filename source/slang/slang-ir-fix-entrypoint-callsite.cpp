@@ -46,6 +46,7 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
         }
         for (auto decor : decorsToRemove)
             decor->removeAndDeallocate();
+        removeParamLayoutDecorations(clonedEntryPointForCall);
         return clonedEntryPointForCall;
     };
     traverseUses(

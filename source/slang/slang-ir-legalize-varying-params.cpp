@@ -5387,27 +5387,6 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
-// Re-point at `newFunc` every `IREntryPointParamDecoration` that currently names `oldFunc` as
-// its originating entry point. When entry-point `uniform` parameters are hoisted to global scope
-// (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
-// IREntryPointParamDecoration recording the entry-point function it came from. If a later pass
-// replaces the entry point with a wrapper (as lowerOutParameters does below), those tags still
-// reference the old function; introduceExplicitGlobalContext binds a global uniform to an entry
-// point only when this decoration names that entry point, so without re-pointing the uniform is
-// silently dropped — on Metal a struct-returning vertex shader's `uniform T*` gets no [[buffer]]
-// argument and reads uninitialized memory.
-static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
-{
-    List<IREntryPointParamDecoration*> decorationsToRetarget;
-    for (auto use = oldFunc->firstUse; use; use = use->nextUse)
-    {
-        if (auto decor = as<IREntryPointParamDecoration>(use->getUser()))
-            decorationsToRetarget.add(decor);
-    }
-    for (auto decor : decorationsToRetarget)
-        decor->setOperand(0, newFunc);
-}
-
 // Convert an entry point's `out`/`inout` parameters (and, for a vertex shader, a struct return)
 // into a single return struct whose fields carry the original stage-output semantics. Metal models
 // stage outputs as return-struct fields (e.g. `[[color(N)]]`, `[[position]]`), so a pointer-typed
@@ -5442,28 +5421,9 @@ void legalizeShaderOutputParamsForMetal(
 
     const bool alwaysUseReturnStruct = true;
     entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink, alwaysUseReturnStruct);
-
-    if (oldFunc == entryPoint.entryPointFunc)
-        return;
-
-    // The wrapper is now the entry point, so global uniform params that recorded `oldFunc` as
-    // their originating entry point must follow it (see retargetEntryPointParamDecorations).
-    retargetEntryPointParamDecorations(oldFunc, entryPoint.entryPointFunc);
-
-    // Since this will no longer be the entry point function, remove those decorations
-    List<IRDecoration*> ds;
-    for (auto decor : oldFunc->getDecorations())
-    {
-        if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
-        {
-            ds.add(decor);
-        }
-    }
-
-    for (auto decor : ds)
-    {
-        decor->removeFromParent();
-    }
+    entryPoint.entryPointDecor =
+        entryPoint.entryPointFunc->findDecoration<IREntryPointDecoration>();
+    SLANG_ASSERT(entryPoint.entryPointDecor);
 }
 
 

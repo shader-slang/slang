@@ -7,12 +7,12 @@
 // was silently dropped (it read uninitialized memory). The wrapper is produced for BOTH triggers
 // of that pass -- a struct return AND `out` parameters -- so both are covered here.
 //
-// Each check pins not just that a buffer argument exists, but that the wrapper initializes its
-// KernelContext from that argument (`kernelContext...= entryPointParams`). That assignment is
-// exactly what the buggy compiler omitted, so the check fails against the unfixed compiler rather
-// than merely matching an incidental `buffer(` elsewhere. The concrete buffer index is Slang's own
-// default layout (entry-point params take the first buffer slot), so the signature check matches
-// `buffer(` without pinning a slot number.
+// Each check pins not just that a buffer argument exists, but that the entry point reads the
+// uniform through that argument (`entryPointParams...->cfg`). That read is exactly what the buggy
+// compiler lost, so the check fails against the unfixed compiler rather than merely matching an
+// incidental `buffer(` elsewhere. The concrete buffer index is Slang's own default layout
+// (entry-point params take the first buffer slot), so the signature check matches `buffer(`
+// without pinning a slot number.
 
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry vsMain
 //TEST:SIMPLE(filecheck=METALOUT): -target metal -stage vertex -entry vsOut
@@ -22,10 +22,10 @@
 struct GridCfg { uint dim; };
 struct VOut { float4 pos : SV_Position; float4 color : COLOR; };
 
-// Struct-return vertex: uniform must be a buffer argument and be threaded into the context.
+// Struct-return vertex: uniform must be a buffer argument that the entry point reads.
 //METAL: {{\[\[}}vertex{{\]\]}}
 //METAL-SAME: buffer(
-//METAL: kernelContext{{.*}}= entryPointParams
+//METAL: entryPointParams{{.*}}->cfg
 [shader("vertex")]
 VOut vsMain(uint vid : SV_VertexID, uint iid : SV_InstanceID, uniform GridCfg* cfg)
 {
@@ -38,7 +38,7 @@ VOut vsMain(uint vid : SV_VertexID, uint iid : SV_InstanceID, uniform GridCfg* c
 // `out`-parameter vertex: same lowerOutParameters wrapper swap, so the same regression applies.
 //METALOUT: {{\[\[}}vertex{{\]\]}}
 //METALOUT-SAME: buffer(
-//METALOUT: kernelContext{{.*}}= entryPointParams
+//METALOUT: entryPointParams{{.*}}->cfg
 [shader("vertex")]
 void vsOut(uint vid : SV_VertexID, uniform GridCfg* cfg, out float4 pos : SV_Position,
            out float4 col : COLOR)
