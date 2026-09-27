@@ -166,3 +166,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Two persistent native sources add six passing focused directives; executable bodies/oracles equal287.
   Qualified contract documents Natural20/CUDA24 and live mutation/snapshot scope. No compiler or main
   corpus change. Next probes existing error-handling compute contracts outside main selection.
+
+- Qualification289: [error handling](report.slice-289-error-handling.md),
+  [evidence](research-evidence.slice-289.json), [plan](plan.slice-289-error-handling.md).
+  Six unchanged sources pass18cells/54words with independent full hex oracles. Literal/success-only
+  limits remain explicit; no compiler or main-corpus change. Next repairs the malformed final
+  catch-all CHECK, then considers runtime-loaded error paths separately.

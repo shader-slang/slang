@@ -40,8 +40,10 @@ Skip Slack; no push or system changes.
     distinct. All285 identities exact; raw fixtures stay under `build/nvvm-nested-dynamic287`.
     [Promotion288](report.slice-288-nested-dynamic-regressions.md) adds two persistent native sources
     and six fresh passing directives, preserving source tokens and qualified scope. No compiler or
-    main-corpus change. Next: bounded existing error-handling compute probes; retain each original
-    oracle and derive full outputs before executing. Write the bounded plan first.
+    main-corpus change. [Qualification289](report.slice-289-error-handling.md) passes six original error-handling
+    sources18cells/54words. Literal inputs may fold branches; witness/parameterized cases exercise
+    success only. Next: repair catch-all’s missing CHECK-NEXT colon and prove deliberate-corruption
+    rejection in a separate bounded slice. Runtime-loaded error paths remain a later opportunity.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.

@@ -69,8 +69,10 @@ preserved interface snapshots across Natural20-byte/CUDA24-byte layouts. All acc
 remain exact. Raw probes stay outside the main corpus; no compiler change or new array/device/
 readonly/exported roles. [Promotion288](report.slice-288-nested-dynamic-regressions.md) retains two native tests with six fresh
 passing directives and updates the qualified contract. Main corpus and implementation cadence stay
-unchanged. Next: bounded existing error-handling compute probes (generic rethrow, aggregate errors,
-synthesized throwing witnesses and catches), a region with no main selection in inventory269.
+unchanged. [Error-handling289](report.slice-289-error-handling.md) qualifies six unchanged compute contracts:
+18cells/54words pass, including generic rethrow and aggregate errors. Literal inputs may fold control
+flow; two cases exercise success only. All285 identities exact. Next repairs catch-all's malformed
+final CHECK directive and proves wrong-output rejection; runtime-loaded error paths remain follow-up.
 Material overload-screening lead remains documented.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
-max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation,286 restored research 287 qualification and288 test promotion with no findings.
+max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation,286 restored research 287 qualification,288 test promotion and289 contracts with no findings.
