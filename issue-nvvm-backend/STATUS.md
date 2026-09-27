@@ -5,8 +5,9 @@ under [WORKFLOW](WORKFLOW.md); skip Slack, no push or system changes.
 [Slice277](report.slice-277-pch-ownership.md) fixes default automatic-PCH ownership: each NVRTC
 compiler gets one private directory, preserving same-owner reuse and explicit caller options.
 The fixed40-process comparison now passes every cell, including16 shared-cwd processes that formerly
-produced8 native failures and2 crashes. Next: probe existing accessor/generic language interactions
-outside the main corpus, preserving their original output oracles. Read [HANDOFF](HANDOFF.md) and
+produced8 native failures and2 crashes. [Research278](report.slice-278-accessor-generics.md) qualifies six accessor/generic interactions:
+all18 cells and72 source-derived output words pass. Next: probe nested FP8/BF16 local-record
+composition, an explicit270 boundary, before proposing a compiler change. Read [HANDOFF](HANDOFF.md) and
 [RESULTS](RESULTS.md); historical research and closed leads belong in [HISTORY](HISTORY.md).
 
 ## Accepted baseline

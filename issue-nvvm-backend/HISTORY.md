@@ -101,3 +101,8 @@ ledger preserves first-known and resolved histories with their original evidence
   native identities preserved, three passing unit additions. Material PTX/cubin/resources exact.
   Full277/targeted233/cadence0. Root local audits plus author self-review due thread limit.
   Loop continues with accessor/generic language probes; Slack skipped.
+
+- Research278: [accessor/generic interactions](report.slice-278-accessor-generics.md),
+  [evidence](research-evidence.slice-278.json), [completed plan](plan.slice-278-accessor-generics.md).
+  Six unchanged sources pass18 cells/72 independently checked words. Main corpus and277 identity
+  unchanged; full277/targeted233/cadence0 inherited. No compiler change. Next: nested FP8/BF16 probe.

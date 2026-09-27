@@ -25,10 +25,11 @@ WORKFLOW until a recorded stopping condition. Skip Slack; no push or system chan
    same40-process comparison with40 private retired namespaces and120 PCH creations. Actual-adapter
    tests cover same-owner reuse, named diagnostics, surviving owners/external library refs and explicit
    caller directories. Exact262 deletion signature is retained without claiming causal reproduction.
-7. Next bounded slice: existing accessor/generic language-surface probes with original independent
-   oracles, such as interface properties, default generic subscripts, multidimensional setters and
-   variadic value packs. Establish exact source selections and expected outputs before execution.
-   Keep focused evidence separate from the capped main corpora; implement only for a reproduced gap.
+7. [Research278](report.slice-278-accessor-generics.md) qualifies six existing accessor/generic sources
+   outside the main corpus:18 cells and72 independent output words pass, with unchanged277 identities.
+   No compiler defect found. Next: probe nested FP8/BF16 local-record composition, a documented270
+   boundary. Establish a small independent output oracle and canonical IR trace before implementation.
+   Preserve current leaf/value/storage/pointer domains and material acceptance obligations.
 8. Delegation recently hits thread limits. Use a fresh bounded worker when available; otherwise record
    reuse and separate root local audits. Author self-review is not independent-agent review.
 
