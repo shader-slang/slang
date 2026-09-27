@@ -81,9 +81,16 @@ outcomes, identities and failure history. No performance improvement from that r
   timing observations. Both complete prototype and maintained runs are retained in focused evidence.
 - The registered material source is unchanged. These timings cover hot 2×2 textures and repeated
   verified inputs with correctness transfers between launches. Original assets, live LUTs, arbitrary
-  inputs and application performance remain open. Next investigate the generated code behind the
-  measured difference before proposing a compiler change; stack/register counts alone do not prove
-  its cause. Keep the lowering-pass boundary unchanged unless a workload justifies moving it.
+  inputs and application performance remain open.
+- A reviewed eval-only control deletes 65 PTX stores to proven never-read local bytes, preserving
+  every other PTX byte. All 9 correctness cells and 12 timing cells pass with byte-identical outputs.
+  Reassembly removes the reported 592-byte stack; at N=1,048,577 NVRTC drops from 2.825–2.832 ms
+  to 0.347 ms (8.14–8.16×), versus paired NVVM O3 at 0.315 ms. This deletion plus reoptimization
+  accounts for most of the observed eval gap, without establishing a unique hardware bottleneck.
+  No compiler/shader source changed; sample was not transformed. Keep the NVVM lowering boundary.
+  Next reduce the CUDA aggregate-init/receiver-copy pattern before considering a production
+  optimization. Any fix must preserve receiver value semantics and prove general field liveness;
+  the exact-artifact PTX deletion is a diagnostic, not a proposed compiler pass.
 
 Future authorized work updates current documents and evidence in place. Keep working plans,
 report drafts and raw artifacts uncommitted; do not restart numbered slice history.

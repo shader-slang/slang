@@ -381,6 +381,29 @@ Tiny 2×2 textures, periodic coherent inputs and correctness transfers between l
 limitations; this does not measure continuous rendering or application frame performance. Static
 stack/register differences may motivate follow-up investigation but do not establish causality.
 
+### Generated-code controls
+
+The current eval-only local-store diagnostic lives in the existing device-event feature record.
+Its transformed PTX removes exactly 65 whole `st.local` instructions from the pinned NVRTC artifact.
+An independent complete local-address audit proves that no pointer escapes and all memory accesses
+use explicit state spaces. Protect the entire read intervals `[320,344)`, `[368,384)`, `[408,448)`;
+keep any vector store touching any protected byte. Retain all six loads, 29 overlapping stores,
+the 592-byte local declaration, and every other PTX byte. Reassembly uses the identical pinned
+`ptxas -v -arch=sm_80` command. This is an exact-artifact diagnostic, not a reusable compiler pass.
+
+The control compares unchanged NVRTC, transformed NVRTC and unchanged NVVM O3 for eval only.
+Three 65-record prerequisites and six enlarged correctness cells precede twelve timing cells
+(two counts × three arms × two reversed rounds), each with three warmups and nine samples. Reuse the
+maintained driver/oracle and every output/reference/provenance obligation above. Pin proof support
+hashes before optional artifacts are merged, and verify that reinserting the removed lines exactly
+reconstructs the original PTX. Preserve all attempts and keep source/proof snapshots under `build/`.
+
+The accepted control removes most of the large-count eval timing gap while retaining exact outputs.
+Removing stores also permits downstream register, scheduling and aggregate optimizations, so it
+cannot prove a unique memory-traffic bottleneck. No sample transform, SASS or profiler evidence was
+collected. A production proposal needs a reduced producer/optimizer reproducer and general semantic
+proof; do not ship a workload-specific PTX deletion based on this experiment.
+
 ## Documentation and evidence maintenance
 
 [accepted-baseline.json](accepted-baseline.json) owns full comparison outcomes and native identities.

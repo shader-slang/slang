@@ -3317,6 +3317,816 @@
         "warmups": 72,
         "measured_launches": 216,
         "compared_bytes": 3850813440
+      },
+      "eval_local_store_control": {
+        "status": "accepted-diagnostic-only",
+        "contract": "tiled-brass-eval-never-read-local-store-control-research-v1",
+        "entry": "eval_buffer",
+        "purpose": "Discriminate the effect of proven never-read local stores and subsequent ptxas reoptimization without changing shader math, resources, inputs or oracles.",
+        "production_compiler_change": false,
+        "transformation": {
+          "removed_stores": 65,
+          "removed_static_store_bytes": 623,
+          "retained_stores": 29,
+          "retained_loads": 6,
+          "protected_local_read_intervals": [
+            [320, 344],
+            [368, 384],
+            [408, 448]
+          ],
+          "interval_semantics": "half-open bytes; any overlap retains whole vector store",
+          "local_depot_declaration_bytes": 592,
+          "all_other_ptx_bytes_exact": true,
+          "local_pointer_escape": false,
+          "generic_memory_alias": false
+        },
+        "static_observations": {
+          "all_four_optimized_entry_backend_ptx_call_counts": 0,
+          "meaning": "No retained helper calls in PTX; earlier inlining/optimization order is not excluded. No SASS disassembler was available.",
+          "eval_nvrtc_baseline": {
+            "stack_bytes": 592,
+            "registers": 48,
+            "spill_load_bytes": 0,
+            "spill_store_bytes": 0
+          },
+          "eval_nvrtc_control": {
+            "stack_bytes": 0,
+            "registers": 48,
+            "spill_load_bytes": 0,
+            "spill_store_bytes": 0
+          },
+          "eval_nvvm_o3": {
+            "stack_bytes": 0,
+            "registers": 52,
+            "spill_load_bytes": 0,
+            "spill_store_bytes": 0
+          }
+        },
+        "arms": {
+          "nvrtc-baseline": {
+            "kind": "unchanged-baseline",
+            "original_mode": "nvrtc-o3",
+            "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-measurement/maintained-execution-eval_buffer/nvrtc-o3/shader.ptx",
+            "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+            "cubin": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-measurement/maintained-execution-eval_buffer/nvrtc-o3/shader.cubin",
+            "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4"
+          },
+          "nvrtc-dead-store-control": {
+            "kind": "transformed-research-control",
+            "original_mode": "nvrtc-o3",
+            "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-codegen/review/eval-never-read-store-control.ptx",
+            "ptx_sha256": "cef5dc7829d3659742da1d4f44d2b52846f8344f992bd6bdb528daf5443b3eca",
+            "cubin": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-codegen/eval-never-read-store-control.cubin",
+            "cubin_sha256": "293f4f5cf4f3fb1343f5662a3ce4e95fce6a96e75d3d444d5288a050393d88d3",
+            "original_ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+            "proof_sha256": "18b7c3092ddaa5b3ff00be52eaa38522f0b33618799db4490dd92116b65afc1f",
+            "change": "remove exactly 65 proved-never-read st.local instructions"
+          },
+          "nvvm-o3-reference": {
+            "kind": "unchanged-reference",
+            "original_mode": "nvvm-o3",
+            "ptx": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-measurement/maintained-execution-eval_buffer/nvvm-o3/shader.ptx",
+            "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+            "cubin": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-measurement/maintained-execution-eval_buffer/nvvm-o3/shader.cubin",
+            "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10"
+          }
+        },
+        "protocol": {
+          "counts": [65537, 1048577],
+          "small_prerequisite_count": 65,
+          "qualification_cells": 9,
+          "timing_cells": 12,
+          "warmups_per_cell": 3,
+          "samples_per_cell": 9,
+          "rounds": 2,
+          "order": "complete six-cell large order reversed in second round",
+          "timeout_seconds": 120,
+          "minimum_interval_ms_for_throughput": 0.1,
+          "unchanged_maintained_source_protocol_sha256": "f4389a72800fa47e65838049a16f6e1e33f03e0f316003ddc912ca7a2ff709ff",
+          "unchanged_oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7"
+        },
+        "validation": {
+          "cpu_contracts": 7,
+          "qualification_active_records": 3342537,
+          "qualification_guard_records": 567,
+          "qualification_output_bytes": 53489664,
+          "all_three_arms_full_outputs_byte_identical_at_each_count": true,
+          "timing_samples": 108,
+          "timing_warmups": 36,
+          "timing_compared_bytes": 1283604480
+        },
+        "qualification_cells": [
+          {
+            "id": "65-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 65,
+            "mode": "nvrtc-baseline",
+            "status": "passed",
+            "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+            "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 65,
+              "compared_bytes": 2048,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 65
+            }
+          },
+          {
+            "id": "65-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 65,
+            "mode": "nvrtc-dead-store-control",
+            "status": "passed",
+            "cubin_sha256": "293f4f5cf4f3fb1343f5662a3ce4e95fce6a96e75d3d444d5288a050393d88d3",
+            "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 65,
+              "compared_bytes": 2048,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 65
+            }
+          },
+          {
+            "id": "65-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 65,
+            "mode": "nvvm-o3-reference",
+            "status": "passed",
+            "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+            "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 65,
+              "compared_bytes": 2048,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 65
+            }
+          },
+          {
+            "id": "65537-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvrtc-baseline",
+            "status": "passed",
+            "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+            "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 65537,
+              "compared_bytes": 1049600,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 65537
+            }
+          },
+          {
+            "id": "65537-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvrtc-dead-store-control",
+            "status": "passed",
+            "cubin_sha256": "293f4f5cf4f3fb1343f5662a3ce4e95fce6a96e75d3d444d5288a050393d88d3",
+            "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 65537,
+              "compared_bytes": 1049600,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 65537
+            }
+          },
+          {
+            "id": "65537-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvvm-o3-reference",
+            "status": "passed",
+            "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+            "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 65537,
+              "compared_bytes": 1049600,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 65537
+            }
+          },
+          {
+            "id": "1048577-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvrtc-baseline",
+            "status": "passed",
+            "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+            "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 1048577,
+              "compared_bytes": 16778240,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 1048577
+            }
+          },
+          {
+            "id": "1048577-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvrtc-dead-store-control",
+            "status": "passed",
+            "cubin_sha256": "293f4f5cf4f3fb1343f5662a3ce4e95fce6a96e75d3d444d5288a050393d88d3",
+            "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 1048577,
+              "compared_bytes": 16778240,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 1048577
+            }
+          },
+          {
+            "id": "1048577-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvvm-o3-reference",
+            "status": "passed",
+            "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+            "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
+            "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "comparison": {
+              "status": "passed",
+              "tile_comparison": {
+                "status": "passed",
+                "compared_records": 65,
+                "compared_components": 260,
+                "tail_records": 63,
+                "tail_sentinels_unchanged": true,
+                "different_seed_outputs_identical": true,
+                "wrapped_uv_output_identical": true,
+                "max_absolute_error": 8.490800915694763e-7,
+                "max_relative_error": 5.085167740487487e-7,
+                "max_tolerance_fraction": 0.002225461884237465,
+                "failed_components": []
+              },
+              "all_active_bytes_periodic": true,
+              "guards_unchanged": true,
+              "active_records": 1048577,
+              "compared_bytes": 16778240,
+              "guard_records": 63,
+              "rejection_records": 0,
+              "non_rejected_records": 1048577
+            }
+          }
+        ],
+        "measurement_cells": [
+          {
+            "id": "round0-65537-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvrtc-baseline",
+            "round": 0,
+            "status": "passed",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.158528,
+                "q1": 0.157695994,
+                "q3": 0.158720002,
+                "iqr": 0.001024007999999993,
+                "minimum": 0.155744001,
+                "maximum": 0.160927996
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 413409618.490109
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round0-65537-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvrtc-dead-store-control",
+            "round": 0,
+            "status": "passed",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.0286720004,
+                "q1": 0.0286720004,
+                "q3": 0.0307199992,
+                "iqr": 0.002047998799999999,
+                "minimum": 0.0286720004,
+                "maximum": 0.0307199992
+              },
+              "all_intervals_at_least_0_1ms": false,
+              "records_per_second": null
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round0-65537-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvvm-o3-reference",
+            "round": 0,
+            "status": "passed",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.0266239997,
+                "q1": 0.0264320001,
+                "q3": 0.027648,
+                "iqr": 0.0012159999000000005,
+                "minimum": 0.0257920008,
+                "maximum": 0.0279040001
+              },
+              "all_intervals_at_least_0_1ms": false,
+              "records_per_second": null
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round0-1048577-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvrtc-baseline",
+            "round": 0,
+            "status": "passed",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 2.83238411,
+                "q1": 2.82931209,
+                "q3": 2.83942389,
+                "iqr": 0.010111799999999782,
+                "minimum": 2.82624006,
+                "maximum": 2.85081601
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 370210027.76350135
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round0-1048577-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvrtc-dead-store-control",
+            "round": 0,
+            "status": "passed",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.347039998,
+                "q1": 0.346112013,
+                "q3": 0.347135991,
+                "iqr": 0.001023977999999981,
+                "minimum": 0.346112013,
+                "maximum": 0.348159999
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 3021487454.019637
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round0-1048577-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvvm-o3-reference",
+            "round": 0,
+            "status": "passed",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.315391988,
+                "q1": 0.315391988,
+                "q3": 0.317440003,
+                "iqr": 0.002048015000000014,
+                "minimum": 0.31436801,
+                "maximum": 0.318464011
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 3324678621.8297973
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round1-1048577-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvvm-o3-reference",
+            "round": 1,
+            "status": "passed",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.315391988,
+                "q1": 0.31436801,
+                "q3": 0.315551996,
+                "iqr": 0.0011839860000000257,
+                "minimum": 0.313344002,
+                "maximum": 0.318271995
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 3324678621.8297973
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round1-1048577-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvrtc-dead-store-control",
+            "round": 1,
+            "status": "passed",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.347135991,
+                "q1": 0.347135991,
+                "q3": 0.34799999,
+                "iqr": 0.0008639990000000042,
+                "minimum": 0.343840003,
+                "maximum": 0.349184006
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 3020651926.581707
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round1-1048577-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 1048577,
+            "mode": "nvrtc-baseline",
+            "round": 1,
+            "status": "passed",
+            "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 2.82521605,
+                "q1": 2.82419205,
+                "q3": 2.833184,
+                "iqr": 0.00899194999999997,
+                "minimum": 2.81900811,
+                "maximum": 2.84262395
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 371149314.4037604
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round1-65537-nvvm-o3-reference",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvvm-o3-reference",
+            "round": 1,
+            "status": "passed",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.0274880007,
+                "q1": 0.0266239997,
+                "q3": 0.027648,
+                "iqr": 0.0010240002999999977,
+                "minimum": 0.0266239997,
+                "maximum": 0.027648
+              },
+              "all_intervals_at_least_0_1ms": false,
+              "records_per_second": null
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round1-65537-nvrtc-dead-store-control",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvrtc-dead-store-control",
+            "round": 1,
+            "status": "passed",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.0305599999,
+                "q1": 0.0296960007,
+                "q3": 0.0307199992,
+                "iqr": 0.0010239985000000014,
+                "minimum": 0.0296960007,
+                "maximum": 0.0308480002
+              },
+              "all_intervals_at_least_0_1ms": false,
+              "records_per_second": null
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          },
+          {
+            "id": "round1-65537-nvrtc-baseline",
+            "entry": "eval_buffer",
+            "count": 65537,
+            "mode": "nvrtc-baseline",
+            "round": 1,
+            "status": "passed",
+            "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+            "contaminated": false,
+            "summary": {
+              "device_ms": {
+                "median": 0.157759994,
+                "q1": 0.157695994,
+                "q3": 0.158720002,
+                "iqr": 0.001024007999999993,
+                "minimum": 0.155647993,
+                "maximum": 0.161791995
+              },
+              "all_intervals_at_least_0_1ms": true,
+              "records_per_second": 415422176.0429327
+            },
+            "warmups_passed": 3,
+            "samples_passed": 9
+          }
+        ],
+        "large_count_comparison": [
+          {
+            "round": 0,
+            "count": 1048577,
+            "median_ms": {
+              "nvrtc-baseline": 2.83238411,
+              "nvrtc-dead-store-control": 0.347039998,
+              "nvvm-o3-reference": 0.315391988
+            },
+            "baseline_over_control": 8.16154946496974,
+            "control_over_nvvm_o3": 1.100345003056958
+          },
+          {
+            "round": 1,
+            "count": 1048577,
+            "median_ms": {
+              "nvvm-o3-reference": 0.315391988,
+              "nvrtc-dead-store-control": 0.347135991,
+              "nvrtc-baseline": 2.82521605
+            },
+            "baseline_over_control": 8.138643422888409,
+            "control_over_nvvm_o3": 1.1006493639908188
+          }
+        ],
+        "provenance": {
+          "source_audit": {
+            "path": "build/nvvm-material-codegen/audit.md",
+            "sha256": "b27eb97cf41f2a2d1a0b5f67d62185d1a889c29a137575781c57d4b5d5a811fe"
+          },
+          "static_inventory": {
+            "path": "build/nvvm-material-codegen/static-inventory.json",
+            "sha256": "40e4e09ad52c3b3310f6f69a5a4e192806694cd4843de9df540baf7944e175af"
+          },
+          "fresh_generated_cuda": {
+            "path": "build/nvvm-material-codegen/dump-current-artifacts.json",
+            "sha256": "129ad2771e42437c280c136d3becac15925c9641997450e46fa165e18bfda370"
+          },
+          "independent_interval_audit": {
+            "path": "build/nvvm-material-codegen/eval-never-read-store-audit.json",
+            "sha256": "04689d82af94c2531d9778ce0a8c7a6ed8488a7d1a60cc105d55b97ac9140758"
+          },
+          "proof": {
+            "path": "build/nvvm-material-codegen/review/eval-control-proof.json",
+            "sha256": "18b7c3092ddaa5b3ff00be52eaa38522f0b33618799db4490dd92116b65afc1f"
+          },
+          "alias_proof": {
+            "path": "build/nvvm-material-codegen/review/eval-address-space-addendum.json",
+            "sha256": "c5cb06f283741523a9abc9946c1991bc2fa9f889ec9fa09179c2afa1b6743f4d"
+          },
+          "root_acceptance": {
+            "path": "build/nvvm-material-codegen/root-transform-acceptance.json",
+            "sha256": "3f5dcf9a584860db79ca6ea79d133d27bae0af74775d8aaca589edb4e3ac544e"
+          },
+          "assembly": {
+            "path": "build/nvvm-material-codegen/assemble-control.json",
+            "sha256": "d2fe8042d411cd5ee788b5dcd46dc29b122512c85f74d33cadf238946d132bde"
+          },
+          "assembly_log": {
+            "path": "build/nvvm-material-codegen/assemble-control.log",
+            "sha256": "61899d0054f73ba9f83611d04c6a07e6777d30617d399947d9efc4c220222db0"
+          },
+          "protocol": {
+            "path": "build/nvvm-material-codegen/prepare-1/results.json",
+            "sha256": "4794205e26a22ba6f459ef75957e8a0958dc1b40c4a901722224d032afc1535e"
+          },
+          "qualification": {
+            "path": "build/nvvm-material-codegen/qualify-0/results.json",
+            "sha256": "2560ed9c533efd2013a3efa13da1fba618d4367e4c29fd1bc986fe03f23a0aba"
+          },
+          "measurement": {
+            "path": "build/nvvm-material-codegen/measure-0/results.json",
+            "sha256": "fce39b48181bcbd71455d12f28eeb053552a71332aa3c42620b74f22bcc0873c"
+          },
+          "cpu_contracts": {
+            "path": "build/nvvm-material-codegen/cpu-control-final.json",
+            "sha256": "8b5722d2683a73f58a1163520e2b4118b3b84860e4120ff87646f57f1e45d357"
+          }
+        },
+        "preparation_history": [
+          {
+            "attempt": "prepare-0",
+            "outcome": "Superseded before any GPU execution after independent review found duplicate optional support paths could overwrite a proof-owned expected hash.",
+            "resolution": "Verify all expected proof/inherited pins before support merge; seventh CPU negative contract and revert drill prove rejection. Same transformed PTX, proof, cubin, inputs, math and protocol.",
+            "evidence": {
+              "path": "build/nvvm-material-codegen/provenance-revert-drill.json",
+              "sha256": "1e900a4169476cc299ee07e019ac848b2593e0b8428fd993ed81a585a417daf6"
+            }
+          }
+        ],
+        "execution_failure_history": [],
+        "interpretation": "For this qualified eval workload, deleting only proven never-read local stores and reassembling removes the reported stack and accounts for most of the optimized event-time gap. The transformed NVRTC artifact remains about10% slower than the paired NVVM O3 reference at the larger count.",
+        "limits": [
+          "Diagnostic exact-artifact PTX transformation, not a production peephole or evidence that general store deletion is safe.",
+          "Deletion permits downstream reoptimization; timing cannot isolate local transactions, occupancy, scheduling or the responsible vendor pass without further evidence.",
+          "No SASS disassembly or profiling was collected; ptxas resources and PTX counts are distinct observations.",
+          "Sampling was not transformed or measured in this control; its earlier benchmark remains separate.",
+          "Fixed synthetic textures, repeated inputs and inter-launch correctness transfers remain central limits; no application speed claim.",
+          "Small-count control and NVVM intervals fail the predeclared throughput gate; retain them as timing observations.",
+          "The correct receiver snapshot representation must be preserved. No additional NVVM lowering pass is justified by this control: NVVM O3 already eliminates the local frame."
+        ],
+        "review": {
+          "prelaunch": {
+            "path": "build/nvvm-material-codegen/review/control-prelaunch.json",
+            "sha256": "6afc847d1c1b88aad85a3d555c19aa52b955d162ab3806729d96a06bad487fe7"
+          },
+          "qualification": {
+            "path": "build/nvvm-material-codegen/review/control-qualification-replay.json",
+            "sha256": "f233cce6ef0f53c720aa9128e94a762723018f364a3ac800a25fa508ef8005f6"
+          },
+          "measurement": {
+            "path": "build/nvvm-material-codegen/review/control-measurement-replay.json",
+            "sha256": "43dd182096f3aa6447a177bab514f4e260e11c796111d129127fd92aea088173"
+          }
+        }
       }
     }
   }

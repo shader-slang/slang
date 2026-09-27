@@ -367,3 +367,13 @@ known sample rejections and correctness transfers between launches limit the res
 synthetic protocol. Clock observations are recorded without changing device configuration. See the
 [measurement runner](../../extras/measure-nvvm-material-runtime.py) and
 [protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement).
+
+The measured eval gap does not currently motivate another NVVM lowering pass. Both optimized PTX
+paths already contain no helper calls, and NVVM O3 reports no local stack. A scoped diagnostic that
+removes only NVRTC stores to proven never-read local byte ranges lets `ptxas` eliminate that path's
+local stack and removes most of its measured gap. The correct receiver snapshots remain part of
+language value semantics. Investigate missed aggregate optimization with a reduced reproducer;
+do not turn the diagnostic's exact-PTX deletion rule into an emitter workaround. The result covers
+deletion plus downstream reoptimization, without identifying a unique hardware bottleneck or vendor
+pass. Current measurements and proof provenance remain in
+[focused evidence](../../issue-nvvm-backend/focused-evidence.json).
