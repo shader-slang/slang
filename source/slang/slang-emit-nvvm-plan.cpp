@@ -29,6 +29,48 @@ const T* _findOperation(
 
 } // namespace
 
+void NVVMAddressPlan::addFieldAddress(const NVVMPlannedFieldAddress& address)
+{
+    SLANG_RELEASE_ASSERT(address.source && !m_fieldAddressIndices.containsKey(address.source));
+    m_fieldAddressIndices[address.source] = m_fieldAddresses.getCount();
+    m_fieldAddresses.add(address);
+}
+
+void NVVMAddressPlan::addElementAddress(const NVVMPlannedElementAddress& address)
+{
+    SLANG_RELEASE_ASSERT(address.source && !m_elementAddressIndices.containsKey(address.source));
+    m_elementAddressIndices[address.source] = m_elementAddresses.getCount();
+    m_elementAddresses.add(address);
+}
+
+const NVVMPlannedFieldAddress* NVVMAddressPlan::findFieldAddress(IRInst* source) const
+{
+    return _findOperation(m_fieldAddresses, m_fieldAddressIndices, source);
+}
+
+NVVMPlannedElementAddress* NVVMAddressPlan::findElementAddress(IRInst* source)
+{
+    const Index* index = m_elementAddressIndices.tryGetValue(source);
+    return index ? &m_elementAddresses[*index] : nullptr;
+}
+
+const NVVMPlannedElementAddress* NVVMAddressPlan::findElementAddress(IRInst* source) const
+{
+    return _findOperation(m_elementAddresses, m_elementAddressIndices, source);
+}
+
+const NVVMPlannedFieldAddress* NVVMEmissionPlanIndex::findFieldAddress(IRInst* source) const
+{
+    SLANG_RELEASE_ASSERT(m_plan);
+    return m_plan->addresses.findFieldAddress(source);
+}
+
+const NVVMPlannedElementAddress* NVVMEmissionPlanIndex::findElementAddress(IRInst* source) const
+{
+    SLANG_RELEASE_ASSERT(m_plan);
+    return m_plan->addresses.findElementAddress(source);
+}
+
 void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
 {
     SLANG_RELEASE_ASSERT(!m_plan);

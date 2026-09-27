@@ -7,11 +7,14 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-The open-ended development loop remains **stopped**. The bounded parser/ordinary-memory foundation
-work authorized on 2026-09-27 is complete. Further implementation requires a new explicit request;
-a finite maintenance task does not resume the loop. Skip Slack notifications. No push, publication,
-system installation, driver change or reboot is implied. Results-only refreshes and documentation
-tasks do not restart the loop.
+On 2026-09-27 the maintainer authorized continued work while away. Finish and accept the current
+address-planning refactor, then resume the normal development loop, prioritizing a real material
+workload. Independent source review concluded that a transforming local-storage pass should remain
+deferred because the bounded rewrite cannot retire the existing conversion responsibility. This
+supersedes the earlier stop-after-slice instruction. Accept and locally commit each bounded task
+before proceeding; regressions or decisions requiring maintainer input stop continuation.
+Skip Slack notifications. No push, publication, system installation, driver change or reboot is
+implied. Finite maintenance, results-refresh and documentation requests alone do not resume a loop.
 
 For authorized implementation work, use a fresh bounded worker and independent review when available.
 The lead owns scope, acceptance and commits; one writer owns the checkout at a time. Read-only review

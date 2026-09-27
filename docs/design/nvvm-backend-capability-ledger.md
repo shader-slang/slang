@@ -142,6 +142,12 @@ selection figures (576/1,852 and 517/795) are historical inventory ratios, not p
 semantics covered.
 Later focused cases remain outside that main denominator unless explicitly enrolled.
 
+Field/index address recipes are shared by pointer validation, ordinary memory planning and
+provider emission. Nested borrowed-vector coverage checks dynamic lane access across a mutation,
+scalar alignment and the absence of invariant-load metadata for Generic Read borrows. Compact
+parameter-group loads retain their independent representation, alignment and invariant metadata.
+These checks preserve existing support boundaries; initial recursive ancestor admission remains.
+
 ## Known gaps and evidence boundaries
 
 - The current main baseline retains 37 unresolved cells: three column-major host-packing mismatches

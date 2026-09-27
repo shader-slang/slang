@@ -188,17 +188,6 @@ bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& pa
     return false;
 }
 
-struct NVVMStructField
-{
-    IRStructField* field = nullptr;
-    uint32_t fieldIndex = 0;
-    bool isConventionalGlobal = false;
-    bool isMutable = false;
-    bool isPhysicalStorage = false;
-    bool isParameterGroupStorage = false;
-    bool isLocalSubstandardRecordStorage = false;
-};
-
 struct NVVMSequentialElementPointer
 {
     IRInst* base = nullptr;
@@ -214,7 +203,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
 // Resolves the aggregate-address shapes with executable representations. These include fields in
 // collected CUDA parameters, loaded parameter groups, local/helper storage, and fields selected
 // after an already-proved sequential aggregate element. Every child inherits its root access.
-bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& outAddress)
+bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldSelection& outAddress)
 {
     outAddress = {};
     if (!fieldAddress)
@@ -243,7 +232,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         // field, which is intentionally more explicit than a local `Ptr<T>`. Resolve that producer
         // recursively and preserve its root role: selecting a child cannot make immutable storage
         // mutable or detach conventional-global pointer provenance.
-        NVVMStructField parentAddress;
+        NVVMStructFieldSelection parentAddress;
         if (!_getNVVMStructFieldAddress(parentFieldAddress, parentAddress))
             return false;
         auto basePointerType = as<IRPtrTypeBase>(parentFieldAddress->getDataType());
@@ -482,7 +471,7 @@ IRVectorType* _getNVVMLocalBFloat16VectorPointer(IRInst* pointer)
 
     // FieldAddress retains the exact record and key. For example, `record.value` in an inout
     // Record helper has an explicit pointer spelling, so its producer proves the local role.
-    NVVMStructField field;
+    NVVMStructFieldSelection field;
     auto fieldAddress = as<IRFieldAddress>(pointer);
     return fieldAddress && _getNVVMStructFieldAddress(fieldAddress, field) &&
                    field.isLocalSubstandardRecordStorage
@@ -490,7 +479,7 @@ IRVectorType* _getNVVMLocalBFloat16VectorPointer(IRInst* pointer)
                : nullptr;
 }
 
-bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField);
+bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructFieldSelection& outField);
 
 // Resolves one canonical parameter-group pointer value. Consider these examples:
 //
@@ -524,7 +513,7 @@ bool _getNVVMParameterGroupPointer(IRInst* inst, IRType*& outElementType)
 
     if (auto fieldExtract = as<IRFieldExtract>(inst))
     {
-        NVVMStructField valueField;
+        NVVMStructFieldSelection valueField;
         if (!_getNVVMStructFieldValue(fieldExtract, valueField) ||
             !isTypeEqual(valueField.field->getFieldType(), parameterGroupType))
         {
@@ -536,7 +525,7 @@ bool _getNVVMParameterGroupPointer(IRInst* inst, IRType*& outElementType)
 
     auto load = as<IRLoad>(inst);
     auto fieldAddress = load ? as<IRFieldAddress>(load->getPtr()) : nullptr;
-    NVVMStructField storageField;
+    NVVMStructFieldSelection storageField;
     if (!fieldAddress || !_getNVVMStructFieldAddress(fieldAddress, storageField) ||
         !isTypeEqual(storageField.field->getFieldType(), parameterGroupType))
     {
@@ -548,7 +537,7 @@ bool _getNVVMParameterGroupPointer(IRInst* inst, IRType*& outElementType)
 }
 
 // Resolves one resource-capable field extraction by canonical struct key and exact result type.
-bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructField& outField)
+bool _getNVVMStructFieldValue(IRFieldExtract* fieldExtract, NVVMStructFieldSelection& outField)
 {
     outField = {};
     auto structType = fieldExtract
@@ -989,7 +978,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         isParameterGroupStorage = arrayType != nullptr;
         if (!arrayType && base->getOp() == kIROp_FieldAddress)
         {
-            NVVMStructField fieldAddress;
+            NVVMStructFieldSelection fieldAddress;
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress))
             {
                 arrayType = fieldAddress.isMutable
@@ -1026,7 +1015,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
                 asNVVMSupportedLocalNumericPointerType(base->getDataType(), &valueType);
         if (!numericPointer && base->getOp() == kIROp_FieldAddress)
         {
-            NVVMStructField fieldAddress;
+            NVVMStructFieldSelection fieldAddress;
             if (_getNVVMStructFieldAddress(as<IRFieldAddress>(base), fieldAddress) &&
                 !fieldAddress.isConventionalGlobal &&
                 (fieldAddress.isMutable ||
@@ -1100,42 +1089,6 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     outPointer.isImmutable = isImmutable;
     outPointer.isParameterGroupStorage = isParameterGroupStorage;
     return true;
-}
-
-// Returns read-only vector pointers with the compact parameter-group representation.
-// Consider this example:
-//     struct Payload { float3 value; };
-//     float3 read(__constref Payload payload) { return payload.value; }
-// Helper parameter lowering gives this borrow a native vector pointee, despite its read-only
-// access. Actual parameter groups and physical-storage references instead select
-// NVVMTypeUse::ParameterGroupStorage. The field and element resolvers preserve that storage role
-// independently of access so loads unpack only vectors that actually use the compact layout.
-IRVectorType* _getNVVMCompactParameterGroupVectorPointer(IRInst* value)
-{
-    auto pointerType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
-    auto vectorType =
-        pointerType ? asNVVMSupportedCompactParameterGroupVectorType(pointerType->getValueType())
-                    : nullptr;
-    if (!pointerType || !vectorType)
-        return nullptr;
-
-    if (auto fieldAddress = as<IRFieldAddress>(value))
-    {
-        NVVMStructField field;
-        return _getNVVMStructFieldAddress(fieldAddress, field) && field.isParameterGroupStorage &&
-                       !field.isMutable
-                   ? vectorType
-                   : nullptr;
-    }
-
-    NVVMSequentialElementPointer elementPointer;
-    if (!_getNVVMSequentialElementPointer(value, elementPointer) ||
-        !elementPointer.isParameterGroupStorage || !elementPointer.isImmutable ||
-        !asNVVMSupportedAggregateStorageArrayType(elementPointer.aggregateType))
-    {
-        return nullptr;
-    }
-    return vectorType;
 }
 
 // Gets the natural CUDA alignment carried by one physical LLVM `byval` entry parameter.
@@ -2778,7 +2731,7 @@ bool _getNVVMSurfaceCallStorageFormat(
     outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
     auto load = as<IRLoad>(resource);
     auto fieldAddress = load ? as<IRFieldAddress>(load->getPtr()) : nullptr;
-    NVVMStructField resolvedField;
+    NVVMStructFieldSelection resolvedField;
     NVVMSurfaceType actualType;
     if (!fieldAddress || !_getNVVMStructFieldAddress(fieldAddress, resolvedField) ||
         !resolvedField.isConventionalGlobal ||
@@ -6826,14 +6779,15 @@ void _requireNVVMStructuredBufferStorageConversion(
 // writable-element producer. `getRootAddr` is the canonical address utility used by memory
 // validation; recognizing only these two roots prevents unrelated struct and array pointers from
 // silently acquiring an external-storage representation.
-IRType* _getNVVMStructuredBufferStoragePointerValueType(IRInst* pointer)
+IRType* _getNVVMStructuredBufferStoragePointerValueType(IRInst* pointer, IRInst* root = nullptr)
 {
     auto pointerType = pointer ? as<IRPtrTypeBase>(pointer->getDataType()) : nullptr;
     IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
     if (!valueType || !isNVVMSupportedStructuredBufferStorageType(valueType))
         return nullptr;
 
-    IRInst* root = getRootAddr(pointer);
+    if (!root)
+        root = getRootAddr(pointer);
     if (!root)
         return nullptr;
     if (root->getOp() == kIROp_RWStructuredBufferGetElementPtr &&
@@ -7728,13 +7682,13 @@ SlangResult _validatePointerValue(
         value ? asNVVMSupportedDeviceHelperValuePointerType(value->getDataType()) : nullptr;
     auto devicePhysicalStoragePtrType =
         value ? asNVVMSupportedDevicePhysicalStoragePointerType(value->getDataType()) : nullptr;
-    NVVMRawBufferElementPointer rawBufferElementPointer;
+    const auto plannedElement = requirements.emissionPlan.addresses.findElementAddress(value);
     NVVMStructuredBufferElementPointer structuredBufferElementPointer;
     const bool hasStructuredBufferElementProducer =
         value && _getNVVMStructuredBufferElementPointer(value, structuredBufferElementPointer);
     const bool hasResourceElementProducer =
         hasStructuredBufferElementProducer ||
-        (value && _getNVVMRawBufferElementPointer(value, rawBufferElementPointer));
+        (plannedElement && plannedElement->kind == NVVMElementAddressKind::RawBuffer);
     auto resourceElementPtrType =
         hasResourceElementProducer
             ? asNVVMSupportedRWStructuredBufferElementPointerType(value->getDataType())
@@ -7769,15 +7723,13 @@ SlangResult _validatePointerValue(
             : nullptr;
     auto sharedHelperPtrType =
         value ? asNVVMSupportedSharedHelperPointerType(value->getDataType()) : nullptr;
-    NVVMSequentialElementPointer sequentialElement;
     auto sequentialElementPtrType =
-        value && _getNVVMSequentialElementPointer(value, sequentialElement)
-            ? sequentialElement.resultType
+        plannedElement && plannedElement->kind == NVVMElementAddressKind::Sequential
+            ? plannedElement->resultType
             : nullptr;
     auto fieldPtrType = value ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
-    NVVMStructField fieldAddress;
-    if (!fieldPtrType || value->getOp() != kIROp_FieldAddress ||
-        !_getNVVMStructFieldAddress(as<IRFieldAddress>(value), fieldAddress))
+    const auto plannedField = requirements.emissionPlan.addresses.findFieldAddress(value);
+    if (!fieldPtrType || !plannedField)
     {
         fieldPtrType = nullptr;
     }
@@ -7816,11 +7768,9 @@ SlangResult _validatePointerValue(
     const auto atomicOperation =
         _findPlannedNVVMOperation(requirements.emissionPlan.atomicOperations, consumer);
     const bool isAtomicConsumer = atomicOperation && atomicOperation->pointer == value;
-    NVVMSequentialElementPointer childElementPointer;
-    const bool hasSequentialChild = consumer && consumer->getOp() == kIROp_GetElementPtr &&
-                                    consumer->getOperandCount() == 2 &&
-                                    consumer->getOperand(0) == value &&
-                                    _getNVVMSequentialElementPointer(consumer, childElementPointer);
+    const auto plannedChild = requirements.emissionPlan.addresses.findElementAddress(consumer);
+    const bool hasSequentialChild = plannedChild && plannedChild->base == value &&
+                                    plannedChild->kind == NVVMElementAddressKind::Sequential;
     if (resourceElementPtrType && consumer->getOp() != kIROp_Load &&
         consumer->getOp() != kIROp_Store && consumer->getOp() != kIROp_SwizzledStore &&
         !isAtomicConsumer && consumer->getOp() != kIROp_Call && !hasSequentialChild)
@@ -7837,7 +7787,7 @@ SlangResult _validatePointerValue(
             codeGenContext,
             toSlice("read-only structured-buffer element access"));
     }
-    if (fieldPtrType && !fieldAddress.isMutable &&
+    if (fieldPtrType && !plannedField->selection.isMutable &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
     {
         StringBuilder construct;
@@ -7845,7 +7795,7 @@ SlangResult _validatePointerValue(
                   << getIROpInfo(consumer->getOp()).name;
         return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
     }
-    if (sequentialElementPtrType && sequentialElement.isImmutable &&
+    if (sequentialElementPtrType && plannedElement->isReadOnly &&
         (consumer->getOp() != kIROp_Load || requireWriteAccess))
     {
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only sequential element load"));
@@ -8623,20 +8573,75 @@ NVVMPlannedStorageConversion _planNVVMBFloat16StorageConversion(
     return conversion;
 }
 
+// Reuses selected address provenance when planning memory operations. Consider a borrowed
+// Payload whose float3 field is read-only: the selection permits a read but carries no compact
+// parameter-group role. The same semantic field in a ParameterBlock has that independent role.
+// Canonical IR still owns pointee/address-space identity; this is a view of checked address facts.
+struct NVVMMemoryAddress
+{
+    IRInst* root = nullptr;
+    IRType* structuredStorageType = nullptr;
+    IRVectorType* localBFloat16Vector = nullptr;
+    IRVectorType* compactVector = nullptr;
+    bool isConventionalGlobal = false;
+};
+
+NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* pointer)
+{
+    NVVMMemoryAddress address;
+    address.root = getRootAddr(pointer);
+    IRType* localValueType = nullptr;
+    if (asNVVMSupportedLocalHelperValuePointerType(pointer->getDataType(), &localValueType))
+        address.localBFloat16Vector = asNVVMBFloat16VectorType(localValueType);
+    bool hasCompactStorage = false;
+    if (pointer->getOp() == kIROp_FieldAddress)
+    {
+        const auto field = plan.addresses.findFieldAddress(pointer);
+        SLANG_RELEASE_ASSERT(field);
+        address.isConventionalGlobal = field->selection.isConventionalGlobal;
+        if (!address.localBFloat16Vector && field->selection.isLocalSubstandardRecordStorage)
+            address.localBFloat16Vector =
+                asNVVMBFloat16VectorType(field->selection.field->getFieldType());
+        hasCompactStorage = field->selection.isParameterGroupStorage && !field->selection.isMutable;
+    }
+    else if (pointer->getOp() == kIROp_GetElementPtr)
+    {
+        const auto element = plan.addresses.findElementAddress(pointer);
+        SLANG_RELEASE_ASSERT(element);
+        hasCompactStorage = element->kind == NVVMElementAddressKind::Sequential &&
+                            element->isParameterGroupStorage && element->isReadOnly &&
+                            asNVVMSupportedAggregateStorageArrayType(element->aggregateType);
+    }
+    if (hasCompactStorage)
+    {
+        auto pointerType = cast<IRPtrTypeBase>(pointer->getDataType());
+        address.compactVector =
+            asNVVMSupportedCompactParameterGroupVectorType(pointerType->getValueType());
+    }
+    address.structuredStorageType =
+        _getNVVMStructuredBufferStoragePointerValueType(pointer, address.root);
+    return address;
+}
+
 // Plans the complete ordinary-load decision before any provider mutation. Access flags and
 // physical representation are independent: `read(__constref Payload p) { return p.value; }`
 // keeps a native float3, while the same semantic field in a parameter group is compact storage.
-void _planNVVMLoad(CodeGenContext* codeGenContext, IRLoad* load, NVVMPlannedLoad& outLoad)
+void _planNVVMLoad(
+    CodeGenContext* codeGenContext,
+    const NVVMEmissionPlan& plan,
+    IRLoad* load,
+    NVVMPlannedLoad& outLoad)
 {
     outLoad = {};
     outLoad.source = load;
     outLoad.pointer = load->getPtr();
-    IRType* storageType = _getNVVMStructuredBufferStoragePointerValueType(load->getPtr());
-    auto localBFloat16Vector = _getNVVMLocalBFloat16VectorPointer(load->getPtr());
+    const auto address = _getNVVMMemoryAddress(plan, load->getPtr());
+    IRType* storageType = address.structuredStorageType;
+    auto localBFloat16Vector = address.localBFloat16Vector;
     const uint32_t physicalAlignment =
         _getNVVMPhysicalAggregateStorageAlignment(codeGenContext, load->getDataType());
     const uint32_t valueAlignment = _getNVVMExecutableValueAlignment(load->getDataType());
-    auto compactVector = _getNVVMCompactParameterGroupVectorPointer(load->getPtr());
+    auto compactVector = address.compactVector;
     outLoad.alignment = compactVector
                             ? getNVVMNumericValueAlignment(compactVector->getElementType())
                             : physicalAlignment;
@@ -8680,32 +8685,34 @@ void _planNVVMLoad(CodeGenContext* codeGenContext, IRLoad* load, NVVMPlannedLoad
     IRType* parameterGroupElementType = nullptr;
     const bool isParameterGroupPointer =
         _getNVVMParameterGroupPointer(load->getPtr(), parameterGroupElementType);
-    outLoad.flags =
-        isParameterGroupPointer || isPointerToImmutableLocation(getRootAddr(load->getPtr()))
-            ? SLANG_NVVM_LOAD_FLAG_INVARIANT
-            : SLANG_NVVM_LOAD_FLAG_NONE;
-    NVVMStructField pointerStorageField;
+    outLoad.flags = isParameterGroupPointer || isPointerToImmutableLocation(address.root)
+                        ? SLANG_NVVM_LOAD_FLAG_INVARIANT
+                        : SLANG_NVVM_LOAD_FLAG_NONE;
     outLoad.isGlobalUserPointer =
         asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
-        _getNVVMStructFieldAddress(as<IRFieldAddress>(load->getPtr()), pointerStorageField) &&
-        pointerStorageField.isConventionalGlobal;
+        address.isConventionalGlobal;
 }
 
 // Retains the exact store ABI and storage conversion selected from the admitted address root.
 // A device pointer saved in local helper storage uses its helper representation; the source
 // pointer's integer width alone cannot establish that provenance.
-void _planNVVMStore(CodeGenContext* codeGenContext, IRStore* store, NVVMPlannedStore& outStore)
+void _planNVVMStore(
+    CodeGenContext* codeGenContext,
+    const NVVMEmissionPlan& plan,
+    IRStore* store,
+    NVVMPlannedStore& outStore)
 {
     outStore = {};
     outStore.source = store;
     outStore.pointer = store->getPtr();
     outStore.value = store->getVal();
-    IRType* storageType = _getNVVMStructuredBufferStoragePointerValueType(store->getPtr());
-    IRInst* rootAddress = getRootAddr(store->getPtr());
+    const auto address = _getNVVMMemoryAddress(plan, store->getPtr());
+    IRType* storageType = address.structuredStorageType;
+    IRInst* rootAddress = address.root;
     outStore.usesHelperPointerValue =
         asNVVMSupportedDeviceCopyableValuePointerType(store->getVal()->getDataType()) &&
         rootAddress && asNVVMSupportedLocalHelperValuePointerType(rootAddress->getDataType());
-    auto localBFloat16Vector = _getNVVMLocalBFloat16VectorPointer(store->getPtr());
+    auto localBFloat16Vector = address.localBFloat16Vector;
     if (localBFloat16Vector)
     {
         outStore.alignment = _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector);
@@ -9456,17 +9463,47 @@ SlangResult _validateNVVMFunction(
                 {
                     NVVMRawBufferElementPointer bufferElementPointer;
                     NVVMSequentialElementPointer sequentialElementPointer;
+                    const bool hasDirectResultType =
+                        asNVVMSupportedDevicePointerType(inst->getDataType()) ||
+                        asNVVMSupportedSharedElementPointerType(inst->getDataType());
+                    bool isSequential = false;
+                    bool isRawBuffer = false;
                     if (inst->getOperandCount() != 2 ||
-                        (!asNVVMSupportedDevicePointerType(inst->getDataType()) &&
-                         !asNVVMSupportedSharedElementPointerType(inst->getDataType()) &&
-                         !_getNVVMSequentialElementPointer(inst, sequentialElementPointer) &&
-                         !_getNVVMRawBufferElementPointer(inst, bufferElementPointer)))
+                        (!hasDirectResultType &&
+                         !(isSequential =
+                               _getNVVMSequentialElementPointer(inst, sequentialElementPointer)) &&
+                         !(isRawBuffer =
+                               _getNVVMRawBufferElementPointer(inst, bufferElementPointer))))
                     {
                         return _diagnoseUnsupportedIRType(
                             codeGenContext,
                             "sequential element pointer",
                             inst->getDataType());
                     }
+                    // Direct device/shared result spellings retain their original first-pass
+                    // admission. Resolve their producer relation in the operand pass, where the
+                    // old validator first inspected it, so earlier diagnostics keep precedence.
+                    NVVMPlannedElementAddress address;
+                    address.source = inst;
+                    address.base = inst->getOperand(0);
+                    address.index = inst->getOperand(1);
+                    address.resultType = as<IRPtrTypeBase>(inst->getDataType());
+                    address.kind = hasDirectResultType ? NVVMElementAddressKind::Pending
+                                   : isRawBuffer       ? NVVMElementAddressKind::RawBuffer
+                                                       : NVVMElementAddressKind::Sequential;
+                    address.aggregateType = sequentialElementPointer.aggregateType;
+                    address.isReadOnly = sequentialElementPointer.isImmutable;
+                    address.isParameterGroupStorage =
+                        sequentialElementPointer.isParameterGroupStorage;
+                    address.propagatesGlobalUserPointer =
+                        asNVVMSupportedDeviceCopyableValuePointerType(inst->getDataType()) !=
+                        nullptr;
+                    address.diagnosticName = getNVVMSupportedSharedGlobal(address.base)
+                                                 ? "shared aggregate element pointer"
+                                             : isRawBuffer  ? "raw buffer scalar element pointer"
+                                             : isSequential ? "numeric sequential element pointer"
+                                                            : "device i32 array element pointer";
+                    requirements.emissionPlan.addresses.addElementAddress(address);
                 }
                 break;
 
@@ -9557,7 +9594,7 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_FieldExtract:
                 {
-                    NVVMStructField field;
+                    NVVMStructFieldSelection field;
                     if (!_getNVVMStructFieldValue(as<IRFieldExtract>(inst), field))
                     {
                         return _diagnoseUnsupportedIR(
@@ -9569,14 +9606,17 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_FieldAddress:
                 {
-                    NVVMStructField fieldAddress;
-                    if (!_getNVVMStructFieldAddress(as<IRFieldAddress>(inst), fieldAddress))
+                    NVVMPlannedFieldAddress address;
+                    if (!_getNVVMStructFieldAddress(as<IRFieldAddress>(inst), address.selection))
                     {
                         return _diagnoseUnsupportedIRType(
                             codeGenContext,
                             "struct field address result",
                             inst->getDataType());
                     }
+                    address.source = inst;
+                    address.base = cast<IRFieldAddress>(inst)->getBase();
+                    requirements.emissionPlan.addresses.addFieldAddress(address);
                 }
                 break;
 
@@ -9640,7 +9680,7 @@ SlangResult _validateNVVMFunction(
                         false,
                         load->getDataType()));
                     NVVMPlannedLoad plannedLoad;
-                    _planNVVMLoad(codeGenContext, load, plannedLoad);
+                    _planNVVMLoad(codeGenContext, requirements.emissionPlan, load, plannedLoad);
                     requirements.emissionPlan.loads.add(plannedLoad);
                     availableValues.add(load);
                 }
@@ -9665,7 +9705,7 @@ SlangResult _validateNVVMFunction(
                         availableValues,
                         dominatorTree));
                     NVVMPlannedStore plannedStore;
-                    _planNVVMStore(codeGenContext, store, plannedStore);
+                    _planNVVMStore(codeGenContext, requirements.emissionPlan, store, plannedStore);
                     requirements.emissionPlan.stores.add(plannedStore);
                 }
                 break;
@@ -10193,10 +10233,32 @@ SlangResult _validateNVVMFunction(
 
             case kIROp_GetElementPtr:
                 {
-                    IRInst* basePointer = inst->getOperand(0);
-                    IRInst* elementIndex = inst->getOperand(1);
-                    NVVMRawBufferElementPointer bufferElementPointer;
-                    if (_getNVVMRawBufferElementPointer(inst, bufferElementPointer))
+                    const auto address =
+                        requirements.emissionPlan.addresses.findElementAddress(inst);
+                    SLANG_RELEASE_ASSERT(address);
+                    if (address->kind == NVVMElementAddressKind::Pending)
+                    {
+                        NVVMRawBufferElementPointer raw;
+                        NVVMSequentialElementPointer sequential;
+                        const bool isRaw = _getNVVMRawBufferElementPointer(inst, raw);
+                        const bool isSequential =
+                            !isRaw && _getNVVMSequentialElementPointer(inst, sequential);
+                        address->kind = isRaw          ? NVVMElementAddressKind::RawBuffer
+                                        : isSequential ? NVVMElementAddressKind::Sequential
+                                                       : NVVMElementAddressKind::DeviceArray;
+                        address->aggregateType = sequential.aggregateType;
+                        address->isReadOnly = sequential.isImmutable;
+                        address->isParameterGroupStorage = sequential.isParameterGroupStorage;
+                        address->diagnosticName = getNVVMSupportedSharedGlobal(address->base)
+                                                      ? "shared aggregate element pointer"
+                                                  : isRaw ? "raw buffer scalar element pointer"
+                                                  : isSequential
+                                                      ? "numeric sequential element pointer"
+                                                      : "device i32 array element pointer";
+                    }
+                    IRInst* basePointer = address->base;
+                    IRInst* elementIndex = address->index;
+                    if (address->kind == NVVMElementAddressKind::RawBuffer)
                     {
                         SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                             codeGenContext,
@@ -10213,10 +10275,9 @@ SlangResult _validateNVVMFunction(
                         availableValues.add(inst);
                         break;
                     }
-                    NVVMSequentialElementPointer sequentialElementPointer;
-                    if (_getNVVMSequentialElementPointer(inst, sequentialElementPointer))
+                    if (address->kind == NVVMElementAddressKind::Sequential)
                     {
-                        if (sequentialElementPointer.isImmutable)
+                        if (address->isReadOnly)
                         {
                             SLANG_RETURN_ON_FAIL(_validateAvailableValue(
                                 codeGenContext,
@@ -10235,7 +10296,7 @@ SlangResult _validateNVVMFunction(
                                 availableValues,
                                 dominatorTree,
                                 false,
-                                sequentialElementPointer.aggregateType));
+                                address->aggregateType));
                         }
                         SLANG_RETURN_ON_FAIL(_validateInteger32Value(
                             codeGenContext,
@@ -17020,18 +17081,15 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GetElementPtr:
                     {
-                        NVVMRawBufferElementPointer bufferElementPointer;
-                        const bool isBufferElement =
-                            _getNVVMRawBufferElementPointer(inst, bufferElementPointer);
-                        NVVMSequentialElementPointer sequentialElementPointer;
-                        const bool isSequentialElement =
-                            _getNVVMSequentialElementPointer(inst, sequentialElementPointer);
+                        const auto address = planIndex.findElementAddress(inst);
+                        SLANG_RELEASE_ASSERT(
+                            address && address->kind != NVVMElementAddressKind::Pending);
                         SlangNVVMValueHandle loweredBasePointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            inst->getOperand(0),
+                            address->base,
                             valueMap,
                             typeContext,
                             loweredBasePointer));
@@ -17040,33 +17098,30 @@ SlangResult emitNVVMIRFromLinkedIR(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            inst->getOperand(1),
+                            address->index,
                             valueMap,
                             typeContext,
                             loweredElementIndex));
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         const SlangResult pointerResult =
-                            isBufferElement ? builder.emitPointerOffset(
-                                                  moduleScope.module,
-                                                  loweredBasePointer,
-                                                  loweredElementIndex,
-                                                  loweredPointer)
-                                            : builder.emitSequentialElementPointer(
-                                                  moduleScope.module,
-                                                  loweredBasePointer,
-                                                  loweredElementIndex,
-                                                  loweredPointer);
+                            address->kind == NVVMElementAddressKind::RawBuffer
+                                ? builder.emitPointerOffset(
+                                      moduleScope.module,
+                                      loweredBasePointer,
+                                      loweredElementIndex,
+                                      loweredPointer)
+                                : builder.emitSequentialElementPointer(
+                                      moduleScope.module,
+                                      loweredBasePointer,
+                                      loweredElementIndex,
+                                      loweredPointer);
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            getNVVMSupportedSharedGlobal(inst->getOperand(0))
-                                ? "shared aggregate element pointer"
-                            : isBufferElement     ? "raw buffer scalar element pointer"
-                            : isSequentialElement ? "numeric sequential element pointer"
-                                                  : "device i32 array element pointer",
+                            address->diagnosticName,
                             pointerResult));
                         valueMap[inst] = loweredPointer;
-                        if (asNVVMSupportedDeviceCopyableValuePointerType(inst->getDataType()) &&
-                            globalUserPointers.contains(inst->getOperand(0)))
+                        if (address->propagatesGlobalUserPointer &&
+                            globalUserPointers.contains(address->base))
                         {
                             globalUserPointers.add(inst);
                         }
@@ -17102,28 +17157,26 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_FieldAddress:
                     {
-                        auto fieldAddress = cast<IRFieldAddress>(inst);
-                        NVVMStructField resolvedAddress;
-                        SLANG_RELEASE_ASSERT(
-                            _getNVVMStructFieldAddress(fieldAddress, resolvedAddress));
+                        const auto address = planIndex.findFieldAddress(inst);
+                        SLANG_RELEASE_ASSERT(address);
                         SlangNVVMValueHandle loweredBasePointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            fieldAddress->getBase(),
+                            address->base,
                             valueMap,
                             typeContext,
                             loweredBasePointer));
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            resolvedAddress.isMutable ? "mutable struct field address"
-                                                      : "immutable struct field address",
+                            address->selection.isMutable ? "mutable struct field address"
+                                                         : "immutable struct field address",
                             builder.emitStructFieldPointer(
                                 moduleScope.module,
                                 loweredBasePointer,
-                                resolvedAddress.fieldIndex,
+                                address->selection.fieldIndex,
                                 loweredPointer)));
                         valueMap[inst] = loweredPointer;
                     }
@@ -17132,7 +17185,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_FieldExtract:
                     {
                         auto fieldExtract = cast<IRFieldExtract>(inst);
-                        NVVMStructField resolvedField;
+                        NVVMStructFieldSelection resolvedField;
                         SLANG_RELEASE_ASSERT(_getNVVMStructFieldValue(fieldExtract, resolvedField));
                         SlangNVVMValueHandle loweredValue = nullptr;
                         // CUDA kernel structs are pointer-backed `byval` parameters, but `IRParam`

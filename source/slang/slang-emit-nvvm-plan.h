@@ -236,9 +236,74 @@ struct NVVMPlannedStore
     bool usesHelperPointerValue = false;
 };
 
+/// Records a field selected by canonical IR key and the admitted storage/access roles of its root.
+/// Read-only access does not imply parameter-group storage or immutable-location load metadata.
+struct NVVMStructFieldSelection
+{
+    IRStructField* field = nullptr;
+    uint32_t fieldIndex = 0;
+    bool isConventionalGlobal = false;
+    bool isMutable = false;
+    bool isPhysicalStorage = false;
+    bool isParameterGroupStorage = false;
+    bool isLocalSubstandardRecordStorage = false;
+};
+
+/// Owns one checked field selection. The IR pointer type remains the address-space authority.
+struct NVVMPlannedFieldAddress
+{
+    IRInst* source = nullptr;
+    IRInst* base = nullptr;
+    NVVMStructFieldSelection selection;
+};
+
+enum class NVVMElementAddressKind
+{
+    // Direct device/shared result types defer producer relation checks to the operand pass.
+    Pending,
+    RawBuffer,
+    Sequential,
+    DeviceArray,
+};
+
+/// Owns one checked index relation and its provider recipe, retaining semantic storage provenance.
+struct NVVMPlannedElementAddress
+{
+    IRInst* source = nullptr;
+    IRInst* base = nullptr;
+    IRInst* index = nullptr;
+    IRType* aggregateType = nullptr;
+    IRPtrTypeBase* resultType = nullptr;
+    NVVMElementAddressKind kind = NVVMElementAddressKind::Pending;
+    bool isReadOnly = false;
+    bool isParameterGroupStorage = false;
+    bool propagatesGlobalUserPointer = false;
+    const char* diagnosticName = nullptr;
+};
+
+/// Indexes address proofs as preflight records them, so ordinary pointer uses never scan the
+/// module. Indices remain stable when the owned lists grow; canonical IR identity is the only
+/// lookup key.
+class NVVMAddressPlan
+{
+public:
+    void addFieldAddress(const NVVMPlannedFieldAddress& address);
+    void addElementAddress(const NVVMPlannedElementAddress& address);
+    NVVMPlannedElementAddress* findElementAddress(IRInst* source);
+    const NVVMPlannedFieldAddress* findFieldAddress(IRInst* source) const;
+    const NVVMPlannedElementAddress* findElementAddress(IRInst* source) const;
+
+private:
+    List<NVVMPlannedFieldAddress> m_fieldAddresses;
+    List<NVVMPlannedElementAddress> m_elementAddresses;
+    Dictionary<IRInst*, Index> m_fieldAddressIndices;
+    Dictionary<IRInst*, Index> m_elementAddressIndices;
+};
+
 /// Owns stable module decisions produced by preflight and consumed without reclassification.
 struct NVVMEmissionPlan
 {
+    NVVMAddressPlan addresses;
     List<NVVMPlannedLocalStorage> localStorage;
     List<NVVMPlannedLoad> loads;
     List<NVVMPlannedStore> stores;
@@ -299,6 +364,8 @@ class NVVMEmissionPlanIndex
 public:
     void initialize(const NVVMEmissionPlan& plan);
 
+    const NVVMPlannedFieldAddress* findFieldAddress(IRInst* source) const;
+    const NVVMPlannedElementAddress* findElementAddress(IRInst* source) const;
     const NVVMPlannedLocalStorage* findLocalStorage(IRInst* source) const;
     const NVVMPlannedLoad* findLoad(IRInst* source) const;
     const NVVMPlannedStore* findStore(IRInst* source) const;

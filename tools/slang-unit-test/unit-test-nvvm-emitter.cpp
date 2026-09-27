@@ -1947,9 +1947,15 @@ SLANG_UNIT_TEST(nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresent
         SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount >= 3);
         SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 1);
         bool sawCompactVectorLoad = false;
-        for (auto resultType : gFakeNVVMBuilder.loadResultTypeKinds)
+        for (Index i = 0; i < gFakeNVVMBuilder.loadResultTypeKinds.getCount(); ++i)
         {
-            sawCompactVectorLoad |= resultType == FakeNVVMBuilderScalarTypeKind::NumericArray;
+            if (gFakeNVVMBuilder.loadResultTypeKinds[i] ==
+                FakeNVVMBuilderScalarTypeKind::NumericArray)
+            {
+                sawCompactVectorLoad = true;
+                SLANG_CHECK(gFakeNVVMBuilder.loadAlignments[i] == 4);
+                SLANG_CHECK(gFakeNVVMBuilder.loadFlags[i] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+            }
         }
         SLANG_CHECK(sawCompactVectorLoad);
         bool sawValueVectorParameter = false;
@@ -9126,6 +9132,101 @@ public:
         return FakeDirectNVVMLoader::loadSharedLibrary(path, outLibrary);
     }
 };
+
+// Nested field/index selection preserves native storage and read permission independently.
+SLANG_UNIT_TEST(nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles)
+{
+    NVVMIRBuilder realBuilder;
+    _requireRealNVVMBuilder(unitTestContext, realBuilder);
+    _resetDirectNVVMFakes();
+    {
+        const char* source = R"SLANG(
+            struct Inner { float3 value; float sentinel; }
+            struct Payload { Inner inner; uint guard; }
+            [noinline] float read(__constref Payload p, uint lane)
+            {
+                return p.inner.value[lane];
+            }
+            [noinline] void replace(inout Payload p, uint lane, float value)
+            {
+                p.inner.value[lane] = value;
+            }
+            RWStructuredBuffer<float> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p;
+                p.inner.value = float3(1.0f, 2.0f, 3.0f);
+                p.inner.sentinel = 9.0f;
+                p.guard = 7;
+                let before = read(p, tid.x % 3);
+                replace(p, tid.x % 3, 5.0f);
+                let after = read(p, tid.x % 3);
+                outputBuffer[0] = before + after + p.inner.sentinel + float(p.guard);
+            }
+        )SLANG";
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        const String& assembly = gFakeNVVM.addedModule;
+        SLANG_CHECK(assembly.indexOf("alloca { { <3 x float>, float }, i32 }, align 16") >= 0);
+
+        // These are the only scalar-returning and void helpers in this fixture. Scope checks
+        // to their bodies because the kernel's resource-descriptor loads may be invariant.
+        const char* helperPrefixes[] = {"define internal float ", "define internal void "};
+        for (Index helper = 0; helper < 2; ++helper)
+        {
+            const Index start = assembly.indexOf(helperPrefixes[helper]);
+            SLANG_CHECK_ABORT(start >= 0);
+            const Index end = assembly.indexOf("\n}", start);
+            SLANG_CHECK_ABORT(end > start);
+            SLANG_CHECK(assembly.indexOf(helperPrefixes[helper], end) < 0);
+            const String body = assembly.subString(start, end - start);
+            SLANG_CHECK(
+                body.indexOf("getelementptr inbounds { { <3 x float>, float }, i32 }") >= 0);
+            SLANG_CHECK(body.indexOf("getelementptr inbounds { <3 x float>, float }") >= 0);
+            SLANG_CHECK(body.indexOf("[3 x float]") < 0);
+
+            const Index laneAddress = body.indexOf("getelementptr <3 x float>");
+            SLANG_CHECK_ABORT(laneAddress >= 0);
+            const Index laneAddressEnd = body.indexOf('\n', laneAddress);
+            SLANG_CHECK_ABORT(laneAddressEnd > laneAddress);
+            const String laneAddressLine =
+                body.subString(laneAddress, laneAddressEnd - laneAddress);
+            // The provider assigns stable names to parameters for LLVM 7/14 textual compatibility.
+            // Both helpers receive the runtime lane as their second parameter.
+            SLANG_CHECK(laneAddressLine.indexOf("i32 0, i32 %slangParameter1") >= 0);
+
+            const Index memoryOperation =
+                body.indexOf(helper == 0 ? "load float," : "store float ");
+            SLANG_CHECK_ABORT(memoryOperation >= 0);
+            const Index memoryOperationEnd = body.indexOf('\n', memoryOperation);
+            SLANG_CHECK_ABORT(memoryOperationEnd > memoryOperation);
+            const String memoryLine =
+                body.subString(memoryOperation, memoryOperationEnd - memoryOperation);
+            SLANG_CHECK(memoryLine.indexOf("align 4") >= 0);
+            SLANG_CHECK(body.indexOf("!invariant.load") < 0);
+        }
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
 
 // This is the former nested FP8 negative, extended to scalar BF16. The canonical inner
 // record remains observable across a noinline outer value parameter and result.

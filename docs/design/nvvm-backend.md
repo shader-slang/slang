@@ -76,9 +76,21 @@ parameter-group vector recipes remain distinct from readonly native-vector acces
 borrow may refer to mutable caller storage and therefore does not imply invariant-load metadata;
 that requires the separate immutable-location contract.
 
-The plan boundary is incomplete: some scalar intrinsic and wave families still resolve during both
-validation and emission. Field/element-address producers, dedicated resource operations and general
-structured-storage conversion still contain repeated or recursive decisions. This is current
+Field and indexed-element addresses also have required source-keyed recipes. `NVVMAddressPlan`
+records canonical field selection, admitted storage/access roles and the raw-offset or sequential
+pointer operation. Its source-to-index dictionaries serve both preflight and immutable emission,
+without scanning unrelated module addresses. Pointer validation and ordinary memory planning reuse
+these records; selected address emission does not rerun the recognizers. Canonical IR pointer types
+remain authoritative for pointee, access qualifier and address space.
+
+Preflight preserves its two-stage diagnostic order. Direct device/shared element-pointer results
+retain pending recipes until their original second-stage raw/sequential/device-array recognition;
+all recipes must be complete before emission. Ordinary load/store planning computes its canonical root after pointer validation. Read-only selection permits reads but does not itself authorize invariant-load metadata.
+
+The plan boundary is incomplete: initial ancestor admission remains recursive, and some scalar
+intrinsic and wave families still resolve during both validation and emission. Field-value
+extraction, dedicated resource operations, helper-signature classification and general
+structured-storage conversion retain repeated or recursive decisions. This is current
 architectural debt, not a reason to bypass preflight or add a second semantic catalog.
 
 ## Canonical types and use-specific representation
@@ -293,17 +305,26 @@ exits, and temporary observers must restore compiler/module/configuration bytes 
 
 ## Remaining refactoring direction
 
-Ordinary allocation/load/store planning establishes a checked analysis and backend-recipe boundary;
-it does not rewrite physical storage into Slang IR or consolidate every address proof. Canonical IR
+Ordinary allocation/load/store planning and checked field/index recipes establish an analysis and
+backend-recipe boundary. They do not rewrite physical storage into Slang IR or consolidate every
+address proof. Canonical IR
 types remain the source of semantic identity, while planned type uses and conversions describe their
 physical roles. A successful physical-type lookup still cannot authorize another role.
 
 A future transforming pass should reuse existing physical-storage lowering after defining per-root
-selection/specialization and retained semantic admission. A broader final address analysis could
-then establish provenance, permitted access, alignment and storage role once for field/index producers
-and all consumers. It must not invent a second type hierarchy. Remaining compound recipes can move
+selection/specialization and retained semantic admission. Field/index recipes already supply checked
+facts to pointer validation, ordinary memory planning and emission. A broader address analysis could
+consolidate their remaining recursive ancestor admission and extend that authority to other address
+producers and consumers. It must not invent a second type hierarchy. Remaining compound recipes can move
 into the existing immutable plan as their families are touched. File separation should follow these
 ownership boundaries.
+
+A transforming local-storage pass is deferred. A one-record rewrite would leave the existing
+BF3/BF4 conversion path necessary while adding explicit root selection, callee specialization,
+original semantic admission and generated-helper cleanup. The shared lowerer's current type-wide
+entry and fallback for unrecognized pointer uses do not establish safe per-root isolation. Revisit
+this when a real workload motivates retiring a complete representation family; an isolated passing
+rewrite alone would not demonstrate that architectural benefit.
 
 These remaining proposals are not implemented support or authorization to resume general feature
 work. Record-array admission would be a useful later test of the revised boundary. Representative
