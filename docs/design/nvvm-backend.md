@@ -327,7 +327,15 @@ this when a real workload motivates retiring a complete representation family; a
 rewrite alone would not demonstrate that architectural benefit.
 
 These remaining proposals are not implemented support or authorization to resume general feature
-work. Record-array admission would be a useful later test of the revised boundary. Representative
-material runtime requires bindings, textures/LUTs, inputs and an independent output oracle before
-any runtime or performance conclusion. Compile/assembly and static resource measurements remain
-valuable but separate.
+work. Record-array admission would be a useful later test of the revised boundary.
+
+Material runtime qualification has a separate contract from compile/assembly and static resource
+measurements. The maintained tiled-brass validator runs the unchanged `eval_buffer` with two live
+synthetic textures and an independent scalar GGX/Fresnel/analytic-compensation oracle in all three
+modes. Its host driver uses installed CUDA headers, checks full texture handles against the
+application's low30 encoding, and packs the independently audited 168-byte global block and
+40-byte input records. A preparation run exposes fresh PTX for field/stride review; execution
+requires byte-identical PTX before launch. Positive finite outputs, repeated seeds, wrapped UVs
+and untouched tail sentinels are required. This contract does not qualify `sample_buffer`, original
+assets, LUT reads, arbitrary graph composition or performance. See
+[the validator](../../extras/validate-nvvm-material-runtime.py) and [commands](../../issue-nvvm-backend/RESULTS.md#material-runtime-correctness).

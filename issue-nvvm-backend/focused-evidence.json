@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "accepted-focused-evidence",
-  "meaning": "Selected focused qualifications outside the full baseline. Original tested identities, outcomes and failed attempts are preserved; no new execution is implied. Replace by feature after reviewed qualification, retaining failure transitions. Historical paths resolve through HISTORY.md.",
+  "meaning": "Selected focused qualifications outside the full baseline. Each feature retains its own tested identity, outcomes and failed attempts. The top-level baseline/archive revision applies to the older archived features, not later qualifications. Replace by feature after reviewed qualification, retaining failure transitions. Historical paths resolve through HISTORY.md.",
   "archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
@@ -1242,6 +1242,346 @@
             "path": "build/nvvm-storage-refactor/parser-validation.json",
             "sha256": "e025dbafcebe4e551343f48b1f1d9a9c2bf30309a35a48e7da5b5b54bbd41710"
           }
+        }
+      }
+    },
+    "tiled-brass-eval-synthetic-textures": {
+      "status": "accepted-three-mode-runtime",
+      "contract": "tiled-brass-eval-synthetic-textures-v1",
+      "entry": "eval_buffer",
+      "sources": {
+        "tests/cuda/complex/tiled_brass_material.slang": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92"
+      },
+      "baseline": {
+        "path": "issue-nvvm-backend/accepted-baseline.json",
+        "sha256": "62c997a14b25874f72f52d6366e7211877df0354c42b9b653c645df46621351b"
+      },
+      "identity": {
+        "path": "issue-nvvm-backend/accepted-identity.json",
+        "sha256": "4ce3f71e06f582b82cba621c0136998540acc0b59a56d17d4b6565f61462163e"
+      },
+      "compiler_identity": {
+        "revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
+        "patch_sha256": "9025401d0c3bf9e0b1644d728f0ac60d9dd5929b3fd48104f61044d6419b6b56",
+        "compiler_version": "2026.18.3-315-g2f33cbe55",
+        "provider_abi": 42
+      },
+      "repository_revision": "35d5fbc86f74634a126a1dc2f5d59c240bea501b",
+      "qualification": "Fresh real GPU execution with unchanged registered source; inherited full compiler baseline was reverified, not rerun.",
+      "inputs": {
+        "color_rgba32f_2x2": [
+          [0.02, 0.35, 0.8, 1],
+          [0.8, 0.15, 0.04, 1],
+          [0.25, 0.6, 0.1, 1],
+          [0.7, 0.4, 0.9, 1]
+        ],
+        "roughness": [0.25, 0.4, 0.6, 0.8],
+        "sampler": "normalized linear wrap, texel centers and one wrapped center, no hardware sRGB conversion",
+        "base_cases": 13,
+        "active_records": 65,
+        "allocated_output_records": 128,
+        "guard_records": 63,
+        "directions": "normal incidence and two front-facing oblique direction pairs; independent normalization",
+        "seed_repeat": "five repetitions with distinct seeds; output bytes identical",
+        "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7"
+      },
+      "abi": {
+        "global_symbol": "SLANG_globalParams",
+        "global_bytes": 168,
+        "global_alignment": 8,
+        "material_offset": 80,
+        "input_offset": 96,
+        "output_offset": 112,
+        "count_offset": 160,
+        "material_bytes": 8,
+        "input_stride": 40,
+        "output_stride": 16,
+        "texture_handles": "full 64-bit driver objects must round-trip unchanged through application low30 encoding",
+        "proof": "CUDA-header host static assertions, independent fresh PTX field/stride audit and exact reviewed PTX hashes before launch; runtime symbol size check"
+      },
+      "oracle": {
+        "kind": "independent scalar double GGX/Fresnel/analytic energy compensation for the selected two-lobe graph",
+        "absolute_tolerance": 1e-5,
+        "relative_tolerance": 0.0002,
+        "threshold": "abs(actual-reference) <= 1e-5 + 2e-4*abs(reference); frozen before GPU outputs",
+        "prelaunch_float32_fma_max_relative": 5.54e-7,
+        "prelaunch_float32_fma_max_absolute": 8.49e-7,
+        "perturbation_checks": {
+          "positive_finite_components": 260,
+          "minimum_perturbation_tolerance_multiples": {
+            "missing_coat": 348.6296105805181,
+            "missing_base": 2615.949454157651,
+            "wrong_color": 3732.189642191362,
+            "wrong_roughness": 1398.8677931836078
+          }
+        },
+        "normal_incidence": "independently collected rational quadratics and closed-form Fresnel/GGX/PDF CPU test"
+      },
+      "fresh_cell_outcomes": [
+        {
+          "id": "nvrtc-o3",
+          "backend": "nvrtc",
+          "optimization": 3,
+          "architecture": 80,
+          "entry": "eval_buffer",
+          "status": "passed",
+          "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+          "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+          "input_sha256": {
+            "inputs.bin": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+            "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+            "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
+          },
+          "runtime_artifact_sha256": {
+            "outputs.bin": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "material.bin": "34fb5c825de7ca4aea6e712f19d439c1da0c92c37b423936c5f618545ca4fa1f",
+            "globals.bin": "70cc0dc27844a4d9f90d44b9737d9e43617dd57c8ea6233d388903c56a8757db"
+          },
+          "runtime": {
+            "launches": 1,
+            "active_records": 65,
+            "output_capacity": 128,
+            "cuda_header_version": 12090,
+            "driver_api_version": 13000,
+            "device": "NVIDIA L4",
+            "device_ordinal": 0,
+            "compute_capability": 89,
+            "texture_handles": {
+              "color": {
+                "decimal": "1",
+                "hex": "0x0000000000000001"
+              },
+              "roughness": {
+                "decimal": "2",
+                "hex": "0x0000000000000002"
+              }
+            }
+          },
+          "return_codes": {
+            "compile": 0,
+            "assembly": 0,
+            "execution": 0
+          },
+          "comparison": {
+            "status": "passed",
+            "compared_records": 65,
+            "compared_components": 260,
+            "tail_records": 63,
+            "tail_sentinels_unchanged": true,
+            "different_seed_outputs_identical": true,
+            "wrapped_uv_output_identical": true,
+            "max_absolute_error": 8.490800915694763e-7,
+            "max_relative_error": 5.085167740487487e-7,
+            "max_tolerance_fraction": 0.002225461884237465,
+            "failed_components": []
+          }
+        },
+        {
+          "id": "nvvm-o0",
+          "backend": "nvvm",
+          "optimization": 0,
+          "architecture": 80,
+          "entry": "eval_buffer",
+          "status": "passed",
+          "ptx_sha256": "cb916e997b632248904b5a057a007a1f313e267cdba5d19cbbd6517f62519142",
+          "cubin_sha256": "799cb7c81b1dbc8c48a97a30a3e3a88bb6a0bb8fa0b60fb743ce56cb8ef06e22",
+          "input_sha256": {
+            "inputs.bin": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+            "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+            "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
+          },
+          "runtime_artifact_sha256": {
+            "outputs.bin": "f51f35a9b425c13a20a4b597745bd42e9ef83d416fbe16da5e3a2e65ca9526d2",
+            "material.bin": "34fb5c825de7ca4aea6e712f19d439c1da0c92c37b423936c5f618545ca4fa1f",
+            "globals.bin": "c1c9ae11659664757d806f1b7ae465595d68813e52a41cc35c3c5f560cbb3545"
+          },
+          "runtime": {
+            "launches": 1,
+            "active_records": 65,
+            "output_capacity": 128,
+            "cuda_header_version": 12090,
+            "driver_api_version": 13000,
+            "device": "NVIDIA L4",
+            "device_ordinal": 0,
+            "compute_capability": 89,
+            "texture_handles": {
+              "color": {
+                "decimal": "1",
+                "hex": "0x0000000000000001"
+              },
+              "roughness": {
+                "decimal": "2",
+                "hex": "0x0000000000000002"
+              }
+            }
+          },
+          "return_codes": {
+            "compile": 0,
+            "assembly": 0,
+            "execution": 0
+          },
+          "comparison": {
+            "status": "passed",
+            "compared_records": 65,
+            "compared_components": 260,
+            "tail_records": 63,
+            "tail_sentinels_unchanged": true,
+            "different_seed_outputs_identical": true,
+            "wrapped_uv_output_identical": true,
+            "max_absolute_error": 2.0136191842823337e-6,
+            "max_relative_error": 5.085167740487487e-7,
+            "max_tolerance_fraction": 0.002225461884237465,
+            "failed_components": []
+          }
+        },
+        {
+          "id": "nvvm-o3",
+          "backend": "nvvm",
+          "optimization": 3,
+          "architecture": 80,
+          "entry": "eval_buffer",
+          "status": "passed",
+          "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+          "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+          "input_sha256": {
+            "inputs.bin": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+            "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+            "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
+          },
+          "runtime_artifact_sha256": {
+            "outputs.bin": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "material.bin": "34fb5c825de7ca4aea6e712f19d439c1da0c92c37b423936c5f618545ca4fa1f",
+            "globals.bin": "7695d28a99c671bdb14e6b8f9eddd5f7ddf3c0817392240ebbca86eddfd2a16c"
+          },
+          "runtime": {
+            "launches": 1,
+            "active_records": 65,
+            "output_capacity": 128,
+            "cuda_header_version": 12090,
+            "driver_api_version": 13000,
+            "device": "NVIDIA L4",
+            "device_ordinal": 0,
+            "compute_capability": 89,
+            "texture_handles": {
+              "color": {
+                "decimal": "1",
+                "hex": "0x0000000000000001"
+              },
+              "roughness": {
+                "decimal": "2",
+                "hex": "0x0000000000000002"
+              }
+            }
+          },
+          "return_codes": {
+            "compile": 0,
+            "assembly": 0,
+            "execution": 0
+          },
+          "comparison": {
+            "status": "passed",
+            "compared_records": 65,
+            "compared_components": 260,
+            "tail_records": 63,
+            "tail_sentinels_unchanged": true,
+            "different_seed_outputs_identical": true,
+            "wrapped_uv_output_identical": true,
+            "max_absolute_error": 8.490800915694763e-7,
+            "max_relative_error": 5.085167740487487e-7,
+            "max_tolerance_fraction": 0.002225461884237465,
+            "failed_components": []
+          }
+        }
+      ],
+      "provenance": {
+        "runtime_artifacts": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "520c123df451c326537fe94ffad532bb14d887c468bc22362452c6e6db65d289",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+          "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a",
+          "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+          "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+          "/usr/local/cuda-12.9/include/cuda.h": "fda3285d055a9f05e40cd76352f9f073d0ab45d42fb5bb0db4bb33b0df506d28",
+          "/usr/local/cuda-12.9/include/cudaTypedefs.h": "52969c2b6053aa1645dd0cc1e786de4bc20eee962dab32503a9e8f1013fb31e1",
+          "/home/skallweit/codex/agent-sandbox/slang/extras/nvvm-material-runtime-driver.cpp": "877e1c528e671c798ce8ea31cbd83a488056550506b3195e327e3689d9342d95",
+          "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-material-runtime.py": "7b2d11634e32e892cecc413d6be8d60ac90bf00543456c60ba9fc16b136530c8",
+          "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/complex-corpus.manifest.json": "7a6d151ed8e23066ec3b81e35b3f3bd606b3c37a0aea82da6953d47d2ebf4173",
+          "/home/skallweit/codex/agent-sandbox/slang/tests/cuda/complex/tiled_brass_material.slang": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+          "/usr/bin/c++": "1353e9bdd29a7295c7226bf6c63abccce056d8cac31f112e5cdbecc3f28c2769",
+          "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+          "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-toolkit.py": "308db6031660aeda9af5e57237cc932ba7739e6707b9ed98457340f9e33b535e",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-material-runtime/execution-0/material-driver": "4aedb74cce19d2a9060f6f3f3bbeeefaacd535a2bff9b12f24f0c42a8d48fca2"
+        },
+        "environment": {
+          "CUDA_PATH": "/usr/local/cuda-12.9",
+          "CUDA_HOME": "/usr/local/cuda-12.9",
+          "LIBNVVM_HOME": "/usr/local/cuda-12.9",
+          "SLANG_NVVM_BUILDER_PATH": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "LD_LIBRARY_PATH": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib:/usr/local/cuda-12.9/nvvm/lib64:/usr/local/cuda-12.9/targets/x86_64-linux/lib:/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib:/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin:/usr/local/cuda-12.9/nvvm/lib64:/usr/local/cuda-12.9/lib64:",
+          "CUDA_VISIBLE_DEVICES": null
+        },
+        "driver_version": "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  580.126.09  Release Build  (dvs-builder@U22-I3-AM02-24-3)  Wed Jan  7 22:51:36 UTC 2026\nGCC version:  gcc version 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1) \n",
+        "compiler_version": "2026.18.3-315-g2f33cbe55",
+        "toolkit_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Tue_May_27_02:21:03_PDT_2025\nCuda compilation tools, release 12.9, V12.9.86\nBuild cuda_12.9.r12.9/compiler.36037853_0",
+        "host_compiler_version": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "accepted_identity_verification": {
+          "path": "build/nvvm-material-runtime/identity-before-execution.json",
+          "sha256": "c4d0024bf1591f2bcfec8a1c0a96735e752f60f4e7b10d9dd9c4a54a8b39ddf1"
+        },
+        "preparation": {
+          "path": "build/nvvm-material-runtime/prepare-0/results.json",
+          "sha256": "ba80f58715bb54c278cf46c0ef3c415003d7da869f67c977a9dc2188a45c4b1b"
+        },
+        "execution": {
+          "path": "build/nvvm-material-runtime/execution-0/results.json",
+          "sha256": "7ebd13b6009b41dacb5f4f9f87a484c58ee83a0678e55c65f8293767bde5cbb4"
+        },
+        "manifest_metadata_update": "After qualification, runtime_status was updated to link this standalone contract. Tested source/entries/options are unchanged. Raw run and inherited full baseline retain the original manifest hash; neither claims to have tested later metadata."
+      },
+      "preparation_history": [
+        {
+          "attempt": "cpu-contracts-initial",
+          "outcome": "10 pass, 1 failed",
+          "failure": "Normal-incidence test numerator constant incorrectly included the xy coefficient twice (26.772 instead of28.81).",
+          "resolution": "Independent collection confirmed .1003-.6303+29.34=28.81; corrected only test constant. Oracle and frozen tolerance unchanged.",
+          "log": {
+            "path": "build/nvvm-material-runtime/cpu-contracts-initial.log",
+            "sha256": "ea51b0ac3551aba025cf9da710621665c7ba16c1e6e864cf32e04ad2b3b1e790"
+          }
+        },
+        {
+          "attempt": "cpu-contracts-corrected",
+          "outcome": "12 pass",
+          "log": {
+            "path": "build/nvvm-material-runtime/cpu-contracts-corrected.log",
+            "sha256": "ab399b9b867d7b265b0284bcafea34f16206664542150bbe1fb48f10dcc61ab0"
+          }
+        },
+        {
+          "attempt": "prepare-0",
+          "outcome": "3 compile/assembly cells prepared; no GPU execution; independently reviewed exact layouts"
+        }
+      ],
+      "execution_failure_history": [],
+      "limits": [
+        "No sample_buffer or original scene/assets qualification.",
+        "No live LUT reads, UDIM, grazing/backside cases or arbitrary material graphs.",
+        "Equal roughness gives equal lobe PDFs; value checks distinguish both lobes, PDF alone does not establish selection weights.",
+        "Opaque texture handles are qualified only when their full value fits the application encoding; failures are retained.",
+        "No timing or performance improvement claim."
+      ],
+      "review": {
+        "source_and_oracle": "independent review accepted; scalar oracle agrees within3.55e-15 before GPU",
+        "fresh_abi": "independent PTX field/stride/handle/global review accepted before first launch",
+        "raw_runtime": "independent scalar replay from uploaded bytes accepted all three cells; ABI, hashes, globals, handles, launch, cleanup and fixed tolerance verified",
+        "acceptance": {
+          "path": "build/nvvm-material-runtime/review/acceptance.json",
+          "sha256": "4a88ed6732c3f35094558f4b60ff4f658c818ead7c161121e1c8f55699d104fb"
+        },
+        "abi": {
+          "path": "build/nvvm-material-runtime/review/abi-prelaunch.md",
+          "sha256": "b45f24dbb1c7d50b1bab6bb49685bdd25fe64ee43390f36b083496e931303f31"
         }
       }
     }

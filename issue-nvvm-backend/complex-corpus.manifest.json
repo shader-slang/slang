@@ -26,7 +26,7 @@
         "lookup-buffers",
         "floating-point-math"
       ],
-      "runtime_status": "not-assessed: material/texture/LUT inputs and expected outputs are not supplied"
+      "runtime_status": "eval_buffer synthetic-texture contract qualified separately by extras/validate-nvvm-material-runtime.py and focused-evidence.json; this manifest still owns compile/assembly only. sample_buffer, original assets and LUT reads remain unqualified."
     }
   ]
 }
