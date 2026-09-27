@@ -17,10 +17,10 @@ Use `git ls-tree -r --name-only <commit> -- issue-nvvm-backend` to find an old p
 referenced Git objects to retrieve archival detail; current commands and accepted comparisons must
 work without them. Keep fetched history separate from current documentation.
 
-The current accepted baseline is a byte-preserving copy of the accepted293 record. Historical paths
-inside that evidence retain their original spelling and hashes: removed repository artifacts resolve
-against the commit above. They are provenance, not live input dependencies. Check the recorded SHA256
-after retrieval. `build/` paths identify local raw evidence; those ignored artifacts were never Git
+Each current baseline identifies its predecessor by Git revision, path and hash. Historical paths
+in retained failure histories keep their original spelling and hashes: removed pre-consolidation
+repository artifacts resolve against the commit above. They are provenance, not live input
+dependencies. Check the recorded SHA256 after retrieval. `build/` paths identify local raw evidence; those ignored artifacts were never Git
 archives and may be unavailable on another machine. Recorded identities/outcomes remain durable.
 
 Future replacements use their own Git revision for provenance. Do not grow this guide into another

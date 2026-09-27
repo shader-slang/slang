@@ -34,6 +34,45 @@ class CensusClassificationContracts(unittest.TestCase):
                 self.assertEqual(runner._classify_result(1, colored, mode),
                                  runner._classify_result(1, plain, mode))
 
+    def test_nvrtc_path_is_not_a_compiler_diagnostic(self):
+        # slang-test prefixes worker output with the test path. Both copies of the
+        # generated path contain the mode name, which is not a compiler identity.
+        for path in ("build/mirrors/nvrtc-o3/case.slang", "nvrtc-case.slang"):
+            for style in (False, True):
+                output = (
+                    f"[{path} (cuda)] slang-test: {path}:91:16: error: "
+                    "CHECK-NEXT: is not on the line after the previous match\n"
+                    "0% of tests passed (0/1)\n"
+                )
+                if style:
+                    output = output.replace("error: ", "\x1b[31merror: \x1b[0m")
+                for mode in runner.MODES:
+                    with self.subTest(path=path, style=style, mode=mode):
+                        self.assertEqual(runner._classify_result(1, output, mode),
+                                         ("runtime-mismatch", "", ""))
+
+    def test_nvrtc_diagnostic_precedes_filecheck(self):
+        wrapper = (
+            "slang-test: build/nvrtc-o3/case.slang:91:16: error: "
+            "CHECK-NEXT: expected string not found in input\n"
+        )
+        for prefix in ("", "[build/nvrtc-o3/case.slang (cuda)] "):
+            for diagnostic in (
+                "nvrtc: error: invalid option",
+                "nvrtc 12.9: error: compilation failed",
+                "nvrtc 12.9: generated.cu(8): error: invalid expression",
+                "nvrtc 12.9: generated.cu(8): error : invalid expression",
+                "NVRTC: generated.cu(8): catastrophic error: cannot open source",
+                "NVRTC: generated.cu(8): catastrophic error : cannot open source",
+            ):
+                with self.subTest(prefix=prefix, diagnostic=diagnostic):
+                    output = prefix + diagnostic + "\n" + wrapper
+                    self.assertEqual(runner._classify_result(1, output, "nvrtc-o3")[0],
+                                     "infrastructure")
+        warning = "nvrtc 12.9: generated.cu(8): warning: unused variable\n"
+        self.assertEqual(runner._classify_result(1, warning + wrapper, "nvrtc-o3")[0],
+                         "runtime-mismatch")
+
     def test_colored_failure_phase_and_shape_match_plain(self):
         wrapper = (
             "slang-test: fixture:20: error: CHECK: expected string not found in input\n"

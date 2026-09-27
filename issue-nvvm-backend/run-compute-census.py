@@ -423,8 +423,15 @@ def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str
         return "infrastructure", diagnostic, shape
     if "profile implicitly upgraded" in output:
         return "infrastructure", diagnostic or "profile implicitly upgraded", shape
+    # reportExternalCompileError prefixes downstream diagnostics with the compiler
+    # name/version. Require that identity at the start of a diagnostic, allowing the
+    # test worker's bracketed prefix. A FileCheck source path containing nvrtc-o3 is
+    # not a downstream compiler diagnostic and must reach mismatch classification.
     if mode.startswith("nvrtc-") and re.search(
-        r"nvrtc[^\r\n]*:\s*(?:error|.* error )", output, re.IGNORECASE
+        r"^(?:\[[^\r\n]*\][ \t]+)?nvrtc(?:[ \t]+[0-9]+(?:\.[0-9]+)*)?:"
+        r"[^\r\n]*\berror(?:[ \t]+#[0-9]+)?[ \t]*:",
+        output,
+        re.IGNORECASE | re.MULTILINE,
     ):
         return "infrastructure", diagnostic, shape
     if "EXPECTED{{{" in output and "ACTUAL{{{" in output:

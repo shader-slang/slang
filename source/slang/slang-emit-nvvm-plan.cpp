@@ -33,6 +33,9 @@ void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
 {
     SLANG_RELEASE_ASSERT(!m_plan);
     m_plan = &plan;
+    _indexOperations(plan.localStorage, m_localStorage);
+    _indexOperations(plan.loads, m_loads);
+    _indexOperations(plan.stores, m_stores);
     _indexOperations(plan.valueOperations, m_valueOperations);
     _indexOperations(plan.uint64WordConstructions, m_uint64WordConstructions);
     _indexOperations(plan.numericTruthinessOperations, m_numericTruthinessOperations);
@@ -52,6 +55,9 @@ void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
         return _findOperation(m_plan->MEMBER, INDEX_MEMBER, source);  \
     }
 
+SLANG_NVVM_DEFINE_PLAN_FIND(findLocalStorage, NVVMPlannedLocalStorage, localStorage, m_localStorage)
+SLANG_NVVM_DEFINE_PLAN_FIND(findLoad, NVVMPlannedLoad, loads, m_loads)
+SLANG_NVVM_DEFINE_PLAN_FIND(findStore, NVVMPlannedStore, stores, m_stores)
 SLANG_NVVM_DEFINE_PLAN_FIND(
     findValueOperation,
     NVVMPlannedValueOperation,

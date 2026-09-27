@@ -5,7 +5,8 @@
   "archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "da78129309339e2810448b210a342c90374bf8978280954f2883527e496f1e08"
+    "sha256": "da78129309339e2810448b210a342c90374bf8978280954f2883527e496f1e08",
+    "revision": "128eca5ccc2a98099351f503ca155935d30c8920"
   },
   "features": {
     "inheritance-initialization-constants": {
@@ -1205,15 +1206,43 @@
           "sha256": "725bd499e824bda73634ff833f97db7f2c86e645ffe9cf550038472acb1381e2"
         }
       },
-      "open_issue": {
+      "resolved_parser_issue": {
         "id": "nvrtc-path-misclassified-as-compiler-error",
-        "status": "open; repair not started",
+        "status": "resolved by maintained parser; shader remains failed as intended",
         "diagnostic_excerpt": "[build/nvvm-record-arrays296/prepared-v2/nvrtc-o3/integer-wrapper-corrupt.slang (cuda)] slang-test: build/nvvm-record-arrays296/prepared-v2/nvrtc-o3/integer-wrapper-corrupt.slang:91:16: error: CHECK-NEXT: is not on the line after the previous match",
         "cause": "The earlier NVRTC error regex starts at nvrtc-o3 in the source path and consumes through the FileCheck error. The later FileCheck regex already matches. Changing only the path segment in a saved-log copy yields runtime-mismatch.",
         "original_classification": "infrastructure",
         "reviewed_classification": "runtime-mismatch",
         "expected_corrupt_output": [32, 0, 65536, 9321],
-        "shader_status": "failed as intended; never a GPU-correct result"
+        "shader_status": "failed as intended; never a GPU-correct result",
+        "resolution": {
+          "runner": "issue-nvvm-backend/run-compute-census.py",
+          "runner_sha256": "2999d039dcf2d30d369db4cf33423fe23ee1a7492140c15f5f3ca79fe7cd3ee7",
+          "original_log": {
+            "path": "build/nvvm-record-arrays296/attempt-v2-001/cell-13/native.log",
+            "sha256": "ccaa888cb10a5063dbed69719e2c42e7e5ae725c2d0308008fc01b1f18631856"
+          },
+          "return_code": 1,
+          "execution_counts": {
+            "passed": 0,
+            "executed": 1,
+            "ignored": 0,
+            "other_summary_status": 0
+          },
+          "maintained_classification": "runtime-mismatch",
+          "fresh_gpu_execution": false,
+          "method": "CPU replay of the unchanged preserved log; compiler identity anchored independently of source paths, including the actual error-space-colon diagnostic form.",
+          "original_main_logs_replayed": 1740,
+          "main_classification_transitions": 0,
+          "contracts": {
+            "passed": 48,
+            "skipped": 1
+          },
+          "evidence": {
+            "path": "build/nvvm-storage-refactor/parser-validation.json",
+            "sha256": "e025dbafcebe4e551343f48b1f1d9a9c2bf30309a35a48e7da5b5b54bbd41710"
+          }
+        }
       }
     }
   }

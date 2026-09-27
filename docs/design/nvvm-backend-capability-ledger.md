@@ -3,8 +3,8 @@
 This matrix describes qualified combinations, not a claim of complete Slang or CUDA support. The
 [architecture](nvvm-backend.md) owns representations and invariants. [STATUS](../../issue-nvvm-backend/STATUS.md)
 owns the current accepted checkpoint and loaded compiler identity; its referenced manifests own exact
-inventories and outcomes. Source test links below identify durable contracts, not fresh runs made by
-this documentation update. Deeper historical evidence is available through the
+inventories and outcomes. Source test links below identify durable contracts; the accepted evidence
+records which compiler and inputs were actually tested. Deeper historical evidence is available through the
 [archive guide](../../issue-nvvm-backend/HISTORY.md).
 
 ## Reading the evidence
@@ -38,11 +38,18 @@ The installed compiler can be older than Git HEAD; source revision alone does no
 | Helpers and control flow        | Typed calls/results, phi values, loops/switches, finite copyable records/arrays, noinline functions, selected mutable references      | Internal by-value ABI and exported CUDA ABI are separate. [Helper values](../../tests/cuda/nvvm-helper-copyable-values.slang), [mutable forwarding](../../tests/cuda/nvvm-mutable-parameter-forwarding.slang)                                                                                           |
 | Pointer-bearing helper values   | Canonical device/UserPointer and qualified recursive helper transport                                                                 | Access/address-space/layout operands and producer provenance are checked. [Pointer forwarding](../../tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang)                                                                                                                                          |
 | Parameter groups and resources  | Selected conventional globals, uniforms, constant/parameter blocks, structured and byte-address buffers, resource-bearing aggregates  | Separate launch, parameter-group and structured-buffer representation; no universal aggregate ABI. [Multiple resources](../../tests/cuda/nvvm-conventional-global-multi-resource.slang), [compact storage](../../tests/cuda/nvvm-compact-vector-storage.slang)                                          |
-| Borrowed float3 storage         | Readonly borrowed fields/array elements preserve native storage across mutable use; GPU regression                                    | Readonly access must not imply compact parameter-group storage. [Borrowed vector storage](../../tests/cuda/nvvm-borrowed-vector-storage.slang)                                                                                                                                                          |
+| Borrowed float3 storage         | Readonly borrowed fields/array elements preserve native storage across mutable use; GPU and provider-memory regression                | Readonly access must not imply compact parameter-group storage. [Borrowed vector storage](../../tests/cuda/nvvm-borrowed-vector-storage.slang)                                                                                                                                                          |
 | Shared/local memory and atomics | Selected finite shared storage, typed integer atomic families and admitted memory orders; unit/integration/corpus gates               | Every element type, pointer role and atomic overload still needs admission. [Emitter units](../../tools/slang-unit-test/unit-test-nvvm-emitter.cpp), [integration units](../../tools/slang-unit-test/unit-test-nvvm-integration.cpp)                                                                    |
 | Thread-local context            | Qualified per-invocation global/context values and finite copyable aggregates                                                         | Does not imply arbitrary global initialization or host ABI. [Context](../../tests/cuda/nvvm-thread-local-global-context.slang), [copyable context](../../tests/cuda/nvvm-copyable-kernel-context.slang)                                                                                                 |
 | Receiver snapshots              | Canonical aggregate parameter snapshots preserve values across resource mutation; GPU and material compile evidence                   | Aggregate-memory ordering issue is fixed; no material GPU claim. [Snapshot](../../tests/cuda/nvvm-aggregate-param-snapshot.slang), [resource snapshot](../../tests/cuda/nvvm-aggregate-param-resource-snapshot.slang)                                                                                   |
 | Nested integer aggregate stores | Nested records and root/wrapped/multidimensional arrays; NVVM O0/O3 GPU and 39 provider shape/alignment checks                        | Qualified libNVVM store workaround; focused NVRTC optimized copies still fail. [Root](../../tests/cuda/nvvm-nested-array-root.slang), [wrapper](../../tests/cuda/nvvm-nested-array-wrapped.slang), [multidimensional](../../tests/cuda/nvvm-nested-array-multidimensional.slang)                        |
+
+Ordinary Var/Load/Store decisions are now retained in the checked emission plan: allocation role,
+alignment, conversion recipe, load flags and pointer ABI/provenance. BF2 identity and BF3/BF4 lane
+conversion are planned before provider mutation. Native readonly borrows remain distinct from compact
+storage and from immutable locations. This changes ownership, not the supported language surface.
+General structured-storage recursion and field/element-address consolidation remain outside this
+boundary; no transforming Slang IR storage pass is claimed.
 
 Unsupported bodies, signatures or roles fail preflight; successful lowering of an adjacent type is
 not authorization to guess an ABI. Negative emitter tests also assert that rejection occurs before
@@ -147,8 +154,10 @@ Later focused cases remain outside that main denominator unless explicitly enrol
 - Local mixed FP8/BF16 record arrays remain unsupported. Their latest boundary experiment completed
   six correct GPU cells, nine unsupported compile obligations, two negative units and one expected
   corruption rejection; its extra O0 captures prove Slang IR shape only.
-- A maintained result-classifier bug can mistake `nvrtc` in a source path for an NVRTC compilation
-  diagnostic. Saved failing evidence was adjudicated; the parser repair is queued, not implemented.
+- The result classifier previously mistook `nvrtc` in a source path for an NVRTC compilation
+  diagnostic. The parser now requires a downstream compiler identity prefix and accepts the actual
+  `error :` producer form. The original failed attempt/adjudication remains in focused evidence;
+  its output mismatch never becomes a passing shader.
 - Toolkit/architecture compile-and-assembly matrices are separate from physical-device execution.
   Historical CUDA 12.9 SM70/80/90 and CUDA 13 SM80/90 results are not fresh qualification of every
   later feature. The manually defined container workflow was not dispatched in that evidence.

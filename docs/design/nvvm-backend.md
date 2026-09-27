@@ -67,9 +67,19 @@ records for ordinary value operations and several compound scalar, memory and re
 requirements are deduplicated by exact overload; emission records remain one per canonical source
 instruction. Requirements are checked before constructing a module.
 
+Ordinary local allocations, loads and stores have required source-keyed plan records. Allocation
+planning owns the admitted type use and physical alignment. After pointer/value/dominance validation,
+load/store planning owns alignment, load flags, storage conversion and pointer-value ABI/provenance
+choices. Emission consumes these records without repeating those decisions. BF2 uses an identity
+recipe; BF3/BF4 recipes carry the canonical vector, lane count and conversion result use. Compact
+parameter-group vector recipes remain distinct from readonly native-vector access. A Generic Read
+borrow may refer to mutable caller storage and therefore does not imply invariant-load metadata;
+that requires the separate immutable-location contract.
+
 The plan boundary is incomplete: some scalar intrinsic and wave families still resolve during both
-validation and emission. Address and aggregate-layout decisions also remain in the emitter. This is
-current architectural debt, not a reason to bypass preflight or add a second semantic catalog.
+validation and emission. Field/element-address producers, dedicated resource operations and general
+structured-storage conversion still contain repeated or recursive decisions. This is current
+architectural debt, not a reason to bypass preflight or add a second semantic catalog.
 
 ## Canonical types and use-specific representation
 
@@ -107,17 +117,23 @@ mutable substandard storage. Readonly references, exported signatures and resour
 storage have independent boundaries. Public pointer results often become `UserPointer`; they do not
 exercise the same shape as synthetic Generic pointer results.
 
-Natural, CUDA and physical LLVM layout are separate contracts. AnyValue uses Natural payload packing;
-local CUDA allocations and externally supplied CUDA buffers follow their appropriate CUDA layout.
-`getSizeAndAlignment` caches layout rules separately. The aggregate layout walk verifies offsets,
-size and alignment before allocation. Increasing allocation alignment cannot repair wrong member
-offsets or array stride in a physical type.
+Natural, CUDA and physical LLVM layout are separate contracts. AnyValue uses Natural payload packing.
+Internal copyable locals and helper borrows may use native LLVM value layout; for example, native
+float3 storage has alignment 16. External CUDA storage boundaries and explicitly qualified local
+BF16/physical-storage families use their selected CUDA-compatible representations. Internal helper
+storage is not a general CUDA ABI. `getSizeAndAlignment` caches layout rules separately. Qualified
+aggregate-storage layout checks verify offsets, size and alignment for the selected role before
+allocation. Increasing allocation alignment cannot repair wrong member offsets or array stride in
+a physical type.
 
 Storage conversion is explicit where representations differ: Boolean storage, compact numeric
-vectors, physical matrices and BF16 vectors cannot inherit register layout without proof. Some
-recursive load/store conversions currently happen in the emitter. Shared
+vectors, physical matrices and BF16 vectors cannot inherit register layout without proof. Ordinary BF16 and compact-vector memory conversions execute checked plan recipes. General recursive
+structured-storage conversions still happen in the emitter. Shared
 [buffer-element lowering](../../source/slang/slang-ir-lower-buffer-element-type.cpp) already provides
-physical types and packing/unpacking operations and is the first reuse candidate for later refactoring.
+physical types and packing/unpacking operations. Its discovery currently selects resources and
+UserPointer/Input/Output roots, not Generic local Ptr/Out/BorrowInOut roots. Reuse for local storage
+needs explicit root selection and preserved semantic-role admission; globally replacing Generic
+pointer types with ordinary arrays could erase the exclusions that preflight must enforce.
 
 ### BF16 and FP8 contracts
 
@@ -275,17 +291,22 @@ NVRTC automatic PCH directories are private to each compiler owner; shared persi
 outlive compatible state. Owned-process cleanup must account for surviving descendants after a leader
 exits, and temporary observers must restore compiler/module/configuration bytes before acceptance.
 
-## Refactoring direction, not implemented support
+## Remaining refactoring direction
 
-The present architecture supports further feature work, but representation conversion and repeated
-role/address proofs make each extension costly. A bounded future refactor should preserve the support
-matrix while testing reuse of existing physical-storage lowering. A separate final legality/address
-analysis could establish provenance, permitted access, alignment and storage role once and feed the
-emission plan. It must not invent a second type hierarchy or treat physical representability as
-permission. Remaining compound recipes can move into the existing immutable plan as their families
-are touched. File separation should follow these ownership boundaries.
+Ordinary allocation/load/store planning establishes a checked analysis and backend-recipe boundary;
+it does not rewrite physical storage into Slang IR or consolidate every address proof. Canonical IR
+types remain the source of semantic identity, while planned type uses and conversions describe their
+physical roles. A successful physical-type lookup still cannot authorize another role.
 
-These are proposals, not completed passes or authorization to resume development. Record-array
-admission would be a useful later test of the revised boundary. Representative material runtime
-requires bindings, textures/LUTs, inputs and an independent output oracle before any runtime or
-performance conclusion. Compile/assembly and static resource measurements remain valuable but separate.
+A future transforming pass should reuse existing physical-storage lowering after defining per-root
+selection/specialization and retained semantic admission. A broader final address analysis could
+then establish provenance, permitted access, alignment and storage role once for field/index producers
+and all consumers. It must not invent a second type hierarchy. Remaining compound recipes can move
+into the existing immutable plan as their families are touched. File separation should follow these
+ownership boundaries.
+
+These remaining proposals are not implemented support or authorization to resume general feature
+work. Record-array admission would be a useful later test of the revised boundary. Representative
+material runtime requires bindings, textures/LUTs, inputs and an independent output oracle before
+any runtime or performance conclusion. Compile/assembly and static resource measurements remain
+valuable but separate.

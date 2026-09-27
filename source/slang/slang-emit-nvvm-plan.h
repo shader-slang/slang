@@ -3,6 +3,7 @@
 #include "compiler-core/slang-nvvm-ir-builder.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-list.h"
+#include "slang-emit-nvvm-type-lowering.h"
 #include "slang-ir-link.h"
 
 namespace Slang
@@ -184,9 +185,63 @@ struct NVVMPlannedAtomicOperation
     const char* diagnosticName = nullptr;
 };
 
+/// Records the physical conversion selected for one already-admitted memory operation.
+/// Read-only access is independent of representation: a borrowed float3 keeps its native vector,
+/// while a parameter-group float3 uses compact component storage.
+enum class NVVMStorageConversionKind
+{
+    Identity,
+    StructuredBuffer,
+    BFloat16Vector,
+    CompactVector,
+    CompactHalfVector,
+};
+
+struct NVVMPlannedStorageConversion
+{
+    NVVMStorageConversionKind kind = NVVMStorageConversionKind::Identity;
+    IRType* type = nullptr;
+    uint32_t laneCount = 0;
+    NVVMTypeUse resultUse = NVVMTypeUse::Value;
+};
+
+/// Owns the admitted local allocation role and its proven physical alignment.
+struct NVVMPlannedLocalStorage
+{
+    IRInst* source = nullptr;
+    IRType* valueType = nullptr;
+    NVVMTypeUse valueUse = NVVMTypeUse::Value;
+    uint32_t alignment = 0;
+};
+
+/// Owns a load's storage conversion, alignment, flags and resulting pointer provenance.
+struct NVVMPlannedLoad
+{
+    IRInst* source = nullptr;
+    IRInst* pointer = nullptr;
+    NVVMPlannedStorageConversion conversion;
+    uint32_t alignment = 0;
+    SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
+    bool isGlobalUserPointer = false;
+};
+
+/// Owns a store's storage conversion and pointer-value ABI choice before provider mutation.
+struct NVVMPlannedStore
+{
+    IRInst* source = nullptr;
+    IRInst* pointer = nullptr;
+    IRInst* value = nullptr;
+    NVVMPlannedStorageConversion conversion;
+    uint32_t alignment = 0;
+    bool usesHelperPointerValue = false;
+};
+
 /// Owns stable module decisions produced by preflight and consumed without reclassification.
 struct NVVMEmissionPlan
 {
+    List<NVVMPlannedLocalStorage> localStorage;
+    List<NVVMPlannedLoad> loads;
+    List<NVVMPlannedStore> stores;
     List<IRFunc*> functions;
     List<String> functionNames;
     List<NVVMPlannedValueOperation> valueOperations;
@@ -244,6 +299,9 @@ class NVVMEmissionPlanIndex
 public:
     void initialize(const NVVMEmissionPlan& plan);
 
+    const NVVMPlannedLocalStorage* findLocalStorage(IRInst* source) const;
+    const NVVMPlannedLoad* findLoad(IRInst* source) const;
+    const NVVMPlannedStore* findStore(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
@@ -257,6 +315,9 @@ public:
 
 private:
     const NVVMEmissionPlan* m_plan = nullptr;
+    Dictionary<IRInst*, Index> m_localStorage;
+    Dictionary<IRInst*, Index> m_loads;
+    Dictionary<IRInst*, Index> m_stores;
     Dictionary<IRInst*, Index> m_valueOperations;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;

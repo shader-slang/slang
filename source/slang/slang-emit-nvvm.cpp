@@ -8499,6 +8499,236 @@ SlangResult _collectNVVMFunctionNames(
     return SLANG_OK;
 }
 
+// Plans one local allocation from its canonical producer and retains the layout proof. Consider
+// `struct R { uint16_t tag; vector<BFloat16, 3> value; }; R local;`: the record is semantic IR,
+// but its local role requires component-array field storage. A successful value-type lookup
+// cannot establish that role, so admission and CUDA layout are checked before recording it.
+SlangResult _planNVVMLocalStorage(
+    CodeGenContext* codeGenContext,
+    IRInst* inst,
+    NVVMPlannedLocalStorage& outStorage)
+{
+    outStorage = {};
+    outStorage.source = inst;
+    IRStructType* physicalStorageType = nullptr;
+    if (asNVVMSupportedLocalPhysicalStoragePointerType(inst->getDataType(), &physicalStorageType))
+    {
+        IRSizeAndAlignment physicalLayout;
+        if (!_getNVVMAggregateStorageLayout(codeGenContext, physicalStorageType, physicalLayout) ||
+            physicalLayout.size <= 0 || physicalLayout.alignment <= 0)
+        {
+            return _diagnoseUnsupportedIR(
+                codeGenContext,
+                toSlice("local physical parameter-group storage layout"));
+        }
+        outStorage.valueType = physicalStorageType;
+        outStorage.valueUse = NVVMTypeUse::ParameterGroupStorage;
+        SLANG_RELEASE_ASSERT(physicalLayout.alignment <= UINT32_MAX);
+        outStorage.alignment = uint32_t(physicalLayout.alignment);
+        return SLANG_OK;
+    }
+
+    if (asNVVMSupportedLocalCopyableValuePointerType(inst->getDataType(), &outStorage.valueType))
+    {
+        outStorage.alignment = _getNVVMExecutableValueAlignment(outStorage.valueType);
+    }
+    else if (asNVVMSupportedLocalHelperValuePointerType(inst->getDataType(), &outStorage.valueType))
+    {
+        uint32_t count = 0;
+        if (asNVVMBFloat16VectorType(outStorage.valueType, &count))
+        {
+            IRSizeAndAlignment cudaLayout;
+            const uint32_t alignment = _getNVVMBFloat16VectorStorageAlignment(outStorage.valueType);
+            if (SLANG_FAILED(getSizeAndAlignment(
+                    codeGenContext->getTargetReq(),
+                    IRTypeLayoutRules::getCUDA(),
+                    outStorage.valueType,
+                    &cudaLayout)) ||
+                cudaLayout.size != count * 2 || cudaLayout.alignment != alignment)
+            {
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("local BF16 vector storage layout"));
+            }
+            outStorage.valueUse = NVVMTypeUse::Storage;
+            outStorage.alignment = alignment;
+        }
+        else if (asNVVMSupportedLocalSubstandardRecordType(outStorage.valueType))
+        {
+            if (!_hasNVVMCompatibleAggregateStorageLayout(
+                    codeGenContext,
+                    outStorage.valueType,
+                    nullptr,
+                    false,
+                    true))
+            {
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("local substandard record storage layout"));
+            }
+            IRSizeAndAlignment physicalLayout;
+            SLANG_RELEASE_ASSERT(_getNVVMAggregateStorageLayout(
+                codeGenContext,
+                outStorage.valueType,
+                physicalLayout,
+                nullptr,
+                false,
+                true));
+            SLANG_RELEASE_ASSERT(
+                physicalLayout.alignment > 0 && physicalLayout.alignment <= UINT32_MAX);
+            outStorage.valueUse = NVVMTypeUse::Storage;
+            outStorage.alignment = uint32_t(physicalLayout.alignment);
+        }
+        else
+        {
+            if (!_hasNVVMCompatibleHelperValueLayout(codeGenContext, outStorage.valueType))
+            {
+                return _diagnoseUnsupportedIR(codeGenContext, toSlice("local helper-value layout"));
+            }
+            outStorage.alignment = _getNVVMExecutableValueAlignment(outStorage.valueType);
+        }
+    }
+    else
+    {
+        IRStructType* valueType = nullptr;
+        if (!asNVVMSupportedLocalResourceStructPointerType(inst->getDataType(), &valueType))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("var"));
+        if (!_hasNVVMCompatibleStructLayout(codeGenContext, valueType))
+        {
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("local resource-struct layout"));
+        }
+        outStorage.valueType = valueType;
+        outStorage.alignment = _getNVVMExecutableValueAlignment(valueType);
+    }
+    SLANG_RELEASE_ASSERT(outStorage.alignment);
+    return SLANG_OK;
+}
+
+// Chooses a BF16 memory conversion only after the address producer has proved the local role.
+// BF2 is already a native vector in both roles; BF3/BF4 transport the same bits in lane arrays.
+NVVMPlannedStorageConversion _planNVVMBFloat16StorageConversion(
+    IRVectorType* type,
+    NVVMTypeUse resultUse)
+{
+    uint32_t count = 0;
+    SLANG_RELEASE_ASSERT(asNVVMBFloat16VectorType(type, &count));
+    NVVMPlannedStorageConversion conversion;
+    if (count > 2)
+    {
+        conversion.kind = NVVMStorageConversionKind::BFloat16Vector;
+        conversion.type = type;
+        conversion.laneCount = count;
+        conversion.resultUse = resultUse;
+    }
+    return conversion;
+}
+
+// Plans the complete ordinary-load decision before any provider mutation. Access flags and
+// physical representation are independent: `read(__constref Payload p) { return p.value; }`
+// keeps a native float3, while the same semantic field in a parameter group is compact storage.
+void _planNVVMLoad(CodeGenContext* codeGenContext, IRLoad* load, NVVMPlannedLoad& outLoad)
+{
+    outLoad = {};
+    outLoad.source = load;
+    outLoad.pointer = load->getPtr();
+    IRType* storageType = _getNVVMStructuredBufferStoragePointerValueType(load->getPtr());
+    auto localBFloat16Vector = _getNVVMLocalBFloat16VectorPointer(load->getPtr());
+    const uint32_t physicalAlignment =
+        _getNVVMPhysicalAggregateStorageAlignment(codeGenContext, load->getDataType());
+    const uint32_t valueAlignment = _getNVVMExecutableValueAlignment(load->getDataType());
+    auto compactVector = _getNVVMCompactParameterGroupVectorPointer(load->getPtr());
+    outLoad.alignment = compactVector
+                            ? getNVVMNumericValueAlignment(compactVector->getElementType())
+                            : physicalAlignment;
+    if (localBFloat16Vector)
+    {
+        outLoad.alignment = _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector);
+        outLoad.conversion =
+            _planNVVMBFloat16StorageConversion(localBFloat16Vector, NVVMTypeUse::Value);
+    }
+    if (!outLoad.alignment)
+        outLoad.alignment = valueAlignment;
+    if (storageType)
+    {
+        outLoad.alignment = _getNVVMStructuredBufferMemoryAlignment(codeGenContext, storageType);
+        SLANG_RELEASE_ASSERT(outLoad.alignment);
+        outLoad.conversion.kind = NVVMStorageConversionKind::StructuredBuffer;
+        outLoad.conversion.type = storageType;
+    }
+    if (compactVector)
+    {
+        uint32_t count = 0;
+        SLANG_RELEASE_ASSERT(asNVVMSupportedNumericVectorType(compactVector, &count));
+        outLoad.conversion.kind = isNVVMFloat16Type(compactVector->getElementType())
+                                      ? NVVMStorageConversionKind::CompactHalfVector
+                                      : NVVMStorageConversionKind::CompactVector;
+        outLoad.conversion.type = compactVector;
+        outLoad.conversion.laneCount = count;
+    }
+    NVVMRawBufferType rawBufferType;
+    NVVMSurfaceType surfaceType;
+    NVVMReadOnlyTextureType sampledTextureType;
+    if (getNVVMSupportedRawBufferType(load->getDataType(), rawBufferType) ||
+        getNVVMSupportedSurfaceType(load->getDataType(), surfaceType) ||
+        getNVVMSupportedReadOnlyTextureType(load->getDataType(), sampledTextureType) ||
+        asNVVMSupportedSamplerValueType(load->getDataType()) ||
+        asNVVMSupportedParameterGroupType(load->getDataType()))
+    {
+        outLoad.alignment = kNVVMPointerAlignment;
+    }
+    SLANG_RELEASE_ASSERT(outLoad.alignment);
+    IRType* parameterGroupElementType = nullptr;
+    const bool isParameterGroupPointer =
+        _getNVVMParameterGroupPointer(load->getPtr(), parameterGroupElementType);
+    outLoad.flags =
+        isParameterGroupPointer || isPointerToImmutableLocation(getRootAddr(load->getPtr()))
+            ? SLANG_NVVM_LOAD_FLAG_INVARIANT
+            : SLANG_NVVM_LOAD_FLAG_NONE;
+    NVVMStructField pointerStorageField;
+    outLoad.isGlobalUserPointer =
+        asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
+        _getNVVMStructFieldAddress(as<IRFieldAddress>(load->getPtr()), pointerStorageField) &&
+        pointerStorageField.isConventionalGlobal;
+}
+
+// Retains the exact store ABI and storage conversion selected from the admitted address root.
+// A device pointer saved in local helper storage uses its helper representation; the source
+// pointer's integer width alone cannot establish that provenance.
+void _planNVVMStore(CodeGenContext* codeGenContext, IRStore* store, NVVMPlannedStore& outStore)
+{
+    outStore = {};
+    outStore.source = store;
+    outStore.pointer = store->getPtr();
+    outStore.value = store->getVal();
+    IRType* storageType = _getNVVMStructuredBufferStoragePointerValueType(store->getPtr());
+    IRInst* rootAddress = getRootAddr(store->getPtr());
+    outStore.usesHelperPointerValue =
+        asNVVMSupportedDeviceCopyableValuePointerType(store->getVal()->getDataType()) &&
+        rootAddress && asNVVMSupportedLocalHelperValuePointerType(rootAddress->getDataType());
+    auto localBFloat16Vector = _getNVVMLocalBFloat16VectorPointer(store->getPtr());
+    if (localBFloat16Vector)
+    {
+        outStore.alignment = _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector);
+        outStore.conversion =
+            _planNVVMBFloat16StorageConversion(localBFloat16Vector, NVVMTypeUse::Storage);
+    }
+    else
+    {
+        outStore.alignment = _getNVVMPhysicalAggregateStorageAlignment(
+            codeGenContext,
+            store->getVal()->getDataType());
+    }
+    if (!outStore.alignment)
+        outStore.alignment = _getNVVMExecutableValueAlignment(store->getVal()->getDataType());
+    if (storageType)
+    {
+        outStore.alignment = _getNVVMStructuredBufferMemoryAlignment(codeGenContext, storageType);
+        SLANG_RELEASE_ASSERT(outStore.alignment);
+        outStore.conversion.kind = NVVMStorageConversionKind::StructuredBuffer;
+        outStore.conversion.type = storageType;
+    }
+}
+
 // Checks one function body using the same block and SSA order that emission will use.
 SlangResult _validateNVVMFunction(
     CodeGenContext* codeGenContext,
@@ -8644,92 +8874,9 @@ SlangResult _validateNVVMFunction(
             {
             case kIROp_Var:
                 {
-                    IRStructType* physicalStorageType = nullptr;
-                    if (asNVVMSupportedLocalPhysicalStoragePointerType(
-                            inst->getDataType(),
-                            &physicalStorageType))
-                    {
-                        IRSizeAndAlignment physicalLayout;
-                        if (!_getNVVMAggregateStorageLayout(
-                                codeGenContext,
-                                physicalStorageType,
-                                physicalLayout) ||
-                            physicalLayout.size <= 0 || physicalLayout.alignment <= 0)
-                        {
-                            return _diagnoseUnsupportedIR(
-                                codeGenContext,
-                                toSlice("local physical parameter-group storage layout"));
-                        }
-                        break;
-                    }
-                    IRType* copyableValueType = nullptr;
-                    if (asNVVMSupportedLocalCopyableValuePointerType(
-                            inst->getDataType(),
-                            &copyableValueType))
-                    {
-                        break;
-                    }
-                    IRType* helperValueType = nullptr;
-                    if (asNVVMSupportedLocalHelperValuePointerType(
-                            inst->getDataType(),
-                            &helperValueType))
-                    {
-                        if (asNVVMBFloat16VectorType(helperValueType))
-                        {
-                            uint32_t count = 0;
-                            asNVVMBFloat16VectorType(helperValueType, &count);
-                            IRSizeAndAlignment cudaLayout;
-                            if (SLANG_FAILED(getSizeAndAlignment(
-                                    codeGenContext->getTargetReq(),
-                                    IRTypeLayoutRules::getCUDA(),
-                                    helperValueType,
-                                    &cudaLayout)) ||
-                                cudaLayout.size != count * 2 ||
-                                cudaLayout.alignment !=
-                                    _getNVVMBFloat16VectorStorageAlignment(helperValueType))
-                            {
-                                return _diagnoseUnsupportedIR(
-                                    codeGenContext,
-                                    toSlice("local BF16 vector storage layout"));
-                            }
-                        }
-                        else if (asNVVMSupportedLocalSubstandardRecordType(helperValueType))
-                        {
-                            if (!_hasNVVMCompatibleAggregateStorageLayout(
-                                    codeGenContext,
-                                    helperValueType,
-                                    nullptr,
-                                    false,
-                                    true))
-                            {
-                                return _diagnoseUnsupportedIR(
-                                    codeGenContext,
-                                    toSlice("local substandard record storage layout"));
-                            }
-                        }
-                        else if (!_hasNVVMCompatibleHelperValueLayout(
-                                     codeGenContext,
-                                     helperValueType))
-                        {
-                            return _diagnoseUnsupportedIR(
-                                codeGenContext,
-                                toSlice("local helper-value layout"));
-                        }
-                        break;
-                    }
-                    IRStructType* valueType = nullptr;
-                    if (!asNVVMSupportedLocalResourceStructPointerType(
-                            inst->getDataType(),
-                            &valueType))
-                    {
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("var"));
-                    }
-                    if (!_hasNVVMCompatibleStructLayout(codeGenContext, valueType))
-                    {
-                        return _diagnoseUnsupportedIR(
-                            codeGenContext,
-                            toSlice("local resource-struct layout"));
-                    }
+                    NVVMPlannedLocalStorage storage;
+                    SLANG_RETURN_ON_FAIL(_planNVVMLocalStorage(codeGenContext, inst, storage));
+                    requirements.emissionPlan.localStorage.add(storage);
                 }
                 break;
 
@@ -9492,6 +9639,9 @@ SlangResult _validateNVVMFunction(
                         dominatorTree,
                         false,
                         load->getDataType()));
+                    NVVMPlannedLoad plannedLoad;
+                    _planNVVMLoad(codeGenContext, load, plannedLoad);
+                    requirements.emissionPlan.loads.add(plannedLoad);
                     availableValues.add(load);
                 }
                 break;
@@ -9514,6 +9664,9 @@ SlangResult _validateNVVMFunction(
                         store,
                         availableValues,
                         dominatorTree));
+                    NVVMPlannedStore plannedStore;
+                    _planNVVMStore(codeGenContext, store, plannedStore);
+                    requirements.emissionPlan.stores.add(plannedStore);
                 }
                 break;
 
@@ -11138,18 +11291,14 @@ SlangResult _emitNVVMBFloat16LocalStorageConversion(
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
     NVVMTypeLoweringContext& typeContext,
-    IRVectorType* type,
+    const NVVMPlannedStorageConversion& conversion,
     bool storageToValue,
     SlangNVVMValueHandle input,
     SlangNVVMValueHandle& outValue)
 {
-    uint32_t count = 0;
-    SLANG_RELEASE_ASSERT(asNVVMBFloat16VectorType(type, &count));
-    if (count == 2)
-    {
-        outValue = input;
-        return SLANG_OK;
-    }
+    const uint32_t count = conversion.laneCount;
+    SLANG_RELEASE_ASSERT(
+        conversion.kind == NVVMStorageConversionKind::BFloat16Vector && count >= 3 && count <= 4);
     SlangNVVMValueHandle elements[4] = {};
     for (uint32_t i = 0; i < count; ++i)
     {
@@ -11172,10 +11321,7 @@ SlangResult _emitNVVMBFloat16LocalStorageConversion(
         }
     }
     SlangNVVMTypeHandle targetType = nullptr;
-    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-        type,
-        storageToValue ? NVVMTypeUse::Value : NVVMTypeUse::Storage,
-        targetType));
+    SLANG_RETURN_ON_FAIL(typeContext.lowerType(conversion.type, conversion.resultUse, targetType));
     return _requireBuilderOperation(
         codeGenContext,
         "local BF16 storage conversion",
@@ -11369,6 +11515,106 @@ SlangResult _emitNVVMStructuredBufferStorageConversion(
             targetType,
             elements.getBuffer(),
             size_t(elements.getCount()),
+            outValue));
+}
+
+// Executes a checked memory conversion without rediscovering its address role or layout.
+// Structured-buffer recursion remains the existing separate conversion implementation; local
+// BF16 and compact-vector recipes already carry their exact lane shape from preflight.
+SlangResult _emitNVVMPlannedStorageConversion(
+    CodeGenContext* codeGenContext,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& typeContext,
+    const NVVMPlannedStorageConversion& conversion,
+    bool storageToValue,
+    SlangNVVMValueHandle input,
+    SlangNVVMValueHandle& outValue)
+{
+    switch (conversion.kind)
+    {
+    case NVVMStorageConversionKind::Identity:
+        outValue = input;
+        return SLANG_OK;
+    case NVVMStorageConversionKind::StructuredBuffer:
+        return _emitNVVMStructuredBufferStorageConversion(
+            codeGenContext,
+            builder,
+            module,
+            typeContext,
+            conversion.type,
+            storageToValue,
+            input,
+            outValue);
+    case NVVMStorageConversionKind::BFloat16Vector:
+        return _emitNVVMBFloat16LocalStorageConversion(
+            codeGenContext,
+            builder,
+            module,
+            typeContext,
+            conversion,
+            storageToValue,
+            input,
+            outValue);
+    case NVVMStorageConversionKind::CompactVector:
+    case NVVMStorageConversionKind::CompactHalfVector:
+        break;
+    default:
+        SLANG_UNEXPECTED("unknown planned storage conversion");
+    }
+    SLANG_RELEASE_ASSERT(storageToValue);
+    const uint32_t elementCount = conversion.laneCount;
+    SlangNVVMValueHandle loweredElements[4] = {};
+    if (conversion.kind == NVVMStorageConversionKind::CompactHalfVector)
+    {
+        for (uint32_t chunkIndex = 0; chunkIndex < 2; ++chunkIndex)
+        {
+            SlangNVVMValueHandle chunk = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "compact parameter-group half-vector chunk extraction",
+                builder.emitAggregateElementExtract(module, input, chunkIndex, chunk)));
+            for (uint32_t laneIndex = 0; laneIndex < 2; ++laneIndex)
+            {
+                const uint32_t elementIndex = chunkIndex * 2 + laneIndex;
+                if (elementIndex >= elementCount)
+                    break;
+                SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
+                    codeGenContext,
+                    builder,
+                    module,
+                    chunk,
+                    laneIndex,
+                    loweredElements[elementIndex]));
+            }
+        }
+    }
+    else
+    {
+        SLANG_RELEASE_ASSERT(elementCount == 3);
+        for (uint32_t elementIndex = 0; elementIndex < elementCount; ++elementIndex)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                codeGenContext,
+                "compact parameter-group vector element extraction",
+                builder.emitAggregateElementExtract(
+                    module,
+                    input,
+                    elementIndex,
+                    loweredElements[elementIndex])));
+        }
+    }
+    SlangNVVMTypeHandle loweredVectorType = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        typeContext.lowerType(conversion.type, conversion.resultUse, loweredVectorType));
+    return _requireBuilderOperation(
+        codeGenContext,
+        "compact parameter-group vector reconstruction",
+        builder.emitVectorConstruct(
+            module,
+            loweredVectorType,
+            loweredElements,
+            elementCount,
             outValue));
 }
 
@@ -15182,68 +15428,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                 {
                 case kIROp_Var:
                     {
-                        IRType* valueType = nullptr;
-                        NVVMTypeUse valueUse = NVVMTypeUse::Value;
-                        IRStructType* physicalStorageType = nullptr;
-                        if (asNVVMSupportedLocalPhysicalStoragePointerType(
-                                inst->getDataType(),
-                                &physicalStorageType))
-                        {
-                            valueType = physicalStorageType;
-                            valueUse = NVVMTypeUse::ParameterGroupStorage;
-                        }
-                        else if (!asNVVMSupportedLocalCopyableValuePointerType(
-                                     inst->getDataType(),
-                                     &valueType))
-                        {
-                            if (!asNVVMSupportedLocalHelperValuePointerType(
-                                    inst->getDataType(),
-                                    &valueType))
-                            {
-                                IRStructType* structValueType = nullptr;
-                                SLANG_RELEASE_ASSERT(asNVVMSupportedLocalResourceStructPointerType(
-                                    inst->getDataType(),
-                                    &structValueType));
-                                valueType = structValueType;
-                            }
-                        }
-                        const bool isLocalSubstandardRecord =
-                            asNVVMSupportedLocalSubstandardRecordType(valueType) != nullptr;
-                        if (asNVVMBFloat16VectorType(valueType) || isLocalSubstandardRecord)
-                            valueUse = NVVMTypeUse::Storage;
+                        const auto storage = planIndex.findLocalStorage(inst);
+                        SLANG_RELEASE_ASSERT(storage);
                         SlangNVVMTypeHandle loweredValueType = nullptr;
-                        SLANG_RETURN_ON_FAIL(
-                            typeContext.lowerType(valueType, valueUse, loweredValueType));
-                        uint32_t alignment = asNVVMBFloat16VectorType(valueType)
-                                                 ? _getNVVMBFloat16VectorStorageAlignment(valueType)
-                                                 : _getNVVMExecutableValueAlignment(valueType);
-                        if (valueUse == NVVMTypeUse::ParameterGroupStorage ||
-                            isLocalSubstandardRecord)
-                        {
-                            IRSizeAndAlignment physicalLayout;
-                            SLANG_RELEASE_ASSERT(_getNVVMAggregateStorageLayout(
-                                codeGenContext,
-                                valueType,
-                                physicalLayout,
-                                nullptr,
-                                false,
-                                isLocalSubstandardRecord));
-                            SLANG_RELEASE_ASSERT(
-                                physicalLayout.alignment > 0 &&
-                                physicalLayout.alignment <= UINT32_MAX);
-                            alignment = uint32_t(physicalLayout.alignment);
-                        }
-                        SLANG_RELEASE_ASSERT(alignment);
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            storage->valueType,
+                            storage->valueUse,
+                            loweredValueType));
                         SlangNVVMValueHandle loweredStorage = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            valueUse == NVVMTypeUse::ParameterGroupStorage
+                            storage->valueUse == NVVMTypeUse::ParameterGroupStorage
                                 ? "local physical parameter-group storage"
                                 : "local copyable storage",
                             builder.emitLocalStorage(
                                 moduleScope.module,
                                 loweredValueType,
-                                alignment,
+                                storage->alignment,
                                 toSlice("slangLocal"),
                                 loweredStorage)));
                         valueMap[inst] = loweredStorage;
@@ -15301,202 +15502,55 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_Load:
                     {
-                        auto load = cast<IRLoad>(inst);
-                        IRType* loadedParameterGroupElementType = nullptr;
-                        const bool isLoadedParameterGroupPointer = _getNVVMParameterGroupPointer(
-                            load->getPtr(),
-                            loadedParameterGroupElementType);
-                        SLANG_RELEASE_ASSERT(
-                            !isLoadedParameterGroupPointer ||
-                            hasNVVMParameterGroupStorageValueRepresentation(
-                                loadedParameterGroupElementType));
-                        IRType* structuredStorageType =
-                            _getNVVMStructuredBufferStoragePointerValueType(load->getPtr());
-                        IRVectorType* compactStorageVector =
-                            _getNVVMCompactParameterGroupVectorPointer(load->getPtr());
-                        IRVectorType* localBFloat16Vector =
-                            _getNVVMLocalBFloat16VectorPointer(load->getPtr());
+                        const auto load = planIndex.findLoad(inst);
+                        SLANG_RELEASE_ASSERT(load);
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            load->getPtr(),
+                            load->pointer,
                             valueMap,
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        uint32_t alignment = compactStorageVector
-                                                 ? getNVVMNumericValueAlignment(
-                                                       compactStorageVector->getElementType())
-                                                 : _getNVVMPhysicalAggregateStorageAlignment(
-                                                       codeGenContext,
-                                                       load->getDataType());
-                        if (localBFloat16Vector)
-                            alignment = _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector);
-                        if (!alignment)
-                            alignment = _getNVVMExecutableValueAlignment(load->getDataType());
-                        if (structuredStorageType)
-                        {
-                            alignment = _getNVVMStructuredBufferMemoryAlignment(
-                                codeGenContext,
-                                structuredStorageType);
-                            SLANG_RELEASE_ASSERT(alignment);
-                        }
-                        NVVMRawBufferType rawBufferType;
-                        NVVMSurfaceType surfaceType;
-                        NVVMReadOnlyTextureType sampledTextureType;
-                        if (getNVVMSupportedRawBufferType(load->getDataType(), rawBufferType) ||
-                            getNVVMSupportedSurfaceType(load->getDataType(), surfaceType) ||
-                            getNVVMSupportedReadOnlyTextureType(
-                                load->getDataType(),
-                                sampledTextureType) ||
-                            asNVVMSupportedSamplerValueType(load->getDataType()) ||
-                            asNVVMSupportedParameterGroupType(load->getDataType()))
-                        {
-                            alignment = kNVVMPointerAlignment;
-                        }
-                        SLANG_RELEASE_ASSERT(alignment);
-                        const SlangNVVMLoadFlags loadFlags =
-                            isLoadedParameterGroupPointer ||
-                                    isPointerToImmutableLocation(getRootAddr(load->getPtr()))
-                                ? SLANG_NVVM_LOAD_FLAG_INVARIANT
-                                : SLANG_NVVM_LOAD_FLAG_NONE;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "value load",
                             builder.emitLoad(
                                 moduleScope.module,
                                 loweredPointer,
-                                alignment,
-                                loadFlags,
+                                load->alignment,
+                                load->flags,
                                 loweredValue)));
-                        if (structuredStorageType)
-                        {
-                            SlangNVVMValueHandle semanticValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                typeContext,
-                                structuredStorageType,
-                                true,
-                                loweredValue,
-                                semanticValue));
-                            loweredValue = semanticValue;
-                        }
-                        if (localBFloat16Vector)
-                        {
-                            SlangNVVMValueHandle semanticValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_emitNVVMBFloat16LocalStorageConversion(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                typeContext,
-                                localBFloat16Vector,
-                                true,
-                                loweredValue,
-                                semanticValue));
-                            loweredValue = semanticValue;
-                        }
-                        NVVMStructField pointerStorageField;
-                        if (asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
-                            _getNVVMStructFieldAddress(
-                                as<IRFieldAddress>(load->getPtr()),
-                                pointerStorageField) &&
-                            pointerStorageField.isConventionalGlobal)
-                        {
-                            globalUserPointers.add(load);
-                        }
-                        if (compactStorageVector)
-                        {
-                            uint32_t elementCount = 0;
-                            SLANG_RELEASE_ASSERT(asNVVMSupportedNumericVectorType(
-                                compactStorageVector,
-                                &elementCount));
-                            SlangNVVMValueHandle loweredElements[4] = {};
-                            if (isNVVMFloat16Type(compactStorageVector->getElementType()))
-                            {
-                                for (uint32_t chunkIndex = 0; chunkIndex < 2; ++chunkIndex)
-                                {
-                                    SlangNVVMValueHandle chunk = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "compact parameter-group half-vector chunk extraction",
-                                        builder.emitAggregateElementExtract(
-                                            moduleScope.module,
-                                            loweredValue,
-                                            chunkIndex,
-                                            chunk)));
-                                    for (uint32_t laneIndex = 0; laneIndex < 2; ++laneIndex)
-                                    {
-                                        const uint32_t elementIndex = chunkIndex * 2 + laneIndex;
-                                        if (elementIndex >= elementCount)
-                                            break;
-                                        SLANG_RETURN_ON_FAIL(_emitNVVMSequentialElementExtract(
-                                            codeGenContext,
-                                            builder,
-                                            moduleScope.module,
-                                            chunk,
-                                            laneIndex,
-                                            loweredElements[elementIndex]));
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                SLANG_RELEASE_ASSERT(elementCount == 3);
-                                for (uint32_t elementIndex = 0; elementIndex < elementCount;
-                                     ++elementIndex)
-                                {
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "compact parameter-group vector element extraction",
-                                        builder.emitAggregateElementExtract(
-                                            moduleScope.module,
-                                            loweredValue,
-                                            elementIndex,
-                                            loweredElements[elementIndex])));
-                                }
-                            }
-                            SlangNVVMTypeHandle loweredVectorType = nullptr;
-                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                                compactStorageVector,
-                                NVVMTypeUse::Value,
-                                loweredVectorType));
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                "compact parameter-group vector reconstruction",
-                                builder.emitVectorConstruct(
-                                    moduleScope.module,
-                                    loweredVectorType,
-                                    loweredElements,
-                                    elementCount,
-                                    loweredValue)));
-                        }
-                        valueMap[load] = loweredValue;
+                        SlangNVVMValueHandle semanticValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_emitNVVMPlannedStorageConversion(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            typeContext,
+                            load->conversion,
+                            true,
+                            loweredValue,
+                            semanticValue));
+                        if (load->isGlobalUserPointer)
+                            globalUserPointers.add(inst);
+                        valueMap[inst] = semanticValue;
                     }
                     break;
 
                 case kIROp_Store:
                     {
-                        auto store = cast<IRStore>(inst);
-                        IRType* structuredStorageType =
-                            _getNVVMStructuredBufferStoragePointerValueType(store->getPtr());
-                        IRVectorType* localBFloat16Vector =
-                            _getNVVMLocalBFloat16VectorPointer(store->getPtr());
+                        const auto store = planIndex.findStore(inst);
+                        SLANG_RELEASE_ASSERT(store);
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        IRInst* rootAddress = getRootAddr(store->getPtr());
-                        if (asNVVMSupportedDeviceCopyableValuePointerType(
-                                store->getVal()->getDataType()) &&
-                            rootAddress &&
-                            asNVVMSupportedLocalHelperValuePointerType(rootAddress->getDataType()))
+                        if (store->usesHelperPointerValue)
                         {
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMHelperValue(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                store->getVal(),
+                                store->value,
                                 valueMap,
                                 globalUserPointers,
                                 helperValueMap,
@@ -15509,74 +15563,38 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                store->getVal(),
+                                store->value,
                                 valueMap,
                                 typeContext,
                                 loweredValue));
                         }
-                        if (structuredStorageType)
-                        {
-                            SlangNVVMValueHandle storageValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_emitNVVMStructuredBufferStorageConversion(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                typeContext,
-                                structuredStorageType,
-                                false,
-                                loweredValue,
-                                storageValue));
-                            loweredValue = storageValue;
-                        }
+                        SlangNVVMValueHandle storageValue = nullptr;
+                        SLANG_RETURN_ON_FAIL(_emitNVVMPlannedStorageConversion(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            typeContext,
+                            store->conversion,
+                            false,
+                            loweredValue,
+                            storageValue));
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
                             builder,
                             moduleScope.module,
-                            store->getPtr(),
+                            store->pointer,
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        if (localBFloat16Vector)
-                        {
-                            SlangNVVMValueHandle storageValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_emitNVVMBFloat16LocalStorageConversion(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                typeContext,
-                                localBFloat16Vector,
-                                false,
-                                loweredValue,
-                                storageValue));
-                            loweredValue = storageValue;
-                        }
-                        uint32_t alignment =
-                            localBFloat16Vector
-                                ? _getNVVMBFloat16VectorStorageAlignment(localBFloat16Vector)
-                                : _getNVVMPhysicalAggregateStorageAlignment(
-                                      codeGenContext,
-                                      store->getVal()->getDataType());
-                        if (!alignment)
-                        {
-                            alignment =
-                                _getNVVMExecutableValueAlignment(store->getVal()->getDataType());
-                        }
-                        if (structuredStorageType)
-                        {
-                            alignment = _getNVVMStructuredBufferMemoryAlignment(
-                                codeGenContext,
-                                structuredStorageType);
-                            SLANG_RELEASE_ASSERT(alignment);
-                        }
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
                             "value store",
                             builder.emitStore(
                                 moduleScope.module,
-                                loweredValue,
+                                storageValue,
                                 loweredPointer,
-                                alignment)));
+                                store->alignment)));
                     }
                     break;
 

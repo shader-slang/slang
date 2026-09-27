@@ -135,8 +135,8 @@ composite accepted counts. Serial closure never proves concurrent reliability. H
 per-owner-directory resolution remain in the accepted evidence; do not reintroduce an already resolved
 limitation as current. Do not use retries to hide shader-output regressions or failed timing samples.
 
-Use the newly reviewed current `NVVM_BASELINE` before quality measurement (currently inherited293;
-recheck STATUS). It must retain `runtime_input_sha256`,
+Use the reviewed current `NVVM_BASELINE` identified by STATUS before quality measurement. It must
+retain `runtime_input_sha256`,
 `provenance.artifact_sha256`, and per-corpus `fresh_cell_outcomes` for the next refresh.
 
 ## Report environment
@@ -272,10 +272,11 @@ snapshot and dependency pins. [focused-evidence.json](focused-evidence.json) own
 qualifications and open failures outside the full corpus; it does not change full-checkpoint cadence.
 Their historical provenance/loop fields never override STATUS/WORKFLOW authority.
 
-The accepted baseline was renamed without changing its bytes. Older repository paths inside it are
-archival citations resolvable through HISTORY; `compare` reads the embedded rows without opening
-those references. Local `build/` evidence may be absent in a fresh checkout. Current runner inputs
-must exist independently of both raw evidence and Git archives.
+Replace the accepted baseline only after reviewed full validation, identifying its predecessor by
+Git revision, path and hash. Older repository paths in retained failure histories are archival
+citations resolvable through HISTORY; `compare` reads embedded rows without opening those references.
+Local `build/` evidence may be absent in a fresh checkout. Current runner inputs must exist
+independently of both raw evidence and Git archives.
 
 Retain `census.slice-195.tsv`, `census.slice-146.tsv` and `census.slice-146-clusters.json`: their old
 names identify live frozen selection/overlap/summary inputs, not disposable reports. Preserve their

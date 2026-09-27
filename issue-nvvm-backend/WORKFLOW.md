@@ -7,11 +7,11 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-The development loop remains **stopped after slice296**, under the user's 2026-09-27 instruction.
-The subsequent documentation consolidation is finite maintenance, not a resume. Do not start the
-queued parser repair, compiler refactoring, experiments or feature work without explicit resume.
-Skip Slack notifications. No push, publication, system installation, driver change or reboot is implied.
-Results-only refreshes and documentation tasks do not restart the loop.
+The open-ended development loop remains **stopped**. The bounded parser/ordinary-memory foundation
+work authorized on 2026-09-27 is complete. Further implementation requires a new explicit request;
+a finite maintenance task does not resume the loop. Skip Slack notifications. No push, publication,
+system installation, driver change or reboot is implied. Results-only refreshes and documentation
+tasks do not restart the loop.
 
 For authorized implementation work, use a fresh bounded worker and independent review when available.
 The lead owns scope, acceptance and commits; one writer owns the checkout at a time. Read-only review

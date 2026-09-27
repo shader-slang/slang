@@ -3764,6 +3764,63 @@ SLANG_UNIT_TEST(nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+// A readonly borrow must keep the same native field storage used by mutable helper calls.
+SLANG_UNIT_TEST(nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation)
+{
+    _resetDirectNVVMFakes();
+    {
+        const char* source = R"SLANG(
+            struct Payload { float3 value; float sentinel; }
+            [noinline] float3 read(__constref Payload p) { return p.value; }
+            [noinline] void replace(inout Payload p, float3 value) { p.value = value; }
+            RWStructuredBuffer<float> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p;
+                p.value = float3(float(tid.x), 2.0f, 3.0f);
+                p.sentinel = 9.0f;
+                let before = read(p);
+                replace(p, float3(4.0f, 5.0f, 6.0f));
+                let after = read(p);
+                outputBuffer[0] = before.x + after.y + p.sentinel;
+            }
+        )SLANG";
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        bool sawNativeVectorLoad = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.loadResultTypeKinds.getCount(); ++i)
+        {
+            const auto kind = gFakeNVVMBuilder.loadResultTypeKinds[i];
+            SLANG_CHECK(kind != FakeNVVMBuilderScalarTypeKind::NumericArray);
+            if (kind == FakeNVVMBuilderScalarTypeKind::Float3)
+            {
+                sawNativeVectorLoad = true;
+                SLANG_CHECK(gFakeNVVMBuilder.loadAlignments[i] == 16);
+                // A readonly borrow can refer to mutable caller storage. Read permission
+                // does not establish an immutable location for invariant-load metadata.
+                SLANG_CHECK(gFakeNVVMBuilder.loadFlags[i] == SLANG_NVVM_LOAD_FLAG_NONE);
+            }
+        }
+        SLANG_CHECK(sawNativeVectorLoad);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangRecursiveCopyableValuesCrossHelperBoundaries)
 {
     _resetDirectNVVMFakes();
@@ -8915,6 +8972,18 @@ SLANG_UNIT_TEST(nvvmSlangBFloat16LocalVectorsUseQualifiedStorage)
                                 : _getFakeNVVMBuilderArrayType()));
                 SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[i] == (width == 2 ? 4u : 2u));
             }
+            bool sawStorageLoad = false;
+            for (Index i = 0; i < gFakeNVVMBuilder.loadResultTypeKinds.getCount(); ++i)
+            {
+                const auto expectedKind = width == 2 ? FakeNVVMBuilderScalarTypeKind::UInt2
+                                                     : FakeNVVMBuilderScalarTypeKind::NumericArray;
+                if (gFakeNVVMBuilder.loadResultTypeKinds[i] != expectedKind)
+                    continue;
+                sawStorageLoad = true;
+                SLANG_CHECK(gFakeNVVMBuilder.loadAlignments[i] == (width == 2 ? 4u : 2u));
+                SLANG_CHECK(gFakeNVVMBuilder.loadFlags[i] == SLANG_NVVM_LOAD_FLAG_NONE);
+            }
+            SLANG_CHECK(sawStorageLoad);
             SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
             if (width > 2)
             {
@@ -9536,6 +9605,18 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
             { Payload p = {vector<BFloat16,3>(bit_cast<BFloat16>(uint16_t(tid.x)))}; outputBuffer[tid.x] = uint(bit_cast<uint16_t>(copy(p).value.x)); }
         )SLANG",
          "helper function result type"},
+        {R"SLANG(
+            struct Payload { vector<BFloat16,3> value; }
+            [noinline] vector<BFloat16,3> read(__constref Payload x) { return x.value; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p;
+                p.value = vector<BFloat16,3>(bit_cast<BFloat16>(uint16_t(tid.x)));
+                outputBuffer[0] = uint(bit_cast<uint16_t>(read(p).x));
+            }
+        )SLANG",
+         "helper function parameter"},
         {R"SLANG(
             RWStructuredBuffer<vector<BFloat16,4>> outputBuffer;
             [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
