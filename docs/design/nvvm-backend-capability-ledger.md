@@ -144,6 +144,14 @@ arithmetic hypotheses. Six fresh default-profile cells preserve exact input/orac
 Integer-offset equivalence is observed at the first location; arbitrary UV quantization, assets,
 LUTs and timing remain outside this qualification. The original device-event protocol uses centers.
 
+A separate [imported mini-LUT fixture](../../tests/cuda/nvvm-material-mini-lut.slang) executes the
+unchanged material library's 16×16 mini-microfacet interpolation and reflection compensation in all
+three modes. Twelve runtime queries cover corners, cosine saturation, asymmetric interiors and both
+sides of the compensation denominator floor. Each mode checks 48 numeric components against an
+independent rational oracle, exact zero-knot bits, completion and a guard. The table is synthetic and
+Fresnel is fixed; original assets, larger LUT families and LUT execution in the registered analytic
+graph remain unqualified. This fixture uses the standard renderer, with no material-driver change.
+
 Material-derived aggregate/indexing coverage also runs through Slang in all three modes. The
 [bounded and literal controls](../../tests/cuda/nvvm-aggregate-index-material.slang) retain initialized
 unused fields, a receiver snapshot and a nested stack copy. A separate

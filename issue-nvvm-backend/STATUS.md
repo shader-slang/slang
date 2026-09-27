@@ -27,7 +27,7 @@ identities; older timing results have not been remeasured under this compiler.
 | Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                                              |
 | Material runtime                                  | 6 fresh default cells pass; both entries, 65 records and 63 guards per cell  |
 | Runner contracts                                  | 90 pass, 1 inherited skip                                                    |
-| Last full / targeted / implementations since full | local-record-arrays / material-filtering / 1                                 |
+| Last full / targeted / implementations since full | local-record-arrays / material-mini-lut / 2                                  |
 
 Compiler source: `01ecb6e8badbf3cea4770ed8e047693ca0123cb5` plus patch
 `989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da`; version `2026.18.3-323-g01ecb6e8b`.
@@ -39,7 +39,9 @@ driver580.126.09, CUDA12.9.2/NVRTC12.9.86 and LLVM14, targeting SM80. Installed 
 The direct static tests use a separately pinned compiler with the same production source and provider.
 A later harness-only qualification passes six filtered and six default material cells, plus 36 runtime
 and 13 measurement CPU contracts. Default input/oracle/output bytes and installed identities are exact;
-raw artifacts are under `build/nvvm-material-filtering/`. The full baseline remains unchanged.
+raw artifacts are under `build/nvvm-material-filtering/`. A separate imported mini-LUT fixture passes
+three modes, 11 neighboring GPU cells and six material compile/assembly cells. Its raw artifacts are
+under `build/nvvm-material-mini-lut/`. The full baseline remains unchanged.
 
 ## Boundaries and next action
 
@@ -60,8 +62,9 @@ raw artifacts are under `build/nvvm-material-filtering/`. The full baseline rema
   exercised by the selected footprint. Arbitrary UVs and texture quantization remain unqualified.
   Prior device-event measurements, eval local-store deletion control and dynamic-index source
   reduction retain their tested compiler identities. They explain a bounded synthetic eval gap,
-  without justifying a production PTX deletion or changing receiver-copy semantics. Original assets,
-  live LUTs, arbitrary inputs and application performance remain open.
+  without justifying a production PTX deletion or changing receiver-copy semantics. A separate imported
+  mini-LUT fixture qualifies synthetic table interpolation and compensation for 12 queries in all three modes. The registered graph remains analytic; original assets, larger
+  LUT families, arbitrary inputs and application performance remain open.
 - Select the next bounded workload-driven capability through the existing checked type/address
   boundaries. Array helper roles are a separate decision; do not broaden generic helper predicates
   merely because local Value/Storage now work. Further vendor optimization research is secondary.

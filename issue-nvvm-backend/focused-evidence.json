@@ -5777,6 +5777,196 @@
       "execution_failure_history": [],
       "row_wise_output_input_offsets_bytes": [0, 12, 4, 16, 8, 20],
       "column_stride_bytes": 12
+    },
+    "material-mini-lut": {
+      "status": "accepted-focused-gpu",
+      "contract": "Imported material mini-microfacet LUT interpolation and reflection compensation with one synthetic 16x16 table and 12 runtime queries.",
+      "source": {
+        "path": "tests/cuda/nvvm-material-mini-lut.slang",
+        "sha256": "66f6b5650d0e7476821a1446745fcf75ef175efe90b17e89df218b95bcf0e9c4"
+      },
+      "imported_module": {
+        "path": "tests/cuda/complex/tiled_brass_material.slang",
+        "sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92"
+      },
+      "compiler_identity": {
+        "path": "issue-nvvm-backend/accepted-identity.json",
+        "sha256": "a14cd92aa3cf5ae1c2335ad1c8763dfb77b5e4cc3ff7178a7b476a194b6eeefd"
+      },
+      "full_baseline": {
+        "path": "issue-nvvm-backend/accepted-baseline.json",
+        "sha256": "92b710f7acdf4ef41b0fb7e458fd21728b3d3c89a5fb44d3ae883597de65b437"
+      },
+      "source_base_revision": "4a60ecf4edf676188bd9f9c9c8e74cf54ecb142a",
+      "input_contract": {
+        "table": "T[r,i]=(32+8*r+4*i+r*i)/512, except T[15,15]=1; exact Float32 values.",
+        "table_directive_sha256": "5b07c3ecac3917dd24e7ee822e1b0281f2f0b321e81657b767bd18080d8b1c4f",
+        "query_float32_sha256": "c45964af1ed955248eaba36c3ff2b84df1626528830c8c089ed7ac0fb7eb5b1b",
+        "expected_float32_sha256": "1b03a55615d907e8acd8b0a1674dd560c06e1e7892e6a5717b769eada3985824",
+        "queries": 12,
+        "expected_components": 48,
+        "absolute_tolerance": 2e-5,
+        "fresnel": [0.25, 0.5, 0.75],
+        "coverage": [
+          "Four corners",
+          "Cosine saturation below zero and above one",
+          "Four interior queries, including an asymmetric pair",
+          "Near-one energy on both sides of compensation denominator floor",
+          "Runtime-derived zero knot raw bits"
+        ]
+      },
+      "oracle": {
+        "derivation": "Independent rational bilinear polynomial with final-corner correction, interpolated at squared cosine knots; compensation 1+F*E/max(1/100,1-E).",
+        "audit": {
+          "path": "build/nvvm-material-mini-lut/oracle-audit.json",
+          "sha256": "a3d3f4391f07a9de44d1a6e98360e95bf541672572aea02be09e4d08cffd246a"
+        },
+        "representative_float32_max_error": 3.814697265625e-6,
+        "limits": "Finite source arithmetic policies; not an exhaustive rounding proof. No exact interior-knot energy or strict branch-side claim."
+      },
+      "cells": [
+        {
+          "mode": "nvrtc-o3",
+          "status": "correct",
+          "executed": 1,
+          "numeric_components_checked": 48,
+          "error_masks": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "completed": 12,
+          "knot_zero_bits": 897988541,
+          "guard": 3735928559,
+          "output": {
+            "path": "build/nvvm-material-mini-lut/full-gpu-0-artifacts/nvvm-material-mini-lut.slang.actual.txt",
+            "sha256": "8e9a008874c1bab544ab1eef0ad0ccd6e0fbe74485783e640ae34b3a8dab03ec"
+          },
+          "ptx": {
+            "path": "build/nvvm-material-mini-lut/full-nvrtc-o3.ptx",
+            "sha256": "5baf1da450b43c902dcdee6c6b79d1aa1cb16419745062d845afaaf8f96ec7a5"
+          },
+          "cubin": {
+            "path": "build/nvvm-material-mini-lut/full-nvrtc-o3.cubin",
+            "sha256": "f86f104f2bc65ba8825e7b12aa8afdd2c719a6229d113c4571f59760c8208e54"
+          },
+          "reflection": {
+            "path": "build/nvvm-material-mini-lut/full-nvrtc-o3.reflection.json",
+            "sha256": "b91b9cd0b88fba49fe8dbc09455d4dbd5c85484a5362d995583dc2b0c3236ca1"
+          }
+        },
+        {
+          "mode": "nvvm-o0",
+          "status": "correct",
+          "executed": 1,
+          "numeric_components_checked": 48,
+          "error_masks": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "completed": 12,
+          "knot_zero_bits": 897988541,
+          "guard": 3735928559,
+          "output": {
+            "path": "build/nvvm-material-mini-lut/full-gpu-0-artifacts/nvvm-material-mini-lut.slang.1.actual.txt",
+            "sha256": "8e9a008874c1bab544ab1eef0ad0ccd6e0fbe74485783e640ae34b3a8dab03ec"
+          },
+          "ptx": {
+            "path": "build/nvvm-material-mini-lut/full-nvvm-o0.ptx",
+            "sha256": "efd8496c18c352eaac6bed7c87a40a49f8aa520edf9f7010e54733a6c98eb79b"
+          },
+          "cubin": {
+            "path": "build/nvvm-material-mini-lut/full-nvvm-o0.cubin",
+            "sha256": "c596b5a69226cde7f61040f909014a894cb06ff86d51802bdda08e0d7295f328"
+          },
+          "reflection": {
+            "path": "build/nvvm-material-mini-lut/full-nvvm-o0.reflection.json",
+            "sha256": "b91b9cd0b88fba49fe8dbc09455d4dbd5c85484a5362d995583dc2b0c3236ca1"
+          }
+        },
+        {
+          "mode": "nvvm-o3",
+          "status": "correct",
+          "executed": 1,
+          "numeric_components_checked": 48,
+          "error_masks": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "completed": 12,
+          "knot_zero_bits": 897988541,
+          "guard": 3735928559,
+          "output": {
+            "path": "build/nvvm-material-mini-lut/full-gpu-0-artifacts/nvvm-material-mini-lut.slang.2.actual.txt",
+            "sha256": "8e9a008874c1bab544ab1eef0ad0ccd6e0fbe74485783e640ae34b3a8dab03ec"
+          },
+          "ptx": {
+            "path": "build/nvvm-material-mini-lut/full-nvvm-o3.ptx",
+            "sha256": "c4c829a7d61c8ee272e2f1f4b95caaa18b57cff2a9887e50e0f71ae3860bdc6e"
+          },
+          "cubin": {
+            "path": "build/nvvm-material-mini-lut/full-nvvm-o3.cubin",
+            "sha256": "2aea84bbd53f6b12b2edc9eb2e108c67a315ffa4fbc1c7b816374ccd739f25ef"
+          },
+          "reflection": {
+            "path": "build/nvvm-material-mini-lut/full-nvvm-o3.reflection.json",
+            "sha256": "b91b9cd0b88fba49fe8dbc09455d4dbd5c85484a5362d995583dc2b0c3236ca1"
+          }
+        }
+      ],
+      "regressions": {
+        "neighboring_gpu_cells": 11,
+        "registered_material_compile_assembly_cells": 6,
+        "registered_material_ptx_cubin_unchanged": true,
+        "neighbors": {
+          "path": "build/nvvm-material-mini-lut/neighboring-gpu-0.json",
+          "sha256": "a730dc28c5c878816e53b1e7cd8cce0a0051a74914aa284cf7a4216d5e0f2fcd"
+        },
+        "material_comparison": {
+          "path": "build/nvvm-material-mini-lut/material-comparison.json",
+          "sha256": "89a30a5807c874367a8d6c0c4d0d91d9994bfdcf57e017f59fa83871e1dd06ca"
+        }
+      },
+      "provenance": {
+        "before_identity": {
+          "path": "build/nvvm-material-mini-lut/before-identity.json",
+          "sha256": "fe246660ea18d19943ae7c48b53937a39376eca8d84b31f7317b12e50653270b"
+        },
+        "source_review": {
+          "path": "build/nvvm-material-mini-lut/review/source-review.json",
+          "sha256": "0e271750b81242bb73b737d717d0ca00b364233aebf780a8a7592b848021eff9"
+        },
+        "pre_execution_review": {
+          "path": "build/nvvm-material-mini-lut/review/pre-execution.json",
+          "sha256": "f8d65d9d44178059745aa5b107593aeee9543a8dbdea29e46d4c815dfc664e16"
+        },
+        "full_outcomes": {
+          "path": "build/nvvm-material-mini-lut/full-outcomes.json",
+          "sha256": "5a5b59ad690989c744238ff296933271a1018792e6baa18e326a5ac26b0919be"
+        },
+        "full_gpu_log": {
+          "path": "build/nvvm-material-mini-lut/full-gpu-0.log",
+          "sha256": "17fce89fc888bccb3f5e614c37ff7e8934be4282f2e6c282b4b9e892a205c971"
+        },
+        "output_review": {
+          "path": "build/nvvm-material-mini-lut/review/final-output-review.json",
+          "sha256": "b3c8f4fe05bb000673f4e6d79cdb045d2257803beeef48fd388d07a3cb45c789"
+        }
+      },
+      "failure_history": [
+        {
+          "attempt": "corner-gpu-0",
+          "classification": "test-diagnostic-mismatch",
+          "cells": 3,
+          "details": "Renderer returned zero with correct corner outputs in all modes; imported constexpr warning E31227 failed wrapper stderr comparison.",
+          "log": {
+            "path": "build/nvvm-material-mini-lut/corner-gpu-0.log",
+            "sha256": "f837bb6affcaf57b4e8fb1a7c51975168ff53aa6830f9e67ca3082bf4b9a8cb6"
+          },
+          "resolution": "Suppress only known E31227 in fixture directives; unchanged module/compiler and output bytes. corner-gpu-1 passes three cells.",
+          "resolved_outcomes": {
+            "path": "build/nvvm-material-mini-lut/corner-outcomes.json",
+            "sha256": "fccdc872b2afed826ccd27120a6ed11e7d12277406bf98fad88b0777f456740e"
+          }
+        }
+      ],
+      "limits": [
+        "Separate synthetic library-policy fixture; registered tiled-brass graph still selects analytic compensation.",
+        "Roughness in [0,1], one table and fixed Fresnel only; cosine saturation controls do not establish physical negative-incidence validity.",
+        "No original assets, larger dielectric/sheen LUT families, arbitrary inputs or performance claim.",
+        "Standard renderer global block is 216 bytes; distinct from custom material runtime driver ABI.",
+        "Outside main corpus; full baseline/accepted compiler identity unchanged."
+      ]
     }
   }
 }
