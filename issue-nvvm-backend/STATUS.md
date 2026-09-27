@@ -1,9 +1,10 @@
 # NVVM current status
 
-The maintainer authorized continued work on 2026-09-27. Continue the normal development loop through
-independently reviewed local commits. Regressions or decisions requiring maintainer input stop
-continuation. This supersedes the earlier stop-after-slice instruction. Skip Slack; no push or system
-changes. Keep working plans, reports and raw artifacts ignored; update current documents in place.
+The Monday results refresh is complete. This finite request does not resume feature development;
+the next implementation still awaits the maintainer's scope decision below. Earlier authorization
+permits independently reviewed local commits, with regressions or maintainer decisions stopping
+continuation. Skip Slack; no push or system changes. Keep working plans, reports and raw artifacts
+ignored; update current documents in place.
 
 Start with the [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
@@ -14,7 +15,8 @@ Start with the [architecture](../docs/design/nvvm-backend.md),
 [Accepted baseline](accepted-baseline.json) records full validation of Half-vector helper bit transport.
 [Accepted identity](accepted-identity.json) pins compiler/provider/modules/configuration and layout.
 [Focused evidence](focused-evidence.json) preserves qualifications and failure histories under their
-actual compiler identities. Older timing results have not been remeasured.
+actual compiler identities. Current compilation and device-event measurements now use the accepted
+compiler bytes; earlier diagnostic experiments retain their original identities.
 
 | Evidence                                          | Accepted result                                                                        |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -39,6 +41,20 @@ Qualification uses native Ubuntu24.04, L4 SM89, driver580.126.09, CUDA12.9.2/NVR
 LLVM14 and SM80. Installed layout is `build/RelWithDebInfo`; current raw artifacts are under
 `build/nvvm-half-vector-helper-abi/`. Pre-format prototype evidence keeps its separate identity. A later test-only plugin refresh
 migrates a stale unit expectation; compiler, provider, modules and corpus bytes are unchanged.
+
+The fresh results-only checkpoint preserves all 1,740 exact outcomes and input identities, with
+4 runtime and 6 material compile/assembly cells passing. Native and semantic suites retain their
+accepted evidence; they were not rerun, and the full baseline/cadence is unchanged. All 65 current
+measurement/runtime/results CPU contracts pass. Raw evidence and the presentation are under
+`build/nvvm-results/2026-09-27-monday-refresh1/` (`presentation-final/`).
+
+Standalone release compilation covers 504 cases/500 sources, with 76 explicit exclusions and
+9,072 measured samples plus 3,024 warmups. NVRTC O3/NVVM O3 geometric-mean time ratios are 1.47×
+for 406 frozen cases and 1.41× for 98 discovery cases; NVVM O0 gives 1.51×/1.49×. Material O3
+compilation remains close (eval 1.381/1.376 s; sample 1.401/1.473 s, NVRTC/NVVM). Large synthetic
+material device-event ratios are 8.95× eval and 6.29× sample, pooling 18 samples per mode. These
+are separate scopes: timed standalone PTX is compile/assembly-qualified; GPU performance covers
+only the qualified synthetic material protocol. See the feature matrix and RESULTS for limits.
 
 ## Boundaries and next action
 

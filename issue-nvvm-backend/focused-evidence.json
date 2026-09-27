@@ -3290,29 +3290,29 @@
       "meaning": "Synthetic device-event comparison of unchanged qualified periodic inputs; independent correctness precedes every accepted timing contract.",
       "baseline": {
         "path": "issue-nvvm-backend/accepted-baseline.json",
-        "sha256": "62c997a14b25874f72f52d6366e7211877df0354c42b9b653c645df46621351b",
-        "refresh": "inherited unchanged; no compiler rebuild or full checkpoint"
+        "sha256": "2bdc74eb56dff3717319ef2f84ac8e09b9bd3fb549977e8af265aa06b37d026f",
+        "refresh": "Full ledger inherited under identical bytes; fresh corpus checkpoint preserves every outcome and input."
       },
       "identity": {
         "path": "issue-nvvm-backend/accepted-identity.json",
-        "sha256": "4ce3f71e06f582b82cba621c0136998540acc0b59a56d17d4b6565f61462163e",
+        "sha256": "dfe85e7b255062433302fd341236641d5f211d9277acf084c9017f063cc147e9",
         "verification": {
-          "path": "build/nvvm-material-measurement/identity-verification.json",
-          "sha256": "2411debb8ae4c1b4ca7e58d2ef20bda62368efd854295b3752090e49ee23f35c"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/identity-check.json",
+          "sha256": "7a2a22cbe4c0f993957c7c85c839fed32badbe029923fe0bbdcc126fdbaab1c5"
         }
       },
       "sources": {
         "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c",
         "extras/measure-nvvm-material-runtime.py": "3dd96d6ed7b5df981374d70c2bf63b375decd432d9d9544a6b5ef4f63f83c1ac",
-        "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
+        "extras/validate-nvvm-material-runtime.py": "7f5c6cb7b11bb0c73f4812a4e440a7f6b3cfeac42dfde9a935d122913b25fde7",
         "issue-nvvm-backend/test-nvvm-material-measurement.py": "820c6afb3705f5518d8c9e4a846a92187b803b01e14356595ff54d0c38a44019",
         "tests/cuda/complex/tiled_brass_material.slang": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
         "issue-nvvm-backend/complex-corpus.manifest.json": "b6867b9576c5c81171c36412001f14ab89e29bbb7f800ffb1f3bca45c5f6b724"
       },
       "compiler_identity": {
-        "revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
-        "patch_sha256": "9025401d0c3bf9e0b1644d728f0ac60d9dd5929b3fd48104f61044d6419b6b56",
-        "compiler_version": "2026.18.3-315-g2f33cbe55",
+        "revision": "3c250bff847674a72bb95c89b19841620c920d72",
+        "patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+        "compiler_version": "2026.18.3-329-g3c250bff8",
         "provider_abi": 42
       },
       "protocol": {
@@ -3340,7 +3340,7 @@
       },
       "qualification": {
         "cpu_contracts": {
-          "runtime": 29,
+          "runtime": 36,
           "measurement": 13
         },
         "default_regression_cells": 6,
@@ -3652,21 +3652,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.158720002,
-              "q1": 0.156864002,
+              "median": 0.157695994,
+              "q1": 0.155647993,
               "q3": 0.158720002,
-              "iqr": 0.0018559999999999965,
-              "minimum": 0.153600007,
+              "iqr": 0.0030720089999999867,
+              "minimum": 0.154624,
               "maximum": 0.160768002
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 412909521.0066845
+            "records_per_second": 415590772.71170247
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 12595200,
-          "host_submit_median_ns": 3789,
-          "host_until_stop_median_ns": 165725
+          "host_submit_median_ns": 2970,
+          "host_until_stop_median_ns": 164814
         },
         {
           "id": "round0-eval_buffer-65537-nvvm-o0",
@@ -3679,21 +3679,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.02377605,
-              "q1": 1.02092803,
-              "q3": 1.02400005,
-              "iqr": 0.003072019999999842,
+              "median": 1.02496004,
+              "q1": 1.02297604,
+              "q3": 1.02604795,
+              "iqr": 0.0030719099999998445,
               "minimum": 1.017856,
-              "maximum": 1.02707195
+              "maximum": 1.03116798
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 64014976.712924674
+            "records_per_second": 63941029.34978811
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 12595200,
-          "host_submit_median_ns": 3830,
-          "host_until_stop_median_ns": 1030990
+          "host_submit_median_ns": 3790,
+          "host_until_stop_median_ns": 1031949
         },
         {
           "id": "round0-eval_buffer-65537-nvvm-o3",
@@ -3707,10 +3707,10 @@
           "summary": {
             "device_ms": {
               "median": 0.027648,
-              "q1": 0.0267520007,
-              "q3": 0.0277120005,
-              "iqr": 0.0009599997999999998,
-              "minimum": 0.0265919995,
+              "q1": 0.0274240002,
+              "q3": 0.0286720004,
+              "iqr": 0.0012480002000000018,
+              "minimum": 0.0266239997,
               "maximum": 0.0286720004
             },
             "all_intervals_at_least_0_1ms": false,
@@ -3719,8 +3719,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 12595200,
-          "host_submit_median_ns": 3731,
-          "host_until_stop_median_ns": 33881
+          "host_submit_median_ns": 3780,
+          "host_until_stop_median_ns": 35001
         },
         {
           "id": "round0-eval_buffer-1048577-nvrtc-o3",
@@ -3733,21 +3733,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.82617593,
-              "q1": 2.82521605,
-              "q3": 2.8313601,
-              "iqr": 0.0061440500000000675,
-              "minimum": 2.82220793,
-              "maximum": 2.84569597
+              "median": 2.83235192,
+              "q1": 2.82828808,
+              "q3": 2.83238411,
+              "iqr": 0.004096029999999917,
+              "minimum": 2.82521605,
+              "maximum": 2.8364799
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 371023257.5648608
+            "records_per_second": 370214235.24234945
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 201338880,
-          "host_submit_median_ns": 3210,
-          "host_until_stop_median_ns": 2833980
+          "host_submit_median_ns": 3700,
+          "host_until_stop_median_ns": 2840400
         },
         {
           "id": "round0-eval_buffer-1048577-nvvm-o0",
@@ -3760,21 +3760,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 15.8349123,
-              "q1": 15.8300161,
-              "q3": 15.8402557,
-              "iqr": 0.010239600000000237,
-              "minimum": 15.8167362,
-              "maximum": 15.8535681
+              "median": 15.8330879,
+              "q1": 15.8248959,
+              "q3": 15.8473282,
+              "iqr": 0.022432300000000183,
+              "minimum": 15.8187523,
+              "maximum": 15.8607359
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 66219312.12085084
+            "records_per_second": 66226942.376793094
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 201338880,
-          "host_submit_median_ns": 3690,
-          "host_until_stop_median_ns": 15843320
+          "host_submit_median_ns": 3761,
+          "host_until_stop_median_ns": 15842545
         },
         {
           "id": "round0-eval_buffer-1048577-nvvm-o3",
@@ -3787,21 +3787,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.314399987,
-              "q1": 0.313344002,
-              "q3": 0.316192001,
-              "iqr": 0.00284799899999999,
-              "minimum": 0.311327994,
-              "maximum": 0.317440003
+              "median": 0.315616012,
+              "q1": 0.315391988,
+              "q3": 0.316320002,
+              "iqr": 0.000928013999999977,
+              "minimum": 0.314496011,
+              "maximum": 0.31833601
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 3335168712.968172
+            "records_per_second": 3322318767.5281825
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 201338880,
-          "host_submit_median_ns": 3040,
-          "host_until_stop_median_ns": 321969
+          "host_submit_median_ns": 2980,
+          "host_until_stop_median_ns": 322379
         },
         {
           "id": "round0-sample_buffer-65537-nvrtc-o3",
@@ -3814,21 +3814,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.137216002,
-              "q1": 0.137183994,
-              "q3": 0.139264002,
-              "iqr": 0.0020800079999999943,
-              "minimum": 0.136127993,
-              "maximum": 0.141312003
+              "median": 0.139423996,
+              "q1": 0.139264002,
+              "q3": 0.140287995,
+              "iqr": 0.0010239930000000008,
+              "minimum": 0.135168001,
+              "maximum": 0.142335996
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 477619221.1167907
+            "records_per_second": 470055384.1535284
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 25190400,
-          "host_submit_median_ns": 3130,
-          "host_until_stop_median_ns": 144824
+          "host_submit_median_ns": 3310,
+          "host_until_stop_median_ns": 146704
         },
         {
           "id": "round0-sample_buffer-65537-nvvm-o0",
@@ -3841,21 +3841,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.08959997,
-              "q1": 1.08636796,
-              "q3": 1.09062397,
-              "iqr": 0.004256009999999977,
-              "minimum": 1.08441603,
-              "maximum": 1.09548795
+              "median": 1.08748806,
+              "q1": 1.08745599,
+              "q3": 1.09055996,
+              "iqr": 0.003103969999999956,
+              "minimum": 1.08332801,
+              "maximum": 1.09568
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 60147762.302159384
+            "records_per_second": 60264569.70939064
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 25190400,
-          "host_submit_median_ns": 2680,
-          "host_until_stop_median_ns": 1098621
+          "host_submit_median_ns": 2840,
+          "host_until_stop_median_ns": 1095741
         },
         {
           "id": "round0-sample_buffer-65537-nvvm-o3",
@@ -3868,12 +3868,12 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.0348160006,
-              "q1": 0.0337920003,
+              "median": 0.035840001,
+              "q1": 0.035840001,
               "q3": 0.035840001,
-              "iqr": 0.0020480007000000036,
-              "minimum": 0.0337920003,
-              "maximum": 0.0368000008
+              "iqr": 0.0,
+              "minimum": 0.0357440002,
+              "maximum": 0.0368640013
             },
             "all_intervals_at_least_0_1ms": false,
             "records_per_second": null
@@ -3881,8 +3881,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 25190400,
-          "host_submit_median_ns": 3030,
-          "host_until_stop_median_ns": 41331
+          "host_submit_median_ns": 3830,
+          "host_until_stop_median_ns": 42972
         },
         {
           "id": "round0-sample_buffer-1048577-nvrtc-o3",
@@ -3895,21 +3895,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.47808003,
-              "q1": 2.4606719,
-              "q3": 2.49036789,
-              "iqr": 0.029695990000000005,
-              "minimum": 2.4512639,
-              "maximum": 2.49651194
+              "median": 2.47609591,
+              "q1": 2.473984,
+              "q3": 2.47910404,
+              "iqr": 0.005120039999999992,
+              "minimum": 2.46681595,
+              "maximum": 2.49036789
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 423140894.283386
+            "records_per_second": 423479961.24269676
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 402677760,
-          "host_submit_median_ns": 3170,
-          "host_until_stop_median_ns": 2496531
+          "host_submit_median_ns": 3590,
+          "host_until_stop_median_ns": 2484110
         },
         {
           "id": "round0-sample_buffer-1048577-nvvm-o0",
@@ -3922,21 +3922,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 15.3446398,
-              "q1": 15.3313284,
-              "q3": 15.3712645,
-              "iqr": 0.03993610000000025,
-              "minimum": 15.3221121,
-              "maximum": 15.3845758
+              "median": 15.3681917,
+              "q1": 15.3610239,
+              "q3": 15.3794556,
+              "iqr": 0.018431700000000717,
+              "minimum": 15.3507843,
+              "maximum": 15.4063044
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 68335067.7283412
+            "records_per_second": 68230343.58687755
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 402677760,
-          "host_submit_median_ns": 3720,
-          "host_until_stop_median_ns": 15362817
+          "host_submit_median_ns": 3690,
+          "host_until_stop_median_ns": 15375943
         },
         {
           "id": "round0-sample_buffer-1048577-nvvm-o3",
@@ -3949,21 +3949,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.392192006,
-              "q1": 0.391167998,
-              "q3": 0.393216014,
-              "iqr": 0.002048015999999986,
+              "median": 0.393216014,
+              "q1": 0.392192006,
+              "q3": 0.394048005,
+              "iqr": 0.001855998999999997,
               "minimum": 0.391167998,
-              "maximum": 0.395231992
+              "maximum": 0.394239992
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 2673631751.688483
+            "records_per_second": 2666669114.8545136
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 402677760,
-          "host_submit_median_ns": 2911,
-          "host_until_stop_median_ns": 399552
+          "host_submit_median_ns": 3520,
+          "host_until_stop_median_ns": 401202
         },
         {
           "id": "round1-sample_buffer-1048577-nvvm-o3",
@@ -3976,21 +3976,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.392416,
-              "q1": 0.392064005,
-              "q3": 0.394239992,
-              "iqr": 0.0021759869999999903,
-              "minimum": 0.390143991,
-              "maximum": 0.395264
+              "median": 0.394239992,
+              "q1": 0.393216014,
+              "q3": 0.395264,
+              "iqr": 0.0020479860000000016,
+              "minimum": 0.391167998,
+              "maximum": 0.397311985
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 2672105622.604583
+            "records_per_second": 2659742850.2382884
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 402677760,
-          "host_submit_median_ns": 4070,
-          "host_until_stop_median_ns": 401211
+          "host_submit_median_ns": 3550,
+          "host_until_stop_median_ns": 402401
         },
         {
           "id": "round1-sample_buffer-1048577-nvvm-o0",
@@ -4003,21 +4003,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 15.5270081,
-              "q1": 15.3741121,
-              "q3": 15.6692476,
-              "iqr": 0.29513550000000066,
-              "minimum": 15.3374081,
-              "maximum": 15.7788162
+              "median": 15.3477116,
+              "q1": 15.3323517,
+              "q3": 15.3538561,
+              "iqr": 0.021504399999999535,
+              "minimum": 15.3231363,
+              "maximum": 15.3753281
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 67532456.55871075
+            "records_per_second": 68321390.66256627
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 402677760,
-          "host_submit_median_ns": 3350,
-          "host_until_stop_median_ns": 15534882
+          "host_submit_median_ns": 3761,
+          "host_until_stop_median_ns": 15357450
         },
         {
           "id": "round1-sample_buffer-1048577-nvrtc-o3",
@@ -4030,21 +4030,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.47603202,
-              "q1": 2.47091198,
-              "q3": 2.47910404,
-              "iqr": 0.008192060000000279,
-              "minimum": 2.45871997,
-              "maximum": 2.49651194
+              "median": 2.46886396,
+              "q1": 2.46271992,
+              "q3": 2.4768641,
+              "iqr": 0.014144179999999729,
+              "minimum": 2.44838405,
+              "maximum": 2.49235201
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 423490888.4578965
+            "records_per_second": 424720445.10706854
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 402677760,
-          "host_submit_median_ns": 3140,
-          "host_until_stop_median_ns": 2483751
+          "host_submit_median_ns": 3560,
+          "host_until_stop_median_ns": 2477011
         },
         {
           "id": "round1-sample_buffer-65537-nvvm-o3",
@@ -4057,12 +4057,12 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.0348160006,
-              "q1": 0.0348160006,
-              "q3": 0.0348160006,
-              "iqr": 0.0,
-              "minimum": 0.0339520015,
-              "maximum": 0.0357760005
+              "median": 0.035840001,
+              "q1": 0.0358080007,
+              "q3": 0.0367360003,
+              "iqr": 0.0009279995999999999,
+              "minimum": 0.0348160006,
+              "maximum": 0.0377600007
             },
             "all_intervals_at_least_0_1ms": false,
             "records_per_second": null
@@ -4070,8 +4070,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 25190400,
-          "host_submit_median_ns": 3130,
-          "host_until_stop_median_ns": 41641
+          "host_submit_median_ns": 4110,
+          "host_until_stop_median_ns": 42771
         },
         {
           "id": "round1-sample_buffer-65537-nvvm-o0",
@@ -4084,21 +4084,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 1.09055996,
-              "q1": 1.08851194,
-              "q3": 1.09158397,
-              "iqr": 0.0030720300000000034,
+              "median": 1.08857596,
+              "q1": 1.08652794,
+              "q3": 1.09260798,
+              "iqr": 0.006080039999999842,
               "minimum": 1.08544004,
               "maximum": 1.09568
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 60094815.87789084
+            "records_per_second": 60204342.56145065
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 25190400,
-          "host_submit_median_ns": 2941,
-          "host_until_stop_median_ns": 1096952
+          "host_submit_median_ns": 3071,
+          "host_until_stop_median_ns": 1096521
         },
         {
           "id": "round1-sample_buffer-65537-nvrtc-o3",
@@ -4113,10 +4113,10 @@
             "device_ms": {
               "median": 0.138239995,
               "q1": 0.138239995,
-              "q3": 0.140287995,
-              "iqr": 0.0020479999999999943,
-              "minimum": 0.136000007,
-              "maximum": 0.141312003
+              "q3": 0.139264002,
+              "iqr": 0.0010240069999999935,
+              "minimum": 0.137216002,
+              "maximum": 0.142176002
             },
             "all_intervals_at_least_0_1ms": true,
             "records_per_second": 474081325.017409
@@ -4124,8 +4124,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 25190400,
-          "host_submit_median_ns": 3050,
-          "host_until_stop_median_ns": 145624
+          "host_submit_median_ns": 3180,
+          "host_until_stop_median_ns": 145314
         },
         {
           "id": "round1-eval_buffer-1048577-nvvm-o3",
@@ -4138,21 +4138,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 0.315391988,
-              "q1": 0.31436801,
-              "q3": 0.316415995,
-              "iqr": 0.00204798500000003,
-              "minimum": 0.31436801,
-              "maximum": 0.317407995
+              "median": 0.317440003,
+              "q1": 0.316415995,
+              "q3": 0.318367988,
+              "iqr": 0.0019519929999999852,
+              "minimum": 0.316224009,
+              "maximum": 0.319359988
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 3324678621.8297973
+            "records_per_second": 3303228925.4357142
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 201338880,
-          "host_submit_median_ns": 2950,
-          "host_until_stop_median_ns": 322009
+          "host_submit_median_ns": 4330,
+          "host_until_stop_median_ns": 324709
         },
         {
           "id": "round1-eval_buffer-1048577-nvvm-o0",
@@ -4165,21 +4165,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 15.8380804,
-              "q1": 15.8289919,
-              "q3": 15.8504963,
-              "iqr": 0.021504399999999535,
-              "minimum": 15.8227196,
-              "maximum": 15.8555517
+              "median": 15.8320637,
+              "q1": 15.8238716,
+              "q3": 15.8360319,
+              "iqr": 0.01216029999999968,
+              "minimum": 15.8167038,
+              "maximum": 15.8484478
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 66206066.23514804
+            "records_per_second": 66231226.69724983
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 201338880,
-          "host_submit_median_ns": 3530,
-          "host_until_stop_median_ns": 15845091
+          "host_submit_median_ns": 4400,
+          "host_until_stop_median_ns": 15839933
         },
         {
           "id": "round1-eval_buffer-1048577-nvrtc-o3",
@@ -4192,21 +4192,21 @@
           "contaminated": false,
           "summary": {
             "device_ms": {
-              "median": 2.8313601,
-              "q1": 2.82726407,
-              "q3": 2.83750391,
-              "iqr": 0.010239840000000111,
-              "minimum": 2.82300806,
-              "maximum": 2.84364796
+              "median": 2.83545589,
+              "q1": 2.82828808,
+              "q3": 2.83545589,
+              "iqr": 0.007167809999999886,
+              "minimum": 2.81907201,
+              "maximum": 2.83945608
             },
             "all_intervals_at_least_0_1ms": true,
-            "records_per_second": 370343920.5772519
+            "records_per_second": 369808962.18420804
           },
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 201338880,
-          "host_submit_median_ns": 3400,
-          "host_until_stop_median_ns": 2838491
+          "host_submit_median_ns": 3889,
+          "host_until_stop_median_ns": 2843082
         },
         {
           "id": "round1-eval_buffer-65537-nvvm-o3",
@@ -4220,11 +4220,11 @@
           "summary": {
             "device_ms": {
               "median": 0.027648,
-              "q1": 0.0275199991,
-              "q3": 0.027648,
-              "iqr": 0.00012800089999999778,
-              "minimum": 0.0266239997,
-              "maximum": 0.0284800008
+              "q1": 0.027648,
+              "q3": 0.0286079999,
+              "iqr": 0.0009599999000000012,
+              "minimum": 0.027648,
+              "maximum": 0.0286720004
             },
             "all_intervals_at_least_0_1ms": false,
             "records_per_second": null
@@ -4232,8 +4232,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 12595200,
-          "host_submit_median_ns": 3370,
-          "host_until_stop_median_ns": 34681
+          "host_submit_median_ns": 3751,
+          "host_until_stop_median_ns": 34911
         },
         {
           "id": "round1-eval_buffer-65537-nvvm-o0",
@@ -4247,11 +4247,11 @@
           "summary": {
             "device_ms": {
               "median": 1.02195203,
-              "q1": 1.020064,
-              "q3": 1.02502406,
-              "iqr": 0.004960059999999933,
-              "minimum": 1.01580799,
-              "maximum": 1.02604795
+              "q1": 1.01993597,
+              "q3": 1.02400005,
+              "iqr": 0.0040640800000000254,
+              "minimum": 1.01561606,
+              "maximum": 1.03014398
             },
             "all_intervals_at_least_0_1ms": true,
             "records_per_second": 64129233.1500139
@@ -4259,8 +4259,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 12595200,
-          "host_submit_median_ns": 2740,
-          "host_until_stop_median_ns": 1031170
+          "host_submit_median_ns": 2669,
+          "host_until_stop_median_ns": 1028389
         },
         {
           "id": "round1-eval_buffer-65537-nvrtc-o3",
@@ -4275,10 +4275,10 @@
             "device_ms": {
               "median": 0.158720002,
               "q1": 0.157695994,
-              "q3": 0.158815995,
-              "iqr": 0.0011200009999999816,
-              "minimum": 0.154880002,
-              "maximum": 0.160735995
+              "q3": 0.159743994,
+              "iqr": 0.0020479999999999943,
+              "minimum": 0.156672001,
+              "maximum": 0.161791995
             },
             "all_intervals_at_least_0_1ms": true,
             "records_per_second": 412909521.0066845
@@ -4286,8 +4286,8 @@
           "warmups_passed": 3,
           "samples_passed": 9,
           "compared_bytes": 12595200,
-          "host_submit_median_ns": 3270,
-          "host_until_stop_median_ns": 165055
+          "host_submit_median_ns": 4040,
+          "host_until_stop_median_ns": 166645
         }
       ],
       "optimized_large_count_comparison": [
@@ -4296,78 +4296,78 @@
           "count": 1048577,
           "round": 0,
           "median_ms": {
-            "nvrtc-o3": 2.82617593,
-            "nvvm-o0": 15.8349123,
-            "nvvm-o3": 0.314399987
+            "nvrtc-o3": 2.83235192,
+            "nvvm-o0": 15.8330879,
+            "nvvm-o3": 0.315616012
           },
-          "nvrtc_o3_over_nvvm_o3": 8.98910956379906
+          "nvrtc_o3_over_nvvm_o3": 8.97404381372134
         },
         {
           "entry": "eval_buffer",
           "count": 1048577,
           "round": 1,
           "median_ms": {
-            "nvvm-o3": 0.315391988,
-            "nvvm-o0": 15.8380804,
-            "nvrtc-o3": 2.8313601
+            "nvvm-o3": 0.317440003,
+            "nvvm-o0": 15.8320637,
+            "nvrtc-o3": 2.83545589
           },
-          "nvrtc_o3_over_nvvm_o3": 8.97727338590478
+          "nvrtc_o3_over_nvvm_o3": 8.932257633578713
         },
         {
           "entry": "sample_buffer",
           "count": 1048577,
           "round": 0,
           "median_ms": {
-            "nvrtc-o3": 2.47808003,
-            "nvvm-o0": 15.3446398,
-            "nvvm-o3": 0.392192006
+            "nvrtc-o3": 2.47609591,
+            "nvvm-o0": 15.3681917,
+            "nvvm-o3": 0.393216014
           },
-          "nvrtc_o3_over_nvvm_o3": 6.318537838836012
+          "nvrtc_o3_over_nvvm_o3": 6.297037307336115
         },
         {
           "entry": "sample_buffer",
           "count": 1048577,
           "round": 1,
           "median_ms": {
-            "nvvm-o3": 0.392416,
-            "nvvm-o0": 15.5270081,
-            "nvrtc-o3": 2.47603202
+            "nvvm-o3": 0.394239992,
+            "nvvm-o0": 15.3477116,
+            "nvrtc-o3": 2.46886396
           },
-          "nvrtc_o3_over_nvvm_o3": 6.309712193182745
+          "nvrtc_o3_over_nvvm_o3": 6.2623376879532815
         }
       ],
       "provenance": {
         "protocol": {
-          "path": "build/nvvm-material-measurement/maintained-protocol/results.json",
-          "sha256": "f4389a72800fa47e65838049a16f6e1e33f03e0f316003ddc912ca7a2ff709ff"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-device-protocol/results.json",
+          "sha256": "eb25011f44b3f57aee6d327853d9f867eaa96248a28f09e5b508b7e963c6aa64"
         },
         "qualification": {
-          "path": "build/nvvm-material-measurement/maintained-qualify/results.json",
-          "sha256": "bde282607c5c80d414a9aadbdc0b71f72ca6d019e704d46969ceec1735197f4c"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-device-qualified/results.json",
+          "sha256": "4fbf97a7c25b1c5d11dbd3125d3c68934226c2ed7ba2b4083e541aba7575ef06"
         },
         "measurement": {
-          "path": "build/nvvm-material-measurement/maintained-measure/results.json",
-          "sha256": "11283e4d13fbf8d17faf32581f40d57e128e55a7b0c7569ed024dc53fda509b2"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-device-measured/results.json",
+          "sha256": "0290816003000fe213be50807d51a5fe0d85e8ddcaaead6589b1ec287db322a6"
         },
         "freeze": {
-          "path": "build/nvvm-material-measurement/maintained-freeze.json",
-          "sha256": "9017f000bb17e6d65fd375971e0b171bf9770b67f4f263719f1b717e0a982e6d"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/identity-check.json",
+          "sha256": "7a2a22cbe4c0f993957c7c85c839fed32badbe029923fe0bbdcc126fdbaab1c5"
         },
         "default_eval": {
-          "path": "build/nvvm-material-measurement/maintained-execution-eval_buffer/results.json",
-          "sha256": "5b859260623ae74f125064577591e46f68c83ca9b32bea6a605222687daa745c"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-eval_buffer-execution/results.json",
+          "sha256": "33d5583ca49ea2f35fbed71c65f27f32adf573cd1903880abb26843166744db4"
         },
         "default_sample": {
-          "path": "build/nvvm-material-measurement/maintained-execution-sample_buffer/results.json",
-          "sha256": "d96963ca71794fffa8b07a84db76ff677b4f32534b77054e4114bbcf5285382a"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-sample_buffer-execution/results.json",
+          "sha256": "b63141db9c109071159c082ef0b34440be5ab991703d4afd6a2a38d00082493d"
         },
         "cpu_runtime": {
-          "path": "build/nvvm-material-measurement/maintained-cpu-runtime.json",
-          "sha256": "4ca0c65811d9bd766cdb36141bd89a573579981174cc964fd0f5f9653c54042e"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/runtime-contract-tests.log",
+          "sha256": "f28f636515a8288fa939e208725d604c2fb9770bd048a4eee095475dd74780ca"
         },
         "cpu_measurement": {
-          "path": "build/nvvm-material-measurement/maintained-cpu-measure-final.json",
-          "sha256": "cc9fb51203d959f7de757dc9e656af1f6d4bd65973dabe00fd8cd84ab279e28f"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/measurement-contract-tests.log",
+          "sha256": "ed4e3dcceee3006d82d7a1b5f74af288733bff5dff0b78eff8084c0455e56bf2"
         }
       },
       "research_gate": {
@@ -4411,20 +4411,20 @@
       ],
       "review": {
         "default_prelaunch": {
-          "path": "build/nvvm-material-measurement/review/maintained-default-prelaunch.json",
-          "sha256": "2faffdacba2f6c61db3d2f903a2ad64702ad7a475bb410dbb0629cbc8ae5b88c"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-abi-review.json",
+          "sha256": "d9b80d27fb95bd1c3c5e682e50fdb9ff11cc59959f96a56e36a13538f3239ec5"
         },
         "protocol_prelaunch": {
-          "path": "build/nvvm-material-measurement/review/maintained-protocol-prelaunch.json",
-          "sha256": "0801559955702ea81c6ccc995ab213be13fba55976f4f7bb3b887869044934f3"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-device-protocol-review.json",
+          "sha256": "bc971fcb56b3084df1e8000bd7fee26f4616865592941c57fd781e05789093e1"
         },
         "qualification": {
-          "path": "build/nvvm-material-measurement/review/maintained-qualification-replay.json",
-          "sha256": "84a657fa5d28f3493e36c9d9466497244bd8d00341e3bec4f39fb23995a12432"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-device-qualification-review.json",
+          "sha256": "b683577998063656e2f7d94c7c4d6c64ee7c6ea029ccb1fe47bb9e08fd4d2732"
         },
         "measurement": {
-          "path": "build/nvvm-material-measurement/review/maintained-measurement-replay.json",
-          "sha256": "2fffbe79803dd271e69a5d77f93280961497565877cce4f77888fb892e3e5c54"
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/final-measurement-review.json",
+          "sha256": "85f0b28b915393d006f4b7fc511f28c6d97ffa6aa4943dbafe7887d6cfa98cc6"
         }
       },
       "measurement_totals": {
@@ -5645,6 +5645,36 @@
             "preparation_history": [
               "Identity verifier initially assumed mode metadata for symlink entries; corrected schema handling before acceptance, with no artifact mismatch."
             ]
+          }
+        }
+      },
+      "historical_diagnostics_scope": {
+        "meaning": "research_gate and eval_local_store_control retain their original pinned artifact identities and were not rerun by this refresh.",
+        "previous_parent_compiler_identity": {
+          "revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
+          "patch_sha256": "9025401d0c3bf9e0b1644d728f0ac60d9dd5929b3fd48104f61044d6419b6b56",
+          "compiler_version": "2026.18.3-315-g2f33cbe55",
+          "provider_abi": 42
+        },
+        "previous_parent_sources": {
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c",
+          "extras/measure-nvvm-material-runtime.py": "3dd96d6ed7b5df981374d70c2bf63b375decd432d9d9544a6b5ef4f63f83c1ac",
+          "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
+          "issue-nvvm-backend/test-nvvm-material-measurement.py": "820c6afb3705f5518d8c9e4a846a92187b803b01e14356595ff54d0c38a44019",
+          "tests/cuda/complex/tiled_brass_material.slang": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+          "issue-nvvm-backend/complex-corpus.manifest.json": "b6867b9576c5c81171c36412001f14ab89e29bbb7f800ffb1f3bca45c5f6b724"
+        },
+        "previous_parent_baseline": {
+          "path": "issue-nvvm-backend/accepted-baseline.json",
+          "sha256": "62c997a14b25874f72f52d6366e7211877df0354c42b9b653c645df46621351b",
+          "refresh": "inherited unchanged; no compiler rebuild or full checkpoint"
+        },
+        "previous_parent_identity": {
+          "path": "issue-nvvm-backend/accepted-identity.json",
+          "sha256": "4ce3f71e06f582b82cba621c0136998540acc0b59a56d17d4b6565f61462163e",
+          "verification": {
+            "path": "build/nvvm-material-measurement/identity-verification.json",
+            "sha256": "2411debb8ae4c1b4ca7e58d2ef20bda62368efd854295b3752090e49ee23f35c"
           }
         }
       }
@@ -7485,6 +7515,253 @@
         "No production change, newcompilerpass, providerABI change or maincheckpointrefresh. Existing artifactidentity/cadence retained."
       ],
       "next_decision": "Choose explicit compiler-visible format conversion first, or a separate native-width CUDA component legalization slice. Neither alone adds arbitrary undecorated runtime-format support."
+    },
+    "compilation-performance": {
+      "status": "accepted",
+      "meaning": "Fresh-process release compilation observations for current architecture decisions; separate from GPU execution.",
+      "retention": "Replace this current feature on the next reviewed measurement refresh. Raw scripts, manifests, samples and presentations stay ignored under build/.",
+      "compiler_identity": {
+        "revision": "3c250bff847674a72bb95c89b19841620c920d72",
+        "patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+        "compiler_version": "2026.18.3-329-g3c250bff8",
+        "provider_abi": 42
+      },
+      "identity": {
+        "path": "issue-nvvm-backend/accepted-identity.json",
+        "sha256": "dfe85e7b255062433302fd341236641d5f211d9277acf084c9017f063cc147e9",
+        "verification": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/identity-check.json",
+          "sha256": "7a2a22cbe4c0f993957c7c85c839fed32badbe029923fe0bbdcc126fdbaab1c5"
+        }
+      },
+      "correctness": {
+        "cases": 580,
+        "sources": 576,
+        "cells": 1740,
+        "correct": 1704,
+        "unresolved": 36,
+        "exact_outcomes_and_inputs_unchanged": true,
+        "native_and_semantic_suites": "Inherited under unchanged accepted identity, not rerun.",
+        "checkpoint": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/checkpoint/checkpoint.json",
+          "sha256": "4bca09589a8195e468ffee32f0dd3074b98bfa97c704efd719a3b42347a22cf1"
+        },
+        "comparison": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/checkpoint/comparison.json",
+          "sha256": "1fd32f0ddf0a3f545e42995c1f204c6cd37e196edd248ee5e6bc3e31ad5f5664"
+        }
+      },
+      "corpus": {
+        "cases": 504,
+        "sources": 500,
+        "excluded_cases": 76,
+        "cells": 1512,
+        "measured_samples": 9072,
+        "warmups": 3024,
+        "rounds": 2,
+        "warmups_per_round": 1,
+        "samples_per_round": 3,
+        "order": "Reverse cases and modes within each fixed 64-case batch in round two.",
+        "debug_policy": "Explicit -g0 in all modes; original renderer options retained in the manifest.",
+        "aggregation": "Geometric mean of per-case median NVRTC O3 / NVVM time ratios, equal case weights.",
+        "aggregates": [
+          {
+            "corpus": "frozen",
+            "mode": "nvvm-o3",
+            "cases": 406,
+            "geometric_mean_ratio": 1.472300769005389,
+            "median_ratio": 1.4875321299551447,
+            "minimum": 0.778776221409799,
+            "maximum": 1.721184747947018,
+            "faster_cases": 400
+          },
+          {
+            "corpus": "frozen",
+            "mode": "nvvm-o0",
+            "cases": 406,
+            "geometric_mean_ratio": 1.5074305781729174,
+            "median_ratio": 1.504585183267808,
+            "minimum": 1.2456948436032222,
+            "maximum": 1.7549505126223668,
+            "faster_cases": 406
+          },
+          {
+            "corpus": "discovery",
+            "mode": "nvvm-o3",
+            "cases": 98,
+            "geometric_mean_ratio": 1.408077559384484,
+            "median_ratio": 1.480938501467382,
+            "minimum": 0.3857302169771198,
+            "maximum": 1.6741332138037432,
+            "faster_cases": 94
+          },
+          {
+            "corpus": "discovery",
+            "mode": "nvvm-o0",
+            "cases": 98,
+            "geometric_mean_ratio": 1.4926573849254938,
+            "median_ratio": 1.4984473027191547,
+            "minimum": 1.1818731558628466,
+            "maximum": 1.7301828221509772,
+            "faster_cases": 98
+          }
+        ],
+        "manifest": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/corpus-compile-manifest.json",
+          "sha256": "4d0bb2e4ab065091cd47d8897ad946d6feac00fa240d04a1c2ddd1ea657eb395"
+        }
+      },
+      "material": {
+        "cells": 6,
+        "measured_samples": 108,
+        "warmups": 24,
+        "assembly_samples": 54,
+        "assembly_warmups": 12,
+        "rounds": 2,
+        "warmups_per_round": 2,
+        "samples_per_round": 9,
+        "summaries": [
+          {
+            "entry": "eval_buffer",
+            "mode": "nvrtc-o3",
+            "wall_ms_n": 18,
+            "wall_ms_median": 1381.0026198625565,
+            "wall_ms_q1": 1371.329817455262,
+            "wall_ms_q3": 1385.104201734066,
+            "wall_ms_minimum": 1356.8610548973083,
+            "wall_ms_maximum": 1393.7667775899172,
+            "assembly_ms": 178.10256034135818,
+            "ptx_bytes": 72360,
+            "cubin_bytes": 70944
+          },
+          {
+            "entry": "eval_buffer",
+            "mode": "nvvm-o0",
+            "wall_ms_n": 18,
+            "wall_ms_median": 1291.886292397976,
+            "wall_ms_q1": 1282.4653405696154,
+            "wall_ms_q3": 1297.8617306798697,
+            "wall_ms_minimum": 1269.373508170247,
+            "wall_ms_maximum": 1312.67118640244,
+            "assembly_ms": 747.2870405763388,
+            "ptx_bytes": 777053,
+            "cubin_bytes": 252856
+          },
+          {
+            "entry": "eval_buffer",
+            "mode": "nvvm-o3",
+            "wall_ms_n": 18,
+            "wall_ms_median": 1375.843203626573,
+            "wall_ms_q1": 1369.119131937623,
+            "wall_ms_q3": 1384.810246527195,
+            "wall_ms_minimum": 1354.6748720109463,
+            "wall_ms_maximum": 1468.9022433012724,
+            "assembly_ms": 151.69663727283478,
+            "ptx_bytes": 55632,
+            "cubin_bytes": 53160
+          },
+          {
+            "entry": "sample_buffer",
+            "mode": "nvrtc-o3",
+            "wall_ms_n": 18,
+            "wall_ms_median": 1400.6678061559796,
+            "wall_ms_q1": 1395.1918329112232,
+            "wall_ms_q3": 1411.1066297627985,
+            "wall_ms_minimum": 1389.8037057369947,
+            "wall_ms_maximum": 1424.6571697294712,
+            "assembly_ms": 258.8844634592533,
+            "ptx_bytes": 103321,
+            "cubin_bytes": 92088
+          },
+          {
+            "entry": "sample_buffer",
+            "mode": "nvvm-o0",
+            "wall_ms_n": 18,
+            "wall_ms_median": 1336.0856883227825,
+            "wall_ms_q1": 1324.6652781963348,
+            "wall_ms_q3": 1344.9235404841602,
+            "wall_ms_minimum": 1312.5528413802385,
+            "wall_ms_maximum": 1399.527495726943,
+            "assembly_ms": 952.8013709932566,
+            "ptx_bytes": 950205,
+            "cubin_bytes": 310968
+          },
+          {
+            "entry": "sample_buffer",
+            "mode": "nvvm-o3",
+            "wall_ms_n": 18,
+            "wall_ms_median": 1472.7690871804953,
+            "wall_ms_q1": 1464.7946902550757,
+            "wall_ms_q3": 1482.5507747009397,
+            "wall_ms_minimum": 1455.2139714360237,
+            "wall_ms_maximum": 1499.389784410596,
+            "assembly_ms": 235.59804446995258,
+            "ptx_bytes": 87087,
+            "cubin_bytes": 77624
+          }
+        ],
+        "measurements": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-clean/measurements.json",
+          "sha256": "b05a8f8bbe37f69fc356fe1e2aa9c9e8fc7ca48d434a6ebdf2134e173ba6ca9e"
+        },
+        "phases": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/presentation-final/material-compile-summary.json",
+          "sha256": "428b56166214b13949d518104dbebc0635f515f6d8f95f0b0a5595a643ee77ad"
+        }
+      },
+      "static_quality": {
+        "cells": 36,
+        "sources": 12,
+        "measurements": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/quality/measurements.json",
+          "sha256": "86af743f7c9080eaf6d5f9f1ab9322aa4190231a5a09d89c286dc92beba7842d"
+        },
+        "meaning": "Single compile/assembly observations and static resources, not a repeated timing benchmark or GPU speed."
+      },
+      "preparation_history": [
+        {
+          "status": "interrupted-unqualified",
+          "meaning": "Initial material compilation overlapped an independent CPU audit; complete protocol rerun in material-clean, no initial samples retained in summaries.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-27-monday-refresh1/material-isolation-incident.json",
+            "sha256": "07e5168bce9bc68ac8b683311f650d7a7bfd5330445e84597ed14f2c9b343ae2"
+          }
+        }
+      ],
+      "provenance": {
+        "summary": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/presentation-final/summary.json",
+          "sha256": "c265ef6df23b72271964519982132d9b5418fee9f3c26f121a879cb9798f0579"
+        },
+        "runner": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/corpus-compile.py",
+          "sha256": "84f925bbf9778ffb5bc078dc7d48289d6ece64174a8cf03dd5ef884256eadbfc"
+        },
+        "stage_runner": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/run-stages.py",
+          "sha256": "1fb5155500725f70aa1f48858a470972843f5b6deb5cde35fcc0ad76e51b4413"
+        },
+        "report_generator": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/make-presentation.py",
+          "sha256": "fc284e73e1c0f774cc0e28ff35eb19be1951b5a02545d91e611154dab66d7336"
+        },
+        "environment": {
+          "path": "build/nvvm-results/2026-09-27-monday-refresh1/environment.json",
+          "sha256": "62541af782ea57fed82d73b9648e1fbdd82828996bd1452e09201ba027af7db1"
+        }
+      },
+      "review": {
+        "path": "build/nvvm-results/2026-09-27-monday-refresh1/final-measurement-review.json",
+        "sha256": "85f0b28b915393d006f4b7fc511f28c6d97ffa6aa4943dbafe7887d6cfa98cc6"
+      },
+      "limits": [
+        "Only representable standalone contracts with all-three-mode original correctness are selected; 76 exclusions remain explicit.",
+        "Timed standalone release PTX is compile/assembly-qualified, not separately GPU-qualified; original runtime contracts remain authoritative.",
+        "Fresh processes reuse warm filesystem/toolkit caches; default NVRTC PCH behavior is not directly traced.",
+        "Assembly is excluded from compilation latency. Nested compiler phase timers must not be summed.",
+        "Equal-case aggregate ratios do not predict application compilation cost. Observed differences and IQRs do not establish statistical significance.",
+        "Frozen/discovery test elapsed time is not kernel runtime; only the separately qualified material protocol supplies device-event observations."
+      ]
     }
   }
 }

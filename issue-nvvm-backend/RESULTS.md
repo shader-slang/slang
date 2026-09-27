@@ -244,6 +244,42 @@ Retain `fresh_references`, `fresh_reference_seconds`, every batch and complete l
 cost; never present them as the end-to-end shared workload cost. The normal report command accepts
 the maintained material/quality measurement schema, not this distinct shared-runner schema.
 
+## Standalone corpus compilation
+
+The current `compilation-performance` feature in [focused evidence](focused-evidence.json) pins the
+reviewed standalone experiment, its manifest, runner and raw measurements. Its consumer is the
+current performance comparison in STATUS and the feature matrix. Replace that feature on the next
+reviewed refresh; keep scripts, exhaustive inventories, samples and presentations under ignored
+`build/`, rather than adding permanent result snapshots. This experiment is separate from the
+maintained material and quality commands above and below.
+
+Freeze a reviewed mapping from each original test contract to a standalone `slangc` invocation.
+Preserve entry/stage, row-major API default, language macros, module name and explicit semantic
+options. Exclude binding-time specialization, conformance and shader-object contracts that the
+standalone mapping does not represent; account for every excluded case. The current selection has
+406 frozen and 98 discovery cases
+(500 unique sources), with 76 exclusions. Only cases correct in all three original modes enter the
+comparison; this is a selected workload comparison, not an estimate over all compiler inputs.
+
+Use explicit `-g0` for all three modes. The renderer's implicit `-g2` requests NVRTC device debug
+with optimization, while the direct route strips debug. Preserve original renderer options as
+provenance, but do not include that asymmetric debug policy in a release comparison. The existing
+GPU correctness evidence belongs to the original contracts. The timed release variants are
+separately compile/assembly-qualified, not separately GPU-qualified.
+
+Compile and assemble each selected cell before measurement, pin its PTX/cubin, and require every
+timed PTX to equal the qualified artifact. Run serial fresh processes with warm filesystem/toolkit
+caches. Within each fixed batch of at most 64 cases, use two rounds, reversing case and mode order
+in round two. Each cell has one warmup and three measured samples per round. Keep all samples,
+failures and timeouts; verify source/toolkit/compiler/provider/support-script identities before
+and after each bounded batch. Assembly is outside the reported compilation interval.
+
+Report per-case median, inclusive quartiles, range and round-specific medians. Aggregate the
+NVRTC O3/NVVM median-time ratios using their geometric mean with equal weight per case. Keep
+exclusions, slower cases and distribution plots visible. These ratios do not predict shared-session
+application compile time, and quartiles do not establish statistical significance. Whole-census
+elapsed time includes setup and validation; it supplies neither compile latency nor GPU performance.
+
 ## Fixed simple-shader quality subset
 
 ```bash
