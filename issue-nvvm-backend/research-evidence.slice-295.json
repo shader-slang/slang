@@ -1,0 +1,452 @@
+{
+  "schema": 1,
+  "kind": "focused-inheritance-initialization-constant-language-qualification",
+  "status": "accepted-research",
+  "date_utc": "2026-09-27",
+  "baseline": {
+    "reference": {
+      "path": "issue-nvvm-backend/runtime-validation.slice-293.json",
+      "sha256": "da78129309339e2810448b210a342c90374bf8978280954f2883527e496f1e08"
+    },
+    "relationship": "Full293 inherited; fresh focused12cells only. Accepted compiled285 bytes restored294 remain unchanged.",
+    "cases": 580,
+    "sources": 576,
+    "cells": 1740,
+    "correct": 1703,
+    "unresolved": 37,
+    "resolved_histories": 20,
+    "last_full": 293,
+    "last_targeted": 233,
+    "implementations_since_full": 0
+  },
+  "protocol": {
+    "freeze": {
+      "path": "build/nvvm-language-surface295/prepared-v2/freeze.json",
+      "sha256": "a4030aaa238846ad51891e9d377700e61898debadb24254064c3cdd824ed3bf6"
+    },
+    "source_revision": "c0ddac70b58f8640bc06f06f36c33ea967340b22",
+    "source_count": 4,
+    "mode_cells": 12,
+    "output_words": 48,
+    "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+    "native_ordinal": 0,
+    "target": "cuda_sm_8_0",
+    "workers": 1,
+    "timeout_seconds": 180,
+    "gate_timeout_seconds": 1800,
+    "retries": 0,
+    "original_bodies_and_sidecars_preserved": true,
+    "source_absent_from_main576_and_prior_focused": true
+  },
+  "sources": [
+    {
+      "source": "tests/language-feature/inheritance/struct-inheritance.slang",
+      "source_sha256": "4a23657c7860424c97415b6f39d01e0265f1ca11dc3f07fe207bf8048c4b319e",
+      "body_sha256": "95145f3c3d87f24a81355ff936ce4d7983504629c6acbc7c527cca7359f52f39",
+      "source_test_ordinal": 0,
+      "selected_directive": {
+        "line": 3,
+        "test_ordinal": 0,
+        "enabled": true,
+        "directive": "TEST",
+        "categories": "(compute)",
+        "command": "COMPARE_COMPUTE",
+        "arguments": "-shaderobj"
+      },
+      "original_sidecar": {
+        "path": "tests/language-feature/inheritance/struct-inheritance.slang.expected.txt",
+        "sha256": "89fc51e95b32472b244ae3b8c5bbd68e6a5207c46e8fb352233ebcc8ec54408d",
+        "contents": "1113\n1002\n1335\n1224\n",
+        "independently_matches_all_words": true
+      },
+      "independent_expected_decimal": [4371, 4098, 4917, 4644],
+      "derivation": "Runtime cbuffer x=1 and y=2 populate inherited and derived fields. For lane v, inherited member access contributes x*4096, direct inherited method and conversion-to-Base call each contribute q=v^x at weights256 and16, and derived method contributes q+y. Result=4096+273*(v^1)+2.",
+      "runtime_and_folding_limits": "Four lane values and x=1/y=2 only. No runtime existential dispatch, pointer/reference aliasing or arbitrary inheritance depth. Source predicts live data dependence; generated IR/PTX has not been inspected."
+    },
+    {
+      "source": "tests/language-feature/inheritance/derived-struct-init-list.slang",
+      "source_sha256": "8cb4dacba5824d1971f862087eeab884aef8ed740ae00a8e984e24751a8b1ac4",
+      "body_sha256": "c4107b7545fbaf33a4f7cf8475936347b2e045f473fe87ea7bcf2a98a40e9e0e",
+      "source_test_ordinal": 0,
+      "selected_directive": {
+        "line": 3,
+        "test_ordinal": 0,
+        "enabled": true,
+        "directive": "TEST",
+        "categories": "(compute)",
+        "command": "COMPARE_COMPUTE",
+        "arguments": ""
+      },
+      "original_sidecar": {
+        "path": "tests/language-feature/inheritance/derived-struct-init-list.slang.expected.txt",
+        "sha256": "70c61c7b769e041a7637729c76c464e48f1665337094ee55a3d0beeaf498a51d",
+        "contents": "11201\n11212\n11223\n11234\n",
+        "independently_matches_all_words": true
+      },
+      "independent_expected_decimal": [70145, 70162, 70179, 70196],
+      "derivation": "Empty-list x preserves Base.a=1 and Derived.b=2; write(1) yields0x112. Explicit flat list y={v,v+1} overrides both fields; second write yields0x11200+16*v+(v+1).",
+      "runtime_and_folding_limits": "Default x initialization is literal and can fold. Explicit y contents depend on dispatchThreadID.x, not a host input buffer. Four lane values only; no proof that constructors/inout calls survive optimization."
+    },
+    {
+      "source": "tests/language-feature/initializer-lists/default-init-16bit-types.slang",
+      "source_sha256": "38b878bb115738ec9502ed0fd5ff619bbad8e9173e1f88a2d76c291cf5035709",
+      "body_sha256": "501ac3ee2f8a12568dfbb8fc15e0ac1bd41f1fee173d42538852d322f332bf0d",
+      "source_test_ordinal": 0,
+      "selected_directive": {
+        "line": 3,
+        "test_ordinal": 0,
+        "enabled": true,
+        "directive": "TEST",
+        "categories": "(compute)",
+        "command": "COMPARE_COMPUTE",
+        "arguments": "-vk -render-feature int16"
+      },
+      "original_sidecar": {
+        "path": "tests/language-feature/initializer-lists/default-init-16bit-types.slang.expected.txt",
+        "sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9",
+        "contents": "0\n1111\n2222\n3333\n",
+        "independently_matches_all_words": true
+      },
+      "independent_expected_decimal": [0, 4369, 8738, 13107],
+      "derivation": "Empty-list S zeros int/int16/float16/int fields. Runtime lane v adds v,16*v,256*v,4096*v respectively; each tested half value0/256/512/768 is exact. Integer conversion and sum yield4369*v.",
+      "runtime_and_folding_limits": "Inputs are dispatch IDs0..3, not host buffer data; default zero construction may fold. No 16-bit overflow, nonintegral half values, aggregate ABI/layout or memory-residency claim. Preserve feature gate; a skipped cell is not a pass."
+    },
+    {
+      "source": "tests/language-feature/constants/static-const-in-struct.slang",
+      "source_sha256": "cc8ff3e95b7658ac80d4e030284708f1f6dd704108d1f0587d0da5b528e4f28e",
+      "body_sha256": "9ebb19c8fe8c68da32a1e5f9d2eaa2864df9456ebdf4ce861ec97b8c9de7882e",
+      "source_test_ordinal": 0,
+      "selected_directive": {
+        "line": 3,
+        "test_ordinal": 0,
+        "enabled": true,
+        "directive": "TEST",
+        "categories": "(compute)",
+        "command": "COMPARE_COMPUTE",
+        "arguments": "-shaderobj"
+      },
+      "original_sidecar": {
+        "path": "tests/language-feature/constants/static-const-in-struct.slang.expected.txt",
+        "sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9",
+        "contents": "0\n1111\n2222\n3333\n",
+        "independently_matches_all_words": true
+      },
+      "independent_expected_decimal": [0, 4369, 8738, 13107],
+      "derivation": "Scoped kArraySize=4 sets local array sizes and loop bounds. Both method and global function initialize a[i]=i and return16*v+a[v]=17*v. test returns256*(17*v)+17*v=4369*v.",
+      "runtime_and_folding_limits": "Constants and array fills may fold; dynamic lane index remains source-level runtime input. Four in-range indices only, no runtime-changing array size or proof of retained local arrays/loops."
+    }
+  ],
+  "fresh_cell_outcomes": [
+    {
+      "id": "language-feature/inheritance/struct-inheritance.slang#language-surface295-1",
+      "mode": "nvrtc-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [4371, 4098, 4917, 4644],
+      "expected_decimal": [4371, 4098, 4917, 4644],
+      "actual_sha256": "89fc51e95b32472b244ae3b8c5bbd68e6a5207c46e8fb352233ebcc8ec54408d"
+    },
+    {
+      "id": "language-feature/inheritance/derived-struct-init-list.slang#language-surface295-1",
+      "mode": "nvrtc-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [70145, 70162, 70179, 70196],
+      "expected_decimal": [70145, 70162, 70179, 70196],
+      "actual_sha256": "70c61c7b769e041a7637729c76c464e48f1665337094ee55a3d0beeaf498a51d"
+    },
+    {
+      "id": "language-feature/initializer-lists/default-init-16bit-types.slang#language-surface295-1",
+      "mode": "nvrtc-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [0, 4369, 8738, 13107],
+      "expected_decimal": [0, 4369, 8738, 13107],
+      "actual_sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9"
+    },
+    {
+      "id": "language-feature/constants/static-const-in-struct.slang#language-surface295-1",
+      "mode": "nvrtc-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [0, 4369, 8738, 13107],
+      "expected_decimal": [0, 4369, 8738, 13107],
+      "actual_sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9"
+    },
+    {
+      "id": "language-feature/inheritance/struct-inheritance.slang#language-surface295-1",
+      "mode": "nvvm-o0",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [4371, 4098, 4917, 4644],
+      "expected_decimal": [4371, 4098, 4917, 4644],
+      "actual_sha256": "89fc51e95b32472b244ae3b8c5bbd68e6a5207c46e8fb352233ebcc8ec54408d"
+    },
+    {
+      "id": "language-feature/inheritance/derived-struct-init-list.slang#language-surface295-1",
+      "mode": "nvvm-o0",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [70145, 70162, 70179, 70196],
+      "expected_decimal": [70145, 70162, 70179, 70196],
+      "actual_sha256": "70c61c7b769e041a7637729c76c464e48f1665337094ee55a3d0beeaf498a51d"
+    },
+    {
+      "id": "language-feature/initializer-lists/default-init-16bit-types.slang#language-surface295-1",
+      "mode": "nvvm-o0",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [0, 4369, 8738, 13107],
+      "expected_decimal": [0, 4369, 8738, 13107],
+      "actual_sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9"
+    },
+    {
+      "id": "language-feature/constants/static-const-in-struct.slang#language-surface295-1",
+      "mode": "nvvm-o0",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [0, 4369, 8738, 13107],
+      "expected_decimal": [0, 4369, 8738, 13107],
+      "actual_sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9"
+    },
+    {
+      "id": "language-feature/inheritance/struct-inheritance.slang#language-surface295-1",
+      "mode": "nvvm-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [4371, 4098, 4917, 4644],
+      "expected_decimal": [4371, 4098, 4917, 4644],
+      "actual_sha256": "89fc51e95b32472b244ae3b8c5bbd68e6a5207c46e8fb352233ebcc8ec54408d"
+    },
+    {
+      "id": "language-feature/inheritance/derived-struct-init-list.slang#language-surface295-1",
+      "mode": "nvvm-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [70145, 70162, 70179, 70196],
+      "expected_decimal": [70145, 70162, 70179, 70196],
+      "actual_sha256": "70c61c7b769e041a7637729c76c464e48f1665337094ee55a3d0beeaf498a51d"
+    },
+    {
+      "id": "language-feature/initializer-lists/default-init-16bit-types.slang#language-surface295-1",
+      "mode": "nvvm-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [0, 4369, 8738, 13107],
+      "expected_decimal": [0, 4369, 8738, 13107],
+      "actual_sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9"
+    },
+    {
+      "id": "language-feature/constants/static-const-in-struct.slang#language-surface295-1",
+      "mode": "nvvm-o3",
+      "status": "passed",
+      "return_code": 0,
+      "timed_out": false,
+      "classification": "correct",
+      "execution_counts": {
+        "passed": 1,
+        "executed": 1,
+        "ignored": 0,
+        "other_summary_status": 0
+      },
+      "diagnostic": "",
+      "canonical_shape": "",
+      "observed_decimal": [0, 4369, 8738, 13107],
+      "expected_decimal": [0, 4369, 8738, 13107],
+      "actual_sha256": "6effd9ffb1d13120fe3e866accd754d30911e8ab605100816ee216b7d54e53c9"
+    }
+  ],
+  "comparisons": {
+    "requested": 12,
+    "executed": 12,
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "unrun": 0,
+    "complete_output_words": 48,
+    "root_audit": {
+      "path": "build/nvvm-language-surface295/root-outcome-audit.json",
+      "sha256": "14f8a37681f70cad7b53e39a7bb60d742d19aaa552882d0c6861fb3914fe6a8f"
+    },
+    "independent_outcome_review": {
+      "path": "build/nvvm-language-surface295/outcome-review.json",
+      "sha256": "295318999a29590a44f90fb390b90c9c06b4ce65168add8fd3a0b287fea0a2d2"
+    }
+  },
+  "identity": {
+    "before": {
+      "path": "build/nvvm-language-surface295/identity-before.json",
+      "sha256": "ea4bf5c138a605a4c505ade509310411b92ea310a7629f45f6d634645bbbb695"
+    },
+    "after": {
+      "path": "build/nvvm-language-surface295/identity-after.json",
+      "sha256": "ea4bf5c138a605a4c505ade509310411b92ea310a7629f45f6d634645bbbb695"
+    },
+    "layout100_exact": true,
+    "runtime37_exact": true,
+    "qualified_source11_exact": true,
+    "configuration2_exact": true,
+    "main_input576_exact": true,
+    "submodule_pins22_exact": true,
+    "loaded_compiler_sha256": "624691257742cd8bff21c6c10b5777c50372785f2e6c21c6133128a2343b1d2c",
+    "provider_abi": 42,
+    "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+    "version": "2026.18.3-301-g8fbf0f84e",
+    "compiled_source": "8fbf0f84ee46f4fd514010c09ff9bb9009f5e0e0",
+    "compiled_patch_sha256": "12f503e9802014f667dcfe2a3224a892c26a567dc7af3999888fa997ef8cc7f5"
+  },
+  "limits": [
+    "Mixed-width and scoped-constant lane0 output starts at0 and expects0, so its output alone cannot establish that lane0 executed a store. Other3 lane outputs differ from their initial zeros; native exact execution and full buffers still bound the qualification.",
+    "Literal defaults/array fills/calls may fold; source-level runtime data dependence does not claim specific instructions survive.",
+    "Only struct-inheritance reads host cbuffer inputs x=1,y=2; all four use dispatch lanes0..3.",
+    "No whole-feature coverage percentage, material execution/performance, aggregate ABI/layout, arbitrary-depth inheritance, pointer aliasing or existential-dispatch claim.",
+    "Mixed-width data stays small and exact: no overflow/nonintegral-half qualification."
+  ],
+  "preparation_history": [
+    {
+      "version": "v1",
+      "status": "unexecuted-superseded",
+      "freeze": {
+        "path": "build/nvvm-language-surface295/prepared-v1/freeze.json",
+        "sha256": "1fd44f904ebb629ff656bc4857aa815e50783ed4175e9b14c41804e4373bfae0"
+      },
+      "reason": "Review rejected custom child cleanup that could miss descendants after leader exit and weak CUDA identity matching."
+    },
+    {
+      "version": "v2",
+      "status": "executed-passed",
+      "reason": "Reuse unchanged owned_process.py, exact native ID/full outputs, clean observer/preload environment."
+    }
+  ],
+  "execution_failure_history": [],
+  "inspection_incidents": [
+    "Author first inspected absent run-discovery-corpus.py, corrected to maintained run-compute-discovery.py; no workload or tracked mutation.",
+    "Reviewer retained harmless broad-listing/wrongfilename read-only incident; no workload or evidence mutation."
+  ],
+  "review": {
+    "author": "Fresh bounded language_surface295",
+    "reviewer": "Separate reused pch_repro275",
+    "pre_execution": {
+      "path": "build/nvvm-language-surface295/pre-execution-review.json",
+      "sha256": "7ee06703584f913625adaaedad7e2e6ceda16660ae9d52a0e1913d4e7a5ca35c"
+    },
+    "final": {
+      "path": "build/nvvm-language-surface295/independent-review.json",
+      "sha256": "484259a9f758b0d7857643603953091b6e6d3fdf88c8093812774a70080ebc08"
+    }
+  },
+  "retained_production_change": false,
+  "raw_evidence_root": "build/nvvm-language-surface295",
+  "notifications": "Skipped at user request",
+  "loop": "active"
+}

@@ -203,3 +203,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Stable14.368ms/3.593% instrumented OR attribution; global observer overhead prevents a precise
   saving claim. Temporary source/layout/config restored; full293/cadence0 inherited. Failedbuild
   and zero-test guard invocation retained; ORpruning deprioritized.
+
+- Slice295: [inheritance and initialization](report.slice-295-language-surface.md),
+  [evidence](research-evidence.slice-295.json), [plan](plan.slice-295-language-surface.md).
+  Four unchanged authored contracts pass12CUDA mode cells/48words with exact bodies/sidecars and
+  identity maps. Host-input inheritance plus lane-dependent defaults/scoped-array indexing;
+  folding and zero-sentinel limits retained. No compiler/main-corpus change; full293/cadence0 inherited.

@@ -45,8 +45,11 @@ dynamic-dispatch regressions with original qualification limits. Their evidence 
 [Inference294](report.slice-294-inference-cost.md) measures failed OR spans at14.368ms/3.593% of
 instrumented semantic CPU. Global7995-call timer overhead is18.594ms versus count-only; no precise
 uninstrumented saving or safe pruning follows. All40samples passed; accepted layout/source/config
-restored exactly. Deprioritize OR pruning and select bounded runtime-observable language interactions
-from sparse inheritance/initialization/type regions. The aggregate-memory gap remains fixed by267.
+restored exactly. OR pruning is deprioritized. [Language295](report.slice-295-language-surface.md)
+qualifies four existing inheritance/initialization/constants contracts:12mode cells/48words, exact
+identities and unchanged inputs. These are focused results outside the main corpus. Next audit the
+excluded FP8/BF16 local record-array boundary for a bounded qualification gate before any admission
+change. The aggregate-memory gap remains fixed by267.
 
 Three column-major host-packing mismatches and34 infrastructure/preflight gaps remain.285's three
 focused NVRTC nested-array controls still produce wrong37 outside the main corpus; both large

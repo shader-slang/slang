@@ -73,7 +73,10 @@ optimization claim. All40samples and qualification passed;100layout/37runtime/11
 refresh version metadata and rebuild before any production build. Raw evidence/recovery archive:
 `build/nvvm-inference-cost294`; accepted recovery remains286/accepted285-layout.
 
-The loop remains active. Next select3–4 runtime-observable existing language interactions from
-sparse inheritance/initialization/type regions, avoiding already-qualified271/278/error/dynamic
-fixtures. Keep main580case/576file/1740cell corpus and full293/targeted233/cadence0 inherited.
-SkipSlack; no push/systemchanges.
+[Language295](report.slice-295-language-surface.md) completes four unchanged inheritance, mixed-width
+initialization and scoped-constant contracts:12mode cells/48words, no skips/failures, exact identities.
+Default/array/call folding and two lane0zero-sentinel limits remain explicit. No production change.
+The loop remains active. Next audit the excluded FP8/BF16 local record-array boundary and propose
+a bounded qualification gate before changing admission. Reuse285integer-store evidence; do not
+reopen267materialgap or largeN65536timeouts. Main580cases/576files/1740cells and
+full293/targeted233/cadence0 remain inherited. SkipSlack; no push/systemchanges.
