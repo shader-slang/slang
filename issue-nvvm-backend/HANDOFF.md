@@ -34,9 +34,11 @@ Skip Slack; no push or system changes.
    are exact285. The observer is removed;100layout/37runtime/11source/2config/576inputs/22pins restored.
    Recovery and observer binaries are under `build/nvvm-generic-inference286`. Before production
    rebuild, refresh cached version metadata; restored source mtimes force observer objects to rebuild.
-10. Next: bounded nested FP8/BF16 dynamic dispatch, joining flat270 AnyValue and nested279 domains.
-    Require independently constructed payload/raw-bit oracles and evidence that dynamic calls plus
-    packing/unpacking survive. No array/device/readonly/exported expansion. Write a bounded plan first.
+10. [Qualification287](report.slice-287-nested-dynamic-records.md) passes six nested dynamic and six
+    neighboring GPU cells, plus two expected corruption rejections. IR confirms runtime-selected
+    unpack/mutation/pack-back and saved interface values. Natural payload20/CUDA local24 remain
+    distinct. All285 identities exact; raw fixtures stay under `build/nvvm-nested-dynamic287`.
+    Next: bounded native-test promotion and qualified contract update, with no new compiler admission.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.

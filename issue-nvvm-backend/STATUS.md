@@ -62,9 +62,12 @@ source/configuration/inputs/pins are exact. Recovery and experimental bytes rema
 `build/nvvm-generic-inference286`. Before a production rebuild, refresh version metadata and rebuild
 the restored observer source files; their mtimes are newer than experimental objects.
 
-Next: bounded nested FP8/BF16 dynamic-dispatch qualification, connecting flat270 AnyValue transport
-with nested279 local/value records. Require actual dynamic packing/unpacking and independent raw-bit
-oracles; preserve Natural payload packing separately from CUDA local layout. No new array/device/
-readonly/exported roles. The material screening lead remains documented for later producer work.
+[Qualification287](report.slice-287-nested-dynamic-records.md) joins nested FP8/BF16 local records
+with runtime dynamic dispatch: six new and six neighboring GPU cells pass; two corruption controls
+produce exact expected rejection masks. Live IR proves runtime selection, mutation pack-back and
+preserved interface snapshots across Natural20-byte/CUDA24-byte layouts. All accepted285 identities
+remain exact. Raw probes stay outside the main corpus; no compiler change or new array/device/
+readonly/exported roles. Next: bounded promotion of the two probes into persistent native regression
+tests and the qualified record contract. Material overload-screening lead remains documented.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
-max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation and286 restored research with no findings.
+max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation,286 restored research and287 qualification with no findings.

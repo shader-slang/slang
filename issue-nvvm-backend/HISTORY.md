@@ -154,3 +154,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Eight main observations each contain7,995 inferences/95,295rows,21 strict extra calls and a broader
   overload-screening frequency lead. No optimization retained; all material/native controls exact
   and complete accepted285 layout restored. Next qualifies nested FP8/BF16 dynamic dispatch.
+
+- Qualification287: [nested dynamic records](report.slice-287-nested-dynamic-records.md),
+  [evidence](research-evidence.slice-287.json), [plan](plan.slice-287-nested-dynamic-records.md).
+  Six new and six neighboring GPU cells pass; two deliberate corruptions reject with exact masks.
+  Live IR proves runtime selection, mutation pack-back and snapshot preservation across Natural20/
+  CUDA24 layouts. Accepted285 identities unchanged; next promotes the two probes to native regressions.
