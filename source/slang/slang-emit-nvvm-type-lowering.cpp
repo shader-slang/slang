@@ -748,6 +748,23 @@ IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type)
                : nullptr;
 }
 
+IRArrayType* asNVVMSupportedLocalSubstandardRecordArrayType(IRInst* type, uint32_t* outElementCount)
+{
+    if (outElementCount)
+        *outElementCount = 0;
+    auto arrayType = as<IRArrayType>(type);
+    auto count = arrayType ? as<IRIntLit>(arrayType->getElementCount()) : nullptr;
+    if (!arrayType || arrayType->getOp() != kIROp_ArrayType || arrayType->getOperandCount() != 2 ||
+        !count || count->getValue() <= 0 || count->getValue() > UINT32_MAX ||
+        !asNVVMSupportedSubstandardRecordType(arrayType->getElementType()))
+    {
+        return nullptr;
+    }
+    if (outElementCount)
+        *outElementCount = uint32_t(count->getValue());
+    return arrayType;
+}
+
 IRStructType* asNVVMSupportedLocalSubstandardRecordType(IRInst* type)
 {
     if (auto record = asNVVMSupportedSubstandardRecordType(type))
@@ -2149,6 +2166,8 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
                             : asNVVMSupportedHelperArrayType(type, &elementCount);
         if (!supportedType && use == NVVMTypeUse::Value)
             supportedType = asNVVMSupportedResourceArrayType(type, &elementCount);
+        if (!supportedType && (use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage))
+            supportedType = asNVVMSupportedLocalSubstandardRecordArrayType(type, &elementCount);
     }
     SLANG_RELEASE_ASSERT(supportedType);
     SlangNVVMTypeHandle elementType = nullptr;
@@ -2370,6 +2389,11 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
+    // A local array snapshot is an SSA value, not an array-bearing callable ABI. Check this
+    // role before consulting caches populated by a local allocation or whole-array load.
+    if (isLocalSubstandardRecordArray)
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage;
+
     // Local record references qualify parameters and allocations, not a new pointer-return ABI.
     if (use == NVVMTypeUse::HelperResult && localHelperPointer &&
         asNVVMSupportedSubstandardRecordType(localHelperPointerValueType) &&
@@ -2482,6 +2506,8 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
         asNVVMSupportedDevicePhysicalStoragePointerType(type, &info.devicePhysicalStorageValueType);
     info.isHelperValue = isNVVMSupportedHelperValueType(type);
     info.isSubstandardRecord = asNVVMSupportedSubstandardRecordType(type) != nullptr;
+    info.isLocalSubstandardRecordArray =
+        asNVVMSupportedLocalSubstandardRecordArrayType(type) != nullptr;
     info.isPointerBearingHelperValue =
         info.isHelperValue && !isNVVMSupportedCopyableValueType(type);
     info.deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
@@ -2928,6 +2954,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
     else if (
         fixedCopyableArrayType || fixedHelperArrayType || fixedResourceArrayType ||
+        typeInfo.isLocalSubstandardRecordArray ||
         (use == NVVMTypeUse::StructuredBufferStorage && isStructuredBufferStorage &&
          as<IRArrayType>(type)) ||
         (use == NVVMTypeUse::ParameterGroupStorage && isParameterGroupElementStorage &&

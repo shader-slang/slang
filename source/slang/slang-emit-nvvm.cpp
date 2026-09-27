@@ -70,6 +70,8 @@ uint32_t _getNVVMExecutableValueAlignment(IRInst* type)
 {
     if (const uint32_t helperAlignment = getNVVMHelperValueAlignment(type))
         return helperAlignment;
+    if (auto arrayType = asNVVMSupportedLocalSubstandardRecordArrayType(type))
+        return getNVVMHelperValueAlignment(arrayType->getElementType());
     return getNVVMResourceValueAlignment(type);
 }
 static const SlangNVVMValueTypeDesc kNVVMHalfToPhysicalOperands[] = {
@@ -188,6 +190,21 @@ bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& pa
     return false;
 }
 
+// Proves that this array pointer comes from an ordinary mutable local allocation. A matching
+// pointee on an out/inout parameter, shared global, or derived external pointer is insufficient.
+IRPtrTypeBase* _getNVVMLocalSubstandardRecordArrayPointer(IRInst* value)
+{
+    auto pointerType =
+        value && value->getOp() == kIROp_Var ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
+    return pointerType && pointerType->getOp() == kIROp_PtrType &&
+                   pointerType->getOperandCount() == 1 &&
+                   pointerType->getAddressSpace() == AddressSpace::Generic &&
+                   pointerType->getAccessQualifier() == AccessQualifier::ReadWrite &&
+                   asNVVMSupportedLocalSubstandardRecordArrayType(pointerType->getValueType())
+               ? pointerType
+               : nullptr;
+}
+
 struct NVVMSequentialElementPointer
 {
     IRInst* base = nullptr;
@@ -196,6 +213,7 @@ struct NVVMSequentialElementPointer
     IRPtrTypeBase* resultType = nullptr;
     bool isImmutable = false;
     bool isParameterGroupStorage = false;
+    bool isLocalSubstandardRecordStorage = false;
 };
 
 bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer& outPointer);
@@ -358,6 +376,12 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructFieldSel
             if (!_getNVVMSequentialElementPointer(fieldAddress->getBase(), parentElement))
                 return false;
             structType = asNVVMSupportedHelperStructType(parentElement.resultType->getValueType());
+            if (!structType && parentElement.isLocalSubstandardRecordStorage)
+            {
+                structType =
+                    asNVVMSupportedSubstandardRecordType(parentElement.resultType->getValueType());
+                outAddress.isLocalSubstandardRecordStorage = structType != nullptr;
+            }
             if (!structType)
             {
                 structType =
@@ -940,6 +964,16 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
         if (!arrayType)
             baseType = nullptr;
     }
+    bool isLocalSubstandardRecordStorage = false;
+    if (!baseType)
+    {
+        baseType = _getNVVMLocalSubstandardRecordArrayPointer(base);
+        if (baseType)
+        {
+            arrayType = asNVVMSupportedLocalSubstandardRecordArrayType(baseType->getValueType());
+            isLocalSubstandardRecordStorage = true;
+        }
+    }
     if (!baseType && hasResourceElementBase)
     {
         baseType = resourceElement.resultType;
@@ -1088,6 +1122,7 @@ bool _getNVVMSequentialElementPointer(IRInst* inst, NVVMSequentialElementPointer
     outPointer.resultType = resultType;
     outPointer.isImmutable = isImmutable;
     outPointer.isParameterGroupStorage = isParameterGroupStorage;
+    outPointer.isLocalSubstandardRecordStorage = isLocalSubstandardRecordStorage;
     return true;
 }
 
@@ -1490,6 +1525,8 @@ bool _getNVVMAggregateStorageLayout(
         allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(type)
             ? as<IRArrayType>(type)
             : asNVVMSupportedAggregateStorageArrayType(type);
+    if (!arrayType && allowLocalSubstandardRecords)
+        arrayType = asNVVMSupportedLocalSubstandardRecordArrayType(type);
     if (arrayType)
     {
         auto canonicalArrayLayout = as<IRArrayTypeLayout>(canonicalTypeLayout);
@@ -1735,6 +1772,7 @@ void _addNVVMReachableStructTypes(
         if (!asNVVMSupportedHelperArrayType(arrayType) &&
             !asNVVMSupportedResourceArrayType(arrayType) &&
             !asNVVMSupportedAggregateStorageArrayType(arrayType) &&
+            !asNVVMSupportedLocalSubstandardRecordArrayType(arrayType) &&
             !(allowZeroStateStructs &&
               isNVVMSupportedParameterGroupElementStorageType(arrayType)) &&
             !isNVVMSupportedStructuredBufferStorageType(arrayType))
@@ -1859,6 +1897,12 @@ bool _getNVVMSequentialElement(IRInst* inst, NVVMSequentialElement& outElement)
         if (!baseArrayType)
         {
             baseArrayType = asNVVMSupportedResourceArrayType(
+                base ? base->getDataType() : nullptr,
+                &baseElementCount);
+        }
+        if (!baseArrayType)
+        {
+            baseArrayType = asNVVMSupportedLocalSubstandardRecordArrayType(
                 base ? base->getDataType() : nullptr,
                 &baseElementCount);
         }
@@ -2096,6 +2140,11 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
         if (!resultType)
         {
             resultType =
+                asNVVMSupportedLocalSubstandardRecordArrayType(inst->getDataType(), &elementCount);
+        }
+        if (!resultType)
+        {
+            resultType =
                 asNVVMSupportedAggregateStorageArrayType(inst->getDataType(), &elementCount);
             outConstruction.resultUse = NVVMTypeUse::Storage;
         }
@@ -2118,6 +2167,11 @@ bool _getNVVMAggregateConstruction(IRInst* inst, NVVMAggregateConstruction& outC
         auto resultType = asNVVMSupportedHelperArrayType(inst->getDataType(), &elementCount);
         if (!resultType)
             resultType = asNVVMSupportedResourceArrayType(inst->getDataType(), &elementCount);
+        if (!resultType)
+        {
+            resultType =
+                asNVVMSupportedLocalSubstandardRecordArrayType(inst->getDataType(), &elementCount);
+        }
         if (!resultType)
         {
             resultType =
@@ -7699,6 +7753,7 @@ SlangResult _validatePointerValue(
     auto sharedGlobalPtrType = value && getNVVMSupportedSharedGlobal(value, &sharedGlobal)
                                    ? as<IRPtrTypeBase>(value->getDataType())
                                    : nullptr;
+    auto localRecordArrayPtrType = _getNVVMLocalSubstandardRecordArrayPointer(value);
     auto localStructPtrType =
         value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
     auto localHelperPtrType =
@@ -7747,6 +7802,7 @@ SlangResult _validatePointerValue(
                                      : localCopyablePtrType        ? localCopyablePtrType
                                      : localPhysicalStoragePtrType ? localPhysicalStoragePtrType
                                      : sequentialElementPtrType    ? sequentialElementPtrType
+                                     : localRecordArrayPtrType     ? localRecordArrayPtrType
                                      : localStructPtrType          ? localStructPtrType
                                      : localHelperPtrType          ? localHelperPtrType
                                      : helperReferencePtrType      ? helperReferencePtrType
@@ -8482,8 +8538,12 @@ SlangResult _planNVVMLocalStorage(
     {
         outStorage.alignment = _getNVVMExecutableValueAlignment(outStorage.valueType);
     }
-    else if (asNVVMSupportedLocalHelperValuePointerType(inst->getDataType(), &outStorage.valueType))
+    else if (
+        asNVVMSupportedLocalHelperValuePointerType(inst->getDataType(), &outStorage.valueType) ||
+        _getNVVMLocalSubstandardRecordArrayPointer(inst))
     {
+        if (!outStorage.valueType)
+            outStorage.valueType = cast<IRPtrTypeBase>(inst->getDataType())->getValueType();
         uint32_t count = 0;
         if (asNVVMBFloat16VectorType(outStorage.valueType, &count))
         {
@@ -8503,7 +8563,9 @@ SlangResult _planNVVMLocalStorage(
             outStorage.valueUse = NVVMTypeUse::Storage;
             outStorage.alignment = alignment;
         }
-        else if (asNVVMSupportedLocalSubstandardRecordType(outStorage.valueType))
+        else if (
+            asNVVMSupportedLocalSubstandardRecordType(outStorage.valueType) ||
+            asNVVMSupportedLocalSubstandardRecordArrayType(outStorage.valueType))
         {
             if (!_hasNVVMCompatibleAggregateStorageLayout(
                     codeGenContext,
@@ -14975,6 +15037,10 @@ SlangResult validateNVVMSupportedIR(
             for (auto inst : block->getOrdinaryInsts())
             {
                 _addNVVMReachableStructTypes(inst->getDataType(), selectedReachableStructTypes);
+                if (auto pointer = _getNVVMLocalSubstandardRecordArrayPointer(inst))
+                    _addNVVMReachableStructTypes(
+                        pointer->getValueType(),
+                        selectedReachableStructTypes);
                 IRType* localValueType = nullptr;
                 if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalCopyableValuePointerType(
                                                       inst->getDataType(),

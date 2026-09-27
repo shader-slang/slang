@@ -2,15 +2,15 @@
   "schema": 1,
   "status": "accepted-full",
   "baseline": {
-    "revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
+    "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "787118d1f575ec57e008a5c0eeccc2c70bb618b8573f7ca822238c70c75fed8f"
+    "sha256": "62c997a14b25874f72f52d6366e7211877df0354c42b9b653c645df46621351b"
   },
   "corpora": {
     "frozen": {
       "raw_results": {
-        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/frozen/results.json",
-        "sha256": "7d6e9693b5bb6dd1f6877a49957d68b2b4deebf9403242fc8f2a16d852d32239"
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/frozen/results.json",
+        "sha256": "68eb3bd29b8c4d5401c5908a4a72d149328dfb1f9981c297d6042ef3a7657228"
       },
       "fresh_cell_outcomes": [
         {
@@ -19001,8 +19001,8 @@
     },
     "discovery": {
       "raw_results": {
-        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/discovery/results.json",
-        "sha256": "dca1f12185a19047763de95dd9957494b5a04cc9d0deb8ae2bfe7757a324dd2a"
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/discovery/results.json",
+        "sha256": "ac2174fd9cb91b049b61f69b07417806166c05c440bcfd4949470ead9daf36a4"
       },
       "fresh_cell_outcomes": [
         {
@@ -30800,8 +30800,8 @@
     }
   ],
   "provenance": {
-    "started_utc": "2026-09-27T10:52:28.151237+00:00",
-    "revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
+    "started_utc": "2026-09-27T14:46:40.841653+00:00",
+    "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
     "platform": "Linux-6.17.0-1017-aws-x86_64-with-glibc2.39",
     "build_label": "RelWithDebInfo",
     "environment": {
@@ -30815,10 +30815,10 @@
     },
     "working-tree": {
       "command": ["git", "status", "--porcelain"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/working-tree.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/working-tree.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.15127976424992085
+      "elapsed_seconds": 0.14821313880383968
     },
     "source-diff": {
       "command": [
@@ -30831,41 +30831,41 @@
         "prelude",
         "external"
       ],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/source-diff.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/source-diff.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.1076534315943718
+      "elapsed_seconds": 0.1109327357262373
     },
     "submodules": {
       "command": ["git", "submodule", "status", "--recursive"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/submodules.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/submodules.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.29471975564956665
+      "elapsed_seconds": 0.2980993501842022
     },
     "compiler-version": {
       "command": [
         "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
         "-version"
       ],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/compiler-version.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/compiler-version.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.24892320856451988
+      "elapsed_seconds": 0.25678062811493874
     },
     "toolkit-version": {
       "command": ["/usr/local/cuda-12.9/bin/nvcc", "--version"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/toolkit-version.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/toolkit-version.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.0028136875480413437
+      "elapsed_seconds": 0.0029083825647830963
     },
     "ptxas-version": {
       "command": ["/usr/local/cuda-12.9/bin/ptxas", "--version"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/ptxas-version.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/ptxas-version.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.0026024039834737778
+      "elapsed_seconds": 0.004783352836966515
     },
     "device": {
       "command": [
@@ -30873,10 +30873,10 @@
         "--query-gpu=name,uuid,driver_version,compute_cap",
         "--format=csv"
       ],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/checkpoint/device.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/checkpoint/device.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.024073919281363487
+      "elapsed_seconds": 0.02405661903321743
     },
     "artifact_sha256": {
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
@@ -30889,11 +30889,11 @@
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "520c123df451c326537fe94ffad532bb14d887c468bc22362452c6e6db65d289",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "520c123df451c326537fe94ffad532bb14d887c468bc22362452c6e6db65d289",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "0806a435d485120907c95d83a2a8674d6c1d9bf72555a59fc4e328bd6659083e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "c0e52538c222f5bc5c039985b210efb5db52d4a00ba06ce524a2324aea82ea79",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
@@ -30901,15 +30901,15 @@
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "62b0343b5c2a68f9d5449d177dbd1b0a104e9d9c27a645fc00c054117199449d",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "520c123df451c326537fe94ffad532bb14d887c468bc22362452c6e6db65d289",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "cae0d99e72622c899dbc51f30ade49ce05b9d5adc06b5ad5c35301f1743cdeb1",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "72becef51f1288d65c3f0ea6f956680e2ff3ad6df50e4e10e177ad2463544d73",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "2d2bd50cc23be361133a9afbbecdaf2dc487ad6b1b1e0e06478ffe60c4b5192d",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "628f0965f3e40e43ea59e27c79ad4734364ddd43636de220c027e9837393cb06",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "42f187d0f99c8d53b4e27fb11bfebdfbc4b5898b43e70e23fb14db1e13cbf9af",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c3bca40ad5f2090e1151b1a5f1d5ec0d58c1e4b851d74d23b98e5d8573c2d26d",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "914dc5d8b713f4d5a5195af7fc506b099359cd0a31d657df85d072ab6aca2bff",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "8c2c8379d88f317b00aaee7bdb54445d282c37bc9400f31d335351d77e876883",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "aa4aecf480c1e996f2876df34b0023242d213acb4224db267a56fb3831ab291a",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "7743bdd503cf913f199067a78e6f3e72da9bf244204c9d85661cc8bf83a2f930",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "3f5170ec5791b91975f77c693d40ca04413eaf22f130068dd9b5e2910bd4b8b3",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "2f9bc437ac98aa42a01ae59187368918ad2ff5f1d3be10ad7d06ce8ff4412b0e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "0543b3d9b25fa1c6fad24b71940ee96d2dfcca914a1e243abf802290c9fe4cfa",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "8a00cba9cc529b1a676f1996c92b3469495f0703c9d2d804cf63cf7a5cb26b1c",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "e03a30d4666194a674e4fa5b6aee2f8e60ad72ebc711a16da7cb1fe247a59a64",
       "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
       "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
       "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
@@ -30917,11 +30917,11 @@
       "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
       "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
     },
-    "full_identity_count": 7205,
+    "full_identity_count": 7214,
     "identity_scope": "runtime-and-tools",
     "raw_complete_provenance": {
-      "path": "build/nvvm-address-refactor/checkpoint/provenance.json",
-      "sha256": "f1d38b098f90011393ea541333fcb538565b17ad318914e24d14a44ef1f2def3"
+      "path": "build/nvvm-local-record-arrays/checkpoint/provenance.json",
+      "sha256": "4a7d0dbf4bf29c3eb69aef2942dce683809c0bfb3a0a6577042d0a29062e6c82"
     }
   },
   "complex_corpus": {
@@ -30929,8 +30929,8 @@
     "required_cell_count": 6,
     "gpu_execution": false,
     "raw_results": {
-      "path": "build/nvvm-address-refactor/checkpoint/complex/results.json",
-      "sha256": "0866c0d3e87693f567c7f5ad3e6ea63db7a58997e9daf237689fe6644da7c2fb"
+      "path": "build/nvvm-local-record-arrays/checkpoint/complex/results.json",
+      "sha256": "30e0aebe945e14cc2eb81ddeb78394643aea05e909e06b627877123b4a894b74"
     },
     "cells": [
       {
@@ -33793,39 +33793,48 @@
   },
   "kind": "nvvm-current-acceptance",
   "validation_date_utc": "2026-09-27",
-  "source_repository_revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
-  "source_compiler_revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
-  "source_compiler_patch_sha256": "9025401d0c3bf9e0b1644d728f0ac60d9dd5929b3fd48104f61044d6419b6b56",
-  "compiler_version": "2026.18.3-315-g2f33cbe55",
+  "source_repository_revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+  "source_compiler_revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+  "source_compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
+  "compiler_version": "2026.18.3-323-g01ecb6e8b",
   "provider_abi": 42,
   "source_and_new_fixture_sha256": {
     "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "22ae318c57571eb3d6e6f6ab03498af1ba3fbb6af209d13cf365462ed4bd0cd2",
-    "source/slang/slang-emit-nvvm-plan.cpp": "aa4298fbb8485ea8047e0b070b6f50445aed840f5dab3b58b59a65cca484c447",
-    "source/slang/slang-emit-nvvm-plan.h": "71d0dc8f667df9b46cffd10c3b4bef93625da29cb3e9b7ebfe17ca52d049dd51",
-    "source/slang/slang-emit-nvvm.cpp": "7ca3ac926d62068ae6f1f845d6e82cb5355127f2ea2fc150a656ffeb5834cb29",
+    "source/slang/slang-emit-nvvm-type-lowering.cpp": "927497d758b7d2e574154addb5284c972003f5d6e08ba3e9dbca030d56a069b4",
+    "source/slang/slang-emit-nvvm-type-lowering.h": "8100216036c1178b7eff6554018a759c211a180d6ab9d1a6a9a59c1ed5899db3",
+    "source/slang/slang-emit-nvvm.cpp": "aa06b94bae764839193978a15a0b470d498ebb95a6b1ff679278db186ca5c1c8",
+    "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
+    "tests/cuda/nvvm-aggregate-index-snapshot.slang": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db",
     "tests/cuda/nvvm-bf16-local-records.slang": "19c7db6eb12baa19e2afd91994e2da19a2b6fde61cdb95b106b2e558e4f2a683",
     "tests/cuda/nvvm-bf16-local-vectors.slang": "c5e0a68bc9f0e160c93f92d64bcb56e0beb7b9b939135e9694de7cbbfbe1b364",
     "tests/cuda/nvvm-borrowed-vector-storage.slang": "6d125820645d07798266aa1a3c40c44fb9bb678d5a2d849ce77e824e3c08c7cf",
+    "tests/cuda/nvvm-column-major-compact.slang": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
     "tests/cuda/nvvm-compact-vector-storage.slang": "d94447399a2c09e3099e68cac1354e16b2d5dab6b2432e0ff23f1946628adfe6",
+    "tests/cuda/nvvm-local-substandard-record-array-copies.slang": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669",
+    "tests/cuda/nvvm-local-substandard-record-arrays.slang": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c",
     "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang": "fe73d768fef88d1e858ab4b4e43dcfc2cb242426e558fa89dff72ea30008eddb",
+    "tests/cuda/nvvm-nested-array-multidimensional.slang": "7efeccacaf1e1a08a89fbfc846eb7f7ad7796e76bf16ecdc6f8dad5cbf06e932",
+    "tests/cuda/nvvm-nested-array-root.slang": "763690737027f2a28a6f3465e15a5cbe470c46c40987b20a1d0d236432c1742c",
+    "tests/cuda/nvvm-nested-array-wrapped.slang": "f90e06f3fa4f5b0b7da2c83e35505de3f3af1f2b7400e0d46c4bf06d4326dda4",
     "tests/cuda/nvvm-nested-integer-record-stores.slang": "127f6c8fa24394272518e1cc1dc7b4b82013e52aa31372f3bf8788f4ae217228",
     "tests/cuda/nvvm-nested-substandard-dynamic.slang": "e42bdfba99aac507bf144da9e266dd85fe19924cf92cb01b1fec2539813f4634",
     "tests/cuda/nvvm-nested-substandard-records.slang": "99d38dd3398bf20bad8b1476d5b7e87495625616b0869557281a731a0246dc3f",
-    "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "1026e39230fa142d741de9b3e2f89cf81032653d8e2fdc8b853c46a72e287ccb"
+    "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "a9fb9066561b591478e42e10843501903f2fc0621491db1280425a712f643dd7",
+    "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "4c075f63b0b6344f947f16dff7ccf3405e4c9e67108f237c54ac7180eaa99994"
   },
   "compiled_identity_note": "Compiler built from the recorded revision plus compiler-source.patch; later documentation/evidence and commit metadata do not identify rebuilt bytes.",
   "original_comparison": {
-    "path": "build/nvvm-address-refactor/checkpoint/comparison.json",
-    "sha256": "19fc4e7e2d53f8e0f1a946b342327d3b8ca10910547aec79775059ac2d801441"
+    "path": "build/nvvm-local-record-arrays/checkpoint/comparison.json",
+    "sha256": "6737931652113a47b307a5ad16d37e3aa0614855dc004ac51805d93aa4ed4cdc"
   },
   "checkpoint": {
-    "path": "build/nvvm-address-refactor/checkpoint/checkpoint.json",
-    "sha256": "e46352944857df31dc3f555c136b780c916f689f3813028e072fd41cdab7f801"
+    "path": "build/nvvm-local-record-arrays/checkpoint/checkpoint.json",
+    "sha256": "2c10908490c0727f3387fab63bb149b1c87a1b3d33a6b6c880347124521e3bd4"
   },
   "historical_evidence_archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "units": {
     "counts": {
-      "passed": 1099,
+      "passed": 1102,
       "ignored": 13
     },
     "outcomes": {
@@ -34940,19 +34949,24 @@
       "slang-unit-test-tool/vtableIByteCodeRunner.internal": "passed",
       "slang-unit-test-tool/testServerProtocolErrorPersistentGarbleFailsTheRun.internal": "passed",
       "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
-      "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed"
+      "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed",
+      "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries.internal": "passed",
+      "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
+      "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed"
     },
     "comparison": {
-      "old_identities_preserved": 1111,
+      "old_identities_preserved": 1112,
       "added": {
-        "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed"
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed"
       },
       "changed": [],
       "missing": []
     },
     "raw_log": {
-      "path": "build/nvvm-address-refactor/full-units.log",
-      "sha256": "fc66cf860c2cda8554e9cc06edb52fbd001e651412cd2eb81276001630421839"
+      "path": "build/nvvm-local-record-arrays/full-units.log",
+      "sha256": "cd10e9a251265c71244d639509eec4898ebb100c77186e90523283dd2b16aa09"
     },
     "gate": {
       "command": [
@@ -34964,8 +34978,8 @@
         "slang-unit-test-tool/"
       ],
       "return_code": 0,
-      "elapsed_seconds": 139.93435525894165,
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/full-units.log"
+      "elapsed_seconds": 141.49879217147827,
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/full-units.log"
     }
   },
   "semantic_regressions": {
@@ -36230,8 +36244,8 @@
       "missing": []
     },
     "raw_log": {
-      "path": "build/nvvm-address-refactor/full-semantics.log",
-      "sha256": "1de53cc62af998f7d760197c265e6f9ed3019e15bf88edca9828227cec4b9947"
+      "path": "build/nvvm-local-record-arrays/full-semantics.log",
+      "sha256": "7653fc0e108eb8524ef2ef3288276fa0779472287f34e57c66505baa775d7d35"
     },
     "gate": {
       "command": [
@@ -36247,8 +36261,8 @@
         "tests/serialization"
       ],
       "return_code": 0,
-      "elapsed_seconds": 34.16543412208557,
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/full-semantics.log"
+      "elapsed_seconds": 34.86703038215637,
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/full-semantics.log"
     }
   },
   "totals": {
@@ -36915,30 +36929,30 @@
   "limitations": [
     "37 unchanged main unresolved cells:3 column-major host-packing mismatches and34 infrastructure/preflight gaps.",
     "Three focused NVRTC optimized nested-array mismatches remain open outside main corpus.",
-    "No new FP8/BF16 record-array admission, exported/device/shared/readonly roles or numerical semantics.",
+    "Only local fixed FP8/BF16/BF2 identity-record arrays are newly admitted; array-bearing helper signatures, wrapper fields, multidimensional arrays, BF3/BF4 elements and external storage roles remain unsupported.",
     "No arbitrary packed/address-space or Cartesian value coverage; low16 patterns are correlated across fields.",
     "Large original/candidate NVVM O3 both exceed120s/4GiB; no identical-cause or largeGPU feasibility claim.",
     "Conservative alignment can change copy widths; no compile-speed or GPU performance claim.",
-    "Material GPU input/binding/output contracts remain unavailable; material6 is compile/assembly only.",
-    "Inherited279 nested cache-order and synthetic Generic pointer-result qualification limits remain unchanged.",
+    "Fresh default synthetic-texture eval/sample runtime contracts are qualified. Original material assets, live LUTs, arbitrary inputs and application performance remain open; compile/assembly and GPU evidence are separate.",
+    "Direct cache-order proof covers the tested flat/nested local arrays. Arbitrary nested dynamic record cache combinations and the exact synthetic Generic pointer helper-result boundary remain outside this qualification.",
     "Normalization covers numeric/semicolon ANSI SGR presentation, not a general terminal emulator.",
     "Colored FileCheck reclassification is reporting accuracy, not a newly passing shader or expanded language feature.",
-    "Field/index address and ordinary memory plans preserve admitted roles; recursive preflight admission and dedicated resource/structured conversion paths remain. No transforming Slang IR storage pass or global address analysis."
+    "Local fixed identity-record arrays add no new physical representation or helper ABI. Field/index address and ordinary memory plans preserve admitted roles; recursive preflight admission and dedicated resource/structured conversion paths remain. No transforming Slang IR storage pass or global address analysis."
   ],
   "runtime_gate": {
     "status": "passed",
     "cells": 4,
     "raw_results": {
-      "path": "build/nvvm-address-refactor/checkpoint/runtime/results.json",
-      "sha256": "a5d7469025b8af2c73a7f41770fed58bdbef3ef41f4dabd9120942967f1381db"
+      "path": "build/nvvm-local-record-arrays/checkpoint/runtime/results.json",
+      "sha256": "da7625d292a99677b589d616ba1400ef795058873d2769ea879dc8960e716d9c"
     }
   },
   "toolkit": {
     "status": "passed",
     "required_cell_count": 18,
     "raw_results": {
-      "path": "build/nvvm-address-refactor/toolkit/results.json",
-      "sha256": "7c972555d09f9c6d05b4a20ba817f75f0147d1f7f11475f5df89a4ffbfd49804"
+      "path": "build/nvvm-local-record-arrays/toolkit/results.json",
+      "sha256": "97008a88290d4c89bde8aba44b2e6e5855123917d9eaf8c1ffa3b0ee732d2c00"
     },
     "cells": [
       {
@@ -37160,22 +37174,19 @@
     ]
   },
   "contracts": {
-    "passed": 48,
+    "passed": 90,
     "skipped": 1,
     "evidence": {
-      "path": "build/nvvm-address-refactor/contracts.json",
-      "sha256": "383a9183d25760d048ee0d41dcb2fc3dfdea933dbb026ae1ccf577e0176672ff"
+      "path": "build/nvvm-local-record-arrays/contracts.json",
+      "sha256": "e2d00f8b2dcd8a0861ffb18e22878c717c16f302181e4bd325777273bbad4e1d"
     }
   },
   "focused": {
     "gpu": {
-      "passed": 24,
+      "passed": 45,
       "gate": {
         "command": [
           "build/RelWithDebInfo/bin/slang-test",
-          "-use-test-server",
-          "-server-count",
-          "2",
           "-disable-retries",
           "tests/cuda/nvvm-bf16-local-vectors.slang",
           "tests/cuda/nvvm-bf16-local-records.slang",
@@ -37184,40 +37195,69 @@
           "tests/cuda/nvvm-nested-substandard-records.slang",
           "tests/cuda/nvvm-nested-substandard-dynamic.slang",
           "tests/cuda/nvvm-nested-integer-record-stores.slang",
-          "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang"
+          "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang",
+          "tests/cuda/nvvm-local-substandard-record-arrays.slang",
+          "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
+          "tests/cuda/nvvm-aggregate-index-material.slang",
+          "tests/cuda/nvvm-aggregate-index-snapshot.slang",
+          "tests/cuda/nvvm-column-major-compact.slang",
+          "tests/cuda/nvvm-nested-array-root.slang",
+          "tests/cuda/nvvm-nested-array-wrapped.slang",
+          "tests/cuda/nvvm-nested-array-multidimensional.slang"
         ],
         "return_code": 0,
-        "elapsed_seconds": 10.579680442810059,
-        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/focused-after.log"
+        "elapsed_seconds": 29.69994020462036,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/focused-gpu.log"
       },
       "log": {
-        "path": "build/nvvm-address-refactor/focused-after.log",
-        "sha256": "d0ce6c829b09e6d34412d38a701e11b88a356872e26bf6b0fafb9120e0b545f0"
+        "path": "build/nvvm-local-record-arrays/focused-gpu.log",
+        "sha256": "cd15aba096b33433f41f55a06cc53e99d07bc5fcda8182854c4d3ea3050ab536"
       },
       "outcomes": {
-        "tests/cuda/nvvm-bf16-local-vectors.slang (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-material.slang (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-material.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-material.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang.2 (cuda)": "passed",
         "tests/cuda/nvvm-bf16-local-records.slang (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-vectors.slang.1 (cuda)": "passed",
         "tests/cuda/nvvm-bf16-local-records.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-vectors.slang.2 (cuda)": "passed",
         "tests/cuda/nvvm-bf16-local-records.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-vectors.slang (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-vectors.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-vectors.slang.2 (cuda)": "passed",
         "tests/cuda/nvvm-borrowed-vector-storage.slang (cuda)": "passed",
-        "tests/cuda/nvvm-compact-vector-storage.slang (cuda)": "passed",
         "tests/cuda/nvvm-borrowed-vector-storage.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-borrowed-vector-storage.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-column-major-compact.slang (cuda)": "passed",
+        "tests/cuda/nvvm-column-major-compact.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-column-major-compact.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-compact-vector-storage.slang (cuda)": "passed",
         "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)": "passed",
         "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-borrowed-vector-storage.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang.2 (cuda)": "passed",
         "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-integer-record-stores.slang (cuda)": "passed",
         "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-integer-record-stores.slang.1 (cuda)": "passed",
         "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-multidimensional.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-multidimensional.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-root.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-root.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-wrapped.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-wrapped.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-integer-record-stores.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-integer-record-stores.slang.1 (cuda)": "passed",
         "tests/cuda/nvvm-nested-integer-record-stores.slang.2 (cuda)": "passed",
         "tests/cuda/nvvm-nested-substandard-dynamic.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-records.slang (cuda)": "passed",
         "tests/cuda/nvvm-nested-substandard-dynamic.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-records.slang.1 (cuda)": "passed",
         "tests/cuda/nvvm-nested-substandard-dynamic.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-records.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-records.slang.1 (cuda)": "passed",
         "tests/cuda/nvvm-nested-substandard-records.slang.2 (cuda)": "passed"
       },
       "source_sha256": {
@@ -37228,18 +37268,26 @@
         "tests/cuda/nvvm-nested-substandard-records.slang": "99d38dd3398bf20bad8b1476d5b7e87495625616b0869557281a731a0246dc3f",
         "tests/cuda/nvvm-nested-substandard-dynamic.slang": "e42bdfba99aac507bf144da9e266dd85fe19924cf92cb01b1fec2539813f4634",
         "tests/cuda/nvvm-nested-integer-record-stores.slang": "127f6c8fa24394272518e1cc1dc7b4b82013e52aa31372f3bf8788f4ae217228",
-        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang": "fe73d768fef88d1e858ab4b4e43dcfc2cb242426e558fa89dff72ea30008eddb"
+        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang": "fe73d768fef88d1e858ab4b4e43dcfc2cb242426e558fa89dff72ea30008eddb",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669",
+        "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db",
+        "tests/cuda/nvvm-column-major-compact.slang": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
+        "tests/cuda/nvvm-nested-array-root.slang": "763690737027f2a28a6f3465e15a5cbe470c46c40987b20a1d0d236432c1742c",
+        "tests/cuda/nvvm-nested-array-wrapped.slang": "f90e06f3fa4f5b0b7da2c83e35505de3f3af1f2b7400e0d46c4bf06d4326dda4",
+        "tests/cuda/nvvm-nested-array-multidimensional.slang": "7efeccacaf1e1a08a89fbfc846eb7f7ad7796e76bf16ecdc6f8dad5cbf06e932"
       }
     },
     "units": {
-      "passed": 18,
+      "passed": 24,
       "gate": {
         "command": [
           "build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
           "-use-test-server",
           "-server-count",
           "2",
-          "-disable-retries",
           "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles",
           "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation",
           "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation",
@@ -37257,25 +37305,34 @@
           "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles",
           "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission",
           "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer",
-          "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation"
+          "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles",
+          "slang-unit-test-tool/nvvmIRBuilderPreservesNestedStructStoreLayout",
+          "slang-unit-test-tool/nvvmIRBuilderNestedStructStoresKeepArrayBoundaries",
+          "slang-unit-test-tool/nvvmIRBuilderPreservesNestedArrayStoreLayout"
         ],
         "return_code": 0,
-        "elapsed_seconds": 16.17228627204895,
-        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-address-refactor/focused-units-v2.log"
+        "elapsed_seconds": 16.29879927635193,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/focused-units.log"
       },
       "log": {
-        "path": "build/nvvm-address-refactor/focused-units-v2.log",
-        "sha256": "0feb88159622f1d7dfdfe733384834e7443dbbd4dda78f74ba443ca436db9416"
+        "path": "build/nvvm-local-record-arrays/focused-units.log",
+        "sha256": "0e04aa4eb2f6bf331a701983a348dc5f269c67dc8d0e1e44e5f5a5dc3eda132a"
       },
       "outcomes": {
-        "slang-unit-test-tool/nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract.internal": "passed",
+        "slang-unit-test-tool/nvvmIRBuilderNestedStructStoresKeepArrayBoundaries.internal": "passed",
+        "slang-unit-test-tool/nvvmIRBuilderPreservesNestedStructStoreLayout.internal": "passed",
+        "slang-unit-test-tool/nvvmIRBuilderPreservesNestedArrayStoreLayout.internal": "passed",
         "slang-unit-test-tool/nvvmSlangMatrixMemoryUsesSequentialPointerContract.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract.internal": "passed",
         "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer.internal": "passed",
         "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
         "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalArraysCrossHelperReferenceBoundaries.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
         "slang-unit-test-tool/nvvmSlangComposesLocalAggregateElementAndFieldAddresses.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalArraysCrossHelperReferenceBoundaries.internal": "passed",
         "slang-unit-test-tool/nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers.internal": "passed",
         "slang-unit-test-tool/nvvmSlangFixedDeviceArrayUsesDirectPipeline.internal": "passed",
         "slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline.internal": "passed",
@@ -37285,9 +37342,39 @@
         "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed",
         "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsUseLocalFields.internal": "passed",
         "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed",
         "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal": "passed"
+      },
+      "tested_source": {
+        "path": "build/nvvm-local-record-arrays/focused-source.json",
+        "sha256": "209d21f7ac36d2e0b9a9f485dd632f7ac82d44e5e6f1d66c3deb3685723082e6"
+      },
+      "note": "Two raw test-body indentation lines changed afterward; full native units requalify the final source and module bytes."
+    },
+    "static_units": {
+      "passed": 2,
+      "ignored": 0,
+      "gate": {
+        "command": [
+          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test",
+          "nvvmLocalRecordArray"
+        ],
+        "return_code": 0,
+        "elapsed_seconds": 7.843641996383667,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-units-0.log"
+      },
+      "identity": {
+        "path": "build/nvvm-local-record-arrays/static-identity.json",
+        "sha256": "db3e0a002c73d01f2b4c1ec116e99a525d3f362a15caf8a1b665f3dea7ceed62"
+      },
+      "review": {
+        "path": "build/nvvm-local-record-arrays/review/static-result.json",
+        "sha256": "1ff332717de5c2785b180fd239c48da2deb99a7647819baabe55e078388bc218"
       }
-    }
+    },
+    "scope": "Local fixed arrays of existing identity records; no array helper ABI or external storage admission."
   },
   "validation_incidents": [
     {
@@ -37461,6 +37548,62 @@
         "passed": 18,
         "failed": 0
       }
+    },
+    {
+      "kind": "new-test-observation-assumptions",
+      "scope": "local-record-array qualification",
+      "status": "resolved",
+      "detail": "Two new unit assertions required unnecessary whole-array memory operations and ignored an integer conversion before layout-value storage. Retained LLVM/fake operations justified correcting only the tests; corrected units pass.",
+      "attempts": [
+        {
+          "path": "build/nvvm-local-record-arrays/early-units-0.json",
+          "sha256": "cb48409271fe3b4a2df552ff320873e301eee53f9f5ba1ce9443b84573658ba8"
+        },
+        {
+          "path": "build/nvvm-local-record-arrays/diagnostic-units-0.json",
+          "sha256": "a0290818622ecb2e45f63e083d10b55a88c826bb22c71887c776a16ffcaa91c3"
+        },
+        {
+          "path": "build/nvvm-local-record-arrays/diagnostic-units-1.json",
+          "sha256": "b8f1d52f1d3a740fb0fdf004fc4f8100f3698b513538bf1e8b52fedf73a7f9c7"
+        }
+      ],
+      "closure": {
+        "path": "build/nvvm-local-record-arrays/early-units-1.json",
+        "sha256": "c04b3783a8988c9bb03ee68f2eb9d93174947c6287177e8df215c19d4096a917"
+      }
+    },
+    {
+      "kind": "new-negative-fixture-syntax",
+      "scope": "local-record-array qualification",
+      "status": "resolved",
+      "detail": "One resource negative omitted a struct semicolon before its resource declaration. Frontend errors were retained and never counted as role coverage; repaired fixture rejects with the intended E52017 and no provider calls.",
+      "attempts": [
+        {
+          "path": "build/nvvm-local-record-arrays/negative-units-0.json",
+          "sha256": "83106b6f765a560a2c21d36b4f4546dec2d9db22ea4fdb7c190f98a3f933719c"
+        }
+      ],
+      "closure": {
+        "path": "build/nvvm-local-record-arrays/negative-units-1.json",
+        "sha256": "7841fb3e1a9da56318fd67a80fc566f958554248770dda1758dd1a95afd185be"
+      }
+    },
+    {
+      "kind": "isolated-static-dependency-configuration",
+      "scope": "local-record-array qualification",
+      "status": "resolved",
+      "detail": "Offline DXC auto-detection could not configure a new isolated static build. Disable unused DXIL only in that isolated configuration; local sources and existing NVVM provider then build successfully. Shared acceptance configuration stays unchanged.",
+      "attempts": [
+        {
+          "path": "build/nvvm-local-record-arrays/static-configure-0.json",
+          "sha256": "338515b6a666e4fe0b8eb26e419163eb4703c95aa05f05c9d690c8e2a3c1dfc4"
+        }
+      ],
+      "closure": {
+        "path": "build/nvvm-local-record-arrays/static-configure-1.json",
+        "sha256": "5ebee4eed76c33d4f05cc0f0c54793e536ce4974ad49d176aff4bb5a21bf0d51"
+      }
     }
   ],
   "acceptance": {
@@ -37470,16 +37613,47 @@
     "reviewed_transitions": [],
     "reviewed_input_deltas": [],
     "new_native_units": [
-      "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal"
+      "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal",
+      "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries.internal",
+      "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal"
     ],
-    "last_full": "address-boundary",
-    "last_targeted": "address-boundary",
+    "last_full": "local-record-arrays",
+    "last_targeted": "local-record-arrays",
     "implementations_since_full": 0,
+    "checkpoint_independent_review": {
+      "path": "build/nvvm-local-record-arrays/review/checkpoint-review.json",
+      "sha256": "e8f68a9ae7061c06fc3cd30f772dae1df793265cd13af899efe9f2f1632a32a8"
+    },
     "lead_review_completed": true,
     "independent_review_completed": true,
-    "review": {
-      "path": "build/nvvm-address-refactor/review/acceptance.json",
-      "sha256": "9bd942c0e8efd83735d357c6d75d7c8c055eb169af53e8462454b25428b5df59"
+    "independent_review": {
+      "path": "build/nvvm-local-record-arrays/review/candidate-acceptance.json",
+      "sha256": "5c2c33b02afd6468d0afd2191d1cf480d0bd51dfcbe8d01d5afe3032a6171cee"
     }
+  },
+  "material_runtime": {
+    "status": "passed",
+    "cells": 6,
+    "entries": [
+      {
+        "entry": "eval_buffer",
+        "status": "passed",
+        "cells": 3,
+        "results": {
+          "path": "build/nvvm-local-record-arrays/material-execution-eval_buffer/results.json",
+          "sha256": "cd27d8042f975e37f3c08878c21d4d7456b31ff53922add366513d6e97480807"
+        }
+      },
+      {
+        "entry": "sample_buffer",
+        "status": "passed",
+        "cells": 3,
+        "results": {
+          "path": "build/nvvm-local-record-arrays/material-execution-sample_buffer/results.json",
+          "sha256": "ebd7dedf60d7567ff7278af29741d44a5fc5b7bc65ef60572e8959c11b33236c"
+        }
+      }
+    ],
+    "scope": "Fresh default synthetic-texture correctness, 65 records and 63 guards; no new timing qualification."
   }
 }

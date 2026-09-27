@@ -1243,6 +1243,460 @@
             "sha256": "e025dbafcebe4e551343f48b1f1d9a9c2bf30309a35a48e7da5b5b54bbd41710"
           }
         }
+      },
+      "local_array_qualification": {
+        "status": "accepted",
+        "scope": "Local nonempty fixed arrays of existing integer/FP8/BF16/BF2 identity records, dynamic indexing and field mutation, saved whole-array values, and existing selected-record by-value helpers.",
+        "excluded": [
+          "array-bearing helper signatures",
+          "wrapper records containing arrays",
+          "multidimensional arrays",
+          "BF3/BF4 record elements",
+          "readonly/shared/device/resource/uniform/exported array storage",
+          "escaping pointer results"
+        ],
+        "provenance": {
+          "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+          "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
+          "compiler_version": "2026.18.3-323-g01ecb6e8b",
+          "compiler_sha256": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
+          "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "provider_abi": 42
+        },
+        "fresh_probe_outcomes": [
+          {
+            "id": "mixed-local",
+            "mode": "nvrtc-o3",
+            "source_sha256": "fbbbf5d7add948e497dda65a3002929b5e02612733e300dd27da31c3752d7b86",
+            "classification": "correct",
+            "return_code": 0,
+            "gpu_execution": true,
+            "execution_counts": {
+              "passed": 1,
+              "failed": 0
+            },
+            "compiler_error_codes": [],
+            "diagnostic": "",
+            "actual": [0, 65536],
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvrtc-o3-mixed-local.json",
+              "sha256": "4bb093d95e6e155053d1b76c1df205e3fa963b3e2f305a1779320306f654b696"
+            }
+          },
+          {
+            "id": "mixed-root",
+            "mode": "nvrtc-o3",
+            "source_sha256": "c4e99037244e09dc04d693b0c5256996345e06ddbb7213c2c91310f2e724c65c",
+            "classification": "correct",
+            "return_code": 0,
+            "gpu_execution": true,
+            "execution_counts": {
+              "passed": 1,
+              "failed": 0
+            },
+            "compiler_error_codes": [],
+            "diagnostic": "",
+            "actual": [0, 0, 65536, 9321],
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvrtc-o3-mixed-root.json",
+              "sha256": "8b040509d5ead4d16e0c13f081bafc371855a510a01b54d29156cd1e73b8d1e2"
+            }
+          },
+          {
+            "id": "mixed-wrapper",
+            "mode": "nvrtc-o3",
+            "source_sha256": "b270e5672c5bf2715bbd8342a41e1d89970072dcf85f71233f94fb617a01d2b8",
+            "classification": "correct",
+            "return_code": 0,
+            "gpu_execution": true,
+            "execution_counts": {
+              "passed": 1,
+              "failed": 0
+            },
+            "compiler_error_codes": [],
+            "diagnostic": "",
+            "actual": [0, 0, 65536, 9321],
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvrtc-o3-mixed-wrapper.json",
+              "sha256": "407a3a1e8f9711bd1faafb9878fa996bbb2048ffc0f49ead16e4734b6f87ee66"
+            }
+          },
+          {
+            "id": "mixed-local",
+            "mode": "nvvm-o0",
+            "source_sha256": "63a87e7d5bc37550f26af2c6dcb2e3a37f45098a3ab3af6db0db65a73c6f2af4",
+            "classification": "correct",
+            "return_code": 0,
+            "gpu_execution": true,
+            "execution_counts": {
+              "passed": 1,
+              "failed": 0
+            },
+            "compiler_error_codes": [],
+            "diagnostic": "",
+            "actual": [0, 65536],
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvvm-o0-mixed-local.json",
+              "sha256": "0c398c5c33febfa00966c5c0024bfd2d8b97ec63f29c070f21b19decd0f4f5ad"
+            }
+          },
+          {
+            "id": "mixed-root",
+            "mode": "nvvm-o0",
+            "source_sha256": "56df446d3229bf05be0b38ebff08767db0b5074f966ee6225b90fd8157853659",
+            "classification": "preflight",
+            "return_code": 1,
+            "gpu_execution": false,
+            "execution_counts": {
+              "passed": 0,
+              "failed": 1
+            },
+            "compiler_error_codes": ["E52017"],
+            "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Array<Cell, 2>>'",
+            "actual": null,
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvvm-o0-mixed-root.json",
+              "sha256": "b54aa3145295367c3068c6fa944e291466d12b15bc0e74ddc6bd19b9dd3f3fd5"
+            }
+          },
+          {
+            "id": "mixed-wrapper",
+            "mode": "nvvm-o0",
+            "source_sha256": "abb0cdd82ddea1b520752860eb349870299a1c29e471185b014f7e16c3d338b1",
+            "classification": "preflight",
+            "return_code": 1,
+            "gpu_execution": false,
+            "execution_counts": {
+              "passed": 0,
+              "failed": 1
+            },
+            "compiler_error_codes": ["E52017"],
+            "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Wrapper>'",
+            "actual": null,
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvvm-o0-mixed-wrapper.json",
+              "sha256": "eb8016562bd5f17b51f3e1d422507a594861eea364b77ac025882e0859170043"
+            }
+          },
+          {
+            "id": "mixed-local",
+            "mode": "nvvm-o3",
+            "source_sha256": "3006df6ca164271288beddfe01f0a6d469f035e4140b7a057822cdf406f0618d",
+            "classification": "correct",
+            "return_code": 0,
+            "gpu_execution": true,
+            "execution_counts": {
+              "passed": 1,
+              "failed": 0
+            },
+            "compiler_error_codes": [],
+            "diagnostic": "",
+            "actual": [0, 65536],
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvvm-o3-mixed-local.json",
+              "sha256": "154d4775a7d0e426826e7bb888969a60ec9776abb69758cea920f1556980e13f"
+            }
+          },
+          {
+            "id": "mixed-root",
+            "mode": "nvvm-o3",
+            "source_sha256": "b428a7b0884b9ed7382c3fa6e66a31fdab38fd91dfb4c3fd8a69a2cf7a97913b",
+            "classification": "preflight",
+            "return_code": 1,
+            "gpu_execution": false,
+            "execution_counts": {
+              "passed": 0,
+              "failed": 1
+            },
+            "compiler_error_codes": ["E52017"],
+            "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Array<Cell, 2>>'",
+            "actual": null,
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvvm-o3-mixed-root.json",
+              "sha256": "af4697e9f62cc2e7782d12605401441cd4f39209928401ab4d04c0933639046c"
+            }
+          },
+          {
+            "id": "mixed-wrapper",
+            "mode": "nvvm-o3",
+            "source_sha256": "c14b414f0a09a28a1a15f56313586b011a69472f1c41aea0375adf8e3038a376",
+            "classification": "preflight",
+            "return_code": 1,
+            "gpu_execution": false,
+            "execution_counts": {
+              "passed": 0,
+              "failed": 1
+            },
+            "compiler_error_codes": ["E52017"],
+            "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Wrapper>'",
+            "actual": null,
+            "gate": {
+              "path": "build/nvvm-local-record-arrays/after-nvvm-o3-mixed-wrapper.json",
+              "sha256": "8657d1588af2a28aea2a145d9345f51865965e71a02d048ab79cca5f53e231e8"
+            }
+          }
+        ],
+        "reviewed_transitions": [
+          {
+            "id": "mixed-local",
+            "mode": "nvvm-o0",
+            "before": {
+              "classification": "preflight",
+              "return_code": 1,
+              "compiler_error_codes": ["E52017"],
+              "gate": {
+                "path": "build/nvvm-local-record-arrays/before-nvvm-o0-mixed-local.json",
+                "sha256": "2dc28674bb92446c050a2f7716be39639b860cc00d835fee74379bcc9eb8e8c0"
+              }
+            },
+            "after": {
+              "classification": "correct",
+              "return_code": 0,
+              "observed_output": [0, 65536],
+              "gate": {
+                "path": "build/nvvm-local-record-arrays/after-nvvm-o0-mixed-local.json",
+                "sha256": "0c398c5c33febfa00966c5c0024bfd2d8b97ec63f29c070f21b19decd0f4f5ad"
+              }
+            }
+          },
+          {
+            "id": "mixed-local",
+            "mode": "nvvm-o3",
+            "before": {
+              "classification": "preflight",
+              "return_code": 1,
+              "compiler_error_codes": ["E52017"],
+              "gate": {
+                "path": "build/nvvm-local-record-arrays/before-nvvm-o3-mixed-local.json",
+                "sha256": "c64704024c3838cda61ca8b2ebd39c8232ece1ea2ed1cf6d3b6bdddecc94b5ca"
+              }
+            },
+            "after": {
+              "classification": "correct",
+              "return_code": 0,
+              "observed_output": [0, 65536],
+              "gate": {
+                "path": "build/nvvm-local-record-arrays/after-nvvm-o3-mixed-local.json",
+                "sha256": "154d4775a7d0e426826e7bb888969a60ec9776abb69758cea920f1556980e13f"
+              }
+            }
+          }
+        ],
+        "permanent_fixture_outcomes": [
+          {
+            "id": "nvvm-local-substandard-record-arrays",
+            "mode": "nvrtc-o3",
+            "source": {
+              "path": "tests/cuda/nvvm-local-substandard-record-arrays.slang",
+              "sha256": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c"
+            },
+            "classification": "correct",
+            "observed_output": [0, 65536],
+            "actual_sha256": "4412e737a05159b647dfb99c7fa9cb8234a6f3674557ac23d2d876a385f53e9a"
+          },
+          {
+            "id": "nvvm-local-substandard-record-arrays",
+            "mode": "nvvm-o0",
+            "source": {
+              "path": "tests/cuda/nvvm-local-substandard-record-arrays.slang",
+              "sha256": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c"
+            },
+            "classification": "correct",
+            "observed_output": [0, 65536],
+            "actual_sha256": "4412e737a05159b647dfb99c7fa9cb8234a6f3674557ac23d2d876a385f53e9a"
+          },
+          {
+            "id": "nvvm-local-substandard-record-arrays",
+            "mode": "nvvm-o3",
+            "source": {
+              "path": "tests/cuda/nvvm-local-substandard-record-arrays.slang",
+              "sha256": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c"
+            },
+            "classification": "correct",
+            "observed_output": [0, 65536],
+            "actual_sha256": "4412e737a05159b647dfb99c7fa9cb8234a6f3674557ac23d2d876a385f53e9a"
+          },
+          {
+            "id": "nvvm-local-substandard-record-array-copies",
+            "mode": "nvrtc-o3",
+            "source": {
+              "path": "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
+              "sha256": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669"
+            },
+            "classification": "correct",
+            "observed_output": [0, 0, 65536, 3735928559],
+            "actual_sha256": "5a8660e4fc3a2399e4b8b9e299f1cce6bf56d2672cc6661fdf20b6980931b52c"
+          },
+          {
+            "id": "nvvm-local-substandard-record-array-copies",
+            "mode": "nvvm-o0",
+            "source": {
+              "path": "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
+              "sha256": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669"
+            },
+            "classification": "correct",
+            "observed_output": [0, 0, 65536, 3735928559],
+            "actual_sha256": "5a8660e4fc3a2399e4b8b9e299f1cce6bf56d2672cc6661fdf20b6980931b52c"
+          },
+          {
+            "id": "nvvm-local-substandard-record-array-copies",
+            "mode": "nvvm-o3",
+            "source": {
+              "path": "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
+              "sha256": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669"
+            },
+            "classification": "correct",
+            "observed_output": [0, 0, 65536, 3735928559],
+            "actual_sha256": "5a8660e4fc3a2399e4b8b9e299f1cce6bf56d2672cc6661fdf20b6980931b52c"
+          }
+        ],
+        "layout_contracts": {
+          "transport_cell": {
+            "size": 8,
+            "alignment": 2
+          },
+          "snapshot_payload": {
+            "size": 16,
+            "alignment": 4,
+            "field_offsets": [0, 2, 3, 4, 8, 12]
+          },
+          "snapshot_outer": {
+            "size": 24,
+            "alignment": 4,
+            "field_offsets": [0, 4, 20]
+          },
+          "separate_bf2_only_unit": {
+            "payload_size": 12,
+            "outer_size": 20,
+            "array_sizes": [24, 40],
+            "alignment": 4
+          }
+        },
+        "focused_gpu": {
+          "passed": 45,
+          "gate": {
+            "path": "build/nvvm-local-record-arrays/focused-gpu.json",
+            "sha256": "132e6dc45f9a6f64a9ddeb544044ad8010bd206d5d8b14fda4ebacb5caf070ce"
+          }
+        },
+        "focused_units": {
+          "passed": 24,
+          "gate": {
+            "path": "build/nvvm-local-record-arrays/focused-units.json",
+            "sha256": "afe94039df76aaeed5d16299d2aa0eac406daa81dce239111c590ae60dd04b3e"
+          },
+          "source": {
+            "path": "build/nvvm-local-record-arrays/focused-source.json",
+            "sha256": "209d21f7ac36d2e0b9a9f485dd632f7ac82d44e5e6f1d66c3deb3685723082e6"
+          },
+          "note": "Final full native run requalifies two later whitespace-only raw-test indentation fixes."
+        },
+        "direct_static_units": {
+          "passed": 2,
+          "ignored": 0,
+          "gate": {
+            "path": "build/nvvm-local-record-arrays/static-units-0.json",
+            "sha256": "178626c5638372befe280aca7cf383774f9b9f021979a07d769e96313639ad43"
+          },
+          "identity": {
+            "path": "build/nvvm-local-record-arrays/static-identity.json",
+            "sha256": "db3e0a002c73d01f2b4c1ec116e99a525d3f362a15caf8a1b665f3dea7ceed62"
+          }
+        },
+        "source_negatives": {
+          "cases": 11,
+          "diagnostics": {
+            "path": "build/nvvm-local-record-arrays/negative-diagnostics.json",
+            "sha256": "e1724f9bee082e662b26778c95678f7c2be7809657aacce43045e7c7ffdebb9f"
+          },
+          "final_native_gate": {
+            "path": "build/nvvm-local-record-arrays/full-units.json",
+            "sha256": "f1e6a8c4c1f47defbd4358914f80c788a59e544fa7e0b070120014431461789a"
+          }
+        },
+        "oracle": {
+          "path": "build/nvvm-local-record-arrays/oracle-audit.json",
+          "sha256": "c0ecd5ebf86a9f3b4cf1fb444657d2dd12b1e5d503360180c3db3857c6853279"
+        },
+        "independent_early_replay": {
+          "path": "build/nvvm-local-record-arrays/review/early-replay.json",
+          "sha256": "ff8ecd148615c32d31e4484fcc679a18ac2c4de8875a5ed3dac4f83879dd72b3"
+        },
+        "independent_direct_review": {
+          "path": "build/nvvm-local-record-arrays/review/static-result.json",
+          "sha256": "1ff332717de5c2785b180fd239c48da2deb99a7647819baabe55e078388bc218"
+        },
+        "independent_source_review": {
+          "path": "build/nvvm-local-record-arrays/review/final-source.json",
+          "sha256": "ce88c687f629ced5cdc2e73f125693c398c67f66ab7ce23cb66bb9fd34d1f5a6"
+        },
+        "validation_incidents": [
+          {
+            "kind": "new-test-observation-assumptions",
+            "scope": "local-record-array qualification",
+            "status": "resolved",
+            "detail": "Two new unit assertions required unnecessary whole-array memory operations and ignored an integer conversion before layout-value storage. Retained LLVM/fake operations justified correcting only the tests; corrected units pass.",
+            "attempts": [
+              {
+                "path": "build/nvvm-local-record-arrays/early-units-0.json",
+                "sha256": "cb48409271fe3b4a2df552ff320873e301eee53f9f5ba1ce9443b84573658ba8"
+              },
+              {
+                "path": "build/nvvm-local-record-arrays/diagnostic-units-0.json",
+                "sha256": "a0290818622ecb2e45f63e083d10b55a88c826bb22c71887c776a16ffcaa91c3"
+              },
+              {
+                "path": "build/nvvm-local-record-arrays/diagnostic-units-1.json",
+                "sha256": "b8f1d52f1d3a740fb0fdf004fc4f8100f3698b513538bf1e8b52fedf73a7f9c7"
+              }
+            ],
+            "closure": {
+              "path": "build/nvvm-local-record-arrays/early-units-1.json",
+              "sha256": "c04b3783a8988c9bb03ee68f2eb9d93174947c6287177e8df215c19d4096a917"
+            }
+          },
+          {
+            "kind": "new-negative-fixture-syntax",
+            "scope": "local-record-array qualification",
+            "status": "resolved",
+            "detail": "One resource negative omitted a struct semicolon before its resource declaration. Frontend errors were retained and never counted as role coverage; repaired fixture rejects with the intended E52017 and no provider calls.",
+            "attempts": [
+              {
+                "path": "build/nvvm-local-record-arrays/negative-units-0.json",
+                "sha256": "83106b6f765a560a2c21d36b4f4546dec2d9db22ea4fdb7c190f98a3f933719c"
+              }
+            ],
+            "closure": {
+              "path": "build/nvvm-local-record-arrays/negative-units-1.json",
+              "sha256": "7841fb3e1a9da56318fd67a80fc566f958554248770dda1758dd1a95afd185be"
+            }
+          },
+          {
+            "kind": "isolated-static-dependency-configuration",
+            "scope": "local-record-array qualification",
+            "status": "resolved",
+            "detail": "Offline DXC auto-detection could not configure a new isolated static build. Disable unused DXIL only in that isolated configuration; local sources and existing NVVM provider then build successfully. Shared acceptance configuration stays unchanged.",
+            "attempts": [
+              {
+                "path": "build/nvvm-local-record-arrays/static-configure-0.json",
+                "sha256": "338515b6a666e4fe0b8eb26e419163eb4703c95aa05f05c9d690c8e2a3c1dfc4"
+              }
+            ],
+            "closure": {
+              "path": "build/nvvm-local-record-arrays/static-configure-1.json",
+              "sha256": "5ebee4eed76c33d4f05cc0f0c54793e536ce4974ad49d176aff4bb5a21bf0d51"
+            }
+          }
+        ],
+        "limits": [
+          "Two-element arrays over 65536 bit patterns do not establish large-array scalability.",
+          "No new arithmetic, representation conversion, provider operation or performance claim.",
+          "Earlier boundary rows retain their original source/binary identities; only the two enumerated local cells are resolved."
+        ],
+        "final_independent_review": {
+          "path": "build/nvvm-local-record-arrays/review/candidate-acceptance.json",
+          "sha256": "5c2c33b02afd6468d0afd2191d1cf480d0bd51dfcbe8d01d5afe3032a6171cee"
+        }
       }
     },
     "tiled-brass-eval-synthetic-textures": {
@@ -1582,6 +2036,158 @@
         "abi": {
           "path": "build/nvvm-material-runtime/review/abi-prelaunch.md",
           "sha256": "b45f24dbb1c7d50b1bab6bb49685bdd25fe64ee43390f36b083496e931303f31"
+        }
+      },
+      "current_compiler_regression": {
+        "status": "passed",
+        "provenance": {
+          "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+          "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
+          "compiler_version": "2026.18.3-323-g01ecb6e8b",
+          "compiler_sha256": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
+          "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "provider_abi": 42
+        },
+        "results": {
+          "path": "build/nvvm-local-record-arrays/material-execution-eval_buffer/results.json",
+          "sha256": "cd27d8042f975e37f3c08878c21d4d7456b31ff53922add366513d6e97480807"
+        },
+        "cells": [
+          {
+            "id": "nvrtc-o3",
+            "status": "passed",
+            "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+            "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "runtime": {
+              "launches": 1,
+              "active_records": 65,
+              "output_capacity": 128,
+              "device": "NVIDIA L4",
+              "compute_capability": 89
+            },
+            "output_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "comparison": {
+              "status": "passed",
+              "compared_records": 65,
+              "compared_components": 260,
+              "tail_records": 63,
+              "tail_sentinels_unchanged": true,
+              "different_seed_outputs_identical": true,
+              "wrapped_uv_output_identical": true,
+              "max_absolute_error": 8.490800915694763e-7,
+              "max_relative_error": 5.085167740487487e-7,
+              "max_tolerance_fraction": 0.002225461884237465,
+              "failed_components_count": 0
+            }
+          },
+          {
+            "id": "nvvm-o0",
+            "status": "passed",
+            "ptx_sha256": "cb916e997b632248904b5a057a007a1f313e267cdba5d19cbbd6517f62519142",
+            "cubin_sha256": "799cb7c81b1dbc8c48a97a30a3e3a88bb6a0bb8fa0b60fb743ce56cb8ef06e22",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "runtime": {
+              "launches": 1,
+              "active_records": 65,
+              "output_capacity": 128,
+              "device": "NVIDIA L4",
+              "compute_capability": 89
+            },
+            "output_sha256": "f51f35a9b425c13a20a4b597745bd42e9ef83d416fbe16da5e3a2e65ca9526d2",
+            "comparison": {
+              "status": "passed",
+              "compared_records": 65,
+              "compared_components": 260,
+              "tail_records": 63,
+              "tail_sentinels_unchanged": true,
+              "different_seed_outputs_identical": true,
+              "wrapped_uv_output_identical": true,
+              "max_absolute_error": 2.0136191842823337e-6,
+              "max_relative_error": 5.085167740487487e-7,
+              "max_tolerance_fraction": 0.002225461884237465,
+              "failed_components_count": 0
+            }
+          },
+          {
+            "id": "nvvm-o3",
+            "status": "passed",
+            "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+            "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "runtime": {
+              "launches": 1,
+              "active_records": 65,
+              "output_capacity": 128,
+              "device": "NVIDIA L4",
+              "compute_capability": 89
+            },
+            "output_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+            "comparison": {
+              "status": "passed",
+              "compared_records": 65,
+              "compared_components": 260,
+              "tail_records": 63,
+              "tail_sentinels_unchanged": true,
+              "different_seed_outputs_identical": true,
+              "wrapped_uv_output_identical": true,
+              "max_absolute_error": 8.490800915694763e-7,
+              "max_relative_error": 5.085167740487487e-7,
+              "max_tolerance_fraction": 0.002225461884237465,
+              "failed_components_count": 0
+            }
+          }
+        ],
+        "scope": "Fresh 65-record/63-guard correctness under the local-array compiler. Prior timings and larger-grid qualifications retain their old identities.",
+        "entry": "eval_buffer",
+        "source": {
+          "name": "tiled-brass-material",
+          "source": "tests/cuda/complex/tiled_brass_material.slang",
+          "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+          "entry_points": ["eval_buffer", "sample_buffer"],
+          "stage": "compute",
+          "provenance": {
+            "original_filename": "tiled_brass_material.slang",
+            "original_sha256": "924b39e55a521540518d99e6465c7d765600fd6bee752c1326c20231550eb73c",
+            "license": "Apache-2.0",
+            "adaptations": [
+              "Normalize CRLF to LF.",
+              "Add user-approved __TARGET_CUDA__=1 definition and explanatory comment."
+            ]
+          },
+          "features": [
+            "layered-material",
+            "generic-interfaces",
+            "aggregate-arrays",
+            "bindless-textures",
+            "lookup-buffers",
+            "floating-point-math"
+          ],
+          "runtime_status": "eval_buffer and sample_buffer synthetic-texture contracts qualified separately by extras/validate-nvvm-material-runtime.py and focused-evidence.json; this manifest still owns compile/assembly only. Original assets, live LUT reads, arbitrary inputs and application performance remain unqualified."
+        },
+        "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+        "absolute_tolerance": 1e-5,
+        "relative_tolerance": 0.0002,
+        "input_sha256": {
+          "inputs.bin": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+          "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+          "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
+        },
+        "harness_sha256": {
+          "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
         }
       }
     },
@@ -2166,6 +2772,185 @@
           "sha256": "94ef83087838e423e18e56591c540b42783925803d72a9b8c50a292e1524bdcf",
           "fields_verified": 2340,
           "all_six_raw_outputs_identical_to_prior_qualified_contracts": true
+        }
+      },
+      "current_compiler_regression": {
+        "status": "passed",
+        "provenance": {
+          "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+          "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
+          "compiler_version": "2026.18.3-323-g01ecb6e8b",
+          "compiler_sha256": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
+          "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "provider_abi": 42
+        },
+        "results": {
+          "path": "build/nvvm-local-record-arrays/material-execution-sample_buffer/results.json",
+          "sha256": "ebd7dedf60d7567ff7278af29741d44a5fc5b7bc65ef60572e8959c11b33236c"
+        },
+        "cells": [
+          {
+            "id": "nvrtc-o3",
+            "status": "passed",
+            "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+            "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "runtime": {
+              "launches": 1,
+              "active_records": 65,
+              "output_capacity": 128,
+              "device": "NVIDIA L4",
+              "compute_capability": 89
+            },
+            "output_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
+            "comparison": {
+              "status": "passed",
+              "matching_global_models": ["float"],
+              "compared_records": 65,
+              "compared_components": 520,
+              "tail_sentinels_unchanged": true,
+              "identical_input_repeats": true,
+              "wrapped_uv_output_identical": true,
+              "early_rejection_bytes_zero": true,
+              "candidate_summaries": {
+                "float": {
+                  "status": "passed",
+                  "failed_components_count": 0,
+                  "max_tolerance_fraction": 0.00669497571070388
+                },
+                "fma": {
+                  "status": "failed",
+                  "failed_components_count": 166,
+                  "max_tolerance_fraction": 9.293487189742255
+                }
+              }
+            }
+          },
+          {
+            "id": "nvvm-o0",
+            "status": "passed",
+            "ptx_sha256": "d26aa8843d412c29a9b1e2ad7fa337c6e4c609b1aa1e0c8c489ba4fcdd03aa4b",
+            "cubin_sha256": "b3601935ed3fd82bbd5cbef9514a44bf4fb477f0e76c531911d94c6cd652d7d1",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "runtime": {
+              "launches": 1,
+              "active_records": 65,
+              "output_capacity": 128,
+              "device": "NVIDIA L4",
+              "compute_capability": 89
+            },
+            "output_sha256": "59b02ed2c75a0578257e63b40dbb640a2f01f10e77583f7ac7d52a481bd8f1f4",
+            "comparison": {
+              "status": "passed",
+              "matching_global_models": ["fma"],
+              "compared_records": 65,
+              "compared_components": 520,
+              "tail_sentinels_unchanged": true,
+              "identical_input_repeats": true,
+              "wrapped_uv_output_identical": true,
+              "early_rejection_bytes_zero": true,
+              "candidate_summaries": {
+                "float": {
+                  "status": "failed",
+                  "failed_components_count": 166,
+                  "max_tolerance_fraction": 9.276043953697473
+                },
+                "fma": {
+                  "status": "passed",
+                  "failed_components_count": 0,
+                  "max_tolerance_fraction": 0.00669497571070388
+                }
+              }
+            }
+          },
+          {
+            "id": "nvvm-o3",
+            "status": "passed",
+            "ptx_sha256": "3868c13c4e03ae53cd36a474f0c4f04859b059339af457914e7f185051d26fb9",
+            "cubin_sha256": "1e36bb481f4d4f11204fb9741c4a73df070b79dfe86555d2143417940498b9f8",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "runtime": {
+              "launches": 1,
+              "active_records": 65,
+              "output_capacity": 128,
+              "device": "NVIDIA L4",
+              "compute_capability": 89
+            },
+            "output_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
+            "comparison": {
+              "status": "passed",
+              "matching_global_models": ["float"],
+              "compared_records": 65,
+              "compared_components": 520,
+              "tail_sentinels_unchanged": true,
+              "identical_input_repeats": true,
+              "wrapped_uv_output_identical": true,
+              "early_rejection_bytes_zero": true,
+              "candidate_summaries": {
+                "float": {
+                  "status": "passed",
+                  "failed_components_count": 0,
+                  "max_tolerance_fraction": 0.00669497571070388
+                },
+                "fma": {
+                  "status": "failed",
+                  "failed_components_count": 166,
+                  "max_tolerance_fraction": 9.293487189742255
+                }
+              }
+            }
+          }
+        ],
+        "scope": "Fresh 65-record/63-guard correctness under the local-array compiler. Prior timings and larger-grid qualifications retain their old identities.",
+        "entry": "sample_buffer",
+        "source": {
+          "name": "tiled-brass-material",
+          "source": "tests/cuda/complex/tiled_brass_material.slang",
+          "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+          "entry_points": ["eval_buffer", "sample_buffer"],
+          "stage": "compute",
+          "provenance": {
+            "original_filename": "tiled_brass_material.slang",
+            "original_sha256": "924b39e55a521540518d99e6465c7d765600fd6bee752c1326c20231550eb73c",
+            "license": "Apache-2.0",
+            "adaptations": [
+              "Normalize CRLF to LF.",
+              "Add user-approved __TARGET_CUDA__=1 definition and explanatory comment."
+            ]
+          },
+          "features": [
+            "layered-material",
+            "generic-interfaces",
+            "aggregate-arrays",
+            "bindless-textures",
+            "lookup-buffers",
+            "floating-point-math"
+          ],
+          "runtime_status": "eval_buffer and sample_buffer synthetic-texture contracts qualified separately by extras/validate-nvvm-material-runtime.py and focused-evidence.json; this manifest still owns compile/assembly only. Original assets, live LUT reads, arbitrary inputs and application performance remain unqualified."
+        },
+        "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+        "absolute_tolerance": 1e-5,
+        "relative_tolerance": 0.0002,
+        "input_sha256": {
+          "inputs.bin": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+          "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+          "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
+        },
+        "harness_sha256": {
+          "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
         }
       }
     },

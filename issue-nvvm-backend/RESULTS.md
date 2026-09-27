@@ -79,6 +79,24 @@ for long gates. Compare unit/semantic identities and statuses with the last acce
 skips and upstream additions; totals alone do not prove preservation. Toolkit and smoke validators
 require real completed cells. Keep expected unresolved/runtime failure histories visible.
 
+Changes to local record-array type roles or address provenance also require the direct static
+units. Follow the build skill to configure an isolated `SLANG_LIB_TYPE=STATIC` test build and build
+`slang-static-unit-test`; the ordinary shared test plugin cannot call these internal compiler APIs.
+Reuse the existing provider, keep the accepted shared layout separate, and record both source and
+configuration identities. On this native host the isolated test configuration disables unused DXIL
+and `slang-llvm` fetching and uses already available dependency sources. Do not add production export
+hooks or link a second compiler into the shared test plugin merely to expose these calls.
+
+```bash
+SLANG_NVVM_BUILDER_PATH="$PWD/build/RelWithDebInfo/bin" \
+  "$NVVM_STATIC_BUILD/RelWithDebInfo/bin/slang-static-unit-test" nvvmLocalRecordArray
+```
+
+Require both named tests to execute and pass without skips: cache orders/role refusals and exact
+local allocation and other pointer-producer address plans. Pin the static executable/provider/configuration and retain
+its output separately from shared native-unit identities. The shared units and permanent three-mode
+fixtures remain required; direct IR tests do not replace GPU execution.
+
 For CPU-only comparison against a durable old compact baseline, even without the old raw directory:
 
 ```bash

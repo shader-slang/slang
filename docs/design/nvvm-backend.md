@@ -209,9 +209,22 @@ invokes the concrete method, reloads and repacks the result. An earlier interfac
 saved payload. Runtime-selected nested regressions explicitly qualify both concrete conformers and
 those mutation/snapshot paths.
 
-Record arrays remain excluded from this substandard domain, including local indexing and retained
-mutable helper copies. BF3/BF4's physical lane arrays and successful layout metadata queries do not
-establish runtime record-array support. Generic local-record pointer helper results remain excluded;
+Ordinary nonempty fixed arrays of these identity records support local mutable allocation, dynamic
+indexing, field/component mutation and whole-array SSA snapshots. Their direct element satisfies the
+same record proof; wrapper records containing arrays and multidimensional arrays remain excluded.
+`NVVMTypeInfo::supports` permits array Value/Storage before cache lookup and rejects helper/external
+roles even when an allowed representation is cached. Array size uses CUDA element stride (24 bytes
+for two of the padded BF2 records above), not Natural payload size.
+
+The array address proof requires an actual ordinary mutable Generic `Var`; a matching pointer type
+on a parameter or external producer is insufficient. Checked element selection passes local record
+provenance into the existing field plan, including nested fields and BF2 lane access. Ordinary memory
+emission retains identity conversion and checked alignment. Selected records can use the existing
+by-value helper contract; array-bearing helper parameters/results and external array storage remain
+excluded. No new physical IR type, conversion recipe or provider operation is needed.
+
+BF3/BF4's physical lane arrays and successful layout metadata queries do not establish BF3/BF4
+record-array runtime support. Generic local-record pointer helper results remain excluded;
 the exact synthetic Generic result boundary has source-review evidence rather than canonical-source
 execution coverage.
 
