@@ -2,10 +2,10 @@
 # SPDX-FileCopyrightText: The Khronos Group, Inc.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Qualify the unchanged tiled-brass eval entry with two synthetic live CUDA textures.
+"""Qualify unchanged tiled-brass eval or sample entries with two synthetic live CUDA textures.
 
 This fixed graph contract covers finite front-facing reflection at texel centers, not original
-assets, LUT reads, sample_buffer, arbitrary material graphs, or GPU performance. Run on native
+assets, LUT reads, arbitrary material graphs, or GPU performance. Run on native
 Linux with the selected CUDA headers. Each invocation requires a new artifact directory.
 """
 
@@ -170,18 +170,247 @@ def oracle_checks(inputs, expected):
             "minimum_perturbation_tolerance_multiples": minimum}
 
 
-def validate_ptx(text, architecture):
+# Sampling uses the same unchanged textures, directions and numerical budget as eval.
+# The finite pre-GPU float/FMA study consumed <0.014 of this budget for these inputs.
+# IOR cancellation is represented explicitly by two candidates instead of widening tolerance.
+SAMPLE_CONTRACT = "tiled-brass-sample-synthetic-textures-v1"
+SAMPLE_INPUT, SAMPLE_OUTPUT = struct.Struct("<5fI"), struct.Struct("<7fI")
+SAMPLE_SENTINEL = b"\xa5" * SAMPLE_OUTPUT.size
+SAMPLE_MODELS = ("float", "fma")
+
+
+def sample_draws(seed):
+    """Generate the selection draw and the lobe's three draws with exact uint32 arithmetic.
+
+    The registered reflection graph ignores draw four, so its consumption is source-reviewed
+    but cannot be verified from sample_buffer outputs.
+    """
+    values = []
+    for _ in range(4):
+        seed = (1664525 * seed + 1013904223) & 0xffffffff
+        values.append((seed >> 8) / 16777216)
+    return values
+
+def sample_constants(model):
+    """Derive the two prequalified source-rounding hypotheses for artistic IOR.
+
+    Consider mx_artistic_ior(.99, 0): n is about 398, and the extinction numerator
+    subtracts two almost equal values. Separate float operations clamp it to zero;
+    contracting the last multiply/subtract leaves positive extinction. Both are legal
+    source arithmetic. These hypotheses were frozen before GPU execution, and one must
+    explain every record in a mode. They do not enumerate all legal compiler arithmetic.
+
+    Each rounded operand has 24 significant bits. Their product has at most 48 bits,
+    exactly representable in binary64; this particular near-equal subtraction is exact
+    there too. A single final f32 rounding therefore models the contracted operation.
+    """
+    if model not in SAMPLE_MODELS:
+        raise ValueError('unknown IOR hypothesis')
+    r = f32(.99)
+    sr = f32(math.sqrt(r))
+    n = f32(f32(1 + sr) / f32(1 - sr))
+    p, m = f32(n + 1), f32(n - 1)
+    pp, mm = f32(p * p), f32(m * m)
+    numerator = f32(pp * r - mm) if model == 'fma' else f32(f32(pp * r) - mm)
+    k = f32(math.sqrt(max(0, f32(numerator / f32(1 - r)))))
+    return n, k
+
+def sample_conductor(n, k, c):
+    """Independent complex-index Fresnel from scalar s/p reflectances."""
+    c2, s2 = c*c, 1-c*c
+    t = n*n-k*k-s2
+    q = math.sqrt(t*t+4*n*n*k*k)
+    a = math.sqrt((q+t)/2)
+    rs = (q+c2-2*c*a)/(q+c2+2*c*a)
+    rp = rs*(c2*q+s2*s2-2*c*a*s2)/(c2*q+s2*s2+2*c*a*s2)
+    return (rs+rp)/2
+
+def sample_probability(color, incoming, model):
+    """Compute the coat selection probability from albedo-weighted Rec.709 luminance."""
+    n, k = sample_constants(model)
+    p = -.32775145+.18346033*n+.61146583*k-.07785134*n*k
+    average = max(0, min(1, p/(1+p)))
+    coat = fresnel(1.5, normalize(incoming)[2])
+    luminance = sum(a*b for a,b in zip(linear_color(color), (.2126,.7152,.0722)))
+    return coat/(coat+(1-coat)*luminance*average)
+
+def sample_direction(incoming, roughness, random):
+    """Invert the bounded visible-normal distribution in stretched isotropic coordinates."""
+    i = normalize(incoming)
+    a = roughness*roughness
+    v = normalize((a*i[0], a*i[1], i[2]))
+    s2 = (1+math.hypot(i[0], i[1]))**2
+    b = v[2]*(1-a*a)*s2/(s2+a*a*i[2]*i[2])
+    z = (1-random[2])*(1+b)-b
+    phi = 2*math.pi*random[1]
+    radial = math.sqrt(max(0, 1-z*z))
+    m = normalize((a*(v[0]+radial*math.cos(phi)),
+                   a*(v[1]+radial*math.sin(phi)), v[2]+z))
+    dot = sum(x*y for x,y in zip(i,m))
+    return tuple(2*dot*x-y for x,y in zip(m,i))
+
+def sample_reference(row, model, mutation=None):
+    """Compute direction, mixture PDF and the selected branch's estimator in double precision.
+
+    Consider a colored conductor below the dielectric coat. MxMaterialInstance.sample first
+    chooses a lobe using albedo-weighted luminance, then sample_for_refl draws a visible normal.
+    Both lobes share its direction density, so mixture probabilities cancel in the PDF. The
+    unchanged FIXED_NON_DELTA_MIXTURE_WEIGHT=0 path retains only the selected lobe's throughput,
+    divided by that lobe's selection probability; full-material eval/pdf is a different value.
+
+    The final row is a deliberate (1,0,0) incoming direction: the inner sampler rejects wi.z=0
+    before MxMaterialInstance copies any fields, leaving its initialized output exactly zero.
+    """
+    incoming = row['incoming']
+    if normalize(incoming)[2] <= 0:
+        return (0.,)*7+(0,)
+    color = tuple(map(f32, COLORS[row['texel']]))
+    roughness = f32(ROUGHNESS[row['texel']])
+    random = sample_draws(row['seed'])
+    if mutation == 'shift_draws':
+        random = random[1:] + random[:1]
+    prob = sample_probability(color, incoming, model)
+    lobe = int(random[0] >= prob)
+    if mutation == 'wrong_lobe':
+        lobe = 1-lobe
+    o = sample_direction(incoming, roughness, random)
+    if o[2] <= 0:
+        return (0.,)*7+(0,)
+    i = normalize(incoming)
+    h = normalize(tuple(x+y for x,y in zip(i,o)))
+    c, a2 = i[2], roughness**4
+    D = a2/(math.pi*(h[2]*h[2]*(a2-1)+1)**2)
+    def smith_lambda(v):
+        return (math.sqrt(1+a2*(1-v[2]*v[2])/(v[2]*v[2]))-1)/2
+    G2 = 1/(1+smith_lambda(i)+smith_lambda(o))
+    s2 = (1+math.hypot(i[0],i[1]))**2
+    k = (1-a2)*s2/(s2+a2*c*c)
+    pdf = D/(2*(k*c+math.sqrt(a2*(i[0]*i[0]+i[1]*i[1])+c*c)))
+    energy = albedo(c, roughness)
+    compensation = (1-energy)/max(energy, 1e-6)
+    micro = sum(x*y for x,y in zip(i,h))
+    n, extinction = sample_constants(model)
+    f = fresnel(1.5, micro) if lobe == 0 else sample_conductor(n, extinction, micro)
+    weights = (1,)*3 if lobe == 0 else tuple(x*(1-fresnel(1.5,c)) for x in linear_color(color))
+    p = prob if lobe == 0 else 1-prob
+    t = math.sqrt(a2*(i[0]*i[0]+i[1]*i[1])+c*c)
+    # D cancels analytically against the bounded-VNDF PDF in the branch estimator.
+    scale = G2*(k*c+t)/(2*c)*f*(1+f*compensation)/p
+    weight = tuple(x*scale for x in weights)
+    if mutation == 'collapsed':
+        weight = tuple(x/pdf for x in reference(color,roughness,incoming,o)[:3])
+    return o+(pdf,)+weight+(2,)
+
+def sample_cases():
+    """Select finite seeds using CPU equations alone, well away from either model's branch edge."""
+    rows = []
+    for texel in range(4):
+        for di, (incoming, _) in enumerate(DIRECTIONS):
+            incoming = tuple(map(f32,incoming))
+            color = tuple(map(f32,COLORS[texel]))
+            probabilities = [sample_probability(color,incoming,m) for m in SAMPLE_MODELS]
+            for lobe in range(2):
+                for seed in range(100000):
+                    random = sample_draws(seed)
+                    if min(abs(random[0]-p) for p in probabilities) <= .03:
+                        continue
+                    if any(int(random[0]>=p) != lobe for p in probabilities):
+                        continue
+                    if sample_direction(incoming,f32(ROUGHNESS[texel]),random)[2] <= .2:
+                        continue
+                    rows.append(dict(texel=texel,direction=di,lobe=lobe,
+                        uv=(.25+.5*(texel%2),.25+.5*(texel//2)),incoming=incoming,seed=seed))
+                    break
+                else:
+                    raise ValueError('no branch-stable seed')
+    # First 24 exercise every pair/lobe. Then repeats and four exact wrapped-coordinate controls.
+    rows += [dict(row) for row in rows]
+    rows += [dict(row,uv=(row['uv'][0]+1,row['uv'][1]-1)) for row in rows[:4]]
+    rows += [dict(row) for row in rows[:12]]
+    rows.append(dict(texel=0,direction=3,lobe=0,uv=(.25,.25),incoming=(1.,0.,0.),seed=17))
+    return rows
+
+def sample_expected_outputs(inputs):
+    """Build complete output tables for both coherent IOR hypotheses."""
+    return {m:[sample_reference(row,m) for row in inputs] for m in SAMPLE_MODELS}
+
+def sample_oracle_checks(inputs, expected):
+    """Check finite geometry, branch margins and sensitivity to meaningful estimator mistakes."""
+    if len(inputs)!=ACTIVE_COUNT or set(expected)!=set(SAMPLE_MODELS):
+        raise ValueError('incomplete oracle')
+    if sample_draws(0) != [(1013904223>>8)/16777216, (1196435762>>8)/16777216,
+                     (3519870697>>8)/16777216, (2868466484>>8)/16777216]:
+        raise ValueError('LCG known sequence failed')
+    margins=[]
+    separation={name:math.inf for name in ('wrong_lobe','shift_draws','collapsed')}
+    for model in SAMPLE_MODELS:
+        for index,row in enumerate(inputs):
+            ref=expected[model][index]
+            if index==64:
+                if ref!=(0.,)*7+(0,): raise ValueError('early rejection must zero all fields')
+                continue
+            if not all(math.isfinite(x) for x in ref) or ref[2]<=.2 or ref[3]<=0 or min(ref[4:7])<=0 or ref[7]!=2:
+                raise ValueError('invalid finite oracle')
+            margin=abs(sample_draws(row['seed'])[0]-sample_probability(tuple(map(f32,COLORS[row['texel']])),row['incoming'],model))
+            margins.append(margin)
+            if margin<=.03: raise ValueError('branch margin too small')
+            for name in separation:
+                altered=sample_reference(row,model,mutation=name)
+                distance=max(abs(a-b)/tolerance(b) for a,b in zip(altered[:7],ref[:7]))
+                separation[name]=min(separation[name],distance)
+    if min(separation.values())<=5:
+        raise ValueError('perturbation separation too small: '+str(separation))
+    return dict(minimum_selection_margin=min(margins),
+                minimum_perturbation_tolerance_multiples=separation,constants={m:sample_constants(m) for m in SAMPLE_MODELS},
+                source_arithmetic_scope='two prequalified IOR hypotheses with a finite residual budget; not all legal optimizations')
+
+def sample_compare_outputs(data, expected):
+    """Require one hypothesis for every record, exact flags and untouched guard/reject records."""
+    if len(data)!=OUTPUT_COUNT*SAMPLE_OUTPUT.size:
+        return dict(status='failed',reason='output byte count mismatch',bytes=len(data))
+    if (set(expected)!=set(SAMPLE_MODELS) or
+            any(len(rows)!=ACTIVE_COUNT or any(len(row)!=8 for row in rows) for rows in expected.values())):
+        raise ValueError('incomplete expected candidates')
+    candidates={}
+    for model, rows in expected.items():
+        failed=[]; worst=0.; detail=[]
+        for index,want in enumerate(rows):
+            got=SAMPLE_OUTPUT.unpack_from(data,index*SAMPLE_OUTPUT.size)
+            for component,(a,b) in enumerate(zip(got,want)):
+                ok=(a==b) if component==7 or index==64 else math.isfinite(a) and abs(a-b)<=tolerance(b)
+                if not ok: failed.append([index,component])
+                if component<7 and math.isfinite(a): worst=max(worst,abs(a-b)/tolerance(b))
+            detail.append(dict(index=index,expected=want,actual=[v if math.isfinite(v) else str(v) for v in got]))
+        candidates[model]=dict(status='passed' if not failed else 'failed',failed_components=failed,
+                               max_tolerance_fraction=worst,rows=detail)
+    matching=[m for m,v in candidates.items() if v['status']=='passed']
+    tail=data[ACTIVE_COUNT*SAMPLE_OUTPUT.size:]==SAMPLE_SENTINEL*(OUTPUT_COUNT-ACTIVE_COUNT)
+    zero_record=data[64*SAMPLE_OUTPUT.size:65*SAMPLE_OUTPUT.size]==bytes(SAMPLE_OUTPUT.size)
+    def same(a, b):
+        stride = SAMPLE_OUTPUT.size
+        return data[a*stride:(a+1)*stride] == data[b*stride:(b+1)*stride]
+    repeat=all(same(i,i+24) for i in range(24)) and all(same(i,i+52) for i in range(12))
+    wrap=all(same(i,i+48) for i in range(4))
+    return dict(status='passed' if matching and tail and repeat and wrap and zero_record else 'failed',
+                matching_global_models=matching,candidates=candidates,compared_records=ACTIVE_COUNT,
+                compared_components=ACTIVE_COUNT*8,tail_sentinels_unchanged=tail,
+                identical_input_repeats=repeat,wrapped_uv_output_identical=wrap,early_rejection_bytes_zero=zero_record)
+
+
+
+def validate_ptx(text, architecture, entry="eval_buffer"):
     """Reject incompatible fresh entry/global/stride contracts before loading their cubin."""
+    layout = entry_layout(entry)
     requirements = {
         "target": rf"(?m)^\s*\.target\s+sm_{architecture}\b",
-        "parameterless_entry": r"\.entry\s+eval_buffer\s*\(\s*\)",
+        "parameterless_entry": rf"\.entry\s+{entry}\s*\(\s*\)",
         "globals_168_align8": r"\.const\s+\.align\s+8\s+\.b8\s+SLANG_globalParams\[168\]",
-        "input_stride40": r"\[SLANG_globalParams\+96\];[^{}]{0,200}?mul\.(?:wide\.[su]32|lo\.s64)\s+[^;\n]+,\s*40\s*;",
-        "output_stride16": r"\[SLANG_globalParams\+112\];[^{}]{0,200}?shl\.b64\s+[^;\n]+,\s*4\s*;",
+        "input_stride": rf"\[SLANG_globalParams\+{layout['input_offset']}\];[^{{}}]{{0,200}}?mul\.(?:wide\.[su]32|lo\.s64)\s+[^;\n]+,\s*{layout['input_stride']}\s*;",
+        "output_stride": rf"\[SLANG_globalParams\+{layout['output_offset']}\];[^{{}}]{{0,200}}?shl\.b64\s+[^;\n]+,\s*{layout['output_shift']}\s*;",
     }
-    for name, offset in (("material", 80), ("input", 96), ("output", 112), ("count", 160)):
+    for name, offset in (("material", 80), ("input", layout["input_offset"]), ("output", layout["output_offset"]), ("count", 160)):
         requirements[name + "_offset"] = rf"ld\.const\.u(?:32|64)\s+[^;\n]*\[SLANG_globalParams\+{offset}\]"
-    entry = re.search(r"\.entry\s+eval_buffer\s*\(\s*\)\s*\{", text)
+    entry = re.search(rf"\.entry\s+{entry}\s*\(\s*\)\s*\{{", text)
     body = ""
     if entry:
         depth = 1
@@ -197,7 +426,7 @@ def validate_ptx(text, architecture):
     return list(requirements)
 
 
-def reviewed_abi_hashes(path, source_sha256, modes):
+def reviewed_abi_hashes(path, source_sha256, modes, entry="eval_buffer"):
     """Require complete, exact PTX identities from a separately reviewed preparation run.
 
     The small automatic checks deliberately do not trace arbitrary PTX register dataflow. The
@@ -205,7 +434,7 @@ def reviewed_abi_hashes(path, source_sha256, modes):
     explicit ABI review. The execution run then demands byte-identical fresh PTX in every mode.
     """
     report = json.loads(path.read_text())
-    if (report.get("status") != "prepared" or report.get("contract") != CONTRACT or
+    if (report.get("status") != "prepared" or report.get("contract") != entry_layout(entry)["contract"] or
             report.get("source", {}).get("source_sha256") != source_sha256):
         raise ValueError("ABI reference must be a successful preparation of this exact source contract")
     cells = report.get("cells", [])
@@ -255,7 +484,7 @@ def compare_outputs(data, expected):
             "max_tolerance_fraction": max_fraction, "failed_components": failures, "rows": rows}
 
 
-def validate_driver_log(text):
+def validate_driver_log(text, entry="eval_buffer"):
     """Require one real launch, cleanup and both full-width texture handle checks."""
     handles = re.findall(r"texture=(color|roughness) handle_decimal=(\d+) handle_hex=(0x[0-9a-f]{16}) low30_fit=true nonzero=true", text)
     if len(handles) != 2 or {row[0] for row in handles} != {"color", "roughness"}:
@@ -264,7 +493,8 @@ def validate_driver_log(text):
         value = int(decimal)
         if value != int(hexadecimal, 16) or not value or value & ~0x3fffffff:
             raise ValueError("texture handle did not round-trip through low30")
-    execution = "execution launches=1 active=65 output_capacity=128 global_bytes=168 input_stride=40"
+    execution = ("execution launches=1 active=65 output_capacity=128 global_bytes=168 "
+                 f"input_stride={entry_layout(entry)['input_stride']}")
     if text.splitlines().count(execution) != 1 or text.splitlines().count("cleanup=PASS") != 1:
         raise ValueError("missing real execution or successful cleanup")
     device = re.search(r"cuda_header_version=(\d+) driver_api_version=(\d+) device_ordinal=0 device=(.+) sm=(\d+)", text)
@@ -275,6 +505,30 @@ def validate_driver_log(text):
             "device": device[3], "device_ordinal": 0, "compute_capability": int(device[4]),
             "texture_handles": {name: {"decimal": decimal, "hex": hexadecimal}
                                 for name, decimal, hexadecimal in handles}}
+
+
+def entry_layout(entry):
+    """Keep each entry's descriptor and packing contract in one explicit table."""
+    layouts = {
+        "eval_buffer": dict(contract=CONTRACT, input_offset=96, output_offset=112,
+                            input_stride=INPUT.size, output_shift=4, input_struct=INPUT,
+                            cases=cases, expected=expected_outputs, check=oracle_checks,
+                            compare=compare_outputs),
+        "sample_buffer": dict(contract=SAMPLE_CONTRACT, input_offset=128, output_offset=144,
+                              input_stride=SAMPLE_INPUT.size, output_shift=5, input_struct=SAMPLE_INPUT,
+                              cases=sample_cases, expected=sample_expected_outputs, check=sample_oracle_checks,
+                              compare=sample_compare_outputs),
+    }
+    if entry not in layouts:
+        raise ValueError("unknown material entry: " + entry)
+    return layouts[entry]
+
+
+def validate_oracle_hash(reference_path, oracle_sha256):
+    """Require execution to use the exact inputs, candidates and budget reviewed in preparation."""
+    prepared = json.loads(reference_path.read_text())
+    if not re.fullmatch(r"[0-9a-f]{64}", oracle_sha256) or oracle_sha256 != prepared.get("oracle_sha256"):
+        raise ValueError("oracle/inputs/tolerance differ from reviewed preparation")
 
 
 def main():
@@ -288,6 +542,7 @@ def main():
                        help="compile all modes without GPU execution, for explicit ABI review")
     phase.add_argument("--abi-reference", type=Path,
                        help="results.json from an explicitly reviewed --prepare-only run")
+    parser.add_argument("--entry", choices=("eval_buffer", "sample_buffer"), default="eval_buffer")
     parser.add_argument("--cxx", default="c++")
     parser.add_argument("--timeout", type=int, default=180)
     args = parser.parse_args()
@@ -298,11 +553,13 @@ def main():
     if args.output.exists():
         parser.error("output directory already exists; use a new directory to preserve every attempt")
     args.output.mkdir(parents=True)
-    report = {"schema": 1, "contract": CONTRACT, "status": "infrastructure-failed", "cells": [],
+    layout = entry_layout(args.entry)
+    report = {"schema": 1, "contract": layout["contract"], "entry": args.entry, "status": "infrastructure-failed", "cells": [],
               "started_utc": datetime.now(timezone.utc).isoformat(), "platform": platform.platform(),
               "absolute_tolerance": ABS_TOL, "relative_tolerance": REL_TOL,
-              "scope": "unchanged eval_buffer, two synthetic textures, finite front-facing reflection",
-              "limitations": ["no original assets", "no LUT read coverage", "no sample_buffer",
+              "scope": f"unchanged {args.entry}, two synthetic textures, finite front-facing reflection",
+              "limitations": ["no original assets", "no LUT read coverage",
+                              "no arbitrary inputs or branch-boundary distribution proof",
                               "no arbitrary graph or GPU performance claim"]}
     def save():
         (args.output / "results.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
@@ -315,13 +572,13 @@ def main():
         manifest_path = REPO / "issue-nvvm-backend/complex-corpus.manifest.json"
         manifest = corpus.read_workloads(manifest_path, toolkit)
         workload = next(row for row in manifest["workloads"] if row["name"] == "tiled-brass-material")
-        if "eval_buffer" not in workload["entry_points"]:
-            raise ValueError("registered eval_buffer entry is absent")
+        if args.entry not in workload["entry_points"]:
+            raise ValueError("registered entry is absent: " + args.entry)
         report.update(source=workload, architecture=manifest["architecture"], manifest=str(manifest_path))
         abi_hashes = None
         if args.abi_reference:
             args.abi_reference = args.abi_reference.resolve()
-            abi_hashes = reviewed_abi_hashes(args.abi_reference, workload["source_sha256"], corpus.MODES)
+            abi_hashes = reviewed_abi_hashes(args.abi_reference, workload["source_sha256"], corpus.MODES, args.entry)
             report["reviewed_abi_reference"] = {"path": str(args.abi_reference),
                                                "sha256": toolkit.sha256(args.abi_reference),
                                                "ptx_sha256": abi_hashes}
@@ -365,11 +622,11 @@ def main():
         if report["helper_build"]["return_code"] != 0:
             raise ValueError("material driver helper build failed")
         report["artifact_sha256"][str(helper)] = toolkit.sha256(helper)
-        inputs = cases()
-        expected = expected_outputs(inputs)
-        report["oracle_checks"] = oracle_checks(inputs, expected)
+        inputs = layout["cases"]()
+        expected = layout["expected"](inputs)
+        report["oracle_checks"] = layout["check"](inputs, expected)
         payloads = {
-            "inputs.bin": b"".join(INPUT.pack(*row["uv"], *row["incoming"], *row["outgoing"], row["seed"]) for row in inputs),
+            "inputs.bin": b"".join(layout["input_struct"].pack(*row["uv"], *row["incoming"], *row.get("outgoing", ()), row["seed"]) for row in inputs),
             "color.bin": struct.pack("<16f", *(v for color in COLORS for v in color)),
             "roughness.bin": struct.pack("<16f", *(v for roughness in ROUGHNESS for v in (roughness, 0, 0, 1))),
         }
@@ -378,9 +635,11 @@ def main():
         oracle_path.write_text(json.dumps(dict(inputs=inputs, expected=expected, absolute_tolerance=ABS_TOL,
                                               relative_tolerance=REL_TOL), indent=2, allow_nan=False) + "\n")
         report["oracle_sha256"] = toolkit.sha256(oracle_path)
+        if args.abi_reference:
+            validate_oracle_hash(args.abi_reference, report["oracle_sha256"])
         for backend, optimization in corpus.MODES:
             report["cells"].append(dict(id=f"{backend}-o{optimization}", backend=backend,
-                optimization=optimization, architecture=manifest["architecture"], entry="eval_buffer", status="pending"))
+                optimization=optimization, architecture=manifest["architecture"], entry=args.entry, status="pending"))
         report["status"] = "running"
         save()
         for cell in report["cells"]:
@@ -395,7 +654,7 @@ def main():
                                                directory / "compile.log", environment, args.timeout)
                 cell["status"] = "compile-failed"
                 if cell["compile"]["return_code"] == 0:
-                    cell["ptx_abi_checks"] = validate_ptx(toolkit.require_file(ptx).read_text(), cell["architecture"])
+                    cell["ptx_abi_checks"] = validate_ptx(toolkit.require_file(ptx).read_text(), cell["architecture"], args.entry)
                     cell["ptx_sha256"] = toolkit.sha256(ptx)
                     if abi_hashes is not None and cell["ptx_sha256"] != abi_hashes[cell["id"]]:
                         raise ValueError("fresh PTX differs from the reviewed ABI artifact")
@@ -407,12 +666,12 @@ def main():
                         if args.prepare_only:
                             cell["status"] = "prepared"
                         else:
-                            cell["execution"] = toolkit.run([str(helper), str(cubin), str(directory)],
+                            cell["execution"] = toolkit.run([str(helper), str(cubin), str(directory), args.entry],
                                                              directory / "execution.log", environment, args.timeout)
                             cell["status"] = "execution-failed"
                             if cell["execution"]["return_code"] == 0:
-                                cell["runtime"] = validate_driver_log((directory / "execution.log").read_text())
-                                cell["comparison"] = compare_outputs((directory / "outputs.bin").read_bytes(), expected)
+                                cell["runtime"] = validate_driver_log((directory / "execution.log").read_text(), args.entry)
+                                cell["comparison"] = layout["compare"]((directory / "outputs.bin").read_bytes(), expected)
                                 cell["status"] = "passed" if cell["comparison"]["status"] == "passed" else "output-mismatch"
                 cell["runtime_artifact_sha256"] = {name: toolkit.sha256(directory / name)
                     for name in ("outputs.bin", "material.bin", "globals.bin") if (directory / name).exists()}

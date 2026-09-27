@@ -167,5 +167,156 @@ ld.const.u32 %f, [SLANG_globalParams+160];
             self.assertEqual(report["cells"], [])
 
 
+class SampleContracts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.inputs=MATERIAL.sample_cases(); cls.expected=MATERIAL.sample_expected_outputs(cls.inputs)
+
+    def encoded(self, model='float'):
+        return b''.join(MATERIAL.SAMPLE_OUTPUT.pack(*row) for row in self.expected[model])+MATERIAL.SAMPLE_SENTINEL*63
+
+    def test_independently_derived_ior_candidates(self):
+        self.assertEqual(MATERIAL.sample_constants("float"),(397.9967956542969,0.0))
+        self.assertEqual(MATERIAL.sample_constants("fma"),(397.9967956542969,0.3896454870700836))
+        with self.assertRaises(ValueError): MATERIAL.sample_constants("unknown")
+
+    def test_exact_rng_known_values(self):
+        self.assertEqual(MATERIAL.sample_draws(0),[(x>>8)/16777216 for x in (1013904223,1196435762,3519870697,2868466484)])
+        self.assertEqual(MATERIAL.sample_draws(0xffffffff)[0],(1012239698>>8)/16777216)
+
+    def test_selection_and_estimator_perturbations(self):
+        checks=MATERIAL.sample_oracle_checks(self.inputs,self.expected)
+        self.assertGreater(min(checks['minimum_perturbation_tolerance_multiples'].values()),5)
+
+    def test_coverage_and_branch_stability(self):
+        self.assertEqual(len(self.inputs),65)
+        self.assertEqual({(r['texel'],r['direction'],r['lobe']) for r in self.inputs[:24]},
+                         {(t,d,l) for t in range(4) for d in range(3) for l in range(2)})
+        for row in self.inputs[:64]:
+            for model in MATERIAL.SAMPLE_MODELS:
+                p=MATERIAL.sample_probability(tuple(map(MATERIAL.f32,MATERIAL.COLORS[row['texel']])),row['incoming'],model)
+                self.assertGreater(abs(MATERIAL.sample_draws(row['seed'])[0]-p),.03)
+                self.assertEqual(int(MATERIAL.sample_draws(row['seed'])[0]>=p),row['lobe'])
+
+    def test_normal_incidence_closed_form(self):
+        for row in self.inputs[:24]:
+            if row['direction']!=0: continue
+            a=MATERIAL.f32(MATERIAL.ROUGHNESS[row['texel']])**2
+            z=1-MATERIAL.sample_draws(row['seed'])[2]*2/(1+a*a)
+            # At normal incidence b=(1-a²)/(1+a²), so 1+b=2/(1+a²).
+            expected_z=(1+z-a*a*(1-z))/(1+z+a*a*(1-z))
+            got=MATERIAL.sample_direction(row['incoming'],MATERIAL.f32(MATERIAL.ROUGHNESS[row['texel']]),MATERIAL.sample_draws(row['seed']))
+            self.assertAlmostEqual(got[2],expected_z,places=13)
+            self.assertAlmostEqual(sum(v*v for v in got),1,places=13)
+
+    def test_selected_color_ratios(self):
+        for row,want in zip(self.inputs[:24],self.expected['float'][:24]):
+            if row['lobe']==0:
+                self.assertEqual(want[4],want[5]); self.assertEqual(want[5],want[6])
+            else:
+                color=MATERIAL.linear_color(tuple(map(MATERIAL.f32,MATERIAL.COLORS[row['texel']])))
+                for a,b in ((0,1),(1,2)):
+                    self.assertAlmostEqual(want[4+a]/want[4+b],color[a]/color[b],places=12)
+
+    def test_abi_packing(self):
+        self.assertEqual(MATERIAL.SAMPLE_INPUT.size,24); self.assertEqual(MATERIAL.SAMPLE_OUTPUT.size,32)
+        data=MATERIAL.SAMPLE_INPUT.pack(.25,.75,.3,.4,1,0xdeadbeef)
+        self.assertEqual(data[20:],b'\xef\xbe\xad\xde')
+        data=MATERIAL.SAMPLE_OUTPUT.pack(1,2,3,4,5,6,7,2)
+        self.assertEqual(data[28:],b'\x02\x00\x00\x00')
+
+    def test_each_coherent_model_passes(self):
+        for model in MATERIAL.SAMPLE_MODELS:
+            result=MATERIAL.sample_compare_outputs(self.encoded(model),self.expected)
+            self.assertEqual(result['status'],'passed')
+            self.assertIn(model,result['matching_global_models'])
+
+    def test_mixed_models_fail(self):
+        # A record-level model choice is forbidden even if both models explain some records.
+        data=bytearray(self.encoded())
+        for index in range(65):
+            if index%2:
+                data[index*32:(index+1)*32]=MATERIAL.SAMPLE_OUTPUT.pack(*self.expected['fma'][index])
+        self.assertEqual(MATERIAL.sample_compare_outputs(bytes(data),self.expected)['status'],'failed')
+
+    def test_nonfinite_wrong_flag_zero_and_tail_fail(self):
+        for index,component,value in ((0,0,math.nan),(0,3,math.inf),(0,4,0.),(0,7,0),(64,0,1e-30),(64,0,-0.)):
+            data=bytearray(self.encoded()); row=list(MATERIAL.SAMPLE_OUTPUT.unpack_from(data,index*32)); row[component]=value
+            MATERIAL.SAMPLE_OUTPUT.pack_into(data,index*32,*row)
+            self.assertEqual(MATERIAL.sample_compare_outputs(bytes(data),self.expected)['status'],'failed')
+        data=bytearray(self.encoded()); data[-1]=0
+        self.assertEqual(MATERIAL.sample_compare_outputs(bytes(data),self.expected)['status'],'failed')
+
+    def test_missing_outputs_or_expected_fail(self):
+        self.assertEqual(MATERIAL.sample_compare_outputs(self.encoded()[:-1],self.expected)['status'],'failed')
+        with self.assertRaises(ValueError): MATERIAL.sample_compare_outputs(self.encoded(),{'float':self.expected['float']})
+        missing_flags={model:[row[:7] for row in rows] for model,rows in self.expected.items()}
+        with self.assertRaises(ValueError): MATERIAL.sample_compare_outputs(self.encoded(),missing_flags)
+
+    def test_repeated_and_wrapped_records_are_exact(self):
+        for index in (24, 48, 52):
+            data=bytearray(self.encoded())
+            bits=struct.unpack_from("<I",data,index*32)[0]
+            struct.pack_into("<I",data,index*32,bits+1)
+            result=MATERIAL.sample_compare_outputs(bytes(data),self.expected)
+            self.assertTrue(result["matching_global_models"])
+            self.assertEqual(result["status"],"failed")
+
+    def test_sample_ptx_layout_and_wrong_entry(self):
+        text=""".target sm_80
+.const .align 8 .b8 SLANG_globalParams[168];
+.visible .entry sample_buffer() {
+ld.const.u64 %a, [SLANG_globalParams+80];
+ld.const.u64 %b, [SLANG_globalParams+128];
+mul.wide.s32 %c, %i, 24;
+ld.const.u64 %d, [SLANG_globalParams+144];
+shl.b64 %e, %i, 5;
+ld.const.u32 %f, [SLANG_globalParams+160];
+}"""
+        MATERIAL.validate_ptx(text,80,"sample_buffer")
+        with self.assertRaises(ValueError): MATERIAL.validate_ptx(text,80,"eval_buffer")
+        for broken in (text.replace(", 24;",", 40;"),text.replace("+144","+112"),
+                       text.replace(", 5;",", 4;"),text.replace("sample_buffer()","sample_buffer(.param .u64 p)")):
+            with self.assertRaises(ValueError): MATERIAL.validate_ptx(broken,80,"sample_buffer")
+
+    def test_sample_execution_evidence(self):
+        log="\n".join((
+            "cuda_header_version=12090 driver_api_version=13000 device_ordinal=0 device=NVIDIA L4 sm=89",
+            "texture=color handle_decimal=1 handle_hex=0x0000000000000001 low30_fit=true nonzero=true",
+            "texture=roughness handle_decimal=2 handle_hex=0x0000000000000002 low30_fit=true nonzero=true",
+            "execution launches=1 active=65 output_capacity=128 global_bytes=168 input_stride=24",
+            "cleanup=PASS"))
+        self.assertEqual(MATERIAL.validate_driver_log(log,"sample_buffer")["launches"],1)
+        with self.assertRaises(ValueError): MATERIAL.validate_driver_log(log,"eval_buffer")
+        for broken in (log.replace("input_stride=24","input_stride=40"),log.replace("cleanup=PASS","cleanup=FAIL"),
+                       log.replace("launches=1","launches=0")):
+            with self.assertRaises(ValueError): MATERIAL.validate_driver_log(broken,"sample_buffer")
+
+    def test_preparation_cannot_cross_entries(self):
+        modes=(("nvrtc",3),("nvvm",0),("nvvm",3))
+        report=dict(status="prepared",contract=MATERIAL.SAMPLE_CONTRACT,source={"source_sha256":"source"},
+                    cells=[dict(id=f"{backend}-o{optimization}",status="prepared",ptx_sha256="a"*64)
+                           for backend,optimization in modes])
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"reference.json"
+            path.write_text(json.dumps(report))
+            self.assertEqual(len(MATERIAL.reviewed_abi_hashes(path,"source",modes,"sample_buffer")),3)
+            with self.assertRaises(ValueError): MATERIAL.reviewed_abi_hashes(path,"source",modes,"eval_buffer")
+
+    def test_preparation_freezes_oracle_inputs_and_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"reference.json"
+            path.write_text(json.dumps({"oracle_sha256":"a"*64}))
+            MATERIAL.validate_oracle_hash(path,"a"*64)
+            for changed in ("b"*64,"", "invalid"):
+                with self.assertRaises(ValueError): MATERIAL.validate_oracle_hash(path,changed)
+            path.write_text("{}")
+            with self.assertRaises(ValueError): MATERIAL.validate_oracle_hash(path,"a"*64)
+
+    def test_early_rejection_exact_fields(self):
+        for model in MATERIAL.SAMPLE_MODELS:
+            self.assertEqual(self.expected[model][-1],(0.,)*7+(0,))
+
+
 if __name__ == "__main__":
     unittest.main()

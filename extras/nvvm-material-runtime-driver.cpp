@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: The Khronos Group, Inc.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Executes the fixed synthetic tiled-brass eval contract. Build with the selected CUDA headers;
-// loading the driver dynamically avoids introducing a CUDA dependency into Slang itself.
+// Executes the fixed synthetic tiled-brass eval and sample contracts. Build with the selected CUDA
+// headers; loading the driver dynamically avoids introducing a CUDA dependency into Slang itself.
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -149,6 +149,19 @@ struct EvalOutput
     Float3 value;
     float pdf;
 };
+struct alignas(8) SampleInput
+{
+    Float2 uv;
+    Float3 wi;
+    uint32_t seed;
+};
+struct SampleOutput
+{
+    Float3 outgoing;
+    float pdf;
+    Float3 weight;
+    uint32_t flags;
+};
 struct Material
 {
     uint32_t color, roughness;
@@ -161,7 +174,7 @@ struct Buffer
 struct Globals
 {
     Buffer inactiveLuts[5];
-    Buffer material, input, output, inactiveSampleInput, inactiveSampleOutput;
+    Buffer material, evalInput, evalOutput, sampleInput, sampleOutput;
     uint32_t count;
     uint32_t padding;
 };
@@ -170,9 +183,14 @@ static_assert(sizeof(Float3) == 12 && sizeof(Material) == 8 && sizeof(EvalOutput
 static_assert(sizeof(EvalInput) == 40 && alignof(EvalInput) == 8);
 static_assert(offsetof(EvalInput, wi) == 8 && offsetof(EvalInput, wo) == 20);
 static_assert(offsetof(EvalInput, seed) == 32);
+static_assert(sizeof(SampleInput) == 24 && alignof(SampleInput) == 8);
+static_assert(offsetof(SampleInput, wi) == 8 && offsetof(SampleInput, seed) == 20);
+static_assert(sizeof(SampleOutput) == 32 && offsetof(SampleOutput, pdf) == 12);
+static_assert(offsetof(SampleOutput, weight) == 16 && offsetof(SampleOutput, flags) == 28);
+static_assert(offsetof(Globals, sampleInput) == 128 && offsetof(Globals, sampleOutput) == 144);
 static_assert(sizeof(Globals) == 168 && alignof(Globals) == 8);
-static_assert(offsetof(Globals, material) == 80 && offsetof(Globals, input) == 96);
-static_assert(offsetof(Globals, output) == 112 && offsetof(Globals, count) == 160);
+static_assert(offsetof(Globals, material) == 80 && offsetof(Globals, evalInput) == 96);
+static_assert(offsetof(Globals, evalOutput) == 112 && offsetof(Globals, count) == 160);
 
 // Transfers one fixed-size artifact and rejects trailing bytes on every input.
 bool transferFile(const char* directory, const char* name, void* data, size_t size, bool write)
@@ -197,7 +215,13 @@ bool transferFile(const char* directory, const char* name, void* data, size_t si
     return ok;
 }
 
-int execute(Driver& driver, Resources& resources, const char* cubin, const char* directory)
+int execute(
+    Driver& driver,
+    Resources& resources,
+    const char* cubin,
+    const char* directory,
+    const char* entry,
+    bool sample)
 {
     int version = 0;
     char deviceName[256] = {};
@@ -236,12 +260,17 @@ int execute(Driver& driver, Resources& resources, const char* cubin, const char*
         return 2;
 
     float pixels[2][16];
-    EvalInput inputs[kActiveCount];
-    EvalOutput outputs[kOutputCount];
-    std::memset(outputs, kSentinel, sizeof(outputs));
+    // File payloads have the entry's proven packed ABI. The arrays reserve the maximum size;
+    // only the selected byte counts are uploaded, initialized, downloaded and written.
+    unsigned char inputs[kActiveCount * sizeof(EvalInput)];
+    unsigned char outputs[kOutputCount * sizeof(SampleOutput)];
+    const size_t inputStride = sample ? sizeof(SampleInput) : sizeof(EvalInput);
+    const size_t inputBytes = kActiveCount * inputStride;
+    const size_t outputBytes = kOutputCount * (sample ? sizeof(SampleOutput) : sizeof(EvalOutput));
+    std::memset(outputs, kSentinel, outputBytes);
     if (!transferFile(directory, "color.bin", pixels[0], sizeof(pixels[0]), false) ||
         !transferFile(directory, "roughness.bin", pixels[1], sizeof(pixels[1]), false) ||
-        !transferFile(directory, "inputs.bin", inputs, sizeof(inputs), false))
+        !transferFile(directory, "inputs.bin", inputs, inputBytes, false))
         return 2;
     bool allFit = true;
     for (int i = 0; i < 2; ++i)
@@ -295,7 +324,7 @@ int execute(Driver& driver, Resources& resources, const char* cubin, const char*
     // The source casts its low30 application handle directly to a CUDA texture object.
     // Narrow only after proving that the full opaque driver handle survives unchanged.
     Material material{uint32_t(resources.textures[0]), uint32_t(resources.textures[1])};
-    const size_t sizes[] = {sizeof(material), sizeof(inputs), sizeof(outputs)};
+    const size_t sizes[] = {sizeof(material), inputBytes, outputBytes};
     const void* hostData[] = {&material, inputs, outputs};
     for (int i = 0; i < 3; ++i)
     {
@@ -307,8 +336,10 @@ int execute(Driver& driver, Resources& resources, const char* cubin, const char*
     }
     Globals globals = {};
     globals.material = {resources.buffers[0], 1};
-    globals.input = {resources.buffers[1], kActiveCount};
-    globals.output = {resources.buffers[2], kOutputCount};
+    Buffer& input = sample ? globals.sampleInput : globals.evalInput;
+    Buffer& output = sample ? globals.sampleOutput : globals.evalOutput;
+    input = {resources.buffers[1], kActiveCount};
+    output = {resources.buffers[2], kOutputCount};
     globals.count = kActiveCount;
     CUdeviceptr symbol = 0;
     size_t symbolSize = 0;
@@ -318,7 +349,7 @@ int execute(Driver& driver, Resources& resources, const char* cubin, const char*
             driver.getGlobal(&symbol, &symbolSize, resources.module, "SLANG_globalParams"),
             "cuModuleGetGlobal") ||
         !driver.check(
-            driver.getFunction(&function, resources.module, "eval_buffer"),
+            driver.getFunction(&function, resources.module, entry),
             "cuModuleGetFunction"))
         return 2;
     if (symbolSize != sizeof(globals))
@@ -338,24 +369,32 @@ int execute(Driver& driver, Resources& resources, const char* cubin, const char*
             "cuLaunchKernel") ||
         !driver.check(driver.synchronize(), "cuCtxSynchronize") ||
         !driver.check(
-            driver.copyToHost(outputs, resources.buffers[2], sizeof(outputs)),
+            driver.copyToHost(outputs, resources.buffers[2], outputBytes),
             "cuMemcpyDtoH") ||
-        !transferFile(directory, "outputs.bin", outputs, sizeof(outputs), true))
+        !transferFile(directory, "outputs.bin", outputs, outputBytes, true))
         return 2;
     std::printf(
         "execution launches=1 active=%u output_capacity=%u global_bytes=%zu input_stride=%zu\n",
         kActiveCount,
         kOutputCount,
         symbolSize,
-        sizeof(EvalInput));
+        inputStride);
     return 0;
 }
 
 int main(int argc, char** argv)
 {
-    if (argc != 3)
+    if (argc != 4)
     {
-        std::fprintf(stderr, "Usage: material-driver shader.cubin artifact-directory\n");
+        std::fprintf(
+            stderr,
+            "Usage: material-driver shader.cubin artifact-directory eval_buffer|sample_buffer\n");
+        return 2;
+    }
+    const bool sample = std::strcmp(argv[3], "sample_buffer") == 0;
+    if (!sample && std::strcmp(argv[3], "eval_buffer") != 0)
+    {
+        std::fprintf(stderr, "Unknown material entry: %s\n", argv[3]);
         return 2;
     }
     static_assert(sizeof(CUtexObject) == sizeof(uint64_t));
@@ -366,7 +405,7 @@ int main(int argc, char** argv)
     int result = 2;
     {
         Resources resources{driver, cleanupOk};
-        result = execute(driver, resources, argv[1], argv[2]);
+        result = execute(driver, resources, argv[1], argv[2], argv[3], sample);
     }
     std::printf("cleanup=%s\n", cleanupOk ? "PASS" : "FAIL");
     return cleanupOk ? result : 2;

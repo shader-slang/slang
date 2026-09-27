@@ -330,12 +330,22 @@ These remaining proposals are not implemented support or authorization to resume
 work. Record-array admission would be a useful later test of the revised boundary.
 
 Material runtime qualification has a separate contract from compile/assembly and static resource
-measurements. The maintained tiled-brass validator runs the unchanged `eval_buffer` with two live
-synthetic textures and an independent scalar GGX/Fresnel/analytic-compensation oracle in all three
-modes. Its host driver uses installed CUDA headers, checks full texture handles against the
-application's low30 encoding, and packs the independently audited 168-byte global block and
-40-byte input records. A preparation run exposes fresh PTX for field/stride review; execution
-requires byte-identical PTX before launch. Positive finite outputs, repeated seeds, wrapped UVs
-and untouched tail sentinels are required. This contract does not qualify `sample_buffer`, original
-assets, LUT reads, arbitrary graph composition or performance. See
-[the validator](../../extras/validate-nvvm-material-runtime.py) and [commands](../../issue-nvvm-backend/RESULTS.md#material-runtime-correctness).
+measurements. The maintained tiled-brass validator runs the unchanged `eval_buffer` and
+`sample_buffer` with two live synthetic textures and independent scalar references in all three
+modes. One CUDA driver owns textures, buffers and cleanup; an explicit entry contract selects
+packing, inputs and output checks. Installed-header assertions and fresh PTX review establish the
+168-byte global block and input/output strides (40/16 for eval, 24/32 for sample). Execution requires
+byte-identical reviewed PTX and frozen oracle hashes. Full texture handles must fit the application's
+low30 encoding without truncation. Repeats, wrapped UVs and untouched tail sentinels are checked.
+
+Sampling returns selected-layer throughput, not the collapsed full-material eval/PDF estimator.
+Cancellation in the source's artistic-IOR calculation affects average Fresnel and selection weights.
+The sample oracle therefore has two independently derived source-arithmetic candidates, fixed before
+GPU execution. One candidate must explain every record in a mode within the unchanged residual
+budget; components cannot choose candidates independently. This finite qualification does not prove
+a unique generated instruction sequence or cover every legal optimization. Exact flags and an
+early-rejection zero record complement the numerical checks. The shared driver preserves eval's
+original inputs, oracle and tolerance. Original assets, live LUT reads, arbitrary graph/input
+composition, sampling-distribution accuracy and performance remain separate qualifications. See
+[the validator](../../extras/validate-nvvm-material-runtime.py) and
+[commands](../../issue-nvvm-backend/RESULTS.md#material-runtime-correctness).

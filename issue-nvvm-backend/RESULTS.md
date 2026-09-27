@@ -267,45 +267,59 @@ local commit and stop unless further work was explicitly authorized.
 
 ## Material runtime correctness
 
-The standalone material validator qualifies the unchanged registered `eval_buffer` with synthetic
-2×2 RGBA32F color/roughness textures, finite front-facing inputs and an independent scalar oracle.
-It does not change the compile-only scope of the complex-corpus runner. Native little-endian Linux,
-the selected CUDA headers, `c++` and a live GPU are required. Run the CPU contract tests first.
+The standalone material validator qualifies the unchanged registered eval and sample entries with
+synthetic 2×2 RGBA32F color/roughness textures and independent scalar references. It does not change
+the compile-only scope of the complex-corpus runner. Native little-endian Linux, selected CUDA
+headers, `c++` and a live GPU are required. Run CPU contracts first; select one entry per invocation
+and use fresh directories for every attempt.
 
 ```bash
 python3 issue-nvvm-backend/test-nvvm-material-runtime.py -v
+export NVVM_MATERIAL_ENTRY=eval_buffer # Repeat the protocol with sample_buffer.
 python3 extras/validate-nvvm-material-runtime.py \
   --slangc build/RelWithDebInfo/bin/slangc \
   --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so --cuda-root "$CUDA_PATH" \
-  --prepare-only --output "$NVVM_RESULTS/material-prepare"
+  --entry "$NVVM_MATERIAL_ENTRY" --prepare-only \
+  --output "$NVVM_RESULTS/material-$NVVM_MATERIAL_ENTRY-prepare"
 ```
 
-Before executing, review the fresh PTX in all three prepared modes: parameterless `eval_buffer`,
-168-byte align8 `SLANG_globalParams`, material/input/output/count offsets80/96/112/160,
-material handles0/4, input stride40 with UV0/4, wi8/12/16, wo20/24/28, seed32 (possibly dead),
-and output stride16 with value/PDF stores0/4/8/12. Confirm no live LUT reads for this fixed graph.
-The automatic checks cover symbols/strides, not arbitrary register dataflow; supplying the reviewed
-reference below asserts that this explicit layout review has been done. Fresh execution PTX must
-match each reviewed hash exactly. Verify the compiler/provider/modules/cache/toolkit identities
-against the current accepted identity and retain that provenance with the run.
+Before execution, review fresh PTX in all three prepared modes. Both parameterless entries use
+168-byte align8 `SLANG_globalParams`, material offset80 with uint32 handles0/4, and count160.
+The entry-specific layout is:
+
+| Entry         | Input / output descriptor | Input layout                                                   | Output layout                                     |
+| ------------- | ------------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| eval_buffer   | 96 / 112                  | stride40: UV0/4, wi8/12/16, wo20/24/28, seed32 (possibly dead) | stride16: value0/4/8, PDF12                       |
+| sample_buffer | 128 / 144                 | stride24: UV0/4, wi8/12/16, seed20                             | stride32: wo0/4/8, PDF12, weight16/20/24, flags28 |
+
+Confirm no live LUT reads for this fixed graph. Automatic checks cover symbols/strides, not arbitrary
+register dataflow; supplying the reviewed reference below asserts that this explicit review has been
+done. Fresh PTX and the oracle/input/tolerance hash must match preparation exactly. Verify the
+compiler/provider/modules/cache/toolkit identities and retain provenance with the run.
 
 ```bash
 python3 extras/validate-nvvm-material-runtime.py \
   --slangc build/RelWithDebInfo/bin/slangc \
   --provider build/RelWithDebInfo/bin/libslang-llvm-nvvm.so --cuda-root "$CUDA_PATH" \
-  --abi-reference "$NVVM_RESULTS/material-prepare/results.json" \
-  --output "$NVVM_RESULTS/material-execution"
+  --entry "$NVVM_MATERIAL_ENTRY" \
+  --abi-reference "$NVVM_RESULTS/material-$NVVM_MATERIAL_ENTRY-prepare/results.json" \
+  --output "$NVVM_RESULTS/material-$NVVM_MATERIAL_ENTRY-execution"
 ```
 
-Acceptance requires one real launch for each NVRTC O3/NVVM O0/O3 cell, 65 active records with all
-260 finite positive components within the frozen `1e-5 + 2e-4 * abs(reference)` tolerance, 63 unchanged
-guard records, identical seed repeats and wrapped-UV outputs, untruncated valid texture handles and
-successful cleanup. The oracle/inputs/tolerance are written before launch; preserve every failed
-attempt instead of fitting them to GPU outputs. `prepared` is compile/assembly only; only `passed`
-includes execution and comparison. This is correctness evidence, not a timing command. Original
-assets, live LUT reads, `sample_buffer`, arbitrary graphs and GPU performance remain unqualified.
-Update the existing material feature in focused evidence after independent review. Keep all raw
-outputs, snapshots and audit logs under the ignored results directory.
+Acceptance requires one real launch for each NVRTC O3/NVVM O0/O3 cell, 65 active records, 63 unchanged
+guards, repeat/wrapped-UV checks, untruncated texture handles and successful cleanup. Eval checks
+260 finite positive components against its scalar oracle. Sample checks 455 floats and 65 flags,
+including exact32-byte zero rejection. Both use the frozen `1e-5 + 2e-4 * abs(reference)` budget.
+Sample throughput is the selected layer's estimator, not full eval/PDF. Its two prequalified IOR
+rounding candidates account for source cancellation; one must explain all records in a mode.
+Never select models per component or widen tolerance after observing outputs. These are finite
+candidates, not an exhaustive account of allowed compiler arithmetic. Preserve unexplained failures.
+
+The oracle/inputs/tolerance are written before launch. `prepared` is compile/assembly only;
+`passed` additionally includes execution and comparison. This is correctness evidence, not a timing
+command. Original assets, live LUT reads, arbitrary graphs/inputs, sampling-distribution accuracy
+and GPU performance remain unqualified. Update the entry's existing focused feature after independent
+review, retaining failures. Keep raw outputs, snapshots and audit logs under ignored build paths.
 
 ## Documentation and evidence maintenance
 
