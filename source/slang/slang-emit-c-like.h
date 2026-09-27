@@ -347,7 +347,36 @@ public:
 
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
 
+    /// How an instruction is folded into the expressions of its users, as decided by its opcode,
+    /// type, and similar properties before the position of its uses is considered.
+    enum class FoldPolicy
+    {
+        /// The instruction is always emitted as a separate declaration or statement.
+        Never,
+        /// The instruction is emitted as part of each of its users, e.g. because its result
+        /// cannot be stored in a temporary on the target. A subclass override of
+        /// `shouldFoldInstIntoUseSites` may still decline to fold it, which only makes
+        /// `isSafeToFoldIntoUseSites` more conservative for its operands.
+        Always,
+        /// The instruction is folded if it has a single use and `isSafeToFoldIntoUseSites`
+        /// holds, along with the other conditions checked by `shouldFoldInstIntoUseSites`.
+        WhenSafe,
+    };
+
+    virtual FoldPolicy getFoldPolicy(IRInst* inst);
+
+    /// Return true if `inst` is emitted as part of the expressions of its users rather than as a
+    /// declaration of its own. Subclasses may override this to decline folding in more cases. An
+    /// instruction that a subclass must always fold should get `FoldPolicy::Always` from
+    /// `getFoldPolicy` instead, so that `isSafeToFoldIntoUseSites` follows it to its uses.
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst);
+
+    /// Return true if the expression for `inst` can be emitted at every point where its text
+    /// ends up when folded: each such point is later in the block of `inst`, no instruction that
+    /// might have side effects lies between, and none is an unconditional branch. Because a user
+    /// that is always folded is itself emitted at its own uses, the check follows such users to
+    /// the points where their text ends up.
+    bool isSafeToFoldIntoUseSites(IRInst* inst);
 
     void emitOperand(IRInst* inst, EmitOpInfo const& outerPrec)
     {
@@ -803,6 +832,14 @@ protected:
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
+    // Results of `isSafeToFoldIntoUseSites`, cached while a function body is being emitted and
+    // its IR cannot change. Without the cache, an always-folded instruction with many uses
+    // makes emission quadratic, because each use re-emits its operands and each operand
+    // rescans every use.
+    Dictionary<IRInst*, bool>* m_foldSafetyCache = nullptr;
+
+    bool isSafeToFoldIntoUseSitesImpl(IRInst* inst);
 
     // Rename entry point if target doesn't allow the name (e.g., 'main')
     virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);

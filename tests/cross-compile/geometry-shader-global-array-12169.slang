@@ -48,8 +48,9 @@ in triangle float4 coarseVecArray[3];
 // `v` receives both fields from the indexed input; the output reads position
 // from `v` and color from the whole-struct copy `[[S]] = v`, so both fields are
 // bound from input element to their matching output.
+// ARR_GLSL: [[II:_S[0-9]+]] = ii{{[0-9_]*}};
 // ARR_GLSL: [[V:v[0-9_]+]].position{{[0-9_]*}} = {{.*}}coarseArray_position{{[0-9_]*}}[ii{{[0-9_]*}}];
-// ARR_GLSL: [[V]].color{{[0-9_]*}} = {{.*}}coarseArray_color{{[0-9_]*}}[ii{{[0-9_]*}}];
+// ARR_GLSL: [[V]].color{{[0-9_]*}} = {{.*}}coarseArray_color{{[0-9_]*}}{{\[}}[[II]]{{\]}};
 // ARR_GLSL: [[S:[A-Za-z_0-9]+]] = [[V]];
 // ARR_GLSL: outputStream_position{{[0-9_]*}} = [[V]].position{{[0-9_]*}};
 // ARR_GLSL: outputStream_color{{[0-9_]*}} = [[S]].color{{[0-9_]*}};

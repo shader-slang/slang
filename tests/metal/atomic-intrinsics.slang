@@ -36,12 +36,14 @@ void computeMain(uint groupIndex : SV_GroupIndex)
     float val = 0.0f;
 
     // InterlockedAdd
-    //MTL: atomic_uint threadgroup*{{.*}}shareMemUI
+    //MTL: array<uint, int(4)> threadgroup* [[UI:_S[0-9]+]] = {{.*}}shareMemUI
+    //MTL: atomic_uint threadgroup*{{.*}}[[UI]]
     //LIB: call {{.*}}.atomic.local.add.u.i32
     InterlockedAdd(shareMemUI[idx], uint(1));
     val += shareMemUI[idx];
 
-    //MTL: atomic_int threadgroup*{{.*}}shareMemI
+    //MTL: array<int, int(4)> threadgroup* [[SI:_S[0-9]+]] = {{.*}}shareMemI
+    //MTL: atomic_int threadgroup*{{.*}}[[SI]]
     //LIB: call {{.*}}.atomic.local.add.s.i32
     InterlockedAdd(shareMemI[idx],  2);
     val += shareMemI[idx];

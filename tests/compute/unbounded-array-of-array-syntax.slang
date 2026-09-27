@@ -36,8 +36,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
     // CHECK: OpStore %{{.*}} %[[N4]]
     // CUDA: Array<RWStructuredBuffer<int>>  g_aoa_0;
-    // CUDA: globalParams_0->g_aoa_0[index_0 >> int(2)].GetDimensions
-    // CUDA: _S1[index_0 >> int(2)]
+    // CUDA: [[BASE:baseIndex_[0-9]+]] = index_0 >> int(2);
+    // CUDA: globalParams_0->g_aoa_0{{\[}}[[BASE]]{{\]}}.GetDimensions
+    // CUDA: _S1{{\[}}[[BASE]]{{\]}}
     int index = int(dispatchThreadID.x);
     
     int baseIndex = index >> 2;
