@@ -141,3 +141,10 @@ ledger preserves first-known and resolved histories with their original evidence
   [evidence](research-evidence.slice-284.json), [plan](plan.slice-284-original-array-size.md).
   Original N65536 O0 compiles; O3 also exceeds 120 seconds/4 GiB. This closes the missing control,
   not the general size limitation. Next: gated provider correction and full checkpoint.
+
+- Slice285: [nested-array store correction](report.slice-285-nested-array-stores.md),
+  [validation](runtime-validation.slice-285.json), [plan](plan.slice-285-nested-array-stores.md).
+  Conservative terminal-store alignment corrects root/wrapped/multidimensional NVVM copies without
+  unrolling arrays. Full1740 outcomes and all six material artifacts are preserved; native units add
+  one passing identity. NVRTC controls and large O3 compilation limits remain explicit. Next returns
+  to material generic-overload inference after the bounded correctness investigation.

@@ -2,82 +2,62 @@
 
 The development loop is **active**, resumed on 2026-09-26. Continue bounded reviewed local commits
 under [WORKFLOW](WORKFLOW.md); skip Slack, no push or system changes.
-[Slice279](report.slice-279-nested-records.md) qualifies nested internal FP8/BF16 records and corrects
-libNVVM's loss of padding in whole nested stores, also reproduced on previously supported integer
-records. Focused14 native/18 GPU cells pass. Reused independent source/material review finds no
-blockers. Read [HANDOFF](HANDOFF.md) and [RESULTS](RESULTS.md); history belongs in [HISTORY](HISTORY.md).
+[Slice285](report.slice-285-nested-array-stores.md) corrects padding loss in whole stores of arrays
+containing nested integer records. Root, wrapped and multidimensional regressions pass at NVVM O0/O3;
+NVRTC's three focused wrong-output controls remain open. Read [HANDOFF](HANDOFF.md) and [RESULTS](RESULTS.md).
+Historical evidence belongs in [HISTORY](HISTORY.md).
 
 ## Accepted baseline
 
-[Validation279](runtime-validation.slice-279.json) freshly preserves every accepted277 corpus outcome.
+[Validation285](runtime-validation.slice-285.json) freshly preserves every accepted279 main outcome.
 [Record contract](../docs/design/nvvm-substandard-record-contract.md) owns the qualified language domain.
 
-| Evidence                                          | Accepted279 result                                  |
+| Evidence                                          | Accepted285 result                                  |
 | ------------------------------------------------- | --------------------------------------------------- |
 | Selected cases / source files / mode cells        | 580 / 576 / 1,740                                   |
 | Frozen / discovery cells                          | 1,356 / 384                                         |
 | Outcomes                                          | 1,703 correct; 37 unresolved; 20 resolved histories |
-| Units / semantics                                 | 1,096 pass + 13 skip / 1,170 pass + 78 skip         |
+| Units / semantics                                 | 1,097 pass + 13 skip / 1,170 pass + 78 skip         |
 | Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                     |
-| Last full / targeted / implementations since full | 279 / 233 / 0                                       |
+| Last full / targeted / implementations since full | 285 / 233 / 0                                       |
 
-All576 main input hashes and22 dependency pins are unchanged. All1103 prior unit identities and1248
-semantic identities are preserved; six new units pass. Two exhaustive279 GPU fixtures remain outside
-the main corpus, as do focused268/270 fixtures and breadth271/278 probes. Discovery stays at128 sources.
+All576 main input hashes and22 dependency pins are unchanged. All1109 prior unit identities and1248
+semantic identities are preserved; one new unit passes39 shape/alignment cases. Focused6units,
+24nativeGPU,6flat-neighbor cells and2direct-vendor promotion cells pass. Three new GPU fixtures remain
+outside the main corpus, alongside earlier focused probes. Discovery stays at128 sources.
 [Corpus269](report.slice-269-corpus-enumeration.md) retains its inventory snapshot and coverage limits.
 
-Qualified source: `0043e8d17dc1a49870c7eeb652dbfad21562378f` plus compiler/provider/test patch
-`62ae64735b12f5777c4c2789dd0beef44d5835480c6b3b6af0a1eb0b31208f64`, version
-`2026.18.3-295-g0043e8d17`. Loaded compiler SHA256:
-`9e013b2c27f8f467af781a54177138dcdda1c15e0c09cc557d428c21b72065ba`.
-Provider ABI42, SHA256 `a861b242b2eb730448a5c1afa3780eed9804412edb55574675ccaa6ebfcb428d`.
+Qualified source: `8fbf0f84e` plus compiler/provider/test patch
+`12f503e9802014f667dcfe2a3224a892c26a567dc7af3999888fa997ef8cc7f5`, version
+`2026.18.3-301-g8fbf0f84e`. Loaded compiler SHA256:
+`624691257742cd8bff21c6c10b5777c50372785f2e6c21c6133128a2343b1d2c`.
+Provider ABI42, SHA256 `af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4`.
 The launcher hash alone is not compiler identity. Qualified layout is `build/RelWithDebInfo`; all37
-runtime identities are retained in validation279. Verified277 recovery is under
-`build/nvvm-nested-records279/accepted277-layout`; raw279 evidence is beside it.
+runtime identities are retained in validation285. Verified279 recovery is under
+`build/nvvm-nested-array-stores285/accepted279-layout`; raw285 evidence is beside it.
 
 ## Results, limits and next action
 
 Three column-major host-packing mismatches and34 infrastructure/preflight gaps remain unchanged.
-Nested support retains local/value roles; arrays, readonly/device/shared/exported signatures and
-BF3/BF4 whole values gain no new support. The provider splits direct nested structs; array subtrees
-remain opaque. Both nested cache visitation orders and packed structs are not newly qualified;
-synthetic Generic pointer-result exclusion remains source-reviewed.
+Provider direct-struct splitting remains; terminal arrays containing nested struct boundaries use a
+truthful alignment1 guarantee. Canonical values, allocation/load alignment, authored LLVM signatures
+and ABI42 are preserved. No new FP8/BF16 record-array admission or device/shared/readonly/exported roles.
+General packed/address-space and nested cache-order qualification remain limited by the contract.
 
-Material NVRTC/O3 PTX and cubins are byte-identical277. TwoO0 artifacts change through field-store
-expansion; independent review accepts those changes with all parsed resources equal. Material GPU
-binding/input/output contracts remain unavailable; no runtime or performance claim. PCH277 ownership
-and research278 language evidence retain their original identities and limits.
+All six material PTX/cubin pairs and parsed resources are byte-identical279. Material GPU binding,
+texture/LUT/input and expected-output contracts remain unavailable; no runtime or performance claim.
+Earlier PCH277 and language-breadth evidence retain their original identities and limits.
 
-[Research280](report.slice-280-array-record-stores.md) finds a preexisting padding-loss bug in whole
-arrays of nested integer records: seven of nine focused cells pass; NVRTC O3 and NVVM O3 fail the
-nested-array case. A separate fresh-source out-copy diagnostic fails both optimized paths at the same
-child-field offset; NVVM O0 passes. Accepted277 reproduces the defect. These failures remain outside
-the main corpus and explicitly open; accepted279 compiler/corpus identities are unchanged.
+Research280–284 isolated the array defect and rejected expanding typed copy helpers. Slice285 closes
+its bounded NVVM correction with independent constructed/snapshot/phi/unaligned and actual Slang
+oracles. NVRTC optimized copies still return wrong37 in all three new fixtures. Original and candidate
+N65536 O3 modules both exceed120seconds/4GiB; no identical-cause or general scalability claim.
+First nine285 fixture syntax failures and five dependent unrun cells remain recorded.
 
-[Prototype281](report.slice-281-array-copy-prototypes.md) finds three passing small-copy remedies:
-pointer memcpy, pointer field loops (both backends), and a typed NVVM noinline/optnone store helper.
-Pointer IR stays compact at65536elements, but local storage grows; large modules were never launched.
-All23attempts (six declaration failures retained) yield17effective cells:9correctGPU,2failing controls,
-6compile-only. No production change; full279/targeted233/cadence0 remains inherited.
-
-[Gate282](report.slice-282-ssa-copy-boundary.md) qualifies the small helper for constructed/phi/earlier-load
-values and realalignment1/canaries, but rejects it as a general correction: N17caller ABI expands,
-N65536O0 times out at120seconds under4GiB, and O3 is explicitly not run after that size-gate failure.
-No arbitrary cutoff or fallback is selected; accepted279 remains unchanged.
-
-[Gate283](report.slice-283-array-store-alignment.md) fixes both small NVVM reproducers by changing only
-whole-store alignment4→1 on actualaligned4 roots. Four candidateGPU cells pass; originalO3 controls
-retain wrong14/9234. N17both modes andN65536O0 compile; N65536O3 times out120s/4GiB. Source signatures
-stay unchanged, but downstream argument promotion remains. General size qualification is incomplete.
-
-[Control284](report.slice-284-original-array-size.md) supplies that comparison: original N65536 O0
-compiles and O3 also times out under the same bounds. The size gate fails without the annotation;
-matching timeouts do not establish identical causes or general scalability. All accepted identities
-remain unchanged.
-
-Next: a bounded provider correction, gated first on constructed/snapshot/phi/unaligned values, then
-wrapped/multidimensional Slang fixtures and the full checkpoint. Keep existing direct-struct splitting;
-use conservative alignment only where nested struct boundaries remain inside array stores. No size
-cutoff or new ABI. NVRTC's production defect stays open.
+Next: return to material-driven work with a bounded investigation of generic overload inference.
+The inheritance-cache lead closed in274: all6230 canonical keys were computed once. Use273 stack
+samples as a lead, not fresh timing evidence; establish concrete call sites, candidate outcomes and
+complete semantic context before considering an optimization. No speculative cache or custom equality.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
-max4CPU workers,2unit servers, serialized suites. Accepted279 local commit46e58db06.
+max4CPU workers,2unit servers, serialized suites. Independent final review accepts285 with no
+findings; the local commit closes this slice before the next bounded plan.

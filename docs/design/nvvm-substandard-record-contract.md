@@ -72,8 +72,8 @@ remain governed by the leaf contracts; raw transport does not grant NaN-payload 
 
 ## Nested store padding
 
-The physical provider splits stores at direct nested-struct boundaries while retaining flat struct,
-array, scalar and vector stores. Installed libNVVM12.9 miscompiles valid whole nested stores by combining
+The physical provider splits stores at direct nested-struct boundaries while retaining whole array,
+flat struct, scalar and vector stores. Installed libNVVM12.9 miscompiles valid whole nested stores by combining
 narrow fields across padding. For `{uint16_t prefix; Child child;}` with
 `Child {uint16_t first; uint last;}`, fields at byte0/4 must not become a contiguous uint16x2 store.
 The same defect reproduces for already-supported integer records, independently of FP8/BF16.
@@ -82,9 +82,27 @@ Provider `_emitStore` validates the original operation before constructing canon
 addresses/extractions. LLVM DataLayout determines field offsets, and commonAlignment derives each
 field's guarantee from the actual parent alignment. Canonical Slang/LLVM aggregate types, ABI42,
 allocation layouts and whole-value loads/transport remain unchanged. This is a bounded target compiler
-workaround, not a semantic representation repair. Root arrays and array subtrees stay opaque; no new
-claim covers arbitrary array-nested layouts. Packed structs are not constructed by the current provider
-API. The change may alter generated code; no compile-speed or GPU performance claim follows.
+workaround, not a semantic representation repair. Root arrays and array subtrees stay opaque.
+
+[Slice285](../../issue-nvvm-backend/report.slice-285-nested-array-stores.md) extends the physical store
+correction to nested struct boundaries hidden inside those arrays. At a terminal whole store,
+`_containsNestedStructLayout` follows canonical array element and struct member types, stopping at
+pointers. If an immediate struct-in-struct boundary remains, the store receives the conservative
+alignment guarantee of one byte. Allocation/load alignment, the stored SSA value and authored LLVM signatures stay
+unchanged. A saved value remains valid even after its source storage changes; no source reread is used.
+Array length does not expand provider instructions, and flat-record arrays retain their alignment.
+
+Three integer GPU fixtures qualify root arrays, guarded wrappers and multidimensional wrappers, each
+with independent field expectations over all 65,536 low16-bit patterns, fresh out copies, saved values
+and both return choices. NVVM O0/O3 pass; NVRTC's separate optimized copy defect remains open. A direct
+LLVM annotation-only gate additionally checks constructed/phi values and real alignment-one storage
+with canaries. Native serialization tests cover 39 shape/alignment combinations, including 65,536
+nested elements represented by one store. This does not admit previously rejected FP8/BF16 record
+arrays or establish arbitrary packed/address-space forms. Both original and annotation-only large
+O3 modules exceed the same 120-second/4 GiB compile bound; no large GPU execution is claimed.
+
+Packed structs are not constructed by the current provider API. Conservative alignment can change
+copy instruction width and generated code; no compile-speed or GPU performance claim follows.
 
 The nested fixture checks all65536 scalar bit patterns, both branch results and both BF2
 component indices across three record depths. Its integer-only sibling exercises the provider issue

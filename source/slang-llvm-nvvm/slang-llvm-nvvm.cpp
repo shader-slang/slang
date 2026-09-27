@@ -629,6 +629,26 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
     return SLANG_OK;
 }
 
+// Returns whether a stored aggregate contains a struct with an immediate struct field.
+// For example, [3 x { i16, { i16, i32 } }] qualifies, while [3 x { i16, i32 }] does not.
+// Array elements are inspected once regardless of the array length; pointer pointees are not
+// part of the stored value. The terminal-store caller has already split direct struct fields,
+// so any remaining nested boundary is hidden inside an array.
+static bool _containsNestedStructLayout(llvm::Type* type)
+{
+    if (auto arrayType = llvm::dyn_cast<llvm::ArrayType>(type))
+        return _containsNestedStructLayout(arrayType->getElementType());
+    if (auto structType = llvm::dyn_cast<llvm::StructType>(type))
+    {
+        for (auto fieldType : structType->elements())
+        {
+            if (fieldType->isStructTy() || _containsNestedStructLayout(fieldType))
+                return true;
+        }
+    }
+    return false;
+}
+
 // Preserves nested struct padding when libNVVM lowers aggregate stores. Consider these LLVM types:
 //
 //     Inner = { i8, i32 }
@@ -636,8 +656,8 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
 //
 // The two i8 fields occupy offsets zero and four. The installed libNVVM optimizer can combine
 // a whole Outer store into adjacent byte stores, losing that nested boundary. Select fields with
-// LLVM's canonical type and layout before handing the operation to libNVVM. Flat structs, vectors
-// and arrays retain ordinary stores; in particular, this does not expand potentially huge arrays.
+// LLVM's canonical type and layout before handing the operation to libNVVM. Arrays retain one
+// whole store, so their size never expands the provider-emitted instruction count.
 static void _emitStorePreservingNestedStructLayout(
     ModuleState* state,
     llvm::Value* value,
@@ -659,6 +679,12 @@ static void _emitStorePreservingNestedStructLayout(
     }
     if (!hasStructField)
     {
+        // Consider an array of Outer from the example above. Its whole SSA value and physical
+        // layout are already correct, but libNVVM can lose the nested padding when lowering an
+        // aligned aggregate store. A one-byte guarantee preserves that padding without expanding
+        // the array or rereading a source pointer that may have changed since the value was loaded.
+        if (_containsNestedStructLayout(value->getType()))
+            alignment = llvm::Align(1);
         state->builder.CreateAlignedStore(value, pointer, alignment);
         return;
     }
