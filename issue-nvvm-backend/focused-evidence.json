@@ -6165,6 +6165,193 @@
         "No new IR representation, compiler pass, provider API or pointer compatibility fallback.",
         "Older material timings and other focused qualifications retain their original source/binary identities."
       ]
+    },
+    "material-dielectric-eval-pdf": {
+      "status": "accepted-focused-gpu",
+      "contract": "Imported dielectric runtime reflection/transmission evaluation and PDFs with no compensation; unchanged compiler and material library.",
+      "source": {
+        "path": "tests/cuda/nvvm-material-dielectric.slang",
+        "sha256": "f23d33fe146dca983878861f59f147c7e3039b1c1e0cf535b1f4d62ab30bc998"
+      },
+      "imported_source": {
+        "path": "tests/cuda/complex/tiled_brass_material.slang",
+        "sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92"
+      },
+      "compiler_identity": {
+        "revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
+        "patch_sha256": "3a1a750089b782f3486c0ac6afac2e50a28157f2f95831dfd9246e0dffa06453",
+        "version": "2026.18.3-326-gcef0ffbdf",
+        "provider_abi": 42,
+        "runtime_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d"
+        },
+        "unchanged_layout": {
+          "path": "build/nvvm-material-dielectric/identity-verification.json",
+          "sha256": "083b8c618b0d0bbc8cd0f37ea9d400101ee713f5ffa88695e71f399a7c94d659"
+        }
+      },
+      "input_contract": {
+        "incoming": [0, 0, 1],
+        "alpha": [0.5, 0.25],
+        "eta": 2,
+        "reflection_tint": [0.25, 0.5, 0.75],
+        "transmission_tint": [0.75, 0.25, 0.5],
+        "normal_queries": 8,
+        "off_axis_queries": 4,
+        "off_axis_directions": "normalize((3,0,+/-4)), normalize((0,3,+/-4))",
+        "scatter_modes": "Normal R-only, T-only, combined and neither; off-axis combined. Disabled tint is zero.",
+        "parameters_from_runtime_buffers": true
+      },
+      "oracle": {
+        "method": "Independent Snell amplitudes, ellipsoidal anisotropic GGX/Smith geometry and weighted-half-vector Jacobian; normal closed forms separately cross-check.",
+        "normal_fresnel": "1/9",
+        "normal_ndf": "8/pi",
+        "normal_transmission_jacobian": 4,
+        "bounded_density_ratio": "17/16",
+        "absolute_tolerance": 1e-6,
+        "relative_tolerance": 1e-5,
+        "disabled_cases_exact_zero": 4,
+        "pre_observation_freeze": {
+          "path": "build/nvvm-material-dielectric/full-before-gpu-freeze.json",
+          "sha256": "32e4df27c93314167b08628beb42acba26503343c3da4e8eda245e8e5265ca74"
+        },
+        "numeric_reference": {
+          "path": "build/nvvm-material-dielectric/review/independent-oracle.json",
+          "sha256": "2e7ada1f33254d8e39be6bf80773dacfa09c1b64b38235fed8fafddc2f0382b4"
+        },
+        "design": {
+          "path": "build/nvvm-material-dielectric/review/oracle-design.md",
+          "sha256": "9c2344978a39d0fd615cd61f2ce933d70b4c55ae8d8bd9c162dfffb07cf66aa3"
+        },
+        "cpu_rounding_model_max_budget_fraction": 0.018007391840496583,
+        "mutants": "Six density/probability/Jacobian/tint/roughness corruptions exceed614 budgets; zero/constant-record outputs also rejected.",
+        "raw_format": "48 IEEE Float32 encodings as uint32, completion12, untouched DEADBEEF guard.",
+        "normal_probe_limit": "Initial four-query float output has six decimal places; full12 evidence uses exact bit readback."
+      },
+      "cells": [
+        {
+          "mode": "nvrtc-o3",
+          "classification": "correct",
+          "executed": 1,
+          "permanent_output": [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3735928559
+          ],
+          "permanent_output_sha256": "7968225689a3da6a8e1f8828367ad003318765f098fecc449c48cd393acbd35f",
+          "raw_output_sha256": "1001c4affafa9d4d70afb8d94bedfca59a184750780ba55b3fefb8c84f212b99",
+          "checked_float_components": 48,
+          "max_budget_fraction": 0.018007391840496583,
+          "ptx_sha256": "e83c870c6b161fd95f77d19dba119b425b8a0e19fc7ca94b513f5feb3fa0b062",
+          "cubin_sha256": "17f3636e92a77caec9d37883ef295cfec1001d2fe7fde28e4e6790bf5750f5b5"
+        },
+        {
+          "mode": "nvvm-o0",
+          "classification": "correct",
+          "executed": 1,
+          "permanent_output": [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3735928559
+          ],
+          "permanent_output_sha256": "7968225689a3da6a8e1f8828367ad003318765f098fecc449c48cd393acbd35f",
+          "raw_output_sha256": "1001c4affafa9d4d70afb8d94bedfca59a184750780ba55b3fefb8c84f212b99",
+          "checked_float_components": 48,
+          "max_budget_fraction": 0.018007391840496583,
+          "ptx_sha256": "e457d920d6c4d56adf5160bbba8d7e562c928936b46b3827177c1392ff19e99a",
+          "cubin_sha256": "69e2c66e28116f9e0c02c85249a380b99ec25d04f693788eadf7e010514ae575"
+        },
+        {
+          "mode": "nvvm-o3",
+          "classification": "correct",
+          "executed": 1,
+          "permanent_output": [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3735928559
+          ],
+          "permanent_output_sha256": "7968225689a3da6a8e1f8828367ad003318765f098fecc449c48cd393acbd35f",
+          "raw_output_sha256": "1001c4affafa9d4d70afb8d94bedfca59a184750780ba55b3fefb8c84f212b99",
+          "checked_float_components": 48,
+          "max_budget_fraction": 0.018007391840496583,
+          "ptx_sha256": "a60e61fb367e9a5297991194ba551806d12508e2bcd5b1a38b8b4fd0e95d7915",
+          "cubin_sha256": "3d8e5462e65a323fed352a84b4f50f19f526e4819d87996a6d03e7ab67e594e0"
+        }
+      ],
+      "regressions": {
+        "neighbor_gpu_cells": 12,
+        "material_runtime_cells": 12,
+        "material_compile_assembly_cells": 6,
+        "main_baseline": "Unchanged1740 cells; no full checkpoint rerun or outcome relabeling.",
+        "independent_preservation_review": {
+          "path": "build/nvvm-material-dielectric/review/regressions.json",
+          "sha256": "1c99a86eb7972de5dbea41f0a0d3cef7c43e3cc8e1a94b609dc9d45efea47729"
+        }
+      },
+      "provenance": {
+        "source_audit": {
+          "path": "build/nvvm-material-dielectric/review/fixture-source-audit.json",
+          "sha256": "1dd2deaab6e17465776818812ec23514885eebf45437adfe0126c1fcb6d888cd"
+        },
+        "raw_numeric_review": {
+          "path": "build/nvvm-material-dielectric/review/full-numeric.json",
+          "sha256": "96baed80d452ce3171278ac584a6f89a672522c740223499b8a906528e9e803c"
+        },
+        "dataflow_review": {
+          "path": "build/nvvm-material-dielectric/review/full-dataflow.json",
+          "sha256": "a312f1b60dfccb63c19267c2cb02c83a7098cee89f87803b09657bc5a7434165"
+        },
+        "normal_outcomes": {
+          "path": "build/nvvm-material-dielectric/normal-outcomes.json",
+          "sha256": "2c78f06e0529501fcf94f6f2114f7de539c23800b1af70a9271b5f9b57b3bdca"
+        },
+        "raw_outcomes": {
+          "path": "build/nvvm-material-dielectric/full-raw-outcomes.json",
+          "sha256": "bdbbe86dcfba6a7fd10b9288eb2f80f233958faf66a4402b3318684a3e3420a0"
+        },
+        "permanent_outcomes": {
+          "path": "build/nvvm-material-dielectric/permanent-outcomes.json",
+          "sha256": "6e6530eb096b09302dc4f78ad29ca18b18abc94b5db5c348f145ff4d0b28c4f3"
+        },
+        "permanent_gpu_gate": {
+          "path": "build/nvvm-material-dielectric/permanent-gpu-0.json",
+          "sha256": "30464fcb0526f0838aa3d9ad285a1209ea068a7591b5a35c424ab0756f0ceef5"
+        },
+        "raw_gpu_gate": {
+          "path": "build/nvvm-material-dielectric/full-raw-gpu-0.json",
+          "sha256": "15eb20de2bccdd4f7f9396e4f99dab89ae5ede245dd54f6bbfda8ac23da3fc6d"
+        },
+        "normal_dataflow": {
+          "path": "build/nvvm-material-dielectric/review/normal-dataflow.json",
+          "sha256": "1369448488956202a465b3c79649b0675b6310194e43a56c896c990eee2f0e98"
+        },
+        "permanent_artifact_snapshots": {
+          "path": "build/nvvm-material-dielectric/permanent-artifacts.json",
+          "sha256": "bad187c734d4118c70158b57fc1e8304e24be6fe9e2381ea0ce24bce5087b8c8"
+        }
+      },
+      "failure_history": [
+        {
+          "attempt": "normal-gpu-0",
+          "classification": "missing-execution",
+          "return_code": 0,
+          "resolution": "Relative exact-file selector normal-gpu-1 executes3 modes; original absolute selector ran0 tests.",
+          "gate": {
+            "path": "build/nvvm-material-dielectric/normal-gpu-0.json",
+            "sha256": "6e49477ad26b999256f2265d90e19605608393317352a4875d78e4c84e591bd9"
+          },
+          "log": {
+            "path": "build/nvvm-material-dielectric/normal-gpu-0.log",
+            "sha256": "9165506fc62a4fae44ed970992060ce60181edfbd287fa5ed4d54f01aecd8350"
+          }
+        },
+        {
+          "attempt": "initial-full-raw-cpu-parser",
+          "classification": "audit-parser-header-mismatch",
+          "resolution": "Parser required uint header; actual renderer spelling is uint32_t. Corrected exact header parsing; unchanged source/outputs pass, no GPU rerun or tolerance change."
+        }
+      ],
+      "limits": [
+        "Twelve selected smooth front-side queries only; no sampling distribution, RNG or BSDFContext behavior claim.",
+        "No TIR, backside, absorption, retroreflection, compensation/LUT, arbitrary inputs, original asset or performance qualification.",
+        "Registered graph remains reflection-only; this fixture invokes an existing public library policy.",
+        "No production compiler/provider/module/driver changes; all previous focused evidence retains original identities."
+      ]
     }
   }
 }

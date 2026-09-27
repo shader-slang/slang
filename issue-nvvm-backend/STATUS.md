@@ -27,7 +27,7 @@ identities; older timing results have not been remeasured under this compiler.
 | Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                                                    |
 | Material runtime                                  | 12 cells pass across default/filtering profiles; 65 records and 63 guards per cell |
 | Runner contracts                                  | 97 pass, 1 inherited skip                                                          |
-| Last full / targeted / implementations since full | record-array-parameters / record-array-parameters / 0                              |
+| Last full / targeted / implementations since full | record-array-parameters / material-dielectric / 1                                  |
 
 Compiler source: `cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd` plus patch
 `3a1a750089b782f3486c0ac6afac2e50a28157f2f95831dfd9246e0dffa06453`; version `2026.18.3-326-gcef0ffbdf`.
@@ -40,6 +40,10 @@ The direct static tests use a separately pinned compiler with the same productio
 Both material profiles and the separate imported mini-LUT fixture are included in fresh correctness
 regressions. Original full corpus inputs/outcomes and all old native/semantic identities are preserved;
 older device-event measurements retain their original compiler identity.
+A subsequent fixture-only dielectric qualification passes three modes over 12 queries, with exact
+raw float readback, 12 neighboring GPU cells, six material compile/assembly cells and 12 material
+runtime cells. Compiler/layout and the full baseline are unchanged; raw artifacts are under
+`build/nvvm-material-dielectric/`.
 
 ## Boundaries and next action
 
@@ -62,8 +66,11 @@ older device-event measurements retain their original compiler identity.
   Prior device-event measurements, eval local-store deletion control and dynamic-index source
   reduction retain their tested compiler identities. They explain a bounded synthetic eval gap,
   without justifying a production PTX deletion or changing receiver-copy semantics. A separate imported
-  mini-LUT fixture qualifies synthetic table interpolation and compensation for 12 queries in all three modes. The registered graph remains analytic; original assets, larger
-  LUT families, arbitrary inputs and application performance remain open.
+  mini-LUT fixture qualifies synthetic interpolation and compensation. A separate dielectric fixture
+  qualifies reflection/transmission values and PDFs for 12 selected queries, including disabled modes
+  and anisotropic directions. The registered graph remains analytic and reflection-only. Sampling
+  distributions, TIR/backside behavior, original assets, larger LUT families, arbitrary inputs and
+  application performance remain open.
 - Select the next bounded workload-driven capability through the existing checked type/address
   boundaries. Array reference and result roles remain separate decisions; do not broaden generic helper
   predicates from internal value-parameter evidence. Further vendor optimization research is secondary.

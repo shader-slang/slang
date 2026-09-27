@@ -155,6 +155,15 @@ independent rational oracle, exact zero-knot bits, completion and a guard. The t
 Fresnel is fixed; original assets, larger LUT families and LUT execution in the registered analytic
 graph remain unqualified. This fixture uses the standard renderer, with no material-driver change.
 
+The [imported dielectric fixture](../../tests/cuda/nvvm-material-dielectric.slang) separately qualifies
+runtime reflection/transmission evaluation and PDFs with the existing no-compensation policy.
+Twelve queries cover normal combined/single/disabled modes and off-axis anisotropic x/y directions.
+Independent geometric equations check 48 float components per mode; raw IEEE readback and permanent
+finite/error masks, exact disabled zeros, completion and guard pass all three modes. The fixed budget
+is `1e-6 + 1e-5*abs(expected)`. This does not qualify sampling, TIR, backside handling, absorption,
+retroreflection, compensation, arbitrary inputs or performance. The registered graph remains
+reflection-only; its code and assets are unchanged.
+
 Material-derived aggregate/indexing coverage also runs through Slang in all three modes. The
 [bounded and literal controls](../../tests/cuda/nvvm-aggregate-index-material.slang) retain initialized
 unused fields, a receiver snapshot and a nested stack copy. A separate
