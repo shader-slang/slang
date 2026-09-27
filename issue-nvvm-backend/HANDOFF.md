@@ -28,12 +28,18 @@ Skip Slack; no push or system changes.
 8. All six material PTX/cubins and parsed resources equal279. Material runtime lacks binding/input/
    output contracts; no speed claim. Original and candidate large N65536 O3 stores both time out at
    120seconds/4GiB; no largeGPU launch or identical-cause claim. Research280–284 stays separately recorded.
-9. Next material lead: generic overload inference identified by273 stacks. Inheritance memoization
-   was observed in274 and closed without an optimization: each6230canonical key computed once.
-   Start with concrete material call sites, candidate outcomes and full semantic context; preserve
-   accepted285 bytes/output controls for any observer. No speculative cache or custom type equality.
-10. Prefer fresh bounded delegation and separate review. Slice285 independent final review accepts
-    the source and all evidence with no findings. Skip Slack and continue the authorized loop.
+9. [Research286](report.slice-286-generic-inference-observation.md) records eight main observations
+   (7,995inferences/95,295rows each),21 strict duplicate pairs and broader overload-screening frequency
+   leads. No safe cache/pruning or CPU-cost claim. All six material artifacts and1110/1248 native IDs
+   are exact285. The observer is removed;100layout/37runtime/11source/2config/576inputs/22pins restored.
+   Recovery and observer binaries are under `build/nvvm-generic-inference286`. Before production
+   rebuild, refresh cached version metadata; restored source mtimes force observer objects to rebuild.
+10. Next: bounded nested FP8/BF16 dynamic dispatch, joining flat270 AnyValue and nested279 domains.
+    Require independently constructed payload/raw-bit oracles and evidence that dynamic calls plus
+    packing/unpacking survive. No array/device/readonly/exported expansion. Write a bounded plan first.
+11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
+    spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
+    Skip Slack and continue the authorized loop.
 
 [HISTORY](HISTORY.md) owns earlier evidence. [Record contract](../docs/design/nvvm-substandard-record-contract.md)
 separates local FP8/BF16 record admission from the integer-array store correction. Earlier timing

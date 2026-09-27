@@ -54,10 +54,17 @@ oracles. NVRTC optimized copies still return wrong37 in all three new fixtures. 
 N65536 O3 modules both exceed120seconds/4GiB; no identical-cause or general scalability claim.
 First nine285 fixture syntax failures and five dependent unrun cells remain recorded.
 
-Next: return to material-driven work with a bounded investigation of generic overload inference.
-The inheritance-cache lead closed in274: all6230 canonical keys were computed once. Use273 stack
-samples as a lead, not fresh timing evidence; establish concrete call sites, candidate outcomes and
-complete semantic context before considering an optimization. No speculative cache or custom equality.
+[Material286](report.slice-286-generic-inference-observation.md) observes7,995 generic inferences per
+run with21 strict extra events. All eight main PTX outputs and six PTX/cubin/resource controls equal285;
+all1110unit/1248semantic identities are preserved. Broader overload screening is a count-based lead,
+not a safe optimization or CPU-cost result. The temporary observer is removed; installed285 layout,
+source/configuration/inputs/pins are exact. Recovery and experimental bytes remain under
+`build/nvvm-generic-inference286`. Before a production rebuild, refresh version metadata and rebuild
+the restored observer source files; their mtimes are newer than experimental objects.
+
+Next: bounded nested FP8/BF16 dynamic-dispatch qualification, connecting flat270 AnyValue transport
+with nested279 local/value records. Require actual dynamic packing/unpacking and independent raw-bit
+oracles; preserve Natural payload packing separately from CUDA local layout. No new array/device/
+readonly/exported roles. The material screening lead remains documented for later producer work.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
-max4CPU workers,2unit servers, serialized suites. Independent final review accepts285 with no
-findings; the local commit closes this slice before the next bounded plan.
+max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation and286 restored research with no findings.

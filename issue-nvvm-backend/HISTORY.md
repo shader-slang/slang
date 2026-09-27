@@ -148,3 +148,9 @@ ledger preserves first-known and resolved histories with their original evidence
   unrolling arrays. Full1740 outcomes and all six material artifacts are preserved; native units add
   one passing identity. NVRTC controls and large O3 compilation limits remain explicit. Next returns
   to material generic-overload inference after the bounded correctness investigation.
+
+- Research286: [material generic inference](report.slice-286-generic-inference-observation.md),
+  [evidence](research-evidence.slice-286.json), [plan](plan.slice-286-generic-inference-observation.md).
+  Eight main observations each contain7,995 inferences/95,295rows,21 strict extra calls and a broader
+  overload-screening frequency lead. No optimization retained; all material/native controls exact
+  and complete accepted285 layout restored. Next qualifies nested FP8/BF16 dynamic dispatch.
