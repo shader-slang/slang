@@ -26,11 +26,17 @@ Skip Slack; no push or system changes.
    independent review finds expected field initialization/copy expansion, unchanged159/176 symbol sets
    and identical parsed resources. Original review-required comparison and acceptance decision retained.
    Material runtime lacks binding/input/output contracts; no equivalence or performance claim.
-8. Next bounded gate: arrays containing padded integer records, already admitted by general copyable
-   types but outside279's store correction. Establish an independent oracle/before evidence; do not
-   widen substandard array admission or preselect unrolling as a fix. Create a fresh bounded plan.
-9. Fresh delegation hits thread limits. Prefer a fresh bounded worker; otherwise record reuse. Slice279
-   had a reused author and separate reused independent reviewer, plus root audits; not fresh-context review.
+8. [Research280](report.slice-280-array-record-stores.md) and its [record](research-evidence.slice-280.json)
+   add nine focused cells outside main corpus: seven pass; nested-record arrays fail NVRTC O3/NVVM O3.
+   Isolated out-copy proves wrong child.first offsets in both PTX paths;277 replay proves preexisting.
+   Original stage64 could be masked by stale data; use the separate diagnostic for out-copy evidence.
+   Raw frozen sources/commands/outputs live under `build/nvvm-array-record-stores280`; installed279
+   artifacts,8sources,2configs,576inputs and22pins are unchanged before/after research.
+9. Next is a fresh bounded correction prototype, not blanket array unrolling or substandard-array
+   admission. Evaluate a representation-preserving fix with bounded generated IR; carry both NVRTC and
+   NVVM obligations. Read280 trace before selecting it. No newer full checkpoint is claimed.
+10. Fresh280 author was available, but another spawn/followup hit thread limits. A separate reused-context
+    reviewer audited280; root owns acceptance/commits. Skip Slack and continue the authorized loop.
 
 [HISTORY](HISTORY.md) owns earlier PCH277, accessor/generic278 and material investigations.
 [The record contract](../docs/design/nvvm-substandard-record-contract.md) separates new279 scope from

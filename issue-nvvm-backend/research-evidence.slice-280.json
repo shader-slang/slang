@@ -1,0 +1,516 @@
+{
+  "schema": 1,
+  "kind": "padded-record-array-store-research",
+  "slice": 280,
+  "date_utc": "2026-09-27",
+  "status": "accepted-research-with-open-correctness-defects",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-279.json",
+    "sha256": "956349660b41e1225573a9e865c5eb37d5ece4ecd4012c7e68efa4da94dfb8b8"
+  },
+  "repository_revision": "46e58db0688c638f0b0c7a74a82f8c132abd8022",
+  "compiler_source_revision": "0043e8d17dc1a49870c7eeb652dbfad21562378f",
+  "compiler_source_patch_sha256": "62ae64735b12f5777c4c2789dd0beef44d5835480c6b3b6af0a1eb0b31208f64",
+  "compiler_version": "2026.18.3-295-g0043e8d17",
+  "provider_abi": 42,
+  "identity": {
+    "all_37_runtime_artifacts_unchanged": true,
+    "all_8_qualified_source_hashes_unchanged": true,
+    "all_2_configurations_unchanged": true,
+    "all_576_main_inputs_unchanged": true,
+    "all_22_dependency_pins_unchanged": true,
+    "before": {
+      "path": "build/nvvm-array-record-stores280/identity-before.json",
+      "sha256": "7b6426fe3a44518ce3cb39876487a74797c0ec944eb74a9c7d819fa46578c736"
+    },
+    "after": {
+      "path": "build/nvvm-array-record-stores280/identity-after.json",
+      "sha256": "7b6426fe3a44518ce3cb39876487a74797c0ec944eb74a9c7d819fa46578c736"
+    }
+  },
+  "sources_and_oracle": {
+    "fixtures": [
+      {
+        "id": "root-flat",
+        "path": "build/nvvm-array-record-stores280/prototypes/root-flat.slang",
+        "sha256": "0efa1fe6cc01c7c30d9220d42d7f77c27a7157bc0b15cab955c7d2837bc1dc83",
+        "expected": [0, 123, 0, 456],
+        "iterations": 65536,
+        "elements": 3,
+        "wrapped": false,
+        "nested": false
+      },
+      {
+        "id": "wrapped-flat",
+        "path": "build/nvvm-array-record-stores280/prototypes/wrapped-flat.slang",
+        "sha256": "f984b964d66d178b4d60f825589c1b5b92f72bf02550050a0ed44d3bbdeacdf3",
+        "expected": [0, 123, 0, 456],
+        "iterations": 65536,
+        "elements": 3,
+        "wrapped": true,
+        "nested": false
+      },
+      {
+        "id": "root-nested",
+        "path": "build/nvvm-array-record-stores280/prototypes/root-nested.slang",
+        "sha256": "1c254ad3e0148151203d88a30bea3a732b5c84ec158fea222c805a3c8c6eb835",
+        "expected": [0, 123, 0, 456],
+        "iterations": 65536,
+        "elements": 3,
+        "wrapped": false,
+        "nested": true
+      }
+    ],
+    "mode_ordinals": {
+      "0": "nvrtc-o3",
+      "1": "nvvm-o0",
+      "2": "nvvm-o3"
+    },
+    "oracle": "For each bits=i XOR inputSeed masked16, element k has first=bits XOR(k*0x1111), last=0x12340000 OR first; nested child.first=first XOR0x5555; wrapped sentinels=(bits XOR37)&255 / (0x98765432 shifted32 OR 0xabcd0000 OR bits). Every first and child.first covers all65536 encodings and each distinct index. All assignment results are checked against independently calculated integer patterns, not another backend. Stage bits are1 initialize,2 choose both,4 old whole value,8 new whole value,16 old element,32 new element/neighbors/restored full value,64 out whole value. Exact [0,123,0,456] observes every stage and the one runtime input seed0; padding bytes are never read."
+  },
+  "focused_cells": [
+    {
+      "id": "root-flat",
+      "mode": "nvrtc-o3",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 0,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "[3 x { i16, i32 }]",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "0efa1fe6cc01c7c30d9220d42d7f77c27a7157bc0b15cab955c7d2837bc1dc83",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "root-flat",
+      "mode": "nvvm-o0",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 0,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "[3 x { i16, i32 }]",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "0efa1fe6cc01c7c30d9220d42d7f77c27a7157bc0b15cab955c7d2837bc1dc83",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "root-flat",
+      "mode": "nvvm-o3",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 0,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "[3 x { i16, i32 }]",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "0efa1fe6cc01c7c30d9220d42d7f77c27a7157bc0b15cab955c7d2837bc1dc83",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "wrapped-flat",
+      "mode": "nvrtc-o3",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 0,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "{ i8, [3 x { i16, i32 }], i64 }",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "f984b964d66d178b4d60f825589c1b5b92f72bf02550050a0ed44d3bbdeacdf3",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "wrapped-flat",
+      "mode": "nvvm-o0",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 0,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "{ i8, [3 x { i16, i32 }], i64 }",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "f984b964d66d178b4d60f825589c1b5b92f72bf02550050a0ed44d3bbdeacdf3",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "wrapped-flat",
+      "mode": "nvvm-o3",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 0,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "{ i8, [3 x { i16, i32 }], i64 }",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "f984b964d66d178b4d60f825589c1b5b92f72bf02550050a0ed44d3bbdeacdf3",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "root-nested",
+      "mode": "nvrtc-o3",
+      "classification": "runtime-mismatch",
+      "native_result": "FAILED",
+      "executed": 1,
+      "passed": 0,
+      "ignored": 0,
+      "return_code": 1,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "FileCheck CHECK-NEXT mismatch against independent output oracle",
+      "canonical_shape": "[3 x { i16, { i16, i32 } }]",
+      "expected": [0, 123, 0, 456],
+      "actual": [46, 123, 0, 456],
+      "source_sha256": "1c254ad3e0148151203d88a30bea3a732b5c84ec158fea222c805a3c8c6eb835",
+      "output_sha256": "fc3f57e3165e0e4ba5a19126708a70958acf1cb536bac48fe450af14d676f57d"
+    },
+    {
+      "id": "root-nested",
+      "mode": "nvvm-o0",
+      "classification": "correct",
+      "native_result": "passed",
+      "executed": 1,
+      "passed": 1,
+      "ignored": 0,
+      "return_code": 1,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "",
+      "canonical_shape": "[3 x { i16, { i16, i32 } }]",
+      "expected": [0, 123, 0, 456],
+      "actual": [0, 123, 0, 456],
+      "source_sha256": "1c254ad3e0148151203d88a30bea3a732b5c84ec158fea222c805a3c8c6eb835",
+      "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+    },
+    {
+      "id": "root-nested",
+      "mode": "nvvm-o3",
+      "classification": "runtime-mismatch",
+      "native_result": "FAILED",
+      "executed": 1,
+      "passed": 0,
+      "ignored": 0,
+      "return_code": 1,
+      "return_code_scope": "three-directive file process; native_result is per cell",
+      "diagnostic": "FileCheck CHECK-NEXT mismatch against independent output oracle",
+      "canonical_shape": "[3 x { i16, { i16, i32 } }]",
+      "expected": [0, 123, 0, 456],
+      "actual": [14, 123, 0, 456],
+      "source_sha256": "1c254ad3e0148151203d88a30bea3a732b5c84ec158fea222c805a3c8c6eb835",
+      "output_sha256": "889b50028b5db4177196953ebb794d388cbe5d109ed66b6f5a097e0229eeec61"
+    }
+  ],
+  "focused_totals": {
+    "cells": 9,
+    "correct": 7,
+    "runtime_mismatch": 2,
+    "ignored": 0
+  },
+  "independent_out_copy": {
+    "source": "build/nvvm-array-record-stores280/diagnostic/independent-out.slang",
+    "source_sha256": "3bdc39e8e46ee7b4abda4fd46e34ac96d83b4b1399c3da9bc8ad5a4dd31c2753",
+    "expected": [0, 123, 0, 456],
+    "oracle": "Fresh src(bits), distinct dst(bits XOR65535), assignOut(dst,src), direct observe all3 source and destination fields for each of3elements, all65536 patterns. Masks1/2/4 destinationfirst/childfirst/childlast;8/16/32 corresponding source fields. No earlier whole copy or returned snapshot can contaminate source.",
+    "run": {
+      "label": "diagnostic-independent-out",
+      "command": [
+        "build/RelWithDebInfo/bin/slang-test",
+        "-test-dir",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-array-record-stores280/diagnostic",
+        "-disable-retries",
+        "build/nvvm-array-record-stores280/diagnostic/independent-out.slang"
+      ],
+      "return_code": 1,
+      "timed_out": false,
+      "start_ns": 1790472745086151900,
+      "end_ns": 1790472748007166977,
+      "seconds": 2.9210155066102743,
+      "log": "build/nvvm-array-record-stores280/diagnostic-independent-out.log",
+      "log_sha256": "fe822f688a4fdd5c2e3efb120704a36fd0cc7ab8b0b2bd3ac7e1b05edd875595"
+    },
+    "outputs": [
+      {
+        "mode": "nvrtc-o3",
+        "actual": [2, 123, 0, 456],
+        "output": "build/nvvm-array-record-stores280/diagnostic/independent-out.slang.actual.txt",
+        "output_sha256": "d72ed7190b032b1db91181f11998954571d6787050f67fc806688c9bc90e689f"
+      },
+      {
+        "mode": "nvvm-o0",
+        "actual": [0, 123, 0, 456],
+        "output": "build/nvvm-array-record-stores280/diagnostic/independent-out.slang.1.actual.txt",
+        "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+      },
+      {
+        "mode": "nvvm-o3",
+        "actual": [2, 123, 0, 456],
+        "output": "build/nvvm-array-record-stores280/diagnostic/independent-out.slang.2.actual.txt",
+        "output_sha256": "d72ed7190b032b1db91181f11998954571d6787050f67fc806688c9bc90e689f"
+      }
+    ]
+  },
+  "omission_control": {
+    "source": "build/nvvm-array-record-stores280/controls/omitted-whole-store.slang",
+    "sha256": "b7efa3aa680fefa4ca842a561eccce54aac401c7cfe98e71caaaf186b74d9681",
+    "mode": "nvrtc-o3",
+    "original_oracle": [0, 123, 0, 456],
+    "predicted_control_output": [8, 123, 0, 456],
+    "expect_native_failure": true,
+    "run": {
+      "label": "control-omitted-whole",
+      "command": [
+        "build/RelWithDebInfo/bin/slang-test",
+        "-test-dir",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-array-record-stores280/controls",
+        "-disable-retries",
+        "build/nvvm-array-record-stores280/controls/omitted-whole-store.slang"
+      ],
+      "return_code": 1,
+      "timed_out": false,
+      "start_ns": 1790472604410245067,
+      "end_ns": 1790472606278293649,
+      "seconds": 1.8680500127375126,
+      "log": "build/nvvm-array-record-stores280/control-omitted-whole.log",
+      "log_sha256": "355b7c7d5846ca028dffa613886995f153fc1ff91f6ce744b9e993635a73d47f"
+    },
+    "actual": [8, 123, 0, 456],
+    "output": "build/nvvm-array-record-stores280/controls/omitted-whole-store.slang.actual.txt",
+    "output_sha256": "fa3a814b08d8cd40be6ecbe0ad674fa155fdaf5d9215158c284c27ce2e3a2424"
+  },
+  "accepted277_control": {
+    "accepted277_layout": "build/nvvm-nested-records279/accepted277-layout",
+    "inventory_entries": 100,
+    "verified_all_original_files_modes_symlinks": true,
+    "source": "build/nvvm-array-record-stores280/accepted277-prototypes/root-nested.slang",
+    "source_sha256": "1c254ad3e0148151203d88a30bea3a732b5c84ec158fea222c805a3c8c6eb835",
+    "environment": {
+      "LD_LIBRARY_PATH": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-nested-records279/accepted277-layout/lib:/home/skallweit/codex/agent-sandbox/slang/build/nvvm-nested-records279/accepted277-layout/bin:/usr/local/cuda-12.9/nvvm/lib64:/usr/local/cuda-12.9/lib64",
+      "SLANG_NVVM_BUILDER_PATH": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-nested-records279/accepted277-layout/bin/libslang-llvm-nvvm.so"
+    },
+    "run": {
+      "label": "accepted277-nested",
+      "command": [
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-nested-records279/accepted277-layout/bin/slang-test",
+        "-test-dir",
+        "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-array-record-stores280/accepted277-prototypes",
+        "-disable-retries",
+        "build/nvvm-array-record-stores280/accepted277-prototypes/root-nested.slang"
+      ],
+      "return_code": 1,
+      "timed_out": false,
+      "start_ns": 1790472661876651457,
+      "end_ns": 1790472665449075170,
+      "seconds": 3.572424042969942,
+      "log": "build/nvvm-array-record-stores280/accepted277-nested.log",
+      "log_sha256": "6d0ac5f0c00a14232626e97eaf9c954f48e015f0b030cc3d56af4e7c01ff37d6"
+    },
+    "outputs": [
+      {
+        "mode": "nvrtc-o3",
+        "actual": [46, 123, 0, 456],
+        "output": "build/nvvm-array-record-stores280/accepted277-prototypes/root-nested.slang.actual.txt",
+        "output_sha256": "fc3f57e3165e0e4ba5a19126708a70958acf1cb536bac48fe450af14d676f57d"
+      },
+      {
+        "mode": "nvvm-o0",
+        "actual": [0, 123, 0, 456],
+        "output": "build/nvvm-array-record-stores280/accepted277-prototypes/root-nested.slang.1.actual.txt",
+        "output_sha256": "1317f5c049cf91f1e7c754bea35ed565d01c72b800a6b1b66a0727523da8699f"
+      },
+      {
+        "mode": "nvvm-o3",
+        "actual": [46, 123, 0, 456],
+        "output": "build/nvvm-array-record-stores280/accepted277-prototypes/root-nested.slang.2.actual.txt",
+        "output_sha256": "fc3f57e3165e0e4ba5a19126708a70958acf1cb536bac48fe450af14d676f57d"
+      }
+    ]
+  },
+  "failures_preserved": {
+    "warning_attempt": {
+      "path": "build/nvvm-array-record-stores280/gpu-results.json",
+      "sha256": "fe0cff55aea213fbcdfbfce2a174c4714bd81c9473e0e304a7de28986e803c59"
+    },
+    "warning_sources": "build/nvvm-array-record-stores280/attempt1-prototypes",
+    "reason": "E30081 uint checker used as bool; none of nine native failures accepted as passes. Only explicit !=0 changed before clean rerun.",
+    "final_attempt": {
+      "path": "build/nvvm-array-record-stores280/gpu-results2.json",
+      "sha256": "46106e039c1f0267cb422f3f6c01374a1791e4048ec0732e1743cc047de307df"
+    },
+    "initial_wrapper_guard_revision": "Constant guards corrected and re-frozen before any GPU execution.",
+    "sequence_mask_limit": "Absent stage64 failure did not establish assignOut correctness; stale correlated state masked it. Separate independent out-copy proves destination child.first fails."
+  },
+  "causal_summary": {
+    "valid_input": "Canonical nested integer record array with initialized distinct source/destination; no padding bytes observed.",
+    "llvm": "[3 x {i16,{i16,i32}}], align4,12-byte element stride, fields0/4/8. Whole stores survive choose/replace/assignOut.",
+    "nvvm_ptx": "st.local.v2.u16 at0/12/24 moves child.first to2/14/26 rather than4/16/28.",
+    "nvrtc": "Generated FixedArray copy is valid C++; NVRTC PTX assignOut performs the same incorrect adjacent16-bit stores.",
+    "scope": "Downstream padding loss on CUDA12.9, preexisting in277; no particular internal optimization pass identified."
+  },
+  "causal_trace": {
+    "canonical_layout": {
+      "root-flat": "Cell={i16,i32}: offsets0,4 size8 align4; array length3 size24 align4.",
+      "wrapped-flat": "Payload={i8,[3xCell],i64}: offsets0,4,32 size40 align8.",
+      "root-nested": "Child={i16,i32}: offsets0,4 size8 align4. Cell={i16,Child}: offsets0,4 size12 align4, flattened leaves0,4,8. Array length3 size36 align4; leaves[k*12+0,k*12+4,k*12+8]."
+    },
+    "input_shape_audit": "Canonical finite integer IRArrayType/IRStructType already admitted recursively by _isNVVMSupportedCopyableValueType (type-lowering.cpp508\u2013549). Whole IRStore serialization (emit-nvvm.cpp15481\u201315580) passes lowered aggregate/pointer/canonical alignment to builder.emitStore. Provider _emitStore validates exact pointee type/alignment, then _emitStorePreservingNestedStructLayout (provider.cpp641\u2013703) leaves array roots and struct-with-array-only children opaque. No evidence of malformed Slang producer shape. Return legalization uses an output pointer for whole array return, which also gets a whole store.",
+    "llvm": [
+      {
+        "id": "root-flat",
+        "o0": {
+          "path": "build/nvvm-array-record-stores280/ir/root-flat-o0-1.llvm-ir-asm",
+          "sha256": "6fd3407546b14eb13e36e2f74ea2bb66505d9f76c52fa61d7092e96e2935f464"
+        },
+        "o3": {
+          "path": "build/nvvm-array-record-stores280/ir/root-flat-o3-1.llvm-ir-asm",
+          "sha256": "6fd3407546b14eb13e36e2f74ea2bb66505d9f76c52fa61d7092e96e2935f464"
+        },
+        "llvm_byte_identical_across_optimization": true,
+        "surviving_whole_array_or_containing_struct_stores": [
+          {
+            "line": 386,
+            "text": "store [3 x { i16, i32 }] %0, [3 x { i16, i32 }]* %slangParameter3, align 4"
+          },
+          {
+            "line": 394,
+            "text": "store [3 x { i16, i32 }] %slangParameter1, [3 x { i16, i32 }]* %slangParameter0, align 4"
+          },
+          {
+            "line": 395,
+            "text": "store [3 x { i16, i32 }] %0, [3 x { i16, i32 }]* %slangParameter2, align 4"
+          },
+          {
+            "line": 402,
+            "text": "store [3 x { i16, i32 }] %slangParameter1, [3 x { i16, i32 }]* %slangParameter0, align 4"
+          }
+        ]
+      },
+      {
+        "id": "wrapped-flat",
+        "o0": {
+          "path": "build/nvvm-array-record-stores280/ir/wrapped-flat-o0-1.llvm-ir-asm",
+          "sha256": "e8da836862f9405355272438f24d973509108320ec308db668df1cd84784dcc7"
+        },
+        "o3": {
+          "path": "build/nvvm-array-record-stores280/ir/wrapped-flat-o3-1.llvm-ir-asm",
+          "sha256": "e8da836862f9405355272438f24d973509108320ec308db668df1cd84784dcc7"
+        },
+        "llvm_byte_identical_across_optimization": true,
+        "surviving_whole_array_or_containing_struct_stores": [
+          {
+            "line": 447,
+            "text": "store { i8, [3 x { i16, i32 }], i64 } %slangParameter1, { i8, [3 x { i16, i32 }], i64 }* %slangParameter0, align 8"
+          },
+          {
+            "line": 454,
+            "text": "store { i8, [3 x { i16, i32 }], i64 } %slangParameter1, { i8, [3 x { i16, i32 }], i64 }* %slangParameter0, align 8"
+          },
+          {
+            "line": 464,
+            "text": "store { i16, i32 } %slangParameter1, { i16, i32 }* %1, align 4"
+          }
+        ]
+      },
+      {
+        "id": "root-nested",
+        "o0": {
+          "path": "build/nvvm-array-record-stores280/ir/root-nested-o0-1.llvm-ir-asm",
+          "sha256": "539ed12bd0a3c79189bed175053e28e9de9cf251864c9bbc8570ed6d8722d579"
+        },
+        "o3": {
+          "path": "build/nvvm-array-record-stores280/ir/root-nested-o3-1.llvm-ir-asm",
+          "sha256": "539ed12bd0a3c79189bed175053e28e9de9cf251864c9bbc8570ed6d8722d579"
+        },
+        "llvm_byte_identical_across_optimization": true,
+        "surviving_whole_array_or_containing_struct_stores": [
+          {
+            "line": 407,
+            "text": "store [3 x { i16, { i16, i32 } }] %0, [3 x { i16, { i16, i32 } }]* %slangParameter3, align 4"
+          },
+          {
+            "line": 415,
+            "text": "store [3 x { i16, { i16, i32 } }] %slangParameter1, [3 x { i16, { i16, i32 } }]* %slangParameter0, align 4"
+          },
+          {
+            "line": 416,
+            "text": "store [3 x { i16, { i16, i32 } }] %0, [3 x { i16, { i16, i32 } }]* %slangParameter2, align 4"
+          },
+          {
+            "line": 423,
+            "text": "store [3 x { i16, { i16, i32 } }] %slangParameter1, [3 x { i16, { i16, i32 } }]* %slangParameter0, align 4"
+          }
+        ]
+      }
+    ],
+    "optimized_nvvm_wrong_offsets": "root-nested-o3.ptx choose835\u2013887, replace890\u2013933, assignOut936\u2013970 load i16 fields at12*k and12*k+4 yet st.local.v2.u16 at12*k writes12*k and12*k+2. Child.first at12*k+4 remains stale; i32 at12*k+8 uses correct offset. The valid whole [3x{i16,{i16,i32}}] stores in LLVM are the opaque boundary. replaceElement uses scalar first plus canonical child fields at0,4,8 after279 and is independently visible in PTX.",
+    "nvrtc_trace": "root-nested.cu exactly equals root-nested-nvrtc-1.cu. It declares legal Child/Cell and FixedArray<Cell,3>, and choose/replace/assignOut perform ordinary C++ aggregate copies. NVRTC PTX assignOut279\u2013289 likewise loads each Cell child.first atparam+4 but emits st.local.v2.u16 atdestination12*k, writingchildfirst at12*k+2. This observed padding loss is consistent with the direct NVVM optimizer issue; no claim that the internal proprietary passes are identical.",
+    "stage64_limit": "Original nested sequential oracle did not flag assignOut (64) despite wrong PTX because returned previous array and stale destination child.first can correlate. Its zero bit is not qualification. Separate independent-out diagnostic initializes fresh src and distinct dst, directly reads allfields ofboth: NVRTC/NVVMO3 mask2=destinationchildfirstonly; NVVMO0zero.",
+    "baseline": "Verified accepted277100-entry recovery layout replay, unchanged same nestedsource: NVRTC46,NVVMO0zero,NVVMO3=46. Accepted279 NVVMO3=14. Both optimized failures therefore predate279; disappearance of bit32 and canonical element PTX agree with279 correction of direct nested struct stores, without proving every operation separately.",
+    "next_work": "Bounded corrective design for array-contained nested aggregate stores without array-size-dependent IR explosion; consider common CUDA/NVVM producer-consumer boundary only after independent causal replay. No production fix or broad array support claim selected here.",
+    "limits": [
+      "Length3 only; one runtime inputseed0;65536patterns, not65536runtime inputs.",
+      "Every uint16 leafencoding covered for each element, but not the Cartesian product of independent fields; upperuint32 anduint64 bits fixed.",
+      "No substandard float arrays, zero/huge/multidimensional arrays, shared/device/exported array contracts, packing, performance or blanket backend equivalence established.",
+      "Negativecontrol deliberately omits whole replace assignment: NVRTC failure8 expected; not production regression.",
+      "All captures compile same frozen source/options; actualGPUcalls from native test runner remain separate artifacts."
+    ]
+  },
+  "raw_summary": {
+    "path": "build/nvvm-array-record-stores280/worker-summary.json",
+    "sha256": "763cddd6740c3f0f1f0dbd30e1132276d90f25432be53cbe4a66988ac87a4772"
+  },
+  "attempt_history": {
+    "path": "build/nvvm-array-record-stores280/attempt1-retention.json",
+    "sha256": "7fc81e21a2f2f50bad4e52aab8733d9c678797c42495eddd743162c667d3db17"
+  },
+  "independent_review": {
+    "path": "build/nvvm-array-record-stores280/independent-review.json",
+    "sha256": "8f253636fab306c7e9f34b924936a7519282e80bf95501e022386fb46ef7dac1"
+  },
+  "review_context": "Fresh author; separate reused-context reviewer; root source/output/identity audits.",
+  "inherited_validation": {
+    "record": {
+      "path": "issue-nvvm-backend/runtime-validation.slice-279.json",
+      "sha256": "956349660b41e1225573a9e865c5eb37d5ece4ecd4012c7e68efa4da94dfb8b8"
+    },
+    "cells": 1740,
+    "correct": 1703,
+    "unresolved": 37,
+    "resolved_histories": 20,
+    "last_full": 279,
+    "last_targeted": 233,
+    "implementations_since_full": 0,
+    "fresh": false,
+    "scope": "No compiler/provider/harness/corpus change. New research failures remain outside main corpus; prior failure histories retained by exact ledger reference."
+  },
+  "limitations": [
+    "Only arraylength3, one runtime seed0,65536low16-bit patterns; upper32/64-bit sentinels fixed.",
+    "No arbitrary arrays, substandard arrays, performance or material GPU claim.",
+    "Mode NVRTC O3 is not an NVRTC O0 comparison.",
+    "Per-cell native result and full buffer distinguish outcomes inside grouped process return code."
+  ],
+  "next_action": "Bounded correction prototype preserving canonical layout without uncontrolled array expansion; keep NVRTC and NVVM causal/validation obligations separate.",
+  "notification": "Skipped per user instruction."
+}

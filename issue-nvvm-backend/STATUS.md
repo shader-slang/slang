@@ -48,8 +48,14 @@ expansion; independent review accepts those changes with all parsed resources eq
 binding/input/output contracts remain unavailable; no runtime or performance claim. PCH277 ownership
 and research278 language evidence retain their original identities and limits.
 
-Next: qualify whole stores of arrays containing padded integer records with a bounded independent
-oracle. Preserve current array admission and establish before evidence before choosing any fix.
-Fresh agent creation hits thread limits;279 used a reused author and a separate reused independent
-reviewer, with root acceptance audits. Native Ubuntu24.04, L4SM89/driver580.126.09, SM80 target,
-CUDA12.9.2/NVRTC12.9.86, LLVM14, RelWithDebInfo; max4CPU workers,2unit servers, serialized suites.
+[Research280](report.slice-280-array-record-stores.md) finds a preexisting padding-loss bug in whole
+arrays of nested integer records: seven of nine focused cells pass; NVRTC O3 and NVVM O3 fail the
+nested-array case. A separate fresh-source out-copy diagnostic fails both optimized paths at the same
+child-field offset; NVVM O0 passes. Accepted277 reproduces the defect. These failures remain outside
+the main corpus and explicitly open; accepted279 compiler/corpus identities are unchanged.
+
+Next: bounded correction prototype for array-contained nested stores, preserving canonical layout
+without uncontrolled array expansion. Keep NVRTC and NVVM obligations explicit. Root source/identity
+and separate reused-context independent review accompany the fresh280 author. Native Ubuntu24.04,
+L4SM89/driver580.126.09, SM80 target, CUDA12.9.2/NVRTC12.9.86, LLVM14, RelWithDebInfo;
+max4CPU workers,2unit servers, serialized suites. Accepted279 local commit46e58db06.
