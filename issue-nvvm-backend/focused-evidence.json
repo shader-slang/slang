@@ -7098,6 +7098,393 @@
         "Actual before LLVM establishes a live, canonical boundary; no unique downstream vendor pass is identified.",
         "No provider ABI change, new Slang IR pass, general helper-domain expansion, performance claim or older timing refresh."
       ]
+    },
+    "surface-physical-format": {
+      "status": "accepted-diagnostic-open-contract",
+      "contract": "Undecorated RWTexture<int4> selects native32x4 surface access. Packed signed8x4 binding is not an implicit format-conversion contract. Independent physical host readback, not shader round-trip equality, determines this qualification.",
+      "compiler_identity": {
+        "revision": "3c250bff847674a72bb95c89b19841620c920d72",
+        "patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+        "compiler_version": "2026.18.3-329-g3c250bff8",
+        "provider_abi": 42
+      },
+      "runtime_sha256": {
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "f12039a5ed1d452c2b2c0d8e10e82d82ade80f8dbc014ee1713a158bd079e2df",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "5eb9a71f1ead185ba5ecd8f50b71d0453d8916c8b9713a1a2ac76e40f1c0ab8f",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "d656744bfdf982e8696e67459ac0f320f1ac2a5e43aa734becdcb1d62fc70ec5",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "60737b5069bd47baeb772f0f3ef0659da3079f1be3dfd700f55fac91d741ed93",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "80e23cc15c779bc208e0506590ad6b257bb4a55b81958a3238ab74084c4d3ae9",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "2ee7df0f4cecd5df44d3eb8031f4fcb20ad98004f45ae4bbb419c8106d57b8b5",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "036c434e1f33a35910c7073f71b537716f9e0fb0b8149dd2f36e92c8b02093ae",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "23ea5f68fa6f032bcfdde4287d67aa3735b7e3ff97f5d743811039aed3b0673b",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "1f520f635a10f7acb5b6b7e72a2d582294d95d7f152543055c1b95a300aa294c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "3d9e4bf3a184edc177dfdae0582ebdc8a415e0f810c991a1f3a6337ed882abe7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9003704e961de5242e95125f151731683e101a22ba1eeb7d93c970eed8d10432",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "72366c2e45312eac364983bcea6d4e0faff945cfa9981199124555bb78b2d301",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+        "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+        "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+      },
+      "accepted_identity": {
+        "path": "build/nvvm-cuda-image-component/before-accepted-identity.json",
+        "sha256": "dfe85e7b255062433302fd341236641d5f211d9277acf084c9017f063cc147e9"
+      },
+      "execution_provenance": {
+        "path": "build/nvvm-cuda-image-component/before-provenance/provenance.json",
+        "sha256": "4a94f05d9dfaf188e09b7520b42dc1c25f91198ab9654f7ae7ef45358a663345"
+      },
+      "source": {
+        "path": "build/nvvm-cuda-image-component/before-2/review/physical-probe/probe.slang",
+        "sha256": "31c15690d5683c0d8ec696f4e3cbf9285e054ac591e52067f24596558a053a99"
+      },
+      "oracle": {
+        "path": "build/nvvm-cuda-image-component/before-2/review/physical-probe/protocol.json",
+        "sha256": "02e36ba4170235a932efc8c02f802b228fcc5aa0afa1e7877d92b05aa86721b2"
+      },
+      "original_signed8_oracle": {
+        "path": "build/nvvm-cuda-image-component/before-2/review/physical-probe/oracle.json",
+        "sha256": "c4424b17857e5195f5ff590328a9b34f8e16927ffbd201edbc11ef2c08eabc8c"
+      },
+      "driver": {
+        "path": "build/nvvm-cuda-image-component/before-2/review/physical-probe/driver.py",
+        "sha256": "ae3773e10fc8364ff4fc7d134914f3a35d2d63b028bc1e62a3571aa1a8972e73"
+      },
+      "source_inputs": {
+        "path": "build/nvvm-cuda-image-component/before-inputs.json",
+        "sha256": "39ea89a5065497f5403bee3f58894f937c87a07f01d8f6e6db158281719d6e90"
+      },
+      "physical_cells": [
+        {
+          "entry": "wholeStore",
+          "mode": "nvrtc-o3",
+          "format": "sint8",
+          "status": "runtime-mismatch",
+          "return_code": 1,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-wholeStore-nvrtc-o3-sint8/results.json",
+            "sha256": "de728d1101aebc91fa36cefc203d30f0c4a6622f6b3c4b2f5149e7ba67ee4def"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 8,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 13,
+          "untouched_neighbors_match": false,
+          "actual_sha256": "8b4b2444e57aed8c2d05a1293255da1b048c63224317d4666230760935fa4a18",
+          "expected_sha256": "24caff18d1530832145bcb41ba56af9fdc89682841886361964d3ca1bdaa8a95"
+        },
+        {
+          "entry": "wholeStore",
+          "mode": "nvrtc-o3",
+          "format": "sint32",
+          "status": "passed",
+          "return_code": 0,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-wholeStore-nvrtc-o3-sint32/results.json",
+            "sha256": "2cd654125ce0f2eb4f50bf3d6642c4fc196338b86ca5dfd99970dc634b431661"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 10,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 0,
+          "untouched_neighbors_match": true,
+          "actual_sha256": "fb4816825e92e01f0caf2d0c155db433e319dc80b1485a20a7f42fbe5c94060b",
+          "expected_sha256": "fb4816825e92e01f0caf2d0c155db433e319dc80b1485a20a7f42fbe5c94060b"
+        },
+        {
+          "entry": "wholeStore",
+          "mode": "nvvm-o0",
+          "format": "sint8",
+          "status": "runtime-mismatch",
+          "return_code": 1,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-wholeStore-nvvm-o0-sint8/results.json",
+            "sha256": "afa2950d2c912e877369bea5e428060bde089ed711ebf9b894b91ff0d27cac60"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 8,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 13,
+          "untouched_neighbors_match": false,
+          "actual_sha256": "8b4b2444e57aed8c2d05a1293255da1b048c63224317d4666230760935fa4a18",
+          "expected_sha256": "24caff18d1530832145bcb41ba56af9fdc89682841886361964d3ca1bdaa8a95"
+        },
+        {
+          "entry": "wholeStore",
+          "mode": "nvvm-o0",
+          "format": "sint32",
+          "status": "passed",
+          "return_code": 0,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-wholeStore-nvvm-o0-sint32/results.json",
+            "sha256": "9c9a759c11ac96bbcc7c67c1d3d36803e20871cf2a0516a43b2bd3e376f725d3"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 10,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 0,
+          "untouched_neighbors_match": true,
+          "actual_sha256": "fb4816825e92e01f0caf2d0c155db433e319dc80b1485a20a7f42fbe5c94060b",
+          "expected_sha256": "fb4816825e92e01f0caf2d0c155db433e319dc80b1485a20a7f42fbe5c94060b"
+        },
+        {
+          "entry": "wholeStore",
+          "mode": "nvvm-o3",
+          "format": "sint8",
+          "status": "runtime-mismatch",
+          "return_code": 1,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-wholeStore-nvvm-o3-sint8/results.json",
+            "sha256": "6f07ddefdc331fe397f2bfc92e8e2438d85ff2afbac71767be71e1ee6f769a3c"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 8,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 13,
+          "untouched_neighbors_match": false,
+          "actual_sha256": "8b4b2444e57aed8c2d05a1293255da1b048c63224317d4666230760935fa4a18",
+          "expected_sha256": "24caff18d1530832145bcb41ba56af9fdc89682841886361964d3ca1bdaa8a95"
+        },
+        {
+          "entry": "wholeStore",
+          "mode": "nvvm-o3",
+          "format": "sint32",
+          "status": "passed",
+          "return_code": 0,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-wholeStore-nvvm-o3-sint32/results.json",
+            "sha256": "25b44d82aa25e0b507c0394c52450d287df8e884c5dd8c64c0e223a31d45b1fe"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 10,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 0,
+          "untouched_neighbors_match": true,
+          "actual_sha256": "fb4816825e92e01f0caf2d0c155db433e319dc80b1485a20a7f42fbe5c94060b",
+          "expected_sha256": "fb4816825e92e01f0caf2d0c155db433e319dc80b1485a20a7f42fbe5c94060b"
+        },
+        {
+          "entry": "componentStore",
+          "mode": "nvvm-o0",
+          "format": "sint8",
+          "status": "runtime-mismatch",
+          "return_code": 1,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-componentStore-nvvm-o0-sint8/results.json",
+            "sha256": "024ed6d75db51616ae6ead127789eaf2f860c5c74cb77bbdae56fda39e3b12d7"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 8,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 6,
+          "untouched_neighbors_match": false,
+          "actual_sha256": "41730c21909fca12f75fe782edd5243a2454ed8a2004bc2957dbafbc61dab096",
+          "expected_sha256": "b98fe54504b4f99d8074640940c85ea50bc397ea5ad32859b5766cdf918300e7"
+        },
+        {
+          "entry": "componentStore",
+          "mode": "nvvm-o0",
+          "format": "sint32",
+          "status": "passed",
+          "return_code": 0,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-componentStore-nvvm-o0-sint32/results.json",
+            "sha256": "365e9692de057069887193f70951dfbd525bde51a1881742fad4e1a3a34d299b"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 10,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 0,
+          "untouched_neighbors_match": true,
+          "actual_sha256": "53d8a5e2bd778a7e94759ec1c052b1ac6d624f6331b0eb13ad428e4f01475a8d",
+          "expected_sha256": "53d8a5e2bd778a7e94759ec1c052b1ac6d624f6331b0eb13ad428e4f01475a8d"
+        },
+        {
+          "entry": "componentStore",
+          "mode": "nvvm-o3",
+          "format": "sint8",
+          "status": "runtime-mismatch",
+          "return_code": 1,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-componentStore-nvvm-o3-sint8/results.json",
+            "sha256": "2b27f7c69acddb54a83b3825ea9d641925b7e5b0df000fc8be86d2142911ed18"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 8,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 6,
+          "untouched_neighbors_match": false,
+          "actual_sha256": "41730c21909fca12f75fe782edd5243a2454ed8a2004bc2957dbafbc61dab096",
+          "expected_sha256": "b98fe54504b4f99d8074640940c85ea50bc397ea5ad32859b5766cdf918300e7"
+        },
+        {
+          "entry": "componentStore",
+          "mode": "nvvm-o3",
+          "format": "sint32",
+          "status": "passed",
+          "return_code": 0,
+          "result": {
+            "path": "build/nvvm-cuda-image-component/physical-componentStore-nvvm-o3-sint32/results.json",
+            "sha256": "140c81d5fee09bfd9b69965d32fe4e5af5ed99b5c06fb022f28188dc63dfe5d5"
+          },
+          "array_descriptor": {
+            "Width": 8,
+            "Height": 0,
+            "Depth": 0,
+            "Format": 10,
+            "NumChannels": 4,
+            "Flags": 2
+          },
+          "wrong_byte_count": 0,
+          "untouched_neighbors_match": true,
+          "actual_sha256": "53d8a5e2bd778a7e94759ec1c052b1ac6d624f6331b0eb13ad428e4f01475a8d",
+          "expected_sha256": "53d8a5e2bd778a7e94759ec1c052b1ac6d624f6331b0eb13ad428e4f01475a8d"
+        }
+      ],
+      "counts": {
+        "physical_launches": 10,
+        "matching_signed32_passed": 5,
+        "packed_signed8_runtime_mismatches": 5,
+        "separate_nvrtc_component_compile_failure": 1
+      },
+      "source_failure": {
+        "entry": "componentStore",
+        "mode": "nvrtc-o3",
+        "status": "invalid-generated-cuda",
+        "gate": {
+          "path": "build/nvvm-cuda-image-component/physical-compile-componentStore-nvrtc-o3.json",
+          "sha256": "873cf3117e0fa9297066e252eefb8f5239bdac3d05072cbf72e53761f6fac841"
+        },
+        "execution_count": 0
+      },
+      "original_corpus_observation": {
+        "results": {
+          "path": "build/nvvm-cuda-image-component/before-2/results.json",
+          "sha256": "534aa668c9eb42a7e1b22773132901b5241f7bcec9e33a93c0cfb1984ab54bdd"
+        },
+        "cells": 9,
+        "correct_shader_oracles": 8,
+        "nvrtc_source_failure": 1,
+        "scope": "Three substring-selected sources and three modes. Original texture-subscript NVVM O0/O3 shader self-checks pass; they do not independently qualify physical RGBA8Sint texels. No original source, binding, outcome history or main baseline is relabeled."
+      },
+      "reviews": {
+        "physical_results": {
+          "path": "build/nvvm-cuda-image-component/review/physical-results-review.json",
+          "sha256": "9c4139288cafb25ac65e40b1d2ef95e626a37982ce3733c1d4694d0e1efb4683"
+        },
+        "original_corpus": {
+          "path": "build/nvvm-cuda-image-component/before-2/review/before-results.json",
+          "sha256": "0fa850dbbd60f17579919116817e5a5d65d7fa4a4799401ad0e04f38f5309b7b"
+        },
+        "original_format_oracle": {
+          "path": "build/nvvm-cuda-image-component/before-2/review/oracle-format-boundary.md",
+          "sha256": "809fe48a313c86a88b4479ca63a6030910d78e7ba2e9789a026484bcd45538c8"
+        },
+        "driver": {
+          "path": "build/nvvm-cuda-image-component-worker/physical-driver-review.json",
+          "sha256": "8c3cce992c92cbae04a5ad8bc418d08cc2d4d2e603d423e4200215dc16a0709e"
+        },
+        "architecture": {
+          "path": "build/nvvm-cuda-image-component/review/architecture-boundary.md",
+          "sha256": "717b1d715b6486405c2fd86250ac4bfa47c7d07347b69dc1b448cf7cd5f16783"
+        },
+        "format_trace": {
+          "path": "build/nvvm-cuda-image-component-worker/format-contract-audit.md",
+          "sha256": "dfa555923f0df802a7a4dd3a7a9abef79f3534b11d88b1a09ec6befc03072784"
+        },
+        "final_candidate": {
+          "path": "build/nvvm-cuda-image-component/review/diagnostic-candidate.json",
+          "sha256": "3c344fbdab243543413832c08829d7525aad8ed7b5ff4b115de9c929c427d57d"
+        }
+      },
+      "validation_incidents": [
+        {
+          "status": "setup-only-failure",
+          "gate": {
+            "path": "build/nvvm-cuda-image-component/before-corpus.json",
+            "sha256": "c071f5423151b92b8fda989154852d264ae488b7b8cf83fed765841a86e0bc31"
+          },
+          "reason": "Census defaulted to absent Release runner. Explicit RelWithDebInfo attempt executes nine requested substring-selected cells; original source failure remains."
+        }
+      ],
+      "interpretation": [
+        "Both NVRTC and NVVM whole-store paths assume native32-bit channels when source format provenance is absent; this experiment does not prove a defect in that native ABI.",
+        "Packed physical failures are separate open obligations; native controls do not repair them. Component-lvalue source legalization and format conversion require separate contracts.",
+        "Protocol inherits a signed8 32-byte scope description; its signed32 format record, byte oracle and actual driver copies explicitly cover128bytes. Every allocation byte is compared in both formats."
+      ],
+      "limits": [
+        "One1D eight-texel allocation and selected small positive values; no arbitraryformatconversion, layered/MS, signedextremes, clamping/overflow, normalized formats, concurrentupdates orperformance qualification.",
+        "Zeros initialize untouched lanes andsixneighboringtexels; this does not qualify preservation of arbitrary nonzero prior contents.",
+        "Five actualpacked launches fail andfive matchingnative launches pass; NVRTCcomponent kernel does not launch because compilation fails.",
+        "No production change, newcompilerpass, providerABI change or maincheckpointrefresh. Existing artifactidentity/cadence retained."
+      ],
+      "next_decision": "Choose explicit compiler-visible format conversion first, or a separate native-width CUDA component legalization slice. Neither alone adds arbitrary undecorated runtime-format support."
     }
   }
 }

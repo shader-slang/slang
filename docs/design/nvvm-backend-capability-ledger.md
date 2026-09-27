@@ -140,6 +140,18 @@ interchangeable, and opaque descriptor bytes cannot be inspected as an undocumen
 The observed driver lookup failures for `txq.array_size` and `txq.num_mipmap_levels` are specific to
 the qualified stack; `txq.level.width` loaded and executed. No full API repair is implemented.
 
+The unannotated surface contract requires a matching physical channel width, count and scalar
+interpretation. A focused host-readback experiment binds the same `RWTexture1D<int4>` kernels to
+signed8×4 and signed32×4 CUDA arrays. Whole stores fail the packed physical oracle in NVRTC O3 and
+NVVM O0/O3; component stores fail in both NVVM modes, while NVRTC component source does not compile.
+All five matching signed32 controls pass. Every physical byte and six neighboring texels are checked;
+these are bounded 1D observations, not qualification of arbitrary formats or array shapes.
+The original `compute/texture-subscript.slang` binds RGBA8Sint but checks results through the same
+shader access mapping. Its historical NVVM passes do not establish packed-format correctness.
+The CUDA component-source gap and packed-format limitation remain separate open obligations in
+[focused evidence](../../issue-nvvm-backend/focused-evidence.json); no source fix or format conversion
+is claimed by this investigation.
+
 ## Language composition and application evidence
 
 | Region                                                                            | Evidence currently available                                                                                                             | Limit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |

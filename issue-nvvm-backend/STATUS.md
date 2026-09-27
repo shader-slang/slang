@@ -58,7 +58,14 @@ migrates a stale unit expectation; compiler, provider, modules and corpus bytes 
   synthetic-texture material eval/sample, mini-LUT and selected dielectric eval/PDF queries retain
   their tested boundaries in the feature matrix. Full applications, arbitrary inputs, sampling
   distributions and unmeasured performance remain open.
-- Next investigate CUDA surface component stores: canonical image subscripts need a complete
-  read/modify/write lowering and surface load/store consumer. Reuse existing format/coordinate
-  contracts; preserve original texel semantics. Arbitrary C RequirePrelude remains explicitly
-  unsupported. Accept this bounded correctness work before returning to a material integration need.
+- Surface investigation found a separate format-contract mismatch. Unannotated int4 surface kernels
+  assume native 32-bit channels; RGBA8Sint allocations are actually four bytes per texel. Independent
+  host readback fails all five packed-format cells and passes all five matching RGBA32Sint controls.
+  Historical shader self-check passes do not qualify physical packed texels. The original NVRTC
+  component-source failure also remains open. No compiler or original corpus input was changed.
+- This diagnostic closeout does not replace the full baseline or reset implementation cadence.
+  The next implementation awaits the maintainer's format-scope choice: explicit static-format
+  conversion (recommended foundation) or separate native-width component legalization. Static format
+  support would still require annotations; it would not silently fix undecorated runtime bindings.
+  Generic runtime formats need their own qualified design. Keep arbitrary C RequirePrelude rejected,
+  and return to a material integration requirement after the selected bounded work.

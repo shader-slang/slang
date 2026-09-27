@@ -333,6 +333,22 @@ helpers preserve complete-source-quad/matching-shuffle semantics; partial quads 
 Masked floating MIN/MAX retains source comparison order and identities, including Half's finite
 exclusive seeds ±65504 and payload-preserving ordered selection. Algebraic reassociation is unsafe.
 
+**Surface storage formats.** An undecorated `RWTexture<int4>` selects native four-lane 32-bit
+surface access. The opaque CUDA surface handle does not make the runtime allocation's format a
+compiler-visible property. Binding RGBA8Sint therefore does not request an implicit conversion:
+byte-X scaling remains 16, although a physical RGBA8 texel occupies four bytes. Independent host
+array readback observes whole and component writes affecting neighboring packed texels; matching
+RGBA32Sint bindings pass. Shader reads through the same access convention can conceal this mismatch.
+The original texture-subscript corpus result is a shader self-check, not packed-format qualification.
+
+Component-lvalue legalization and storage-format selection are separate responsibilities. The existing
+image-subscript pass creates load/modify/store operations; CUDA source still needs scheduling and
+complete image-operation consumers. Fixing those consumers for native-width storage cannot qualify
+packed bindings. Static format conversion needs authoritative format provenance and matched loads,
+stores and coordinate scaling. Generic runtime formats require a separate design; device queries,
+specialization or explicit binding metadata remain alternatives to investigate. Do not infer format
+from test comments, values, or arbitrary caller walks. A new general lowering pass is not implied.
+
 **Texture queries.** Selected non-mip geometry has direct lowering. Full mip, array-count and
 allocated/view-level-count semantics remain unresolved. CUDA source helpers ignore requested mip and
 write zero for some counts. A length-one declared cube array may bind a nonlayered cube. Texture and

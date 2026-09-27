@@ -116,6 +116,15 @@ against before-O0 and repaired O0/O3 helpers. Check complete outputs, completion
 unspecified padding. Preserve wrong-output before cells. Same-module Slang calls do not substitute
 for the external caller, and this gate does not establish CUDA-prelude binary interoperability.
 
+For surface-format qualification, pair shader checks with independent host readback of the actual
+CUDA array. Freeze logical texels and their physical byte encoding before execution, query the created
+array's channel format/count/extents, and copy the complete allocation back without shader texture
+loads. Check untouched neighboring texels as well as written channels. Run the same kernels with a
+matching native-width allocation as a control; shader read/write agreement alone can share a wrong
+byte-X scale. The current `surface-physical-format` focused record pins a driver, frozen signed8 and
+signed32 oracles, source and ten launch results. These raw research files stay under ignored `build/`;
+a production format expansion needs permanent reproducible host-readback coverage.
+
 For CPU-only comparison against a durable old compact baseline, even without the old raw directory:
 
 ```bash
