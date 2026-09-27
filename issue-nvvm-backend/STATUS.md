@@ -54,8 +54,14 @@ nested-array case. A separate fresh-source out-copy diagnostic fails both optimi
 child-field offset; NVVM O0 passes. Accepted277 reproduces the defect. These failures remain outside
 the main corpus and explicitly open; accepted279 compiler/corpus identities are unchanged.
 
-Next: bounded correction prototype for array-contained nested stores, preserving canonical layout
-without uncontrolled array expansion. Keep NVRTC and NVVM obligations explicit. Root source/identity
-and separate reused-context independent review accompany the fresh280 author. Native Ubuntu24.04,
-L4SM89/driver580.126.09, SM80 target, CUDA12.9.2/NVRTC12.9.86, LLVM14, RelWithDebInfo;
+[Prototype281](report.slice-281-array-copy-prototypes.md) finds three passing small-copy remedies:
+pointer memcpy, pointer field loops (both backends), and a typed NVVM noinline/optnone store helper.
+Pointer IR stays compact at65536elements, but local storage grows; large modules were never launched.
+All23attempts (six declaration failures retained) yield17effective cells:9correctGPU,2failing controls,
+6compile-only. No production change; full279/targeted233/cadence0 remains inherited.
+
+Next: qualify typed SSA-helper phi/constructed/earlier-load values, underalignment and larger compile
+sizes before selecting an NVVM fix. Pointer methods require a correct snapshot-address boundary;
+NVRTC's production defect remains open. Separate reused author/reviewer and root audits own281.
+Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
 max4CPU workers,2unit servers, serialized suites. Accepted279 local commit46e58db06.

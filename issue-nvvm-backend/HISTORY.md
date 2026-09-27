@@ -120,3 +120,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Seven of nine cells pass; nested-array padding loss is reproduced in NVRTC O3/NVVM O3 and accepted277.
   Independent out-copy and PTX trace isolate child.first corruption; no production change. Baseline279
   remains inherited, while these focused failures stay open for the next bounded correction prototype.
+
+- Prototype281: [copy correction experiments](report.slice-281-array-copy-prototypes.md),
+  [evidence](research-evidence.slice-281.json), [plan](plan.slice-281-array-copy-prototypes.md).
+  Both pointer-copy methods and a small typed NVVM helper pass. Large pointer compilation stays compact
+  but storage grows; no general SSA materialization or production correction claimed. Next qualifies
+  helper producer/alignment/size boundaries; accepted279 and research280 open defects remain intact.

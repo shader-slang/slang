@@ -32,11 +32,17 @@ Skip Slack; no push or system changes.
    Original stage64 could be masked by stale data; use the separate diagnostic for out-copy evidence.
    Raw frozen sources/commands/outputs live under `build/nvvm-array-record-stores280`; installed279
    artifacts,8sources,2configs,576inputs and22pins are unchanged before/after research.
-9. Next is a fresh bounded correction prototype, not blanket array unrolling or substandard-array
-   admission. Evaluate a representation-preserving fix with bounded generated IR; carry both NVRTC and
-   NVVM obligations. Read280 trace before selecting it. No newer full checkpoint is claimed.
-10. Fresh280 author was available, but another spawn/followup hit thread limits. A separate reused-context
-    reviewer audited280; root owns acceptance/commits. Skip Slack and continue the authorized loop.
+9. [Prototype281](report.slice-281-array-copy-prototypes.md) qualifies small standalone pointer memcpy/
+   field-loop remedies on both backends and a typed NVVM noinline/optnone helper with callerO3.
+   Seventeen effective cells:9correctGPU/2wrong-baselineGPU/6largecompile-only; six initial declaration
+   failures retained. Raw root `build/nvvm-array-store-prototype281`. Pointer IR102/114instructions
+   stays constant at65536elements; storage grows to786432/2359296bytes, with no largeGPU execution.
+10. Next bounded gate: typed helper for phi/constructed/earlier-load-after-mutation SSA values,
+    underaligned roots and larger compile sizes/caller ABI. No production remedy selected. Pointer
+    loops/memcpy cannot recover arbitrary SSA snapshots by rereading mutable memory; no blind reuse
+    of dynamic element extracts (provider may expand O(N)). NVRTC production defect remains open.
+11. Prefer fresh bounded delegation when available;281 reused author and independent reviewer with root
+    acceptance audits. Skip Slack, no push/system changes, continue the authorized loop.
 
 [HISTORY](HISTORY.md) owns earlier PCH277, accessor/generic278 and material investigations.
 [The record contract](../docs/design/nvvm-substandard-record-contract.md) separates new279 scope from
