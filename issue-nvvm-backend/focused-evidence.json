@@ -4533,6 +4533,134 @@
           }
         }
       }
+    },
+    "column-major-compact-uniform": {
+      "status": "accepted-focused-gpu",
+      "contract": "Compact column-major ConstantBuffer<float3x2> with explicit six-word CUDA host packing.",
+      "source": {
+        "path": "tests/cuda/nvvm-column-major-compact.slang",
+        "sha256": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f"
+      },
+      "input_floats": [1.0, 0.0, 10.0, 0.0, 1.0, 20.0],
+      "expected_outputs": [1.0, 0.0, 0.0, 1.0, 10.0, 20.0, 11.0, 22.0],
+      "gpu_cells": 3,
+      "exact_float_components": 24,
+      "ptx_reflection_cells": 3,
+      "uniform_size_bytes": 24,
+      "uniform_alignment": 4,
+      "cells": [
+        {
+          "id": "tests/cuda/nvvm-column-major-compact.slang",
+          "mode": "nvrtc-o3",
+          "status": "correct",
+          "return_code": 0,
+          "executed": 1,
+          "actual": [1.0, 0.0, 0.0, 1.0, 10.0, 20.0, 11.0, 22.0],
+          "actual_sha256": "8b4ede5f9ff6137d94cef57beec42a7cdaec98b693262e686c11b7be6bfbc92a",
+          "source_sha256": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
+          "reflection_sha256": "722ed56072fce896d2e755a62b802320a6a88b0dbe750e2d3d11f0e8dc45e35a",
+          "ptx_sha256": "11bde8e1b3cdb727d18e0c4d01bd4833fc37014edc0c610e17b327dfe131c846",
+          "uniform_size": 24,
+          "uniform_alignment": 4
+        },
+        {
+          "id": "tests/cuda/nvvm-column-major-compact.slang",
+          "mode": "nvvm-o0",
+          "status": "correct",
+          "return_code": 0,
+          "executed": 1,
+          "actual": [1.0, 0.0, 0.0, 1.0, 10.0, 20.0, 11.0, 22.0],
+          "actual_sha256": "8b4ede5f9ff6137d94cef57beec42a7cdaec98b693262e686c11b7be6bfbc92a",
+          "source_sha256": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
+          "reflection_sha256": "722ed56072fce896d2e755a62b802320a6a88b0dbe750e2d3d11f0e8dc45e35a",
+          "ptx_sha256": "2784b5ce4b389b24192473774a1d3469299e45d0746979fe920c0bae8e4eefbe",
+          "uniform_size": 24,
+          "uniform_alignment": 4
+        },
+        {
+          "id": "tests/cuda/nvvm-column-major-compact.slang",
+          "mode": "nvvm-o3",
+          "status": "correct",
+          "return_code": 0,
+          "executed": 1,
+          "actual": [1.0, 0.0, 0.0, 1.0, 10.0, 20.0, 11.0, 22.0],
+          "actual_sha256": "8b4ede5f9ff6137d94cef57beec42a7cdaec98b693262e686c11b7be6bfbc92a",
+          "source_sha256": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
+          "reflection_sha256": "722ed56072fce896d2e755a62b802320a6a88b0dbe750e2d3d11f0e8dc45e35a",
+          "ptx_sha256": "d6942fc298cc6850ccdb09c031f3c34247b0c712b1b5067b39f78c69705d08ad",
+          "uniform_size": 24,
+          "uniform_alignment": 4
+        }
+      ],
+      "compiler_identity": {
+        "path": "issue-nvvm-backend/accepted-identity.json",
+        "sha256": "4ce3f71e06f582b82cba621c0136998540acc0b59a56d17d4b6565f61462163e"
+      },
+      "provenance": {
+        "input_pins": {
+          "path": "build/nvvm-column-major-qualification/input-pins.json",
+          "sha256": "5c6bce31170e88e6db6e775a3a3b57a10ff33b1bcb90bc4ec03fe7e9509977a0"
+        },
+        "source_review": {
+          "path": "build/nvvm-column-major-qualification/review/source-oracle.json",
+          "sha256": "f45983bf621be550ddd9eb1644785d8ff305f5196625d381407f8aab74abbf49"
+        },
+        "results": {
+          "path": "build/nvvm-column-major-qualification/results.json",
+          "sha256": "95f5d9abbf89e3b29a7c1bc41c2e84eb5738e7823dcb372648febbdb798b992d"
+        },
+        "runtime_gate": {
+          "path": "build/nvvm-column-major-qualification/focused-0.json",
+          "sha256": "ee849ba8403deecc490f249b045eb95db873758c5e4123e033651b9261d9caa4"
+        },
+        "runtime_log": {
+          "path": "build/nvvm-column-major-qualification/focused-0.log",
+          "sha256": "dde4765878fbbd02b2854a247e19fdaa0655d1562a4f64694031edcecb9aecd7"
+        },
+        "device": {
+          "path": "build/nvvm-column-major-qualification/device.txt",
+          "sha256": "22420c3ef2f77ce7e95772fcdf47940effd9e12ad7e4e9a864968eaed24b6e8f"
+        },
+        "ownership_audit": {
+          "path": "build/nvvm-column-major-qualification/audit.md",
+          "sha256": "74d43e2a57f21922de40aa96329cefac0f452b19a750110ca0866e2f679427c6"
+        },
+        "result_review": {
+          "path": "build/nvvm-column-major-qualification/review/result-replay.json",
+          "sha256": "af42700cd9d87d8b17092b4c8e6276fa5806d32d76abe90ec3e6d0506d5f3a54"
+        }
+      },
+      "original_boundary": {
+        "id": "compute/non-square-column-major.slang#discovery-1",
+        "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+        "classification": "runtime-mismatch",
+        "baseline": {
+          "path": "issue-nvvm-backend/accepted-baseline.json",
+          "sha256": "62c997a14b25874f72f52d6366e7211877df0354c42b9b653c645df46621351b"
+        },
+        "source": {
+          "path": "tests/compute/non-square-column-major.slang",
+          "sha256": "7577f1aedbf5f6fa1b090e49792c7b09602e7a4ee1a5025fd97c3d54b1f368c4"
+        },
+        "expected_file": {
+          "path": "tests/compute/non-square-column-major.slang.expected.txt",
+          "sha256": "f9455e85b4ea6f4640044708b7b281e09ce4ee2bab03bbebde3ff411edfcbce5"
+        },
+        "selection": {
+          "path": "issue-nvvm-backend/discovery-corpus.manifest.tsv",
+          "sha256": "2974725cda335818576b62977a3cc29223156cfbccb12b79d3db4b3ef8b274e3"
+        },
+        "meaning": "Original graphics-packed eight-word source and its three failing CUDA discovery cells are unchanged; this focused six-word fixture does not resolve or replace them."
+      },
+      "limits": [
+        "Selected float3x2 uniform shape only; other sizes, address spaces and host layouts need independent qualification.",
+        "Raw buffer upload intentionally preserves authored bytes; no automatic target-specific repacking.",
+        "Separate focused fixture outside main corpus; no full baseline/cadence change.",
+        "No compiler, provider, harness or original fixture change; no performance claim."
+      ],
+      "execution_failure_history": [],
+      "row_wise_output_input_offsets_bytes": [0, 12, 4, 16, 8, 20],
+      "column_stride_bytes": 12
     }
   }
 }

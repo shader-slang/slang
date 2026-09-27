@@ -298,7 +298,10 @@ depth (host array depth counts faces). These observations do not resolve length-
 subresource view. Full and partial mip chains can have identical base dimensions.
 
 **Host packing and process lifetime.** The column-major `float3x2` CUDA layout is compact stride 12,
-size 24; graphics-packed host words do not implement that contract. Keep the original mismatches.
+size 24; graphics-packed host words do not implement that contract. The permanent
+[compact-column fixture](../../tests/cuda/nvvm-column-major-compact.slang) checks all six elements
+and multiplication in three modes, with fresh 24-byte reflection. Raw test-buffer uploads preserve
+their authored bytes; do not silently repack them for a different target. Keep the original mismatches.
 NVRTC automatic PCH directories are private to each compiler owner; shared persistent paths can
 outlive compatible state. Owned-process cleanup must account for surviving descendants after a leader
 exits, and temporary observers must restore compiler/module/configuration bytes before acceptance.

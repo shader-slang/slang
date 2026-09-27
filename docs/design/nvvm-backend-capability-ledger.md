@@ -167,9 +167,12 @@ These checks preserve existing support boundaries; initial recursive ancestor ad
 
 - The current main baseline retains 37 unresolved cells: three column-major host-packing mismatches
   and 34 infrastructure/preflight outcomes. Keep original bytes, identities and expected outputs.
-- The qualified column-major `float3x2` uses CUDA column stride 12 and size 24. Graphics-packed eight
-  Float32 words produce `11,1`; the corresponding CUDA-packed six words produce `11,22`. This does
-  not establish that arbitrary graphics host layouts can be reused for CUDA.
+- The qualified column-major `float3x2` uses CUDA column stride 12 and size 24. The permanent
+  [compact-column test](../../tests/cuda/nvvm-column-major-compact.slang) checks all six elements
+  plus multiplication in three GPU modes (24 exact Float32 components), with fresh 24-byte layout
+  reflection. Graphics-packed eight words produce `11,1`; the CUDA-packed six words produce `11,22`.
+  The original three discovery mismatches remain unchanged. This does not establish that arbitrary
+  graphics host layouts can be reused for CUDA or expand the main corpus denominator.
 - Three focused integer nested-array cases still produce wrong output under NVRTC O3 while the
   corrected NVVM modes pass. They are outside the main-corpus outcome count.
 - Local mixed FP8/BF16 record arrays remain unsupported. Their latest boundary experiment completed

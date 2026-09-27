@@ -65,7 +65,10 @@ outcomes, identities and failure history. No performance improvement from that r
   frozen budget. Twenty-nine runtime and thirteen measurement CPU contracts pass. Full compiler
   evidence above remains inherited and unchanged; isolated harness work does not reset checkpoint cadence.
 - Three column-major host-packing mismatches and 34 infrastructure/preflight gaps remain in the
-  main corpus. Exact rows and resolved histories are preserved.
+  main corpus. Exact rows and resolved histories are preserved. A separate permanent compact CUDA
+  `float3x2` fixture passes all three GPU modes (24 exact components) and three 24-byte reflection
+  checks. The original graphics-authored input, discovery selection and failure rows remain intact;
+  raw buffer uploads do not imply target-dependent repacking.
 - Three focused NVRTC nested-array controls still return wrong37 outside the main corpus. Both
   large N65536 O3 vendor experiments exceed120seconds/4GiB. No large-GPU or speed claim follows.
 - Older inheritance/initialization/constants and record-array qualifications retain their tested
@@ -97,8 +100,9 @@ outcomes, identities and failure history. No performance improvement from that r
   96 integer components pass, plus 6 neighboring GPU cells and one IR check. These focused tests
   do not change the main corpus totals or compiler checkpoint. Any production fix must preserve
   receiver value semantics and prove general field liveness; the PTX deletion remains a diagnostic.
-  Return to workload coverage and triage the remaining host-packing boundary before more vendor
-  optimization research.
+  The compact matrix-packing positive is now permanent. Select the next coherent feature boundary
+  from workload value and existing checked-plan ownership; further vendor optimization research is
+  secondary to compiler capability.
 
 Future authorized work updates current documents and evidence in place. Keep working plans,
 report drafts and raw artifacts uncommitted; do not restart numbered slice history.
