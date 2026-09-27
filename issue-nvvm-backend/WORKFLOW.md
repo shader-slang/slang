@@ -7,11 +7,11 @@ histories. Do not reconstruct decisions from chat or repeat the historical ledge
 
 ## Authority and ownership
 
-The general development loop is **active**, explicitly resumed by the maintainer on 2026-09-26
-following slices268/269. Continue bounded, independently reviewed slices and accepted local commits
-until a recorded stopping condition needs human input. Prioritize FP8 aggregate/dynamic-dispatch
-qualification, language-breadth probes and material-driven work using current evidence. Results-only
-requests do not change loop authority. No push, publication, driver change or reboot is implied.
+The development loop is **stopped after slice296**, as requested by the maintainer on 2026-09-27.
+Its independent acceptance and navigation closeout are complete in this local commit. Do not start the
+queued parser repair or any later slice without explicit user resume. The earlier 2026-09-26 resume
+authorized work through this stopping boundary only. Skip Slack under the current override; no push,
+publication, driver change or reboot is implied. Results-only requests do not restart the loop.
 Respect newer maintainer scope and stopping instructions.
 
 Use one bounded fresh-context worker per slice when delegation is available. The lead owns scope,

@@ -209,3 +209,10 @@ ledger preserves first-known and resolved histories with their original evidence
   Four unchanged authored contracts pass12CUDA mode cells/48words with exact bodies/sidecars and
   identity maps. Host-input inheritance plus lane-dependent defaults/scoped-array indexing;
   folding and zero-sentinel limits retained. No compiler/main-corpus change; full293/cadence0 inherited.
+
+- Research296: [local record-array boundary](report.slice-296-record-array-boundary.md),
+  [evidence](research-evidence.slice-296.json), [plan](plan.slice-296-record-array-boundary.md).
+  Six GPU passes/22words; nine unsupported compile obligations; two existing negative units and one
+  expected guard-corruption rejection. Canonical pre-emission array/helper shapes retained; no
+  admission change. Path-sensitive NVRTC classifier false positive adjudicated without rerun;
+  original failure preserved. Loop stopped after296 under user request; parser repair queued only.

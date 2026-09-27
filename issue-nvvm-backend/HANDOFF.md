@@ -3,9 +3,9 @@
 Current full baseline: [validation293](runtime-validation.slice-293.json),
 [parser report](report.slice-293-diagnostic-colors.md), with unchanged compiler285 bytes,
 [array store report](report.slice-285-nested-array-stores.md) and
-[plan285](plan.slice-285-nested-array-stores.md). The user resumed the development loop on 2026-09-26.
-Continue bounded reviewed local commits under WORKFLOW until a recorded stopping condition.
-Skip Slack; no push or system changes.
+[plan285](plan.slice-285-nested-array-stores.md). The user requested stopping the development loop after slice296 on 2026-09-27.
+Slice296 is independently accepted and closed with this local commit; the loop is stopped under WORKFLOW. An explicit resume is required
+before another slice. Skip Slack; no push or system changes.
 
 1. Read STATUS, WORKFLOW and RESULTS; inspect HEAD, working changes and dependency pins.
 2. Qualified285 layout is installed at `build/RelWithDebInfo`. Verify all37 runtime identities,
@@ -57,7 +57,7 @@ Skip Slack; no push or system changes.
     overhead controls; see the current closeout below.267 already closed the aggregate-memory gap.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
-    Skip Slack and continue the authorized loop.
+    Skip Slack; the latest user instruction stops the loop after296 closeout.
 
 [HISTORY](HISTORY.md) owns earlier evidence. [Record contract](../docs/design/nvvm-substandard-record-contract.md)
 separates local FP8/BF16 record admission from the integer-array store correction. Earlier timing
@@ -76,7 +76,24 @@ refresh version metadata and rebuild before any production build. Raw evidence/r
 [Language295](report.slice-295-language-surface.md) completes four unchanged inheritance, mixed-width
 initialization and scoped-constant contracts:12mode cells/48words, no skips/failures, exact identities.
 Default/array/call folding and two lane0zero-sentinel limits remain explicit. No production change.
-The loop remains active. Next audit the excluded FP8/BF16 local record-array boundary and propose
-a bounded qualification gate before changing admission. Reuse285integer-store evidence; do not
-reopen267materialgap or largeN65536timeouts. Main580cases/576files/1740cells and
-full293/targeted233/cadence0 remain inherited. SkipSlack; no push/systemchanges.
+The following296 gate characterizes the excluded boundary without changing admission.
+
+## Slice296 closeout and stop
+
+[Boundary296](report.slice-296-record-array-boundary.md) accounts for18obligations:6GPU passes/22words,
+6unsupported shader compiles,3unsupported IR captures,2existing negative units and1expected corruption
+rejection with full buffer[32,0,65536,9321]. Mixed local/root/wrapper refuse var/OutParam<Array<Cell,2>>/
+OutParam<Wrapper>. Final O0 Slang IR retains those canonical shapes and whole-copy helpers; no mixed
+LLVM/PTX or CUDA/provider layout proof. Integer control passes allthree modes.
+
+The NVRTC classifier mistakes a source path containing nvrtc-o3 for a compiler error. Exact saved
+FileCheck/output/count evidence supports a reviewed runtime-mismatch adjudication; original raw
+failed/infrastructure evidence remains. Continuation runs only the five previously unrun obligations.
+All100layout/37runtime/11source/2config/576input/22pin identities are unchanged285; full293 remains
+inherited. Raw evidence is build/nvvm-record-arrays296; final296 independent acceptance is complete.
+This local commit closes296.
+
+**Stopped after296** under the latest user request. A bounded path-sensitive parser repair with regression
+coverage and its required full checkpoint is queued, not started. Resume only on explicit user request.
+No array admission; do not reopen267materialgap or largeN65536timeouts. Main580cases/576files/1740cells
+and full293/targeted233/cadence0 remain inherited. SkipSlack; no push/systemchanges.

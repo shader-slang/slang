@@ -1,7 +1,8 @@
 # NVVM backend status
 
-The development loop is **active**, resumed on 2026-09-26. Continue bounded reviewed local commits
-under [WORKFLOW](WORKFLOW.md); skip Slack, no push or system changes. Read [HANDOFF](HANDOFF.md)
+The development loop is **stopped after slice296**, as explicitly requested by the user on 2026-09-27.
+Slice296 is independently accepted and closed with this local commit under [WORKFLOW](WORKFLOW.md).
+Skip Slack; no push or system changes. Any later slice requires an explicit resume. Read [HANDOFF](HANDOFF.md)
 and [RESULTS](RESULTS.md). [HISTORY](HISTORY.md) owns earlier evidence and failure histories.
 
 ## Accepted checkpoint
@@ -47,9 +48,14 @@ instrumented semantic CPU. Global7995-call timer overhead is18.594ms versus coun
 uninstrumented saving or safe pruning follows. All40samples passed; accepted layout/source/config
 restored exactly. OR pruning is deprioritized. [Language295](report.slice-295-language-surface.md)
 qualifies four existing inheritance/initialization/constants contracts:12mode cells/48words, exact
-identities and unchanged inputs. These are focused results outside the main corpus. Next audit the
-excluded FP8/BF16 local record-array boundary for a bounded qualification gate before any admission
-change. The aggregate-memory gap remains fixed by267.
+identities and unchanged inputs. These are focused results outside the main corpus.
+
+[Boundary296](report.slice-296-record-array-boundary.md) characterizes all18obligations:6GPU passes/
+22words,9unsupported compile cells,2negative units and1expected guard-corruption rejection. O0 dumps
+retain local arrays and noinline whole copies before NVVM admission rejects them. A path-sensitive
+NVRTC classifier false positive is adjudicated from saved evidence; its original failed record stays.
+No array or parser change. A separate parser repair/full checkpoint is queued only; do not start it
+without explicit user resume. The aggregate-memory gap remains fixed by267.
 
 Three column-major host-packing mismatches and34 infrastructure/preflight gaps remain.285's three
 focused NVRTC nested-array controls still produce wrong37 outside the main corpus; both large
