@@ -41,11 +41,15 @@ Skip Slack; no push or system changes.
     earlier-load/phi SSA and offset1 storage/canaries. N17caller expansion and N65536O0 timeout under
     120seconds/4GiB reject the general method; O3 explicitly not run. No cutoff/fallback selected.
     Eight exact dispositions/raw sources at `build/nvvm-ssa-copy-boundary282`; accepted identities unchanged.
-11. Next bounded experiment: weaken whole-array store annotation toalign1 on actually aligned roots,
-    keeping canonical values and call ABI. Ordinary realunaligned path provides a lead only. Establish
-    frozen before/after and size evidence; no implementation until the causal contract is qualified.
-12. Prefer fresh bounded delegation when available;282 reused author and independent reviewer with root
-    acceptance audits. Skip Slack, no push/system changes, continue the authorized loop.
+11. [Gate283](report.slice-283-array-store-alignment.md) changes only four/two whole-store alignment
+    annotations4→1, with actualroots still4aligned. Both small candidates passO0/O3, controls remainwrong.
+    N17both/N65536O0 compile; N65536O3 times out120s/4GiB. Rawroot
+    `build/nvvm-array-store-alignment283`; no new authored ABI, but NVVM argument promotion remains.
+12. Next: original-large baseline under identical bounds before attributing283timeout and choosing
+    production scope. No general fix/cutoff selected. Accepted279 identities and280 production defects
+    remain unchanged. This comparison is new evidence, not a retry of the failed candidate.
+13. Prefer fresh bounded delegation when available;283 used fresh author and separate reused reviewer.
+    Skip Slack, no push/system changes, continue the authorized loop.
 
 [HISTORY](HISTORY.md) owns earlier PCH277, accessor/generic278 and material investigations.
 [The record contract](../docs/design/nvvm-substandard-record-contract.md) separates new279 scope from

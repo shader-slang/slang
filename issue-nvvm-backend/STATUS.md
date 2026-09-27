@@ -65,8 +65,12 @@ values and realalignment1/canaries, but rejects it as a general correction: N17c
 N65536O0 times out at120seconds under4GiB, and O3 is explicitly not run after that size-gate failure.
 No arbitrary cutoff or fallback is selected; accepted279 remains unchanged.
 
-Next: isolate whether conservative whole-store align1 annotations fix actually aligned roots without
-new helper ABI. The passing ordinary underaligned path is a lead, not proof of this counterfactual.
-Pointer methods still require correct snapshot materialization; NVRTC's production defect stays open.
+[Gate283](report.slice-283-array-store-alignment.md) fixes both small NVVM reproducers by changing only
+whole-store alignment4→1 on actualaligned4 roots. Four candidateGPU cells pass; originalO3 controls
+retain wrong14/9234. N17both modes andN65536O0 compile; N65536O3 times out120s/4GiB. Source signatures
+stay unchanged, but downstream argument promotion remains. General size qualification is incomplete.
+
+Next: original-large comparison under identical bounds before attributing that timeout or selecting
+production scope. No compiler change or size cutoff chosen. NVRTC's production defect stays open.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
 max4CPU workers,2unit servers, serialized suites. Accepted279 local commit46e58db06.

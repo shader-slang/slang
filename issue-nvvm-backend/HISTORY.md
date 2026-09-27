@@ -131,3 +131,8 @@ ledger preserves first-known and resolved histories with their original evidence
   [evidence](research-evidence.slice-282.json), [plan](plan.slice-282-ssa-copy-boundary.md).
   Small constructed/snapshot/phi/unaligned values pass; N65536O0 times out, O3 explicitly unrun.
   General helper rejected without cutoff/fallback; next isolates alignment annotations without a new ABI.
+
+- Gate283: [whole-array alignment counterfactual](report.slice-283-array-store-alignment.md),
+  [evidence](research-evidence.slice-283.json), [plan](plan.slice-283-array-store-alignment.md).
+  Small annotation-only changes correct both reproducers; N65536O3 times out with no original-large
+  baseline, so causal scalability attribution remains open. No production change selected.
