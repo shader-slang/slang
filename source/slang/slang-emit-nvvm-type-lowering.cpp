@@ -2166,7 +2166,8 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
                             : asNVVMSupportedHelperArrayType(type, &elementCount);
         if (!supportedType && use == NVVMTypeUse::Value)
             supportedType = asNVVMSupportedResourceArrayType(type, &elementCount);
-        if (!supportedType && (use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage))
+        if (!supportedType && (use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage ||
+                               use == NVVMTypeUse::HelperParameter))
             supportedType = asNVVMSupportedLocalSubstandardRecordArrayType(type, &elementCount);
     }
     SLANG_RELEASE_ASSERT(supportedType);
@@ -2389,10 +2390,11 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
-    // A local array snapshot is an SSA value, not an array-bearing callable ABI. Check this
-    // role before consulting caches populated by a local allocation or whole-array load.
+    // Internal value parameters preserve the same array snapshot as ordinary SSA values. Reference
+    // and result roles remain separate contracts, even after a value/storage lookup fills a cache.
     if (isLocalSubstandardRecordArray)
-        return use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage;
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage ||
+               use == NVVMTypeUse::HelperParameter;
 
     // Local record references qualify parameters and allocations, not a new pointer-return ABI.
     if (use == NVVMTypeUse::HelperResult && localHelperPointer &&

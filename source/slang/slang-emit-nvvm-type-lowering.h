@@ -144,8 +144,9 @@ bool isNVVMSupportedHelperValueType(IRInst* type);
 /// Its register and local storage representations agree; external storage is not admitted.
 IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type);
 
-/// Returns an ordinary fixed array of qualified identity records for local values and storage.
-/// This does not admit array-bearing helper signatures, nested arrays, or wrapper records.
+/// Returns an ordinary fixed array of qualified identity records for local values, storage and
+/// internal value parameters. This does not admit reference/result roles, nested arrays or
+/// wrappers.
 IRArrayType* asNVVMSupportedLocalSubstandardRecordArrayType(
     IRInst* type,
     uint32_t* outElementCount = nullptr);

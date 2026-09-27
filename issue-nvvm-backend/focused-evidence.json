@@ -5967,6 +5967,204 @@
         "Standard renderer global block is 216 bytes; distinct from custom material runtime driver ABI.",
         "Outside main corpus; full baseline/accepted compiler identity unchanged."
       ]
+    },
+    "local-substandard-record-array-parameters": {
+      "status": "accepted-focused-gpu",
+      "contract": "Internal by-value parameters of the existing ordinary fixed identity-record array family; snapshot isolation and callee-local mutation.",
+      "source": {
+        "path": "tests/cuda/nvvm-substandard-record-array-parameter.slang",
+        "sha256": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e"
+      },
+      "compiler_identity": {
+        "revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
+        "patch_sha256": "3a1a750089b782f3486c0ac6afac2e50a28157f2f95831dfd9246e0dffa06453",
+        "version": "2026.18.3-326-gcef0ffbdf",
+        "runtime_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d"
+        }
+      },
+      "admission": {
+        "added_type_use": "HelperParameter",
+        "preserved_type_uses": ["Value", "Storage"],
+        "forbidden_type_uses": [
+          "HelperValue",
+          "HelperResult",
+          "EntryPointParameter",
+          "EntryPointResult",
+          "ParameterGroupStorage",
+          "StructuredBufferStorage"
+        ],
+        "explicit_export_rejection": true,
+        "generic_helper_predicate_unchanged": true,
+        "producer": "Canonical Array<Record,N> input parameter; source mutation creates callee-local Var. Source array results still legalize to OutParam."
+      },
+      "oracle": {
+        "method": "Exact independent integer equations for all original fields and caller-live/callee-mutated before/BF2 lane values; literal and dynamic slot checks.",
+        "iterations": 65536,
+        "records": 2,
+        "cell_size_bytes": 16,
+        "cell_alignment": 4,
+        "original_fp8_encodings_per_field_per_slot": 256,
+        "original_bf16_encodings_per_field_or_lane_per_slot": 65536,
+        "slot_lane_combinations": 4,
+        "occurrences_per_slot_lane_combination": 16384,
+        "limits": "Correlated finite patterns; not a Cartesian product or every encoding under every slot/lane selection.",
+        "review": {
+          "path": "build/nvvm-record-array-helpers/review/candidate-oracle.json",
+          "sha256": "711d00273e148cfa207f2a50cf6aa6cc2dc9f075a7835a2d3584f1108cf85be3"
+        }
+      },
+      "cells": [
+        {
+          "mode": "nvrtc-o3",
+          "classification": "correct",
+          "executed": 1,
+          "actual": [0, 0, 0, 0, 65536, 3735928559],
+          "actual_sha256": "1264666ea352c6613886f186bd4add7304f4555722c442e04c83f6b11dc00510",
+          "ptx_sha256": "dbb25b452450289126c490a4a35f4adb55902b72cdaee8dd5d8e335633a46d36",
+          "cubin_sha256": "b66f185291592f67515e3bd6cc0cff615f4fe78867297ee6352d442eacf2955e"
+        },
+        {
+          "mode": "nvvm-o0",
+          "classification": "correct",
+          "executed": 1,
+          "actual": [0, 0, 0, 0, 65536, 3735928559],
+          "actual_sha256": "1264666ea352c6613886f186bd4add7304f4555722c442e04c83f6b11dc00510",
+          "ptx_sha256": "394df8473ab5bc41af87049e441174b85a84769e68c2823e25a60ad1055cbd35",
+          "cubin_sha256": "2ff01695340065ff47c99eeb9168dc245b002e3a8975f9163996c8f0eb7a948a"
+        },
+        {
+          "mode": "nvvm-o3",
+          "classification": "correct",
+          "executed": 1,
+          "actual": [0, 0, 0, 0, 65536, 3735928559],
+          "actual_sha256": "1264666ea352c6613886f186bd4add7304f4555722c442e04c83f6b11dc00510",
+          "ptx_sha256": "f7df930c70e5ea8ba72bd12cf4131bdbd768571ca4a292b887496edf9de42bec",
+          "cubin_sha256": "7fab4b58b0cb932fa5de7d1fbfa9b98f60fe235e4168d376ff2d05b116c368c1"
+        }
+      ],
+      "before_after": {
+        "before_correct": 5,
+        "before_preflight": 4,
+        "after_correct": 7,
+        "after_preflight": 2,
+        "unchanged_cells": 7,
+        "transitions": [
+          {
+            "probe": "value",
+            "mode": "nvvm-o0",
+            "before": "preflight",
+            "after": "correct",
+            "source_sha256": "195f36a0d0f4eb3c99e2b27d4cd9f9fdc1a6976b317b5b0738c9ebe3c346cb61",
+            "actual": [0, 65536, 3735928559]
+          },
+          {
+            "probe": "value",
+            "mode": "nvvm-o3",
+            "before": "preflight",
+            "after": "correct",
+            "source_sha256": "195f36a0d0f4eb3c99e2b27d4cd9f9fdc1a6976b317b5b0738c9ebe3c346cb61",
+            "actual": [0, 65536, 3735928559]
+          }
+        ],
+        "remaining": "Source array-result NVVM O0/O3 remain E52017 helper function parameter: OutParam<Array<Cell, 2>>.",
+        "before": {
+          "path": "build/nvvm-record-array-helpers/before-outcomes.json",
+          "sha256": "29747a0194463346abeb2e4593a8ae26ad8f84dbdb205f4abcad7ba78046ba82"
+        },
+        "after": {
+          "path": "build/nvvm-record-array-helpers/after-outcomes.json",
+          "sha256": "5be2d0f79d8474f96daaaacc37bd51b7f8475c6164f5bf44b46d90aa414ad815"
+        }
+      },
+      "validation": {
+        "focused_gpu_cells": 51,
+        "focused_shared_units": 28,
+        "direct_static_units": 2,
+        "full_baseline": "See current accepted-baseline.json for full corpus/native/semantic/material/toolkit acceptance under this compiler."
+      },
+      "provenance": {
+        "before_review": {
+          "path": "build/nvvm-record-array-helpers/review/before-review.json",
+          "sha256": "68f9c684b85332771b6bca5419aefc87c140f57038c52ce017983e9cfea29504"
+        },
+        "source_review": {
+          "path": "build/nvvm-record-array-helpers/review/final-source-2.json",
+          "sha256": "42883c66343033f72786159e71aee5e4d922c5e1c5011a9234211fd8d07c8061"
+        },
+        "gpu_gate": {
+          "path": "build/nvvm-record-array-helpers/candidate-after-gpu-0.json",
+          "sha256": "4a32eed10f4d4d44e8ccc57dd847f61db7095a19406b1fb1a88922176ffd81be"
+        },
+        "focused_results_review": {
+          "path": "build/nvvm-record-array-helpers/review/focused-results.json",
+          "sha256": "2740588f80c889755e2e86cccca0c58694a4564f32659417925430ff6bbb7970"
+        },
+        "dataflow_review": {
+          "path": "build/nvvm-record-array-helpers/review/candidate-dataflow.json",
+          "sha256": "e9d8b2664ff49b0f3a0a21c345239d9788824e9d0ba95b8bc7b3e8b7e5dd17ff"
+        },
+        "static_identity": {
+          "path": "build/nvvm-record-array-helpers/static-identity.json",
+          "sha256": "6338948d4c85048abb2a281d986309e0bcff2eb5fbdec5748954e0000d6102f1"
+        },
+        "before_identity": {
+          "path": "build/nvvm-record-array-helpers/before-identity.json",
+          "sha256": "2a8a3d7f1449e32ed8e1d372a4569cf8f77921675c5d6688b25fe17659662ff7"
+        },
+        "checkpoint_review": {
+          "path": "build/nvvm-record-array-helpers/review/checkpoint-review.json",
+          "sha256": "009d820dd6397d02cec1010f73e264dd05c907631752e9a0748880e2daf396fd"
+        },
+        "unit_component_refresh": {
+          "path": "build/nvvm-record-array-helpers/unit-component-refresh-1.json",
+          "sha256": "b3c8415b55d2989303fbfeecd6acc1e93a5dde1271eae5616bb0bb3835bfe7c5"
+        }
+      },
+      "failure_history": [
+        {
+          "attempt": "before-gpu-0",
+          "classification": "missing-execution",
+          "return_code": 0,
+          "reason": "Directory prefix selected no tests; actual nine-cell before inventory comes from explicit-file gates.",
+          "log": {
+            "path": "build/nvvm-record-array-helpers/before-gpu-0.log",
+            "sha256": "9165506fc62a4fae44ed970992060ce60181edfbd287fa5ed4d54f01aecd8350"
+          }
+        },
+        {
+          "attempt": "focused-units",
+          "classification": "obsolete-negative-test",
+          "passed": 24,
+          "failed": 1,
+          "reason": "Historical nested-record case now admits the intended Array<Outer,2> value parameter; scalar fake builder failed E52018. Exact case migrated to a real-builder positive; all other negative sources preserved.",
+          "log": {
+            "path": "build/nvvm-record-array-helpers/focused-units.log",
+            "sha256": "aa363b539fd82b6351f7949dfed32820586d50d49543f2c251e828fdb211216c"
+          },
+          "resolution": "focused-1-units passes26/26; full native run uses final rebuilt unit bytes."
+        },
+        {
+          "attempt": "full-units",
+          "classification": "obsolete-negative-test",
+          "passed": 1103,
+          "ignored": 13,
+          "failed": 1,
+          "log": {
+            "path": "build/nvvm-record-array-helpers/full-units.log",
+            "sha256": "c4b76c40ddbcd52a6854adc2bc789a95f1dab5e03e1a8157a8d040afeb655b5d"
+          },
+          "resolution": "The exact FP8-only Payload[2] by-value parameter case for both formats moves to real-builder positive coverage; all 13 remaining negative sources unchanged. Final focused units pass28/28 and native units pass1105 with13 inherited skips. Only the unit-test plugin changed after the shader checkpoint; explicit component refresh preserves that chronology."
+        }
+      ],
+      "limits": [
+        "Reference/out/inout/read-only borrow roles, array results and CUDA exports remain excluded.",
+        "Wrapper records containing arrays, multidimensional arrays, BF3/BF4 elements and shared/device/resource/external storage remain excluded.",
+        "Two-element transport does not establish large-array scalability; no arithmetic or performance expansion.",
+        "No new IR representation, compiler pass, provider API or pointer compatibility fallback.",
+        "Older material timings and other focused qualifications retain their original source/binary identities."
+      ]
     }
   }
 }

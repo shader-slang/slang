@@ -88,8 +88,8 @@ struct LocalRecordArrayIR
 
 } // namespace
 
-// Test both lookup orders directly. A successful value/storage lookup must neither authorize a
-// helper/resource role nor be poisoned by an earlier failed lookup of such a role.
+// Start with each admitted role in turn. A cached local or internal parameter representation must
+// neither authorize a reference/result/resource role nor be poisoned by its earlier rejection.
 SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
 {
     LocalRecordArrayContext context(unitTestContext);
@@ -98,17 +98,20 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
     _requireRealNVVMBuilder(unitTestContext, provider);
     const NVVMTypeUse forbidden[] = {
         NVVMTypeUse::HelperValue,
-        NVVMTypeUse::HelperParameter,
         NVVMTypeUse::HelperResult,
         NVVMTypeUse::EntryPointParameter,
         NVVMTypeUse::EntryPointResult,
         NVVMTypeUse::ParameterGroupStorage,
         NVVMTypeUse::StructuredBufferStorage,
     };
+    const NVVMTypeUse admitted[] = {
+        NVVMTypeUse::Value,
+        NVVMTypeUse::Storage,
+        NVVMTypeUse::HelperParameter};
     IRArrayType* arrays[] = {ir.payloadArray, ir.outerArray};
     for (auto array : arrays)
     {
-        for (bool storageFirst : {false, true})
+        for (auto first : admitted)
         {
             ScopedNVVMBuilderModule scope;
             scope.builder = &provider;
@@ -122,14 +125,15 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
                 SLANG_CHECK(rejected == nullptr);
             }
 
-            const auto first = storageFirst ? NVVMTypeUse::Storage : NVVMTypeUse::Value;
-            const auto second = storageFirst ? NVVMTypeUse::Value : NVVMTypeUse::Storage;
             SlangNVVMTypeHandle firstType = nullptr;
-            SlangNVVMTypeHandle secondType = nullptr;
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, first, firstType)));
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, second, secondType)));
             SLANG_CHECK_ABORT(firstType != nullptr);
-            SLANG_CHECK(firstType == secondType);
+            for (auto use : admitted)
+            {
+                SlangNVVMTypeHandle nextType = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, use, nextType)));
+                SLANG_CHECK(firstType == nextType);
+            }
 
             // Construct the independent expected LLVM type directly through the provider.
             SlangNVVMTypeHandle i16 = nullptr;
@@ -164,7 +168,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
                 SLANG_CHECK(SLANG_FAILED(lowering.lowerType(array, use, rejected)));
                 SLANG_CHECK(rejected == nullptr);
             }
-            for (auto use : {first, second})
+            for (auto use : admitted)
             {
                 SlangNVVMTypeHandle repeated = nullptr;
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, use, repeated)));

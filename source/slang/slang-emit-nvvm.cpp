@@ -7987,6 +7987,7 @@ bool _isSupportedNVVMHelperParameterType(IRInst* type)
     NVVMReadOnlyTextureType sampledTextureType;
     return isNVVMFloat8Type(type) || isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
            isNVVMSupportedHelperValueType(type) || asNVVMSupportedSubstandardRecordType(type) ||
+           asNVVMSupportedLocalSubstandardRecordArrayType(type) ||
            asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedLocalResourceStructPointerType(type) ||
            asNVVMSupportedLocalCopyableValuePointerType(type) ||
@@ -8281,6 +8282,12 @@ SlangResult _validateNVVMHelperTarget(
             helper->getResultType());
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
+        if (isCUDAExport &&
+            asNVVMSupportedLocalSubstandardRecordArrayType(helper->getParamType(parameterIndex)))
+            return _diagnoseUnsupportedIRType(
+                codeGenContext,
+                "exported substandard record array helper parameter",
+                helper->getParamType(parameterIndex));
         if (isCUDAExport &&
             asNVVMSupportedSubstandardRecordType(helper->getParamType(parameterIndex)))
             return _diagnoseUnsupportedIRType(
