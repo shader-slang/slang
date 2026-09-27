@@ -106,3 +106,11 @@ ledger preserves first-known and resolved histories with their original evidence
   [evidence](research-evidence.slice-278.json), [completed plan](plan.slice-278-accessor-generics.md).
   Six unchanged sources pass18 cells/72 independently checked words. Main corpus and277 identity
   unchanged; full277/targeted233/cadence0 inherited. No compiler change. Next: nested FP8/BF16 probe.
+
+- Correctness279: [nested record admission and padding-preserving stores](report.slice-279-nested-records.md),
+  [validation](runtime-validation.slice-279.json), [completed plan](plan.slice-279-nested-records.md).
+  New nested FP8/BF16 composition exposed valid LLVM miscompiled by libNVVM O3; accepted277 integer
+  control also fails. Provider splits direct nested struct stores using canonical offsets/alignment.
+  Focused14native/18GPU and full1740 preservation pass; six new units, old native identities exact.
+  Material O3/NVRTC artifacts exact; O0 store expansion independently reviewed, resources unchanged.
+  Full279/targeted233/cadence0. Reused independent reviewer; next bounded gate is array-nested stores.

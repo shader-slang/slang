@@ -140,7 +140,7 @@ IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(
 /// pointers.
 bool isNVVMSupportedHelperValueType(IRInst* type);
 
-/// Returns a flat internal record containing FP8, scalar BF16, or BF2 and integer fields.
+/// Returns a finite internal record tree containing FP8, scalar BF16, or BF2 and integer leaves.
 /// Its register and local storage representations agree; external storage is not admitted.
 IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type);
 

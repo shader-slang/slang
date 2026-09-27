@@ -11,6 +11,7 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
@@ -628,6 +629,55 @@ static SlangResult SLANG_NVVM_CALL _emitLoad(
     return SLANG_OK;
 }
 
+// Preserves nested struct padding when libNVVM lowers aggregate stores. Consider these LLVM types:
+//
+//     Inner = { i8, i32 }
+//     Outer = { i8, Inner }
+//
+// The two i8 fields occupy offsets zero and four. The installed libNVVM optimizer can combine
+// a whole Outer store into adjacent byte stores, losing that nested boundary. Select fields with
+// LLVM's canonical type and layout before handing the operation to libNVVM. Flat structs, vectors
+// and arrays retain ordinary stores; in particular, this does not expand potentially huge arrays.
+static void _emitStorePreservingNestedStructLayout(
+    ModuleState* state,
+    llvm::Value* value,
+    llvm::Value* pointer,
+    llvm::Align alignment)
+{
+    auto structType = llvm::dyn_cast<llvm::StructType>(value->getType());
+    bool hasStructField = false;
+    if (structType)
+    {
+        for (auto fieldType : structType->elements())
+        {
+            if (fieldType->isStructTy())
+            {
+                hasStructField = true;
+                break;
+            }
+        }
+    }
+    if (!hasStructField)
+    {
+        state->builder.CreateAlignedStore(value, pointer, alignment);
+        return;
+    }
+
+    const llvm::StructLayout* layout = state->module->getDataLayout().getStructLayout(structType);
+    for (unsigned i = 0; i < structType->getNumElements(); ++i)
+    {
+        llvm::Value* fieldValue = state->builder.CreateExtractValue(value, i);
+        llvm::Value* fieldPointer = state->builder.CreateStructGEP(structType, pointer, i);
+        // The caller guarantees the root alignment, not the child's nominal ABI alignment.
+        // Retain only the guarantee that survives this exact offset, including underaligned roots.
+        _emitStorePreservingNestedStructLayout(
+            state,
+            fieldValue,
+            fieldPointer,
+            llvm::commonAlignment(alignment, layout->getElementOffset(i)));
+    }
+}
+
 static SlangResult SLANG_NVVM_CALL _emitStore(
     SlangNVVMModuleHandle module,
     SlangNVVMValueHandle value,
@@ -649,7 +699,7 @@ static SlangResult SLANG_NVVM_CALL _emitStore(
         return SLANG_E_INVALID_ARG;
     }
 
-    state->builder.CreateAlignedStore(llvmValue, llvmPointer, llvm::Align(alignment));
+    _emitStorePreservingNestedStructLayout(state, llvmValue, llvmPointer, llvm::Align(alignment));
     return SLANG_OK;
 }
 

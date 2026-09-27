@@ -1,42 +1,38 @@
 # Start a fresh NVVM session
 
-Current full baseline: [validation277](runtime-validation.slice-277.json),
-[PCH ownership report](report.slice-277-pch-ownership.md) and
-[completed plan277](plan.slice-277-pch-ownership.md).
-The user resumed the development loop on 2026-09-26. Continue bounded reviewed local commits under
-WORKFLOW until a recorded stopping condition. Skip Slack; no push or system changes.
+Current full baseline: [validation279](runtime-validation.slice-279.json),
+[nested record/store report](report.slice-279-nested-records.md) and
+[plan279](plan.slice-279-nested-records.md). The user resumed the development loop on 2026-09-26.
+Continue bounded reviewed local commits under WORKFLOW until a recorded stopping condition.
+Skip Slack; no push or system changes.
 
 1. Read STATUS, WORKFLOW and RESULTS; inspect HEAD, working changes and dependency pins.
-2. Qualified277 layout is installed at `build/RelWithDebInfo`. Verify all37 runtime provenance entries,
-   all576 main inputs and22 pins. Actual compiler aa1fe42e/version293-g9210ef5a1 comes from recorded
-   source9210ef5a1 plus patch30e61108; provider ABI42/hash fbef1a9e is unchanged. Do not treat a launcher
-   hash or later commit number as the compiled identity.
+2. Qualified279 layout is installed at `build/RelWithDebInfo`. Verify all37 runtime identities,
+   all576 main inputs and22pins. Actual compiler9e013b2c/version295-g0043e8d17 and provider a861b242/ABI42
+   come from source0043e8d17 plus patch62ae6473. A later commit number is not the compiled identity.
 3. Builds follow `build/nvvm-setup/slang-skills/skills/slang-build/SKILL.md`, native tools and RESULTS
-   prerequisites. Previous270's100-entry installed layout is preserved under
-   `build/nvvm-pch-ownership277/accepted270-layout`. Use fresh ignored artifact roots.
-4. Limit builds/jobs to four CPU workers, units to two servers, and gates to30 minutes. Serialize
-   builds/GPU/suites/benchmarks. Preserve failed attempts and exact comparisons; no retries hiding losses.
-5. Full277 preserves580 cases/576 sources/1740 cells:1703 correct,37 unresolved,20 resolved histories.
-   Units1090pass/13skip preserve1100 old IDs plus3 additions; semantics1170pass/78skip preserve1248 IDs.
-   Runtime4/toolkit18/material6 pass. Material PTX/cubin/resources equal270. Last full277/targeted233,
-   implementation cadence0. Frozen195 is immutable; discovery remains at128 sources.
-6. Research275 reproduced8 native failures+2SIGSEGV among16 shared-cwd processes, with24 controls
-   passing. Lifecycle276 qualified20 processes/100 direct NVRTC compiles. Implementation277 passes the
-   same40-process comparison with40 private retired namespaces and120 PCH creations. Actual-adapter
-   tests cover same-owner reuse, named diagnostics, surviving owners/external library refs and explicit
-   caller directories. Exact262 deletion signature is retained without claiming causal reproduction.
-7. [Research278](report.slice-278-accessor-generics.md) qualifies six existing accessor/generic sources
-   outside the main corpus:18 cells and72 independent output words pass, with unchanged277 identities.
-   No compiler defect found. Next: probe nested FP8/BF16 local-record composition, a documented270
-   boundary. Establish a small independent output oracle and canonical IR trace before implementation.
-   Preserve current leaf/value/storage/pointer domains and material acceptance obligations.
-8. Delegation recently hits thread limits. Use a fresh bounded worker when available; otherwise record
-   reuse and separate root local audits. Author self-review is not independent-agent review.
+   prerequisites. Verified277 layout is preserved under `build/nvvm-nested-records279/accepted277-layout`;
+   older270 recovery remains under `build/nvvm-pch-ownership277/accepted270-layout`. Use fresh artifact roots.
+4. Limit builds/jobs to4CPU workers, units to2servers, gates to30minutes. Serialize builds/GPU/suites/
+   benchmarks. Preserve failed attempts and exact comparisons; no retries hiding losses.
+5. Full279 preserves580cases/576sources/1740cells:1703correct,37unresolved,20resolved histories.
+   Units1096pass/13skip preserve1103old IDs plus6new; semantics1170pass/78skip preserve1248IDs.
+   Runtime4/toolkit18/material6 pass. Last full279/targeted233/cadence0. Frozen195 immutable; discovery128.
+6. Nested FP8/BF16 admission uses canonical finite record trees and existing local ancestry. Candidate1
+   exposed a libNVVM12.9 O3 wrong-output bug in valid nested stores; accepted277 integer control and
+   standalone LLVM reproduce it. Provider splitting at direct struct boundaries fixes both exhaustive
+   regressions. Focused14native/18GPU pass. Arrays stay opaque; all documented role boundaries remain.
+7. Material NVRTC/O3 PTX/cubins are byte-identical277. TwoO0 artifacts differ in six functions per module;
+   independent review finds expected field initialization/copy expansion, unchanged159/176 symbol sets
+   and identical parsed resources. Original review-required comparison and acceptance decision retained.
+   Material runtime lacks binding/input/output contracts; no equivalence or performance claim.
+8. Next bounded gate: arrays containing padded integer records, already admitted by general copyable
+   types but outside279's store correction. Establish an independent oracle/before evidence; do not
+   widen substandard array admission or preselect unrolling as a fix. Create a fresh bounded plan.
+9. Fresh delegation hits thread limits. Prefer a fresh bounded worker; otherwise record reuse. Slice279
+   had a reused author and separate reused independent reviewer, plus root audits; not fresh-context review.
 
-[HISTORY](HISTORY.md) owns older evidence. FP8/BF16 record scope remains in
-[the contract](../docs/design/nvvm-substandard-record-contract.md) and validation270; focused268/270
-fixtures remain outside the main corpus. Breadth271's12 cells passed. Material272 sampling and273/274
-semantic investigation are complete; each of6230 canonical inheritance keys was computed once, so
-that cache-duplication lead is closed. Earlier267/272 timing retains original identity and does not
-measure277. No new performance claim or material GPU execution; binding/input/output contracts remain
-unavailable. Windows private-directory acquisition and its failure diagnostic are source-audited only.
+[HISTORY](HISTORY.md) owns earlier PCH277, accessor/generic278 and material investigations.
+[The record contract](../docs/design/nvvm-substandard-record-contract.md) separates new279 scope from
+flat270 cache-order evidence. The inheritance-cache lead closed in274 without an optimization;
+each6230canonical key was computed once. Earlier timing results keep their original identity.

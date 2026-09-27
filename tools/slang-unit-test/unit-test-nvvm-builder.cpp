@@ -1486,6 +1486,179 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsLocalAggregatePointerCalls)
     }
 }
 
+// Canonical nested offsets must survive the provider store operation even when the root
+// pointer promises less alignment than the type's ABI. Flat child stores keep their own shape.
+SLANG_UNIT_TEST(nvvmIRBuilderPreservesNestedStructStoreLayout)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (uint32_t alignment : {8u, 1u})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("nested-struct-stores"), scope.module)));
+        SlangNVVMTypeHandle voidType = nullptr;
+        SlangNVVMTypeHandle i8 = nullptr;
+        SlangNVVMTypeHandle i16 = nullptr;
+        SlangNVVMTypeHandle i32 = nullptr;
+        SlangNVVMTypeHandle i64 = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 8, i8)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 16, i16)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, i64)));
+        SlangNVVMTypeHandle inner = nullptr;
+        SlangNVVMTypeHandle middle = nullptr;
+        SlangNVVMTypeHandle outer = nullptr;
+        const SlangNVVMTypeHandle innerFields[] = {i8, i32};
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getStructType(scope.module, innerFields, 2, inner)));
+        const SlangNVVMTypeHandle middleFields[] = {i8, inner, i16};
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getStructType(scope.module, middleFields, 3, middle)));
+        const SlangNVVMTypeHandle outerFields[] = {i8, middle, i64};
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getStructType(scope.module, outerFields, 3, outer)));
+        SlangNVVMTypeHandle pointerType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+            scope.module,
+            outer,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            pointerType)));
+        SlangNVVMTypeHandle functionType = nullptr;
+        const SlangNVVMTypeHandle parameters[] = {outer, pointerType};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, parameters, 2, functionType)));
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_INTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("storeNested"),
+            function)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        SlangNVVMValueHandle value = nullptr;
+        SlangNVVMValueHandle pointer = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, value)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 1, pointer)));
+        SLANG_CHECK(builder.emitStore(scope.module, value, pointer, 3) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitStore(scope.module, value, pointer, alignment)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+            assembly)));
+        const String text = _getBlobText(assembly);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("  store ")) == 5);
+        SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("extractvalue")) == 6);
+        SLANG_CHECK(
+            _countOccurrences(text.getUnownedSlice(), toSlice("getelementptr inbounds")) == 6);
+        SLANG_CHECK(text.indexOf("store { i8, i32 }") >= 0);
+        SLANG_CHECK(text.indexOf("store { i8, { i8, i32 }, i16 }") < 0);
+        SLANG_CHECK(text.indexOf("store { i8, { i8, { i8, i32 }, i16 }, i64 }") < 0);
+        if (alignment == 1)
+        {
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice(", align 1\n")) == 5);
+        }
+        else
+        {
+            // Outer offsets zero and 24 retain eight. Middle starts at four; its fields at
+            // relative offsets zero, four and twelve retain only the inherited four-byte proof.
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice(", align 8\n")) == 2);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice(", align 4\n")) == 3);
+        }
+    }
+}
+
+// Arrays are explicit store boundaries, even when their elements are structs. This keeps the
+// correction bounded and prevents a large array store from turning into thousands of instructions.
+SLANG_UNIT_TEST(nvvmIRBuilderNestedStructStoresKeepArrayBoundaries)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.createModule(toSlice("nested-struct-array-boundaries"), scope.module)));
+    SlangNVVMTypeHandle voidType = nullptr;
+    SlangNVVMTypeHandle i8 = nullptr;
+    SlangNVVMTypeHandle i32 = nullptr;
+    SlangNVVMTypeHandle vectorType = nullptr;
+    SlangNVVMTypeHandle flatType = nullptr;
+    SlangNVVMTypeHandle arrayType = nullptr;
+    SlangNVVMTypeHandle mixedType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 8, i8)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVectorType(scope.module, i32, 2, vectorType)));
+    const SlangNVVMTypeHandle fields[] = {i8, i32};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getStructType(scope.module, fields, 2, flatType)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getArrayType(scope.module, flatType, 65536, arrayType)));
+    const SlangNVVMTypeHandle mixedFields[] = {i8, flatType, arrayType};
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(builder.getStructType(scope.module, mixedFields, 3, mixedType)));
+    const SlangNVVMTypeHandle types[] = {i32, vectorType, flatType, arrayType, mixedType};
+    const char* names[] = {"scalar", "vector", "flat", "array", "mixed"};
+    for (Index i = 0; i < SLANG_COUNT_OF(types); ++i)
+    {
+        SlangNVVMTypeHandle pointerType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+            scope.module,
+            types[i],
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            pointerType)));
+        const SlangNVVMTypeHandle parameters[] = {types[i], pointerType};
+        SlangNVVMTypeHandle functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, parameters, 2, functionType)));
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_INTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            UnownedStringSlice(names[i]),
+            function)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        SlangNVVMValueHandle value = nullptr;
+        SlangNVVMValueHandle pointer = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, value)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 1, pointer)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitStore(scope.module, value, pointer, 1)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+    }
+    ComPtr<ISlangBlob> assembly;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+        scope.module,
+        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        assembly)));
+    const String text = _getBlobText(assembly);
+    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("  store ")) == 7);
+    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store i32 ")) == 1);
+    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store <2 x i32> ")) == 1);
+    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("store { i8, i32 } ")) == 2);
+    SLANG_CHECK(
+        _countOccurrences(text.getUnownedSlice(), toSlice("store [65536 x { i8, i32 }] ")) == 2);
+    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("extractvalue")) == 3);
+    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("getelementptr inbounds")) == 3);
+    SLANG_CHECK(text.indexOf("getelementptr inbounds [65536") < 0);
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderBuildsRawViewValueCalls)
 {
     NVVMIRBuilder builder;

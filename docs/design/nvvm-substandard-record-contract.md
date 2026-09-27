@@ -1,9 +1,12 @@
 # NVVM internal substandard-float records
 
 Slice270 qualifies flat internal records containing integer scalar fields together with scalar
-FloatE4M3, FloatE5M2, BFloat16 or vector<BFloat16,2>. At least one substandard field is required.
-The [slice report](../../issue-nvvm-backend/report.slice-270-fp8-aggregate.md) owns validation and
-limitations. Existing [FP8 scalar semantics](nvvm-fp8-scalar-contract.md) and
+FloatE4M3, FloatE5M2, BFloat16 or vector<BFloat16,2>. Slice279 extends this to finite nonempty
+nested records with the same leaves. At least one substandard
+descendant is required; integer-only child records may accompany it.
+The [nested-record report279](../../issue-nvvm-backend/report.slice-279-nested-records.md) owns the
+new qualification and limits; [report270](../../issue-nvvm-backend/report.slice-270-fp8-aggregate.md)
+retains the original flat-record evidence. Existing [FP8 scalar semantics](nvvm-fp8-scalar-contract.md) and
 [BF16 vector/storage semantics](nvvm-bf16-vector-contract.md) remain distinct leaf contracts.
 
 ## Canonical values and local memory
@@ -28,10 +31,12 @@ The selected domain has identical physical register and local-memory representat
 uses i16 and BF2 uses <2 x i16> in both roles. This does not extend to BF3/BF4 whole-record values:
 their existing local fields use component-array storage, which remains a separate qualified domain.
 
-`asNVVMSupportedSubstandardRecordType` owns the flat value-domain classification.
+`asNVVMSupportedSubstandardRecordType` owns the bounded value-domain classification.
+Nested membership walks canonical field types and rejects recursive, empty or unqualified records.
 `asNVVMSupportedLocalSubstandardRecordType` combines it with the existing local-only BF16 record
 family. Exact Generic local Ptr, OutParam and BorrowInOutParam roots qualify memory access; field
-addresses are resolved by canonical keys. No recursive copyable/helper classifier is widened.
+addresses are resolved by canonical keys. A nested field inherits local substandard storage permission
+only from a qualified parent address. No recursive copyable/helper classifier is widened.
 
 ## Layout and cache identity
 
@@ -49,7 +54,7 @@ existing local BF3/BF4 fields; it does not qualify BF3/BF4 component-pointer acc
 
 ## Boundaries
 
-The new domain excludes nested records, record arrays, readonly record references, device/resource/
+The domain excludes record arrays, readonly record references, device/resource/
 shared record storage and exported record signatures. Bare scalar FP8 pointers remain unsupported;
 physical Storage leaf lowering does not grant pointer admission. Previously supported BF16 local
 storage and internal pointer roles remain as before. Newly admitted local-record pointer helper
@@ -57,10 +62,32 @@ results are explicitly excluded, independently of internal record-value results.
 
 Generic pointer-result exclusions are verified by code review rather than executed canonical-IR
 tests: public source pointer returns lower as UserPointer and do not reach that exact synthetic
-shape. This limitation is recorded in270 evidence. Both Value/Storage cache visitation orders for the mixed Payload record, including its BF2 leaf,
-are exercised by real GPU roundtrips; AlignedPair is storage-first. This is not inferred from the
+shape. This limitation is recorded in270 evidence. Slice270 exercises both Value/Storage cache visitation orders for its flat mixed Payload record, including its BF2 leaf,
+with real GPU roundtrips; AlignedPair is storage-first. This is not inferred from the
 pointer-result exclusion.
 
 No provider ABI change, FP8 arithmetic or new numerical conversion is introduced. Bit transport
 preserves every encoding, including signed zeros, infinities and NaN payloads. Conversion semantics
 remain governed by the leaf contracts; raw transport does not grant NaN-payload guarantees to casts.
+
+## Nested store padding
+
+The physical provider splits stores at direct nested-struct boundaries while retaining flat struct,
+array, scalar and vector stores. Installed libNVVM12.9 miscompiles valid whole nested stores by combining
+narrow fields across padding. For `{uint16_t prefix; Child child;}` with
+`Child {uint16_t first; uint last;}`, fields at byte0/4 must not become a contiguous uint16x2 store.
+The same defect reproduces for already-supported integer records, independently of FP8/BF16.
+
+Provider `_emitStore` validates the original operation before constructing canonical LLVM field
+addresses/extractions. LLVM DataLayout determines field offsets, and commonAlignment derives each
+field's guarantee from the actual parent alignment. Canonical Slang/LLVM aggregate types, ABI42,
+allocation layouts and whole-value loads/transport remain unchanged. This is a bounded target compiler
+workaround, not a semantic representation repair. Root arrays and array subtrees stay opaque; no new
+claim covers arbitrary array-nested layouts. Packed structs are not constructed by the current provider
+API. The change may alter generated code; no compile-speed or GPU performance claim follows.
+
+The nested fixture checks all65536 scalar bit patterns, both branch results and both BF2
+component indices across three record depths. Its integer-only sibling exercises the provider issue
+without substandard types. Natural/CUDA layout checks remain separate; qualification does not claim
+both cache visitation orders for these new nested records. Exact synthetic Generic pointer-result
+exclusion remains source-reviewed, distinct from public UserPointer negative tests.

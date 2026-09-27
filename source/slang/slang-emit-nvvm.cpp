@@ -244,10 +244,20 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         // recursively and preserve its root role: selecting a child cannot make immutable storage
         // mutable or detach conventional-global pointer provenance.
         NVVMStructField parentAddress;
+        if (!_getNVVMStructFieldAddress(parentFieldAddress, parentAddress))
+            return false;
         auto basePointerType = as<IRPtrTypeBase>(parentFieldAddress->getDataType());
         structType = basePointerType
                          ? asNVVMSupportedHelperStructType(basePointerType->getValueType())
                          : nullptr;
+        if (!structType && basePointerType && parentAddress.isLocalSubstandardRecordStorage)
+        {
+            // For `outer.inner.pair[index]`, the parent field address proves that inner belongs
+            // to qualified local storage. Its explicit derived pointer spelling alone does not
+            // grant that role. Retain the proof through each field so BF2 component selection
+            // observes the same local root without admitting device or shared record storage.
+            structType = asNVVMSupportedSubstandardRecordType(basePointerType->getValueType());
+        }
         if (!structType && basePointerType)
             structType = asNVVMSupportedResourceStructType(basePointerType->getValueType());
         if (!structType && basePointerType)
@@ -255,8 +265,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
             structType =
                 asNVVMSupportedPhysicalAggregateStorageStructType(basePointerType->getValueType());
         }
-        if (!structType || !_getNVVMStructFieldAddress(parentFieldAddress, parentAddress) ||
-            !isTypeEqual(parentAddress.field->getFieldType(), structType))
+        if (!structType || !isTypeEqual(parentAddress.field->getFieldType(), structType))
         {
             return false;
         }
@@ -264,6 +273,7 @@ bool _getNVVMStructFieldAddress(IRFieldAddress* fieldAddress, NVVMStructField& o
         outAddress.isMutable = parentAddress.isMutable;
         outAddress.isPhysicalStorage = parentAddress.isPhysicalStorage;
         outAddress.isParameterGroupStorage = parentAddress.isParameterGroupStorage;
+        outAddress.isLocalSubstandardRecordStorage = parentAddress.isLocalSubstandardRecordStorage;
     }
     else if (
         auto resourceElementPointer = asNVVMSupportedRWStructuredBufferElementPointerType(

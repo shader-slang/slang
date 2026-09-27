@@ -9039,6 +9039,411 @@ SLANG_UNIT_TEST(nvvmSlangSubstandardRecordsUseInternalValues)
     }
 }
 
+// Uses LLVM's real aggregate types while retaining the deterministic fake libNVVM compiler.
+// Consider `struct Payload { FloatE4M3 value; }; struct Outer { Payload inner; };`.
+// The scalar fake provider has only one struct handle and one field list, so it cannot represent
+// distinct parent and child types. Forward
+// only the existing builder-library request to the platform loader instead of inventing another
+// recursive type model in the fixture. The real provider verifies and serializes the module;
+// separate GPU tests qualify libNVVM optimization and execution.
+class RealBuilderFakeNVVMLoader : public FakeDirectNVVMLoader
+{
+public:
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    loadSharedLibrary(const char* path, ISlangSharedLibrary** outLibrary) SLANG_OVERRIDE
+    {
+        if (path && UnownedStringSlice(path).indexOf(toSlice("slang-llvm-nvvm")) >= 0)
+            return DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(path, outLibrary);
+        return FakeDirectNVVMLoader::loadSharedLibrary(path, outLibrary);
+    }
+};
+
+// This is the former nested FP8 negative, extended to scalar BF16. The canonical inner
+// record remains observable across a noinline outer value parameter and result.
+SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsUseInternalValues)
+{
+    NVVMIRBuilder realBuilder;
+    _requireRealNVVMBuilder(unitTestContext, realBuilder);
+    for (const char* format : {"FloatE4M3", "FloatE5M2", "BFloat16"})
+    {
+        _resetDirectNVVMFakes();
+        {
+            StringBuilder source;
+            source << "typealias F = " << format << "; typealias Bits = "
+                   << (String(format) == "BFloat16" ? "uint16_t" : "uint8_t") << ";"
+                   << R"SLANG(
+                struct Payload { F value; }
+                struct Outer { Payload value; }
+                [noinline] Outer copy(Outer x) { return x; }
+                RWStructuredBuffer<uint> outputBuffer;
+                [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+                {
+                    Payload p = {bit_cast<F>(Bits(tid.x))};
+                    Outer o = {p};
+                    outputBuffer[0] = uint(bit_cast<Bits>(copy(o).value.value));
+                }
+            )SLANG";
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            const auto result =
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+            if (SLANG_FAILED(result))
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    _getBlobText(diagnostics).getBuffer());
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK_ABORT(code != nullptr);
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+            const char* recordType = String(format) == "BFloat16" ? "{ { i16 } }" : "{ { i8 } }";
+            StringBuilder signature;
+            signature << "define internal " << recordType;
+            SLANG_CHECK(gFakeNVVM.addedModule.indexOf(signature.getUnownedSlice()) >= 0);
+            StringBuilder extraction;
+            extraction << "extractvalue " << recordType;
+            SLANG_CHECK(gFakeNVVM.addedModule.indexOf(extraction.getUnownedSlice()) >= 0);
+            StringBuilder returnedValue;
+            returnedValue << "ret " << recordType;
+            SLANG_CHECK(gFakeNVVM.addedModule.indexOf(returnedValue.getUnownedSlice()) >= 0);
+            SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+            SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+            SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
+// Three struct levels retain a local root through whole-inner assignment and BF2 lane addressing.
+// The integer-only child checks that substandard admission is a property of the complete record.
+SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsUseLocalFields)
+{
+    NVVMIRBuilder realBuilder;
+    _requireRealNVVMBuilder(unitTestContext, realBuilder);
+    const char* source = R"SLANG(
+        struct Inner { uint16_t prefix; vector<BFloat16, 2> pair; uint16_t suffix; }
+        struct Guards { uint16_t first; uint last; }
+        struct Middle { Inner payload; Guards guards; }
+        struct Outer { uint8_t tag; Middle middle; uint64_t tail; }
+        [noinline] void initialize(out Outer p, uint bits)
+        {
+            p.tag = uint8_t(17);
+            p.middle.payload.prefix = uint16_t(19);
+            p.middle.payload.pair = vector<BFloat16, 2>(
+                bit_cast<BFloat16>(uint16_t(bits)), bit_cast<BFloat16>(uint16_t(bits ^ 65535)));
+            p.middle.payload.suffix = uint16_t(23);
+            p.middle.guards.first = uint16_t(29);
+            p.middle.guards.last = 31;
+            p.tail = uint64_t(37);
+        }
+        [noinline] Inner replace(inout Outer p, Inner q, uint lane, uint bits)
+        {
+            let old = p.middle.payload;
+            p.middle.payload = q;
+            p.middle.payload.pair[lane] = bit_cast<BFloat16>(uint16_t(bits));
+            p.middle.guards.last += 1;
+            return old;
+        }
+        RWStructuredBuffer<uint> outputBuffer;
+        [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            Outer a;
+            Outer b;
+            initialize(a, tid.x);
+            initialize(b, tid.x ^ 65535);
+            let old = replace(a, b.middle.payload, tid.x & 1, tid.x ^ 0x5555);
+            outputBuffer[0] = uint(bit_cast<uint16_t>(old.pair.x));
+            outputBuffer[1] = uint(bit_cast<uint16_t>(a.middle.payload.pair.y));
+            outputBuffer[2] = a.middle.guards.last;
+            outputBuffer[3] = uint(a.tail) + uint(a.tag);
+        }
+    )SLANG";
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+        const String& assembly = gFakeNVVM.addedModule;
+        SLANG_CHECK(
+            assembly.indexOf(
+                "alloca { i8, { { i16, <2 x i16>, i16 }, { i16, i32 } }, i64 }, align 8") >= 0);
+        SLANG_CHECK(
+            assembly.indexOf(
+                "getelementptr inbounds { i8, { { i16, <2 x i16>, i16 }, { i16, i32 } }, i64 }") >=
+            0);
+        SLANG_CHECK(assembly.indexOf("getelementptr <2 x i16>") >= 0);
+        SLANG_CHECK(assembly.indexOf("load { i16, <2 x i16>, i16 }") >= 0);
+        SLANG_CHECK(assembly.indexOf("store { i16, <2 x i16>, i16 }") >= 0);
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+// CUDA padding is checked at each nested boundary, including the integer-only child. BF2
+// aligns to four bytes, so the inner payload is sixteen bytes rather than its Natural size twelve.
+SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordLayoutQueries)
+{
+    const char* source = R"SLANG(
+        struct Inner
+        {
+            uint8_t tag; FloatE4M3 a; FloatE5M2 b; BFloat16 scalar;
+            vector<BFloat16, 2> pair; uint16_t suffix;
+        }
+        struct Guards { uint16_t first; uint last; }
+        struct Middle { uint8_t tag; Inner payload; Guards guards; }
+        struct Outer { uint16_t prefix; Middle middle; uint64_t tail; }
+        [CUDAKernel] void computeMain(
+            uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
+        {
+            Inner inner; Guards guards; Middle middle; Outer outer;
+            destination[0] = __sizeOf<Inner>();
+            destination[1] = __alignOf<Inner>();
+            destination[2] = __offsetOf(inner, inner.scalar);
+            destination[3] = __offsetOf(inner, inner.pair);
+            destination[4] = __offsetOf(inner, inner.suffix);
+            destination[5] = __sizeOf<Guards>();
+            destination[6] = __alignOf<Guards>();
+            destination[7] = __offsetOf(guards, guards.last);
+            destination[8] = __sizeOf<Middle>();
+            destination[9] = __alignOf<Middle>();
+            destination[10] = __offsetOf(middle, middle.payload);
+            destination[11] = __offsetOf(middle, middle.guards);
+            destination[12] = __sizeOf<Outer>();
+            destination[13] = __alignOf<Outer>();
+            destination[14] = __offsetOf(outer, outer.middle);
+            destination[15] = __offsetOf(outer, outer.tail);
+        }
+    )SLANG";
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        const int64_t expected[] = {16, 4, 4, 8, 12, 8, 4, 4, 28, 4, 4, 20, 40, 8, 4, 32};
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == SLANG_COUNT_OF(expected));
+        for (Index i = 0; i < SLANG_COUNT_OF(expected); ++i)
+        {
+            const auto value = gFakeNVVMBuilder.storeValueRefs[i];
+            SLANG_CHECK_ABORT(value.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK_ABORT(value.index >= 0);
+            SLANG_CHECK_ABORT(value.index < gFakeNVVMBuilder.integerConstantValues.getCount());
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[value.index] == expected[i]);
+        }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+// Nesting preserves the existing local/internal domain; it cannot grant an external memory
+// role or a pointer-return ABI. Each rejected source must stop before loading either provider.
+SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsRejectOtherRoles)
+{
+    struct Case
+    {
+        const char* source;
+        const char* construct;
+    };
+    const Case cases[] = {
+        {R"SLANG(
+            [noinline] Outer copy(Outer x[2]) { return x[1]; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Outer p = {{bit_cast<FloatE4M3>(uint8_t(tid.x))}};
+                Outer values[2] = {p, p};
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(values).inner.value));
+            }
+        )SLANG",
+         "helper function parameter"},
+        {R"SLANG(
+            [noinline] uint read(__constref Outer x)
+            { return uint(bit_cast<uint8_t>(x.inner.value)); }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Outer p = {{bit_cast<FloatE4M3>(uint8_t(tid.x))}};
+                outputBuffer[0] = read(p);
+            }
+        )SLANG",
+         "helper function parameter"},
+        // Shared storage never acquires the local record role. Module preflight rejects this
+        // unsupported global declaration before an individual field access needs diagnosis.
+        {R"SLANG(
+            groupshared Outer sharedValue;
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                sharedValue.inner.value = bit_cast<FloatE4M3>(uint8_t(tid.x));
+                GroupMemoryBarrierWithGroupSync();
+                outputBuffer[0] = uint(bit_cast<uint8_t>(sharedValue.inner.value));
+            }
+        )SLANG",
+         "'global_var'"},
+        {R"SLANG(
+            RWStructuredBuffer<Outer> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            { outputBuffer[0].inner.value = bit_cast<FloatE4M3>(uint8_t(tid.x)); }
+        )SLANG",
+         "struct field address result"},
+        {R"SLANG(
+            [CudaDeviceExport] [noinline] Outer copy(Outer x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Outer p = {{bit_cast<FloatE4M3>(uint8_t(tid.x))}};
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(p).inner.value));
+            }
+        )SLANG",
+         "exported substandard record helper result"},
+        {R"SLANG(
+            [CudaDeviceExport] [noinline] uint read(Outer x)
+            { return uint(bit_cast<uint8_t>(x.inner.value)); }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Outer p = {{bit_cast<FloatE4M3>(uint8_t(tid.x))}};
+                outputBuffer[0] = read(p);
+            }
+        )SLANG",
+         "exported substandard record helper parameter"},
+        {R"SLANG(
+            [CudaDeviceExport] [noinline] void replace(inout Outer x, FloatE4M3 y)
+            { x.inner.value = y; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Outer p = {{bit_cast<FloatE4M3>(uint8_t(tid.x))}};
+                replace(p, p.inner.value);
+                outputBuffer[0] = uint(bit_cast<uint8_t>(p.inner.value));
+            }
+        )SLANG",
+         "exported substandard record helper reference"},
+        // Public pointer syntax produces a UserPointer result. The separate exact Generic
+        // local-pointer result exclusion remains a source audit, not a claim about this case.
+        {R"SLANG(
+            [noinline] Ptr<Outer> address(inout Outer x) { return &x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Outer p = {{bit_cast<FloatE4M3>(uint8_t(tid.x))}};
+                outputBuffer[0] = uint(bit_cast<uint8_t>((*address(p)).inner.value));
+            }
+        )SLANG",
+         "helper function result type"},
+        {R"SLANG(
+            struct ArrayChild { Payload values[2]; }
+            [noinline] ArrayChild copy(ArrayChild x) { return x; }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p = {bit_cast<FloatE4M3>(uint8_t(tid.x))};
+                ArrayChild x = {{p, p}};
+                outputBuffer[0] = uint(bit_cast<uint8_t>(copy(x).values[1].value));
+            }
+        )SLANG",
+         "helper function result type"},
+    };
+    for (const auto& test : cases)
+    {
+        _resetDirectNVVMFakes();
+        {
+            StringBuilder source;
+            source << "struct Payload { FloatE4M3 value; }; struct Outer { Payload inner; };\n"
+                   << test.source;
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK(SLANG_FAILED(
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+            const String text = _getBlobText(diagnostics);
+            if (text.indexOf(test.construct) < 0)
+                getTestReporter()->message(TestMessageType::TestFailure, text.getBuffer());
+            SLANG_CHECK(text.indexOf("E52017") >= 0);
+            SLANG_CHECK(text.indexOf(test.construct) >= 0);
+            SLANG_CHECK(code == nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+
+    // BF3/BF4 retain their flat local-only representation; nesting does not make them values.
+    for (uint32_t width : {3u, 4u})
+    {
+        _resetDirectNVVMFakes();
+        {
+            StringBuilder source;
+            source << "struct Payload { vector<BFloat16," << width << "> value; }"
+                   << R"SLANG(
+                struct Outer { Payload inner; }
+                [noinline] void initialize(out Outer x, BFloat16 v) { x.inner.value = v; }
+                RWStructuredBuffer<uint> outputBuffer;
+                [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+                {
+                    Outer p;
+                    initialize(p, bit_cast<BFloat16>(uint16_t(tid.x)));
+                    outputBuffer[0] = uint(bit_cast<uint16_t>(p.inner.value.x));
+                }
+            )SLANG";
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()) == SLANG_OK);
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            ComPtr<slang::IBlob> code;
+            ComPtr<slang::IBlob> diagnostics;
+            SLANG_CHECK(SLANG_FAILED(
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+            const String text = _getBlobText(diagnostics);
+            SLANG_CHECK(text.indexOf("E52017") >= 0);
+            SLANG_CHECK(text.indexOf("helper function parameter") >= 0);
+            SLANG_CHECK(code == nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+        SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
 {
     struct UnsupportedCase
@@ -9698,17 +10103,6 @@ SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
             }
         )SLANG",
          "helper function parameter"},
-        {R"SLANG(
-            struct Payload { F value; }
-            struct Outer { Payload value; }; [noinline] Outer copy(Outer x) { return x; }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                Payload p = {bit_cast<F>(uint8_t(tid.x))};
-                Outer o = { p }; outputBuffer[0] = uint(bit_cast<uint8_t>(copy(o).value.value));
-            }
-        )SLANG",
-         "helper function result type"},
         {R"SLANG(
             struct Payload { F value; }
             [noinline] Payload copy(Payload x[2]) { return x[1]; }

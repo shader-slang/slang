@@ -688,29 +688,64 @@ IRPtrTypeBase* asNVVMSupportedDeviceHelperValuePointerType(IRInst* type, IRType*
     return _asNVVMSupportedDeviceHelperValuePointerType(type, outValueType, activeTypes);
 }
 
+// Proves a finite record tree whose leaves share their register and local storage representation.
+// Consider this example:
+//
+//     struct Payload { FloatE4M3 value; }
+//     struct Outer { uint tag; Payload inner; }
+//
+// Front-end lowering retains both canonical structs and their field keys, so the existing nested
+// declarations and recursive layout remain the source of truth. Keep this proof separate from
+// recursive helper values, which also authorize device storage, and require a substandard leaf
+// somewhere in the complete record.
+static bool _isNVVMSupportedSubstandardRecordFieldType(
+    IRInst* type,
+    HashSet<IRInst*>& activeTypes,
+    bool& hasSubstandardField)
+{
+    uint32_t count = 0;
+    if (isNVVMFloat8Type(type) || isNVVMBFloat16Type(type) ||
+        (asNVVMBFloat16VectorType(type, &count) && count == 2))
+    {
+        hasSubstandardField = true;
+        return true;
+    }
+    if (isNVVMSupportedIntegerScalarType(type))
+        return true;
+
+    auto structType = as<IRStructType>(type);
+    if (!structType || activeTypes.contains(type))
+        return false;
+
+    activeTypes.add(type);
+    bool hasField = false;
+    for (auto field : structType->getFields())
+    {
+        if (!_isNVVMSupportedSubstandardRecordFieldType(
+                field->getFieldType(),
+                activeTypes,
+                hasSubstandardField))
+        {
+            activeTypes.remove(type);
+            return false;
+        }
+        hasField = true;
+    }
+    activeTypes.remove(type);
+    return hasField;
+}
+
 IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type)
 {
     auto structType = as<IRStructType>(type);
     if (!structType)
         return nullptr;
-
-    // Consider `struct Payload { uint8_t tag; FloatE4M3 a; FloatE5M2 b; };`.
-    // The canonical fields have identical register and local storage representations. Keep this
-    // flat proof separate from recursive helper values, which also authorize device storage.
+    HashSet<IRInst*> activeTypes;
     bool hasSubstandardField = false;
-    for (auto field : structType->getFields())
-    {
-        IRType* fieldType = field->getFieldType();
-        uint32_t count = 0;
-        if (isNVVMFloat8Type(fieldType) || isNVVMBFloat16Type(fieldType) ||
-            (asNVVMBFloat16VectorType(fieldType, &count) && count == 2))
-        {
-            hasSubstandardField = true;
-        }
-        else if (!isNVVMSupportedIntegerScalarType(fieldType))
-            return nullptr;
-    }
-    return hasSubstandardField ? structType : nullptr;
+    return _isNVVMSupportedSubstandardRecordFieldType(type, activeTypes, hasSubstandardField) &&
+                   hasSubstandardField
+               ? structType
+               : nullptr;
 }
 
 IRStructType* asNVVMSupportedLocalSubstandardRecordType(IRInst* type)
