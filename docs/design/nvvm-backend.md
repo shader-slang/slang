@@ -116,6 +116,23 @@ Role validation happens before a cache lookup. Value, helper and the different s
 have separate caches; a helper pointer key includes its pointee use. A successful storage lookup must
 never authorize a previously unsupported value, resource, exported signature or reference role.
 
+Half helper parameters and results use physical i16 scalars or `<N x i16>` vectors for the
+already-admitted widths 2–4. Canonical body values remain Half: caller arguments are encoded, callee
+parameters decoded, returns encoded, and call results decoded with bit-preserving reinterpretation.
+The common return path includes specialized helper bodies. Native Half-vector call transport can
+lose argument/result transfers under libNVVM O3 despite live uses in the supplied LLVM IR; integer
+transport avoids that boundary defect without changing arithmetic, storage or type admission.
+`getNVVMHalfHelperABILaneCount` selects the same shapes for type lowering and all four crossings.
+Preflight requires both exact conversion directions for every parameter/result width before provider
+mutation. Copyable HelperValue requests redirect to Value before cache access, keeping canonical
+Half values separate from the existing physical helper ABI cache regardless of request order.
+
+Exported Half helpers retain their existing direct-NVVM PTX symbols and parameter/result layout.
+An independently authored PTX caller checks widths 2–4 and a half4-to-half3 boundary against frozen
+before-repair ABI declarations; semantic lane offsets are checked while unspecified return padding
+is ignored. This is a direct PTX contract, not CUDA-prelude binary interoperability: the captured
+NVRTC helper has different symbol and parameter/result packing.
+
 The recursive copyable/helper domains support selected finite arrays and records. Specialized local
 substandard-float records have a narrower proof. Broadening a general recursive predicate to admit
 one local type can also admit device, shared or external storage: changes must name the intended role.

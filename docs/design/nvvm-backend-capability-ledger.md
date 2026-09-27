@@ -51,6 +51,18 @@ storage and from immutable locations. This changes ownership, not the supported 
 General structured-storage recursion and recursive ancestor admission remain outside this
 boundary; no transforming Slang IR storage pass is claimed.
 
+Half-vector helper parameters/results use physical integer lane transport while body arithmetic and
+storage retain their selected Half representations. [Parameter transport](../../tests/cuda/nvvm-half-vector-helper-parameters.slang)
+and [result transport](../../tests/cuda/nvvm-half-vector-helper-results.slang) separately cover all
+65,536 encodings per lane in two correlated input families, preserving earlier results across later
+calls. This includes signed zeros and NaN payload bits without performing Half arithmetic; it is not
+a Cartesian product of lane combinations. [Effectful composition](../../tests/cuda/nvvm-half-vector-helper-effectful.slang)
+checks a Half-vector result beside an observed call effect. [Exports](../../tests/cuda/nvvm-half-vector-helper-exports.slang)
+cover retained source boundaries; separate frozen-declaration PTX callers qualify the existing direct
+export ABI, including semantic lane offsets. CUDA-prelude binary interoperability and return padding
+contents are not qualified. [Direct static units](../../tools/slang-static-unit-test/unit-test-nvvm-type-lowering.cpp)
+check exact classifier boundaries and canonical/physical/storage cache orders.
+
 Unsupported bodies, signatures or roles fail preflight; successful lowering of an adjacent type is
 not authorization to guess an ABI. Negative emitter tests also assert that rejection occurs before
 provider mutation. The provider's serialization tests establish physical operation shape separately
@@ -204,11 +216,11 @@ These checks preserve existing support boundaries; initial recursive ancestor ad
   [Source coverage](../../tests/compute/swizzle-set-source.slang) checks all five source targets;
   HLSL/GLSL retain multi-lane syntax. WGSL has source checks only. The original Half-vector corpus
   test is correct in all three modes with unchanged input and oracle.
-- Native Half-vector noinline helper transport has a separately reproduced NVVM O3 wrong-output
-  failure outside the main corpus. A half4 parameter/half3 result probe fails before and after the
-  source-emission repair; NVVM O0 is correct, and repaired NVRTC is correct. O3 omits argument/result
-  transfers in PTX. Parameter/result isolation and the LLVM handoff remain to be investigated;
-  ordinary Half-vector arithmetic and Float32 helper evidence do not qualify this ABI.
+- The separate Half-vector noinline helper failure survived the source-emission repair: NVVM O3
+  omitted argument/result transfers while O0 and NVRTC were correct. Parameter-only, result-only,
+  combined and exported probes isolated the boundary with identical O0/O3 provider LLVM inputs.
+  Physical integer lane transport now repairs this boundary; the original wrong-output observations
+  remain preserved in focused evidence. Ordinary arithmetic evidence alone does not qualify an ABI.
 - The qualified column-major `float3x2` uses CUDA column stride 12 and size 24. The permanent
   [compact-column test](../../tests/cuda/nvvm-column-major-compact.slang) checks all six elements
   plus multiplication in three GPU modes (24 exact Float32 components), with fresh 24-byte layout

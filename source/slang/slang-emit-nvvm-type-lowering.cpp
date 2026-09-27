@@ -149,6 +149,15 @@ IRVectorType* asNVVMSupportedValueVectorType(IRInst* type, uint32_t* outElementC
     return _asNVVMSupportedVectorType(type, true, outElementCount);
 }
 
+uint32_t getNVVMHalfHelperABILaneCount(IRInst* type)
+{
+    if (isNVVMFloat16Type(type))
+        return 1;
+    uint32_t count = 0;
+    auto vectorType = asNVVMSupportedValueVectorType(type, &count);
+    return vectorType && isNVVMFloat16Type(vectorType->getElementType()) ? count : 0;
+}
+
 IRVectorType* asNVVMBFloat16VectorType(IRInst* type, uint32_t* outElementCount)
 {
     if (outElementCount)
@@ -2729,19 +2738,31 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             deviceCopyablePointer ? NVVMTypeUse::Value : NVVMTypeUse::HelperValue);
     }
 
-    // Keep canonical Half values in LLVM's `half` type inside helper bodies, but transport a Half
-    // helper parameter or result as i16. libNVVM's O3 NVPTX lowering can otherwise omit the caller
-    // parameter store for a direct `half` argument, leaving the callee's value uninitialized.
-    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) && isFloat16)
+    // Consider `half3 rearrange(half4 value) { return value.zwx; }`. The caller and callee retain
+    // canonical Half vectors, but the LLVM boundary transports the same lane bits as i16 vectors.
+    // libNVVM O3 can omit native Half argument and result stores even when their uses are live.
+    // Copyable HelperValue requests already redirect to Value above, so the existing helper ABI
+    // cache remains separate from canonical Half scalar/vector values and their storage roles.
+    const uint32_t halfBoundaryLaneCount = getNVVMHalfHelperABILaneCount(type);
+    if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&
+        halfBoundaryLaneCount)
     {
         if (auto mappedType = m_helperABIRepresentationMap.tryGetValue(type))
         {
             outType = *mappedType;
             return SLANG_OK;
         }
+        SlangNVVMTypeHandle integerType = nullptr;
         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            "physical Half helper ABI type",
-            m_builder.getIntegerType(m_module, 16, outType)));
+            "physical Half helper ABI element type",
+            m_builder.getIntegerType(m_module, 16, integerType)));
+        outType = integerType;
+        if (halfBoundaryLaneCount > 1)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                "physical Half helper ABI vector type",
+                m_builder.getVectorType(m_module, integerType, halfBoundaryLaneCount, outType)));
+        }
         m_helperABIRepresentationMap[type] = outType;
         return SLANG_OK;
     }

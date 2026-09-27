@@ -1,50 +1,12 @@
 // Direct tests of local record-array roles and linked-IR address provenance.
-#include "compiler-core/slang-diagnostic-sink.h"
+#include "nvvm-static-test-context.h"
 #include "slang-unit-test/unit-test-nvvm-support.h"
-#include "slang/slang-code-gen.h"
 #include "slang/slang-emit-nvvm.h"
-#include "slang/slang-module.h"
-#include "slang/slang-session.h"
-#include "static-unit-test-env.h"
 
 using namespace Slang;
 
 namespace
 {
-
-// Give direct preflight and type-lowering calls a real CUDA target and diagnostic owner without
-// invoking target compilation. The separate hand-built IR below owns the tested instructions.
-struct LocalRecordArrayContext
-{
-    static TargetProgram* addTarget(Module* module)
-    {
-        SLANG_RELEASE_ASSERT(module);
-        slang::TargetDesc desc = {};
-        desc.format = SLANG_PTX;
-        auto linkage = module->getLinkage();
-        linkage->addTarget(desc);
-        return module->getTargetProgram(linkage->targets.getLast());
-    }
-
-    explicit LocalRecordArrayContext(UnitTestContext* testContext)
-        : env(testContext)
-        , owner(
-              env.checkModuleFromSource("nvvmLocalArrayContext", "struct ContextOwner { uint x; }"))
-        , targetProgram(addTarget(owner))
-        , sink(owner->getLinkage()->getSourceManager(), nullptr)
-        , shared(targetProgram, entryIndices, &sink, nullptr)
-        , codeGen(&shared)
-    {
-    }
-
-    StaticUnitTestEnv env;
-    Module* owner;
-    TargetProgram* targetProgram;
-    DiagnosticSink sink;
-    CodeGenContext::EntryPointIndices entryIndices;
-    CodeGenContext::Shared shared;
-    CodeGenContext codeGen;
-};
 
 // Build canonical padded records once per module; array roles must reuse these exact field keys
 // and element types rather than accepting a separately reconstructed structural equivalent.
@@ -92,7 +54,7 @@ struct LocalRecordArrayIR
 // neither authorize a reference/result/resource role nor be poisoned by its earlier rejection.
 SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
 {
-    LocalRecordArrayContext context(unitTestContext);
+    NVVMStaticTestContext context(unitTestContext);
     LocalRecordArrayIR ir(context.env.getSessionImpl());
     NVVMIRBuilder provider;
     _requireRealNVVMBuilder(unitTestContext, provider);
@@ -207,7 +169,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
     };
     for (auto kind : kinds)
     {
-        LocalRecordArrayContext context(unitTestContext);
+        NVVMStaticTestContext context(unitTestContext);
         LocalRecordArrayIR ir(context.env.getSessionImpl());
         auto& builder = ir.builder;
         auto pointerType = builder.getPtrType(kIROp_PtrType, ir.outerArray);

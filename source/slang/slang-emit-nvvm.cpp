@@ -74,23 +74,27 @@ uint32_t _getNVVMExecutableValueAlignment(IRInst* type)
         return getNVVMHelperValueAlignment(arrayType->getElementType());
     return getNVVMResourceValueAlignment(type);
 }
-static const SlangNVVMValueTypeDesc kNVVMHalfToPhysicalOperands[] = {
-    NVVMSemantics::kFloat16,
-};
-static const SlangNVVMValueTypeDesc kNVVMPhysicalToHalfOperands[] = {
-    NVVMSemantics::kUnsignedI16,
-};
-static const SlangNVVMValueOperationDesc kNVVMHalfToPhysicalOperation = {
-    SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-    NVVMSemantics::kUnsignedI16,
-    kNVVMHalfToPhysicalOperands,
-    SLANG_COUNT_OF(kNVVMHalfToPhysicalOperands),
-};
-static const SlangNVVMValueOperationDesc kNVVMPhysicalToHalfOperation = {
-    SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-    NVVMSemantics::kFloat16,
-    kNVVMPhysicalToHalfOperands,
-    SLANG_COUNT_OF(kNVVMPhysicalToHalfOperands),
+// Owns the exact scalar/vector bitcast descriptor used by both preflight and emission.
+// The operand descriptor remains valid while getDesc() is consumed by either caller.
+struct NVVMHalfHelperABIOperation
+{
+    NVVMHalfHelperABIOperation(IRType* canonicalType, bool toPhysical)
+    {
+        const uint32_t laneCount = getNVVMHalfHelperABILaneCount(canonicalType);
+        SLANG_RELEASE_ASSERT(laneCount);
+        operandType = toPhysical ? NVVMSemantics::kFloat16 : NVVMSemantics::kUnsignedI16;
+        resultType = toPhysical ? NVVMSemantics::kUnsignedI16 : NVVMSemantics::kFloat16;
+        operandType.laneCount = laneCount;
+        resultType.laneCount = laneCount;
+    }
+
+    SlangNVVMValueOperationDesc getDesc() const
+    {
+        return {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, resultType, &operandType, 1};
+    }
+
+    SlangNVVMValueTypeDesc operandType;
+    SlangNVVMValueTypeDesc resultType;
 };
 static const SlangNVVMValueTypeDesc kNVVMRawBufferCountConversionOperands[] = {
     NVVMSemantics::kUnsignedI64,
@@ -2527,23 +2531,22 @@ SlangResult _requireBuilderOperation(
     return result;
 }
 
-// Crosses the physical i16 boundary selected for a canonical Half helper parameter or result. The
-// conversion is bit-preserving: only the LLVM call ABI changes, while helper bodies continue to use
-// the canonical Half value produced by Slang IR.
+// Crosses the physical i16 scalar/vector boundary selected for a canonical Half helper parameter
+// or result. Only the LLVM call representation changes; helper bodies retain canonical Half values.
 SlangResult _emitNVVMHalfHelperABIReinterpretation(
     CodeGenContext* codeGenContext,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
+    IRType* canonicalType,
     bool toPhysical,
     SlangNVVMValueHandle value,
     SlangNVVMValueHandle& outValue)
 {
-    const SlangNVVMValueOperationDesc& operation =
-        toPhysical ? kNVVMHalfToPhysicalOperation : kNVVMPhysicalToHalfOperation;
+    const NVVMHalfHelperABIOperation operation(canonicalType, toPhysical);
     return _requireBuilderOperation(
         codeGenContext,
         toPhysical ? "physical Half helper ABI encoding" : "canonical Half helper ABI decoding",
-        builder.emitValueOperation(module, operation, &value, 1, outValue));
+        builder.emitValueOperation(module, operation.getDesc(), &value, 1, outValue));
 }
 
 // Widens one pointer whose producer proves global-memory provenance into the helper UserPointer
@@ -6877,16 +6880,14 @@ void _requireNVVMAtomicReductionOperations(
 // Records both directions of the bit-preserving Half helper ABI boundary. A Half parameter uses
 // the physical-to-canonical direction at helper entry and the canonical-to-physical direction at
 // each call; a Half result uses the same pair in the opposite locations.
-void _requireNVVMHalfHelperABIOperations(NVVMValueOperationRequirements& requirements)
+void _requireNVVMHalfHelperABIOperations(
+    NVVMValueOperationRequirements& requirements,
+    IRType* canonicalType)
 {
-    _requireValueOperation(
-        requirements,
-        kNVVMHalfToPhysicalOperation,
-        "physical Half helper ABI encoding");
-    _requireValueOperation(
-        requirements,
-        kNVVMPhysicalToHalfOperation,
-        "canonical Half helper ABI decoding");
+    const NVVMHalfHelperABIOperation encode(canonicalType, true);
+    const NVVMHalfHelperABIOperation decode(canonicalType, false);
+    _requireValueOperation(requirements, encode.getDesc(), "physical Half helper ABI encoding");
+    _requireValueOperation(requirements, decode.getDesc(), "canonical Half helper ABI decoding");
 }
 
 // Records every scalar operation used to legalize one compound wave helper. These descriptors are
@@ -8213,13 +8214,14 @@ SlangResult _emitNVVMFunctionValueReturn(
     SlangNVVMValueHandle value)
 {
     SLANG_RELEASE_ASSERT(function && !as<IRVoidType>(function->getResultType()));
-    if (isNVVMFloat16Type(function->getResultType()))
+    if (getNVVMHalfHelperABILaneCount(function->getResultType()))
     {
         SlangNVVMValueHandle physicalValue = nullptr;
         SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
             codeGenContext,
             builder,
             module,
+            function->getResultType(),
             true,
             value,
             physicalValue));
@@ -8816,15 +8818,16 @@ SlangResult _validateNVVMFunction(
     const bool isEntryPoint = function == entryPoint;
     if (!isEntryPoint)
     {
-        bool hasHalfBoundary = isNVVMFloat16Type(function->getResultType());
-        for (UInt parameterIndex = 0;
-             parameterIndex < function->getParamCount() && !hasHalfBoundary;
-             ++parameterIndex)
+        if (getNVVMHalfHelperABILaneCount(function->getResultType()))
+            _requireNVVMHalfHelperABIOperations(
+                requirements.valueOperations,
+                function->getResultType());
+        for (UInt parameterIndex = 0; parameterIndex < function->getParamCount(); ++parameterIndex)
         {
-            hasHalfBoundary = isNVVMFloat16Type(function->getParamType(parameterIndex));
+            IRType* parameterType = function->getParamType(parameterIndex);
+            if (getNVVMHalfHelperABILaneCount(parameterType))
+                _requireNVVMHalfHelperABIOperations(requirements.valueOperations, parameterType);
         }
-        if (hasHalfBoundary)
-            _requireNVVMHalfHelperABIOperations(requirements.valueOperations);
     }
     IRBlock* entryBlock = function->getFirstBlock();
     if (!entryBlock)
@@ -15456,8 +15459,9 @@ SlangResult emitNVVMIRFromLinkedIR(
         bool hasEntryAggregateValueParameter = false;
         for (auto param : function->getParams())
         {
-            hasHalfParameter = hasHalfParameter ||
-                               (function != entryPoint && isNVVMFloat16Type(param->getDataType()));
+            hasHalfParameter =
+                hasHalfParameter ||
+                (function != entryPoint && getNVVMHalfHelperABILaneCount(param->getDataType()));
             hasEntryAggregateValueParameter =
                 hasEntryAggregateValueParameter ||
                 (function == entryPoint &&
@@ -15476,13 +15480,14 @@ SlangResult emitNVVMIRFromLinkedIR(
         {
             for (auto param : function->getParams())
             {
-                if (!isNVVMFloat16Type(param->getDataType()))
+                if (!getNVVMHalfHelperABILaneCount(param->getDataType()))
                     continue;
                 SlangNVVMValueHandle loweredValue = nullptr;
                 SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
                     codeGenContext,
                     builder,
                     moduleScope.module,
+                    param->getDataType(),
                     false,
                     valueMap.getValue(param),
                     loweredValue));
@@ -16237,13 +16242,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                                         genericArgument)));
                                 loweredArgument = genericArgument;
                             }
-                            if (isNVVMFloat16Type(callee->getParamType(argumentIndex)))
+                            if (getNVVMHalfHelperABILaneCount(callee->getParamType(argumentIndex)))
                             {
                                 SlangNVVMValueHandle physicalArgument = nullptr;
                                 SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
                                     codeGenContext,
                                     builder,
                                     moduleScope.module,
+                                    callee->getParamType(argumentIndex),
                                     true,
                                     loweredArgument,
                                     physicalArgument));
@@ -16264,12 +16270,13 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 size_t(loweredArguments.getCount()),
                                 physicalValue)));
                         SlangNVVMValueHandle loweredValue = physicalValue;
-                        if (isNVVMFloat16Type(call->getDataType()))
+                        if (getNVVMHalfHelperABILaneCount(call->getDataType()))
                         {
                             SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
+                                call->getDataType(),
                                 false,
                                 physicalValue,
                                 loweredValue));

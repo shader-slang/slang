@@ -30,6 +30,10 @@ bool isNVVMFloat32Type(IRInst* type);
 /// Returns whether `type` is the canonical IEEE 16-bit float accepted as a direct NVVM value.
 bool isNVVMFloat16Type(IRInst* type);
 
+/// Returns one for scalar Half or the width of an admitted Half vector, otherwise zero.
+/// Only helper parameters/results use this count to select integer bit transport.
+uint32_t getNVVMHalfHelperABILaneCount(IRInst* type);
+
 /// Returns whether `type` is canonical scalar BF16, distinct from every IEEE format.
 bool isNVVMBFloat16Type(IRInst* type);
 

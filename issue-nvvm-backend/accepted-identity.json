@@ -1,20 +1,36 @@
 {
   "schema": 1,
   "status": "accepted-identity",
-  "meaning": "Exact accepted compiler/provider/standard-module/configuration/layout identity for canonical multi-lane swizzle source emission; old focused measurements retain their original tested binaries.",
-  "verified_repository_revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
+  "meaning": "Exact accepted compiler/provider/standard-module/configuration/layout identity for Half-vector helper integer-bit transport; old focused measurements retain their original tested binaries.",
+  "verified_repository_revision": "3c250bff847674a72bb95c89b19841620c920d72",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "d3c9b5c22beab086e71b4712806dd417352d01688b2508e423ea4cb311fa81e4"
+    "sha256": "2bdc74eb56dff3717319ef2f84ac8e09b9bd3fb549977e8af265aa06b37d026f"
+  },
+  "unit_component_refresh": {
+    "path": "build/nvvm-half-vector-helper-abi/unit-component-refresh.json",
+    "sha256": "abeae066ffdb93f68fa63e732b6b2ae8ed05fc45372aaafb9f40bebd192e7047"
+  },
+  "fixture_component_refresh": {
+    "path": "build/nvvm-half-vector-helper-abi/fixture-component-refresh.json",
+    "sha256": "da55ab696b9977ccc826235fe95fe162ebd64158465403b08172445b87959da4"
+  },
+  "fixture_format_proof": {
+    "path": "build/nvvm-half-vector-helper-abi/fixture-format-inputs.json",
+    "sha256": "a8b194918c17a18d45d12ec3ab29ce51fa26e408f697ecd8e1a7309ca9f05c6f"
+  },
+  "corpus_execution_provenance": {
+    "path": "build/nvvm-half-vector-helper-abi/checkpoint/provenance.json",
+    "sha256": "e1d532d2a23178e821176461463448b0d71e7efe4405853b86a03220095bc189"
   },
   "verification_evidence": {
-    "path": "build/nvvm-cuda-swizzle-set/checkpoint/provenance.json",
-    "sha256": "699fc6d85053e6d1b4c136f3330b31324a92b9fbc00fcda8a676480cd17d5aac"
+    "path": "build/nvvm-half-vector-helper-abi/fixture-refresh/provenance.json",
+    "sha256": "613e7d75ad1edb9ee3a9de96a9fb636b4d95f4e52b802755d9fa447c020d15ba"
   },
   "accepted_identity": {
-    "revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
-    "patch_sha256": "7101a82b9f7baa664aa967a9bc66ad1ef81fdb60c7da1419d26388d888ee4aff",
-    "compiler_version": "2026.18.3-328-g2b8dafc69",
+    "revision": "3c250bff847674a72bb95c89b19841620c920d72",
+    "patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+    "compiler_version": "2026.18.3-329-g3c250bff8",
     "provider_abi": 42
   },
   "runtime_sha256": {
@@ -28,11 +44,11 @@
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "a37e84461322c76b5e60ef514c1a598ea25f2f3bd3484d853bffba5c577af5b6",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "60737b5069bd47baeb772f0f3ef0659da3079f1be3dfd700f55fac91d741ed93",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
@@ -40,15 +56,15 @@
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "48d4be3b35e29e3c3c76df5798b79ca7ec7ebfdc3eb6b8582d6be1a388c8b0aa",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "3a2aa06edb72240002c0645453e6ea79911e175da0a7aca9801c4de60db7b7c3",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "c65ee1f1f7c0d079737ef1b4ebc78174b3dbd729177a7c59de2e4f6d5cbfe164",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "802eeb213569f96fad0258e8b9426fd82a7bb17b17d31ff2d8f367fd01fea439",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ea8e28f53e0fa571be3f7535dbd9f60ae1ffe2635fb51b6e858379feb41abe25",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "05f5f080c4b37f7916d54df2f9255bdadde311ec1f3516ace76e1ca01ec34a9f",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "36a6f1b096f477f6aab49698f86f4765057f3a5f82a09ba112c7d579ccc4a88e",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "bb4672e5a9b39964247c52dfca4cd68da49feff4ab1c00228706c3369a0cd8b5",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "80e23cc15c779bc208e0506590ad6b257bb4a55b81958a3238ab74084c4d3ae9",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "2ee7df0f4cecd5df44d3eb8031f4fcb20ad98004f45ae4bbb419c8106d57b8b5",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "036c434e1f33a35910c7073f71b537716f9e0fb0b8149dd2f36e92c8b02093ae",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "23ea5f68fa6f032bcfdde4287d67aa3735b7e3ff97f5d743811039aed3b0673b",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "1f520f635a10f7acb5b6b7e72a2d582294d95d7f152543055c1b95a300aa294c",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "3d9e4bf3a184edc177dfdae0582ebdc8a415e0f810c991a1f3a6337ed882abe7",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9003704e961de5242e95125f151731683e101a22ba1eeb7d93c970eed8d10432",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "72366c2e45312eac364983bcea6d4e0faff945cfa9981199124555bb78b2d301",
     "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
     "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
     "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
@@ -58,8 +74,9 @@
   },
   "source_sha256": {
     "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "22ae318c57571eb3d6e6f6ab03498af1ba3fbb6af209d13cf365462ed4bd0cd2",
-    "source/slang/slang-emit-c-like.cpp": "2d306917a5f3a08e4394f9c60faccaa18b45f556edc490dcb73eff4864d4a1f1",
-    "source/slang/slang-emit-c-like.h": "bc74ea6aa06984d7786c20ea7e1e036f22369f2c31414b8363e6e99860f2fac6",
+    "source/slang/slang-emit-nvvm-type-lowering.cpp": "0c64bb622040203d1b900c4491497e0d343ff384e7fd3b62abc6c4619b01658f",
+    "source/slang/slang-emit-nvvm-type-lowering.h": "6e3c9535aca6643283162f62b32bb3025040e3d807b58bc9b2b1c392e8d99539",
+    "source/slang/slang-emit-nvvm.cpp": "a2ff0155cc096fd80a799f4f2794299ec89a5666854afbf463d34095fcd034ff",
     "tests/compute/swizzle-set-snapshot.slang": "08e56a34611636cdd88d03ee91869abe50c6df339c902dd49386338e20f81cb6",
     "tests/compute/swizzle-set-source.slang": "110b2964c3776c1521e4085dd4fbf48323d327104e96a1194c15f9088816ffc2",
     "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
@@ -69,6 +86,10 @@
     "tests/cuda/nvvm-borrowed-vector-storage.slang": "6d125820645d07798266aa1a3c40c44fb9bb678d5a2d849ce77e824e3c08c7cf",
     "tests/cuda/nvvm-column-major-compact.slang": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
     "tests/cuda/nvvm-compact-vector-storage.slang": "d94447399a2c09e3099e68cac1354e16b2d5dab6b2432e0ff23f1946628adfe6",
+    "tests/cuda/nvvm-half-vector-helper-effectful.slang": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+    "tests/cuda/nvvm-half-vector-helper-exports.slang": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+    "tests/cuda/nvvm-half-vector-helper-parameters.slang": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+    "tests/cuda/nvvm-half-vector-helper-results.slang": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
     "tests/cuda/nvvm-local-substandard-record-array-copies.slang": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669",
     "tests/cuda/nvvm-local-substandard-record-arrays.slang": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c",
     "tests/cuda/nvvm-material-dielectric.slang": "f23d33fe146dca983878861f59f147c7e3039b1c1e0cf535b1f4d62ab30bc998",
@@ -80,10 +101,14 @@
     "tests/cuda/nvvm-nested-integer-record-stores.slang": "127f6c8fa24394272518e1cc1dc7b4b82013e52aa31372f3bf8788f4ae217228",
     "tests/cuda/nvvm-nested-substandard-dynamic.slang": "e42bdfba99aac507bf144da9e266dd85fe19924cf92cb01b1fec2539813f4634",
     "tests/cuda/nvvm-nested-substandard-records.slang": "99d38dd3398bf20bad8b1476d5b7e87495625616b0869557281a731a0246dc3f",
-    "tests/cuda/nvvm-substandard-record-array-parameter.slang": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e"
+    "tests/cuda/nvvm-substandard-record-array-parameter.slang": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e",
+    "tools/slang-static-unit-test/nvvm-static-test-context.h": "ed18a21636010a11aefe1016f7bd68da5858f064412becf0dbd99442a6aff893",
+    "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "589fe02a1ed3298ffb9272915a30c16cb26e748873782953d0b4b946fea1a6c1",
+    "tools/slang-static-unit-test/unit-test-nvvm-type-lowering.cpp": "a8289f3287c291aec2c5a816437a5ef4beb7e180f1f760abecc1fc5240da8982",
+    "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "a4abc1f09c67873fd401217cd6613b8042a37af744af7f8b3fb4e1f708dc9211"
   },
   "configuration_sha256": {
-    "build/CMakeCache.txt": "fc1cdd85cbd631ecbf19e907636060df696f86eb08f5a8643df6bc6a2ede592f",
+    "build/CMakeCache.txt": "bc5327737b90bb0edfd1b23311a60dbd0efed91d2101eef75cb20ec7fce3beca",
     "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
   },
   "submodules": " 9dc178a86fcbbf13c94b4cd4cb046f238d26c8da external/WindowsToolchain (v0.12.0-9-g9dc178a)\n 69e0473f6e98d47c93518424c08ee69ee632c0f0 external/catch2 (heads/pinned)\n 924936d0427cb25a61169739a7660230bffa6ea6 external/cmark (swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-15-a)\n e0b53eaf63c6d00e0725788ef1dbb759aa321d79 external/fast_float (v6.1.0-352-ge0b53ea)\n efec5db081e3aad807d0731e172ac597f6a39447 external/glm (0.9.5.3-2723-gefec5db0)\n d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4 external/glslang (11.1.0-1385-gd1f52c89)\n 8936b58fe26e8c3da834b8f60b06511d537b4c63 external/imgui (v1.62-5420-g8936b58fe)\n 3fe7be956f23385aa1950dc31e2f25127ccfc0ea external/lua (v5.4-beta-333-g3fe7be95)\n 7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4 external/lz4 (v1.9.2-1351-g7f71be01)\n a63bd172ddcba73a3d87ca32032b66ad41ddb9a6 external/metal-cpp (remotes/origin/metal-cpp_macOS14.2_iOS17.2)\n 8c532c32c3c96e5ba1f2283e032f69ead8add00f external/mimalloc (v2.1.7)\n 6ef6c68f4fcbb8287aa8edf9c6670804932f41c6 external/miniz (3.0.2-68-g6ef6c68)\n d96329f8d6dee5da67c5ebd861acab25445d0ddb external/nlohmann-json (heads/pinned)\n a1280c1863ff19d87f8e827468a4cc906ba9032a external/optix-dev (v9.0.0-1-ga1280c1)\n 1f149bfe20bf6e49c1afd4154eaf0032c8c2fda2 external/replxx (heads/pinned)\n 079b75b54c49e6546fd611c9a91a25307c279668 external/slang-rhi (079b75b5)\n 5bf94dc23702a8fe699c1a834c7a59b7d0daf232 external/slang-user-skills (heads/main)\n 496543121ce6419f23d6fa5d7194ba66c36212d2 external/spirv-headers (v2026.08.0-2-g4965431)\n ef96ed763b43b59b33b31b362f09a02b729fa1c9 external/spirv-tools (v2022.4-1347-gef96ed76)\n d541711a794343de4ef5ea76f037c9fb9c127a55 external/tinyobjloader (v1.0.6-85-gd541711)\n 73f3cbb237e84d483afafc743f1f14ec53e12314 external/unordered_dense (v4.5.0)\n 387259ecf4b0fe0cfac161b1d0b0a74e42796710 external/vulkan (v1.4.347)\n",
@@ -252,11 +277,11 @@
       "mode": 420
     },
     "lib/libslang-compiler.so.0.2026.18.3": {
-      "sha256": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+      "sha256": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
       "mode": 493
     },
     "lib/libslang-compiler.so.0.2026.18.3.dwarf": {
-      "sha256": "ed50b4de8f653121bfcb138bd88a99101c3966e02c310907f259f2eca5bfbbbe",
+      "sha256": "3e04fc74bed35a453e36bfdd2deebdd87947c40602d80f6444b2aefaa4077e38",
       "mode": 420
     },
     "lib/libslang-glsl-module-2026.16.so": {
@@ -268,11 +293,11 @@
       "mode": 420
     },
     "lib/libslang-glsl-module-2026.18.3.so": {
-      "sha256": "a37e84461322c76b5e60ef514c1a598ea25f2f3bd3484d853bffba5c577af5b6",
+      "sha256": "60737b5069bd47baeb772f0f3ef0659da3079f1be3dfd700f55fac91d741ed93",
       "mode": 493
     },
     "lib/libslang-glsl-module-2026.18.3.so.dwarf": {
-      "sha256": "43a067fab36ddfdb23ad882d332a26fc7d9f6032ea5a4bf40733fc6ef39052fc",
+      "sha256": "4ab640951afaf6842bc4e32ec34400c25034087785db8ef96720d2ed00e2a57c",
       "mode": 420
     },
     "lib/libslang-glslang-2026.16.so": {
@@ -323,18 +348,18 @@
       "mode": 420
     },
     "lib/libslang-unit-test-tool.so": {
-      "sha256": "48d4be3b35e29e3c3c76df5798b79ca7ec7ebfdc3eb6b8582d6be1a388c8b0aa",
+      "sha256": "80e23cc15c779bc208e0506590ad6b257bb4a55b81958a3238ab74084c4d3ae9",
       "mode": 493
     },
     "lib/libslang-unit-test-tool.so.dwarf": {
-      "sha256": "0a7e4e6660ad7d347c47d7d385ff60f698c4fb7ad062151dcb5aa23da7c029bd",
+      "sha256": "f1eef6182b5304f82a6517dc2a5959d46bb0c8a10a07d2fff3efd5493e571644",
       "mode": 420
     },
     "lib/libslang.so": {
       "symlink": "libslang-compiler.so.0.2026.18.3"
     },
     "lib/slang-core-module.bin": {
-      "sha256": "3a2aa06edb72240002c0645453e6ea79911e175da0a7aca9801c4de60db7b7c3",
+      "sha256": "2ee7df0f4cecd5df44d3eb8031f4fcb20ad98004f45ae4bbb419c8106d57b8b5",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/experimental/workgraph.slang": {
@@ -342,7 +367,7 @@
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": {
-      "sha256": "c65ee1f1f7c0d079737ef1b4ebc78174b3dbd729177a7c59de2e4f6d5cbfe164",
+      "sha256": "036c434e1f33a35910c7073f71b537716f9e0fb0b8149dd2f36e92c8b02093ae",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/WaveMatrix.slang": {
@@ -422,23 +447,23 @@
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/neural.slang-module": {
-      "sha256": "802eeb213569f96fad0258e8b9426fd82a7bb17b17d31ff2d8f367fd01fea439",
+      "sha256": "23ea5f68fa6f032bcfdde4287d67aa3735b7e3ff97f5d743811039aed3b0673b",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": {
-      "sha256": "ea8e28f53e0fa571be3f7535dbd9f60ae1ffe2635fb51b6e858379feb41abe25",
+      "sha256": "1f520f635a10f7acb5b6b7e72a2d582294d95d7f152543055c1b95a300aa294c",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": {
-      "sha256": "05f5f080c4b37f7916d54df2f9255bdadde311ec1f3516ace76e1ca01ec34a9f",
+      "sha256": "3d9e4bf3a184edc177dfdae0582ebdc8a415e0f810c991a1f3a6337ed882abe7",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": {
-      "sha256": "36a6f1b096f477f6aab49698f86f4765057f3a5f82a09ba112c7d579ccc4a88e",
+      "sha256": "9003704e961de5242e95125f151731683e101a22ba1eeb7d93c970eed8d10432",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/numerics.slang-module": {
-      "sha256": "bb4672e5a9b39964247c52dfca4cd68da49feff4ab1c00228706c3369a0cd8b5",
+      "sha256": "72366c2e45312eac364983bcea6d4e0faff945cfa9981199124555bb78b2d301",
       "mode": 420
     },
     "lib/slang-standard-module-2026.16/slang/permuto-encoder.slang": {
@@ -478,7 +503,7 @@
       "mode": 420
     },
     "include/slang-tag-version.h": {
-      "sha256": "eb4d6e3a58ee2f5c84f2265fa733fb79107b87c10a464aa0c1cc5f5e875a020f",
+      "sha256": "633b7d9b6506b32ec3b2f1f2ae5b6f192a0db86f82324fee0207e2af09677693",
       "mode": 420
     },
     "include/slang.h": {
@@ -488,7 +513,7 @@
   },
   "device": "name, uuid, driver_version, compute_cap\nNVIDIA L4, GPU-502ada78-9ff3-cb9f-3e8e-e60d8c98c5a9, 580.126.09, 8.9\n",
   "final_candidate_review": {
-    "path": "build/nvvm-cuda-swizzle-set/review/final-candidate.json",
-    "sha256": "9677146e6ed419588847bc7405dabb0db686993818b250daf000e5fe3e638084"
+    "path": "build/nvvm-half-vector-helper-abi/review/final-candidate.json",
+    "sha256": "2d12375eb5dff2f32c98cc9758c3d271b08712e76951691c2d20182a539dffef"
   }
 }

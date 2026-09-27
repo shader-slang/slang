@@ -675,6 +675,21 @@ SLANG_UNIT_TEST(nvvmSlangIntegerVectorSwizzleUsesGenericConstruction)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+// Match the complete independently stated conversion signature, not merely BIT_REINTERPRET.
+// The fake provider's integer vector handles collapse widths, so the descriptor also proves i16.
+static bool _isHalfVectorBoundaryBitcast(
+    const FakeNVVMBuilderScalarOperation& operation,
+    uint32_t width,
+    bool encode)
+{
+    const SlangNVVMValueTypeDesc half = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, width};
+    const SlangNVVMValueTypeDesc integer = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, width};
+    return operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET &&
+           operation.operandCount == 1 &&
+           NVVMSemantics::areSameType(operation.resultType, encode ? integer : half) &&
+           NVVMSemantics::areSameType(operation.operandTypes[0], encode ? half : integer);
+}
+
 SLANG_UNIT_TEST(nvvmSlangVectorConstructionFlattensMixedOperands)
 {
     _resetDirectNVVMFakes();
@@ -728,11 +743,41 @@ SLANG_UNIT_TEST(nvvmSlangVectorConstructionFlattensMixedOperands)
             second.index < gFakeNVVMBuilder.vectorElementIndices.getCount());
         SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[first.index] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[second.index] == 1);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.vectorElementBaseValueRefs[first.index].kind ==
-            FakeNVVMBuilderValueKind::Call);
         const FakeNVVMBuilderValueRef firstBase =
             gFakeNVVMBuilder.vectorElementBaseValueRefs[first.index];
+        SLANG_CHECK_ABORT(
+            firstBase.kind == FakeNVVMBuilderValueKind::ScalarOperation && firstBase.index >= 0 &&
+            firstBase.index < gFakeNVVMBuilder.scalarOperations.getCount());
+        const auto& decode = gFakeNVVMBuilder.scalarOperations[firstBase.index];
+        SLANG_CHECK_ABORT(_isHalfVectorBoundaryBitcast(decode, 2, false));
+        const auto call = decode.operands[0];
+        SLANG_CHECK_ABORT(
+            call.kind == FakeNVVMBuilderValueKind::Call && call.index >= 0 &&
+            call.index < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount());
+        const auto physicalHalf2 =
+            _getFakeNVVMBuilderVectorType(2, FakeNVVMBuilderScalarTypeKind::Integer);
+        SLANG_CHECK(gFakeNVVMBuilder.callResultTypes[call.index] == physicalHalf2);
+        SLANG_CHECK(decode.callerBlockIndex == gFakeNVVMBuilder.callCallerBlockIndices[call.index]);
+
+        Index makePairFunction = -1;
+        for (Index i = 0; i < gFakeNVVMBuilder.functionNames.getCount(); ++i)
+        {
+            if (gFakeNVVMBuilder.functionNames[i].indexOf("makePair") >= 0)
+            {
+                SLANG_CHECK(makePairFunction == -1);
+                makePairFunction = i;
+            }
+        }
+        SLANG_CHECK_ABORT(makePairFunction >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.callCalleeFunctionIndices[call.index] == makePairFunction);
+        const Index makePairType = gFakeNVVMBuilder.functionTypeIndices[makePairFunction];
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultTypes[makePairType] == physicalHalf2);
+        Index makePairCallCount = 0;
+        for (Index callee : gFakeNVVMBuilder.callCalleeFunctionIndices)
+            makePairCallCount += callee == makePairFunction;
+        SLANG_CHECK(makePairCallCount == 1);
+
+        // Both constructor lanes must come from this one decoded call snapshot.
         const FakeNVVMBuilderValueRef secondBase =
             gFakeNVVMBuilder.vectorElementBaseValueRefs[second.index];
         SLANG_CHECK(secondBase.kind == firstBase.kind);
@@ -3196,6 +3241,8 @@ SLANG_UNIT_TEST(nvvmSlangFloat16ValuesUseGenericTypedPipeline)
         const SlangNVVMTypeHandle halfType = _getFakeNVVMBuilderHalfType();
         const SlangNVVMTypeHandle half2Type =
             _getFakeNVVMBuilderVectorType(2, FakeNVVMBuilderScalarTypeKind::Half);
+        const SlangNVVMTypeHandle physicalHalf2Type =
+            _getFakeNVVMBuilderVectorType(2, FakeNVVMBuilderScalarTypeKind::Integer);
         SLANG_CHECK(gFakeNVVMBuilder.getFloatingPointTypeCallCount >= 2);
         SLANG_CHECK(gFakeNVVMBuilder.getVectorTypeCallCount >= 1);
         SLANG_CHECK(gFakeNVVMBuilder.floatingPointConstantBitWidths.getCount() >= 2);
@@ -3217,21 +3264,24 @@ SLANG_UNIT_TEST(nvvmSlangFloat16ValuesUseGenericTypedPipeline)
         SLANG_CHECK_ABORT(adjustFunction >= 0);
         const Index chooseType = gFakeNVVMBuilder.functionTypeIndices[chooseFunction];
         const Index adjustType = gFakeNVVMBuilder.functionTypeIndices[adjustFunction];
-        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultTypes[chooseType] == half2Type);
-        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultTypes[adjustType] == half2Type);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultTypes[chooseType] == physicalHalf2Type);
+        SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultTypes[adjustType] == physicalHalf2Type);
         SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[chooseType] == 3);
         SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[adjustType] == 1);
         const Index chooseParameterOffset =
             gFakeNVVMBuilder.functionTypeParameterKindOffsets[chooseType];
-        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypes[chooseParameterOffset] == half2Type);
         SLANG_CHECK(
-            gFakeNVVMBuilder.functionParameterTypes[chooseParameterOffset + 1] == half2Type);
+            gFakeNVVMBuilder.functionParameterTypes[chooseParameterOffset] == physicalHalf2Type);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypes[chooseParameterOffset + 1] ==
+            physicalHalf2Type);
         SLANG_CHECK(
             gFakeNVVMBuilder.functionParameterTypes[chooseParameterOffset + 2] ==
             _getFakeNVVMBuilderBooleanType());
         const Index adjustParameterOffset =
             gFakeNVVMBuilder.functionTypeParameterKindOffsets[adjustType];
-        SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypes[adjustParameterOffset] == half2Type);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.functionParameterTypes[adjustParameterOffset] == physicalHalf2Type);
 
         bool sawScalarFloatToHalf = false;
         bool sawScalarIntegerToHalf = false;
@@ -3294,10 +3344,10 @@ SLANG_UNIT_TEST(nvvmSlangFloat16ValuesUseGenericTypedPipeline)
         for (SlangNVVMTypeHandle phiType : gFakeNVVMBuilder.scalarPhiTypes)
             sawHalf2Phi |= phiType == half2Type;
         SLANG_CHECK(sawHalf2Phi);
-        bool sawHalf2Call = false;
+        bool sawPhysicalHalf2Call = false;
         for (SlangNVVMTypeHandle callType : gFakeNVVMBuilder.callResultTypes)
-            sawHalf2Call |= callType == half2Type;
-        SLANG_CHECK(sawHalf2Call);
+            sawPhysicalHalf2Call |= callType == physicalHalf2Type;
+        SLANG_CHECK(sawPhysicalHalf2Call);
         bool sawHalfElement = false;
         for (FakeNVVMBuilderScalarTypeKind elementKind : gFakeNVVMBuilder.vectorElementTypeKinds)
         {
@@ -3310,6 +3360,239 @@ SLANG_UNIT_TEST(nvvmSlangFloat16ValuesUseGenericTypedPipeline)
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+// Each helper deliberately performs native Half arithmetic between the two physical crossings.
+// The runtime input and all consumed lanes keep the parameter/result boundaries observable.
+static const char kHalfVectorBoundarySource[] = R"(
+[noinline] half2 boundary2(half2 value) { return -value; }
+[noinline] half3 boundary3(half3 value) { return -value; }
+[noinline] half4 boundary4(half4 value) { return -value; }
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float input)
+{
+    half4 value = half4(input, input + 1.0, input + 2.0, input + 3.0);
+    half2 a = boundary2(value.xy);
+    half3 b = boundary3(value.xyz);
+    half4 c = boundary4(value);
+    *destination = float(a.x) + float(a.y) + float(b.x) + float(b.y) + float(b.z) +
+        float(c.x) + float(c.y) + float(c.z) + float(c.w);
+}
+)";
+
+// All three widths belong to one signature: preflight must not stop at the first Half boundary.
+static const char kMixedHalfVectorBoundarySource[] = R"(
+[noinline]
+half4 mixedBoundary(half2 a, half3 b, half4 c)
+{
+    return half4(a.x + a.y, b.x + b.y + b.z, c.x + c.y, c.z + c.w);
+}
+
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> destination,
+    uniform float input)
+{
+    half4 value = half4(input, input + 1.0, input + 2.0, input + 3.0);
+    half4 result = mixedBoundary(value.xy, value.xyz, value);
+    *destination = float(result.x) + float(result.y) + float(result.z) + float(result.w);
+}
+)";
+
+SLANG_UNIT_TEST(nvvmSlangHalfVectorsCrossAllFourHelperBoundaries)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(
+            globalSession,
+            kHalfVectorBoundarySource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        const char* names[] = {"boundary2", "boundary3", "boundary4"};
+        for (uint32_t width = 2; width <= 4; ++width)
+        {
+            Index function = -1;
+            for (Index i = 0; i < gFakeNVVMBuilder.functionNames.getCount(); ++i)
+            {
+                if (gFakeNVVMBuilder.functionNames[i].indexOf(names[width - 2]) >= 0)
+                {
+                    SLANG_CHECK(function == -1);
+                    function = i;
+                }
+            }
+            SLANG_CHECK_ABORT(function >= 0);
+            const auto physical =
+                _getFakeNVVMBuilderVectorType(width, FakeNVVMBuilderScalarTypeKind::Integer);
+            const Index functionType = gFakeNVVMBuilder.functionTypeIndices[function];
+            SLANG_CHECK(gFakeNVVMBuilder.functionTypeResultTypes[functionType] == physical);
+            SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[functionType] == 1);
+            const Index parameterOffset =
+                gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionType];
+            SLANG_CHECK(gFakeNVVMBuilder.functionParameterTypes[parameterOffset] == physical);
+
+            Index call = -1;
+            for (Index i = 0; i < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount(); ++i)
+            {
+                if (gFakeNVVMBuilder.callCalleeFunctionIndices[i] == function)
+                {
+                    SLANG_CHECK(call == -1);
+                    call = i;
+                }
+            }
+            SLANG_CHECK_ABORT(call >= 0);
+            SLANG_CHECK(gFakeNVVMBuilder.callResultTypes[call] == physical);
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.callArgumentCounts[call] == 1);
+            const auto argument =
+                gFakeNVVMBuilder.callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[call]];
+            SLANG_CHECK_ABORT(argument.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+            const auto& encoding = gFakeNVVMBuilder.scalarOperations[argument.index];
+            SLANG_CHECK(_isHalfVectorBoundaryBitcast(encoding, width, true));
+            SLANG_CHECK(encoding.callerBlockIndex == gFakeNVVMBuilder.callCallerBlockIndices[call]);
+
+            Index entryDecode = -1;
+            Index resultDecode = -1;
+            for (Index i = 0; i < gFakeNVVMBuilder.scalarOperations.getCount(); ++i)
+            {
+                const auto& operation = gFakeNVVMBuilder.scalarOperations[i];
+                if (!_isHalfVectorBoundaryBitcast(operation, width, false))
+                    continue;
+                const auto operand = operation.operands[0];
+                if (operand.kind == FakeNVVMBuilderValueKind::Parameter &&
+                    operand.functionIndex == function && operand.index == 0)
+                {
+                    SLANG_CHECK(entryDecode == -1);
+                    entryDecode = i;
+                    SLANG_CHECK(
+                        gFakeNVVMBuilder.blockFunctionIndices[operation.callerBlockIndex] ==
+                        function);
+                }
+                if (operand.kind == FakeNVVMBuilderValueKind::Call && operand.index == call)
+                {
+                    SLANG_CHECK(resultDecode == -1);
+                    resultDecode = i;
+                    SLANG_CHECK(
+                        operation.callerBlockIndex ==
+                        gFakeNVVMBuilder.callCallerBlockIndices[call]);
+                }
+            }
+            SLANG_CHECK_ABORT(entryDecode >= 0);
+            SLANG_CHECK_ABORT(resultDecode >= 0);
+
+            Index returnCount = 0;
+            for (Index i = 0; i < gFakeNVVMBuilder.scalarReturnValueRefs.getCount(); ++i)
+            {
+                if (gFakeNVVMBuilder
+                        .blockFunctionIndices[gFakeNVVMBuilder.scalarReturnBlockIndices[i]] !=
+                    function)
+                    continue;
+                ++returnCount;
+                const auto returned = gFakeNVVMBuilder.scalarReturnValueRefs[i];
+                SLANG_CHECK_ABORT(returned.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                const auto& returnEncoding = gFakeNVVMBuilder.scalarOperations[returned.index];
+                SLANG_CHECK(_isHalfVectorBoundaryBitcast(returnEncoding, width, true));
+                SLANG_CHECK(
+                    returnEncoding.callerBlockIndex ==
+                    gFakeNVVMBuilder.scalarReturnBlockIndices[i]);
+                const auto bodyValue = returnEncoding.operands[0];
+                SLANG_CHECK_ABORT(bodyValue.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                const auto& negate = gFakeNVVMBuilder.scalarOperations[bodyValue.index];
+                SLANG_CHECK(negate.key.operation == SLANG_NVVM_VALUE_OP_NEGATE);
+                const SlangNVVMValueTypeDesc nativeHalf = {
+                    SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+                    16,
+                    width};
+                SLANG_CHECK(NVVMSemantics::areSameType(negate.resultType, nativeHalf));
+                SLANG_CHECK_ABORT(negate.operandCount == 1);
+                SLANG_CHECK(NVVMSemantics::areSameType(negate.operandTypes[0], nativeHalf));
+                SLANG_CHECK(negate.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                SLANG_CHECK(negate.operands[0].index == entryDecode);
+            }
+            SLANG_CHECK(returnCount == 1);
+            // The caller consumes the decoded canonical result, not the physical call value.
+            uint32_t observedLanes = 0;
+            for (Index i = 0; i < gFakeNVVMBuilder.vectorElementBaseValueRefs.getCount(); ++i)
+            {
+                const auto base = gFakeNVVMBuilder.vectorElementBaseValueRefs[i];
+                if (base.kind == FakeNVVMBuilderValueKind::ScalarOperation &&
+                    base.index == resultDecode)
+                {
+                    SLANG_CHECK(
+                        gFakeNVVMBuilder.vectorElementTypeKinds[i] ==
+                        FakeNVVMBuilderScalarTypeKind::Half);
+                    const auto lane = gFakeNVVMBuilder.vectorElementIndices[i];
+                    SLANG_CHECK_ABORT(lane < width);
+                    observedLanes |= 1u << lane;
+                }
+            }
+            SLANG_CHECK(observedLanes == (1u << width) - 1u);
+        }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangHalfVectorBoundaryCapabilitiesPreflightEveryWidth)
+{
+    for (uint32_t width = 2; width <= 4; ++width)
+    {
+        for (bool encode : {false, true})
+        {
+            const SlangNVVMValueTypeDesc half = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, width};
+            const SlangNVVMValueTypeDesc integer = {
+                SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+                16,
+                width};
+            const SlangNVVMValueTypeDesc operand = encode ? half : integer;
+            const SlangNVVMValueOperationDesc rejected =
+                {SLANG_NVVM_VALUE_OP_BIT_REINTERPRET, encode ? integer : half, &operand, 1};
+            _resetDirectNVVMFakes();
+            _rejectFakeNVVMBuilderValueOperation(rejected);
+            {
+                ComPtr<slang::IGlobalSession> globalSession;
+                SLANG_CHECK_ABORT(
+                    slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) ==
+                    SLANG_OK);
+                ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+                globalSession->setSharedLibraryLoader(loader);
+                ComPtr<slang::IBlob> code;
+                ComPtr<slang::IBlob> diagnostics;
+                SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+                    globalSession,
+                    kMixedHalfVectorBoundarySource,
+                    code,
+                    diagnostics)));
+                SLANG_CHECK(code == nullptr);
+                const String text = _getBlobText(diagnostics);
+                SLANG_CHECK(text.indexOf("E52018") >= 0);
+                SLANG_CHECK(
+                    text.indexOf(
+                        encode ? "physical Half helper ABI encoding"
+                               : "canonical Half helper ABI decoding") >= 0);
+                SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 1);
+                SLANG_CHECK(gFakeNVVMBuilder.isOperationSupportedCallCount > 0);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+            }
+            SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+            SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+        }
+    }
 }
 
 SLANG_UNIT_TEST(nvvmSlangOpaqueHalfHelpersUseTypedFloatConversions)

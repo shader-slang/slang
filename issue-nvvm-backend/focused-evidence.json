@@ -5,8 +5,7 @@
   "archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "da78129309339e2810448b210a342c90374bf8978280954f2883527e496f1e08",
-    "revision": "128eca5ccc2a98099351f503ca155935d30c8920"
+    "sha256": "2bdc74eb56dff3717319ef2f84ac8e09b9bd3fb549977e8af265aa06b37d026f"
   },
   "features": {
     "inheritance-initialization-constants": {
@@ -6528,7 +6527,7 @@
         }
       },
       "half_vector_helper_open_failure": {
-        "status": "unresolved-runtime-mismatch",
+        "status": "resolved-runtime-mismatch",
         "mode": "nvvm-o3",
         "probe": {
           "path": "build/nvvm-cuda-swizzle-set/probe-runtime.slang",
@@ -6570,6 +6569,17 @@
         "independent_finding": {
           "path": "build/nvvm-cuda-swizzle-set/review/half-vector-abi-finding.json",
           "sha256": "39cdb9f7d03071ea439206818ae0513308914ec9e5b199a991d9fd21bd299c4c"
+        },
+        "historical_status": "unresolved-runtime-mismatch",
+        "resolution": {
+          "feature": "half-vector-helper-abi",
+          "permanent_source": "tests/cuda/nvvm-half-vector-helper-effectful.slang",
+          "source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "evidence": {
+            "path": "build/nvvm-half-vector-helper-abi/review/focused-after.json",
+            "sha256": "2849b66191cc846408600745f07bac81c25bef46c9a67384edcf6c6f15965b4d"
+          },
+          "scope": "Original source and expected15words retained. Prior source-emission acceptance and its binary identity remain historical."
         }
       },
       "validation_incidents": [
@@ -6587,6 +6597,506 @@
         "Effectful float helper is one ordinary noinline call; no universal forced-intrinsic folding claim.",
         "Scalar CUDA image-component control encounters the separate existing CUsurfObject subscript failure; only GLSL exercises legalized scalar SwizzleSet in this probe.",
         "No NVVM type-role, helper ABI, provider, lowering pass or storage representation change. Older focused results retain their original identities."
+      ]
+    },
+    "half-vector-helper-abi": {
+      "status": "accepted-focused-correctness",
+      "contract": "Already-admitted Half2/Half3/Half4 helper parameters and results transport exact lane bits using integer-vector physical LLVM types while canonical values, arithmetic, storage and other roles remain unchanged. Scalar Half retains its established boundary.",
+      "source_sha256": {
+        "tests/cuda/nvvm-half-vector-helper-effectful.slang": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+        "tests/cuda/nvvm-half-vector-helper-exports.slang": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+        "tests/cuda/nvvm-half-vector-helper-parameters.slang": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+        "tests/cuda/nvvm-half-vector-helper-results.slang": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06"
+      },
+      "compiler_identity": {
+        "revision": "3c250bff847674a72bb95c89b19841620c920d72",
+        "patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+        "compiler_version": "2026.18.3-329-g3c250bff8",
+        "provider_abi": 42,
+        "compiler_sha256": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
+        "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4"
+      },
+      "before_compiler_identity": {
+        "revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
+        "patch_sha256": "7101a82b9f7baa664aa967a9bc66ad1ef81fdb60c7da1419d26388d888ee4aff",
+        "compiler_version": "2026.18.3-328-g2b8dafc69",
+        "provider_abi": 42,
+        "compiler_sha256": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+        "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4"
+      },
+      "complete_provenance": {
+        "path": "build/nvvm-half-vector-helper-abi/fixture-refresh/provenance.json",
+        "sha256": "613e7d75ad1edb9ee3a9de96a9fb636b4d95f4e52b802755d9fa447c020d15ba"
+      },
+      "unit_component_refresh": {
+        "path": "build/nvvm-half-vector-helper-abi/unit-component-refresh.json",
+        "sha256": "abeae066ffdb93f68fa63e732b6b2ae8ed05fc45372aaafb9f40bebd192e7047"
+      },
+      "fixture_component_refresh": {
+        "path": "build/nvvm-half-vector-helper-abi/fixture-component-refresh.json",
+        "sha256": "da55ab696b9977ccc826235fe95fe162ebd64158465403b08172445b87959da4"
+      },
+      "fixture_format_proof": {
+        "path": "build/nvvm-half-vector-helper-abi/fixture-format-inputs.json",
+        "sha256": "a8b194918c17a18d45d12ec3ab29ce51fa26e408f697ecd8e1a7309ca9f05c6f"
+      },
+      "corpus_execution_provenance": {
+        "path": "build/nvvm-half-vector-helper-abi/checkpoint/provenance.json",
+        "sha256": "e1d532d2a23178e821176461463448b0d71e7efe4405853b86a03220095bc189"
+      },
+      "formatted_source_identity": {
+        "path": "build/nvvm-half-vector-helper-abi/tested-source-formatted.json",
+        "sha256": "39a4a75311007152b0270d110c4d142bec0b40a294c5fdf8514a4367b10437f6"
+      },
+      "before_identity_snapshot": {
+        "path": "build/nvvm-half-vector-helper-abi/before-accepted-identity.json",
+        "sha256": "93a0f0dae204f2e997b6e8806cf67b1864d03035f89a4140e2bdda3b701b5b74"
+      },
+      "permanent_cells": [
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-parameters.slang",
+          "mode": "nvrtc-o3",
+          "source_sha256": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+          "before_source_sha256": "9612dae252ab110226e3e30785a8fe619112fe3371931337f6157ef0696b920e",
+          "after_source_sha256": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [0, 0, 0, 0, 0, 0, 65536, 3735928559],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-parameters.slang.nvrtc-o3.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-parameters.slang.nvrtc-o3.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-parameters.slang",
+          "mode": "nvvm-o0",
+          "source_sha256": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+          "before_source_sha256": "9612dae252ab110226e3e30785a8fe619112fe3371931337f6157ef0696b920e",
+          "after_source_sha256": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [0, 0, 0, 0, 0, 0, 65536, 3735928559],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-parameters.slang.nvvm-o0.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-parameters.slang.nvvm-o0.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-parameters.slang",
+          "mode": "nvvm-o3",
+          "source_sha256": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+          "before_source_sha256": "9612dae252ab110226e3e30785a8fe619112fe3371931337f6157ef0696b920e",
+          "after_source_sha256": "48d022ac45115b56b92a44918fa931d24ee02a08b65da20b845e81e0a520a018",
+          "before": "runtime-mismatch",
+          "after": "correct",
+          "expected_words": [0, 0, 0, 0, 0, 0, 65536, 3735928559],
+          "before_wrong_word_indices": [0, 1, 2, 3, 4, 5],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-parameters.slang.nvvm-o3.actual.txt",
+            "sha256": "1008e93574016febc24c7025d5c6b8a78494e9e335829790a2877f3aee73e16d"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-parameters.slang.nvvm-o3.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-results.slang",
+          "mode": "nvrtc-o3",
+          "source_sha256": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
+          "before_source_sha256": "1ef888d13b1589d1ad789535ca252ad838999ab6581db2831edf5e206ca628b8",
+          "after_source_sha256": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [0, 0, 0, 0, 0, 0, 65536, 3735928559],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-results.slang.nvrtc-o3.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-results.slang.nvrtc-o3.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-results.slang",
+          "mode": "nvvm-o0",
+          "source_sha256": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
+          "before_source_sha256": "1ef888d13b1589d1ad789535ca252ad838999ab6581db2831edf5e206ca628b8",
+          "after_source_sha256": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [0, 0, 0, 0, 0, 0, 65536, 3735928559],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-results.slang.nvvm-o0.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-results.slang.nvvm-o0.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-results.slang",
+          "mode": "nvvm-o3",
+          "source_sha256": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
+          "before_source_sha256": "1ef888d13b1589d1ad789535ca252ad838999ab6581db2831edf5e206ca628b8",
+          "after_source_sha256": "9bf35cdd25b366f45ec28ed6fb3eb08f4339bd3ce28728905add91b936ae8d06",
+          "before": "runtime-mismatch",
+          "after": "correct",
+          "expected_words": [0, 0, 0, 0, 0, 0, 65536, 3735928559],
+          "before_wrong_word_indices": [0, 1, 2, 3, 4, 5],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-results.slang.nvvm-o3.actual.txt",
+            "sha256": "1008e93574016febc24c7025d5c6b8a78494e9e335829790a2877f3aee73e16d"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-results.slang.nvvm-o3.actual.txt",
+            "sha256": "552b50d1f3e5c7ee83f46352f0707a107a6068845884598e832cbab11f677f2e"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-effectful.slang",
+          "mode": "nvrtc-o3",
+          "source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "before_source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "after_source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [
+            -4, -8, -1, 8, 8, 2, 4, 2, -4, -8, -1, 8, 1, 3, 31337
+          ],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-effectful.slang.nvrtc-o3.actual.txt",
+            "sha256": "e3a20fca6d24cd2f7f48e5aac3f352d62d84bdb753a1690e645aa3a0ac954c37"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-effectful.slang.nvrtc-o3.actual.txt",
+            "sha256": "e3a20fca6d24cd2f7f48e5aac3f352d62d84bdb753a1690e645aa3a0ac954c37"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-effectful.slang",
+          "mode": "nvvm-o0",
+          "source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "before_source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "after_source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [
+            -4, -8, -1, 8, 8, 2, 4, 2, -4, -8, -1, 8, 1, 3, 31337
+          ],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-effectful.slang.nvvm-o0.actual.txt",
+            "sha256": "e3a20fca6d24cd2f7f48e5aac3f352d62d84bdb753a1690e645aa3a0ac954c37"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-effectful.slang.nvvm-o0.actual.txt",
+            "sha256": "e3a20fca6d24cd2f7f48e5aac3f352d62d84bdb753a1690e645aa3a0ac954c37"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-effectful.slang",
+          "mode": "nvvm-o3",
+          "source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "before_source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "after_source_sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75",
+          "before": "runtime-mismatch",
+          "after": "correct",
+          "expected_words": [
+            -4, -8, -1, 8, 8, 2, 4, 2, -4, -8, -1, 8, 1, 3, 31337
+          ],
+          "before_wrong_word_indices": [8, 9, 10],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-effectful.slang.nvvm-o3.actual.txt",
+            "sha256": "e39bc54a7f8b13c9352f5a9e0459bafa7ad218c6d82daa7fe84143535e39a6f0"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-effectful.slang.nvvm-o3.actual.txt",
+            "sha256": "e3a20fca6d24cd2f7f48e5aac3f352d62d84bdb753a1690e645aa3a0ac954c37"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-exports.slang",
+          "mode": "nvrtc-o3",
+          "source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "before_source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "after_source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [
+            49152, 15360, 17408, 15360, 49152, 51200, 17408, 49152, 15360, 3,
+            3735928559
+          ],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-exports.slang.nvrtc-o3.actual.txt",
+            "sha256": "5ea7038ae6018a7e7cb96fcb9e800146fd8f2dc5ed1c21f6d68babbee5ead545"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-exports.slang.nvrtc-o3.actual.txt",
+            "sha256": "5ea7038ae6018a7e7cb96fcb9e800146fd8f2dc5ed1c21f6d68babbee5ead545"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-exports.slang",
+          "mode": "nvvm-o0",
+          "source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "before_source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "after_source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "before": "correct",
+          "after": "correct",
+          "expected_words": [
+            49152, 15360, 17408, 15360, 49152, 51200, 17408, 49152, 15360, 3,
+            3735928559
+          ],
+          "before_wrong_word_indices": [],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-exports.slang.nvvm-o0.actual.txt",
+            "sha256": "5ea7038ae6018a7e7cb96fcb9e800146fd8f2dc5ed1c21f6d68babbee5ead545"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-exports.slang.nvvm-o0.actual.txt",
+            "sha256": "5ea7038ae6018a7e7cb96fcb9e800146fd8f2dc5ed1c21f6d68babbee5ead545"
+          },
+          "executed": 1,
+          "ignored": 0
+        },
+        {
+          "id": "tests/cuda/nvvm-half-vector-helper-exports.slang",
+          "mode": "nvvm-o3",
+          "source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "before_source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "after_source_sha256": "44be36f1e960ded6c31888f56d784a804579cae09c1167647c088e247dbba35f",
+          "before": "runtime-mismatch",
+          "after": "correct",
+          "expected_words": [
+            49152, 15360, 17408, 15360, 49152, 51200, 17408, 49152, 15360, 3,
+            3735928559
+          ],
+          "before_wrong_word_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+          "before_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-outputs/nvvm-half-vector-helper-exports.slang.nvvm-o3.actual.txt",
+            "sha256": "17935659600d01c93e7a29bda8b6d19ae0e4e3082ca28706fd4ebcff8288a3a1"
+          },
+          "after_output": {
+            "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/nvvm-half-vector-helper-exports.slang.nvvm-o3.actual.txt",
+            "sha256": "5ea7038ae6018a7e7cb96fcb9e800146fd8f2dc5ed1c21f6d68babbee5ead545"
+          },
+          "executed": 1,
+          "ignored": 0
+        }
+      ],
+      "external_cells": [
+        {
+          "id": "widths",
+          "mode": "nvvm-o0",
+          "before": "passed",
+          "after": "passed",
+          "records": 65536,
+          "guard_uint32_words": 64,
+          "before_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-before-widths-nvvm-o0/results.json",
+            "sha256": "ac1f861fe97851bcdf38d7d8d304468fa20076ddbf14f75504ea85d79e83ccd6"
+          },
+          "after_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-final-widths-nvvm-o0/results.json",
+            "sha256": "987c614ec380d75a9cd2c9a43fa78f68e76204b6e4b5bdc28e9e0bbbde45fc01"
+          },
+          "caller_sha256": "9fda8cf70bbbff0b11415c66a98889948fbcf3bd4bf3b0a5aa9585f7327ba516",
+          "input_sha256": "b99c628e6e491c3409d34e2d0feb0c5e386899eca82e478819cad6153fa2f8d1",
+          "expected_sha256": "9dc4163958a651ee2538d2b8abf5e6fb02b7d0ad27056753809a1f022073e609"
+        },
+        {
+          "id": "widths",
+          "mode": "nvvm-o3",
+          "before": "runtime-mismatch",
+          "after": "passed",
+          "records": 65536,
+          "guard_uint32_words": 64,
+          "before_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-before-widths-nvvm-o3/results.json",
+            "sha256": "a5dcb7ad1078a4117c7d92bc9c1971d3e36303b9766cdbe9ff317c78c125c636"
+          },
+          "after_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-final-widths-nvvm-o3/results.json",
+            "sha256": "d976d583f5c57ba51462c1e14682498ee970d59a4aae4a031795631b7f19297b"
+          },
+          "caller_sha256": "9fda8cf70bbbff0b11415c66a98889948fbcf3bd4bf3b0a5aa9585f7327ba516",
+          "input_sha256": "b99c628e6e491c3409d34e2d0feb0c5e386899eca82e478819cad6153fa2f8d1",
+          "expected_sha256": "9dc4163958a651ee2538d2b8abf5e6fb02b7d0ad27056753809a1f022073e609"
+        },
+        {
+          "id": "four-to-three",
+          "mode": "nvvm-o0",
+          "before": "passed",
+          "after": "passed",
+          "records": 65536,
+          "guard_uint32_words": 64,
+          "before_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-before-four-to-three-nvvm-o0/results.json",
+            "sha256": "6043e3256b3847d92f63eedec4bc7a5fe7f27cccaf7517846cf21a6aa81a4ceb"
+          },
+          "after_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-final-four-to-three-nvvm-o0/results.json",
+            "sha256": "f0909f6930c9102115348279c2c0ee9f339169a1bfceaab8d65adca21e46a6c1"
+          },
+          "caller_sha256": "0210c5e3099e272a2262d7e52c9d72673324913b8228f2feb3da6c45f802042e",
+          "input_sha256": "b99c628e6e491c3409d34e2d0feb0c5e386899eca82e478819cad6153fa2f8d1",
+          "expected_sha256": "a4b573600e01c8a1053103fda31beb921aac3d10c49845754ca6741d2c65319d"
+        },
+        {
+          "id": "four-to-three",
+          "mode": "nvvm-o3",
+          "before": "runtime-mismatch",
+          "after": "passed",
+          "records": 65536,
+          "guard_uint32_words": 64,
+          "before_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-before-four-to-three-nvvm-o3/results.json",
+            "sha256": "231c39414bf5f8471c276aad5036606eee677d1dbeff0d39d93ee250a74a9d92"
+          },
+          "after_results": {
+            "path": "build/nvvm-half-vector-helper-abi/external-final-four-to-three-nvvm-o3/results.json",
+            "sha256": "7d25128241880188e6f1f881b07504acc55474ac18f8cf93a96dd2cb4b7986e4"
+          },
+          "caller_sha256": "0210c5e3099e272a2262d7e52c9d72673324913b8228f2feb3da6c45f802042e",
+          "input_sha256": "b99c628e6e491c3409d34e2d0feb0c5e386899eca82e478819cad6153fa2f8d1",
+          "expected_sha256": "a4b573600e01c8a1053103fda31beb921aac3d10c49845754ca6741d2c65319d"
+        }
+      ],
+      "qualification": {
+        "permanent_gpu_cells": 12,
+        "compile_and_assembly_cells": 15,
+        "shared_boundary_units": 4,
+        "capability_refusals": 6,
+        "direct_static_units": 5,
+        "focused_regressions": {
+          "path": "build/nvvm-half-vector-helper-abi/candidate-baseline.json",
+          "sha256": "ecf0041835972f76c941c2204169c29f8c84e0f9e36d5053eb394063d956172d"
+        },
+        "static_identity": {
+          "path": "build/nvvm-half-vector-helper-abi/static-after-identity.json",
+          "sha256": "af2b11486e5e8692ef50d5e625cb135c71166bbca42ef55f804a630bcea8f7c8"
+        },
+        "permanent_gpu_gate": {
+          "path": "build/nvvm-half-vector-helper-abi/permanent-after-3.json",
+          "sha256": "e0a40d8898f7197a0ffecc4dfc3fe43b80b3e55f44d7be649db2a95dda4f0574"
+        },
+        "formatted_output_index": {
+          "path": "build/nvvm-half-vector-helper-abi/review/permanent-formatted-outputs/index.json",
+          "sha256": "5f30a89eb1b4460ed7692f963769b478751ef6a034cbd0cba0d9eed3a7ec55e1"
+        },
+        "compile_capture_inventory": {
+          "path": "build/nvvm-half-vector-helper-abi/formatted-capture-sha256.json",
+          "sha256": "b9c8375ba19974e9eddf3ab4fa298b7b20942025f1b5728986ab1fdfdf335f7f"
+        },
+        "compile_assembly_attempts": {
+          "path": "build/nvvm-half-vector-helper-abi/formatted-attempts.json",
+          "sha256": "9098676bd5f4fb7d63a3baeda09687fbc04f7f267954a7e46b00a1a954d175bc"
+        },
+        "source_review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/final-source-3.json",
+          "sha256": "120a21d0c19fbed0803c1c1435978ff2a3b0dd622247e58983db8fea5d5410ca"
+        },
+        "before_oracle_review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/permanent-oracle.json",
+          "sha256": "c0d3dabe2fe2669ce5f764f81e3e92571e857f21dcfc1a0398e47cf8a1769b8f"
+        },
+        "before_review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/permanent-before-results.json",
+          "sha256": "d2df78a581211327d04547e0f1bb2f116772170b7c1695cabe264561a4f4d0b2"
+        },
+        "after_review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/focused-after.json",
+          "sha256": "2849b66191cc846408600745f07bac81c25bef46c9a67384edcf6c6f15965b4d"
+        },
+        "export_abi_review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/final-export-abi-2.json",
+          "sha256": "169292109b814ab1fb336070b4fc29bef3b4a42c3f072954572a43ea0517f728"
+        },
+        "final_candidate_review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/final-candidate.json",
+          "sha256": "2d12375eb5dff2f32c98cc9758c3d271b08712e76951691c2d20182a539dffef"
+        }
+      },
+      "diagnostic_prototype": {
+        "before_gpu_cells": 21,
+        "before_correct": 15,
+        "before_wrong_nvvm_o3": 6,
+        "after_correct": 21,
+        "compile_and_assembly_cells_per_version": 21,
+        "before_llvm_pairs_identical": 7,
+        "identity": {
+          "path": "build/nvvm-half-vector-helper-abi/prototype-identity.json",
+          "sha256": "b7ff0bea54d3009ee19d24a9dd2564b7caecf9b334536d56b68e4b6065e0bb40"
+        },
+        "source_patch": {
+          "path": "build/nvvm-half-vector-helper-abi/prototype-source.patch",
+          "sha256": "8617839266a62ffae1916123bdd6e944c2f33f6369e6baeb9696fe7c55057cf5"
+        },
+        "review": {
+          "path": "build/nvvm-half-vector-helper-abi/review/prototype-results.json",
+          "sha256": "3907bd179d0eebaca1a8a18b7a30ebfc3650ca83cdb91869bcd09d6dc9c46230"
+        },
+        "scope": "Pre-format prototype kept under its own identity. Final compiler separately qualifies permanent fixtures and external callers."
+      },
+      "oracle": {
+        "raw_bit_fixtures": "65,536 iterations in each isolated parameter/result fixture; two XOR-salted correlated families, every 16-bit encoding in every lane per family; A results remain live across B calls. Six mismatch masks must remain zero, completion is65,536 and guardDEADBEEF is unchanged.",
+        "external": "65,536 separately linked PTX caller records per cell; odd affine lane bijections, 64 trailinguint32guard words. Output padding is never read.",
+        "proof": {
+          "path": "build/nvvm-half-vector-helper-abi/review/fixture-drafts/oracle.json",
+          "sha256": "8c4bc50e132bbd0a1a2c419436624b043adba8c5fd2238194b3fe983f3847e24"
+        }
+      },
+      "rejected_hypothesis": {
+        "claim": "A new Half-specific cache is required to separate HelperValue from physical boundaries.",
+        "disposition": "Rejected: unchanged-production scalar test passes because copyable HelperValue normalizes to Value before cache lookup. No extra map or scalar defect claim retained.",
+        "before_scalar_test": {
+          "path": "build/nvvm-half-vector-helper-abi/static-before-scalar.json",
+          "sha256": "25cdd66487834da47dc4deb793aaa843985e41294a171b5e6ce2b09490810b1e"
+        }
+      },
+      "limits": [
+        "Correlated per-lane exhaustive encodings are not Cartesian combinations or a proof of arbitrary Half arithmetic, NaN arithmetic, aggregates or pointer roles.",
+        "Export qualification preserves existing direct-NVVM PTX symbols, alignments, sizes and semantic lane offsets. It does not establish native CUDA-prelude binary interoperability or defined padding contents.",
+        "Bare Half2 Storage remains excluded; Half3/4 keep compact storage. Entry-point Half roles and non-Half families are unchanged.",
+        "Actual before LLVM establishes a live, canonical boundary; no unique downstream vendor pass is identified.",
+        "No provider ABI change, new Slang IR pass, general helper-domain expansion, performance claim or older timing refresh."
       ]
     }
   }

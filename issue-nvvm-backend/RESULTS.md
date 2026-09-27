@@ -79,9 +79,10 @@ for long gates. Compare unit/semantic identities and statuses with the last acce
 skips and upstream additions; totals alone do not prove preservation. Toolkit and smoke validators
 require real completed cells. Keep expected unresolved/runtime failure histories visible.
 
-Changes to local record-array type roles or address provenance also require the direct static
-units. Follow the build skill to configure an isolated `SLANG_LIB_TYPE=STATIC` test build and build
-`slang-static-unit-test`; the ordinary shared test plugin cannot call these internal compiler APIs.
+Changes to type representations, local record-array roles or address provenance also require the
+direct static units. Follow the build skill to configure an isolated `SLANG_LIB_TYPE=STATIC` test
+build and build `slang-static-unit-test`; the ordinary shared test plugin cannot call these internal
+compiler APIs.
 Reuse the existing provider, keep the accepted shared layout separate, and record both source and
 configuration identities. On this native host the isolated test configuration disables unused DXIL
 and `slang-llvm` fetching and uses already available dependency sources. Do not add production export
@@ -96,6 +97,24 @@ Require both named tests to execute and pass without skips: cache orders/role re
 local allocation and other pointer-producer address plans. Pin the static executable/provider/configuration and retain
 its output separately from shared native-unit identities. The shared units and permanent three-mode
 fixtures remain required; direct IR tests do not replace GPU execution.
+
+For Half helper-boundary changes, also run the three direct type-lowering units in
+`unit-test-nvvm-type-lowering.cpp` (selectors `nvvmHalf` and `nvvmScalarHalf`). Require actual execution
+without skips of both cache-order units and the exact classifier unit. The scalar test preserves an
+existing invariant; it is not evidence of a reproduced scalar cache defect. Run the shared
+`nvvmSlangFloat16ValuesUseGenericTypedPipeline`,
+`nvvmSlangHalfVectorsCrossAllFourHelperBoundaries`, and
+`nvvmSlangHalfVectorBoundaryCapabilitiesPreflightEveryWidth` units, followed by the three-mode
+`tests/cuda/nvvm-half-vector-helper-` fixtures with retries disabled.
+
+Capture actual provider LLVM using `-dump-intermediates -dump-intermediate-prefix UNIQUE_PREFIX`
+in addition to `-dump-ir`; inventory and hash the produced LLVM and PTX rather than relying on dump
+ordinals. Inspect the four conversions, retained calls and native body operations. For exported
+boundaries, freeze independently authored PTX caller declarations before repair, compare symbol,
+visibility, size, alignment and semantic lane offsets for each width, then execute that same caller
+against before-O0 and repaired O0/O3 helpers. Check complete outputs, completion and guards; ignore
+unspecified padding. Preserve wrong-output before cells. Same-module Slang calls do not substitute
+for the external caller, and this gate does not establish CUDA-prelude binary interoperability.
 
 For CPU-only comparison against a durable old compact baseline, even without the old raw directory:
 
