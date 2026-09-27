@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#getenumbarriermemorytypeflags-and-getenumbarriersemanticflags
-//META: doc_section_digest=94b81c5b3ee65db0217000986781d5a66853dd32b46147987fdd5e3c5818dd84
+//META: doc_section_digest=317deed31ccd4d62bda7fa4d68a0f890c2fba63b524551d7d97a028f181885d1
 //META: purpose=`getEnumBarrierMemoryTypeFlags` and `getEnumBarrierSemanticFlags` emit HLSL named constants, joining the name of each set bit with a bitwise-or and special-casing the whole-set values `ALL_MEMORY` and `REORDER`.
 //META: intent=functional
 //META: pipeline_stage=emit

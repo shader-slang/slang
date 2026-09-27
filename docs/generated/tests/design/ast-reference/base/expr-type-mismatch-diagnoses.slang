@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/base.md#expr-syntaxnode
-//META: doc_section_digest=369743522fa835d335b8cfc1d7160c48df288006a4cdb5149e41fdce6b476f7e
+//META: doc_section_digest=cbdd88eddf413d4b0dfa6196b2bf8c23ff2478080970ece6ed50d7450b88d1b4
 //META: purpose=The checker compares an Expr's type against the surrounding context, so a call whose argument type matches no overload is diagnosed with the argument type spelled out.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -290,6 +290,7 @@ them.
 | `source/slang/slang-emit-metal.cpp`                                                   | Metal emitter's atomic handling (`atomic_fetch_add_explicit`, 32-bit `atomic_uint` only)                                         |
 | `tests/language-feature/coverage/`                                                    | End-to-end tests                                                                                                                 |
 | `tools/slang-unit-test/unit-test-coverage-metal-runtime.cpp`                          | GPU execution test — validates the Metal binding contract and exact line/function/branch counter values on a real dispatch       |
+| `tools/slang-static-unit-test/unit-test-coverage-coalescing.cpp`                      | Static unit test — drives `assignCoverageCounterSlots` on hand-built IR to pin the counter-coalescing properties                 |
 | `examples/shader-coverage-image-pipeline/`, `examples/shader-coverage-bvh-traversal/` | Runnable raw-Vulkan reference hosts — compile with coverage, bind via metadata, dispatch, read back, render LCOV reports         |
 | `tools/slang-unit-test/unit-test-descriptor-set-space-offset-reflection.cpp`          | Reflection unit test for `DescriptorSetInfo::spaceOffset` (regression-watch for the non-zero space mis-binding bug)              |
 

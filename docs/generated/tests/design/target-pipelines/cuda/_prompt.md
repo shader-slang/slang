@@ -72,7 +72,11 @@ CUDA-specific passes plus the arms CUDA shares with CPU and Metal:
   become the CUDA thread/block index expressions (anchor
   `#legalizeentrypointvaryingparamsforcuda`).
 - `lowerImmutableBufferLoadForCUDA` (anchor
-  `#lowerimmutablebufferloadforcuda`).
+  `#lowerimmutablebufferloadforcuda`). Positive `__ldg` checks must
+  load from eligible global-memory storage such as
+  `StructuredBuffer<T>` or `ConstantBuffer<T>`. Add the complementary
+  top-level `uniform` boundary: it is rooted in the emitted
+  `__constant__` `SLANG_globalParams` group and must not use `__ldg`.
 - `undoParameterCopy` and `transformParamsToConstRef` (anchor
   `#undoparametercopy-and-transformparamstoconstref`).
 - `legalizeArrayReturnType`, default-option `legalizeByteAddressBufferOps`,

@@ -229,7 +229,8 @@ On GLSL and VK targets loop unrolling uses the [GL_EXT_control_flow_attributes](
 
 Metal Shading Language does not support loop unrolling.
 
-Slang does have a cross target mechanism to [unroll loops](language-reference/06-statements.md), in the section `Compile-Time For Statement`.
+Slang also has a target-independent mechanism to unroll loops. See attribute
+[\[ForceUnroll\]](https://shader-slang.org/stdlib-reference/attributes/forceunroll-05.html).
 
 <a id="rwbuffer-atomics"></a>
 

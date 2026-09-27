@@ -370,12 +370,23 @@ interface __BuiltinType
 {
 }
 
+/// A compiler-supported, non-void scalar representation.
+///
+/// Implemented by `bool`, the builtin signed and unsigned integer scalar types, and the `half`,
+/// `float`, and `double` types. This sealed marker supports representation-level dispatch such as
+/// compiler-defined casts; it does not imply any particular mathematical capabilities.
+[sealed]
+[builtin]
+interface __BuiltinScalarType : __BuiltinType
+{
+}
+
 /// A type that can be used for arithmetic operations. For defining generic functions that work with builtin scalar arithmetic types only.
 /// Builtin types implementing this interface: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `half`, `double`.
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
+interface __BuiltinArithmeticType : __BuiltinScalarType, IArithmetic, ICoopElement
 {
 }
 
@@ -383,7 +394,7 @@ interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 /// Builtin types implementing this interface: `bool`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `int`, `uint`, `int64_t`, `uint64_t`.
 [sealed]
 [builtin]
-interface __BuiltinLogicalType : __BuiltinType, ILogical
+interface __BuiltinLogicalType : __BuiltinScalarType, ILogical
 {
 }
 
@@ -4586,6 +4597,21 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 /// Used on a fragment shader entry point to specify that early depth stencil testing can be enabled.
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
+
+/// Used on a fragment shader entry point so that its input `SV_Coverage` reports only the samples
+/// that survived the early depth/stencil test, rather than every sample the fragment covers.
+/// @remarks On SPIR-V this requires the `SampleMaskPostDepthCoverage` capability, declares
+/// `OpExtension "SPV_KHR_post_depth_coverage"`, and enables the `PostDepthCoverage` execution mode.
+/// On GLSL it requires `GL_ARB_post_depth_coverage` and emits `layout(post_depth_coverage) in;`.
+/// Post-depth coverage is only meaningful with early depth/stencil testing, so the compiler also
+/// enables `EarlyFragmentTests` (which Vulkan requires to accompany `PostDepthCoverage`); pairing
+/// this attribute with `[earlydepthstencil]` is therefore optional but harmless.
+/// @remarks This attribute currently takes effect on SPIR-V/Vulkan and GLSL only. On any other
+/// target (HLSL, Metal, WGSL, CUDA) no post-depth-coverage execution mode is emitted and the
+/// compiler warns that the attribute has no effect, rather than silently changing `SV_Coverage`
+/// semantics.
+__attributeTarget(FuncDecl)
+attribute_syntax [postdepthcoverage]    : PostDepthCoverageAttribute;
 
 // SPIR-V 64-bit indexing
 /// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.

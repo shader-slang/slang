@@ -1,11 +1,11 @@
 {
   "bundles": {
     "conformance/generics": {
-      "generated_at": "2026-08-05T06:20:12+00:00",
+      "generated_at": "2026-09-12T14:58:32+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "7e725f15572c6589ee6d738a8856fb3348f11617",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
       "source_doc_digest": "161ac2b8c4ff8931f9b82ee45ac6cc5874f5a355a04ed060e8249023e6226a57",
-      "watched_paths_digest": "d51ad2faa208cd9fcf410e6e543934342dc61fab2ff7289bb654b26cc4349956"
+      "watched_paths_digest": "ca9187e8ddccaa6bb8226d601b512b917a01796e8417c385f4f4ac128f59413f"
     },
     "coverage/autodiff": {
       "generated_at": "2026-06-11T12:00:00+00:00",
@@ -14,372 +14,382 @@
       "watched_paths_digest": "415a50cb05f7c62902b743f24a4fc8a5a1e26f0059d645d4973f127e8f110ee4"
     },
     "coverage/check-decl": {
-      "generated_at": "2026-06-11T12:00:00+00:00",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "6445f2640b2b6124540b80df9bc23261410a0419e7ff9f20571cfe7ad7f42416"
+      "generated_at": "2026-09-12T14:58:31+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "bb3d06948eb92c185b03440d72bc47a77e041fa540154d9face90aa0a6ed460c"
     },
     "coverage/check-expr": {
-      "generated_at": "2026-06-11T13:22:38+00:00",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "50f3927d8d5182d8b0ea76a1385cd5f0b05daac09fba7d68297998ea30f2809b"
+      "generated_at": "2026-09-12T14:58:32+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "fb2caae495a96ab3f57ac8c150d827b41e2288343427dba935b8597b292acea2"
     },
     "coverage/cli-options": {
-      "generated_at": "2026-06-11T15:00:00+00:00",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "83695ce7fd999921f0e228ef51b84e5f8201e91a6f81b5a9c90d9fa6a19da990"
+      "generated_at": "2026-09-12T14:58:31+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "e02b8ea2e9e2f19cdce5a97737aba699feed1507be7da3972d6d2ac25fa54000"
     },
     "coverage/emit": {
-      "generated_at": "2026-06-11T15:00:00Z",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "7c8fbec89ad4217847f03ab88cd9895b0e9ec0d88dc602baa08bac9cb716a0e1"
+      "generated_at": "2026-09-12T14:58:31+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "9c80430cb48dd04853f58680ad18a60f1d3880056a4a0ba83aed8041e14fd90e"
     },
     "coverage/legalize": {
-      "generated_at": "2026-06-11T17:00:00Z",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "00b1ce917654fb0ad0b3cc68e06fe14b4e2bacbf7bed870661952abe53db8a90"
+      "generated_at": "2026-09-12T14:58:32+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "3214e53b34d754342e4be3f1d9d450d887793c4c58bbd8b9db6cc39b689f58c4"
     },
     "coverage/lower-to-ir": {
-      "generated_at": "2026-06-11T13:43:23Z",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "b6659b833f864303089712cf3ac328ce498f4412e693617dae58416e5c50162c"
+      "generated_at": "2026-09-12T14:58:31+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "d83c5826a2c7ca76710877a96f747a5620e5a9c0cfdb48f569b8e711e44cb12f"
     },
     "coverage/parser": {
-      "generated_at": "2026-06-11T15:00:00+00:00",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "42f4b911f9253e6d36391e4734dc07282f032209ff1f8ab27d77fa319acb0e13"
+      "generated_at": "2026-09-12T14:58:31+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "4222270cff09181339fee83415cfae74ffd78361d67454784edd450d5cee7570"
     },
     "coverage/specialize": {
-      "generated_at": "2026-06-11T14:00:00+00:00",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "be9d6bdc63cfae3185a1605cf375e75f1caf240e9ddcf13318b656167b5b7905"
+      "generated_at": "2026-09-12T14:58:32+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "c11332bf8f0de2f75a9032164bac01fce2ed340f38644cef8fbe0b3b6c752aa8"
     },
     "coverage/torch": {
-      "generated_at": "2026-06-11T16:00:00+00:00",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "72169107a8604a0a9f04384d6eea2b34191649206aecf28b8f167f23edfb7780"
+      "generated_at": "2026-09-12T14:58:32+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "983531a515a2ef71383263c352759b6b315ba02a82e2db8e0a23e6e1a62394d8"
     },
     "coverage/type-layout": {
-      "generated_at": "2026-06-11T17:00:00Z",
-      "model": "claude-opus-4-8[1m]",
-      "source_commit": "ef1068b5485e09b3a7afadba2e25f9541e29af42",
-      "watched_paths_digest": "0a2aa024299dd826ce0f7a6153336a696d3348a0c9cb798df8e2fc61b3e42130"
+      "generated_at": "2026-09-12T14:58:32+00:00",
+      "model": "claude-opus-5[1m]",
+      "source_commit": "d592afa9b9efaf43740554b05a3fdf5b6f6e5077",
+      "source_doc_digest": null,
+      "watched_paths_digest": "54ca91015baa0a44a5a6cf446be6aa6b2fd821c4773f1a8b233649ed1068e744"
     },
     "design/ast-reference/base": {
-      "generated_at": "2026-08-13T14:00:03+00:00",
+      "generated_at": "2026-09-11T14:06:27+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "7a6e4ce1e37b832e536d92b516233432432eeab672ca22cdf5f4d6cab03a04ba",
-      "watched_paths_digest": "81b9bf99f9379fb9fd8dcb82308357fc736c12a7fe7fd8190eb6452a6af8f585"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "33aa872db97827658a05c5fc92b42a94a410ea667b029d0067cf2b2589f03dd3",
+      "watched_paths_digest": "c0b1c86c213d093decc3d7880fc7f56ae2c700974043191b2a49c8750d04f0b9"
     },
     "design/ast-reference/declarations": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:31:15+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "b238ae214c191fe1a4c723c03e3ee7fec5a3e9cc56322d4d5f36aa4c300c1c21",
-      "watched_paths_digest": "a443474e0fc0012cadd42a1324081028b72b434795934efbd6b6925fc0f826f1"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "0f6090808b3538ce9b56e63b218ac57a74b2dfd387469e86deaef30e5cb36d6e",
+      "watched_paths_digest": "6d5c920f24a22169fc98ecebeefa6a3442149ad8cf3a524de23b62434bc69020"
     },
     "design/ast-reference/expressions": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:06:27+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "8b68578b6230e1f3db1de11bd7d984c0a1f8a2987bddfbe99ecaa94c81acd1f7",
-      "watched_paths_digest": "2cd53fd8b152b4434a26a20ab98cca6aee64ed2ccd4d4aad0d8592c1ba6a7da0"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "bd4ceec08c0ba7c68308f1c239c5122db4ae612e3adca57ec9b0de7546a9ae4a",
+      "watched_paths_digest": "ee0de491cefb7403cccd35b8744368a75da1a4b081050512e7d5cd200ac34f05"
     },
     "design/ast-reference/modifiers": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:31:15+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "863716a44fb4c952e1da36ea310bcc228cb8ec6bb5b8458538899a1e5cdea749",
-      "watched_paths_digest": "377a2d857db29e87bcc44f87d7b606adab97df6fd96e02b137bae9ab3cdb396d"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "65aa45f4d0a183fc676545a2ce05237a7d5f6bd345ec82148b6106bbf2ccd3ba",
+      "watched_paths_digest": "68732f60bcf24cb631b4035a021877fdae9c748b1c6f1c2bc1e02dd17a2a2f93"
     },
     "design/ast-reference/statements": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:31:16+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "c541a2a8e41d3a177a92e5cff0ff2301d09419489f9b9d114f60e9a65142d9e0",
-      "watched_paths_digest": "779d1fe5a276f7b28bdb31b97503a410e81a3d052f4efac724ff5174adcc3df2"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "d9a4b3704a30b3833799ec22e38e9ce16b88c117fe4d9b6e54e75a522ab59eaa",
+      "watched_paths_digest": "912ce6e9419bd4dc77b3178a26f3298ca1095db9bdc1be7861c99ac3243057a7"
     },
     "design/ast-reference/types": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:31:16+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "8319906596943b11be5eb583f4f83cb34c9d3ebd9c4278914428d355de74e16e",
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "7d0456d8012c8c18f0502d88bea24f697505b1f3d2c106ab0e3c41103acdbbb7",
       "watched_paths_digest": "b05183b09ce7aed8128e45e31d4986249932ca45431a04b94d0ca99f3d163135"
     },
     "design/ast-reference/values": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:06:27+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "86a422539ac349340441179e0d66fd7a7adec46dba975d3aae0e2fa759f719d5",
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "6f91d54b1440fcd7a352625ac6b16a47ce1b98829ccabd6800a961cb1a499b60",
       "watched_paths_digest": "aea6c67df76f1024b3cea1726b279a8ddc00bda3f01d9c6a25e65b7c80d11490"
     },
     "design/cross-cutting/core-module": {
-      "generated_at": "2026-08-13T14:00:04+00:00",
+      "generated_at": "2026-09-11T14:31:16+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "8a07deafba5dc7572bcacbecabb22795b7a4076682bd55d6de5676859c77f0df",
-      "watched_paths_digest": "e3702b2bb4b3b93680f0aa20c0d2faddbe420daf72e125260bb8e1dca2064879"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "1206f7e9bc8c0ef1bcf59cc1a7882cea8b02a1d3c95ffb54cfab7c4707d3fef1",
+      "watched_paths_digest": "edc660b81f8addeb0ea42a29dcedcfaef46e2506016c677d25e8e7326572d9b5"
     },
     "design/cross-cutting/diagnostics": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
+      "generated_at": "2026-09-11T14:31:16+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "36a849c720b2096b99269b3399cb0b5b1faf225f7fe4a666aac539d87e0844ca",
-      "watched_paths_digest": "1fd02b253f9cc07d74750ea2c25b6f8286574f53da9306d6110c916c2eea83d1"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "d77cb30baa7984b4cb40efb57319b48e09948fd03be20855b6a239edd43490b8",
+      "watched_paths_digest": "bea88f5e61f4f4d37c0b2ad0dfe1ef28de94f2d7ec1ef1449cae3c3e679effed"
     },
     "design/cross-cutting/diagnostics-catalog": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
+      "generated_at": "2026-09-11T14:06:27+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "36a849c720b2096b99269b3399cb0b5b1faf225f7fe4a666aac539d87e0844ca",
-      "watched_paths_digest": "066feab8065801e4e72259431701afaabfae819e2f03a3d824d35d6e71c8d213"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "d77cb30baa7984b4cb40efb57319b48e09948fd03be20855b6a239edd43490b8",
+      "watched_paths_digest": "8ae65a7d42371c083dbecc0f3b34d3f20235db2d56b987bb5a3a0a261186802b"
     },
     "design/cross-cutting/ir-instructions": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
+      "generated_at": "2026-09-11T14:06:28+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "7f5cec76cb15ba6a3db42d408860e4b84fea3e45715663b2eeb28eec8a7fb192",
-      "watched_paths_digest": "beb2fa6ee9eefe58c409199ec2a6fef9d7adfca1877b593e5327cbdc61d6a7f9"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "3dc20a88a63060148715c0223dd908a6cbdd86b0a74613c025dc77d910a27bf0",
+      "watched_paths_digest": "33fb7b6a4eccdcda28e4cd073be267674cb6b1a754686c84f2f67de0ae77c0f0"
     },
     "design/cross-cutting/serialization": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
+      "generated_at": "2026-09-11T14:31:16+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "e368d7eee5434916fc267b20773fd2159029c6f48cb9d37a2f9b107d1d9cebf5",
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "7a782f90c9c9a7e0606a12c1e90b7a5f931ad12b2321ca65b8d46e952fdb0fa2",
       "watched_paths_digest": "4e6b00091ba47f8369959c5a2fe18c6bbce1fdbf51cea6001632e6cda82a688a"
     },
     "design/cross-cutting/targets": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "32900dc5f475519ad70c2891a8a3bbf178204951fb23058aed1acd712e4231e0",
-      "watched_paths_digest": "e463363722f8f0350be37df9551cba2e504764ba13b54d179f110c539c5bf9d3"
+      "generated_at": "2026-09-16T06:46:36+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
+      "source_doc_digest": "17c44d8c152f02477de96d75c284561a0a68bbc60055e05c53e5a61396a4760e",
+      "watched_paths_digest": "ae4ecf3a8d0550a9b7a41fdf512139e37f0f5a520470aa731ef7c12647e3d2f0"
     },
     "design/ir-reference/control-flow": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
+      "generated_at": "2026-09-11T14:31:16+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "8a7904407a948acaa39a548a3ea1f8c0176835eea690791b1d6fbdfaf04ac2b4",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "d8d1eef83d75625e73480ce584a00175854ca6daf38f431aeba80f82ffb6a7cf",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/decorations": {
-      "generated_at": "2026-08-13T14:00:05+00:00",
+      "generated_at": "2026-09-11T14:06:28+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "df518f41d4ddd1742be2a738cf746e0f6622e1553de027455965151d469a79e5",
-      "watched_paths_digest": "d15d1888c1942e74bb5f0d1c587028144302fd5be5a0ac77096604764c68cf54"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "bc0f50725b432b471715a0e0146d6d12d14b8cb461b2df2bd2d4bd24c1d363a5",
+      "watched_paths_digest": "fcaa284c01b289f2b37e35395ca5a9fa3c55542790959075750143b9e8d0736a"
     },
     "design/ir-reference/differentiation": {
-      "generated_at": "2026-08-13T14:00:06+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "4897cc418e438c54c148715c0567f3267618967d3bceb61cce00c1f4ef0c04ea",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "d37ec9c310a538074172182da205c6cb28797c61d573176f5f2611408fb91642",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/generics-and-existentials": {
-      "generated_at": "2026-08-13T14:00:06+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "15c2c97989955a40a237787b15b31b11aaf1d718c59916ad109eee00afb7ba02",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "e907bcf6f4276a0dbe6ea76173b03bb708cfe6b68967ff2ac6e0adfa0deea014",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/metadata": {
-      "generated_at": "2026-08-13T14:00:06+00:00",
+      "generated_at": "2026-09-11T14:06:28+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "bc653b5707641f7f1f73c6b6ebb22c7405c29f629b0c6633eef90523062888b8",
-      "watched_paths_digest": "d15d1888c1942e74bb5f0d1c587028144302fd5be5a0ac77096604764c68cf54"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "0508226fa5ef4b2c5c0ed92389ed19cea50b4f0307d1ec290f183a214549feef",
+      "watched_paths_digest": "fcaa284c01b289f2b37e35395ca5a9fa3c55542790959075750143b9e8d0736a"
     },
     "design/ir-reference/misc": {
-      "generated_at": "2026-08-13T14:00:06+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "c3c8141fe4cd63776017a000a1fbd924126528ab7d21832d89f8bf9b90e87971",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "0e75c3b778fcdb702911534cb0a8d22b746e057c0ecc2682974279fcce59796e",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/resources-and-atomics": {
-      "generated_at": "2026-08-13T14:00:06+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "35d912d66419360889e636b91372cee3200eeeef0a80e67ce19a70bb96592ea3",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "03680127250ed7df9be1e7f2fdf77024242063b8371003883c226c8cf088cb5b",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/structure": {
-      "generated_at": "2026-08-13T14:00:06+00:00",
+      "generated_at": "2026-09-11T14:06:28+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "011b6773c6915737fc490caf33d6bb01bf2db6cc639c305f62e8e4a4a1683c5f",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "1ef1fe52f772dea1a3893dd7f175c0b78ea19c926a0cb3277b78199bbb4ccf9e",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/types": {
-      "generated_at": "2026-08-13T14:00:07+00:00",
+      "generated_at": "2026-09-11T14:06:28+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "0646630fb3eb5eb5e51b1b5710124cdc8a8dcdf8f5c52e5369a37c0cc8f4aaa8",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "fded5c0fe58d5a2a00e439e8623ed33bdf640db4b0d0c5230b44b6b0c6a2bcc2",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/ir-reference/values": {
-      "generated_at": "2026-08-13T14:00:07+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "8bd46256e0d263777a5e4206097eeb6f3808812b437da46710ef7e9c75e522c8",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "93e30436886eae69e510401f0ec272bdf05575139d1c9579575e7394d6157de0",
+      "watched_paths_digest": "5530d668d17a168c0b6e86818c27321db372db2537e8d3b006b0a941201ec310"
     },
     "design/name-resolution/lookup": {
-      "generated_at": "2026-08-13T14:00:07+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "ba75d93a4211c8edc3185687699c525c8793a39baf2b90b7166575aebfca06ab",
-      "watched_paths_digest": "b64dd978a4791dc55a97d3e798586d15994831751b1de432433826ab15c5313e"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "2e7c61642aa963c1eab83e3b5f078378672249e689a4505d7f9ae670dde8982a",
+      "watched_paths_digest": "fd7f3e4358dd53ce98e2c638a15ac2260c44e0636c6b24e6e6acf97a02b1aa44"
     },
     "design/name-resolution/overload-resolution": {
-      "generated_at": "2026-08-13T14:00:07+00:00",
+      "generated_at": "2026-09-11T14:31:17+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "c83ec604440f6a3e9d71ebce10b680aba8f50363c6979cb0ff09972b10a420e1",
-      "watched_paths_digest": "3952bb6ae44ce766550f6b8a475a4bfeacd527f7f82c2e8bb3067099f4e488a6"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "ad0a750862e3c4522d0aa08b167f46265a6e0cf241fc5bc8bc85eedea0e7b56c",
+      "watched_paths_digest": "a91f3be6da31fc87c70ca6a66c1d67dcbbb2aaf74e3f4a40026000841c682498"
     },
     "design/name-resolution/scopes": {
-      "generated_at": "2026-08-13T14:00:07+00:00",
+      "generated_at": "2026-09-11T14:31:18+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "26fbbcec5abd0e13823ed646e5eacb4a2b29871658b606c7dad0d6050ae59cab",
-      "watched_paths_digest": "61dc2589a4a9843f1bf8bb8e81ac88bf6ecf9b1390a4ae746c1d24e014d265cc"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "295a1b82fd710fe29aeaa26c94e5bc01da9c7386ef35fc22569559d2f9793a4f",
+      "watched_paths_digest": "b55c600284ce9522903fcb3453fca99c64b22c2adc36e71bea0c9dee78bbb599"
     },
     "design/name-resolution/visibility": {
-      "generated_at": "2026-08-13T14:00:07+00:00",
+      "generated_at": "2026-09-11T14:31:18+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "1484c8453b8c00b5a45add048e99af12315352909eaea11bdf446e75743f2de6",
-      "watched_paths_digest": "49fb3c164cd4160806ba5c8b93658e916be3b640948db44af0283376988cf170"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "a7095d08e19b250e87e775dd69cd41427ca4bf6f8ec327b3b01d99e4032d4db2",
+      "watched_paths_digest": "ea7af997acc2a5e024c1a96595e8f772c8c32165c576419e84f647fbca61797d"
     },
     "design/pipeline/01-lex-preprocess": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
+      "generated_at": "2026-09-11T14:31:18+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "3e4f2f0ecdf2c1fac585eb54e90d710ecf81828367dd1e48dac035ad96a9abd0",
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "5fa59a06e154292b22925d948f8f55f0480b9ea3ebfcf146adc3daa07cdc40af",
       "watched_paths_digest": "330e6213b9a72fe7806351a65c3e91ac9889f460b5283385bda77cb5343323fd"
     },
     "design/pipeline/02-parse-ast": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
+      "generated_at": "2026-09-11T14:31:18+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "a654f183c7fed97a0fbbb30d6342bd7bedf4143d35dd604c77cef2fb319b02c9",
-      "watched_paths_digest": "bde599e130e37fc45e54c6587161b4be86dad7b6597385ab0fa3e8898397196d"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "85f898ae5955e8e2399c7b1103f6548228a10472ea22dcdc9002a9c6a1ace868",
+      "watched_paths_digest": "038e61bb9edebc9b97b6731d3af12b502c0b2005954b85e6b50888bcf0187062"
     },
     "design/pipeline/03-semantic-check": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
+      "generated_at": "2026-09-11T14:31:18+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "fab98eedc56fcfd300d17ce39b737ca6a061bdbd585935b889c3eb89dfc531b9",
-      "watched_paths_digest": "e83103ec54fcd5e744037c992bf474bc60b77b8f4a2be4b208dca62cbafafc89"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "88faf24674e206b87e28f8016f3aee496ca4853d7bc7812ed89d335365a6deaf",
+      "watched_paths_digest": "11a3b2a74f48f90d98486c8f57f25f6c463d92e3001af62701cc8e774eb46911"
     },
     "design/pipeline/04-ast-to-ir": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
+      "generated_at": "2026-09-11T14:31:18+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "5550ae4589c77be3fc5854565455df77294134fc11bdc36b1ae7487f3078bbf0",
-      "watched_paths_digest": "bf3a74570843c35b5ff86178bb3be46495bdc1991238c701f98921137179d5f6"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "2c992db0706037cf7553d5ce3b261d3e5065bf928b9540520a28cbb3818f7813",
+      "watched_paths_digest": "042981bd32663848d67436680367d2ddb6ba0dc7d8de06b973afab4f7d5b89bb"
     },
     "design/pipeline/04b-pre-link-passes": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
+      "generated_at": "2026-09-11T14:31:19+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "98b6c242ea4561edd67be1bf12905584e408ff70a685305faecd58263dc48a34",
-      "watched_paths_digest": "7ecea090b00335e4addf7355eb402939caa83e856fa2e30e9d9444d7355637c1"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "f823e9e8c896e28d834d5c4ec67a6e9cce147fbd64181c86fdb7c3e407f4451d",
+      "watched_paths_digest": "9435dca8b5ef4a18864c8e899ca75d0ad07a5a9723bdc0513c8ec876cd8b24dd"
     },
     "design/pipeline/04c-layout-ir": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
+      "generated_at": "2026-09-12T07:07:23+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "da9cda313002a3dcb389bcc82b9ad03eacafd2d3870e49b402a5804722d3eeb1",
-      "watched_paths_digest": "be46cf0446effe4bf1b5fad8f17e307f84771e0991ee455ef7fcdbe0196ff3ff"
+      "source_commit": "2094af503348384f42f81337791d59c3b5e5b6ee",
+      "source_doc_digest": "4f0de1ca84e30c5ff41ef6a98ba7bf37e445560f3a0b234dfc979924968add0a",
+      "watched_paths_digest": "87e9e0a0e1e824b00a4fade43a72d2b503c876dc891f0447067c52e5c0282cbb"
     },
     "design/pipeline/05-ir-passes": {
-      "generated_at": "2026-08-13T14:00:08+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "782cb4512f088dc36f0e9418afc7c54d32206b800a7398214751688ee0622457",
-      "watched_paths_digest": "38f0ebbe7f507ea842d3e8544c070ca7d9677b2a1a249ac76066855fd07ea876"
+      "generated_at": "2026-09-16T06:46:37+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
+      "source_doc_digest": "9e47cfe14a2e87583d053faa5efba3bea70e1d24dc8091589cb824d2a1419b80",
+      "watched_paths_digest": "6793d82d75d05d6dd52d9c36466dde9550190660d1bbfac0f3e0727805879abd"
     },
     "design/pipeline/06-emit": {
-      "generated_at": "2026-08-13T14:00:09+00:00",
+      "generated_at": "2026-09-11T14:06:29+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "488273fd6a8f8d7f3a4126342069dd6e986e51ca78984f428c9a4779ceea7a7c",
-      "watched_paths_digest": "654dedc798e029b1e61b2fac33dcea290ef7dfe3f2884550b43d92874c7e9a93"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "b0716587c29c95c2e6a49ac178b483eff81e9cf02097d839d8e6250c3f23f341",
+      "watched_paths_digest": "5f653785ed78510785a1eb4ae35a6cbc43f97d20bbd6f3f87d35a63e9ba0524f"
     },
     "design/pipeline/overview": {
-      "generated_at": "2026-08-13T14:00:09+00:00",
+      "generated_at": "2026-09-11T14:31:19+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "c125b9551abeb838b8b6a0698c445b52f4c61fa1459b5c682a8bbd8a515b75d9",
-      "watched_paths_digest": "1c39be6ab47657cf5a0b05ea459a72804775018d3395ce79288be0a730502402"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "68de969f14d030acd4661b1ca75c7150c209c30bdf772f70e5d673521ab9038f",
+      "watched_paths_digest": "ac034c53f21fbf6e845c2af2288c9b81206ea6c62787403c188af7fff47b2c7d"
     },
     "design/syntax-reference/grammar": {
-      "generated_at": "2026-08-13T14:00:09+00:00",
+      "generated_at": "2026-09-11T14:31:19+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "1cb67c5630944b634b458a7ff7933e89371c959570aaa5c23dd6671df6ec1131",
-      "watched_paths_digest": "dac521695060d5dcbe6e1eda4f10eb6f8dcaff3a2d9144144f918cd86e5358ab"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "7ebbe68e70b751fa489c4cafe47bb5331bca97b439c755d8563711c03abc577c",
+      "watched_paths_digest": "99f735ed159c3bb33f963d427f90829e59a3e91bd5f749fb08b638b728e54347"
     },
     "design/syntax-reference/keywords-and-builtins": {
-      "generated_at": "2026-08-13T14:00:09+00:00",
+      "generated_at": "2026-09-11T14:31:19+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "182e67cdebb47f78a21ff3d370d7812e27a644f81dabe0fc737fbfd089d836e6",
-      "watched_paths_digest": "ac5572ea7fae4a598e2b0cbc97008b7e7785ad1887d0b133e553a212f4ab96f8"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "834c1236314a75193ee12f880231676d44d4c53ec77cf16119e733a924b42b17",
+      "watched_paths_digest": "3e7aa810527431c897e77fb62a116fdaace92a3f19cc53159f39a132029a113a"
     },
     "design/syntax-reference/tokens": {
-      "generated_at": "2026-08-13T14:00:09+00:00",
+      "generated_at": "2026-09-11T14:31:20+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "9d5ada50ee544f1140e8ec2680b782e744150aa0799083a207772d40391d0b73",
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "ea82791f3182322939ced7d0fd2bb55bd57e84fafb9febbda2d54ef9e9c621a1",
       "watched_paths_digest": "3b23aa8745718c3c9b2740ec584b30f97dee58483ad3f8efe781def69aa1b5d4"
     },
     "design/target-pipelines/cuda": {
-      "generated_at": "2026-08-13T14:00:09+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "47c50163759420f2beec2ece252daa2540ab7f75d4d64a8b7e58917f5937433e",
-      "watched_paths_digest": "a25251b8d559ae543baf8b53f0f062d2b717ec05c0c4a85853eac7c8938b9929"
+      "generated_at": "2026-09-16T08:39:05+00:00",
+      "model": "gpt-5.6-sol",
+      "source_commit": "d3b56927b854c14fa1ac169b72da6e080ea80833",
+      "source_doc_digest": "8f5f2c489e64725ff848a909352ae18b3fea8c9e41f23048f45bc851cc3e3b48",
+      "watched_paths_digest": "cc1bfb5c7f168a5d644931cad25ab14568abe04820e170e0fd240e3e3f62b61c"
     },
     "design/target-pipelines/hlsl": {
-      "generated_at": "2026-08-13T14:00:10+00:00",
+      "generated_at": "2026-09-11T14:31:20+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "04c43f21037e90fb55ee1a1d56f6df9ce4c0fb5fb0928768190b72549dff25dc",
-      "watched_paths_digest": "ce91dfefce18b76fee6f23826d3df96072bc55d52438c131ee44611ee2674ece"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "3b058c4e4d88489b721fccbef419f1b97b9a04cb8e11276e516d343a3cdc2cb9",
+      "watched_paths_digest": "fbb6ebc7eff6c34a4d8595d19234ef72a62be6fabe6de7b2a7f7dc3efb381872"
     },
     "design/target-pipelines/metal": {
-      "generated_at": "2026-08-13T14:00:10+00:00",
+      "generated_at": "2026-09-11T14:31:20+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "ffc029803379411a1df51804a20cebcb2622f62d9dcf024e0f9d28c30b81267f",
-      "watched_paths_digest": "0d4fa8b278a0dd34659e69f7b9ad69965d11c08f9a6f79c3e16ece66be235df9"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "3c74a7212d7f6639f5591ab418a08bfb35faa01d8891b9205574420038c45282",
+      "watched_paths_digest": "d9ac37a8c9d3f5f928ca5b9af73afd7ef6eae9c2fdc6d956f5c6a337a612a838"
     },
     "design/target-pipelines/spirv": {
-      "generated_at": "2026-08-13T14:00:10+00:00",
+      "generated_at": "2026-09-11T14:31:20+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "dd9454c1dde7f0688e9c7f4e125cbe094d0269bc28353dbb505e4b06bc75c08e",
-      "watched_paths_digest": "8e9d8dd20570e98a16b60ab5d6667cb7a6fcc73debc6a2df857d72989c894d6a"
+      "source_commit": "25a5bb130ef0e46a222896f37119b4b5408d2d40",
+      "source_doc_digest": "d460fe7357ba4d007a36d645238ad8858781addb0005bb14f219950051f06f42",
+      "watched_paths_digest": "e84a0ec37bf84abfbcc2635e07e1abea5cd4a3ec37cc4acd0fd3e5df118a36c8"
     },
     "design/target-pipelines/wgsl": {
-      "generated_at": "2026-08-13T14:00:10+00:00",
+      "generated_at": "2026-09-11T14:06:29+00:00",
       "model": "claude-opus-5[1m]",
-      "source_commit": "c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0",
-      "source_doc_digest": "751475e8d3e12f85e8973f442a6b40945f12a36e20ac4c00faaed643a8de6b5e",
-      "watched_paths_digest": "bc78bd447b0aeab75cd02aa8de6e9cf8a328323df3e68d3f0eb3f64c5ac19e07"
+      "source_commit": "a680b2b50f2ff7c3d2db2a0388214effc7655d18",
+      "source_doc_digest": "1fd66211432cfb80c3e7f2fa3570d5e6e52b449b315a5fc38f476fd2b8a03086",
+      "watched_paths_digest": "f5baea83fc1af1793afca083fbf6c2a889d831da7d981aa1d62b76714351004d"
     }
   },
   "schema_version": 1

@@ -430,6 +430,11 @@ void calcRequiredLoweringPassSet(
             result.autodiff = true;
     }
 
+    // The replacement pass owns the opcode classification so this scan cannot silently omit a
+    // location-operand role that the pass knows how to consume.
+    if (isRayTracingLocationOperand(inst->getOp()))
+        result.rayTracingLocationOperand = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -1864,6 +1869,11 @@ Result linkAndOptimizeIR(
     // selector is not yet a phi the pass finds nothing to thread and is a no-op.
     SLANG_PASS(threadSwitchOnConstantPhi);
 
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    {
+        SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
+    }
+
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
@@ -1990,11 +2000,29 @@ Result linkAndOptimizeIR(
             SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
         }
 
+        // Vulkan (SPIR-V + GLSL): an empty `CallShader` payload is backed by a
+        // `[__vulkanCallablePayload]` global; if it legalizes to `none`, type legalization aborts
+        // with "non-simple operand(s)!" — via `OpExecuteCallableKHR` on SPIR-V, or
+        // `__callablePayloadLocation` on GLSL. Pad it so a real Callable Data variable survives.
+        // Must run before legalizeResourceTypes erases the empty payload struct.
+        if (isKhronosTarget(targetRequest))
+        {
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForVulkan);
+        }
+
         // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
         // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
         if (isD3DTarget(targetRequest))
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+
+            // A callable entry point must keep exactly one argument parameter for DXC, and a
+            // `CallShader(index, payload)` must keep its payload argument, but an empty
+            // callable-data struct would be erased by the empty-struct legalization below. Pad it
+            // with a dummy field first (must run before legalizeExistentialTypeLayout /
+            // legalizeResourceTypes remove the empty struct). `targetCaps` lets the pass recognize
+            // the `CallShader` intrinsic call via `findTargetIntrinsicDefinition`.
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSL, targetRequest->getTargetCaps());
 
             // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
             // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
@@ -2752,9 +2780,10 @@ Result linkAndOptimizeIR(
         }
     }
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly &&
+        requiredLoweringPassSet.rayTracingLocationOperand)
     {
-        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

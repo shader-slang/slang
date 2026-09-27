@@ -18,6 +18,106 @@ import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# Not a real timer name — a per-WORKLOAD marker carried inside the same
+# {workload|timer: value} maps the series already use, so a schema transition is
+# visible downstream without changing any of those return shapes. 1.0 =
+# "detailed", 0.0 = "coarse", absent = unknown (data recorded before bench.py
+# started writing "timer_schema" in #13009).
+#
+# Per workload, NOT per point: the schema is a property of how a given workload
+# was invoked, and the two coexist within one sweep. The api-mode workloads are
+# always coarse (their driver takes no -report-detailed-perf-benchmark) while
+# target/module/link workloads went detailed in #13009, so a nightly point
+# legitimately holds both — permanently. A per-point schema would therefore read
+# "mixed" forever and discriminate nothing.
+SCHEMA_MARKER = "__timer_schema__"
+
+# The companion marker for the other provenance axis a counter can silently
+# change along: the size the workload ran at. canonical_runs() prefers the
+# manifest's current default_size but FALLS BACK to whatever row it found when
+# no default-size row exists, so a point swept before a resize publishes its
+# counters under the same metric key at the old size. #13035 moved
+# interface_depth 64->128, conformance and overload_resolution 600->2400 and
+# resource_aggregate 80->320; without this marker the 2026-09-20 nightly
+# compared n=128 against an n=64 median and called it an 8.8x regression.
+#
+# Kept as a marker rather than fixed in canonical_runs because the off-default
+# rows are still legitimate data for charts and per-release views — it is only
+# COMPARISON across the change that is invalid.
+SIZE_MARKER = "__size__"
+
+
+def schema_value(schema):
+    """The SCHEMA_MARKER encoding of a record's `timer_schema`, or None when the
+    record predates the field (callers treat None as unknown, never as a match)."""
+    return None if schema is None else (1.0 if schema == "detailed" else 0.0)
+
+
+def point_metrics(results_json_path):
+    """{ 'workload|counter': median } for the canonical run of each workload,
+    plus the SCHEMA_MARKER / SIZE_MARKER provenance entries.
+
+    canonical_runs() collapses any swept (multi-size) data to default_size so
+    history and daily points compare like-with-like. The median (not min) is the
+    saved/compared value: it reflects the typical run rather than the single
+    luckiest one, and is steadier when a build's run-to-run spread shifts.
+
+    Lives here rather than in track.py because trend.py builds baseline points
+    straight from daily/ (see daily_series_points) and must encode them
+    identically — two copies of this would let the alerting baseline and the
+    published series disagree about what a point contains.
+    """
+    out = {}
+    for r in canonical_runs(read_json(results_json_path)):
+        for timer, st in r["timers"].items():
+            if st is not None:
+                out[f"{r['workload']}|{timer}"] = st["median"]
+        sv = schema_value(r.get("timer_schema"))
+        if sv is not None:
+            out[f"{r['workload']}|{SCHEMA_MARKER}"] = sv
+        size = r.get("size")
+        if size is not None:
+            out[f"{r['workload']}|{SIZE_MARKER}"] = float(size)
+    return out
+
+
+def daily_series_points(results_dir):
+    """Every daily sweep on disk, oldest first, as tracking-series point dicts.
+
+    The tracking series itself keeps only the dailies dated after the last
+    release — a display choice, so the rendered line reads as "release history,
+    then the current tail". trend.py deliberately does NOT reuse that truncation
+    for its baseline: a release shipping must not erase the comparable nights
+    that alerting depends on.
+    """
+    ddir = os.path.join(results_dir, "daily")
+    if not os.path.isdir(ddir):
+        return []
+    pts = []
+    for label in sorted(os.listdir(ddir)):
+        rj = os.path.join(ddir, label, "results.json")
+        if not os.path.exists(rj):
+            continue
+        meta = {}
+        mp = os.path.join(ddir, label, "meta.json")
+        if os.path.exists(mp):
+            meta = read_json(mp)
+        date = meta.get("date") or label[:10]  # label prefix is YYYY-MM-DD
+        pts.append({"label": label, "date": date, "kind": "daily",
+                    "commit": meta.get("commit", ""),
+                    "commit_time": meta.get("commit_time", ""),
+                    "runner": meta.get("runner", ""),
+                    "metrics": point_metrics(rj)})
+    # Within one date the label tiebreak is the short SHA — lexicographic hex,
+    # unrelated to code order (labels carry only the commit's DATE, and e.g.
+    # master's HEAD is usually committed the previous day, so same-date
+    # siblings are common). Sort by the commit's full timestamp when meta
+    # carries it so siblings land in true code order; the label remains the
+    # deterministic fallback for points registered before commit_time existed.
+    pts.sort(key=lambda p: (p["date"], p.get("commit_time") or "", p["label"]))
+    return pts
+
+
 # The profiler timers are NESTED:
 #   compileInner
 #     frontEndExecute        -> parseTranslationUnit, SemanticChecking, generateIR
@@ -389,6 +489,45 @@ except ValueError as _e:
     assert "unit_of contract" in str(_e), \
         f"the rejection must cite the unit_of contract; got {str(_e)!r}"
 del _rec, _mr, _mu, _bad
+
+
+# Import-time self-check for point_metrics, the sole producer of the
+# per-workload provenance markers consumed by trend.py. A missing workload
+# prefix or wrong encoding would make every affected counter look unknown and
+# silently remove it from judgement.
+def _point_metrics_selfcheck():
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="point_metrics_selfcheck_")
+    try:
+        path = os.path.join(d, "results.json")
+        records = [
+            {"workload": "detailed", "size": 128, "timer_schema": "detailed",
+             "timers": {"compileInner": {"median": 1.0}}},
+            {"workload": "coarse", "size": None, "timer_schema": "coarse",
+             "timers": {"compileInner": {"median": 2.0}}},
+            {"workload": "legacy", "size": 32,
+             "timers": {"compileInner": {"median": 3.0}}},
+        ]
+        with open_output(path) as fh:
+            json.dump(records, fh)
+
+        got = point_metrics(path)
+        assert got[f"detailed|{SCHEMA_MARKER}"] == 1.0
+        assert got[f"detailed|{SIZE_MARKER}"] == 128.0
+        assert got[f"coarse|{SCHEMA_MARKER}"] == 0.0
+        assert f"coarse|{SIZE_MARKER}" not in got, \
+            "a missing size must remain unknown, not acquire a marker"
+        assert f"legacy|{SCHEMA_MARKER}" not in got, \
+            "a record predating timer_schema must remain unknown"
+        assert got[f"legacy|{SIZE_MARKER}"] == 32.0
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_point_metrics_selfcheck()
+del _point_metrics_selfcheck
 
 
 # Import-time self-check for daily_labels, over a throwaway tmpdir (the same

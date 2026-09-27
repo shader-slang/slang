@@ -2100,11 +2100,7 @@ Modifier* SemanticsVisitor::checkModifier(
             return nullptr;
         }
 
-        auto moduleDecl = getModuleDecl(decl);
-        bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-
-        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
-            isGLSLInput = true;
+        bool isGLSLInput = getShared()->isGLSLSourceLanguage();
         if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
         {
             if (!ignoreUnallowedModifier)

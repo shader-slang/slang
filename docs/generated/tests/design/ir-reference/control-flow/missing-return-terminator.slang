@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#missingreturn-and-unreachable
-//META: doc_section_digest=8dc2e6325e6131bb53f09d067b428f04953d9d1b20f2b7ffd7f4a73c37ecab2b
+//META: doc_section_digest=02851414d308139a54420788f3d1df4b635e46cd5b62e893a4626636328c7882
 //META: purpose=A value-returning function whose body can fall off the end terminates that block with missingReturn rather than an implicit return_val.
 //META: intent=functional
 //META: pipeline_stage=lower

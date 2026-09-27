@@ -1661,6 +1661,13 @@ local insts = {
 	-- Operand 0: register index (int literal)
 	-- Operand 1: value to write (uint32)
 	{ setOptiXPayloadRegister = { min_operands = 2 } },
+	-- Write side of a portable `ReportHit(tHit, hitKind, attributes)` call for OptiX.
+	-- Operand 0: tHit (float). Operand 1: hitKind (uint). The remaining operands are the
+	-- aggregate's scalar attribute leaves, produced by the CUDA varying-param legalization
+	-- pass, which flattens `attributes` field-wise (one operand per OptiX attribute register)
+	-- mirroring the read side (`emitOptiXAttributeFetch`). The CUDA emitter renders this as a
+	-- single `optixReportIntersection(tHit, hitKind, a0..aN)`.
+	{ reportOptiXIntersection = { min_operands = 2 } },
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{
@@ -1927,6 +1934,7 @@ local insts = {
 			{ vulkanCallablePayload = { struct_name = "VulkanCallablePayloadDecoration" } },
 			{ vulkanCallablePayloadIn = { struct_name = "VulkanCallablePayloadInDecoration" } },
 			{ earlyDepthStencil = { struct_name = "EarlyDepthStencilDecoration" } },
+			{ postDepthCoverage = { struct_name = "PostDepthCoverageDecoration" } },
 			-- Marks a fragment entry point whose `gl_FragDepth` output is constrained to
 			-- only ever increase / decrease the fixed-function depth (HLSL
 			-- SV_DepthGreaterEqual / SV_DepthLessEqual). Carried on the entry point so the
@@ -2696,7 +2704,11 @@ local insts = {
 			},
 			{
 				experimentalModule = {
-					-- Marks a module as an experimental module
+					-- Marks a module as experimental in serialized IR.
+					--
+					-- Retained as derived metadata because the AST-gate refactor left
+					-- `IRModule::k_maxSupportedModuleVersion` unchanged, so compatible
+					-- pre-refactor readers still inspect this marker to emit E00104.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},
@@ -2816,6 +2828,7 @@ local insts = {
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
+	{ IsBindlessTextureNVEncodable = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
 	{ TranslateBase = {
 		hoistable = true,
@@ -2996,10 +3009,10 @@ local insts = {
 	{ DebugInlinedVariable = { min_operands = 2 } },
 	{
 		DebugScope = {
-			min_operands = 2,
+			min_operands = 1,
 		},
 	},
-	{ DebugNoScope = { min_operands = 1 } },
+	{ DebugNoScope = { min_operands = 0 } },
 	{
 		DebugBuildIdentifier = {
 			min_operands = 2,

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#ifelse
-//META: doc_section_digest=58ff39ee4b5eb63d9fd7dd839e0f9f67e7ef5727cd278b7eee0411b98e5d64fe
+//META: doc_section_digest=8e8ff9867878750c6e494dc89c9ad99cc9c750ba3dbe5e5c6e752d1886d3e399
 //META: purpose=A loop-condition test lowers to a degenerate ifElse whose afterBlock operand names the loop body (its trueBlock) and whose falseBlock is the loop's break label.
 //META: intent=functional
 //META: pipeline_stage=lower

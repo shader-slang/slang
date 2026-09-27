@@ -1649,6 +1649,18 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
                 m_writer->emit("layout(early_fragment_tests) in;\n");
             }
+            else if (as<IRPostDepthCoverageDecoration>(decoration))
+            {
+                // GL_ARB_post_depth_coverage: `layout(post_depth_coverage) in;` makes
+                // gl_SampleMaskIn report only samples that survived the early depth/stencil
+                // test. The extension implicitly enables early_fragment_tests, so it is not
+                // redeclared here. If the entry point also has `[earlydepthstencil]`, the
+                // separate decoration branch additionally emits `layout(early_fragment_tests)
+                // in;`; declaring both qualifiers is valid (the ARB-implied one made explicit).
+                _requireGLSLExtension(
+                    UnownedStringSlice::fromLiteral("GL_ARB_post_depth_coverage"));
+                m_writer->emit("layout(post_depth_coverage) in;\n");
+            }
             else if (as<IRGLSLFragDepthGreaterDecoration>(decoration))
             {
                 // Redeclare the `gl_FragDepth` builtin with the conservative-depth

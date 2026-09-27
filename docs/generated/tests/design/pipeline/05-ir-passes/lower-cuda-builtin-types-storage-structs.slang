@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#type-and-value-legalization
-//META: doc_section_digest=3e3c1fa508130c56014c50d7c74ee56f2e557c277dfbc86c712dbb9373bf794a
+//META: doc_section_digest=be338458e89c71e229e00d5eae5f44da20b6937edb6e9cd44c679913a4082adf
 //META: purpose=Matrix and vector parameters of a [CudaKernel] function are flattened into plain storage structs, a float2x2 becoming _MatrixStorage_float2x2 (_ColMajor suffixed under column-major layout) and a float3 becoming _VectorStorage_float3_.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

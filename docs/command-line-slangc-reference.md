@@ -982,7 +982,7 @@ Perform uniformity validation analysis.
 
 <a id="allow-glsl"></a>
 ### -allow-glsl
-Enable GLSL as an input language. 
+Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension or `-lang glsl` for each GLSL input instead. 
 
 
 <a id="enable-experimental-passes"></a>
