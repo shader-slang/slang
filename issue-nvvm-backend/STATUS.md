@@ -67,7 +67,10 @@ with runtime dynamic dispatch: six new and six neighboring GPU cells pass; two c
 produce exact expected rejection masks. Live IR proves runtime selection, mutation pack-back and
 preserved interface snapshots across Natural20-byte/CUDA24-byte layouts. All accepted285 identities
 remain exact. Raw probes stay outside the main corpus; no compiler change or new array/device/
-readonly/exported roles. Next: bounded promotion of the two probes into persistent native regression
-tests and the qualified record contract. Material overload-screening lead remains documented.
+readonly/exported roles. [Promotion288](report.slice-288-nested-dynamic-regressions.md) retains two native tests with six fresh
+passing directives and updates the qualified contract. Main corpus and implementation cadence stay
+unchanged. Next: bounded existing error-handling compute probes (generic rethrow, aggregate errors,
+synthesized throwing witnesses and catches), a region with no main selection in inventory269.
+Material overload-screening lead remains documented.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
-max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation,286 restored research and287 qualification with no findings.
+max4CPU workers,2unit servers, serialized suites. Independent reviews accept285 implementation,286 restored research 287 qualification and288 test promotion with no findings.

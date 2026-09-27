@@ -160,3 +160,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Six new and six neighboring GPU cells pass; two deliberate corruptions reject with exact masks.
   Live IR proves runtime selection, mutation pack-back and snapshot preservation across Natural20/
   CUDA24 layouts. Accepted285 identities unchanged; next promotes the two probes to native regressions.
+
+- Promotion288: [nested dynamic regressions](report.slice-288-nested-dynamic-regressions.md),
+  [evidence](research-evidence.slice-288.json), [plan](plan.slice-288-nested-dynamic-regressions.md).
+  Two persistent native sources add six passing focused directives; executable bodies/oracles equal287.
+  Qualified contract documents Natural20/CUDA24 and live mutation/snapshot scope. No compiler or main
+  corpus change. Next probes existing error-handling compute contracts outside main selection.

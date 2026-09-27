@@ -52,6 +52,63 @@ addresses require an actual field of a qualified local record, preserving existi
 access, address-space, index and element-type checks. This also composes with BF2 fields beside
 existing local BF3/BF4 fields; it does not qualify BF3/BF4 component-pointer access.
 
+## Nested dynamic payloads
+
+[Slice287](../../issue-nvvm-backend/report.slice-287-nested-dynamic-records.md) qualifies nested
+records through runtime-selected interface methods, including a mutating receiver and an earlier
+interface-value copy. The persistent
+[substandard regression](../../tests/cuda/nvvm-nested-substandard-dynamic.slang) and
+[integer structural control](../../tests/cuda/nvvm-nested-integer-dynamic.slang) each run at NVRTC O3,
+NVVM O0 and NVVM O3. IRecord is their interface with `inspect` and mutating `flip` methods,
+using `anyValueSize(20)`. These excerpts show the concrete fields; method implementations are omitted:
+
+```slang
+struct PairPayload
+{
+    uint16_t before;
+    vector<BFloat16, 2> pair;
+    uint16_t after;
+};
+struct Leaf
+{
+    FloatE4M3 a;
+    FloatE5M2 b;
+    BFloat16 scalar;
+};
+struct RecordA : IRecord { uint head; PairPayload payload; Leaf leaf; uint tail; };
+struct RecordB : IRecord { uint head; Leaf leaf; PairPayload payload; uint tail; };
+```
+
+Both records have a 20-byte Natural payload and a 24-byte CUDA local allocation, each aligned to
+four bytes. Their top-level field offsets differ as follows:
+
+| Record and field order             | Natural offsets | CUDA offsets |
+| ---------------------------------- | --------------- | ------------ |
+| RecordA: head, payload, leaf, tail | 0, 4, 12, 16    | 0, 4, 16, 20 |
+| RecordB: head, leaf, payload, tail | 0, 4, 8, 16     | 0, 4, 8, 20  |
+
+The test constructs five integer words from independent input expressions and passes them to
+`createDynamicObject<IRecord>(kind, packed)`, where `kind` comes from an input buffer and IRecord has
+`anyValueSize(20)`. `lowerCreateExistentialObject` produces the canonical runtime-witness/payload
+representation. The selected concrete wrapper uses `emitMarshallingCode` to recursively unpack
+Natural fields into the CUDA local record. For the mutating method, `maybeUnpackArg` handles the
+`BorrowInOut` receiver: the wrapper reloads and repacks the changed concrete value before the next
+inspection. The earlier interface copy retains its original payload. Slice287's emitted IR confirms
+that both conformers and these unpack, mutate, repack and snapshot paths remain live.
+
+For each conformer, all 65,536 inputs exercise every scalar BF16 encoding and both BF2 lanes, as well
+as every FP8 encoding. Fixed XOR masks distinguish neighboring fields; combinations are correlated,
+not Cartesian. Nine field checks and a conformance-identity check compare against integer expressions
+from the input. Initial, mutated and saved-value mismatch masks must each be zero, and each loop must
+complete 65,536 iterations. All eight output words start nonzero, so omitted writes also fail. The
+integer control substitutes u8/u16/u16x2 leaves with the same schema. Slice287's two deliberately
+corrupted payloads establish that the independent oracle rejects damaged guard fields.
+
+This qualifies raw bit transport through these nested dynamic records. It adds no floating arithmetic,
+record-array admission, whole BF3/BF4 values, device/shared/readonly/exported record roles, arbitrary
+packed or address-space forms, or new guarantee about cache visitation order. The separate array-store
+limits below remain unchanged.
+
 ## Boundaries
 
 The domain excludes record arrays, readonly record references, device/resource/

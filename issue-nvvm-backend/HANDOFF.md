@@ -38,7 +38,10 @@ Skip Slack; no push or system changes.
     neighboring GPU cells, plus two expected corruption rejections. IR confirms runtime-selected
     unpack/mutation/pack-back and saved interface values. Natural payload20/CUDA local24 remain
     distinct. All285 identities exact; raw fixtures stay under `build/nvvm-nested-dynamic287`.
-    Next: bounded native-test promotion and qualified contract update, with no new compiler admission.
+    [Promotion288](report.slice-288-nested-dynamic-regressions.md) adds two persistent native sources
+    and six fresh passing directives, preserving source tokens and qualified scope. No compiler or
+    main-corpus change. Next: bounded existing error-handling compute probes; retain each original
+    oracle and derive full outputs before executing. Write the bounded plan first.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.
