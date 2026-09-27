@@ -372,8 +372,14 @@ The measured eval gap does not currently motivate another NVVM lowering pass. Bo
 paths already contain no helper calls, and NVVM O3 reports no local stack. A scoped diagnostic that
 removes only NVRTC stores to proven never-read local byte ranges lets `ptxas` eliminate that path's
 local stack and removes most of its measured gap. The correct receiver snapshots remain part of
-language value semantics. Investigate missed aggregate optimization with a reduced reproducer;
-do not turn the diagnostic's exact-PTX deletion rule into an emitter workaround. The result covers
-deletion plus downstream reoptimization, without identifying a unique hardware bottleneck or vendor
-pass. Current measurements and proof provenance remain in
+language value semantics. A source-derived CUDA reduction isolates bounded dynamic indexing:
+eight constant-index variants eliminate local storage, while eight bounded-index variants retain
+27 stores to proven never-read bytes alongside live stack data. Initialization spelling, receiver
+snapshot size and branch spelling produce identical PTX within each group. Three full-material
+force-inline controls produce the original PTX unchanged. These are static optimization findings,
+not reduced-kernel runtime or performance evidence, and do not identify a particular vendor pass.
+Keep a source-level reproducer and general field-liveness proof; do not turn the diagnostic's
+exact-PTX deletion rule into an emitter workaround. The measured control covers deletion plus
+downstream reoptimization without identifying a unique hardware bottleneck. Current measurements
+and proof provenance remain in
 [focused evidence](../../issue-nvvm-backend/focused-evidence.json).

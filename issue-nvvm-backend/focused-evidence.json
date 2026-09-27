@@ -4126,6 +4126,274 @@
             "path": "build/nvvm-material-codegen/review/control-measurement-replay.json",
             "sha256": "43dd182096f3aa6447a177bab514f4e260e11c796111d129127fd92aea088173"
           }
+        },
+        "source_reduction": {
+          "status": "accepted-static-reproducer",
+          "production_change": false,
+          "gpu_execution": false,
+          "inventory": {
+            "original_replay_compiles": 1,
+            "synthetic_compiles": 16,
+            "full_source_hint_compiles": 3,
+            "total_compiles": 20,
+            "candidate_assemblies": 19,
+            "cpu_contracts_pass": 4,
+            "compile_or_assembly_failures": 0
+          },
+          "source_factors": [
+            "aggregate or member initialization",
+            "whole Graph or Surface+hints receiver snapshot",
+            "if/else or conditional expression",
+            "literal slot0 or bounded tag&1"
+          ],
+          "full_source_controls": [
+            "forceinline constructor",
+            "forceinline prepare helper",
+            "both"
+          ],
+          "outcome": "All eight literal variants are byte-identical; all eight bounded variants are byte-identical; all three full-source controls exactly reproduce original PTX. Bounded indexing alone distinguishes the synthetic groups in this matrix.",
+          "groups": {
+            "literal": {
+              "ptx_sha256": "1f0d3e0a42fae31bf88c107f69783d0eb4eb447e613d3dbd0c43c02c2acd5193",
+              "local_store_instructions": 0,
+              "local_load_instructions": 0,
+              "ptx_calls": 0,
+              "stack_bytes": 0,
+              "spill_store_bytes": 0,
+              "spill_load_bytes": 0,
+              "registers": 10
+            },
+            "bounded": {
+              "ptx_sha256": "7e33d7b1c8f137bd47bde5db10e220c5e0b063deb78201108fda68a569926eca",
+              "local_store_instructions": 37,
+              "local_load_instructions": 5,
+              "ptx_calls": 0,
+              "stack_bytes": 584,
+              "spill_store_bytes": 0,
+              "spill_load_bytes": 0,
+              "registers": 22
+            },
+            "full-source": {
+              "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+              "local_store_instructions": 94,
+              "local_load_instructions": 6,
+              "ptx_calls": 0,
+              "stack_bytes": 592,
+              "spill_store_bytes": 0,
+              "spill_load_bytes": 0,
+              "registers": 48
+            }
+          },
+          "cells": [
+            {
+              "id": "aggregate-graph-if-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "00148ff41e363731ea3938d0ff041dfe40c1743296f21ea74d9602083d4a6bdf",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "aggregate-graph-if-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "098b0d0f40a0925a587e3cbc7d451c59b66a0efbfcad977a16e2e981032d7394",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "aggregate-graph-select-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "c00e30a447e6f385cb7df1cc633d1fea61e36a831375021667debd5a77297862",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "aggregate-graph-select-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "93c41777ddf824034db6546461d6f4ce57b4dfaaec1b6285c161007c6d5310e6",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "aggregate-view-if-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "3ee36dc8595ae67879fbeebbd0a40d7e29a809baf08f6eb73583cef664549194",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "aggregate-view-if-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "33a7b3f89696242ebbdcf27ae9e2985d5577784a9272452f206d56a37cc16505",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "aggregate-view-select-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "a84b02d95abdbe573747875dca68a3489f3d937a5948d5d6aa20c22d84837f68",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "aggregate-view-select-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "d5ea84dac210271d9c3db36e0ad0007f1a5eeb9f81550d17f6b61d86c0314f0b",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "members-graph-if-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "66d20cb7b22602a38ff7f2b7ed6f642332212a84728b12ca557942003109d15c",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "members-graph-if-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "2a3df2325c4d8012ed49b11967aa81b2f7b3a24072d5d6444e4c1510e48f79ca",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "members-graph-select-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "d9040eb01c2f7cfa62fadd942f3ba1f826cbffb4fa5de77279bf97e97bad2475",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "members-graph-select-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "04efd502f959c0fec7cdd71daa1226565078de946df0a21fdb1adf46af30c6e9",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "members-view-if-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "d28a4e2f05b632cf4921ce2b8c5c4ecb24f8371a628357844b62ce8df60943b7",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "members-view-if-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "fdd7aa59eced853b37c7cd692af814b277b579c670e9191bae36969289954d63",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "members-view-select-literal",
+              "status": "compiled-static-only",
+              "source_sha256": "0e9c6be23ed7c0125f4094060b7f01570fcbfdee786e03f6d4374e47488ecb09",
+              "ptx_group": "literal",
+              "cubin_sha256": "b9bfd0a15b9b669a2d0d2ac5007acfd80467bda5fcae43631df56beef20cb74c"
+            },
+            {
+              "id": "members-view-select-bounded",
+              "status": "compiled-static-only",
+              "source_sha256": "dcbd0e8a5b867f54a09960838a595e0676d042385e5c8477b82d1586ad9401bb",
+              "ptx_group": "bounded",
+              "cubin_sha256": "c4078a0eb1fe05635ca81e55599af37af40ec37329b10552228c059bb68b16c5"
+            },
+            {
+              "id": "full-forceinline-constructor",
+              "status": "compiled-static-only",
+              "source_sha256": "da102dbc530008ba940baad9b8e750abd2e7721694bf954307b0622214836263",
+              "ptx_group": "full-source",
+              "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4"
+            },
+            {
+              "id": "full-forceinline-prepare",
+              "status": "compiled-static-only",
+              "source_sha256": "68096bebb279ddf4fd12b98d1bbcae9aa06346d816c1c16561ba0f4e9d9ec981",
+              "ptx_group": "full-source",
+              "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4"
+            },
+            {
+              "id": "full-forceinline-both",
+              "status": "compiled-static-only",
+              "source_sha256": "eb4892fd2a2b071ec8e5090206e2f6225f6c261382612cd5c07d20b326977dd3",
+              "ptx_group": "full-source",
+              "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4"
+            }
+          ],
+          "proof": {
+            "read_union": [
+              [288, 428],
+              [444, 460],
+              [464, 472],
+              [476, 480],
+              [488, 492]
+            ],
+            "never_read_store_instructions": 27,
+            "never_read_static_store_bytes": 108,
+            "never_read_executed_bytes_per_active_thread": 304,
+            "remaining_store_instructions": 10,
+            "local_pointer_escape": false,
+            "generic_memory_access": false,
+            "explanation": "The Graph stack [288,428) is copied to [444,584). Its bounded slot0/1 consumer reads only the listed four destination intervals. The other Graph fields [0,288) and trailing metadata[428,444) are never read. One dead store instruction initializes50words, so static and executed-byte counts differ."
+          },
+          "provenance": {
+            "inventory": {
+              "path": "build/nvvm-material-reduction/candidates.json",
+              "sha256": "1eec24755ad17b523dc43a53b00f9ddc079e7f52e197503aaea8fc01bec35e67"
+            },
+            "generator": {
+              "path": "build/nvvm-material-reduction/make_candidates.py",
+              "sha256": "5971fb0ac7ed684b6fc6bc56e83dab4d963482a72090c6844a20890fc3e6b0a7"
+            },
+            "runner": {
+              "path": "build/nvvm-material-reduction/run_candidates.py",
+              "sha256": "dafa0ed3d5b62ab5168aa6ecb3b72e773d443e062da6bc3b56bdc1cfe1cc3185"
+            },
+            "cpu_contracts": {
+              "path": "build/nvvm-material-reduction/test_candidates.py",
+              "sha256": "b58d1572f3e72822ec19637451dacca184ed43056c5dbe1ac8332c9512c17906"
+            },
+            "original_replay": {
+              "path": "build/nvvm-material-reduction/original-pass-through.json",
+              "sha256": "9ef046c6b1533e97148fe899a0cd4dfd420cbbd3ce6391c8251cc608471d220b"
+            },
+            "original_identity": {
+              "path": "build/nvvm-material-reduction/original-replay-comparison.json",
+              "sha256": "776a09c4c78fe4d7f8af4e31189d1d11774df2395ffee6458d207e9074b6d76d"
+            },
+            "toolchain": {
+              "path": "build/nvvm-material-reduction/replay-provenance.json",
+              "sha256": "a601e32b9c5d4cb981ff60fdafdf62ded19567feaf79a8b27ba617bd75b37cad"
+            },
+            "matrix": {
+              "path": "build/nvvm-material-reduction/matrix-0/results.json",
+              "sha256": "0b2120de09a84139fc186910c0d7b68306c260bb0d97cf58aeb468f15c5ce408"
+            },
+            "gate": {
+              "path": "build/nvvm-material-reduction/matrix-gate-0.json",
+              "sha256": "a44ee05af30b72bb2dacb7c9267db0569f604e3632bac5231737491be5547bdd"
+            },
+            "precompile_review": {
+              "path": "build/nvvm-material-reduction/review/precompile.json",
+              "sha256": "7122162cba2e33381655062883bc300d01a74712c91b264a8d6eb6787347b2b7"
+            },
+            "static_review": {
+              "path": "build/nvvm-material-reduction/review/static-replay.json",
+              "sha256": "b8120ddb7216fd8f27255e963d33dd2b0cfb897db9a08b4bcb764fff1955ed56"
+            },
+            "cpu_result": {
+              "path": "build/nvvm-material-reduction/cpu-contracts-0.json",
+              "sha256": "cdecccca7a8822022ae024aca2e0a0e2e2820693b3d8d7af13478ac9c6bf6b0a"
+            }
+          },
+          "limits": [
+            "Source-derived static reproducer; no reduced-kernel GPU correctness or timing claim.",
+            "Complete original material proof/runtime evidence remains separate.",
+            "No exact vendor pass or shared root cause is established by a similar static pattern.",
+            "Correct receiver snapshots and live local data must remain.",
+            "API options inferred from adapter source; not intercepted.",
+            "No registered shader, compiler, prelude, installed layout or full baseline changed."
+          ],
+          "next_action": "Qualify this missing aggregate/dynamic-index/copy composition through Slang with bounded and literal controls in the existing three-mode harness; further vendor reduction is secondary."
         }
       }
     }

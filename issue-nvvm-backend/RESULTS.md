@@ -404,6 +404,29 @@ cannot prove a unique memory-traffic bottleneck. No sample transform, SASS or pr
 collected. A production proposal needs a reduced producer/optimizer reproducer and general semantic
 proof; do not ship a workload-specific PTX deletion based on this experiment.
 
+For source reduction, first replay the exact generated CUDA through the installed Slang adapter:
+
+```bash
+build/RelWithDebInfo/bin/slangc GENERATED.cu -pass-through nvrtc \
+  -entry eval_buffer -stage compute -target ptx -capability cuda_sm_8_0 -O3 -o REPLAY.ptx
+```
+
+Require byte-identical baseline PTX before interpreting variants. Pin the compiler library, NVRTC,
+adapter source, prelude, assembly tool and every candidate; retain the leading prelude include and
+identical options. The current bounded inventory is 16 synthetic variants (initialization, receiver
+snapshot, branch spelling and indexing) plus three exact full-source inline-hint controls, following
+one original replay. All compile and assemble. API options are inferred from adapter source, not
+intercepted. Compile serially with 120-second command and 30-minute total bounds; retain failures and
+blocked cells. Sources, runner and logs remain under ignored `build/nvvm-material-reduction/`.
+
+A static positive requires complete local-address/noescape/read-range proof, including bounded
+indices and loop trips. The reduced bounded-index PTX copies `[288,428)` into `[444,584)` and reads
+only `[444,460)`, `[464,472)`, `[476,480)`, `[488,492)` from that copy. Twenty-seven stores outside
+all read ranges are never read; one initializes 50 words in a loop, giving 108 static store bytes
+and 304 executed store bytes per active thread. Preserve live local data. Constant-index variants
+have only explicit global/parameter memory accesses and no local declarations or calls. Stack and
+register reports remain separate observations; no reduced-source GPU or speed claim follows.
+
 ## Documentation and evidence maintenance
 
 [accepted-baseline.json](accepted-baseline.json) owns full comparison outcomes and native identities.

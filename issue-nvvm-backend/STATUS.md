@@ -88,9 +88,14 @@ outcomes, identities and failure history. No performance improvement from that r
   to 0.347 ms (8.14–8.16×), versus paired NVVM O3 at 0.315 ms. This deletion plus reoptimization
   accounts for most of the observed eval gap, without establishing a unique hardware bottleneck.
   No compiler/shader source changed; sample was not transformed. Keep the NVVM lowering boundary.
-  Next reduce the CUDA aggregate-init/receiver-copy pattern before considering a production
-  optimization. Any fix must preserve receiver value semantics and prove general field liveness;
-  the exact-artifact PTX deletion is a diagnostic, not a proposed compiler pass.
+  Source reduction isolates bounded dynamic indexing: all 8 bounded variants retain 27 proven
+  never-read stores (304 executed bytes per active thread) and a 584-byte stack; all 8 constant-index
+  variants eliminate local memory. Initialization, receiver-copy and branch spelling do not change
+  PTX within either group. Three full-material force-inline controls reproduce the original PTX.
+  All 19 candidates compile/assemble; no candidate GPU result is claimed. Next qualify the reduced
+  aggregate/indexing composition through Slang if existing coverage lacks it. Any production fix
+  must preserve receiver value semantics and prove general field liveness; the PTX deletion remains
+  a diagnostic. Further vendor-specific reduction is secondary to workload coverage.
 
 Future authorized work updates current documents and evidence in place. Keep working plans,
 report drafts and raw artifacts uncommitted; do not restart numbered slice history.

@@ -48,7 +48,7 @@ Ordinary Var/Load/Store decisions are now retained in the checked emission plan:
 alignment, conversion recipe, load flags and pointer ABI/provenance. BF2 identity and BF3/BF4 lane
 conversion are planned before provider mutation. Native readonly borrows remain distinct from compact
 storage and from immutable locations. This changes ownership, not the supported language surface.
-General structured-storage recursion and field/element-address consolidation remain outside this
+General structured-storage recursion and recursive ancestor admission remain outside this
 boundary; no transforming Slang IR storage pass is claimed.
 
 Unsupported bodies, signatures or roles fail preflight; successful lowering of an adjacent type is
@@ -132,6 +132,12 @@ the qualified stack; `txq.level.width` loaded and executed. No full API repair i
 | Accessors, generics, variadics, constrained extensions, lambdas, tuples and defer | Focused unchanged-source experiments plus main-corpus selection                                                                          | Passing isolated examples does not establish all feature intersections. Selected membership and semantic coverage are different measurements.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Material shaders                                                                  | Both registered entries × three modes compile/assemble and execute with two live synthetic textures and independent scalar oracles       | 65 active records/entry/mode and 63 untouched guards. Eval checks 260 components; sample checks 455 floats/65 flags, selected-layer throughput, coherent arithmetic candidates and exact rejection zeros. Fixed synthetic inputs only; no original assets, live LUTs or sampling-distribution claim. Device-event evidence has its own scoped row below. [Runtime validator](../../extras/validate-nvvm-material-runtime.py). [Material manifest](../../issue-nvvm-backend/complex-corpus.manifest.json)                                                                                                                                                                                                                       |
 | Synthetic material device events                                                  | Both entries × two counts × three modes × two reversed rounds; 216 measured launches and 72 warmups pass complete output checks          | At N1,048,577, NVRTC O3/NVVM O3 time ratios are 8.98–8.99 eval and 6.31–6.32 sample on the qualified L4. Tiny hot textures, periodic inputs and inter-launch correctness transfers only; no application performance or causal claim. Small NVVM O3 cells fail the 0.1 ms throughput gate. An eval-only diagnostic removes 65 proven never-read PTX stores: reassembly eliminates its stack and reduces NVRTC time about 8.15× with exact outputs. This is not a production pass or a sampling result. [Runner](../../extras/measure-nvvm-material-runtime.py), [CPU contracts](../../issue-nvvm-backend/test-nvvm-material-measurement.py), [protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement). |
+
+The eval diagnostic also has a source-derived CUDA reduction with independent static address proof.
+Eight bounded-index variants retain 27 never-read store instructions and a 584-byte stack; eight
+constant-index variants have no local memory. The other three source factors do not change PTX.
+Three full-material force-inline controls reproduce the original PTX exactly. All 19 candidates
+compile and assemble; none has a reduced-kernel GPU correctness or timing qualification.
 
 The [current focused evidence](../../issue-nvvm-backend/focused-evidence.json) retains the inheritance/
 initialization and mixed-record-array boundary outcomes separately from the full baseline.
