@@ -1,0 +1,316 @@
+{
+  "schema": 1,
+  "slice": 284,
+  "date_utc": "2026-09-27",
+  "kind": "original-large-array-store-comparison",
+  "status": "accepted-research",
+  "repository_revision": "8f84b1cc20948d57a6dd7495493932312f3faf63",
+  "baseline": {
+    "path": "issue-nvvm-backend/runtime-validation.slice-279.json",
+    "sha256": "956349660b41e1225573a9e865c5eb37d5ece4ecd4012c7e68efa4da94dfb8b8"
+  },
+  "compiler_source_revision": "0043e8d17dc1a49870c7eeb652dbfad21562378f",
+  "compiler_source_patch_sha256": "62ae64735b12f5777c4c2789dd0beef44d5835480c6b3b6af0a1eb0b31208f64",
+  "compiler_version": "2026.18.3-295-g0043e8d17",
+  "provider_abi": 42,
+  "identity": {
+    "before": {
+      "path": "build/nvvm-original-array-size284/identity-before.json",
+      "sha256": "79bd82644429174756db51ed3a1be4d921fa31598530e0559a8514942449b308"
+    },
+    "after": {
+      "path": "build/nvvm-original-array-size284/identity-after.json",
+      "sha256": "79bd82644429174756db51ed3a1be4d921fa31598530e0559a8514942449b308"
+    },
+    "unchanged_counts": {
+      "runtime_artifacts": 37,
+      "qualified_sources": 8,
+      "configurations": 2,
+      "main_inputs": 576,
+      "dependency_pins": 22
+    }
+  },
+  "freeze": {
+    "path": "build/nvvm-original-array-size284/freeze.json",
+    "sha256": "d1385d1df7d5f31737c7a2bb27fe40f7f6eb195a3e5720a1c8e74d7e229c8fe4"
+  },
+  "cells": [
+    {
+      "id": "pointer281-original-65536-nvvm-o0",
+      "family": "pointer281",
+      "variant": "original",
+      "count": 65536,
+      "backend": "nvvm",
+      "opt": 0,
+      "gpu": false,
+      "source": "build/nvvm-original-array-size284/sources/pointer281-original-65536.ll",
+      "source_sha256": "5f9124aa8f7b627bef39f4eb0e8ff97ec411dc1cd4bf3674fe511a06998937b7",
+      "expected": [0, 123, 0, 456],
+      "compile_timeout_seconds": 120,
+      "canonical_shape": "Cell={i16,{i16,i32}}, leaves0/4/8, stride12, actual roots align4",
+      "address_space_limit_bytes": 4294967296,
+      "options": ["-arch=compute_80", "-opt=0"],
+      "options_sha256": "c5c362a6c191558313c8e2e268a932ea608c2240ff90202dc34fc5a3e6f65774",
+      "source_bytes": 5078,
+      "executed": 0,
+      "output": null,
+      "compile_return_code": 0,
+      "compile_seconds": 0.8352697938680649,
+      "ptx_sha256": "bc9b1009495f758f10a0a0850217903cd38d2b6e98e66ea3db85a49114f1fd80",
+      "ptx_bytes": 8011,
+      "ptx_lines": 400,
+      "passed": false,
+      "classification": "compile-only",
+      "peak_rss_kib": 237092,
+      "seconds": 0.8355555310845375,
+      "record": {
+        "path": "build/nvvm-original-array-size284/results/pointer281-original-65536-nvvm-o0.json",
+        "sha256": "c014bb7fb72081c29efe272d45e0f2aba2ad77efcba7f157741b294a666461b9"
+      },
+      "compile_log": {
+        "path": "build/nvvm-original-array-size284/results/pointer281-original-65536-nvvm-o0.compile.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "diagnostic": "",
+      "ptx": {
+        "path": "build/nvvm-original-array-size284/results/pointer281-original-65536-nvvm-o0.ptx",
+        "sha256": "bc9b1009495f758f10a0a0850217903cd38d2b6e98e66ea3db85a49114f1fd80"
+      },
+      "ptx_instruction_count": 199,
+      "ptx_function_instruction_counts": {
+        "initialize": 26,
+        "check": 41,
+        "replace": 38,
+        "computeMain": 94
+      },
+      "local_depot_bytes": [2359296],
+      "aggregate_parameter_sizes": [],
+      "st_param_instruction_count": 30,
+      "ignored": 0,
+      "process": {
+        "id": "pointer281-original-65536-nvvm-o0",
+        "return_code": 0,
+        "child_return_code": 0,
+        "timed_out": false,
+        "seconds": 0.9179996438324451,
+        "log": "build/nvvm-original-array-size284/pointer281-original-65536-nvvm-o0.process.log",
+        "log_sha256": "23b2f053ee24a56b5e9466be6d33e98e67cb796db29aa858b3d1b163955ad7d0",
+        "command": [
+          "python3",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-original-array-size284/replay.py",
+          "pointer281-original-65536-nvvm-o0"
+        ],
+        "address_space_limit_bytes": 4294967296,
+        "classification": "compile-only",
+        "compile_return_code": 0,
+        "executed": 0,
+        "passed": 0,
+        "ignored": 0,
+        "output": null
+      },
+      "source_llvm_instruction_count": 96
+    },
+    {
+      "id": "pointer281-original-65536-nvvm-o3",
+      "family": "pointer281",
+      "variant": "original",
+      "count": 65536,
+      "backend": "nvvm",
+      "opt": 3,
+      "gpu": false,
+      "source": "build/nvvm-original-array-size284/sources/pointer281-original-65536.ll",
+      "source_sha256": "5f9124aa8f7b627bef39f4eb0e8ff97ec411dc1cd4bf3674fe511a06998937b7",
+      "expected": [0, 123, 0, 456],
+      "compile_timeout_seconds": 120,
+      "canonical_shape": "Cell={i16,{i16,i32}}, leaves0/4/8, stride12, actual roots align4",
+      "address_space_limit_bytes": 4294967296,
+      "options": ["-arch=compute_80", "-opt=3"],
+      "options_sha256": "58616b6f662da6346f6f2f08807c2ddc01cfd08592a1068523e14222f874b459",
+      "executed": 0,
+      "passed": false,
+      "output": null,
+      "compile_return_code": null,
+      "ptx": null,
+      "classification": "compile-process-timeout",
+      "diagnostic": "Owned direct NVVM compile exceeded120s under4GiB; terminated without completed compiler return or PTX.",
+      "ignored": 0,
+      "process": {
+        "id": "pointer281-original-65536-nvvm-o3",
+        "return_code": 124,
+        "child_return_code": -15,
+        "timed_out": true,
+        "seconds": 120.06695270165801,
+        "log": "build/nvvm-original-array-size284/pointer281-original-65536-nvvm-o3.process.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "command": [
+          "python3",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-original-array-size284/replay.py",
+          "pointer281-original-65536-nvvm-o3"
+        ],
+        "address_space_limit_bytes": 4294967296,
+        "classification": "timeout",
+        "compile_return_code": null,
+        "executed": 0,
+        "passed": 0,
+        "ignored": 0,
+        "output": null
+      },
+      "source_bytes": 5078,
+      "source_llvm_instruction_count": 96
+    }
+  ],
+  "counts": {
+    "compile-only": 1,
+    "compile-process-timeout": 1
+  },
+  "comparisons": [
+    {
+      "fresh284": {
+        "id": "pointer281-original-65536-nvvm-o0",
+        "classification": "compile-only",
+        "compile_return_code": 0,
+        "executed": 0,
+        "passed": false,
+        "ignored": 0,
+        "diagnostic": "",
+        "source_sha256": "5f9124aa8f7b627bef39f4eb0e8ff97ec411dc1cd4bf3674fe511a06998937b7",
+        "ptx_sha256": "bc9b1009495f758f10a0a0850217903cd38d2b6e98e66ea3db85a49114f1fd80",
+        "ptx_bytes": 8011,
+        "ptx_instruction_count": 199,
+        "ptx_function_instruction_counts": {
+          "initialize": 26,
+          "check": 41,
+          "replace": 38,
+          "computeMain": 94
+        },
+        "local_depot_bytes": [2359296],
+        "aggregate_parameter_sizes": [],
+        "st_param_instruction_count": 30
+      },
+      "inherited283": {
+        "id": "pointer281-align1-65536-nvvm-o0",
+        "classification": "compile-only",
+        "compile_return_code": 0,
+        "executed": 0,
+        "passed": false,
+        "ignored": 0,
+        "diagnostic": "",
+        "source_sha256": "379338b7a1a01f55ce5847ba6fb46f238c0d769e389edf4a2f35546062f536c2",
+        "ptx_sha256": "6215306b6f66bd5a916aeb7d9b8d7491eb85db587600f95d4bb1a96b35f4f06b",
+        "ptx_bytes": 7973,
+        "ptx_instruction_count": 197,
+        "ptx_function_instruction_counts": {
+          "initialize": 26,
+          "check": 41,
+          "replace": 36,
+          "computeMain": 94
+        },
+        "local_depot_bytes": [2359296],
+        "aggregate_parameter_sizes": [],
+        "st_param_instruction_count": 30
+      },
+      "inherited_record": {
+        "path": "build/nvvm-array-store-alignment283/worker-summary.json",
+        "sha256": "75c086c950804be74765cc6a9119b2253ddbf112a6d59911ee56756d650a665a"
+      }
+    },
+    {
+      "fresh284": {
+        "id": "pointer281-original-65536-nvvm-o3",
+        "classification": "compile-process-timeout",
+        "compile_return_code": null,
+        "executed": 0,
+        "passed": false,
+        "ignored": 0,
+        "diagnostic": "Owned direct NVVM compile exceeded120s under4GiB; terminated without completed compiler return or PTX.",
+        "source_sha256": "5f9124aa8f7b627bef39f4eb0e8ff97ec411dc1cd4bf3674fe511a06998937b7",
+        "ptx_sha256": null,
+        "ptx_bytes": null,
+        "ptx_instruction_count": null,
+        "ptx_function_instruction_counts": null,
+        "local_depot_bytes": null,
+        "aggregate_parameter_sizes": null,
+        "st_param_instruction_count": null
+      },
+      "inherited283": {
+        "id": "pointer281-align1-65536-nvvm-o3",
+        "classification": "compile-process-timeout",
+        "compile_return_code": null,
+        "executed": 0,
+        "passed": false,
+        "ignored": 0,
+        "diagnostic": "Owned direct NVVM compile process exceeded120s under4GiB address-space bound; terminated without completed compiler return or PTX.",
+        "source_sha256": "379338b7a1a01f55ce5847ba6fb46f238c0d769e389edf4a2f35546062f536c2",
+        "ptx_sha256": null,
+        "ptx_bytes": null,
+        "ptx_instruction_count": null,
+        "ptx_function_instruction_counts": null,
+        "local_depot_bytes": null,
+        "aggregate_parameter_sizes": null,
+        "st_param_instruction_count": null
+      },
+      "inherited_record": {
+        "path": "build/nvvm-array-store-alignment283/worker-summary.json",
+        "sha256": "75c086c950804be74765cc6a9119b2253ddbf112a6d59911ee56756d650a665a"
+      }
+    }
+  ],
+  "source_difference_audit": {
+    "origin281": {
+      "path": "build/nvvm-array-store-prototype281/sources/baseline-3.ll",
+      "sha256": "082d311a49228b67d4777419c32d02c0f338ef0ebc24fa9f57ad83a43bd9d0e1"
+    },
+    "inherited_candidate283": {
+      "path": "build/nvvm-array-store-alignment283/sources/pointer281-align1-65536.ll",
+      "sha256": "379338b7a1a01f55ce5847ba6fb46f238c0d769e389edf4a2f35546062f536c2"
+    },
+    "inherited_record283": {
+      "path": "issue-nvvm-backend/research-evidence.slice-283.json",
+      "sha256": "ce58751067ae8005aec3b0d5a3cf45d89fd20fd28d3d0da84f25ddb8f6dd2d61"
+    },
+    "inherited_summary283": {
+      "path": "build/nvvm-array-store-alignment283/worker-summary.json",
+      "sha256": "75c086c950804be74765cc6a9119b2253ddbf112a6d59911ee56756d650a665a"
+    },
+    "restored_store_lines": [69, 70],
+    "origin_delta": "Capacity and count bound 3 to 65536 only.",
+    "candidate_delta": "Exactly two whole Payload store annotations align1 to align4.",
+    "authored_function_signatures": [
+      "define internal void @initialize(%Payload* %p, i32 %bits, i32 %n) noinline {",
+      "define internal i32 @check(%Payload* %p, i32 %bits, i32 %n) noinline {",
+      "define internal void @replace(%Payload* %dst, %Payload* %src, %Payload* %old, i32 %n) noinline {",
+      "define void @computeMain() {"
+    ]
+  },
+  "limits": [
+    "Compile-only: no GPU module loading, launch, correctness, assembly or performance claims.",
+    "Both original cells executed once independently; no candidate retries.",
+    "Matching timeouts establish only common gate failure, not identical causes.",
+    "Accepted279 artifacts,576inputs,22pins unchanged; inherited corpus outcomes stay inherited."
+  ],
+  "raw_summary": {
+    "path": "build/nvvm-original-array-size284/worker-summary.json",
+    "sha256": "542b9a7e7046a75619799a8405747ac5f561f0fa29f240f36f8d87e9a5747ed3"
+  },
+  "independent_review": {
+    "path": "build/nvvm-original-array-size284/independent-review.json",
+    "sha256": "d99c941d2d4c209ce03444e7d7aad562ae9a699f60187568ce7bfbc7196e81e5"
+  },
+  "review_context": "Fresh author; separate reused-context independent reviewer; root audit.",
+  "inherited_validation": {
+    "record": {
+      "path": "issue-nvvm-backend/runtime-validation.slice-279.json",
+      "sha256": "956349660b41e1225573a9e865c5eb37d5ece4ecd4012c7e68efa4da94dfb8b8"
+    },
+    "fresh": false,
+    "cells": 1740,
+    "correct": 1703,
+    "unresolved": 37,
+    "resolved_histories": 20,
+    "last_full": 279,
+    "last_targeted": 233,
+    "implementations_since_full": 0
+  },
+  "production_changes": false,
+  "notification": "Skipped per user instruction."
+}

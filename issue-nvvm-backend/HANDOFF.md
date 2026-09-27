@@ -45,11 +45,17 @@ Skip Slack; no push or system changes.
     annotations4→1, with actualroots still4aligned. Both small candidates passO0/O3, controls remainwrong.
     N17both/N65536O0 compile; N65536O3 times out120s/4GiB. Rawroot
     `build/nvvm-array-store-alignment283`; no new authored ABI, but NVVM argument promotion remains.
-12. Next: original-large baseline under identical bounds before attributing283timeout and choosing
-    production scope. No general fix/cutoff selected. Accepted279 identities and280 production defects
-    remain unchanged. This comparison is new evidence, not a retry of the failed candidate.
-13. Prefer fresh bounded delegation when available;283 used fresh author and separate reused reviewer.
-    Skip Slack, no push/system changes, continue the authorized loop.
+12. [Control284](report.slice-284-original-array-size.md) compiles the original large source under
+    the same limits: O0 succeeds; O3 also times out at 120 seconds/4 GiB. Both counts are compile-only;
+    no large GPU launch. Raw root `build/nvvm-original-array-size284`; no candidate retry. Matching
+    timeouts establish common gate failure, not identical causes or general scalability.
+13. Next: bounded provider correction after an annotation-only constructed/snapshot/phi/unaligned
+    promotion gate. Keep direct-struct splitting, canonical array values and one store per array;
+    lower alignment only for nested struct boundaries hidden inside arrays. Add actual wrapped and
+    multidimensional Slang fixtures, before evidence, provider units and full279 comparison. No size
+    cutoff/new ABI. Accepted279 remains installed, and280 production defects remain open.
+14. Prefer fresh bounded delegation;284 used fresh author and separate reused reviewer. Skip Slack,
+    no push/system changes; continue the authorized loop.
 
 [HISTORY](HISTORY.md) owns earlier PCH277, accessor/generic278 and material investigations.
 [The record contract](../docs/design/nvvm-substandard-record-contract.md) separates new279 scope from

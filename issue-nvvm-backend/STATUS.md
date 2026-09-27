@@ -70,7 +70,14 @@ whole-store alignment4→1 on actualaligned4 roots. Four candidateGPU cells pass
 retain wrong14/9234. N17both modes andN65536O0 compile; N65536O3 times out120s/4GiB. Source signatures
 stay unchanged, but downstream argument promotion remains. General size qualification is incomplete.
 
-Next: original-large comparison under identical bounds before attributing that timeout or selecting
-production scope. No compiler change or size cutoff chosen. NVRTC's production defect stays open.
+[Control284](report.slice-284-original-array-size.md) supplies that comparison: original N65536 O0
+compiles and O3 also times out under the same bounds. The size gate fails without the annotation;
+matching timeouts do not establish identical causes or general scalability. All accepted identities
+remain unchanged.
+
+Next: a bounded provider correction, gated first on constructed/snapshot/phi/unaligned values, then
+wrapped/multidimensional Slang fixtures and the full checkpoint. Keep existing direct-struct splitting;
+use conservative alignment only where nested struct boundaries remain inside array stores. No size
+cutoff or new ABI. NVRTC's production defect stays open.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
 max4CPU workers,2unit servers, serialized suites. Accepted279 local commit46e58db06.

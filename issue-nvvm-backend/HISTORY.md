@@ -136,3 +136,8 @@ ledger preserves first-known and resolved histories with their original evidence
   [evidence](research-evidence.slice-283.json), [plan](plan.slice-283-array-store-alignment.md).
   Small annotation-only changes correct both reproducers; N65536O3 times out with no original-large
   baseline, so causal scalability attribution remains open. No production change selected.
+
+- Control284: [original large array comparison](report.slice-284-original-array-size.md),
+  [evidence](research-evidence.slice-284.json), [plan](plan.slice-284-original-array-size.md).
+  Original N65536 O0 compiles; O3 also exceeds 120 seconds/4 GiB. This closes the missing control,
+  not the general size limitation. Next: gated provider correction and full checkpoint.
