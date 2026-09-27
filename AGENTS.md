@@ -55,20 +55,20 @@ outcomes current. Distill durable architecture into `docs/design/`, durable test
 relevant test manifest, and the implementation narrative into the required five-part PR
 description.
 
-For the NVVM backend slice loop, the maintainer explicitly requires completed plans and reports
-to be committed with each slice. This is an exception to the working-log rule above; generated
-binaries and raw validation logs remain under ignored `build/`.
-
 For NVVM development, read `issue-nvvm-backend/WORKFLOW.md` and
-`issue-nvvm-backend/STATUS.md` before selecting or resuming a slice. They define the agreed loop,
-current acceptance evidence, and next action. A request to prepare the loop does not start it;
-an explicit start/resume request authorizes continuing through accepted local commits until a
-recorded stopping condition requires human input. Finite maintenance or results-refresh requests do
-not restart the general loop. Future NVVM slices use compact plans/five-part reports and one
-structured outcome/comparison/provenance record; retain per-cell obligations and failure histories,
-but keep raw logs, source snapshots, repeated samples and exhaustive artifact indexes under ignored
-`build/`. Keep STATUS short and link historical evidence through `issue-nvvm-backend/HISTORY.md`.
-Use `issue-nvvm-backend/RESULTS.md` for refresh commands and `HANDOFF.md` for a fresh session.
+`issue-nvvm-backend/STATUS.md` before selecting or resuming work. A request to prepare the loop does
+not start it; an explicit start/resume request authorizes bounded reviewed local commits until a
+recorded stopping condition requires human input. Finite maintenance and results-refresh requests do
+not restart the general loop.
+
+The maintainer superseded the NVVM per-slice plan/report retention exception on 2026-09-27.
+Keep active plans and five-part report drafts uncommitted; put raw evidence under ignored `build/`.
+Update the current architecture, feature matrix, relevant tests/manifests and current accepted evidence
+in place. Retain exact comparison outcomes and unresolved/resolved failure histories, but use Git for
+superseded snapshots and completed narratives. Do not add permanent slice-numbered reports, plans,
+validation snapshots or result packages. `issue-nvvm-backend/WORKFLOW.md` defines the bounded retention
+rules and `RESULTS.md` defines validation commands. STATUS is the fresh-session entry point; historical
+recovery is documented in `issue-nvvm-backend/HISTORY.md`.
 
 ## WSL and Windows Tooling
 

@@ -1,125 +1,105 @@
 # NVVM development workflow
 
-Read [STATUS](STATUS.md), the active bounded plan, and [AGENTS](../AGENTS.md). For commands use
-[RESULTS](RESULTS.md); for a new session use [HANDOFF](HANDOFF.md). Historical plans and reports are
-indexed by [HISTORY](HISTORY.md). Manifests own inventories; compact results own outcomes and failure
-histories. Do not reconstruct decisions from chat or repeat the historical ledger here.
+Start with [STATUS](STATUS.md), the [architecture](../docs/design/nvvm-backend.md), and the
+[feature matrix](../docs/design/nvvm-backend-capability-ledger.md). Use [RESULTS](RESULTS.md) for
+commands and [AGENTS](../AGENTS.md) for compiler methodology. [HISTORY](HISTORY.md) explains archive
+recovery; current design must be understandable without reading completed slice narratives.
 
 ## Authority and ownership
 
-The development loop is **stopped after slice296**, as requested by the maintainer on 2026-09-27.
-Its independent acceptance and navigation closeout are complete in this local commit. Do not start the
-queued parser repair or any later slice without explicit user resume. The earlier 2026-09-26 resume
-authorized work through this stopping boundary only. Skip Slack under the current override; no push,
-publication, driver change or reboot is implied. Results-only requests do not restart the loop.
-Respect newer maintainer scope and stopping instructions.
+The development loop remains **stopped after slice296**, under the user's 2026-09-27 instruction.
+The subsequent documentation consolidation is finite maintenance, not a resume. Do not start the
+queued parser repair, compiler refactoring, experiments or feature work without explicit resume.
+Skip Slack notifications. No push, publication, system installation, driver change or reboot is implied.
+Results-only refreshes and documentation tasks do not restart the loop.
 
-Use one bounded fresh-context worker per slice when delegation is available. The lead owns scope,
-acceptance and commits; one writer owns the checkout at a time. Read-only review can overlap; builds,
-GPU suites and performance measurements cannot compete. If delegation is unavailable, record it and
-use separate local audits without claiming independent review. Share at most four CPU workers on
-this host; units use two servers. Bound long gates to 30 minutes and retain interrupted attempts.
+For authorized implementation work, use a fresh bounded worker and independent review when available.
+The lead owns scope, acceptance and commits; one writer owns the checkout at a time. Read-only review
+can overlap. If delegation is unavailable, record that and perform separate local audits without
+claiming independent review. Serialize builds, GPU suites and measurements; use at most four CPU
+workers, two unit-test servers and 30-minute long gates. Preserve failed and interrupted attempts.
 
-## Establish and select
+## Select and implement
 
-Inspect revision, working changes, submodule pins and actual loaded compiler/provider/cache bytes.
-Use the platform-specific `slang-build` skill and matching RelWithDebInfo tools. Record toolkit,
-device/driver, architecture, configuration and exact inputs. On host/toolchain/configuration changes,
-run the smoke gate before a full frozen/discovery/material checkpoint. Reuse matching accepted
-before-evidence; inherited results must keep their original source identity and never become fresh.
+Inspect revision, working changes, submodule pins and actual compiler/provider/module/cache bytes.
+Use the platform-specific slang-build skill. Record toolkit, device/driver, architecture, configuration
+and exact inputs. Reuse accepted evidence only with its original source and binary identity.
 
-Correctness regressions take priority. Otherwise select one demonstrable slice from evidence of
-breadth, severity, material relevance, scope and uncertainty. Aim for one material-driven slice per
-three accepted implementations; explain justified correctness/infrastructure exceptions. A diagnostic
-moving to another unsupported instruction alone does not justify a compiler change. Write a bounded
-ExecPlan first, including exact acceptance domain, fresh/inherited cells and checkpoint triggers.
+Correctness regressions take priority. Select a bounded result from application relevance, feature
+composition, severity and uncertainty; avoid selecting work merely to increase passing test counts.
+Aim for a material-driven slice per three accepted implementations, explaining correctness or
+infrastructure exceptions. A moved unsupported diagnostic alone does not justify a compiler change.
+Write an uncommitted bounded ExecPlan when AGENTS requires it; include exact acceptance obligations.
 
-Trace complex workload -> producer/IR/consumer -> existing runnable fixture. Preserve application
-shaders, inputs and independent oracles; NVRTC differential comparison is supplemental. Add boundary
-coverage and reproduce failures before changing production. Keep frozen v1 immutable; discovery has
-50–128 unique sources and excludes frozen overlap. Use documented runner extensions for unsupported
-harness contracts instead of relabeling tests. Queue independent next blockers rather than extending
-the slice indefinitely. Apply AGENTS' helper inventory and input-shape audit at the responsible layer.
+Trace workload -> producer IR -> consumer -> runnable fixture. Preserve application inputs and
+independent oracles; NVRTC differential comparison is supplemental. Reproduce failures before
+production changes. Apply the helper inventory and input-shape audit from AGENTS. Keep frozen v1
+immutable; discovery has 50–128 unique sources excluding frozen overlap. Extend a harness explicitly
+for new test contracts instead of relabeling failures. Queue unrelated blockers separately.
 
-## Accept without losing obligations
+## Acceptance and checkpoint cadence
 
-For a bounded compiler slice, require focused positive/boundary/negative tests and real GPU output
-at NVRTC O3/NVVM O0/O3; relevant units and runtime smoke; toolkit/assembly for affected ABI/emission;
-explicit neighboring frozen/discovery subsets; every registered material compile/assembly cell.
-Explain why targeted coverage bounds the change. Review exact `(id, mode)` and five fields:
-classification, return code, executed/passed/ignored counts, diagnostic and canonical shape.
-Require one result per requested cell. Show additions separately; retain unresolved and resolved
-failure history. Wrong output, crash, timeout, ignored or missing execution never becomes a pass.
+For compiler changes, require focused positive/boundary/negative coverage and real GPU outputs at
+NVRTC O3/NVVM O0/O3; relevant units and runtime smoke; toolkit/assembly for affected ABI/emission;
+explicit neighboring frozen/discovery selections; and all registered material compile/assembly cells.
+Explain why the chosen coverage bounds the change. Require one result per requested `(id, mode)` and
+compare classification, return code, execution counts, diagnostic and canonical shape. Wrong output,
+crashes, timeouts, skips and missing execution never become passes. Preserve failure histories.
 
-Run full frozen/discovery/all-material checkpoints after three implementations, before a fourth;
+Run full frozen/discovery/all-material checkpoints after three implementations and before a fourth;
 also after shared lowering/type, ABI/provider/library or corpus-runner changes, uncertain impact,
-host/toolchain/configuration transitions, and before publishing/releasing. The frozen inventory is
-`census.slice-195.tsv`, never the census runner's unfiltered discovery default. STATUS separately
-names last full, last targeted and implementations since full. Only accepted exact preservation resets
-cadence. A stop instruction takes precedence over launching an otherwise unnecessary checkpoint.
+host/toolchain/configuration changes, and before publication. Full acceptance includes the native,
+toolkit and runner gates in RESULTS. Use `census.slice-195.tsv` for frozen selection; do not substitute
+unfiltered discovery. STATUS records last full, last targeted and implementations since full.
+Documentation-only consolidation does not create fresh GPU evidence or reset this cadence.
 
-The maintained `checkpoint` command wraps runtime smoke and all three corpora. Full acceptance also
-requires units, semantic suites, toolkit and runner contracts listed in RESULTS. Exit codes alone are
-insufficient: census can exit 2 for known gaps. `compare` refuses missing, duplicate, changed or false
-passing cells. It emits `review-required` for differences; changed input hashes also require review.
-Preserve that comparison. Resolve regressions, or prove an intentional upstream transition and update
-its failure history in a separately reviewed `accepted-full` record. Never use failed/review-required
-outcomes as a new baseline to erase the loss. Old raw logs are optional for comparison; checked-in
-per-cell compact outcomes are not. A regression blocks subsequent feature work.
+`compare` rejects missing, duplicate, changed and false-passing cells. Retain review-required results;
+resolve regressions or review intentional transitions before updating the accepted baseline. A manual
+status edit or matching total is insufficient. Compare input hashes and exact native identities,
+including skips. A regression blocks subsequent feature work. Respect user stopping instructions.
 
-## Measure and report
+## Measurement
 
-Use optimized builds, fixed comparable inputs/options, warmups and repeated samples, with no competing
-work. Separate fresh-process wall time, nested Slang phases, downstream assembly, bounded shared-session
-lifetime and GPU execution. Fresh processes can share warmed filesystem/toolkit/PCH caches; retain
-cache diagnostics and effective math/toolkit options. Do not sum nested phase timers. Failed compile
-latency is not successful compile time. PTX/cubin bytes, registers, stack/spills, SASS and executable
-sections are observations with explicit entry/module scope, not kernel speed. Material runtime needs
-binding, texture/LUT/input and expected-output contracts before any runtime/performance claim.
+Use optimized, qualified builds, fixed options/inputs, warmups and repeated samples without competing
+work. Separate fresh-process wall time, nested Slang phases, downstream assembly, shared-session
+lifetime and GPU execution. Warm filesystem/toolkit/PCH caches are compatible with fresh processes;
+record cache evidence and math options. Never sum inclusive nested timers or marginal medians.
+Failed compilation latency is not successful compile time. PTX/cubin sizes, registers, stack/spills
+and SASS are scoped observations, not GPU speed. Material runtime needs explicit binding/input/output
+contracts. Preserve and restore accepted layouts around temporary profiling; no unpaired speed claims.
 
-For temporary profiling, preserve the accepted compiler/module/cache layout and qualify unchanged
-outputs before interpreting timers. Keep experimental identities separate and restore the accepted
-layout at closeout. Compute disjoint residuals and percentages per sample, not from marginal medians.
-Unpaired sessions and source-level counterfactuals do not establish compiler optimization wins.
+## Keep current information, not a second project history
 
-Future accepted slices retain a compact five-part report (normally 1–2 pages), completed bounded plan,
-one structured outcome/comparison/provenance record and relevant manifest/design deltas. Keep STATUS
-short: current accepted state, known gaps, current action, authority, and links. Raw logs, repeated
-samples, binaries, source snapshots and exhaustive indexes stay under ignored `build/`. Do not create
-hundreds of checked-in raw-artifact references or copy unchanged historical prose into each slice.
-Preserve exact per-cell outcomes and failure histories even when that data exceeds the prose budget.
+Each retained artifact has one responsibility:
 
-Format changed files, inspect the final diff and confirm validation corresponds to final bytes before
-local commit. Commit completed NVVM plans/reports under the explicit maintainer exception in AGENTS.
-At boundaries update STATUS and the plan with remaining acceptance, exact next command and stop state.
+| Artifact                  | Update rule                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| Architecture              | Current pipeline, ownership, invariants and rationale for surviving exceptions.       |
+| Feature matrix            | Supported combinations, boundaries, evidence strength and permanent test links.       |
+| STATUS                    | Authority, current identities/cadence, unresolved issues and next action; keep short. |
+| RESULTS                   | Reusable commands and measurement/acceptance protocols.                               |
+| Current accepted evidence | Exact outcomes, inventories, provenance and unresolved/resolved histories.            |
+| Tests and input manifests | Reproducible contracts and selected inputs; frozen inventories remain immutable.      |
 
-## Notify after each completed slice
+Update these artifacts in place. Plans, five-part report/PR-description drafts, per-attempt logs,
+source snapshots, repeated samples, generated presentations and exhaustive audit indexes stay
+uncommitted under ignored working paths or `build/`. Put an actual PR's five-part narrative in its
+PR description. Use a concise commit body when closing local-only work. Do not append slice summaries
+to the architecture or matrix, or create new permanent numbered plans/reports/evidence files.
 
-Current override: the user requested "Skip the Slack notifications" on 2026-09-26. Continue skipping
-completion DMs during the resumed loop unless the user changes this preference. The standing policy
-below is retained for reference and is inactive while this override applies.
+Replace the current full baseline only after accepted full validation. Preserve all current cells,
+input/runtime identities and unresolved/resolved failure history; Git retains previous accepted
+snapshots. Keep focused evidence outside that baseline in one current feature-keyed record while it
+supports a current claim or open issue. Replace superseded entries with reviewed evidence, retaining
+failure transitions; remove redundant supporting files in the same change. Do not embed full old
+baselines recursively. Unchanged evidence keeps its tested identity and never becomes fresh.
 
-The maintainer has given standing authorization to send one Slack DM after every completed NVVM
-slice, including implementation, research, maintenance and results slices. The lead sends it after
-review, the closing local commit and the STATUS/plan update, before starting another authorized slice
-or stopping. A completed research slice with no retained compiler change still gets a notification;
-an interrupted or unfinished slice must not be announced as complete. Do not request confirmation
-again for these completion DMs. This notification policy does not authorize starting the loop.
+At closeout, ask of every added durable artifact: which current contract does it own, why is an
+existing artifact insufficient, and when is it replaced? New durable categories need a concrete
+consumer and a documented retention rule. Existing slice-named inventories are retained only where
+live tools depend on their exact identity. Superseded material is recoverable through Git, not copied
+into a checked-in archive. `.gitignore` guards against accidental numbered snapshot accumulation.
 
-Recipient: Simon Kallweit (`skallweit`, `skallweit@nvidia.com`) in NVIDIA Slack, verified user ID
-`UFX629P4L`. Use an available Slack send-message tool; the current connector accepts that user ID as
-`channel_id`. If recipient lookup is needed, consult the `managing-slack` skill and resolve the email.
-Its `slack-cli` is read-only, so use the connector to send. Discover the current tool rather than
-assuming a particular tool name is installed in every session.
-
-Keep the message short: slice number/title, outcome and practical change, key validation results and
-remaining limitations, closing commit and report path/link, and whether the loop is continuing or
-stopped. Include performance numbers only when supported by accepted measurements; distinguish
-completed research from a supported feature. Local paths identify checkout artifacts, not published
-links. Send only once per completed slice; workers report to the lead instead of sending their own DMs.
-
-Retain the returned message permalink in the task closeout. If resuming around a notification boundary,
-check the prior closeout or Slack DM history before resending. On an uncertain send result, check
-history before retrying. If Slack is unavailable or delivery fails, report the undelivered notification
-in the task and handoff; do not claim delivery or undo acceptance. A notification failure alone does
-not block otherwise authorized development. Respect the recorded stop condition after notifying.
+Format changed files, inspect the final diff, verify live links/inputs and exact evidence preservation,
+and obtain independent review. Update current status and stop/resume authority, then make the
+reviewed local commit. Do not commit completed working plans or report drafts. No Slack notifications.

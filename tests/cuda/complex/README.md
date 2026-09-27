@@ -1,9 +1,9 @@
 # Complex CUDA / NVVM compile corpus
 
 These application-sized shaders are compile-and-assemble workloads. Their identities and source
-hashes live in [the complex-corpus manifest](../../../issue-nvvm-backend/complex-corpus.manifest.json).
-They are deliberately separate from the frozen and discovery **runtime** corpora: a successful
-compile does not establish correct GPU output, and no historical denominator changes here.
+hashes live in the [material manifest](../../../issue-nvvm-backend/complex-corpus.manifest.json).
+They are separate from the frozen and discovery runtime corpora. Successful compilation and assembly
+do not establish correct GPU output.
 
 ## Tiled brass material
 
@@ -13,45 +13,33 @@ NVIDIA's Apache-2.0 license header retained. Its two independent compute workloa
 - `tiled-brass-material/eval_buffer`: evaluate the BSDF and PDF for supplied directions.
 - `tiled-brass-material/sample_buffer`: sample an outgoing direction, PDF, weight, and flags.
 
-The corpus copy only normalizes CRLF to LF and adds the user-approved `__TARGET_CUDA__=1` definition
-and explanatory comment. The original attachment hash and adapted source hash are in the manifest.
-Keep this application workload intact; put reduced compiler regressions beside related focused tests.
+The corpus copy normalizes CRLF to LF and adds the approved `__TARGET_CUDA__=1` definition and
+explanatory comment. Original and adapted hashes remain in the manifest. Keep the workload intact;
+put reduced compiler regressions beside related focused tests.
 
-The initial [assessment](../../../issue-nvvm-backend/report.tiled-brass-assessment.md) finds both
-entries compile and assemble through NVRTC, while direct NVVM O0/O3 reject
-`CastUInt64ToDescriptorHandle`. This is a tracked support gap, not an expected-error language test.
+Both entries pass NVRTC O3 and NVVM O0/O3 compilation and SM80 assembly in the
+[current accepted baseline](../../../issue-nvvm-backend/accepted-baseline.json). Earlier descriptor-
+handle rejection is historical, not a current expected failure. Compiler identity and limitations
+are recorded in [STATUS](../../../issue-nvvm-backend/STATUS.md).
 
-## Reproduce
+## Reproduce and interpret
 
-From the repository root, using the configured native Linux development environment:
+Follow the environment, correctness and material measurement commands in
+[RESULTS](../../../issue-nvvm-backend/RESULTS.md). The maintained
+`issue-nvvm-backend/run-complex-corpus.py` compiles each entry separately, checks PTX entry/target
+contracts and assembles with `ptxas -v`. Its bounded shared-session protocol is distinct from the
+fresh-process material benchmark. Preserve failed attempts, input hashes and exact tool identities;
+failure latency is not successful compile time.
 
-```bash
-source build/nvvm-setup/env.sh
-python3 issue-nvvm-backend/run-complex-corpus.py \
-    --slangc build/Debug/bin/slangc --build-label Debug \
-    --provider build/Debug/bin/libslang-llvm-nvvm.so \
-    --cuda-root "$CUDA_PATH" --output build/nvvm-complex
-```
-
-The runner compiles both entries separately at SM80 through NVRTC O3 and NVVM O0/O3, checks fresh
-PTX entry/target declarations, and assembles successful outputs with `ptxas -v`. It records one
-warmup and three timed successful compilations, phase timers, exact commands, compiler/provider/
-toolkit hashes, PTX/cubin sizes, and assembler resource reports. A rejected shader stops after its
-first failed attempt; failure latency is not reported as a successful compilation metric.
-
-Exit 0 means all cells compile and assemble. Exit 1 retains incomplete shader support or per-cell
-failures in `results.json`; **the initial material assessment is expected to exit 1**. Exit 2 reports
-invalid inputs or missing prerequisites. Successful compiler/assembler output is not GPU execution.
-The source SHA check requires an intentional manifest update when a workload changes.
-
-Use an optimized compiler build and controlled repeated measurements before comparing compilation
-speed. PTX size, register counts, stack usage and spills are useful observations, but executable
-correctness and timed kernels on representative inputs are required to judge generated code quality.
+Exit0 requires all selected cells to compile and assemble. Exit1 preserves incomplete support or
+per-cell failures; exit2 reports invalid inputs or prerequisites. Output inspection and hash checks
+remain necessary. PTX/cubin size, registers, stack and spills are scoped observations, not GPU-speed
+or numerical-correctness evidence.
 
 ## Runtime contract still needed
 
-Both entries require a generated material data record and input/output buffers. The selected material
-also uses bindless texture handles and lookup-table buffers in `lut_globals`. Establish the host
-mapping for the packed texture indices and CUDA texture objects, real or explicitly scoped texture/LUT
-fixtures, direction/UV/seed cases, and expected BSDF/PDF/sample behavior before claiming runtime
-coverage. Neither zero dispatches nor missing/default resources can stand in for this contract.
+Both entries require a generated material data record and input/output buffers. The material also
+uses bindless texture handles and lookup-table buffers in `lut_globals`. Establish the mapping for
+packed texture indices and CUDA texture objects, scoped texture/LUT fixtures, direction/UV/seed
+cases, and expected BSDF/PDF/sample behavior before claiming runtime coverage. Zero dispatches and
+missing/default resources cannot stand in for that contract.

@@ -30,7 +30,7 @@ in the repository. Commands default to SM80 and matching CUDA12.9 on this host.
 
 ```bash
 export NVVM_RESULTS=build/nvvm-results/2026-09-28-refresh1
-export NVVM_BASELINE=issue-nvvm-backend/runtime-validation.slice-293.json
+export NVVM_BASELINE=issue-nvvm-backend/accepted-baseline.json
 export CUDA_PATH=/usr/local/cuda-12.9
 export CUDA_HOME="$CUDA_PATH"
 export LIBNVVM_HOME="$CUDA_PATH"
@@ -94,9 +94,9 @@ and all three correct modes. Comparisons retain unresolved/resolved histories. I
 legitimately change upstream: checkpoint writes each old/new hash delta and stops at `review-required`.
 Do not overwrite old evidence or feed the rejected outcomes back as an accepted baseline.
 
-After all gates and exact deltas are reviewed, create one compact checked-in accepted record from
+After all gates and exact deltas are reviewed, replace `accepted-baseline.json` with the complete current record from
 `outcomes.json`, set `status: accepted-full`, attach gate evidence, reviewed input/outcome transitions,
-and update the failure histories. Preserve the original comparison and baseline reference. A manual
+and update the failure histories. Keep the original comparison under the ignored results root and identify the previous baseline by Git revision, path and hash. A manual
 status edit without that review is not acceptance. The compact schema produced by checkpoint already supplies all required fields:
 
 ```json
@@ -126,15 +126,17 @@ status edit without that review is not acceptance. The compact schema produced b
 The sample shows field structure only; preserve actual complete rows and histories. Copy the complete
 checkpoint outcomes, add reviewed gate/transition evidence, and change status only after acceptance.
 The harness deliberately has no automatic promotion command: a matching count is not a review.
+Update the current record in place; Git retains the old accepted snapshot. Do not add another
+slice-numbered validation file. Retain exact cells and failure transitions, not nested old baselines.
 If a run has an infrastructure failure, retain the failed comparison. A supplemental closure needs
 an explicit, predeclared scope and review: preserve every failed attempt, require all declared rounds
 to pass, identify each substituted cell and its source evidence, and distinguish original counts from
-composite accepted counts. Serial closure never proves concurrent reliability. Accepted262 demonstrates
-this for one NVRTC automatic-PCH deletion incident; its open reliability limitation must remain visible
-until separately resolved. Do not use retries to hide shader-output regressions or failed timing samples.
+composite accepted counts. Serial closure never proves concurrent reliability. Historical NVRTC PCH incidents and their later
+per-owner-directory resolution remain in the accepted evidence; do not reintroduce an already resolved
+limitation as current. Do not use retries to hide shader-output regressions or failed timing samples.
 
-Set `NVVM_BASELINE` to this newly reviewed file before quality measurement (the setup example uses
-the accepted293 record; recheck STATUS in later sessions). It must retain `runtime_input_sha256`,
+Use the newly reviewed current `NVVM_BASELINE` before quality measurement (currently inherited293;
+recheck STATUS). It must retain `runtime_input_sha256`,
 `provenance.artifact_sha256`, and per-corpus `fresh_cell_outcomes` for the next refresh.
 
 ## Report environment
@@ -159,7 +161,7 @@ build/nvvm-results-tools/bin/python issue-nvvm-backend/nvvm-results.py report \
   --measurements "$NVVM_RESULTS/material/measurements.json" --output "$NVVM_RESULTS/material-report"
 ```
 
-The fixed slice257 protocol runs six cells (two entries x NVRTC O3/NVVM O0/O3), two rounds in opposite
+The fixed material protocol runs six cells (two entries x NVRTC O3/NVVM O0/O3), two rounds in opposite
 cell order, each with two warmups and nine measured fresh processes:132 compiles (108 measured,
 24 warmup). Assembly is a separate eleven attempts per cell:66 assemblies (54 measured,12 warmup).
 Every PTX/cubin hash must agree within its cell. No sample removal, automatic retries or cherry-picking.
@@ -221,9 +223,7 @@ cover the whole module. Cubin bytes include metadata; PTX bytes include formatti
 Quality command latencies are single observations, not a repeated speed benchmark. None of these
 metrics proves GPU speed, occupancy, numerical equivalence or a particular optimization's presence.
 
-## Package and stop
-
-### Optional compiler-stage attribution
+## Reporting and optional compiler-stage attribution
 
 For a qualified instrumented material run, use the same reporter with an explicit option:
 
@@ -240,54 +240,17 @@ and inclusive IQRs; warmups are excluded and both rounds retained. Do not stack 
 medians. NVRTC exposes no separate verification call; its zero in that category is not proof of no
 internal verification. The opaque vendor compile API is not pure optimization time.
 
-[The attribution experiment](experiments/material-attribution/README.md) preserves the temporary
-profiler patch and its scope definitions. Revalidate boundaries after compiler changes, preserve the
-accepted binary/module/cache layout, and prove output preservation before interpreting new profiling
-results. Discarded measurement-only changes do not create a new full correctness baseline. Restore
-the accepted layout exactly and preserve the experimental build separately at closeout.
+Temporary attribution requires independently checked scope boundaries. Historical profiler patches
+and packages are available through [HISTORY](HISTORY.md); they are not part of the current compiler.
+Revalidate boundaries after source changes, preserve the accepted binary/module/cache layout, and
+prove output preservation before interpreting timings. Restore the accepted layout at closeout.
+Discarded instrumentation does not create a new full correctness baseline.
 
-The [explanatory265 package](results/2026-09-26-attribution/README.md) is an example that explicitly
-inherits baseline263 quality/timing while adding qualified264 research. A later compiler optimization
-must use new accepted correctness and paired before/after measurements; unrelated timing sessions
-cannot establish its effect. Label source-level counterfactual probes separately from compiler wins.
-Copy the four stage artifacts into a new package, retaining generated JSON/Markdown/PNG bytes and
-using the SVG whitespace normalization below. Preserve original packages and raw records.
-
-`report` generates a readable `summary.md`, structured `summary.json`, and standalone SVG/PNG figures (`wall-time` for repeated material timing, `entry-registers` for quality)
-from validated complete measurements. Copy compact summaries/charts and link the reviewed correctness
-ledger from the presentation/results package; keep all raw logs/samples under ignored build. Add
-links to exact source revision, manifests, binaries/toolkit/device, protocol, unresolved cells,
-cache/math settings and limitations. A future refresh follows the same commands with a new output
-root; avoid a new slice-specific benchmark script. Update STATUS with the package path and explicit
-stopped-loop authority. The finite maintenance request ends here.
-
-Use a new package directory for each accepted refresh. For the existing package layout:
-
-```bash
-export NVVM_PACKAGE=issue-nvvm-backend/results/2026-09-28-refresh1
-mkdir -p "$NVVM_PACKAGE/material" "$NVVM_PACKAGE/quality"
-cp "$NVVM_RESULTS/material-report/summary.md" "$NVVM_RESULTS/material-report/summary.json" \
-  "$NVVM_RESULTS/material-report/wall-time.svg" "$NVVM_RESULTS/material-report/wall-time.png" \
-  "$NVVM_PACKAGE/material/"
-cp "$NVVM_RESULTS/quality-report/summary.md" "$NVVM_RESULTS/quality-report/summary.json" \
-  "$NVVM_RESULTS/quality-report/entry-registers.svg" "$NVVM_RESULTS/quality-report/entry-registers.png" \
-  "$NVVM_PACKAGE/quality/"
-# Matplotlib SVG path lines can contain trailing spaces; retain all XML tokens.
-python3 - "$NVVM_PACKAGE" <<'PY_SVG'
-import sys
-from pathlib import Path
-for path in Path(sys.argv[1]).rglob("*.svg"):
-    path.write_text("\n".join(line.rstrip() for line in path.read_text().splitlines()) + "\n")
-PY_SVG
-```
-
-Copy the narrative/presentation structure from the latest package named in STATUS, then replace every
-result from the new summary rows. Keep generated summaries/PNGs unchanged; SVG trailing-whitespace normalization above preserves all XML tokens. Derive each material
-ratio as NVRTC O3 median divided by the matching NVVM O3 median, and report both entries. Compare
-quality metrics only for the same fixture and mode; record entry versus whole-module scope. Inspect
-the rendered charts. Update correctness, exact source/binary identities, sample inventory, protocol,
-limitations and raw-root references. Local raw paths in JSON identify evidence on this host; they are
-not portable download links. The summaries, hashes and accepted per-cell ledger remain durable.
+`report` produces readable/structured summaries and SVG/PNG figures under the new ignored output
+root. Inspect generated charts and retain every sample there. Publish or export a presentation only
+when requested; do not commit a new dated result package for every refresh. If a performance result
+supports a current architectural decision, retain its compact reviewed metrics, provenance and limits
+in the current evidence and matrix. Replace superseded summaries; Git owns earlier snapshots.
 
 If a future source change invalidates the fixed quality manifest's hashes, review that fixture's
 semantics and runtime obligations first. Update the manifest only as part of an accepted change,
@@ -296,6 +259,31 @@ measurement pass. If the selected subset or options change, describe it as a cha
 
 A results-only refresh of unchanged source can use the existing accepted-full ledger after verifying
 its compiler/provider/input identities. A compiler, toolkit, shared runner or configuration change
-requires the correctness gates prescribed by WORKFLOW before new presentation claims. Preserve old
-packages and all failed attempts. Commit the compact completed plan/report and package, update STATUS
-and HANDOFF navigation, and stop unless further work has been explicitly authorized.
+requires the correctness gates prescribed by WORKFLOW before new claims. Preserve failed attempts
+under the ignored results root. Update the current baseline/identity/focused evidence as applicable,
+STATUS and feature matrix; keep completed working plans/report drafts uncommitted. Make the reviewed
+local commit and stop unless further work was explicitly authorized.
+
+## Documentation and evidence maintenance
+
+[accepted-baseline.json](accepted-baseline.json) owns full comparison outcomes and native identities.
+[accepted-identity.json](accepted-identity.json) preserves the current verified runtime/layout/config
+snapshot and dependency pins. [focused-evidence.json](focused-evidence.json) owns selected later
+qualifications and open failures outside the full corpus; it does not change full-checkpoint cadence.
+Their historical provenance/loop fields never override STATUS/WORKFLOW authority.
+
+The accepted baseline was renamed without changing its bytes. Older repository paths inside it are
+archival citations resolvable through HISTORY; `compare` reads the embedded rows without opening
+those references. Local `build/` evidence may be absent in a fresh checkout. Current runner inputs
+must exist independently of both raw evidence and Git archives.
+
+Retain `census.slice-195.tsv`, `census.slice-146.tsv` and `census.slice-146-clusters.json`: their old
+names identify live frozen selection/overlap/summary inputs, not disposable reports. Preserve their
+bytes unless a separately reviewed inventory change explicitly authorizes otherwise. Discovery,
+material and quality manifests remain current input authorities.
+
+For summary utilities, set output paths under `build/` explicitly (in particular the discovery
+summarizer's `--table` and `--clusters` options); legacy defaults can generate numbered files in the
+issue directory. Ignore guards prevent accidental snapshot commits. Keep source/tool behavior changes
+separate from documentation cleanup. A documentation-only migration needs exact data/input checks,
+link/reference checks and relevant CPU contracts; it does not require a fresh GPU checkpoint.

@@ -168,3 +168,10 @@ replay-capture
 
 # Scaler autoscaler build output (built from source; see extras/scaler/README.md)
 /extras/scaler/scaler-linux
+
+# NVVM working narratives and historical snapshots belong in build/ or Git history.
+# Existing tracked frozen inventories retain their original names and bytes.
+/issue-nvvm-backend/plan.*.md
+/issue-nvvm-backend/report.*.md
+/issue-nvvm-backend/*slice-*
+/issue-nvvm-backend/results/
