@@ -178,3 +178,9 @@ ledger preserves first-known and resolved histories with their original evidence
   One colon activates the final CHECK. Identical corrupted shaders pass the old oracle and fail the
   repaired one; normal CPU and three CUDA cells pass. All285 identities and main inputs unchanged.
   Broader289 results retain original hashes. Next qualifies runtime-loaded error paths separately.
+
+- Qualification291: [runtime-loaded errors](report.slice-291-runtime-errors.md),
+  [evidence](research-evidence.slice-291.json), [plan](plan.slice-291-runtime-errors.md).
+  Nine GPU cells/48words and three IR captures pass. V2 generic/aggregate paths consume live results;
+  witness v3 adds catch256 to make its tag observable after v2’s legal payload-only simplification.
+  Original versions remain intact; no compiler/main-corpus change. Next promotes the final two probes.

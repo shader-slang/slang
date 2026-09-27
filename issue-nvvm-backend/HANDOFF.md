@@ -44,7 +44,10 @@ Skip Slack; no push or system changes.
     sources18cells/54words. Literal inputs may fold branches; witness/parameterized cases exercise
     success only. [Repair290](report.slice-290-catchall-oracle.md) adds the missing CHECK colon: identical corrupt
     output9 passes the old oracle and fails the fixed one; four normal CPU/CUDA positives preserve7.
-    The test is outside the main corpus. Next qualifies bounded runtime-loaded error inputs.
+    The test is outside the main corpus. [Qualification291](report.slice-291-runtime-errors.md)
+    passes nine GPU cells/48words plus three IR compiles. Witness v2 did not observe its tag; v3
+    catch+256 preserves final PTX tag-dependent selection. Generic/aggregate v2 stays qualified.
+    Next promotes the final two runtime-input probes into native regressions; no compiler fix needed.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.
