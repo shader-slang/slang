@@ -318,8 +318,68 @@ candidates, not an exhaustive account of allowed compiler arithmetic. Preserve u
 The oracle/inputs/tolerance are written before launch. `prepared` is compile/assembly only;
 `passed` additionally includes execution and comparison. This is correctness evidence, not a timing
 command. Original assets, live LUT reads, arbitrary graphs/inputs, sampling-distribution accuracy
-and GPU performance remain unqualified. Update the entry's existing focused feature after independent
-review, retaining failures. Keep raw outputs, snapshots and audit logs under ignored build paths.
+and application performance remain unqualified. Update the entry's existing focused feature after
+independent review, retaining failures. Keep raw outputs, snapshots and audit logs under ignored build paths.
+
+## Material device-event measurement
+
+Use fresh successful eval and sample runtime reports from the preceding protocol. Their artifact
+hashes must still match the current driver, validator, manifest, compiler and shader bytes. The
+measurement runner compiles nothing; it reuses the qualified cubins and shared helper. Run with the
+same CUDA environment and no competing builds or GPU work. Every output directory must be new.
+
+```bash
+python3 issue-nvvm-backend/test-nvvm-material-measurement.py
+python3 extras/measure-nvvm-material-runtime.py prepare \
+  --helper "$NVVM_RESULTS/material-eval_buffer-execution/material-driver" \
+  --eval-reference "$NVVM_RESULTS/material-eval_buffer-execution/results.json" \
+  --sample-reference "$NVVM_RESULTS/material-sample_buffer-execution/results.json" \
+  --output "$NVVM_RESULTS/material-device-protocol" --timeout 120
+```
+
+Review the pinned protocol, helper and already reviewed PTX before launching. The fixed protocol
+uses unchanged 65-record tiles at 65,537 and 1,048,577 active records, 64 threads per block and 63
+guards. Six small helper-regression cells must pass before twelve enlarged qualification cells.
+The independent oracle checks the first tile; every remaining active byte must repeat its verified
+record. Sample candidate selection remains global, and all rejection records must be exactly zero.
+
+```bash
+python3 extras/measure-nvvm-material-runtime.py qualify \
+  --protocol "$NVVM_RESULTS/material-device-protocol/results.json" \
+  --output "$NVVM_RESULTS/material-device-qualified" --timeout 120
+```
+
+Independently review all eighteen qualification outcomes, raw outputs and their bindings before
+measurement. Each full reference is bound to entry/count/backend/cubin/input/oracle/layout. The
+measurement stage rechecks those bindings and independently requalifies the reference bytes.
+
+```bash
+python3 extras/measure-nvvm-material-runtime.py measure \
+  --protocol "$NVVM_RESULTS/material-device-protocol/results.json" \
+  --qualification "$NVVM_RESULTS/material-device-qualified/results.json" \
+  --output "$NVVM_RESULTS/material-device-measured" --timeout 120
+```
+
+Each of 24 cells (two entries × two counts × three modes × two rounds) retains three warmups and
+nine measured launches. Round two reverses the complete cell order. Reset all active/guard bytes and
+synchronize before each launch; after the stop event, download and compare every byte against the
+qualified reference. Retain mismatch buffers, logs, every timing and every failure. Identical
+per-launch buffers need not be duplicated when the complete comparison evidence is retained.
+
+Report `device_ms` separately from `host_submit_ns`, `host_until_stop_ns` and fresh-process wall time.
+CUDA12.9 `cuEventElapsedTime_v2` measures one launch's event interval, which can include submission
+gaps. It excludes compilation, allocation, reset, readback and comparison. Require complete passing
+launch/output/cleanup evidence; observed competing processes suppress accepted summaries. Before
+and after process snapshots cannot exclude transient contention. Record changing clocks and device
+state without controlling them.
+
+Keep median, inclusive quartiles, range and round-specific ratios. The fixed 0.1 ms interpretation
+threshold suppresses records/second when any measured interval is shorter. This is a conservative
+protocol rule, not a CUDA accuracy guarantee. Keep noisy samples and order effects. Sampling includes
+1,008 / 16,131 rejection records at the two counts (64,529 / 1,032,446 non-rejected records).
+Tiny 2×2 textures, periodic coherent inputs and correctness transfers between launches are central
+limitations; this does not measure continuous rendering or application frame performance. Static
+stack/register differences may motivate follow-up investigation but do not establish causality.
 
 ## Documentation and evidence maintenance
 

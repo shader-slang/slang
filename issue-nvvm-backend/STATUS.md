@@ -2,8 +2,9 @@
 
 The maintainer authorized continued work on 2026-09-27. Address planning is accepted; the
 transforming local-storage pass is deferred after independent feasibility review. The tiled-brass
-synthetic-texture eval and sample contracts now pass real three-mode GPU validation. Continue the normal
-development loop with a bounded workload-driven task after independent acceptance. This supersedes the
+synthetic-texture eval/sample contracts and bounded device-event measurements pass three-mode GPU
+validation. Continue the normal development loop with a bounded workload-driven task after independent
+acceptance. This supersedes the
 earlier stop-after-slice instruction. Commit reviewed tasks separately; regressions or decisions
 needing maintainer input stop continuation. Skip Slack; no push or system changes.
 
@@ -42,7 +43,7 @@ Host qualification: native Ubuntu24.04, L4 SM89/driver580.126.09, targetSM80,
 CUDA12.9.2/NVRTC12.9.86 and LLVM14. Installed layout: `build/RelWithDebInfo`.
 Version metadata and matching standard modules were rebuilt before validation. Raw acceptance
 artifacts are under ignored `build/nvvm-address-refactor/`; current machine records retain compact
-outcomes, identities and failure history. No performance improvement is claimed.
+outcomes, identities and failure history. No performance improvement from that refactor is claimed.
 
 ## Current boundaries and next action
 
@@ -61,8 +62,8 @@ outcomes, identities and failure history. No performance improvement is claimed.
   Each cell checks 65 records and 63 untouched guards; eval checks 260 components, sample checks
   455 floats and 65 flags. Sample O0 matches the contraction candidate; NVRTC/O3 match the separate
   candidate, each consistently across its whole run. Matched sample error uses at most 0.67% of the
-  frozen budget. Twenty-nine harness CPU contracts pass. Full compiler evidence above remains
-  inherited and unchanged; isolated harness work does not reset checkpoint cadence.
+  frozen budget. Twenty-nine runtime and thirteen measurement CPU contracts pass. Full compiler
+  evidence above remains inherited and unchanged; isolated harness work does not reset checkpoint cadence.
 - Three column-major host-packing mismatches and 34 infrastructure/preflight gaps remain in the
   main corpus. Exact rows and resolved histories are preserved.
 - Three focused NVRTC nested-array controls still return wrong37 outside the main corpus. Both
@@ -72,10 +73,17 @@ outcomes, identities and failure history. No performance improvement is claimed.
   not emitted CUDA/provider layout proof.
 - The parser now distinguishes NVRTC compiler identity from source paths, including the actual
   `error :` spelling. The preserved corruption log is a runtime mismatch, never a passing shader.
-- The registered material source is unchanged. Both entries have bounded synthetic-texture runtime
-  contracts. Original assets, live LUT reads, arbitrary inputs and performance remain open. Next
-  assess a controlled GPU measurement of the qualified workload before broadening compiler roles;
-  first establish a useful workload size and preserve the independent correctness obligations.
+- Synthetic device-event qualification passes 6 fresh default regressions, 18 small/enlarged cells
+  and 24 timing cells (216 samples, 72 warmups). All outputs are checked after every launch. At
+  N=1,048,577, eval medians are 2.826–2.831 ms NVRTC O3 versus 0.314–0.315 ms NVVM O3;
+  sample medians are 2.476–2.478 ms versus 0.392 ms. Reversed-round ratios are 8.98–8.99 and
+  6.31–6.32. Small NVVM O3 intervals fail the predeclared 0.1 ms throughput gate and remain
+  timing observations. Both complete prototype and maintained runs are retained in focused evidence.
+- The registered material source is unchanged. These timings cover hot 2×2 textures and repeated
+  verified inputs with correctness transfers between launches. Original assets, live LUTs, arbitrary
+  inputs and application performance remain open. Next investigate the generated code behind the
+  measured difference before proposing a compiler change; stack/register counts alone do not prove
+  its cause. Keep the lowering-pass boundary unchanged unless a workload justifies moving it.
 
 Future authorized work updates current documents and evidence in place. Keep working plans,
 report drafts and raw artifacts uncommitted; do not restart numbered slice history.

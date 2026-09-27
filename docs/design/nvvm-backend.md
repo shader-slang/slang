@@ -346,6 +346,24 @@ budget; components cannot choose candidates independently. This finite qualifica
 a unique generated instruction sequence or cover every legal optimization. Exact flags and an
 early-rejection zero record complement the numerical checks. The shared driver preserves eval's
 original inputs, oracle and tolerance. Original assets, live LUT reads, arbitrary graph/input
-composition, sampling-distribution accuracy and performance remain separate qualifications. See
-[the validator](../../extras/validate-nvvm-material-runtime.py) and
+composition, sampling-distribution accuracy and application performance remain separate qualifications.
+See [the validator](../../extras/validate-nvvm-material-runtime.py) and
 [commands](../../issue-nvvm-backend/RESULTS.md#material-runtime-correctness).
+
+The synthetic device-event runner reuses that driver and oracle at 65,537 and 1,048,577 records.
+Each input is the original record at `index % 65`; the shader uses dispatch identity only for bounds
+and indexing, so every output must repeat its independently verified tile exactly. Six small and
+twelve enlarged correctness cells precede timing. A full qualified reference is bound to entry,
+count, backend, cubin, input and oracle hashes; measurement rechecks those bindings and correctness.
+Every warmup and measured launch resets active output and guards, then checks all downloaded bytes
+against that reference. Failed launches, cleanup, comparisons or observed competing processes cannot
+produce accepted timing summaries.
+
+CUDA events bracket one kernel on the same stream. Compilation, allocation, reset and readback are
+excluded; host submission gaps can still contribute to the interval. Three warmups and nine samples
+per cell run in two rounds with reversed complete order. All samples remain available; intervals
+below the predeclared 0.1 ms threshold have no throughput summary. Tiny hot textures, periodic inputs,
+known sample rejections and correctness transfers between launches limit the result to this
+synthetic protocol. Clock observations are recorded without changing device configuration. See the
+[measurement runner](../../extras/measure-nvvm-material-runtime.py) and
+[protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement).

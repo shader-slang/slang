@@ -2168,6 +2168,1156 @@
           "all_six_raw_outputs_identical_to_prior_qualified_contracts": true
         }
       }
+    },
+    "tiled-brass-synthetic-device-events": {
+      "status": "accepted",
+      "contract": "tiled-brass-periodic-device-events-v1",
+      "meaning": "Synthetic device-event comparison of unchanged qualified periodic inputs; independent correctness precedes every accepted timing contract.",
+      "baseline": {
+        "path": "issue-nvvm-backend/accepted-baseline.json",
+        "sha256": "62c997a14b25874f72f52d6366e7211877df0354c42b9b653c645df46621351b",
+        "refresh": "inherited unchanged; no compiler rebuild or full checkpoint"
+      },
+      "identity": {
+        "path": "issue-nvvm-backend/accepted-identity.json",
+        "sha256": "4ce3f71e06f582b82cba621c0136998540acc0b59a56d17d4b6565f61462163e",
+        "verification": {
+          "path": "build/nvvm-material-measurement/identity-verification.json",
+          "sha256": "2411debb8ae4c1b4ca7e58d2ef20bda62368efd854295b3752090e49ee23f35c"
+        }
+      },
+      "sources": {
+        "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c",
+        "extras/measure-nvvm-material-runtime.py": "3dd96d6ed7b5df981374d70c2bf63b375decd432d9d9544a6b5ef4f63f83c1ac",
+        "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
+        "issue-nvvm-backend/test-nvvm-material-measurement.py": "820c6afb3705f5518d8c9e4a846a92187b803b01e14356595ff54d0c38a44019",
+        "tests/cuda/complex/tiled_brass_material.slang": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+        "issue-nvvm-backend/complex-corpus.manifest.json": "b6867b9576c5c81171c36412001f14ab89e29bbb7f800ffb1f3bca45c5f6b724"
+      },
+      "compiler_identity": {
+        "revision": "2f33cbe5538c02482f19ee6c95fafba6f639b0b8",
+        "patch_sha256": "9025401d0c3bf9e0b1644d728f0ac60d9dd5929b3fd48104f61044d6419b6b56",
+        "compiler_version": "2026.18.3-315-g2f33cbe55",
+        "provider_abi": 42
+      },
+      "protocol": {
+        "counts": [65537, 1048577],
+        "block_size": 64,
+        "guard_records": 63,
+        "input": "accepted 65-record tile at index % 65",
+        "warmups": 3,
+        "samples": 9,
+        "rounds": 2,
+        "order": "complete cell order reversed in second round",
+        "timeout_seconds": 120,
+        "minimum_interval_ms_for_throughput": 0.1,
+        "absolute_tolerance": 1e-5,
+        "relative_tolerance": 0.0002,
+        "output": "every active and guard byte checked after each reset/launch",
+        "sample_rejection_records": {
+          "65537": 1008,
+          "1048577": 16131
+        },
+        "sample_non_rejected_records": {
+          "65537": 64529,
+          "1048577": 1032446
+        }
+      },
+      "qualification": {
+        "cpu_contracts": {
+          "runtime": 29,
+          "measurement": 13
+        },
+        "default_regression_cells": 6,
+        "default_outputs_exact_prior_accepted": true,
+        "small_and_large_cells": 18,
+        "active_records": 6685074,
+        "guard_records": 1134,
+        "compared_bytes": 160468992
+      },
+      "runtime": {
+        "header_version": 12090,
+        "driver_api_version": 13000,
+        "device": "NVIDIA L4",
+        "sm": 89,
+        "multiprocessors": 58,
+        "l2_bytes": 50331648,
+        "launches": 1
+      },
+      "qualification_cells": [
+        {
+          "id": "small-eval_buffer-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 65,
+          "mode": "nvrtc-o3",
+          "status": "passed",
+          "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+          "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 2048,
+          "rejection_records": 0
+        },
+        {
+          "id": "small-eval_buffer-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 65,
+          "mode": "nvvm-o0",
+          "status": "passed",
+          "cubin_sha256": "799cb7c81b1dbc8c48a97a30a3e3a88bb6a0bb8fa0b60fb743ce56cb8ef06e22",
+          "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "f51f35a9b425c13a20a4b597745bd42e9ef83d416fbe16da5e3a2e65ca9526d2",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 2048,
+          "rejection_records": 0
+        },
+        {
+          "id": "small-eval_buffer-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 65,
+          "mode": "nvvm-o3",
+          "status": "passed",
+          "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+          "input_sha256": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 2048,
+          "rejection_records": 0
+        },
+        {
+          "id": "small-sample_buffer-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 65,
+          "mode": "nvrtc-o3",
+          "status": "passed",
+          "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+          "input_sha256": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 4096,
+          "rejection_records": 1,
+          "matching_global_models": ["float"]
+        },
+        {
+          "id": "small-sample_buffer-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 65,
+          "mode": "nvvm-o0",
+          "status": "passed",
+          "cubin_sha256": "b3601935ed3fd82bbd5cbef9514a44bf4fb477f0e76c531911d94c6cd652d7d1",
+          "input_sha256": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "59b02ed2c75a0578257e63b40dbb640a2f01f10e77583f7ac7d52a481bd8f1f4",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 4096,
+          "rejection_records": 1,
+          "matching_global_models": ["fma"]
+        },
+        {
+          "id": "small-sample_buffer-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 65,
+          "mode": "nvvm-o3",
+          "status": "passed",
+          "cubin_sha256": "1e36bb481f4d4f11204fb9741c4a73df070b79dfe86555d2143417940498b9f8",
+          "input_sha256": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 4096,
+          "rejection_records": 1,
+          "matching_global_models": ["float"]
+        },
+        {
+          "id": "eval_buffer-65537-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvrtc-o3",
+          "status": "passed",
+          "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+          "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 1049600,
+          "rejection_records": 0
+        },
+        {
+          "id": "eval_buffer-65537-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvvm-o0",
+          "status": "passed",
+          "cubin_sha256": "799cb7c81b1dbc8c48a97a30a3e3a88bb6a0bb8fa0b60fb743ce56cb8ef06e22",
+          "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "1f7817058cf15140b655d47923b769ca50f6e859668859d631efee4e33243b1c",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 1049600,
+          "rejection_records": 0
+        },
+        {
+          "id": "eval_buffer-65537-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvvm-o3",
+          "status": "passed",
+          "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+          "input_sha256": "6069c2066863876c877e20cf149ed95a06ef4480ba935ba3b1f68a1874f90e19",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 1049600,
+          "rejection_records": 0
+        },
+        {
+          "id": "eval_buffer-1048577-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvrtc-o3",
+          "status": "passed",
+          "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+          "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 16778240,
+          "rejection_records": 0
+        },
+        {
+          "id": "eval_buffer-1048577-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o0",
+          "status": "passed",
+          "cubin_sha256": "799cb7c81b1dbc8c48a97a30a3e3a88bb6a0bb8fa0b60fb743ce56cb8ef06e22",
+          "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "d6acc16a0fa47060b5aeedc261468bfde72626c525546006de3af980a878eeb7",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 16778240,
+          "rejection_records": 0
+        },
+        {
+          "id": "eval_buffer-1048577-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o3",
+          "status": "passed",
+          "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+          "input_sha256": "91f3c78a94704796f195751252d5105fec321f47c86216d14dc6bbef810ed4aa",
+          "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+          "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 16778240,
+          "rejection_records": 0
+        },
+        {
+          "id": "sample_buffer-65537-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvrtc-o3",
+          "status": "passed",
+          "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+          "input_sha256": "0bedebf1c6cf9221398a07239583692d8585ea12863cfb43e25377d9a4aa69ec",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 2099200,
+          "rejection_records": 1008,
+          "matching_global_models": ["float"]
+        },
+        {
+          "id": "sample_buffer-65537-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvvm-o0",
+          "status": "passed",
+          "cubin_sha256": "b3601935ed3fd82bbd5cbef9514a44bf4fb477f0e76c531911d94c6cd652d7d1",
+          "input_sha256": "0bedebf1c6cf9221398a07239583692d8585ea12863cfb43e25377d9a4aa69ec",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "1d1d50460d7e7e1298ea77f668d7d77976bc7b50402762ac0e0d5b1fc6898e96",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 2099200,
+          "rejection_records": 1008,
+          "matching_global_models": ["fma"]
+        },
+        {
+          "id": "sample_buffer-65537-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvvm-o3",
+          "status": "passed",
+          "cubin_sha256": "1e36bb481f4d4f11204fb9741c4a73df070b79dfe86555d2143417940498b9f8",
+          "input_sha256": "0bedebf1c6cf9221398a07239583692d8585ea12863cfb43e25377d9a4aa69ec",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 2099200,
+          "rejection_records": 1008,
+          "matching_global_models": ["float"]
+        },
+        {
+          "id": "sample_buffer-1048577-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvrtc-o3",
+          "status": "passed",
+          "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+          "input_sha256": "8ffa8e4c017e53705c5115fe6ef8014c713ab94e50c2fa0630ea31d9ee73f903",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 33556480,
+          "rejection_records": 16131,
+          "matching_global_models": ["float"]
+        },
+        {
+          "id": "sample_buffer-1048577-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o0",
+          "status": "passed",
+          "cubin_sha256": "b3601935ed3fd82bbd5cbef9514a44bf4fb477f0e76c531911d94c6cd652d7d1",
+          "input_sha256": "8ffa8e4c017e53705c5115fe6ef8014c713ab94e50c2fa0630ea31d9ee73f903",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "137f98166596faf5bd3cdf946ab559e6e57d11fe9492e87d0656ee7537d42f62",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 33556480,
+          "rejection_records": 16131,
+          "matching_global_models": ["fma"]
+        },
+        {
+          "id": "sample_buffer-1048577-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o3",
+          "status": "passed",
+          "cubin_sha256": "1e36bb481f4d4f11204fb9741c4a73df070b79dfe86555d2143417940498b9f8",
+          "input_sha256": "8ffa8e4c017e53705c5115fe6ef8014c713ab94e50c2fa0630ea31d9ee73f903",
+          "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "all_active_bytes_periodic": true,
+          "guards_unchanged": true,
+          "compared_bytes": 33556480,
+          "rejection_records": 16131,
+          "matching_global_models": ["float"]
+        }
+      ],
+      "measurement_cells": [
+        {
+          "id": "round0-eval_buffer-65537-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvrtc-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.158720002,
+              "q1": 0.156864002,
+              "q3": 0.158720002,
+              "iqr": 0.0018559999999999965,
+              "minimum": 0.153600007,
+              "maximum": 0.160768002
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 412909521.0066845
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 12595200,
+          "host_submit_median_ns": 3789,
+          "host_until_stop_median_ns": 165725
+        },
+        {
+          "id": "round0-eval_buffer-65537-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvvm-o0",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "1f7817058cf15140b655d47923b769ca50f6e859668859d631efee4e33243b1c",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 1.02377605,
+              "q1": 1.02092803,
+              "q3": 1.02400005,
+              "iqr": 0.003072019999999842,
+              "minimum": 1.017856,
+              "maximum": 1.02707195
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 64014976.712924674
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 12595200,
+          "host_submit_median_ns": 3830,
+          "host_until_stop_median_ns": 1030990
+        },
+        {
+          "id": "round0-eval_buffer-65537-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvvm-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.027648,
+              "q1": 0.0267520007,
+              "q3": 0.0277120005,
+              "iqr": 0.0009599997999999998,
+              "minimum": 0.0265919995,
+              "maximum": 0.0286720004
+            },
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 12595200,
+          "host_submit_median_ns": 3731,
+          "host_until_stop_median_ns": 33881
+        },
+        {
+          "id": "round0-eval_buffer-1048577-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvrtc-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 2.82617593,
+              "q1": 2.82521605,
+              "q3": 2.8313601,
+              "iqr": 0.0061440500000000675,
+              "minimum": 2.82220793,
+              "maximum": 2.84569597
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 371023257.5648608
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 201338880,
+          "host_submit_median_ns": 3210,
+          "host_until_stop_median_ns": 2833980
+        },
+        {
+          "id": "round0-eval_buffer-1048577-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o0",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "d6acc16a0fa47060b5aeedc261468bfde72626c525546006de3af980a878eeb7",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 15.8349123,
+              "q1": 15.8300161,
+              "q3": 15.8402557,
+              "iqr": 0.010239600000000237,
+              "minimum": 15.8167362,
+              "maximum": 15.8535681
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 66219312.12085084
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 201338880,
+          "host_submit_median_ns": 3690,
+          "host_until_stop_median_ns": 15843320
+        },
+        {
+          "id": "round0-eval_buffer-1048577-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.314399987,
+              "q1": 0.313344002,
+              "q3": 0.316192001,
+              "iqr": 0.00284799899999999,
+              "minimum": 0.311327994,
+              "maximum": 0.317440003
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 3335168712.968172
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 201338880,
+          "host_submit_median_ns": 3040,
+          "host_until_stop_median_ns": 321969
+        },
+        {
+          "id": "round0-sample_buffer-65537-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvrtc-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.137216002,
+              "q1": 0.137183994,
+              "q3": 0.139264002,
+              "iqr": 0.0020800079999999943,
+              "minimum": 0.136127993,
+              "maximum": 0.141312003
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 477619221.1167907
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 25190400,
+          "host_submit_median_ns": 3130,
+          "host_until_stop_median_ns": 144824
+        },
+        {
+          "id": "round0-sample_buffer-65537-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvvm-o0",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "1d1d50460d7e7e1298ea77f668d7d77976bc7b50402762ac0e0d5b1fc6898e96",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 1.08959997,
+              "q1": 1.08636796,
+              "q3": 1.09062397,
+              "iqr": 0.004256009999999977,
+              "minimum": 1.08441603,
+              "maximum": 1.09548795
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 60147762.302159384
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 25190400,
+          "host_submit_median_ns": 2680,
+          "host_until_stop_median_ns": 1098621
+        },
+        {
+          "id": "round0-sample_buffer-65537-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvvm-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.0348160006,
+              "q1": 0.0337920003,
+              "q3": 0.035840001,
+              "iqr": 0.0020480007000000036,
+              "minimum": 0.0337920003,
+              "maximum": 0.0368000008
+            },
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 25190400,
+          "host_submit_median_ns": 3030,
+          "host_until_stop_median_ns": 41331
+        },
+        {
+          "id": "round0-sample_buffer-1048577-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvrtc-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 2.47808003,
+              "q1": 2.4606719,
+              "q3": 2.49036789,
+              "iqr": 0.029695990000000005,
+              "minimum": 2.4512639,
+              "maximum": 2.49651194
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 423140894.283386
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 402677760,
+          "host_submit_median_ns": 3170,
+          "host_until_stop_median_ns": 2496531
+        },
+        {
+          "id": "round0-sample_buffer-1048577-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o0",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "137f98166596faf5bd3cdf946ab559e6e57d11fe9492e87d0656ee7537d42f62",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 15.3446398,
+              "q1": 15.3313284,
+              "q3": 15.3712645,
+              "iqr": 0.03993610000000025,
+              "minimum": 15.3221121,
+              "maximum": 15.3845758
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 68335067.7283412
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 402677760,
+          "host_submit_median_ns": 3720,
+          "host_until_stop_median_ns": 15362817
+        },
+        {
+          "id": "round0-sample_buffer-1048577-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o3",
+          "round": 0,
+          "status": "passed",
+          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.392192006,
+              "q1": 0.391167998,
+              "q3": 0.393216014,
+              "iqr": 0.002048015999999986,
+              "minimum": 0.391167998,
+              "maximum": 0.395231992
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 2673631751.688483
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 402677760,
+          "host_submit_median_ns": 2911,
+          "host_until_stop_median_ns": 399552
+        },
+        {
+          "id": "round1-sample_buffer-1048577-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.392416,
+              "q1": 0.392064005,
+              "q3": 0.394239992,
+              "iqr": 0.0021759869999999903,
+              "minimum": 0.390143991,
+              "maximum": 0.395264
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 2672105622.604583
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 402677760,
+          "host_submit_median_ns": 4070,
+          "host_until_stop_median_ns": 401211
+        },
+        {
+          "id": "round1-sample_buffer-1048577-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o0",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "137f98166596faf5bd3cdf946ab559e6e57d11fe9492e87d0656ee7537d42f62",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 15.5270081,
+              "q1": 15.3741121,
+              "q3": 15.6692476,
+              "iqr": 0.29513550000000066,
+              "minimum": 15.3374081,
+              "maximum": 15.7788162
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 67532456.55871075
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 402677760,
+          "host_submit_median_ns": 3350,
+          "host_until_stop_median_ns": 15534882
+        },
+        {
+          "id": "round1-sample_buffer-1048577-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "mode": "nvrtc-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "914240cc240cd92b598c26a7aeaaac286bd7bfddead050e51b32be9855769707",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 2.47603202,
+              "q1": 2.47091198,
+              "q3": 2.47910404,
+              "iqr": 0.008192060000000279,
+              "minimum": 2.45871997,
+              "maximum": 2.49651194
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 423490888.4578965
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 402677760,
+          "host_submit_median_ns": 3140,
+          "host_until_stop_median_ns": 2483751
+        },
+        {
+          "id": "round1-sample_buffer-65537-nvvm-o3",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvvm-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.0348160006,
+              "q1": 0.0348160006,
+              "q3": 0.0348160006,
+              "iqr": 0.0,
+              "minimum": 0.0339520015,
+              "maximum": 0.0357760005
+            },
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 25190400,
+          "host_submit_median_ns": 3130,
+          "host_until_stop_median_ns": 41641
+        },
+        {
+          "id": "round1-sample_buffer-65537-nvvm-o0",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvvm-o0",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "1d1d50460d7e7e1298ea77f668d7d77976bc7b50402762ac0e0d5b1fc6898e96",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 1.09055996,
+              "q1": 1.08851194,
+              "q3": 1.09158397,
+              "iqr": 0.0030720300000000034,
+              "minimum": 1.08544004,
+              "maximum": 1.09568
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 60094815.87789084
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 25190400,
+          "host_submit_median_ns": 2941,
+          "host_until_stop_median_ns": 1096952
+        },
+        {
+          "id": "round1-sample_buffer-65537-nvrtc-o3",
+          "entry": "sample_buffer",
+          "count": 65537,
+          "mode": "nvrtc-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "f848c007dcd18e07623002a51d38ae7d3668b97d4bc6a006b9eadc0bd53c6e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.138239995,
+              "q1": 0.138239995,
+              "q3": 0.140287995,
+              "iqr": 0.0020479999999999943,
+              "minimum": 0.136000007,
+              "maximum": 0.141312003
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 474081325.017409
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 25190400,
+          "host_submit_median_ns": 3050,
+          "host_until_stop_median_ns": 145624
+        },
+        {
+          "id": "round1-eval_buffer-1048577-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.315391988,
+              "q1": 0.31436801,
+              "q3": 0.316415995,
+              "iqr": 0.00204798500000003,
+              "minimum": 0.31436801,
+              "maximum": 0.317407995
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 3324678621.8297973
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 201338880,
+          "host_submit_median_ns": 2950,
+          "host_until_stop_median_ns": 322009
+        },
+        {
+          "id": "round1-eval_buffer-1048577-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvvm-o0",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "d6acc16a0fa47060b5aeedc261468bfde72626c525546006de3af980a878eeb7",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 15.8380804,
+              "q1": 15.8289919,
+              "q3": 15.8504963,
+              "iqr": 0.021504399999999535,
+              "minimum": 15.8227196,
+              "maximum": 15.8555517
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 66206066.23514804
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 201338880,
+          "host_submit_median_ns": 3530,
+          "host_until_stop_median_ns": 15845091
+        },
+        {
+          "id": "round1-eval_buffer-1048577-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "mode": "nvrtc-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "95012d1f26e2d179a8be849c24844f947a1c38c92cdb5cf6fcb1d03bf53aaf5c",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 2.8313601,
+              "q1": 2.82726407,
+              "q3": 2.83750391,
+              "iqr": 0.010239840000000111,
+              "minimum": 2.82300806,
+              "maximum": 2.84364796
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 370343920.5772519
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 201338880,
+          "host_submit_median_ns": 3400,
+          "host_until_stop_median_ns": 2838491
+        },
+        {
+          "id": "round1-eval_buffer-65537-nvvm-o3",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvvm-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.027648,
+              "q1": 0.0275199991,
+              "q3": 0.027648,
+              "iqr": 0.00012800089999999778,
+              "minimum": 0.0266239997,
+              "maximum": 0.0284800008
+            },
+            "all_intervals_at_least_0_1ms": false,
+            "records_per_second": null
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 12595200,
+          "host_submit_median_ns": 3370,
+          "host_until_stop_median_ns": 34681
+        },
+        {
+          "id": "round1-eval_buffer-65537-nvvm-o0",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvvm-o0",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "1f7817058cf15140b655d47923b769ca50f6e859668859d631efee4e33243b1c",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 1.02195203,
+              "q1": 1.020064,
+              "q3": 1.02502406,
+              "iqr": 0.004960059999999933,
+              "minimum": 1.01580799,
+              "maximum": 1.02604795
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 64129233.1500139
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 12595200,
+          "host_submit_median_ns": 2740,
+          "host_until_stop_median_ns": 1031170
+        },
+        {
+          "id": "round1-eval_buffer-65537-nvrtc-o3",
+          "entry": "eval_buffer",
+          "count": 65537,
+          "mode": "nvrtc-o3",
+          "round": 1,
+          "status": "passed",
+          "reference_sha256": "8fa2f17ed292d61ddb88dee4e176fbd0994029bab5b07ebff54e37c41fac5e9a",
+          "contaminated": false,
+          "summary": {
+            "device_ms": {
+              "median": 0.158720002,
+              "q1": 0.157695994,
+              "q3": 0.158815995,
+              "iqr": 0.0011200009999999816,
+              "minimum": 0.154880002,
+              "maximum": 0.160735995
+            },
+            "all_intervals_at_least_0_1ms": true,
+            "records_per_second": 412909521.0066845
+          },
+          "warmups_passed": 3,
+          "samples_passed": 9,
+          "compared_bytes": 12595200,
+          "host_submit_median_ns": 3270,
+          "host_until_stop_median_ns": 165055
+        }
+      ],
+      "optimized_large_count_comparison": [
+        {
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "round": 0,
+          "median_ms": {
+            "nvrtc-o3": 2.82617593,
+            "nvvm-o0": 15.8349123,
+            "nvvm-o3": 0.314399987
+          },
+          "nvrtc_o3_over_nvvm_o3": 8.98910956379906
+        },
+        {
+          "entry": "eval_buffer",
+          "count": 1048577,
+          "round": 1,
+          "median_ms": {
+            "nvvm-o3": 0.315391988,
+            "nvvm-o0": 15.8380804,
+            "nvrtc-o3": 2.8313601
+          },
+          "nvrtc_o3_over_nvvm_o3": 8.97727338590478
+        },
+        {
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "round": 0,
+          "median_ms": {
+            "nvrtc-o3": 2.47808003,
+            "nvvm-o0": 15.3446398,
+            "nvvm-o3": 0.392192006
+          },
+          "nvrtc_o3_over_nvvm_o3": 6.318537838836012
+        },
+        {
+          "entry": "sample_buffer",
+          "count": 1048577,
+          "round": 1,
+          "median_ms": {
+            "nvvm-o3": 0.392416,
+            "nvvm-o0": 15.5270081,
+            "nvrtc-o3": 2.47603202
+          },
+          "nvrtc_o3_over_nvvm_o3": 6.309712193182745
+        }
+      ],
+      "provenance": {
+        "protocol": {
+          "path": "build/nvvm-material-measurement/maintained-protocol/results.json",
+          "sha256": "f4389a72800fa47e65838049a16f6e1e33f03e0f316003ddc912ca7a2ff709ff"
+        },
+        "qualification": {
+          "path": "build/nvvm-material-measurement/maintained-qualify/results.json",
+          "sha256": "bde282607c5c80d414a9aadbdc0b71f72ca6d019e704d46969ceec1735197f4c"
+        },
+        "measurement": {
+          "path": "build/nvvm-material-measurement/maintained-measure/results.json",
+          "sha256": "11283e4d13fbf8d17faf32581f40d57e128e55a7b0c7569ed024dc53fda509b2"
+        },
+        "freeze": {
+          "path": "build/nvvm-material-measurement/maintained-freeze.json",
+          "sha256": "9017f000bb17e6d65fd375971e0b171bf9770b67f4f263719f1b717e0a982e6d"
+        },
+        "default_eval": {
+          "path": "build/nvvm-material-measurement/maintained-execution-eval_buffer/results.json",
+          "sha256": "5b859260623ae74f125064577591e46f68c83ca9b32bea6a605222687daa745c"
+        },
+        "default_sample": {
+          "path": "build/nvvm-material-measurement/maintained-execution-sample_buffer/results.json",
+          "sha256": "d96963ca71794fffa8b07a84db76ff677b4f32534b77054e4114bbcf5285382a"
+        },
+        "cpu_runtime": {
+          "path": "build/nvvm-material-measurement/maintained-cpu-runtime.json",
+          "sha256": "4ca0c65811d9bd766cdb36141bd89a573579981174cc964fd0f5f9653c54042e"
+        },
+        "cpu_measurement": {
+          "path": "build/nvvm-material-measurement/maintained-cpu-measure-final.json",
+          "sha256": "cc9fb51203d959f7de757dc9e656af1f6d4bd65973dabe00fd8cd84ab279e28f"
+        }
+      },
+      "research_gate": {
+        "status": "passed before promotion",
+        "qualification": {
+          "path": "build/nvvm-material-measurement/qualify-0/results.json",
+          "sha256": "b514d85ab18b088605136d7e7c97154a3612c0d92b1d8f61f9cdb517d49d17d9"
+        },
+        "measurement": {
+          "path": "build/nvvm-material-measurement/measure-0/results.json",
+          "sha256": "23f148b353848721ec05ef6c4d0a15b9b3f0982be0382104e741acb60987122c"
+        },
+        "independent_qualification": {
+          "path": "build/nvvm-material-measurement/review/qualification-replay.json",
+          "sha256": "66b4e039702e5e70ec7423b5881f4a10946dc307fd946b3ffc79b11da8ee2384"
+        },
+        "independent_measurement": {
+          "path": "build/nvvm-material-measurement/review/measurement-replay.json",
+          "sha256": "a0f888cef974a7e9939037f971bfa9966b6fdc312f74a308f6fc9daca0e16438"
+        },
+        "meaning": "Retained complete prototype measurements; final maintained run is a separate repetition, not favorable-sample selection."
+      },
+      "preparation_history": [
+        {
+          "outcome": "Prototype used a strictly checked historical runtime_status manifest successor; maintained runner removes that exception and requires exact fresh reports."
+        },
+        {
+          "outcome": "Independent reviewer corrected an overly narrow PTX declaration regex to accept the already-valid NVRTC .const declaration; shader, ABI and implementation were unchanged."
+        }
+      ],
+      "execution_failure_history": [],
+      "limits": [
+        "Synthetic hot 2x2 textures and periodic coherent inputs; no original assets, live LUTs, arbitrary graph/input distribution or application frame-performance claim.",
+        "Sample throughput estimator and records/second execution throughput are different quantities; sample workload includes known early rejections.",
+        "Correctness reset/readback/comparison occurs between persistent-allocation launches; this is not continuously queued rendering throughput.",
+        "CUDA event interval may include host submission gaps; host submission, synchronization wall time, compilation and allocation are separate.",
+        "All nine intervals must be at least0.1ms for a throughput summary; four small-count NVVM O3 round cells fail this interpretation gate and remain timing observations.",
+        "Clocks were observed, not fixed; retain noisy samples and order effects. Before/after process snapshots cannot exclude transient contention.",
+        "Static stack/register observations do not establish the cause of the measured difference. No NVRTC O0 comparison was performed.",
+        "Every launch is source-reviewed to compare its full output against the independently qualified reference; identical per-launch buffers are not stored redundantly."
+      ],
+      "review": {
+        "default_prelaunch": {
+          "path": "build/nvvm-material-measurement/review/maintained-default-prelaunch.json",
+          "sha256": "2faffdacba2f6c61db3d2f903a2ad64702ad7a475bb410dbb0629cbc8ae5b88c"
+        },
+        "protocol_prelaunch": {
+          "path": "build/nvvm-material-measurement/review/maintained-protocol-prelaunch.json",
+          "sha256": "0801559955702ea81c6ccc995ab213be13fba55976f4f7bb3b887869044934f3"
+        },
+        "qualification": {
+          "path": "build/nvvm-material-measurement/review/maintained-qualification-replay.json",
+          "sha256": "84a657fa5d28f3493e36c9d9466497244bd8d00341e3bec4f39fb23995a12432"
+        },
+        "measurement": {
+          "path": "build/nvvm-material-measurement/review/maintained-measurement-replay.json",
+          "sha256": "2fffbe79803dd271e69a5d77f93280961497565877cce4f77888fb892e3e5c54"
+        }
+      },
+      "measurement_totals": {
+        "cells": 24,
+        "warmups": 72,
+        "measured_launches": 216,
+        "compared_bytes": 3850813440
+      }
     }
   }
 }
