@@ -184,3 +184,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Nine GPU cells/48words and three IR captures pass. V2 generic/aggregate paths consume live results;
   witness v3 adds catch256 to make its tag observable after v2’s legal payload-only simplification.
   Original versions remain intact; no compiler/main-corpus change. Next promotes the final two probes.
+
+- Promotion292: [runtime-error regressions](report.slice-292-runtime-error-regressions.md),
+  [evidence](test-evidence.slice-292.json), [plan](plan.slice-292-runtime-error-regressions.md).
+  Two persistent tests preserve the qualified291 sources and add six native directives. All six
+  pass with36 exact output words; runtime inputs and tag-distinct catch remain.285 identities exact;
+  main corpus and cadence unchanged. Next: bounded ANSI-color classifier repair with full checkpoint.

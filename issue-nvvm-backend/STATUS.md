@@ -55,9 +55,12 @@ Broader289 evidence retains its original source hash. Main corpus and checkpoint
 [Runtime errors291](report.slice-291-runtime-errors.md) passes nine GPU cells/48words and three IR
 captures across two versions. Generic/aggregate calls consume live tags/payloads. Initial witness
 payload-only output did not observe its tag; refined catch+256 now retains tag-based PTX selection.
-All original results/limits remain recorded and accepted285 identities are exact. Next: promote final
-two runtime-error probes as native regressions, preserving inputs, noinline calls and distinct catches.
-No compiler change is motivated; the main corpus and checkpoint cadence remain unchanged.
+All original results/limits remain recorded and accepted285 identities are exact.
+[Promotion292](report.slice-292-runtime-error-regressions.md) adds the final two native tests; all six
+directives pass with36 exact output words. Inputs, noinline calls and tag-distinct catches remain.
+Next: repair maintained census ANSI-color normalization using290’s preserved FileCheck failure.
+Shared-runner changes require a full checkpoint. No compiler change is motivated; main corpus and
+checkpoint cadence remain unchanged.
 
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
 max4CPU workers,2unit servers, serialized suites. Independent review owns each accepted slice;

@@ -47,7 +47,10 @@ Skip Slack; no push or system changes.
     The test is outside the main corpus. [Qualification291](report.slice-291-runtime-errors.md)
     passes nine GPU cells/48words plus three IR compiles. Witness v2 did not observe its tag; v3
     catch+256 preserves final PTX tag-dependent selection. Generic/aggregate v2 stays qualified.
-    Next promotes the final two runtime-input probes into native regressions; no compiler fix needed.
+    [Promotion292](report.slice-292-runtime-error-regressions.md) adds two permanent tests; six fresh
+    native directives pass with36 exact output words.285 identities and main selection stay unchanged.
+    Next: ANSI-color classification repair using the preserved290 FileCheck failure, followed by the
+    required full checkpoint. No compiler fix is currently motivated.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.
