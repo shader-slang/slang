@@ -16,6 +16,16 @@ struct LoweredCombinedSamplerStructInfo
     IRTypeLayout* typeLayout;
 };
 
+IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
+{
+    auto textureType = as<IRTextureTypeBase>(typeInst);
+    if (!textureType)
+        return nullptr;
+    if (!textureType->isCombined())
+        return nullptr;
+    return textureType;
+}
+
 struct LowerCombinedSamplerContext
 {
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
@@ -103,84 +113,98 @@ struct LowerCombinedSamplerContext
         mapLoweredTypeToLoweredInfo.add(info.type, info);
         return info;
     }
-};
 
-IRTypeLayout* maybeCreateArrayLayout(
-    IRBuilder* builder,
-    IRTypeLayout* elementTypeLayout,
-    IRType* type)
-{
-    if (auto arrayType = as<IRArrayTypeBase>(type))
+    /// Return `typeLayout` with the layout of every combined texture-sampler inside `type`
+    /// replaced by the layout of its lowered `{texture, sampler}` struct, rebuilding each
+    /// enclosing array, struct and parameter-group layout on the way up while keeping their
+    /// resource usage. Returns `typeLayout` itself when nothing inside it changes.
+    ///
+    /// Consider `struct S { float4 c; Sampler2D s; }; ConstantBuffer<S> cb;`. Once `Sampler2D`
+    /// becomes a struct, type legalization looks up the layouts of the `texture` and `sampler`
+    /// fields under `cb.s`, so the field layout of `s` has to become a struct layout too.
+    /// Layout insts are hoisted and shared between parameters, so we build new layouts rather
+    /// than modifying existing ones.
+    ///
+    IRTypeLayout* lowerTypeLayout(IRBuilder* builder, IRType* type, IRTypeLayout* typeLayout)
     {
-        auto newElementTypeLayout =
-            maybeCreateArrayLayout(builder, elementTypeLayout, arrayType->getElementType());
-        IRIntegerValue elementCount = -1;
-        if (auto count = arrayType->getElementCount())
-            elementCount = getIntVal(count);
-        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(builder, newElementTypeLayout);
-        for (auto sizeAttr : newElementTypeLayout->getSizeAttrs())
+        if (auto textureType = isCombinedTextureSamplerType(type))
+            return lowerCombinedTextureSamplerType(textureType).typeLayout;
+
+        if (auto arrayType = as<IRArrayTypeBase>(type))
         {
-            arrayTypeLayoutBuilder.addResourceUsage(
-                sizeAttr->getResourceKind(),
-                elementCount == -1 ? LayoutSize::infinite() : sizeAttr->getSize() * elementCount);
+            auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout);
+            if (!arrayTypeLayout)
+                return typeLayout;
+            auto elementTypeLayout = arrayTypeLayout->getElementTypeLayout();
+            auto newElementTypeLayout =
+                lowerTypeLayout(builder, arrayType->getElementType(), elementTypeLayout);
+            if (newElementTypeLayout == elementTypeLayout)
+                return typeLayout;
+            IRArrayTypeLayout::Builder newArrayTypeLayoutBuilder(builder, newElementTypeLayout);
+            newArrayTypeLayoutBuilder.addResourceUsageFrom(typeLayout);
+            return newArrayTypeLayoutBuilder.build();
         }
-        for (auto alignmentAttr : newElementTypeLayout->getAlignmentAttrs())
+
+        if (auto structType = as<IRStructType>(type))
         {
-            arrayTypeLayoutBuilder.addAlignment(alignmentAttr);
+            auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
+            if (!structTypeLayout)
+                return typeLayout;
+            bool anyFieldChanged = false;
+            IRStructTypeLayout::Builder newStructTypeLayoutBuilder(builder);
+            newStructTypeLayoutBuilder.addResourceUsageFrom(typeLayout);
+            for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
+            {
+                auto fieldKey = fieldAttr->getFieldKey();
+                auto fieldLayout = fieldAttr->getLayout();
+                auto newFieldLayout = fieldLayout;
+                if (auto field = findStructField(structType, as<IRStructKey>(fieldKey)))
+                    newFieldLayout = lowerVarLayout(builder, field->getFieldType(), fieldLayout);
+                anyFieldChanged |= newFieldLayout != fieldLayout;
+                newStructTypeLayoutBuilder.addField(fieldKey, newFieldLayout);
+            }
+            if (!anyFieldChanged)
+                return typeLayout;
+            return newStructTypeLayoutBuilder.build();
         }
-        return arrayTypeLayoutBuilder.build();
+
+        if (auto parameterGroupType = as<IRParameterGroupType>(type))
+        {
+            auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout);
+            if (!parameterGroupTypeLayout)
+                return typeLayout;
+            auto elementType = parameterGroupType->getElementType();
+            auto elementVarLayout = parameterGroupTypeLayout->getElementVarLayout();
+            auto newElementVarLayout = lowerVarLayout(builder, elementType, elementVarLayout);
+            if (newElementVarLayout == elementVarLayout)
+                return typeLayout;
+            // The offset element type layout is what `getFieldLayout` reads through a
+            // parameter group, so it is lowered along with the element var layout.
+            IRParameterGroupTypeLayout::Builder newParameterGroupTypeLayoutBuilder(builder);
+            newParameterGroupTypeLayoutBuilder.addResourceUsageFrom(typeLayout);
+            newParameterGroupTypeLayoutBuilder.setContainerVarLayout(
+                parameterGroupTypeLayout->getContainerVarLayout());
+            newParameterGroupTypeLayoutBuilder.setElementVarLayout(newElementVarLayout);
+            newParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(lowerTypeLayout(
+                builder,
+                elementType,
+                parameterGroupTypeLayout->getOffsetElementTypeLayout()));
+            return newParameterGroupTypeLayoutBuilder.build();
+        }
+
+        return typeLayout;
     }
-    return elementTypeLayout;
-}
 
-IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
-{
-    auto textureType = as<IRTextureTypeBase>(typeInst);
-    if (!textureType)
-        return nullptr;
-    if (!textureType->isCombined())
-        return nullptr;
-    return textureType;
-}
-
-void lowerCombinedTextureSamplers(
-    IRModule* module,
-    CodeGenContext* codeGenContext,
-    DiagnosticSink* sink)
-{
-    SLANG_UNUSED(sink);
-
-    LowerCombinedSamplerContext context;
-    context.codeGenTarget = codeGenContext->getTargetFormat();
-
-    bool hasCombinedSampler = false;
-
-    // Lower combined texture sampler type into a struct type.
-    for (auto globalInst : module->getGlobalInsts())
+    /// Return `varLayout` with its type layout lowered by `lowerTypeLayout` for a variable of
+    /// `type`, keeping all of its offsets. Returns `varLayout` itself when nothing changes.
+    IRVarLayout* lowerVarLayout(IRBuilder* builder, IRType* type, IRVarLayout* varLayout)
     {
-        if (isCombinedTextureSamplerType(globalInst))
-            hasCombinedSampler = true;
-        auto globalParam = as<IRGlobalParam>(globalInst);
-        if (!globalParam)
-            continue;
-        auto elementType = unwrapArray(globalParam->getFullType());
-        auto textureType = isCombinedTextureSamplerType(elementType);
-        if (!textureType)
-            continue;
-        auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecor)
-            continue;
-        // Replace the original VarLayout with the new StructTypeVarLayout.
-        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
-        if (!varLayout)
-            continue;
-        IRBuilder subBuilder(globalInst);
-        subBuilder.setInsertBefore(globalInst);
+        auto typeLayout = varLayout->getTypeLayout();
+        auto newTypeLayout = lowerTypeLayout(builder, type, typeLayout);
+        if (newTypeLayout == typeLayout)
+            return varLayout;
 
-        auto typeInfo = context.lowerCombinedTextureSamplerType(textureType);
-        auto newTypeLayout =
-            maybeCreateArrayLayout(&subBuilder, typeInfo.typeLayout, globalParam->getFullType());
-        IRVarLayout::Builder newVarLayoutBuilder(&subBuilder, newTypeLayout);
+        IRVarLayout::Builder newVarLayoutBuilder(builder, newTypeLayout);
         newVarLayoutBuilder.cloneEverythingButOffsetsFrom(varLayout);
         IRVarOffsetAttr* resOffsetAttr = nullptr;
         IRVarOffsetAttr* descriptorTableSlotOffsetAttr = nullptr;
@@ -200,7 +224,8 @@ void lowerCombinedTextureSamplers(
         }
         // If the user provided an layout offset for the texture but not for descriptor table
         // slot, then we use the texture offset for the descriptor table slot offset.
-        if (resOffsetAttr && !descriptorTableSlotOffsetAttr)
+        if (isCombinedTextureSamplerType(unwrapArray(type)) && resOffsetAttr &&
+            !descriptorTableSlotOffsetAttr)
         {
             auto info =
                 newVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot);
@@ -208,9 +233,45 @@ void lowerCombinedTextureSamplers(
             info->space = resOffsetAttr->getSpace();
             info->kind = LayoutResourceKind::DescriptorTableSlot;
         }
-        auto newVarLayout = newVarLayoutBuilder.build();
+        return newVarLayoutBuilder.build();
+    }
+};
+
+void lowerCombinedTextureSamplers(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    DiagnosticSink* sink)
+{
+    SLANG_UNUSED(sink);
+
+    LowerCombinedSamplerContext context;
+    context.codeGenTarget = codeGenContext->getTargetFormat();
+
+    bool hasCombinedSampler = false;
+
+    // Lower the layout of every shader parameter that contains a combined texture sampler,
+    // lowering each combined texture sampler type it reaches into a struct type.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (isCombinedTextureSamplerType(globalInst))
+            hasCombinedSampler = true;
+        auto globalParam = as<IRGlobalParam>(globalInst);
+        if (!globalParam)
+            continue;
+        auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+        auto varLayout = as<IRVarLayout>(layoutDecor->getLayout());
+        if (!varLayout)
+            continue;
+        IRBuilder subBuilder(globalInst);
+        subBuilder.setInsertBefore(globalInst);
+
+        auto newVarLayout =
+            context.lowerVarLayout(&subBuilder, globalParam->getFullType(), varLayout);
+        if (newVarLayout == varLayout)
+            continue;
         subBuilder.addLayoutDecoration(globalParam, newVarLayout);
-        varLayout->removeAndDeallocate();
         layoutDecor->removeAndDeallocate();
     }
 
