@@ -126,3 +126,8 @@ ledger preserves first-known and resolved histories with their original evidence
   Both pointer-copy methods and a small typed NVVM helper pass. Large pointer compilation stays compact
   but storage grows; no general SSA materialization or production correction claimed. Next qualifies
   helper producer/alignment/size boundaries; accepted279 and research280 open defects remain intact.
+
+- Gate282: [typed SSA-helper boundary](report.slice-282-ssa-copy-boundary.md),
+  [evidence](research-evidence.slice-282.json), [plan](plan.slice-282-ssa-copy-boundary.md).
+  Small constructed/snapshot/phi/unaligned values pass; N65536O0 times out, O3 explicitly unrun.
+  General helper rejected without cutoff/fallback; next isolates alignment annotations without a new ABI.

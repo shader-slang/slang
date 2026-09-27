@@ -60,8 +60,13 @@ Pointer IR stays compact at65536elements, but local storage grows; large modules
 All23attempts (six declaration failures retained) yield17effective cells:9correctGPU,2failing controls,
 6compile-only. No production change; full279/targeted233/cadence0 remains inherited.
 
-Next: qualify typed SSA-helper phi/constructed/earlier-load values, underalignment and larger compile
-sizes before selecting an NVVM fix. Pointer methods require a correct snapshot-address boundary;
-NVRTC's production defect remains open. Separate reused author/reviewer and root audits own281.
+[Gate282](report.slice-282-ssa-copy-boundary.md) qualifies the small helper for constructed/phi/earlier-load
+values and realalignment1/canaries, but rejects it as a general correction: N17caller ABI expands,
+N65536O0 times out at120seconds under4GiB, and O3 is explicitly not run after that size-gate failure.
+No arbitrary cutoff or fallback is selected; accepted279 remains unchanged.
+
+Next: isolate whether conservative whole-store align1 annotations fix actually aligned roots without
+new helper ABI. The passing ordinary underaligned path is a lead, not proof of this counterfactual.
+Pointer methods still require correct snapshot materialization; NVRTC's production defect stays open.
 Native Ubuntu24.04, L4SM89/driver580.126.09, targetSM80, CUDA12.9.2/NVRTC12.9.86, LLVM14;
 max4CPU workers,2unit servers, serialized suites. Accepted279 local commit46e58db06.

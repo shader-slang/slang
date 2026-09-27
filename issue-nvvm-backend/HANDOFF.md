@@ -37,11 +37,14 @@ Skip Slack; no push or system changes.
    Seventeen effective cells:9correctGPU/2wrong-baselineGPU/6largecompile-only; six initial declaration
    failures retained. Raw root `build/nvvm-array-store-prototype281`. Pointer IR102/114instructions
    stays constant at65536elements; storage grows to786432/2359296bytes, with no largeGPU execution.
-10. Next bounded gate: typed helper for phi/constructed/earlier-load-after-mutation SSA values,
-    underaligned roots and larger compile sizes/caller ABI. No production remedy selected. Pointer
-    loops/memcpy cannot recover arbitrary SSA snapshots by rereading mutable memory; no blind reuse
-    of dynamic element extracts (provider may expand O(N)). NVRTC production defect remains open.
-11. Prefer fresh bounded delegation when available;281 reused author and independent reviewer with root
+10. [Gate282](report.slice-282-ssa-copy-boundary.md) qualifies the small typed helper for constructed/
+    earlier-load/phi SSA and offset1 storage/canaries. N17caller expansion and N65536O0 timeout under
+    120seconds/4GiB reject the general method; O3 explicitly not run. No cutoff/fallback selected.
+    Eight exact dispositions/raw sources at `build/nvvm-ssa-copy-boundary282`; accepted identities unchanged.
+11. Next bounded experiment: weaken whole-array store annotation toalign1 on actually aligned roots,
+    keeping canonical values and call ABI. Ordinary realunaligned path provides a lead only. Establish
+    frozen before/after and size evidence; no implementation until the causal contract is qualified.
+12. Prefer fresh bounded delegation when available;282 reused author and independent reviewer with root
     acceptance audits. Skip Slack, no push/system changes, continue the authorized loop.
 
 [HISTORY](HISTORY.md) owns earlier PCH277, accessor/generic278 and material investigations.
