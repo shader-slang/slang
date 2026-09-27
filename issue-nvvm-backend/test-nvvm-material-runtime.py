@@ -5,6 +5,7 @@
 """CPU contracts for the fixed material oracle and fail-closed runtime validation."""
 
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
@@ -316,6 +317,124 @@ ld.const.u32 %f, [SLANG_globalParams+160];
     def test_early_rejection_exact_fields(self):
         for model in MATERIAL.SAMPLE_MODELS:
             self.assertEqual(self.expected[model][-1],(0.,)*7+(0,))
+
+
+class FilteringContracts(unittest.TestCase):
+    PROFILE = "linear-filtering"
+    WEIGHTS = ((12, 4, 0, 0), (4, 0, 12, 0), (3, 1, 9, 3), (3, 9, 1, 3))
+
+    def test_independent_weight_table_and_wrap(self):
+        for uv, numerators in zip(MATERIAL.FILTERING_UVS, self.WEIGHTS):
+            color = tuple(sum(n*MATERIAL.f32(texel[channel])/16
+                              for n, texel in zip(numerators, MATERIAL.COLORS))
+                          for channel in range(4))
+            roughness = sum(n*MATERIAL.f32(value)/16
+                            for n, value in zip(numerators, MATERIAL.ROUGHNESS))
+            self.assertEqual(MATERIAL.filtered_texture_inputs(uv), (color, roughness))
+            shifted = (uv[0]+1, uv[1]-1)
+            self.assertEqual(MATERIAL.filtered_texture_inputs(shifted), (color, roughness))
+        # The fourth footprint crosses two seams. Clamping chooses row zero, column one.
+        self.assertEqual(MATERIAL.filtered_texture_inputs(MATERIAL.FILTERING_UVS[3], "clamp"),
+                         (tuple(map(MATERIAL.f32, MATERIAL.COLORS[1])),
+                          MATERIAL.f32(MATERIAL.ROUGHNESS[1])))
+
+    def test_default_oracle_and_payload_bytes_remain_frozen(self):
+        # SHA256 from the accepted validator before adding input profiles.
+        hashes = {
+            "eval_buffer": ("c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+                            "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7"),
+            "sample_buffer": ("55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+                              "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00"),
+        }
+        for entry, (input_hash, oracle_hash) in hashes.items():
+            layout = MATERIAL.entry_layout(entry)
+            rows = layout["cases"]()
+            expected = layout["expected"](rows)
+            payload = b"".join(layout["input_struct"].pack(
+                *row["uv"], *row["incoming"], *row.get("outgoing", ()), row["seed"]) for row in rows)
+            oracle = json.dumps(dict(inputs=rows, expected=expected,
+                                     absolute_tolerance=MATERIAL.ABS_TOL,
+                                     relative_tolerance=MATERIAL.REL_TOL),
+                                indent=2, allow_nan=False) + "\n"
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), input_hash)
+            self.assertEqual(hashlib.sha256(oracle.encode()).hexdigest(), oracle_hash)
+            self.assertEqual(layout["cases"]("texel-centers"), rows)
+
+    def test_counterfactual_filtering_discrimination(self):
+        checks = MATERIAL.filtering_oracle_checks()["maximum_counterfactual_tolerance_multiples"]
+        self.assertEqual(set(checks), {"point", "clamp", "swapped_axes", "decode_before_filter"})
+        self.assertGreater(min(checks.values()), 100)
+
+    def test_unknown_profiles_fail(self):
+        for make in (MATERIAL.cases, MATERIAL.sample_cases):
+            with self.assertRaises(ValueError):
+                make("unknown")
+        with self.assertRaises(ValueError):
+            MATERIAL.entry_layout("eval_buffer", "unknown")
+        with self.assertRaises(ValueError):
+            MATERIAL.filtered_texture_inputs((.5, .5), "unknown")
+
+    def test_filtered_eval_and_corrupted_buffers(self):
+        rows = MATERIAL.cases(self.PROFILE)
+        expected = MATERIAL.expected_outputs(rows, self.PROFILE)
+        MATERIAL.oracle_checks(rows, expected, self.PROFILE)
+        data = b"".join(MATERIAL.OUTPUT.pack(*row) for row in expected) + MATERIAL.SENTINEL*63
+        self.assertEqual(MATERIAL.compare_outputs(data, expected)["status"], "passed")
+        old = MATERIAL.expected_outputs(MATERIAL.cases())
+        centers = b"".join(MATERIAL.OUTPUT.pack(*row) for row in old) + MATERIAL.SENTINEL*63
+        self.assertEqual(MATERIAL.compare_outputs(centers, expected)["status"], "failed")
+        for broken in (data[:-1], struct.pack("<f", math.nan)+data[4:], data[:-1]+b"\0"):
+            self.assertEqual(MATERIAL.compare_outputs(broken, expected)["status"], "failed")
+
+    def test_filtered_sample_lobes_margins_and_outputs(self):
+        rows = MATERIAL.sample_cases(self.PROFILE)
+        expected = MATERIAL.sample_expected_outputs(rows, self.PROFILE)
+        MATERIAL.sample_oracle_checks(rows, expected, self.PROFILE)
+        self.assertEqual(len(rows), 65)
+        self.assertEqual({(r['texel'], r['direction'], r['lobe']) for r in rows[:24]},
+                         {(t, d, l) for t in range(4) for d in range(3) for l in range(2)})
+        for model in MATERIAL.SAMPLE_MODELS:
+            data = b"".join(MATERIAL.SAMPLE_OUTPUT.pack(*row) for row in expected[model])
+            data += MATERIAL.SAMPLE_SENTINEL*63
+            self.assertEqual(MATERIAL.sample_compare_outputs(data, expected)["status"], "passed")
+            for row in rows[:64]:
+                color, _ = MATERIAL.texture_inputs(row, self.PROFILE)
+                probability = MATERIAL.sample_probability(color, row['incoming'], model)
+                selection = MATERIAL.sample_draws(row['seed'])[0]
+                self.assertGreater(abs(selection-probability), .03)
+                self.assertEqual(int(selection >= probability), row['lobe'])
+            for offset, replacement in ((28, bytes(4)), (64*32, struct.pack("<f", -0.0)),
+                                        (65*32, bytes(4)), (0, struct.pack("<f", math.inf))):
+                broken = data[:offset]+replacement+data[offset+4:]
+                self.assertEqual(MATERIAL.sample_compare_outputs(broken, expected)["status"], "failed")
+        mixed = b"".join(MATERIAL.SAMPLE_OUTPUT.pack(*expected[MATERIAL.SAMPLE_MODELS[i%2]][i])
+                         for i in range(65)) + MATERIAL.SAMPLE_SENTINEL*63
+        self.assertEqual(MATERIAL.sample_compare_outputs(mixed, expected)["status"], "failed")
+
+    def test_prepare_rejects_wrong_or_missing_profile(self):
+        modes = (("nvrtc", 3), ("nvvm", 0), ("nvvm", 3))
+        for entry in ("eval_buffer", "sample_buffer"):
+            report = dict(status="prepared", input_profile=self.PROFILE,
+                          contract=MATERIAL.entry_layout(entry, self.PROFILE)["contract"],
+                          source={"source_sha256": "source"},
+                          cells=[dict(id=f"{backend}-o{optimization}", status="prepared",
+                                      ptx_sha256="a"*64) for backend, optimization in modes])
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory)/"reference.json"
+                path.write_text(json.dumps(report))
+                self.assertEqual(len(MATERIAL.reviewed_abi_hashes(
+                    path, "source", modes, entry, self.PROFILE)), 3)
+                with self.assertRaises(ValueError):
+                    MATERIAL.reviewed_abi_hashes(path, "source", modes, entry)
+                for profile in (None, "texel-centers", "unknown"):
+                    changed = dict(report)
+                    if profile is None:
+                        del changed["input_profile"]
+                    else:
+                        changed["input_profile"] = profile
+                    path.write_text(json.dumps(changed))
+                    with self.assertRaises(ValueError):
+                        MATERIAL.reviewed_abi_hashes(path, "source", modes, entry, self.PROFILE)
 
 
 if __name__ == "__main__":

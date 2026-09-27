@@ -2040,6 +2040,9 @@
       },
       "current_compiler_regression": {
         "status": "passed",
+        "entry": "eval_buffer",
+        "input_profile": "texel-centers",
+        "contract": "tiled-brass-eval-synthetic-textures-v1",
         "provenance": {
           "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
           "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
@@ -2049,8 +2052,20 @@
           "provider_abi": 42
         },
         "results": {
-          "path": "build/nvvm-local-record-arrays/material-execution-eval_buffer/results.json",
-          "sha256": "cd27d8042f975e37f3c08878c21d4d7456b31ff53922add366513d6e97480807"
+          "path": "build/nvvm-material-filtering/execute-centers-eval/results.json",
+          "sha256": "cb5c6f9af0303dd10777f527de0e12c60208908af52d6d2ae8590b5cac7f4aa3"
+        },
+        "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+        "harness_sha256": {
+          "extras/validate-nvvm-material-runtime.py": "7f5c6cb7b11bb0c73f4812a4e440a7f6b3cfeac42dfde9a935d122913b25fde7",
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
+        },
+        "absolute_tolerance": 1e-5,
+        "relative_tolerance": 0.0002,
+        "input_sha256": {
+          "inputs.bin": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+          "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+          "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
         },
         "cells": [
           {
@@ -2063,13 +2078,10 @@
               "assembly": 0,
               "execution": 0
             },
-            "runtime": {
-              "launches": 1,
-              "active_records": 65,
-              "output_capacity": 128,
-              "device": "NVIDIA L4",
-              "compute_capability": 89
-            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
             "output_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
             "comparison": {
               "status": "passed",
@@ -2095,13 +2107,10 @@
               "assembly": 0,
               "execution": 0
             },
-            "runtime": {
-              "launches": 1,
-              "active_records": 65,
-              "output_capacity": 128,
-              "device": "NVIDIA L4",
-              "compute_capability": 89
-            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
             "output_sha256": "f51f35a9b425c13a20a4b597745bd42e9ef83d416fbe16da5e3a2e65ca9526d2",
             "comparison": {
               "status": "passed",
@@ -2127,13 +2136,10 @@
               "assembly": 0,
               "execution": 0
             },
-            "runtime": {
-              "launches": 1,
-              "active_records": 65,
-              "output_capacity": 128,
-              "device": "NVIDIA L4",
-              "compute_capability": 89
-            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
             "output_sha256": "06a8fadb60a3b0b799114acd0aa09ae9ab449de73364681048c0b0537cba827d",
             "comparison": {
               "status": "passed",
@@ -2150,44 +2156,190 @@
             }
           }
         ],
-        "scope": "Fresh 65-record/63-guard correctness under the local-array compiler. Prior timings and larger-grid qualifications retain their old identities.",
+        "scope": "Fixed65record synthetic correctness; no timing or arbitrary-input claim.",
+        "default_bytes_preserved": {
+          "path": "build/nvvm-material-filtering/regression-comparison.json",
+          "sha256": "01592c68985081993ec4dc59ffc4038a266f68ad3b5e515749e9754c06354b2e"
+        }
+      },
+      "linear_filtering_qualification": {
+        "status": "accepted",
         "entry": "eval_buffer",
-        "source": {
-          "name": "tiled-brass-material",
-          "source": "tests/cuda/complex/tiled_brass_material.slang",
-          "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
-          "entry_points": ["eval_buffer", "sample_buffer"],
-          "stage": "compute",
-          "provenance": {
-            "original_filename": "tiled_brass_material.slang",
-            "original_sha256": "924b39e55a521540518d99e6465c7d765600fd6bee752c1326c20231550eb73c",
-            "license": "Apache-2.0",
-            "adaptations": [
-              "Normalize CRLF to LF.",
-              "Add user-approved __TARGET_CUDA__=1 definition and explanatory comment."
-            ]
-          },
-          "features": [
-            "layered-material",
-            "generic-interfaces",
-            "aggregate-arrays",
-            "bindless-textures",
-            "lookup-buffers",
-            "floating-point-math"
-          ],
-          "runtime_status": "eval_buffer and sample_buffer synthetic-texture contracts qualified separately by extras/validate-nvvm-material-runtime.py and focused-evidence.json; this manifest still owns compile/assembly only. Original assets, live LUT reads, arbitrary inputs and application performance remain unqualified."
+        "input_profile": "linear-filtering",
+        "contract": "tiled-brass-eval-linear-filtering-v1",
+        "provenance": {
+          "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+          "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
+          "compiler_version": "2026.18.3-323-g01ecb6e8b",
+          "compiler_sha256": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
+          "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "provider_abi": 42
         },
-        "oracle_sha256": "58472921db79867ad2abf745cc1f767e3afa0308adb33a94c6124b2c2b861dd7",
+        "results": {
+          "path": "build/nvvm-material-filtering/execute-linear-eval/results.json",
+          "sha256": "2ce2d0b53c9fadbf4e56907aab3bafde90107cc1152bed8e26a807b17f0d3426"
+        },
+        "oracle_sha256": "74348061658aa562f1193dd4801c995ba8bb32d9cf21b2907dde769b91a57a66",
+        "harness_sha256": {
+          "extras/validate-nvvm-material-runtime.py": "7f5c6cb7b11bb0c73f4812a4e440a7f6b3cfeac42dfde9a935d122913b25fde7",
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
+        },
         "absolute_tolerance": 1e-5,
         "relative_tolerance": 0.0002,
         "input_sha256": {
-          "inputs.bin": "c658c2d181ef6988160212a00f1d9fbc16aa92fa92472c4ced0eeaa94edfc977",
+          "inputs.bin": "6edaf284d496f8d0a31aee0204d0219ca9c86fd9c4b3bdc5913e70c94899a56b",
           "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
           "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
         },
-        "harness_sha256": {
-          "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
-          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
+        "cells": [
+          {
+            "id": "nvrtc-o3",
+            "status": "passed",
+            "ptx_sha256": "dd883ced6199630abb18ac5981fd45b081f5024a726b2066bb8c0ff7b9b3bf65",
+            "cubin_sha256": "838160c7dd4fd6259de8217aa2efd3d361ecb4837e15251253be9073709487b4",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
+            "output_sha256": "97d0d58a07aef0d3d7fec95da7d5fd74a7ec30b5d77b96cfc7ce64a7636a3995",
+            "comparison": {
+              "status": "passed",
+              "compared_records": 65,
+              "compared_components": 260,
+              "tail_records": 63,
+              "tail_sentinels_unchanged": true,
+              "different_seed_outputs_identical": true,
+              "wrapped_uv_output_identical": true,
+              "max_absolute_error": 1.956240009093335e-6,
+              "max_relative_error": 5.600704548554906e-7,
+              "max_tolerance_fraction": 0.0021960227288247455,
+              "failed_components_count": 0
+            }
+          },
+          {
+            "id": "nvvm-o0",
+            "status": "passed",
+            "ptx_sha256": "cb916e997b632248904b5a057a007a1f313e267cdba5d19cbbd6517f62519142",
+            "cubin_sha256": "799cb7c81b1dbc8c48a97a30a3e3a88bb6a0bb8fa0b60fb743ce56cb8ef06e22",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
+            "output_sha256": "d7b5f6f0736e51518ceecf0e456b84138a4e15f6c09ea073ded2eb2dafa2f875",
+            "comparison": {
+              "status": "passed",
+              "compared_records": 65,
+              "compared_components": 260,
+              "tail_records": 63,
+              "tail_sentinels_unchanged": true,
+              "different_seed_outputs_identical": true,
+              "wrapped_uv_output_identical": true,
+              "max_absolute_error": 1.956240009093335e-6,
+              "max_relative_error": 5.600704548554906e-7,
+              "max_tolerance_fraction": 0.0021960227288247455,
+              "failed_components_count": 0
+            }
+          },
+          {
+            "id": "nvvm-o3",
+            "status": "passed",
+            "ptx_sha256": "4ae95039cb9d0254fddcbf02afdde637d4ce0f42e12b5cf5de6e33b2765883e8",
+            "cubin_sha256": "21eec6a5f62aa6d36e7d06201f0cf47188d52d8df615b3b30c79c2bd50790e10",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
+            "output_sha256": "97d0d58a07aef0d3d7fec95da7d5fd74a7ec30b5d77b96cfc7ce64a7636a3995",
+            "comparison": {
+              "status": "passed",
+              "compared_records": 65,
+              "compared_components": 260,
+              "tail_records": 63,
+              "tail_sentinels_unchanged": true,
+              "different_seed_outputs_identical": true,
+              "wrapped_uv_output_identical": true,
+              "max_absolute_error": 1.956240009093335e-6,
+              "max_relative_error": 5.600704548554906e-7,
+              "max_tolerance_fraction": 0.0021960227288247455,
+              "failed_components_count": 0
+            }
+          }
+        ],
+        "scope": "Fixed65record synthetic correctness; no timing or arbitrary-input claim.",
+        "uv_locations": [
+          [0.375, 0.25],
+          [0.25, 0.625],
+          [0.375, 0.625],
+          [0.875, 0.125]
+        ],
+        "row_major_weights_over16": [
+          [12, 4, 0, 0],
+          [4, 0, 12, 0],
+          [3, 1, 9, 3],
+          [3, 9, 1, 3]
+        ],
+        "filtering_contract": "Normalized linear wrap; interpolate encoded uploaded Float32 color before one sRGB decode; filter roughness before GGX arithmetic.",
+        "source_review": {
+          "path": "build/nvvm-material-filtering/review/source-review.json",
+          "sha256": "b22fa527ae134fce01a8b9587d2719acedb4ae1e0991326748717c05340a7d91"
+        },
+        "pre_execution_review": {
+          "path": "build/nvvm-material-filtering/review/pre-execution.json",
+          "sha256": "5ef5235ed3dd120e0467d708aa0ecfbcf2780f0241862c46c3c39f0b7fa27821"
+        },
+        "independent_cpu_audit": {
+          "path": "build/nvvm-material-filtering/independent-filtering-audit.json",
+          "sha256": "33966f9f2dda029e8186d6d7a1f3d84bc7f216585685db2733d714c588fa3eff"
+        },
+        "independent_oracle_comparison": {
+          "path": "build/nvvm-material-filtering/worker-oracle-comparison.json",
+          "sha256": "c4982e2b924c0636e78a48a3fcf710c8425f72fadd60316f0b889b85326d6a8a"
+        },
+        "cpu_contracts": {
+          "path": "build/nvvm-material-filtering/cpu-contracts.json",
+          "sha256": "67dda8229309291abd58777b4fc774eedce13eef2c764bf7c0b4d7f38f832300"
+        },
+        "validation_incidents": [
+          {
+            "status": "resolved-auditor-schema-error",
+            "description": "Initial independent CPU replay treated input_sha256 mapping as scalar; corrected auditor only, execution artifacts unchanged.",
+            "attempt": {
+              "path": "build/nvvm-material-filtering/review/independent-output-replay-auditor-schema-error.json",
+              "sha256": "42ed26281d7832d2d285cd9dc705e1da64f685d4c31ce0917dddcae8abe56a07"
+            },
+            "resolution": {
+              "path": "build/nvvm-material-filtering/review/independent-output-replay.json",
+              "sha256": "92f69e20b6f7d0a8088a02128758bba7670d4e87dae3540102e6dc83afb32cab"
+            }
+          }
+        ],
+        "limits": [
+          "Four dyadic locations and three existing direction pairs only; no arbitrary coordinate quantization proof.",
+          "GPU integer-offset equivalence covers location0; seam footprint tested separately.",
+          "No original assets, live LUTs, graph or distribution qualification, or new timing claim."
+        ],
+        "independent_output_replay": {
+          "path": "build/nvvm-material-filtering/review/independent-output-replay.json",
+          "sha256": "92f69e20b6f7d0a8088a02128758bba7670d4e87dae3540102e6dc83afb32cab"
+        },
+        "independent_acceptance": {
+          "path": "build/nvvm-material-filtering/review/candidate-acceptance.json",
+          "sha256": "63ef1041669426f34101dabf6f59c25fd5f38b203df7232b59a8c5a5016e59ed"
         }
       }
     },
@@ -2776,6 +2928,9 @@
       },
       "current_compiler_regression": {
         "status": "passed",
+        "entry": "sample_buffer",
+        "input_profile": "texel-centers",
+        "contract": "tiled-brass-sample-synthetic-textures-v1",
         "provenance": {
           "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
           "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
@@ -2785,8 +2940,20 @@
           "provider_abi": 42
         },
         "results": {
-          "path": "build/nvvm-local-record-arrays/material-execution-sample_buffer/results.json",
-          "sha256": "ebd7dedf60d7567ff7278af29741d44a5fc5b7bc65ef60572e8959c11b33236c"
+          "path": "build/nvvm-material-filtering/execute-centers-sample/results.json",
+          "sha256": "90b4dfe6df0d9f0ba5e31f8345b258fd3803d0af633ad77e0f12bb7678dbcca8"
+        },
+        "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+        "harness_sha256": {
+          "extras/validate-nvvm-material-runtime.py": "7f5c6cb7b11bb0c73f4812a4e440a7f6b3cfeac42dfde9a935d122913b25fde7",
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
+        },
+        "absolute_tolerance": 1e-5,
+        "relative_tolerance": 0.0002,
+        "input_sha256": {
+          "inputs.bin": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+          "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
+          "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
         },
         "cells": [
           {
@@ -2799,13 +2966,10 @@
               "assembly": 0,
               "execution": 0
             },
-            "runtime": {
-              "launches": 1,
-              "active_records": 65,
-              "output_capacity": 128,
-              "device": "NVIDIA L4",
-              "compute_capability": 89
-            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
             "output_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
             "comparison": {
               "status": "passed",
@@ -2840,13 +3004,10 @@
               "assembly": 0,
               "execution": 0
             },
-            "runtime": {
-              "launches": 1,
-              "active_records": 65,
-              "output_capacity": 128,
-              "device": "NVIDIA L4",
-              "compute_capability": 89
-            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
             "output_sha256": "59b02ed2c75a0578257e63b40dbb640a2f01f10e77583f7ac7d52a481bd8f1f4",
             "comparison": {
               "status": "passed",
@@ -2881,13 +3042,10 @@
               "assembly": 0,
               "execution": 0
             },
-            "runtime": {
-              "launches": 1,
-              "active_records": 65,
-              "output_capacity": 128,
-              "device": "NVIDIA L4",
-              "compute_capability": 89
-            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
             "output_sha256": "5c6674159550658a1fbf5afe39a80b84e2666454be6710d57a02b9fcbe74639c",
             "comparison": {
               "status": "passed",
@@ -2913,44 +3071,217 @@
             }
           }
         ],
-        "scope": "Fresh 65-record/63-guard correctness under the local-array compiler. Prior timings and larger-grid qualifications retain their old identities.",
+        "scope": "Fixed65record synthetic correctness; no timing or arbitrary-input claim.",
+        "default_bytes_preserved": {
+          "path": "build/nvvm-material-filtering/regression-comparison.json",
+          "sha256": "01592c68985081993ec4dc59ffc4038a266f68ad3b5e515749e9754c06354b2e"
+        }
+      },
+      "linear_filtering_qualification": {
+        "status": "accepted",
         "entry": "sample_buffer",
-        "source": {
-          "name": "tiled-brass-material",
-          "source": "tests/cuda/complex/tiled_brass_material.slang",
-          "source_sha256": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
-          "entry_points": ["eval_buffer", "sample_buffer"],
-          "stage": "compute",
-          "provenance": {
-            "original_filename": "tiled_brass_material.slang",
-            "original_sha256": "924b39e55a521540518d99e6465c7d765600fd6bee752c1326c20231550eb73c",
-            "license": "Apache-2.0",
-            "adaptations": [
-              "Normalize CRLF to LF.",
-              "Add user-approved __TARGET_CUDA__=1 definition and explanatory comment."
-            ]
-          },
-          "features": [
-            "layered-material",
-            "generic-interfaces",
-            "aggregate-arrays",
-            "bindless-textures",
-            "lookup-buffers",
-            "floating-point-math"
-          ],
-          "runtime_status": "eval_buffer and sample_buffer synthetic-texture contracts qualified separately by extras/validate-nvvm-material-runtime.py and focused-evidence.json; this manifest still owns compile/assembly only. Original assets, live LUT reads, arbitrary inputs and application performance remain unqualified."
+        "input_profile": "linear-filtering",
+        "contract": "tiled-brass-sample-linear-filtering-v1",
+        "provenance": {
+          "revision": "01ecb6e8badbf3cea4770ed8e047693ca0123cb5",
+          "compiler_patch_sha256": "989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da",
+          "compiler_version": "2026.18.3-323-g01ecb6e8b",
+          "compiler_sha256": "b918103eafb90edd687a2f6ded774730209a8b96a17edc853db32090cf489d9d",
+          "provider_sha256": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "provider_abi": 42
         },
-        "oracle_sha256": "4f7741c5d047ddd45e1ef64afc46d36834ac5ddade5fd7475ff98d56b5c1de00",
+        "results": {
+          "path": "build/nvvm-material-filtering/execute-linear-sample/results.json",
+          "sha256": "01261039d92d2211b7682325927250f70d1c489e49d2f466c69e67c9c7f87d92"
+        },
+        "oracle_sha256": "406f6392e60beee09b9dd0d7627967125df7b94e4194cfff6d69d223f92d1197",
+        "harness_sha256": {
+          "extras/validate-nvvm-material-runtime.py": "7f5c6cb7b11bb0c73f4812a4e440a7f6b3cfeac42dfde9a935d122913b25fde7",
+          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
+        },
         "absolute_tolerance": 1e-5,
         "relative_tolerance": 0.0002,
         "input_sha256": {
-          "inputs.bin": "55b52294a283c173b674dc5ea93dc3e9cb667a186a9931cffb91c1003e69bfa4",
+          "inputs.bin": "d923f4f888e3a35c7f7d69f7f9871345f6351838d49e1ac3c7e6d552aef16038",
           "color.bin": "3491a7780b43a61be0fd31c26dc61cbd51cb621ccb7c564b7ba0d7fce2f58144",
           "roughness.bin": "37ea7dfb86322acd0214ec2c597d77bc24d04fd48e23551524129f1aaac34c39"
         },
-        "harness_sha256": {
-          "extras/validate-nvvm-material-runtime.py": "4822de2febcadfa8fd5ed0fc145bc8dfb3839f2562ae909f247184b14fe091b3",
-          "extras/nvvm-material-runtime-driver.cpp": "efd6443254e5c1a5a9724d4445565e68dfb2be7688704ae4fa6ed67938fc019c"
+        "cells": [
+          {
+            "id": "nvrtc-o3",
+            "status": "passed",
+            "ptx_sha256": "214dd03be9f4d7635d26cba874c1b4f3913c43c7e7e2ea4bb62355cf6857fd25",
+            "cubin_sha256": "26e250e48bf3acfe639495cd04a899e78e4e9e370d80ad9749fd3e5ec69b7666",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
+            "output_sha256": "65d77d7a9317921c2d08966e7e40e1f1a327d6585ff80516ad7fb8c413236799",
+            "comparison": {
+              "status": "passed",
+              "matching_global_models": ["float"],
+              "compared_records": 65,
+              "compared_components": 520,
+              "tail_sentinels_unchanged": true,
+              "identical_input_repeats": true,
+              "wrapped_uv_output_identical": true,
+              "early_rejection_bytes_zero": true,
+              "candidate_summaries": {
+                "float": {
+                  "status": "passed",
+                  "failed_components_count": 0,
+                  "max_tolerance_fraction": 0.0028780024038279114
+                },
+                "fma": {
+                  "status": "failed",
+                  "failed_components_count": 192,
+                  "max_tolerance_fraction": 8.708385888566848
+                }
+              }
+            }
+          },
+          {
+            "id": "nvvm-o0",
+            "status": "passed",
+            "ptx_sha256": "d26aa8843d412c29a9b1e2ad7fa337c6e4c609b1aa1e0c8c489ba4fcdd03aa4b",
+            "cubin_sha256": "b3601935ed3fd82bbd5cbef9514a44bf4fb477f0e76c531911d94c6cd652d7d1",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
+            "output_sha256": "3185eb84cb4ccaecbae6c12e1a3499c86b0ed3c28e2f1bfed51a72925b6efb75",
+            "comparison": {
+              "status": "passed",
+              "matching_global_models": ["fma"],
+              "compared_records": 65,
+              "compared_components": 520,
+              "tail_sentinels_unchanged": true,
+              "identical_input_repeats": true,
+              "wrapped_uv_output_identical": true,
+              "early_rejection_bytes_zero": true,
+              "candidate_summaries": {
+                "float": {
+                  "status": "failed",
+                  "failed_components_count": 192,
+                  "max_tolerance_fraction": 8.695510143200105
+                },
+                "fma": {
+                  "status": "passed",
+                  "failed_components_count": 0,
+                  "max_tolerance_fraction": 0.003061828590963839
+                }
+              }
+            }
+          },
+          {
+            "id": "nvvm-o3",
+            "status": "passed",
+            "ptx_sha256": "3868c13c4e03ae53cd36a474f0c4f04859b059339af457914e7f185051d26fb9",
+            "cubin_sha256": "1e36bb481f4d4f11204fb9741c4a73df070b79dfe86555d2143417940498b9f8",
+            "return_codes": {
+              "compile": 0,
+              "assembly": 0,
+              "execution": 0
+            },
+            "launches": 1,
+            "active_records": 65,
+            "guard_records": 63,
+            "cleanup_passed": true,
+            "output_sha256": "65d77d7a9317921c2d08966e7e40e1f1a327d6585ff80516ad7fb8c413236799",
+            "comparison": {
+              "status": "passed",
+              "matching_global_models": ["float"],
+              "compared_records": 65,
+              "compared_components": 520,
+              "tail_sentinels_unchanged": true,
+              "identical_input_repeats": true,
+              "wrapped_uv_output_identical": true,
+              "early_rejection_bytes_zero": true,
+              "candidate_summaries": {
+                "float": {
+                  "status": "passed",
+                  "failed_components_count": 0,
+                  "max_tolerance_fraction": 0.0028780024038279114
+                },
+                "fma": {
+                  "status": "failed",
+                  "failed_components_count": 192,
+                  "max_tolerance_fraction": 8.708385888566848
+                }
+              }
+            }
+          }
+        ],
+        "scope": "Fixed65record synthetic correctness; no timing or arbitrary-input claim.",
+        "uv_locations": [
+          [0.375, 0.25],
+          [0.25, 0.625],
+          [0.375, 0.625],
+          [0.875, 0.125]
+        ],
+        "row_major_weights_over16": [
+          [12, 4, 0, 0],
+          [4, 0, 12, 0],
+          [3, 1, 9, 3],
+          [3, 9, 1, 3]
+        ],
+        "filtering_contract": "Normalized linear wrap; interpolate encoded uploaded Float32 color before one sRGB decode; filter roughness before GGX arithmetic.",
+        "source_review": {
+          "path": "build/nvvm-material-filtering/review/source-review.json",
+          "sha256": "b22fa527ae134fce01a8b9587d2719acedb4ae1e0991326748717c05340a7d91"
+        },
+        "pre_execution_review": {
+          "path": "build/nvvm-material-filtering/review/pre-execution.json",
+          "sha256": "5ef5235ed3dd120e0467d708aa0ecfbcf2780f0241862c46c3c39f0b7fa27821"
+        },
+        "independent_cpu_audit": {
+          "path": "build/nvvm-material-filtering/independent-filtering-audit.json",
+          "sha256": "33966f9f2dda029e8186d6d7a1f3d84bc7f216585685db2733d714c588fa3eff"
+        },
+        "independent_oracle_comparison": {
+          "path": "build/nvvm-material-filtering/worker-oracle-comparison.json",
+          "sha256": "c4982e2b924c0636e78a48a3fcf710c8425f72fadd60316f0b889b85326d6a8a"
+        },
+        "cpu_contracts": {
+          "path": "build/nvvm-material-filtering/cpu-contracts.json",
+          "sha256": "67dda8229309291abd58777b4fc774eedce13eef2c764bf7c0b4d7f38f832300"
+        },
+        "validation_incidents": [
+          {
+            "status": "resolved-auditor-schema-error",
+            "description": "Initial independent CPU replay treated input_sha256 mapping as scalar; corrected auditor only, execution artifacts unchanged.",
+            "attempt": {
+              "path": "build/nvvm-material-filtering/review/independent-output-replay-auditor-schema-error.json",
+              "sha256": "42ed26281d7832d2d285cd9dc705e1da64f685d4c31ce0917dddcae8abe56a07"
+            },
+            "resolution": {
+              "path": "build/nvvm-material-filtering/review/independent-output-replay.json",
+              "sha256": "92f69e20b6f7d0a8088a02128758bba7670d4e87dae3540102e6dc83afb32cab"
+            }
+          }
+        ],
+        "limits": [
+          "Four dyadic locations and three existing direction pairs only; no arbitrary coordinate quantization proof.",
+          "GPU integer-offset equivalence covers location0; seam footprint tested separately.",
+          "No original assets, live LUTs, graph or distribution qualification, or new timing claim."
+        ],
+        "independent_output_replay": {
+          "path": "build/nvvm-material-filtering/review/independent-output-replay.json",
+          "sha256": "92f69e20b6f7d0a8088a02128758bba7670d4e87dae3540102e6dc83afb32cab"
+        },
+        "independent_acceptance": {
+          "path": "build/nvvm-material-filtering/review/candidate-acceptance.json",
+          "sha256": "63ef1041669426f34101dabf6f59c25fd5f38b203df7232b59a8c5a5016e59ed"
         }
       }
     },

@@ -343,7 +343,8 @@ this when a real workload motivates retiring a complete representation family; a
 rewrite alone would not demonstrate that architectural benefit.
 
 These remaining proposals are not implemented support or authorization to resume general feature
-work. Record-array admission would be a useful later test of the revised boundary.
+work. Qualified local record arrays now exercise the revised boundary through existing checked
+type/address plans without another transforming pass.
 
 Material runtime qualification has a separate contract from compile/assembly and static resource
 measurements. The maintained tiled-brass validator runs the unchanged `eval_buffer` and
@@ -353,6 +354,13 @@ packing, inputs and output checks. Installed-header assertions and fresh PTX rev
 168-byte global block and input/output strides (40/16 for eval, 24/32 for sample). Execution requires
 byte-identical reviewed PTX and frozen oracle hashes. Full texture handles must fit the application's
 low30 encoding without truncation. Repeats, wrapped UVs and untouched tail sentinels are checked.
+
+Input profiles own fixed coordinates, sampled inputs, independent oracles and preparation identity.
+The default texel-center profile preserves original bytes and measurement inputs. The separately
+qualified linear-filtering profile uses four dyadic locations for axis, bilinear and wrap-seam
+footprints. Its scalar reference interpolates uploaded encoded RGB before the graph decodes sRGB,
+and filters roughness before nonlinear material arithmetic. Profile identity and frozen oracle
+hashes prevent cross-profile preparation reuse even when the shader and ABI bytes agree.
 
 Sampling returns selected-layer throughput, not the collapsed full-material eval/PDF estimator.
 Cancellation in the source's artistic-IOR calculation affects average Fresnel and selection weights.

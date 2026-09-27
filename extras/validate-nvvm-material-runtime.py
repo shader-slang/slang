@@ -4,8 +4,8 @@
 
 """Qualify unchanged tiled-brass eval or sample entries with two synthetic live CUDA textures.
 
-This fixed graph contract covers finite front-facing reflection at texel centers, not original
-assets, LUT reads, arbitrary material graphs, or GPU performance. Run on native
+This fixed graph contract covers finite front-facing reflection at fixed texture coordinates,
+not original assets, LUT reads, arbitrary material graphs, or GPU performance. Run on native
 Linux with the selected CUDA headers. Each invocation requires a new artifact directory.
 """
 
@@ -29,9 +29,9 @@ ACTIVE_COUNT, OUTPUT_COUNT = 65, 128
 INPUT = struct.Struct("<8fI4x")
 OUTPUT = struct.Struct("<4f")
 SENTINEL = b"\xa5" * OUTPUT.size
-# Frozen before GPU comparison. Independent source-style float32/FMA CPU arithmetic over these
-# inputs differed by <8.5e-7 absolute and <5.6e-7 relative. This leaves >400x observed arithmetic
-# margin for CUDA normalization/transcendentals, while missing-lobe/texel/roughness perturbations
+# Frozen before GPU comparison. Independent source-style float32/FMA CPU arithmetic over the
+# original texel-center inputs differed by <8.5e-7 absolute and <5.6e-7 relative. This leaves
+# >400x observed arithmetic margin for CUDA normalization/transcendentals, while perturbations
 # exceed the comparison budget by >349x. This empirical finite-input envelope is not a proof
 # about arbitrary inputs or a promise of correctly rounded CUDA transcendental instructions.
 ABS_TOL, REL_TOL = 1e-5, 2e-4
@@ -125,28 +125,117 @@ def reference(color, roughness, incoming, outgoing, omit=None):
                  for component in linear_color(color)) + (pdf,)
 
 
-def cases():
-    """Use twelve texel/direction pairs and a wrapped UV, repeated with different seeds."""
+INPUT_PROFILES = ("texel-centers", "linear-filtering")
+FILTERING_UVS = ((3/8, 1/4), (1/4, 5/8), (3/8, 5/8), (7/8, 1/8))
+
+
+def input_locations(input_profile):
+    """Choose the four fixed sample locations without changing the default input contract."""
+    if input_profile == "texel-centers":
+        return tuple((.25 + .5*(index % 2), .25 + .5*(index // 2)) for index in range(4))
+    if input_profile == "linear-filtering":
+        return FILTERING_UVS
+    raise ValueError("unknown material input profile: " + input_profile)
+
+
+def filtered_texture_inputs(uv, address_mode="wrap"):
+    """Interpolate uploaded Float32 texels before the graph decodes sampled sRGB color.
+
+    The normalized 2x2 footprint is centered at (2u-1/2, 2v-1/2). The frozen profile
+    uses exact quarter weights, so CUDA's eight fractional weight bits do not quantize
+    them. Clamp is used only as a counterfactual for checking seam discrimination.
+    """
+    if address_mode not in ("wrap", "clamp"):
+        raise ValueError("unknown texture address mode")
+    x, y = (2*coordinate - .5 for coordinate in uv)
+    left, bottom = math.floor(x), math.floor(y)
+    a, b = x-left, y-bottom
+    color, roughness = [0.0]*4, 0.0
+    for dx, wx in ((0, 1-a), (1, a)):
+        for dy, wy in ((0, 1-b), (1, b)):
+            column, row = left+dx, bottom+dy
+            if address_mode == "wrap":
+                column, row = column % 2, row % 2
+            else:
+                column, row = min(1, max(0, column)), min(1, max(0, row))
+            index, weight = row*2+column, wx*wy
+            for channel in range(4):
+                color[channel] += weight*f32(COLORS[index][channel])
+            roughness += weight*f32(ROUGHNESS[index])
+    return tuple(color), roughness
+
+
+def texture_inputs(row, input_profile="texel-centers"):
+    """Resolve one profile's sampled color and roughness for references and seed selection."""
+    input_locations(input_profile)
+    if input_profile == "linear-filtering":
+        return filtered_texture_inputs(row["uv"])
+    return tuple(map(f32, COLORS[row["texel"]])), f32(ROUGHNESS[row["texel"]])
+
+
+def filtering_oracle_checks():
+    """Require the finite profile to distinguish common texture and decode mistakes.
+
+    Each mistake must change at least one observed eval component by over 100 tolerance
+    units. The seam case distinguishes clamp; axis-only cases distinguish exchanged UVs.
+    Decode-before-filter is computed from the graph's linear dependence on decoded color,
+    without changing the actual reference or reproducing shader aggregate operations.
+    """
+    separation = dict.fromkeys(("point", "clamp", "swapped_axes", "decode_before_filter"), 0.0)
+    # Independently enumerated row-major interpolation weights for the four frozen UVs.
+    weights = ((12, 4, 0, 0), (4, 0, 12, 0), (3, 1, 9, 3), (3, 9, 1, 3))
+    for uv, numerators in zip(FILTERING_UVS, weights):
+        color, roughness = filtered_texture_inputs(uv)
+        point_index = (math.floor(2*uv[1]) % 2)*2 + math.floor(2*uv[0]) % 2
+        alternatives = {
+            "point": (tuple(map(f32, COLORS[point_index])), f32(ROUGHNESS[point_index])),
+            "clamp": filtered_texture_inputs(uv, "clamp"),
+            "swapped_axes": filtered_texture_inputs(tuple(reversed(uv))),
+        }
+        wrong_linear = tuple(sum(n*linear_color(tuple(map(f32, texel)))[channel]/16
+                                 for n, texel in zip(numerators, COLORS)) for channel in range(3))
+        for incoming, outgoing in DIRECTIONS:
+            incoming, outgoing = tuple(map(f32, incoming)), tuple(map(f32, outgoing))
+            wanted = reference(color, roughness, incoming, outgoing)
+            changed = {name: reference(c, r, incoming, outgoing)
+                       for name, (c, r) in alternatives.items()}
+            coat = reference((0., 0., 0., 1.), roughness, incoming, outgoing)
+            decoded = linear_color(color)
+            changed["decode_before_filter"] = tuple(
+                coat[channel] + (wanted[channel]-coat[channel])*wrong_linear[channel]/decoded[channel]
+                for channel in range(3)) + (wanted[3],)
+            for name, output in changed.items():
+                separation[name] = max(separation[name], max(
+                    abs(actual-expected)/tolerance(expected)
+                    for actual, expected in zip(output, wanted)))
+    if min(separation.values()) <= 100:
+        raise ValueError("filtering counterfactual separation is below 100 tolerance units")
+    return {"maximum_counterfactual_tolerance_multiples": separation}
+
+
+def cases(input_profile="texel-centers"):
+    """Use twelve location/direction pairs and a wrapped UV, repeated with different seeds."""
+    locations = input_locations(input_profile)
     base = []
     for texel in range(4):
         for direction, (incoming, outgoing) in enumerate(DIRECTIONS):
             base.append(dict(texel=texel, direction=direction,
-                             uv=(.25 + .5 * (texel % 2), .25 + .5 * (texel // 2)),
+                             uv=locations[texel],
                              incoming=tuple(map(f32, incoming)), outgoing=tuple(map(f32, outgoing))))
-    base.append(dict(base[0], uv=(1.25, -.75)))
+    base.append(dict(base[0], uv=(locations[0][0]+1, locations[0][1]-1)))
     return [dict(base[index % len(base)], seed=17 + index * 7919) for index in range(ACTIVE_COUNT)]
 
 
-def expected_outputs(inputs):
-    return [reference(tuple(map(f32, COLORS[row["texel"]])), f32(ROUGHNESS[row["texel"]]),
-                      row["incoming"], row["outgoing"]) for row in inputs]
+def expected_outputs(inputs, input_profile="texel-centers"):
+    return [reference(*texture_inputs(row, input_profile), row["incoming"], row["outgoing"])
+            for row in inputs]
 
 
 def tolerance(value):
     return ABS_TOL + REL_TOL * abs(value)
 
 
-def oracle_checks(inputs, expected):
+def oracle_checks(inputs, expected, input_profile="texel-centers"):
     """Require positive finite outputs and distinguish omitted lobes and wrong texture inputs."""
     if len(inputs) != ACTIVE_COUNT or len(expected) != ACTIVE_COUNT:
         raise ValueError("oracle requires all 65 records")
@@ -155,7 +244,7 @@ def oracle_checks(inputs, expected):
     minimum = dict.fromkeys(("missing_coat", "missing_base", "wrong_color", "wrong_roughness"), math.inf)
     for row, output in zip(inputs[:12], expected[:12]):
         texel = row["texel"]
-        color, roughness = tuple(map(f32, COLORS[texel])), f32(ROUGHNESS[texel])
+        color, roughness = texture_inputs(row, input_profile)
         for name in minimum:
             altered = reference(
                 tuple(map(f32, COLORS[(texel + 1) % 4])) if name == "wrong_color" else color,
@@ -171,7 +260,7 @@ def oracle_checks(inputs, expected):
 
 
 # Sampling uses the same unchanged textures, directions and numerical budget as eval.
-# The finite pre-GPU float/FMA study consumed <0.014 of this budget for these inputs.
+# The original texel-center pre-GPU float/FMA study consumed <0.014 of this budget.
 # IOR cancellation is represented explicitly by two candidates instead of widening tolerance.
 SAMPLE_CONTRACT = "tiled-brass-sample-synthetic-textures-v1"
 SAMPLE_INPUT, SAMPLE_OUTPUT = struct.Struct("<5fI"), struct.Struct("<7fI")
@@ -249,7 +338,7 @@ def sample_direction(incoming, roughness, random):
     dot = sum(x*y for x,y in zip(i,m))
     return tuple(2*dot*x-y for x,y in zip(m,i))
 
-def sample_reference(row, model, mutation=None):
+def sample_reference(row, model, mutation=None, input_profile="texel-centers"):
     """Compute direction, mixture PDF and the selected branch's estimator in double precision.
 
     Consider a colored conductor below the dielectric coat. MxMaterialInstance.sample first
@@ -264,8 +353,7 @@ def sample_reference(row, model, mutation=None):
     incoming = row['incoming']
     if normalize(incoming)[2] <= 0:
         return (0.,)*7+(0,)
-    color = tuple(map(f32, COLORS[row['texel']]))
-    roughness = f32(ROUGHNESS[row['texel']])
+    color, roughness = texture_inputs(row, input_profile)
     random = sample_draws(row['seed'])
     if mutation == 'shift_draws':
         random = random[1:] + random[:1]
@@ -301,13 +389,15 @@ def sample_reference(row, model, mutation=None):
         weight = tuple(x/pdf for x in reference(color,roughness,incoming,o)[:3])
     return o+(pdf,)+weight+(2,)
 
-def sample_cases():
+def sample_cases(input_profile="texel-centers"):
     """Select finite seeds using CPU equations alone, well away from either model's branch edge."""
+    locations = input_locations(input_profile)
     rows = []
     for texel in range(4):
         for di, (incoming, _) in enumerate(DIRECTIONS):
             incoming = tuple(map(f32,incoming))
-            color = tuple(map(f32,COLORS[texel]))
+            color, roughness = texture_inputs(
+                dict(texel=texel, uv=locations[texel]), input_profile)
             probabilities = [sample_probability(color,incoming,m) for m in SAMPLE_MODELS]
             for lobe in range(2):
                 for seed in range(100000):
@@ -316,10 +406,10 @@ def sample_cases():
                         continue
                     if any(int(random[0]>=p) != lobe for p in probabilities):
                         continue
-                    if sample_direction(incoming,f32(ROUGHNESS[texel]),random)[2] <= .2:
+                    if sample_direction(incoming,roughness,random)[2] <= .2:
                         continue
                     rows.append(dict(texel=texel,direction=di,lobe=lobe,
-                        uv=(.25+.5*(texel%2),.25+.5*(texel//2)),incoming=incoming,seed=seed))
+                        uv=locations[texel],incoming=incoming,seed=seed))
                     break
                 else:
                     raise ValueError('no branch-stable seed')
@@ -327,14 +417,15 @@ def sample_cases():
     rows += [dict(row) for row in rows]
     rows += [dict(row,uv=(row['uv'][0]+1,row['uv'][1]-1)) for row in rows[:4]]
     rows += [dict(row) for row in rows[:12]]
-    rows.append(dict(texel=0,direction=3,lobe=0,uv=(.25,.25),incoming=(1.,0.,0.),seed=17))
+    rows.append(dict(texel=0,direction=3,lobe=0,uv=locations[0],incoming=(1.,0.,0.),seed=17))
     return rows
 
-def sample_expected_outputs(inputs):
+def sample_expected_outputs(inputs, input_profile="texel-centers"):
     """Build complete output tables for both coherent IOR hypotheses."""
-    return {m:[sample_reference(row,m) for row in inputs] for m in SAMPLE_MODELS}
+    return {m:[sample_reference(row,m,input_profile=input_profile) for row in inputs]
+            for m in SAMPLE_MODELS}
 
-def sample_oracle_checks(inputs, expected):
+def sample_oracle_checks(inputs, expected, input_profile="texel-centers"):
     """Check finite geometry, branch margins and sensitivity to meaningful estimator mistakes."""
     if len(inputs)!=ACTIVE_COUNT or set(expected)!=set(SAMPLE_MODELS):
         raise ValueError('incomplete oracle')
@@ -351,11 +442,11 @@ def sample_oracle_checks(inputs, expected):
                 continue
             if not all(math.isfinite(x) for x in ref) or ref[2]<=.2 or ref[3]<=0 or min(ref[4:7])<=0 or ref[7]!=2:
                 raise ValueError('invalid finite oracle')
-            margin=abs(sample_draws(row['seed'])[0]-sample_probability(tuple(map(f32,COLORS[row['texel']])),row['incoming'],model))
+            margin=abs(sample_draws(row['seed'])[0]-sample_probability(texture_inputs(row,input_profile)[0],row['incoming'],model))
             margins.append(margin)
             if margin<=.03: raise ValueError('branch margin too small')
             for name in separation:
-                altered=sample_reference(row,model,mutation=name)
+                altered=sample_reference(row,model,mutation=name,input_profile=input_profile)
                 distance=max(abs(a-b)/tolerance(b) for a,b in zip(altered[:7],ref[:7]))
                 separation[name]=min(separation[name],distance)
     if min(separation.values())<=5:
@@ -426,7 +517,7 @@ def validate_ptx(text, architecture, entry="eval_buffer"):
     return list(requirements)
 
 
-def reviewed_abi_hashes(path, source_sha256, modes, entry="eval_buffer"):
+def reviewed_abi_hashes(path, source_sha256, modes, entry="eval_buffer", input_profile="texel-centers"):
     """Require complete, exact PTX identities from a separately reviewed preparation run.
 
     The small automatic checks deliberately do not trace arbitrary PTX register dataflow. The
@@ -434,7 +525,8 @@ def reviewed_abi_hashes(path, source_sha256, modes, entry="eval_buffer"):
     explicit ABI review. The execution run then demands byte-identical fresh PTX in every mode.
     """
     report = json.loads(path.read_text())
-    if (report.get("status") != "prepared" or report.get("contract") != entry_layout(entry)["contract"] or
+    if (report.get("status") != "prepared" or report.get("contract") != entry_layout(entry,input_profile)["contract"] or
+            report.get("input_profile", "texel-centers") != input_profile or
             report.get("source", {}).get("source_sha256") != source_sha256):
         raise ValueError("ABI reference must be a successful preparation of this exact source contract")
     cells = report.get("cells", [])
@@ -507,8 +599,9 @@ def validate_driver_log(text, entry="eval_buffer"):
                                 for name, decimal, hexadecimal in handles}}
 
 
-def entry_layout(entry):
+def entry_layout(entry, input_profile="texel-centers"):
     """Keep each entry's descriptor and packing contract in one explicit table."""
+    input_locations(input_profile)
     layouts = {
         "eval_buffer": dict(contract=CONTRACT, input_offset=96, output_offset=112,
                             input_stride=INPUT.size, output_shift=4, input_struct=INPUT,
@@ -521,7 +614,10 @@ def entry_layout(entry):
     }
     if entry not in layouts:
         raise ValueError("unknown material entry: " + entry)
-    return layouts[entry]
+    layout = layouts[entry]
+    if input_profile == "linear-filtering":
+        layout["contract"] = layout["contract"].replace("synthetic-textures-v1", "linear-filtering-v1")
+    return layout
 
 
 def validate_oracle_hash(reference_path, oracle_sha256):
@@ -543,6 +639,7 @@ def main():
     phase.add_argument("--abi-reference", type=Path,
                        help="results.json from an explicitly reviewed --prepare-only run")
     parser.add_argument("--entry", choices=("eval_buffer", "sample_buffer"), default="eval_buffer")
+    parser.add_argument("--input-profile", choices=INPUT_PROFILES, default="texel-centers")
     parser.add_argument("--cxx", default="c++")
     parser.add_argument("--timeout", type=int, default=180)
     args = parser.parse_args()
@@ -553,8 +650,8 @@ def main():
     if args.output.exists():
         parser.error("output directory already exists; use a new directory to preserve every attempt")
     args.output.mkdir(parents=True)
-    layout = entry_layout(args.entry)
-    report = {"schema": 1, "contract": layout["contract"], "entry": args.entry, "status": "infrastructure-failed", "cells": [],
+    layout = entry_layout(args.entry, args.input_profile)
+    report = {"schema": 1, "contract": layout["contract"], "entry": args.entry, "input_profile": args.input_profile, "status": "infrastructure-failed", "cells": [],
               "started_utc": datetime.now(timezone.utc).isoformat(), "platform": platform.platform(),
               "absolute_tolerance": ABS_TOL, "relative_tolerance": REL_TOL,
               "scope": f"unchanged {args.entry}, two synthetic textures, finite front-facing reflection",
@@ -578,7 +675,7 @@ def main():
         abi_hashes = None
         if args.abi_reference:
             args.abi_reference = args.abi_reference.resolve()
-            abi_hashes = reviewed_abi_hashes(args.abi_reference, workload["source_sha256"], corpus.MODES, args.entry)
+            abi_hashes = reviewed_abi_hashes(args.abi_reference, workload["source_sha256"], corpus.MODES, args.entry, args.input_profile)
             report["reviewed_abi_reference"] = {"path": str(args.abi_reference),
                                                "sha256": toolkit.sha256(args.abi_reference),
                                                "ptx_sha256": abi_hashes}
@@ -622,9 +719,11 @@ def main():
         if report["helper_build"]["return_code"] != 0:
             raise ValueError("material driver helper build failed")
         report["artifact_sha256"][str(helper)] = toolkit.sha256(helper)
-        inputs = layout["cases"]()
-        expected = layout["expected"](inputs)
-        report["oracle_checks"] = layout["check"](inputs, expected)
+        inputs = layout["cases"](args.input_profile)
+        expected = layout["expected"](inputs, args.input_profile)
+        report["oracle_checks"] = layout["check"](inputs, expected, args.input_profile)
+        if args.input_profile == "linear-filtering":
+            report["filtering_oracle_checks"] = filtering_oracle_checks()
         payloads = {
             "inputs.bin": b"".join(layout["input_struct"].pack(*row["uv"], *row["incoming"], *row.get("outgoing", ()), row["seed"]) for row in inputs),
             "color.bin": struct.pack("<16f", *(v for color in COLORS for v in color)),

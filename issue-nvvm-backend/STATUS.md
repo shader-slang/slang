@@ -27,7 +27,7 @@ identities; older timing results have not been remeasured under this compiler.
 | Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                                              |
 | Material runtime                                  | 6 fresh default cells pass; both entries, 65 records and 63 guards per cell  |
 | Runner contracts                                  | 90 pass, 1 inherited skip                                                    |
-| Last full / targeted / implementations since full | local-record-arrays / local-record-arrays / 0                                |
+| Last full / targeted / implementations since full | local-record-arrays / material-filtering / 1                                 |
 
 Compiler source: `01ecb6e8badbf3cea4770ed8e047693ca0123cb5` plus patch
 `989b5d610b6a596afdc7f8e04bd87207ad82e99c0e00d79bc1809960f13ee7da`; version `2026.18.3-323-g01ecb6e8b`.
@@ -37,6 +37,9 @@ Later Git commits do not identify rebuilt bytes. Qualification uses native Ubunt
 driver580.126.09, CUDA12.9.2/NVRTC12.9.86 and LLVM14, targeting SM80. Installed layout is
 `build/RelWithDebInfo`; raw acceptance artifacts are under `build/nvvm-local-record-arrays/`.
 The direct static tests use a separately pinned compiler with the same production source and provider.
+A later harness-only qualification passes six filtered and six default material cells, plus 36 runtime
+and 13 measurement CPU contracts. Default input/oracle/output bytes and installed identities are exact;
+raw artifacts are under `build/nvvm-material-filtering/`. The full baseline remains unchanged.
 
 ## Boundaries and next action
 
@@ -52,7 +55,9 @@ The direct static tests use a separately pinned compiler with the same productio
   in the main corpus. The permanent compact CUDA matrix test passes; raw uploads do not repack host
   data. Three focused NVRTC nested integer-array wrong-output controls remain outside the main corpus;
   two large vendor experiments timed out. Their histories and limits remain in focused evidence.
-- The tiled-brass material's synthetic-texture eval/sample contracts pass fresh correctness gates.
+- The tiled-brass material's synthetic-texture eval/sample contracts pass texel-center and fixed
+  off-center filtering correctness gates. Interpolation precedes color decode; both wrap seams are
+  exercised by the selected footprint. Arbitrary UVs and texture quantization remain unqualified.
   Prior device-event measurements, eval local-store deletion control and dynamic-index source
   reduction retain their tested compiler identities. They explain a bounded synthetic eval gap,
   without justifying a production PTX deletion or changing receiver-copy semantics. Original assets,

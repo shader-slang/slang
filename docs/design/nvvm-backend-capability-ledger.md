@@ -136,6 +136,14 @@ the qualified stack; `txq.level.width` loaded and executed. No full API repair i
 | Material shaders                                                                  | Both registered entries × three modes compile/assemble and execute with two live synthetic textures and independent scalar oracles       | 65 active records/entry/mode and 63 untouched guards. Eval checks 260 components; sample checks 455 floats/65 flags, selected-layer throughput, coherent arithmetic candidates and exact rejection zeros. Fixed synthetic inputs only; no original assets, live LUTs or sampling-distribution claim. Device-event evidence has its own scoped row below. [Runtime validator](../../extras/validate-nvvm-material-runtime.py). [Material manifest](../../issue-nvvm-backend/complex-corpus.manifest.json)                                                                                                                                                                                                                       |
 | Synthetic material device events                                                  | Both entries × two counts × three modes × two reversed rounds; 216 measured launches and 72 warmups pass complete output checks          | At N1,048,577, NVRTC O3/NVVM O3 time ratios are 8.98–8.99 eval and 6.31–6.32 sample on the qualified L4. Tiny hot textures, periodic inputs and inter-launch correctness transfers only; no application performance or causal claim. Small NVVM O3 cells fail the 0.1 ms throughput gate. An eval-only diagnostic removes 65 proven never-read PTX stores: reassembly eliminates its stack and reduces NVRTC time about 8.15× with exact outputs. This is not a production pass or a sampling result. [Runner](../../extras/measure-nvvm-material-runtime.py), [CPU contracts](../../issue-nvvm-backend/test-nvvm-material-measurement.py), [protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement). |
 
+The material validator also qualifies a separately named `linear-filtering` input profile in six
+GPU cells. Four dyadic UV locations exercise horizontal, vertical and bilinear blends and a footprint
+across both wrap seams; encoded color is interpolated before sRGB decoding. Each cell checks 65 active
+records and 63 guards. Both entries retain independent oracles, fixed tolerances, and sample-wide
+arithmetic hypotheses. Six fresh default-profile cells preserve exact input/oracle/output bytes.
+Integer-offset equivalence is observed at the first location; arbitrary UV quantization, assets,
+LUTs and timing remain outside this qualification. The original device-event protocol uses centers.
+
 Material-derived aggregate/indexing coverage also runs through Slang in all three modes. The
 [bounded and literal controls](../../tests/cuda/nvvm-aggregate-index-material.slang) retain initialized
 unused fields, a receiver snapshot and a nested stack copy. A separate

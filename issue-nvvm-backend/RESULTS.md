@@ -333,6 +333,15 @@ rounding candidates account for source cancellation; one must explain all record
 Never select models per component or widen tolerance after observing outputs. These are finite
 candidates, not an exhaustive account of allowed compiler arithmetic. Preserve unexplained failures.
 
+The default `--input-profile texel-centers` preserves the original input and oracle bytes. To
+qualify off-center interpolation, add `--input-profile linear-filtering` to both preparation and
+execution commands and use separate output directories. A preparation from another profile is
+rejected even though the shader and ABI are identical. The four fixed locations exercise horizontal,
+vertical and bilinear blends plus a footprint across both wrap seams. The oracle interpolates
+uploaded encoded color before sRGB decoding and filters roughness before GGX arithmetic. Exact
+dyadic weights avoid coordinate-weight quantization in these cases; arbitrary coordinates remain
+unqualified. Wrapped-equivalence GPU records repeat the first location only.
+
 The oracle/inputs/tolerance are written before launch. `prepared` is compile/assembly only;
 `passed` additionally includes execution and comparison. This is correctness evidence, not a timing
 command. Original assets, live LUT reads, arbitrary graphs/inputs, sampling-distribution accuracy
@@ -341,7 +350,8 @@ independent review, retaining failures. Keep raw outputs, snapshots and audit lo
 
 ## Material device-event measurement
 
-Use fresh successful eval and sample runtime reports from the preceding protocol. Their artifact
+Use fresh successful **texel-center profile** eval and sample runtime reports from the preceding
+protocol. The fixed measurement contract rejects linear-filtering profile reports. Their artifact
 hashes must still match the current driver, validator, manifest, compiler and shader bytes. The
 measurement runner compiles nothing; it reuses the qualified cubins and shared helper. Run with the
 same CUDA environment and no competing builds or GPU work. Every output directory must be new.
