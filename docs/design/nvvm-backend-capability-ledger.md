@@ -133,6 +133,14 @@ the qualified stack; `txq.level.width` loaded and executed. No full API repair i
 | Material shaders                                                                  | Both registered entries × three modes compile/assemble and execute with two live synthetic textures and independent scalar oracles       | 65 active records/entry/mode and 63 untouched guards. Eval checks 260 components; sample checks 455 floats/65 flags, selected-layer throughput, coherent arithmetic candidates and exact rejection zeros. Fixed synthetic inputs only; no original assets, live LUTs or sampling-distribution claim. Device-event evidence has its own scoped row below. [Runtime validator](../../extras/validate-nvvm-material-runtime.py). [Material manifest](../../issue-nvvm-backend/complex-corpus.manifest.json)                                                                                                                                                                                                                       |
 | Synthetic material device events                                                  | Both entries × two counts × three modes × two reversed rounds; 216 measured launches and 72 warmups pass complete output checks          | At N1,048,577, NVRTC O3/NVVM O3 time ratios are 8.98–8.99 eval and 6.31–6.32 sample on the qualified L4. Tiny hot textures, periodic inputs and inter-launch correctness transfers only; no application performance or causal claim. Small NVVM O3 cells fail the 0.1 ms throughput gate. An eval-only diagnostic removes 65 proven never-read PTX stores: reassembly eliminates its stack and reduces NVRTC time about 8.15× with exact outputs. This is not a production pass or a sampling result. [Runner](../../extras/measure-nvvm-material-runtime.py), [CPU contracts](../../issue-nvvm-backend/test-nvvm-material-measurement.py), [protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement). |
 
+Material-derived aggregate/indexing coverage also runs through Slang in all three modes. The
+[bounded and literal controls](../../tests/cuda/nvvm-aggregate-index-material.slang) retain initialized
+unused fields, a receiver snapshot and a nested stack copy. A separate
+[copy-then-mutate witness](../../tests/cuda/nvvm-aggregate-index-snapshot.slang) checks saved and live
+slots independently, including all vector lanes. Six GPU cells check 96 exact integer components;
+these two focused sources remain outside the main corpus denominator. This qualifies behavior, not
+identical generated code or performance relative to the CUDA reduction.
+
 The eval diagnostic also has a source-derived CUDA reduction with independent static address proof.
 Eight bounded-index variants retain 27 never-read store instructions and a 584-byte stack; eight
 constant-index variants have no local memory. The other three source factors do not change PTX.

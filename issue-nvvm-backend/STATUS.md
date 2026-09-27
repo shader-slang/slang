@@ -92,10 +92,13 @@ outcomes, identities and failure history. No performance improvement from that r
   never-read stores (304 executed bytes per active thread) and a 584-byte stack; all 8 constant-index
   variants eliminate local memory. Initialization, receiver-copy and branch spelling do not change
   PTX within either group. Three full-material force-inline controls reproduce the original PTX.
-  All 19 candidates compile/assemble; no candidate GPU result is claimed. Next qualify the reduced
-  aggregate/indexing composition through Slang if existing coverage lacks it. Any production fix
-  must preserve receiver value semantics and prove general field liveness; the PTX deletion remains
-  a diagnostic. Further vendor-specific reduction is secondary to workload coverage.
+  All 19 CUDA candidates compile/assemble; none has a GPU result. Two separate permanent Slang
+  fixtures qualify bounded/literal indexing and copy-then-mutate semantics: all 6 mode cells and
+  96 integer components pass, plus 6 neighboring GPU cells and one IR check. These focused tests
+  do not change the main corpus totals or compiler checkpoint. Any production fix must preserve
+  receiver value semantics and prove general field liveness; the PTX deletion remains a diagnostic.
+  Return to workload coverage and triage the remaining host-packing boundary before more vendor
+  optimization research.
 
 Future authorized work updates current documents and evidence in place. Keep working plans,
 report drafts and raw artifacts uncommitted; do not restart numbered slice history.

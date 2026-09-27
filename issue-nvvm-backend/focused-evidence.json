@@ -4393,7 +4393,144 @@
             "API options inferred from adapter source; not intercepted.",
             "No registered shader, compiler, prelude, installed layout or full baseline changed."
           ],
-          "next_action": "Qualify this missing aggregate/dynamic-index/copy composition through Slang with bounded and literal controls in the existing three-mode harness; further vendor reduction is secondary."
+          "next_action": "Material-derived Slang composition now qualified; prioritize remaining workload/host-packing boundaries over additional vendor-specific optimization research.",
+          "slang_qualification": {
+            "status": "accepted-focused-gpu",
+            "scope": "Material-derived initialized aggregate/dynamic indexing/value copy, plus separate mutation/index semantic witness. Two permanent sources outside main corpus denominator.",
+            "compiler_change": false,
+            "main_baseline_replaced": false,
+            "source_sha256": {
+              "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
+              "tests/cuda/nvvm-aggregate-index-snapshot.slang": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db"
+            },
+            "runtime_inputs": [0, 1, 2, 3],
+            "expected_outputs": {
+              "material": [1, 26, 83, 108, 1, 26, 83, 108],
+              "snapshot": [
+                3215431, 6548762, 6543213, 6548762, 6543213, 6548762, 3215431,
+                6548762, 3215431, 7654324, 7654324, 3215431, 3215431, 6548762,
+                8765435, 6548762, 8765435, 6548762, 3215431, 6548762, 3215431,
+                9876546, 9876546, 3215431
+              ]
+            },
+            "new_gpu_cells": 6,
+            "checked_uint_components": 96,
+            "neighbor_gpu_cells": 6,
+            "neighbor_ir_checks": 1,
+            "cells": [
+              {
+                "id": "tests/cuda/nvvm-aggregate-index-material.slang",
+                "mode": "nvrtc-o3",
+                "status": "correct",
+                "return_code": 0,
+                "executed": 1,
+                "component_count": 8,
+                "actual_sha256": "3a85dd49e47fb3efb6682c13fdc34a4e91fada785956880473aee17d9c9e87ee",
+                "source_sha256": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0"
+              },
+              {
+                "id": "tests/cuda/nvvm-aggregate-index-material.slang",
+                "mode": "nvvm-o0",
+                "status": "correct",
+                "return_code": 0,
+                "executed": 1,
+                "component_count": 8,
+                "actual_sha256": "3a85dd49e47fb3efb6682c13fdc34a4e91fada785956880473aee17d9c9e87ee",
+                "source_sha256": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0"
+              },
+              {
+                "id": "tests/cuda/nvvm-aggregate-index-material.slang",
+                "mode": "nvvm-o3",
+                "status": "correct",
+                "return_code": 0,
+                "executed": 1,
+                "component_count": 8,
+                "actual_sha256": "3a85dd49e47fb3efb6682c13fdc34a4e91fada785956880473aee17d9c9e87ee",
+                "source_sha256": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0"
+              },
+              {
+                "id": "tests/cuda/nvvm-aggregate-index-snapshot.slang",
+                "mode": "nvrtc-o3",
+                "status": "correct",
+                "return_code": 0,
+                "executed": 1,
+                "component_count": 24,
+                "actual_sha256": "6541e4ac7bc2cb41b3e30df78fd8a8ca435629a017a2913067075bc1d14ce309",
+                "source_sha256": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db"
+              },
+              {
+                "id": "tests/cuda/nvvm-aggregate-index-snapshot.slang",
+                "mode": "nvvm-o0",
+                "status": "correct",
+                "return_code": 0,
+                "executed": 1,
+                "component_count": 24,
+                "actual_sha256": "6541e4ac7bc2cb41b3e30df78fd8a8ca435629a017a2913067075bc1d14ce309",
+                "source_sha256": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db"
+              },
+              {
+                "id": "tests/cuda/nvvm-aggregate-index-snapshot.slang",
+                "mode": "nvvm-o3",
+                "status": "correct",
+                "return_code": 0,
+                "executed": 1,
+                "component_count": 24,
+                "actual_sha256": "6541e4ac7bc2cb41b3e30df78fd8a8ca435629a017a2913067075bc1d14ce309",
+                "source_sha256": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db"
+              }
+            ],
+            "identity": {
+              "path": "issue-nvvm-backend/accepted-identity.json",
+              "sha256": "4ce3f71e06f582b82cba621c0136998540acc0b59a56d17d4b6565f61462163e"
+            },
+            "provenance": {
+              "source_review": {
+                "path": "build/nvvm-aggregate-index-qualification/review/source-oracles.json",
+                "sha256": "53213c18e57dd141ac9d70d5ac1ae3e43c4acb1f02f71540d5ec6a310b627fe0"
+              },
+              "result_review": {
+                "path": "build/nvvm-aggregate-index-qualification/review/result-replay.json",
+                "sha256": "1297fa5aab19c12b65c1b9dc761603d5787b5da68018c53117c4fc7a79ef3192"
+              },
+              "results": {
+                "path": "build/nvvm-aggregate-index-qualification/results.json",
+                "sha256": "1c3e77e5c2f33a49af75618f9359f5f0288f93fe46f8c437a94f5d8c4e2ed80c"
+              },
+              "focused_gate": {
+                "path": "build/nvvm-aggregate-index-qualification/focused-0.json",
+                "sha256": "28fe5d2dcbfde4d7df27dcd6ac0f5da80dac44acc75b7cf43545e09741266ec5"
+              },
+              "focused_log": {
+                "path": "build/nvvm-aggregate-index-qualification/focused-0.log",
+                "sha256": "c89d64d6ab69172ed23d8b4ec4a5ef51c0de12b5e8ac81802147021a464843da"
+              },
+              "neighbor_gate": {
+                "path": "build/nvvm-aggregate-index-qualification/neighbors-0.json",
+                "sha256": "da7625dfdb0282e4de922beb055e0d769e5b2e4b2a3f8bcbac5e3ecbbc1772e4"
+              },
+              "neighbor_log": {
+                "path": "build/nvvm-aggregate-index-qualification/neighbors-0.log",
+                "sha256": "4d76f8f252fb1f498526b840c0119a2b2906b207c13c425b7d11511e4669c58a"
+              },
+              "neighbor_artifacts": {
+                "path": "build/nvvm-aggregate-index-qualification/neighbors-artifacts.json",
+                "sha256": "e2a20ea6e51005433c90f3535ca2ffa2a66f2d8f6675621287dfbc0eb0b75fa1"
+              },
+              "identity_verification": {
+                "path": "build/nvvm-aggregate-index-qualification/identity-verification.json",
+                "sha256": "9212e838aced13a98ddc9053a8178f8508559ea5ccdcecb694676dddf474845a"
+              }
+            },
+            "limits": [
+              "Exact four-tag behavioral qualification, not arbitrary numeric/input coverage.",
+              "Slang translation is a separate source contract; no CUDA candidate GPU or identical-codegen claim.",
+              "No production compiler, harness, installed layout, main inventory or checkpoint cadence change."
+            ],
+            "execution_failure_history": [],
+            "preparation_history": [
+              "Identity verifier initially assumed mode metadata for symlink entries; corrected schema handling before acceptance, with no artifact mismatch."
+            ]
+          }
         }
       }
     }
