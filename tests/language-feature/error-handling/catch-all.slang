@@ -53,5 +53,5 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     handlerFunc(0, 0); // CHECK: 1
     handlerFunc(1, 1); // CHECK-NEXT: 10
     handlerFunc(2, 2); // CHECK-NEXT: 30
-    handlerFunc(3, 3); // CHECK-NEXT 7
+    handlerFunc(3, 3); // CHECK-NEXT: 7
 }

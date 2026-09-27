@@ -172,3 +172,9 @@ ledger preserves first-known and resolved histories with their original evidence
   Six unchanged sources pass18cells/54words with independent full hex oracles. Literal/success-only
   limits remain explicit; no compiler or main-corpus change. Next repairs the malformed final
   catch-all CHECK, then considers runtime-loaded error paths separately.
+
+- Repair290: [catch-all oracle](report.slice-290-catchall-oracle.md),
+  [evidence](test-evidence.slice-290.json), [plan](plan.slice-290-catchall-oracle.md).
+  One colon activates the final CHECK. Identical corrupted shaders pass the old oracle and fail the
+  repaired one; normal CPU and three CUDA cells pass. All285 identities and main inputs unchanged.
+  Broader289 results retain original hashes. Next qualifies runtime-loaded error paths separately.

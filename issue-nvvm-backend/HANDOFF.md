@@ -42,8 +42,9 @@ Skip Slack; no push or system changes.
     and six fresh passing directives, preserving source tokens and qualified scope. No compiler or
     main-corpus change. [Qualification289](report.slice-289-error-handling.md) passes six original error-handling
     sources18cells/54words. Literal inputs may fold branches; witness/parameterized cases exercise
-    success only. Next: repair catch-all’s missing CHECK-NEXT colon and prove deliberate-corruption
-    rejection in a separate bounded slice. Runtime-loaded error paths remain a later opportunity.
+    success only. [Repair290](report.slice-290-catchall-oracle.md) adds the missing CHECK colon: identical corrupt
+    output9 passes the old oracle and fails the fixed one; four normal CPU/CUDA positives preserve7.
+    The test is outside the main corpus. Next qualifies bounded runtime-loaded error inputs.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.
