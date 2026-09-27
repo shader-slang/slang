@@ -31,7 +31,7 @@ Qualified compiler source: `8fbf0f84e` plus patch
 Provider ABI42, SHA256 `af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4`.
 Installed `build/RelWithDebInfo` has 100 layout entries/37 runtime identities exact285. Recovery:
 `build/nvvm-generic-inference286/accepted285-layout`. A later HEAD is not compiled identity.
-Before a production rebuild, refresh version metadata and rebuild restored286 observer sources;
+Before a production rebuild, refresh version metadata and rebuild restored294 observer sources;
 their mtimes are newer than experimental objects.293 preserves both configuration hashes.
 
 ## Results, limits and next action
@@ -42,9 +42,11 @@ stays failed; this is reporting accuracy. [Promotion292](report.slice-292-runtim
 and [promotion288](report.slice-288-nested-dynamic-regressions.md) retain runtime error and nested
 dynamic-dispatch regressions with original qualification limits. Their evidence is inherited here.
 
-Next: measure material overload-inference cost from the [286 frequency lead](report.slice-286-generic-inference-observation.md),
-with discarded instrumentation and overhead controls. Frequency is not CPU cost or safe pruning.
-The older aggregate-memory gap is already fixed by267; do not repeat that investigation.
+[Inference294](report.slice-294-inference-cost.md) measures failed OR spans at14.368ms/3.593% of
+instrumented semantic CPU. Global7995-call timer overhead is18.594ms versus count-only; no precise
+uninstrumented saving or safe pruning follows. All40samples passed; accepted layout/source/config
+restored exactly. Deprioritize OR pruning and select bounded runtime-observable language interactions
+from sparse inheritance/initialization/type regions. The aggregate-memory gap remains fixed by267.
 
 Three column-major host-packing mismatches and34 infrastructure/preflight gaps remain.285's three
 focused NVRTC nested-array controls still produce wrong37 outside the main corpus; both large

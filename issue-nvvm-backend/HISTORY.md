@@ -197,3 +197,9 @@ ledger preserves first-known and resolved histories with their original evidence
   is correctly labeled, without shader correctness gain. Fresh full1740 outcomes and2358 native
   identities equal285, runtime4/toolkit18/material6 pass, contracts46pass/1skip; all installed bytes
   unchanged. Next measures the286 material inference-cost lead with overhead controls.
+
+- Slice294: [inference CPU cost](report.slice-294-inference-cost.md), [evidence](research-evidence.slice-294.json).
+  All40samples/51compile obligations,6GPUguards/48words and2358nativeIDs preserve outputs.
+  Stable14.368ms/3.593% instrumented OR attribution; global observer overhead prevents a precise
+  saving claim. Temporary source/layout/config restored; full293/cadence0 inherited. Failedbuild
+  and zero-test guard invocation retained; ORpruning deprioritized.

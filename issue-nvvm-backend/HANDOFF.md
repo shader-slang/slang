@@ -53,8 +53,8 @@ Skip Slack; no push or system changes.
     [Parser293](report.slice-293-diagnostic-colors.md) normalizes SGR styling at all three semantic
     text readers. All1740 outcomes and1110/1248 native identities remain exact285; runtime4, toolkit18,
     material6 and runner contracts46pass/1skip pass. Original290 failure stays failed.
-    Next: a bounded discarded CPU-cost observer for286 failed overload inference, including overhead
-    controls.267 already closed the old aggregate-memory gap; no speculative optimization.
+    [Inference294](report.slice-294-inference-cost.md) completes the discarded CPU-cost study with
+    overhead controls; see the current closeout below.267 already closed the aggregate-memory gap.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.
@@ -62,3 +62,18 @@ Skip Slack; no push or system changes.
 [HISTORY](HISTORY.md) owns earlier evidence. [Record contract](../docs/design/nvvm-substandard-record-contract.md)
 separates local FP8/BF16 record admission from the integer-array store correction. Earlier timing
 results retain their original identity and cannot be presented as fresh285 performance measurements.
+
+## Slice294 closeout
+
+[Inference cost294](report.slice-294-inference-cost.md) closes the286 frequency lead as a
+prioritization study: observed OR-failure14.368ms/3.593% of instrumented root; whole7995-call
+timer overhead18.594ms versus count-only. No exact uninstrumented cost, removable-work or
+optimization claim. All40samples and qualification passed;100layout/37runtime/11source/2config/
+576inputs/22pins restored. Sources restored294 have newer mtimes than experimental objects;
+refresh version metadata and rebuild before any production build. Raw evidence/recovery archive:
+`build/nvvm-inference-cost294`; accepted recovery remains286/accepted285-layout.
+
+The loop remains active. Next select3–4 runtime-observable existing language interactions from
+sparse inheritance/initialization/type regions, avoiding already-qualified271/278/error/dynamic
+fixtures. Keep main580case/576file/1740cell corpus and full293/targeted233/cadence0 inherited.
+SkipSlack; no push/systemchanges.
