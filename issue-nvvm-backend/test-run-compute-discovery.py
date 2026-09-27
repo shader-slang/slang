@@ -18,6 +18,21 @@ MANIFEST = ROOT / "issue-nvvm-backend/discovery-corpus.manifest.tsv"
 
 
 class DiscoveryContractTests(unittest.TestCase):
+    def test_colored_unavailable_entry_point_keeps_discovery_diagnostic(self):
+        census = DISCOVERY._load_census_module(ROOT / "issue-nvvm-backend")
+        DISCOVERY._install_discovery_classifier(census)
+        plain = "error[E36107]: unavailable features in entry point 'main'\n"
+        colored = "\x1b[31merror[E36107]:\x1b[0m unavailable features in entry point 'main'\n"
+        expected = (
+            "infrastructure",
+            "E36107: target capability requirements make the entry point unavailable to CUDA",
+            "target capability requirement",
+        )
+        for mode in census.MODES:
+            with self.subTest(mode=mode):
+                self.assertEqual(census._classify_result(1, plain, mode), expected)
+                self.assertEqual(census._classify_result(1, colored, mode), expected)
+
     def _write_synthetic_manifest(self, directory, count):
         """Write real unique source contracts so capacity checks exercise the complete loader."""
         tests = Path(directory) / "tests"

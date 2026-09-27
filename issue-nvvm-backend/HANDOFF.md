@@ -1,6 +1,7 @@
 # Start a fresh NVVM session
 
-Current full baseline: [validation285](runtime-validation.slice-285.json),
+Current full baseline: [validation293](runtime-validation.slice-293.json),
+[parser report](report.slice-293-diagnostic-colors.md), with unchanged compiler285 bytes,
 [array store report](report.slice-285-nested-array-stores.md) and
 [plan285](plan.slice-285-nested-array-stores.md). The user resumed the development loop on 2026-09-26.
 Continue bounded reviewed local commits under WORKFLOW until a recorded stopping condition.
@@ -15,9 +16,9 @@ Skip Slack; no push or system changes.
    Use fresh artifact roots; preserve modes, links, configuration and loaded libraries for experiments.
 4. Limit builds/jobs to4CPU workers, units to2servers, gates to30minutes. Serialize builds/GPU/suites/
    benchmarks. Preserve failed attempts and exact comparisons; no retries hiding losses.
-5. Full285 preserves580cases/576sources/1740cells:1703correct,37unresolved,20resolved histories.
+5. Full293 preserves580cases/576sources/1740cells:1703correct,37unresolved,20resolved histories.
    Units1097pass/13skip preserve1109old IDs plus1new; semantics1170pass/78skip preserve1248IDs.
-   Runtime4/toolkit18/material6 pass. Last full285/targeted233/cadence0. Frozen195 immutable; discovery128.
+   Runtime4/toolkit18/material6 pass. Last full293/targeted233/cadence0. Frozen195 immutable; discovery128.
 6. Provider terminal whole stores conservatively use alignment1 where canonical array/member types
    contain a nested struct boundary. Existing direct struct splitting and authored signatures stay.
    Three new integer GPU fixtures cover root/wrapped/multidimensional arrays and saved values; all
@@ -49,8 +50,11 @@ Skip Slack; no push or system changes.
     catch+256 preserves final PTX tag-dependent selection. Generic/aggregate v2 stays qualified.
     [Promotion292](report.slice-292-runtime-error-regressions.md) adds two permanent tests; six fresh
     native directives pass with36 exact output words.285 identities and main selection stay unchanged.
-    Next: ANSI-color classification repair using the preserved290 FileCheck failure, followed by the
-    required full checkpoint. No compiler fix is currently motivated.
+    [Parser293](report.slice-293-diagnostic-colors.md) normalizes SGR styling at all three semantic
+    text readers. All1740 outcomes and1110/1248 native identities remain exact285; runtime4, toolkit18,
+    material6 and runner contracts46pass/1skip pass. Original290 failure stays failed.
+    Next: a bounded discarded CPU-cost observer for286 failed overload inference, including overhead
+    controls.267 already closed the old aggregate-memory gap; no speculative optimization.
 11. Prefer fresh bounded delegation and separate review;286 used reused author/reviewer after a fresh
     spawn hit the thread limit. Independent final review accepts source/method/evidence/restoration.
     Skip Slack and continue the authorized loop.

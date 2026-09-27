@@ -107,6 +107,7 @@ def _install_discovery_classifier(census: ModuleType) -> None:
     base_classifier = census._classify_result
 
     def classify(return_code: int, output: str, mode: str) -> tuple[str, str, str]:
+        output = census.normalize_diagnostic_output(output)
         if UNAVAILABLE_ENTRY_POINT_RE.search(output):
             return (
                 "infrastructure",

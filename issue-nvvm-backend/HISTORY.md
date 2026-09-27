@@ -190,3 +190,10 @@ ledger preserves first-known and resolved histories with their original evidence
   Two persistent tests preserve the qualified291 sources and add six native directives. All six
   pass with36 exact output words; runtime inputs and tag-distinct catch remain.285 identities exact;
   main corpus and cadence unchanged. Next: bounded ANSI-color classifier repair with full checkpoint.
+
+- Parser293: [colored diagnostics](report.slice-293-diagnostic-colors.md),
+  [validation](runtime-validation.slice-293.json), [plan](plan.slice-293-diagnostic-colors.md).
+  Shared SGR normalization preserves raw logs and compiler-error precedence. The original290 failure
+  is correctly labeled, without shader correctness gain. Fresh full1740 outcomes and2358 native
+  identities equal285, runtime4/toolkit18/material6 pass, contracts46pass/1skip; all installed bytes
+  unchanged. Next measures the286 material inference-cost lead with overhead controls.

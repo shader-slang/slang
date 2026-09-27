@@ -7,6 +7,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 runner_path = Path(__file__).with_name("run-compute-census.py")
 loader = importlib.machinery.SourceFileLoader("census_contract_runner", str(runner_path))
@@ -16,6 +17,103 @@ loader.exec_module(runner)
 
 
 class CensusClassificationContracts(unittest.TestCase):
+    def test_colored_filecheck_matches_plain_failure(self):
+        # FileCheck's styled CHECK-NEXT diagnostic from the corrupt-output290 control.
+        plain = (
+            "slang-test: fixture.slang:54:36: error: "
+            "CHECK-NEXT: expected string not found in input\n"
+        )
+        colored = (
+            "\x1b[1mslang-test: fixture.slang:54:36: \x1b[0m\x1b[0;1;31merror: "
+            "\x1b[0m\x1b[1mCHECK-NEXT: expected string not found in input\n\x1b[0m"
+        )
+        for mode in runner.MODES:
+            with self.subTest(mode=mode):
+                self.assertEqual(runner._classify_result(1, plain, mode),
+                                 ("runtime-mismatch", "", ""))
+                self.assertEqual(runner._classify_result(1, colored, mode),
+                                 runner._classify_result(1, plain, mode))
+
+    def test_colored_failure_phase_and_shape_match_plain(self):
+        wrapper = (
+            "slang-test: fixture:20: error: CHECK: expected string not found in input\n"
+            "EXPECTED{{{7}}}\nACTUAL{{{9}}}\n"
+        )
+        cases = (
+            ("error[E30001]: invalid source", "infrastructure"),
+            ("error[E52017]: direct NVVM lowering does not support Slang IR instruction "
+             "or shape 'helper function parameter: unsupported'", "preflight"),
+            ("error[E52018]: downstream compiler failed", "provider"),
+            ("NVVM IR verification failed", "provider"),
+            ("libNVVM failed", "provider"),
+            ("no CUDA device", "infrastructure"),
+        )
+        for mode in runner.MODES:
+            for diagnostic, expected in cases:
+                with self.subTest(mode=mode, diagnostic=diagnostic):
+                    plain = diagnostic + "\n" + wrapper
+                    # Styling can divide tokens as well as surround entire lines.
+                    colored = "\x1b[1m" + "\x1b[0m\x1b[31m".join(diagnostic) + "\x1b[m\n" + wrapper
+                    result = runner._classify_result(1, plain, mode)
+                    self.assertEqual(result[0], expected)
+                    self.assertEqual(runner._classify_result(1, colored, mode), result)
+
+    def test_styled_summary_counts_and_strict_success(self):
+        cases = (
+            ("100% of tests passed (1/1)\n", "correct"),
+            ("100% of tests passed (1/1) 1 tests ignored\n", "infrastructure"),
+            ("100% of tests passed (1/1) unexpected status\n", "infrastructure"),
+            ("100% of tests passed (1/1)\n100% of tests passed (1/1)\n", "infrastructure"),
+            ("100% of tests passed (1/)\n", "infrastructure"),
+            ("0% of tests passed (0/0)\n", "infrastructure"),
+            ("0% of tests passed (0/1)\n", "infrastructure"),
+            ("100% of tests passed (2/2)\n", "infrastructure"),
+            ("arbitrary output\n", "infrastructure"),
+        )
+        for plain, expected in cases:
+            colored = "\x1b[32m" + plain.replace("tests passed", "tests \x1b[1mpassed") + "\x1b[0m"
+            with self.subTest(plain=plain):
+                self.assertEqual(runner.execution_counts(colored), runner.execution_counts(plain))
+                self.assertEqual(runner._classify_result(0, plain, "nvvm-o0")[0], expected)
+                self.assertEqual(runner._classify_result(0, colored, "nvvm-o0"),
+                                 runner._classify_result(0, plain, "nvvm-o0"))
+        self.assertNotEqual(
+            runner._classify_result(1, "\x1b[32m100% of tests passed (1/1)\x1b[0m\n",
+                                    "nvvm-o0")[0], "correct")
+
+    def test_non_sgr_text_is_preserved(self):
+        # Cursor commands, OSC titles, malformed escapes and printable escape spellings
+        # are not styling; removing them could turn invalid text into a passing summary.
+        controls = ("\x1b[2J", "\x1b]0;title\x07", "\x1b[31", r"\x1b[31m", "[31m")
+        for control in controls:
+            with self.subTest(control=control):
+                text = "100% of tests " + control + "passed (1/1)\n"
+                self.assertEqual(runner.normalize_diagnostic_output(text), text)
+                self.assertIsNone(runner.execution_counts(text))
+                self.assertEqual(runner._classify_result(0, text, "nvvm-o0")[0],
+                                 "infrastructure")
+
+    def test_run_one_preserves_raw_log_and_return_code(self):
+        output = (
+            "slang-test: fixture:54:36: \x1b[31merror: \x1b[0m"
+            "CHECK-NEXT: expected string not found in input\n"
+            "\x1b[1m0% of tests passed (0/1)\x1b[0m\n"
+        )
+        workload = dict(id="case#1", source="case.slang", source_line=1,
+                        source_test_ordinal=0, cuda_ordinal=0, capability="cuda_sm_8_0",
+                        reference_derived_from_direct=False)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(runner.subprocess, "run", return_value=
+                                   runner.subprocess.CompletedProcess([], 1, output)):
+                result = runner._run_one(root, root / "results", root / "mirror", workload,
+                                         "nvvm-o0", root / "provider", root / "slang-test")
+            self.assertEqual((root / result["log"]).read_bytes(), output.encode("utf-8"))
+            self.assertEqual(result["return_code"], 1)
+            self.assertEqual(result["classification"], "runtime-mismatch")
+            self.assertEqual(result["execution_counts"],
+                             dict(passed=0, executed=1, ignored=0, other_summary_status=0))
+
     def test_failure_phase_precedes_secondary_output_comparison(self):
         wrapper = "EXPECTED{{{\nexpected value\n}}}\nACTUAL{{{\nactual value\n}}}\n"
         cases = (

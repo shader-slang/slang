@@ -30,7 +30,7 @@ in the repository. Commands default to SM80 and matching CUDA12.9 on this host.
 
 ```bash
 export NVVM_RESULTS=build/nvvm-results/2026-09-28-refresh1
-export NVVM_BASELINE=issue-nvvm-backend/runtime-validation.slice-262.json
+export NVVM_BASELINE=issue-nvvm-backend/runtime-validation.slice-293.json
 export CUDA_PATH=/usr/local/cuda-12.9
 export CUDA_HOME="$CUDA_PATH"
 export LIBNVVM_HOME="$CUDA_PATH"
@@ -134,7 +134,7 @@ this for one NVRTC automatic-PCH deletion incident; its open reliability limitat
 until separately resolved. Do not use retries to hide shader-output regressions or failed timing samples.
 
 Set `NVVM_BASELINE` to this newly reviewed file before quality measurement (the setup example uses
-the current accepted262 record; recheck STATUS in later sessions). It must retain `runtime_input_sha256`,
+the accepted293 record; recheck STATUS in later sessions). It must retain `runtime_input_sha256`,
 `provenance.artifact_sha256`, and per-corpus `fresh_cell_outcomes` for the next refresh.
 
 ## Report environment

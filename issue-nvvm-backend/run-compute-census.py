@@ -343,8 +343,18 @@ def prepare_mode(
             shutil.copy2(expected_source, Path(str(generated_path) + ".expected.txt"))
 
 
+def normalize_diagnostic_output(output: str) -> str:
+    """Remove ANSI SGR styling for semantic parsing, leaving captured logs unchanged.
+
+    FileCheck can reset and restart color between ``error: `` and ``CHECK-NEXT``.
+    Parse their plain text together; retain non-SGR escapes and printable diagnostics.
+    """
+    return re.sub(r"\x1b\[[0-9;]*m", "", output)
+
+
 def execution_counts(output: str) -> dict[str, int] | None:
     """Read one authoritative slang-test summary, rejecting absent or ambiguous summaries."""
+    output = normalize_diagnostic_output(output)
     summaries = re.findall(
         r"^\d+% of tests passed \((\d+)/(\d+)\)([^\r\n]*)$", output, re.MULTILINE
     )
@@ -361,6 +371,7 @@ def execution_counts(output: str) -> dict[str, int] | None:
 
 
 def _classify_result(return_code: int, output: str, mode: str) -> tuple[str, str, str]:
+    output = normalize_diagnostic_output(output)
     diagnostic_match = DIAGNOSTIC_RE.search(output)
     diagnostic_code = diagnostic_match.group(1).upper() if diagnostic_match else ""
     diagnostic = diagnostic_match.group(2).strip() if diagnostic_match else ""
