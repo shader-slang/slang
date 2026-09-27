@@ -750,10 +750,9 @@ protected:
     // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
 
-    // Special handling for swizzleStore call, save the right-handside vector to a temporary
-    // variable first, then assign the corresponding elements to the left-handside vector one by
-    // one.
-    void _emitSwizzleStorePerElement(IRInst* inst);
+    // Emit vector lane writes for a SwizzledStore destination or a multi-lane SwizzleSet result.
+    // Source folding keeps ordinary multi-lane replacements in their own SSA temporary.
+    void _emitSwizzleUpdatePerElement(IRInst* inst);
 
     String _emitLiteralOneWithType(int bitWidth);
 

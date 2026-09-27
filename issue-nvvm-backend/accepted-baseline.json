@@ -2,15 +2,15 @@
   "schema": 1,
   "status": "accepted-full",
   "baseline": {
-    "revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
+    "revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "92b710f7acdf4ef41b0fb7e458fd21728b3d3c89a5fb44d3ae883597de65b437"
+    "sha256": "74ad77c179bc5d0226e0e062cf31a4d226d731b728b5cd5c6cb551c1b47d898d"
   },
   "corpora": {
     "frozen": {
       "raw_results": {
-        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/frozen/results.json",
-        "sha256": "55390e2e866975eb426919d1930e083549d9537640dd4ce6655849c952513f4f"
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/frozen/results.json",
+        "sha256": "2a68b5cc466c84ef0f01afe71bb82fb9037faca11675c846d423d4bea37484b8"
       },
       "fresh_cell_outcomes": [
         {
@@ -1010,10 +1010,10 @@
         {
           "id": "compute/half-vector-calc.slang#cuda-1",
           "mode": "nvrtc-o3",
-          "classification": "infrastructure",
-          "return_code": 1,
+          "classification": "correct",
+          "return_code": 0,
           "execution_counts": {
-            "passed": 0,
+            "passed": 1,
             "executed": 1,
             "ignored": 0,
             "other_summary_status": 0
@@ -19001,8 +19001,8 @@
     },
     "discovery": {
       "raw_results": {
-        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/discovery/results.json",
-        "sha256": "8507f91e1052a270483143ca5e0880685ab5241a9f4c70b55b51d826e95199aa"
+        "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/discovery/results.json",
+        "sha256": "53222434aa63ae2fa339643435ed5f68aec1693573087691d8b92083852d6fd0"
       },
       "fresh_cell_outcomes": [
         {
@@ -25171,71 +25171,6 @@
       }
     },
     {
-      "id": "compute/half-vector-calc.slang#cuda-1",
-      "mode": "nvrtc-o3",
-      "classification": "infrastructure",
-      "diagnostic": "",
-      "canonical_shape": "",
-      "return_code": 1,
-      "execution_counts": {
-        "passed": 0,
-        "executed": 1,
-        "ignored": 0,
-        "other_summary_status": 0
-      },
-      "corpus": "frozen",
-      "evidence": {
-        "path": "build/nvvm-results/2026-09-26-integration/checkpoint-reviewed/frozen/logs/nvrtc-o3/8a2b84f4deae4525148a2536ddb488bd1820541a.log",
-        "sha256": "a00b2affd42de3f96a33a770cc26baa11eecc5f7b93fe3cb51dbabe0cf6c0999"
-      },
-      "prior_failure_record": {
-        "manifest": "issue-nvvm-backend/runtime-validation.slice-260.json",
-        "key": ["frozen", "compute/half-vector-calc.slang#cuda-1", "nvrtc-o3"]
-      },
-      "first_known_evidence": {
-        "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
-        "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
-        "diagnostic_observed_before_this_change": {
-          "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
-          "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
-          "evidence": {
-            "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
-            "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
-          }
-        }
-      },
-      "reproduction": [
-        "timeout",
-        "--kill-after=30s",
-        "5m",
-        "python3",
-        "issue-nvvm-backend/run-compute-census.py",
-        "--config",
-        "RelWithDebInfo",
-        "--bin-dir",
-        "build/RelWithDebInfo/bin",
-        "--provider",
-        "build/RelWithDebInfo/bin",
-        "--architecture",
-        "80",
-        "--jobs",
-        "1",
-        "--modes",
-        "nvrtc-o3",
-        "--match",
-        "compute/half-vector-calc.slang#cuda-1",
-        "--workload-ids-from",
-        "issue-nvvm-backend/census.slice-195.tsv",
-        "--output",
-        "build/nvvm-optimized-reproduce/1a3a80fc7505cac05c058bf77f29091d62d276fc"
-      ],
-      "evidence_status": "fresh-maintenance-merged-full-checkpoint",
-      "previous_evidence": {
-        "path": "build/nvvm-loop/slice-260-after/frozen/logs/nvrtc-o3/8a2b84f4deae4525148a2536ddb488bd1820541a.log",
-        "sha256": "ed9d48d9ffc03f4ec20abfc3f2858bd2d462d257f1f9b5dc63b63124eda07b20"
-      }
-    },
-    {
       "id": "compute/texture-subscript.slang#cuda-1",
       "mode": "nvrtc-o3",
       "classification": "infrastructure",
@@ -30797,11 +30732,116 @@
       },
       "resolved_in_slice": 270,
       "resolution": "Qualified canonical flat record values and local storage plus BF2 local-field component access; original oracle unchanged."
+    },
+    {
+      "prior_failure": {
+        "id": "compute/half-vector-calc.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "classification": "infrastructure",
+        "diagnostic": "",
+        "canonical_shape": "",
+        "return_code": 1,
+        "execution_counts": {
+          "passed": 0,
+          "executed": 1,
+          "ignored": 0,
+          "other_summary_status": 0
+        },
+        "corpus": "frozen",
+        "evidence": {
+          "path": "build/nvvm-results/2026-09-26-integration/checkpoint-reviewed/frozen/logs/nvrtc-o3/8a2b84f4deae4525148a2536ddb488bd1820541a.log",
+          "sha256": "a00b2affd42de3f96a33a770cc26baa11eecc5f7b93fe3cb51dbabe0cf6c0999"
+        },
+        "prior_failure_record": {
+          "manifest": "issue-nvvm-backend/runtime-validation.slice-260.json",
+          "key": ["frozen", "compute/half-vector-calc.slang#cuda-1", "nvrtc-o3"]
+        },
+        "first_known_evidence": {
+          "historical_category_evidence": "issue-nvvm-backend/census.slice-195.tsv",
+          "historical_record_commit": "2f76637c73f7643e6406494f4b954410aacee528",
+          "diagnostic_observed_before_this_change": {
+            "source_commit": "2634d3b9dac628991fde9da0cfc966f3001951b8",
+            "environment": "Linux L4 SM89, CUDA 12.9.2, target SM80",
+            "evidence": {
+              "path": "build/nvvm-loop/slice-202-before/frozen/results.json",
+              "sha256": "7ff2a4c9410bb7d69d3ca3825078c0378bd2063778c5fffac835cc86e630d4d5"
+            }
+          }
+        },
+        "reproduction": [
+          "timeout",
+          "--kill-after=30s",
+          "5m",
+          "python3",
+          "issue-nvvm-backend/run-compute-census.py",
+          "--config",
+          "RelWithDebInfo",
+          "--bin-dir",
+          "build/RelWithDebInfo/bin",
+          "--provider",
+          "build/RelWithDebInfo/bin",
+          "--architecture",
+          "80",
+          "--jobs",
+          "1",
+          "--modes",
+          "nvrtc-o3",
+          "--match",
+          "compute/half-vector-calc.slang#cuda-1",
+          "--workload-ids-from",
+          "issue-nvvm-backend/census.slice-195.tsv",
+          "--output",
+          "build/nvvm-optimized-reproduce/1a3a80fc7505cac05c058bf77f29091d62d276fc"
+        ],
+        "evidence_status": "fresh-maintenance-merged-full-checkpoint",
+        "previous_evidence": {
+          "path": "build/nvvm-loop/slice-260-after/frozen/logs/nvrtc-o3/8a2b84f4deae4525148a2536ddb488bd1820541a.log",
+          "sha256": "ed9d48d9ffc03f4ec20abfc3f2858bd2d462d257f1f9b5dc63b63124eda07b20"
+        }
+      },
+      "transition": {
+        "corpus": "frozen",
+        "id": "compute/half-vector-calc.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "before": {
+          "classification": "infrastructure",
+          "return_code": 1,
+          "execution_counts": {
+            "passed": 0,
+            "executed": 1,
+            "ignored": 0,
+            "other_summary_status": 0
+          },
+          "diagnostic": "",
+          "canonical_shape": ""
+        },
+        "after": {
+          "classification": "correct",
+          "return_code": 0,
+          "execution_counts": {
+            "passed": 1,
+            "executed": 1,
+            "ignored": 0,
+            "other_summary_status": 0
+          },
+          "diagnostic": "",
+          "canonical_shape": ""
+        }
+      },
+      "final_evidence": {
+        "path": "build/nvvm-cuda-swizzle-set/checkpoint/frozen/results.json",
+        "sha256": "2a68b5cc466c84ef0f01afe71bb82fb9037faca11675c846d423d4bea37484b8"
+      },
+      "focused_proof": {
+        "path": "build/nvvm-cuda-swizzle-set/review/focused-after.json",
+        "sha256": "ecb6b8485ff4e8935e1c8451bb917678fd28c3467750a80fc06cabc4077cd7c6"
+      },
+      "resolution": "Shared CLike emission uses component assignments for canonical multi-lane SwizzleSet on CUDA/CPU/WGPU. Original half-vector inputs and oracle unchanged."
     }
   ],
   "provenance": {
-    "started_utc": "2026-09-27T16:33:28.606932+00:00",
-    "revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
+    "started_utc": "2026-09-27T17:56:02.796365+00:00",
+    "revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
     "platform": "Linux-6.17.0-1017-aws-x86_64-with-glibc2.39",
     "build_label": "RelWithDebInfo",
     "environment": {
@@ -30815,10 +30855,10 @@
     },
     "working-tree": {
       "command": ["git", "status", "--porcelain"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/working-tree.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/working-tree.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.14714833721518517
+      "elapsed_seconds": 0.15168930776417255
     },
     "source-diff": {
       "command": [
@@ -30831,41 +30871,41 @@
         "prelude",
         "external"
       ],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/source-diff.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/source-diff.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.10945025272667408
+      "elapsed_seconds": 0.10831822827458382
     },
     "submodules": {
       "command": ["git", "submodule", "status", "--recursive"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/submodules.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/submodules.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.32580687291920185
+      "elapsed_seconds": 0.31224319338798523
     },
     "compiler-version": {
       "command": [
         "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc",
         "-version"
       ],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/compiler-version.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/compiler-version.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.2706861514598131
+      "elapsed_seconds": 0.2551669739186764
     },
     "toolkit-version": {
       "command": ["/usr/local/cuda-12.9/bin/nvcc", "--version"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/toolkit-version.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/toolkit-version.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.002088841050863266
+      "elapsed_seconds": 0.0024665016680955887
     },
     "ptxas-version": {
       "command": ["/usr/local/cuda-12.9/bin/ptxas", "--version"],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/ptxas-version.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/ptxas-version.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.0023381561040878296
+      "elapsed_seconds": 0.0026373788714408875
     },
     "device": {
       "command": [
@@ -30873,10 +30913,10 @@
         "--query-gpu=name,uuid,driver_version,compute_cap",
         "--format=csv"
       ],
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/checkpoint/device.log",
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/checkpoint/device.log",
       "return_code": 0,
       "timed_out": false,
-      "elapsed_seconds": 0.024626651778817177
+      "elapsed_seconds": 0.02415240742266178
     },
     "artifact_sha256": {
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
@@ -30889,11 +30929,11 @@
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "a17aa31ab1a2110b2cb3b43c0f563425a86eb30cb39b4717629a512f5902963b",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "a37e84461322c76b5e60ef514c1a598ea25f2f3bd3484d853bffba5c577af5b6",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
@@ -30901,15 +30941,15 @@
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
       "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "aeb2b6119376e3ee96ea66262e62f69ddeca02161a42ce1cc2c017d19abbab5e",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "a315dafb6881fa5c1c01cf5ddafb65c0ee987ce222a55af96b7fb4679a95570e",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "492cbdb16ff16f597dffcfd6ff42836d3f2327303753486cc32c036b9beab594",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "e915691e3d08180009528fe836a54f06eaf8786490d2032fb613e4e3bf8db204",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "1ed590d8e03d503e66fd159783823913f239eb01cf62f5b849bde07b843a2cda",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "ec452f8b9b9985eeb76600d77d32a46171ff7ae57d4330ba80b8e8a798bd7b79",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "a813a474c3abef4e24c7691570565b98d5ee3d3879a24f0cdee5e66c3dbd9eea",
-      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "c31662ab56be492d5ceb3b8cacbf8157b560b1f20a4ae5df40b15e870570d6db",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "48d4be3b35e29e3c3c76df5798b79ca7ec7ebfdc3eb6b8582d6be1a388c8b0aa",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "3a2aa06edb72240002c0645453e6ea79911e175da0a7aca9801c4de60db7b7c3",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "c65ee1f1f7c0d079737ef1b4ebc78174b3dbd729177a7c59de2e4f6d5cbfe164",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "802eeb213569f96fad0258e8b9426fd82a7bb17b17d31ff2d8f367fd01fea439",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ea8e28f53e0fa571be3f7535dbd9f60ae1ffe2635fb51b6e858379feb41abe25",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "05f5f080c4b37f7916d54df2f9255bdadde311ec1f3516ace76e1ca01ec34a9f",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "36a6f1b096f477f6aab49698f86f4765057f3a5f82a09ba112c7d579ccc4a88e",
+      "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "bb4672e5a9b39964247c52dfca4cd68da49feff4ab1c00228706c3369a0cd8b5",
       "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
       "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
       "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
@@ -30917,11 +30957,11 @@
       "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
       "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
     },
-    "full_identity_count": 7216,
+    "full_identity_count": 7219,
     "identity_scope": "runtime-and-tools",
     "raw_complete_provenance": {
-      "path": "build/nvvm-record-array-helpers/checkpoint/provenance.json",
-      "sha256": "e5c46eebccef864e3662329ed8df8731318b331bc938965fab66552703bd2384"
+      "path": "build/nvvm-cuda-swizzle-set/checkpoint/provenance.json",
+      "sha256": "699fc6d85053e6d1b4c136f3330b31324a92b9fbc00fcda8a676480cd17d5aac"
     }
   },
   "complex_corpus": {
@@ -30929,8 +30969,8 @@
     "required_cell_count": 6,
     "gpu_execution": false,
     "raw_results": {
-      "path": "build/nvvm-record-array-helpers/checkpoint/complex/results.json",
-      "sha256": "1d821732c361fc460c1f15d682dd377d8f425343df9dbb382d37f73ef8796621"
+      "path": "build/nvvm-cuda-swizzle-set/checkpoint/complex/results.json",
+      "sha256": "c0364b3f956c924e9aa7c2c59439a4b6bb0ed140a2ca11fa26868c2e7782613f"
     },
     "cells": [
       {
@@ -33726,7 +33766,7 @@
     ],
     "output_preservation": {
       "status": "passed",
-      "scope": "Exact PTX/cubin and named-function assembly resources; no timing or GPU execution claim.",
+      "scope": "Exact PTX/cubin and named-function assembly resources; no timing claim.",
       "cells": [
         {
           "id": "tiled-brass-material-eval_buffer-nvrtc-o3",
@@ -33793,16 +33833,17 @@
   },
   "kind": "nvvm-current-acceptance",
   "validation_date_utc": "2026-09-27",
-  "source_repository_revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
-  "source_compiler_revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
-  "source_compiler_patch_sha256": "3a1a750089b782f3486c0ac6afac2e50a28157f2f95831dfd9246e0dffa06453",
-  "compiler_version": "2026.18.3-326-gcef0ffbdf",
+  "source_repository_revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
+  "source_compiler_revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
+  "source_compiler_patch_sha256": "7101a82b9f7baa664aa967a9bc66ad1ef81fdb60c7da1419d26388d888ee4aff",
+  "compiler_version": "2026.18.3-328-g2b8dafc69",
   "provider_abi": 42,
   "source_and_new_fixture_sha256": {
     "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "22ae318c57571eb3d6e6f6ab03498af1ba3fbb6af209d13cf365462ed4bd0cd2",
-    "source/slang/slang-emit-nvvm-type-lowering.cpp": "d50e0dafa379eb6db240cfb1ab2955ce8c7f15827f57e477b76b4d2dbf63afbd",
-    "source/slang/slang-emit-nvvm-type-lowering.h": "e8744a1f2eef5aacf6006e12530b996bfe0422e18c919742ba20e1ec3b39746c",
-    "source/slang/slang-emit-nvvm.cpp": "e904abbe888036ad30d8b5994727fc1ec95704f682d659321469a829df22a344",
+    "source/slang/slang-emit-c-like.cpp": "2d306917a5f3a08e4394f9c60faccaa18b45f556edc490dcb73eff4864d4a1f1",
+    "source/slang/slang-emit-c-like.h": "bc74ea6aa06984d7786c20ea7e1e036f22369f2c31414b8363e6e99860f2fac6",
+    "tests/compute/swizzle-set-snapshot.slang": "08e56a34611636cdd88d03ee91869abe50c6df339c902dd49386338e20f81cb6",
+    "tests/compute/swizzle-set-source.slang": "110b2964c3776c1521e4085dd4fbf48323d327104e96a1194c15f9088816ffc2",
     "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
     "tests/cuda/nvvm-aggregate-index-snapshot.slang": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db",
     "tests/cuda/nvvm-bf16-local-records.slang": "19c7db6eb12baa19e2afd91994e2da19a2b6fde61cdb95b106b2e558e4f2a683",
@@ -33812,6 +33853,7 @@
     "tests/cuda/nvvm-compact-vector-storage.slang": "d94447399a2c09e3099e68cac1354e16b2d5dab6b2432e0ff23f1946628adfe6",
     "tests/cuda/nvvm-local-substandard-record-array-copies.slang": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669",
     "tests/cuda/nvvm-local-substandard-record-arrays.slang": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c",
+    "tests/cuda/nvvm-material-dielectric.slang": "f23d33fe146dca983878861f59f147c7e3039b1c1e0cf535b1f4d62ab30bc998",
     "tests/cuda/nvvm-material-mini-lut.slang": "66f6b5650d0e7476821a1446745fcf75ef175efe90b17e89df218b95bcf0e9c4",
     "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang": "fe73d768fef88d1e858ab4b4e43dcfc2cb242426e558fa89dff72ea30008eddb",
     "tests/cuda/nvvm-nested-array-multidimensional.slang": "7efeccacaf1e1a08a89fbfc846eb7f7ad7796e76bf16ecdc6f8dad5cbf06e932",
@@ -33820,29 +33862,22 @@
     "tests/cuda/nvvm-nested-integer-record-stores.slang": "127f6c8fa24394272518e1cc1dc7b4b82013e52aa31372f3bf8788f4ae217228",
     "tests/cuda/nvvm-nested-substandard-dynamic.slang": "e42bdfba99aac507bf144da9e266dd85fe19924cf92cb01b1fec2539813f4634",
     "tests/cuda/nvvm-nested-substandard-records.slang": "99d38dd3398bf20bad8b1476d5b7e87495625616b0869557281a731a0246dc3f",
-    "tests/cuda/nvvm-substandard-record-array-parameter.slang": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e",
-    "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "b9901429d375f8e9ab533f0f43e69b7807d839a6448ae309c3eb7440d7d30331",
-    "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "b0b2981ce9e9ab2d4aefc90521ff33260f034cf95ad27f9891d5e278b2fe3a67"
+    "tests/cuda/nvvm-substandard-record-array-parameter.slang": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e"
   },
-  "compiled_identity_note": "Compiler built from the recorded revision plus compiler-source.patch; later documentation/evidence and commit metadata do not identify rebuilt bytes.",
+  "compiled_identity_note": "Compiler built from the recorded revision plus compiler-source.patch. Later documentation/evidence and commit metadata do not identify rebuilt bytes.",
   "original_comparison": {
-    "path": "build/nvvm-record-array-helpers/checkpoint/comparison.json",
-    "sha256": "995566aad66288388d4ee5e690f909d38ca8801102bfebadf9b5f38fa056dbdf"
+    "path": "build/nvvm-cuda-swizzle-set/checkpoint/comparison.json",
+    "sha256": "613d76a3d50d90ce88d8d1bfd7c8fbc7ebdfa1746f9f2e44ef4c53b58e0fef42"
   },
   "checkpoint": {
-    "path": "build/nvvm-record-array-helpers/checkpoint/checkpoint.json",
-    "sha256": "25c94f7bf263f127b65a27731718f7c780def165b05cffb19b72ded139f48701"
+    "path": "build/nvvm-cuda-swizzle-set/checkpoint/checkpoint.json",
+    "sha256": "014af859a609511cacc23c63f45c5f1493d4ca5855ea6c1a70b9d36a3c33d44c"
   },
   "historical_evidence_archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
-  "unit_component_refresh": {
-    "path": "build/nvvm-record-array-helpers/unit-component-refresh-1.json",
-    "sha256": "b3c8415b55d2989303fbfeecd6acc1e93a5dde1271eae5616bb0bb3835bfe7c5"
-  },
   "current_complete_provenance": {
-    "path": "build/nvvm-record-array-helpers/unit-refresh-1/provenance.json",
-    "sha256": "9bfd102bbde4819fd13cd17839f98b527e99dbc9e7344bfe901ad5cf2c431a3d"
+    "path": "build/nvvm-cuda-swizzle-set/checkpoint/provenance.json",
+    "sha256": "699fc6d85053e6d1b4c136f3330b31324a92b9fbc00fcda8a676480cd17d5aac"
   },
-  "component_chronology": "Full shader corpus used the original checkpoint unit-test plugin. Only that plugin changed afterward to migrate now-supported negative cases into real-builder positives; focused/native/runtime gates reran with final plugin bytes. All other 7,215 checkpoint artifacts are identical.",
   "units": {
     "counts": {
       "passed": 1105,
@@ -34969,18 +35004,14 @@
       "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord.internal": "passed"
     },
     "comparison": {
-      "old_identities_preserved": 1115,
-      "added": {
-        "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangFloat8RecordArrayParametersReturnRecords.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal": "passed"
-      },
+      "old_identities_preserved": 1118,
+      "added": {},
       "changed": [],
       "missing": []
     },
     "raw_log": {
-      "path": "build/nvvm-record-array-helpers/full-units-1.log",
-      "sha256": "db7f18b49066032169f9c07cfaa2ca280b0b24c931f092aae46faef1007549ac"
+      "path": "build/nvvm-cuda-swizzle-set/full-units-1.log",
+      "sha256": "5261bf43dea3678a53fc41a8f82387f4a5fefcd450821c488a274ca73d311189"
     },
     "gate": {
       "command": [
@@ -34992,9 +35023,9 @@
         "slang-unit-test-tool/"
       ],
       "return_code": 0,
-      "elapsed_seconds": 142.08167147636414,
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/full-units-1.log",
-      "log_sha256": "db7f18b49066032169f9c07cfaa2ca280b0b24c931f092aae46faef1007549ac"
+      "elapsed_seconds": 144.57386231422424,
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/full-units-1.log",
+      "log_sha256": "5261bf43dea3678a53fc41a8f82387f4a5fefcd450821c488a274ca73d311189"
     }
   },
   "semantic_regressions": {
@@ -36259,8 +36290,8 @@
       "missing": []
     },
     "raw_log": {
-      "path": "build/nvvm-record-array-helpers/full-semantics.log",
-      "sha256": "1f593d0f7d5e9a807573b40e6f47c406a504697817b6173221e103a74a44b2f9"
+      "path": "build/nvvm-cuda-swizzle-set/full-semantics.log",
+      "sha256": "849c9e4c8176313cc04c4435df2d41fd6ec735c324c0b4f17889d402a55cdcbb"
     },
     "gate": {
       "command": [
@@ -36276,21 +36307,21 @@
         "tests/serialization"
       ],
       "return_code": 0,
-      "elapsed_seconds": 34.58855605125427,
-      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/full-semantics.log",
-      "log_sha256": "1f593d0f7d5e9a807573b40e6f47c406a504697817b6173221e103a74a44b2f9"
+      "elapsed_seconds": 34.0940477848053,
+      "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/full-semantics.log",
+      "log_sha256": "849c9e4c8176313cc04c4435df2d41fd6ec735c324c0b4f17889d402a55cdcbb"
     }
   },
   "totals": {
     "cases": 580,
     "files": 576,
     "cells": 1740,
-    "correct": 1703,
-    "unresolved": 37,
-    "resolved_histories": 20,
+    "correct": 1704,
+    "unresolved": 36,
+    "resolved_histories": 21,
     "classifications": {
-      "correct": 1703,
-      "infrastructure": 32,
+      "correct": 1704,
+      "infrastructure": 31,
       "preflight": 2,
       "runtime-mismatch": 3
     }
@@ -36942,483 +36973,6 @@
       }
     }
   ],
-  "limitations": [
-    "37 unchanged main unresolved cells:3 column-major host-packing mismatches and34 infrastructure/preflight gaps.",
-    "Three focused NVRTC optimized nested-array mismatches remain open outside main corpus.",
-    "Internal value parameters of fixed identity-record arrays are qualified. Source array returns become OutParam; reference/result/export roles, wrapper fields, multidimensional arrays, BF3/BF4 elements and external storage remain excluded.",
-    "No arbitrary packed/address-space or Cartesian value coverage; low16 patterns are correlated across fields.",
-    "Large original/candidate NVVM O3 both exceed120s/4GiB; no identical-cause or largeGPU feasibility claim.",
-    "Conservative alignment can change copy widths; no compile-speed or GPU performance claim.",
-    "Default and fixed linear-filtering synthetic-texture material profiles are qualified. The separate mini-LUT fixture uses synthetic data; the registered graph remains analytic. No original assets, arbitrary inputs or application performance claim.",
-    "Direct cache tests cover Value/Storage/HelperParameter first-use orders for flat/nested identity-record arrays. They do not establish arbitrary nested dynamic record combinations or synthetic Generic pointer results.",
-    "Normalization covers numeric/semicolon ANSI SGR presentation, not a general terminal emulator.",
-    "Colored FileCheck reclassification is reporting accuracy, not a newly passing shader or expanded language feature.",
-    "No new physical representation, conversion, provider ABI, lowering pass or general helper-domain expansion. Checked memory/address plans remain authoritative; recursive preflight admission and dedicated resource/conversion debt remain."
-  ],
-  "runtime_gate": {
-    "status": "passed",
-    "cells": 4,
-    "raw_results": {
-      "path": "build/nvvm-record-array-helpers/runtime-final/results.json",
-      "sha256": "b5ff1028c37ff423017fb65b33c842f9d3a58d22c88e55d32599223d0a82c43d"
-    },
-    "checkpoint_runtime": {
-      "path": "build/nvvm-record-array-helpers/checkpoint/runtime/results.json",
-      "sha256": "108978bc319fd60c087c7a9b89e17f083a51707192b08839301f867fcc41a114"
-    }
-  },
-  "toolkit": {
-    "status": "passed",
-    "required_cell_count": 18,
-    "raw_results": {
-      "path": "build/nvvm-record-array-helpers/toolkit/results.json",
-      "sha256": "4835fcd5423de3312d1bcc48ce0654e206ed0afacb139e34d017b036f5c2f121"
-    },
-    "cells": [
-      {
-        "id": "core-execution-sm80-o0",
-        "source": "tests/cuda/nvvm-core-execution.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "e3e3e78e3296d49fa9a385d80cf8d25b5f65cfc552c2b3270be699cf3d812589",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "12c3abcfca5ffbb301cb5a293ab6f1b216c587929affedd560257347228b7e78",
-        "cubin_sha256": "7652d0bb1664ff7c148b236c58c211b414561102fa0dbf87c905fd07391d3bfe"
-      },
-      {
-        "id": "core-execution-sm80-o3",
-        "source": "tests/cuda/nvvm-core-execution.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "e3e3e78e3296d49fa9a385d80cf8d25b5f65cfc552c2b3270be699cf3d812589",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "0ad71592fbc3fad3d828f285da5aa9013d46b42c3d612345e3dcc12a4e90a864",
-        "cubin_sha256": "64b001f7857c61284d8a7871250b987b29895dbdd2cb8e8a2c39eecdbaa55874"
-      },
-      {
-        "id": "mixed-numeric-sm80-o0",
-        "source": "tests/cuda/nvvm-mixed-numeric.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "7860270efbfd0a15b31383683e7f6fbfeaafafe9745af00594b3a41f0e447b2e",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "328dc0fe0003bc7b5c8b844d93ae114b51f9ea2cbab6686ed31fcbb3cb166f12",
-        "cubin_sha256": "04ebbfc3a94ee06e3de76a94d6b485f73e1d4e7890f839d3bde0fb246f38c162"
-      },
-      {
-        "id": "mixed-numeric-sm80-o3",
-        "source": "tests/cuda/nvvm-mixed-numeric.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "7860270efbfd0a15b31383683e7f6fbfeaafafe9745af00594b3a41f0e447b2e",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "be08e20809681273fec7c60199c5a3b5aac5df7061b0e1cec405d19b9276c899",
-        "cubin_sha256": "be778a181466ffff0a1f284dae206d6db7b171983d894dd2d82f3aac3427f509"
-      },
-      {
-        "id": "native-float-surface-sm80-o0",
-        "source": "tests/cuda/nvvm-native-float-surface.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "802708c20f945ce3ffbfd7de5ac5121efb3a8ed8d51345fcc83028678c4ab32f",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "37f2839fed30574a64d1613d48c0c8100fbb5fa43f0dfc455044c1380e70ea4d",
-        "cubin_sha256": "b3ef5624ff147dda4e53d28a68702d39ba297bf50b1a9c03b8fd40ecc1e46f22"
-      },
-      {
-        "id": "native-float-surface-sm80-o3",
-        "source": "tests/cuda/nvvm-native-float-surface.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "802708c20f945ce3ffbfd7de5ac5121efb3a8ed8d51345fcc83028678c4ab32f",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "e74bd9a13f27510a476bc46626bcd1853215cc8035e181c1c8fbd9d6780b7999",
-        "cubin_sha256": "17d20eae0cad38f20cac32b7976cb704415df002edd859ab1e2f1ce0648812da"
-      },
-      {
-        "id": "float64-values-sm80-o0",
-        "source": "tests/cuda/nvvm-float64-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "a6a4cfbb73708680345f6d7bbe2b072a93c6b5069683586afdffba53020cdfbd",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "65882b9e7820f13793260580796bbe9ef2cf26a4bd4e46657f152b443c25065b",
-        "cubin_sha256": "cbad5f8e209b8afd4f087d7d33f1839d5a53e5c678f4b1ef28cb8026e9b57e71"
-      },
-      {
-        "id": "float64-values-sm80-o3",
-        "source": "tests/cuda/nvvm-float64-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "a6a4cfbb73708680345f6d7bbe2b072a93c6b5069683586afdffba53020cdfbd",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "3c3476b0c698d9264cd10a17d82975bcfa68825648870df54fccc89d517fac31",
-        "cubin_sha256": "f64224347674a0637de1051daa07ec158e1253e842c25b979ba14e35285f9b34"
-      },
-      {
-        "id": "thread-local-global-context-sm80-o0",
-        "source": "tests/cuda/nvvm-thread-local-global-context.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "03f479d5910edda26e05903947f06a9ff3d615e5283626b92c10c00e28e409f2",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "083ad8ceb46321c74804cc469b00c263f1adae37c24dc7f39b40b579b62d3558",
-        "cubin_sha256": "16f3b63af857d6b4dc9cebc8c88af96c2038c26cc4527daed9cdbb8368bd7c89"
-      },
-      {
-        "id": "thread-local-global-context-sm80-o3",
-        "source": "tests/cuda/nvvm-thread-local-global-context.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "03f479d5910edda26e05903947f06a9ff3d615e5283626b92c10c00e28e409f2",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "93953d0b775b7208e5b031390ac1e83c1ce5975e5bb6639abde0265905f0057c",
-        "cubin_sha256": "41aee3d78f2f06492026cbe02b2238fa7331b2135746ea1e3ad92a96bafdb6d1"
-      },
-      {
-        "id": "half-values-sm80-o0",
-        "source": "tests/cuda/nvvm-half-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "60e87970794702947ca6b31a835283a839bd722fd0ebac819057e9b294597ff9",
-        "cubin_sha256": "5ba58c8928b6a8889c99d5d0a76de784652f0c0e19a591ea86e03cdb96630502"
-      },
-      {
-        "id": "half-values-sm80-o3",
-        "source": "tests/cuda/nvvm-half-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "e711393db1a7317f63de166f5bc7862bb524998d8a46d0a587e4d96af30c88e4",
-        "cubin_sha256": "aa8a374416c966a86a6b6f8c16e54e3cb8efaffb3bd5838aa7d75729ea945133"
-      },
-      {
-        "id": "float-matrix-values-sm80-o0",
-        "source": "tests/cuda/nvvm-float-matrix-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "811249e0698322abbbde7c0a5dfb1107a819c5d4220e299dacdc80d7598d8690",
-        "cubin_sha256": "fa562db81df12f3e52b42c65e6868d8ceb1b1007c2d3709c54f9e3842a4eb50e"
-      },
-      {
-        "id": "float-matrix-values-sm80-o3",
-        "source": "tests/cuda/nvvm-float-matrix-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "21cdd27c9d52face22c89bf9de5e1d04bd5b9161451a3dbb9e3dd0734c39d7c0",
-        "cubin_sha256": "667524bc52275f4a811bbf19bb3bf93db9d97f1c06c87816ab2ef90645db8f5a"
-      },
-      {
-        "id": "helper-copyable-values-sm80-o0",
-        "source": "tests/cuda/nvvm-helper-copyable-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "6c5cfca9b324dba78c250d287f0315a6942c56a5a7c5eecbfcc8cde2e9bd8fc0",
-        "cubin_sha256": "a5620800686cfb25c506664b3791311f76b49eed0d9b884f81b7d750e2951e46"
-      },
-      {
-        "id": "helper-copyable-values-sm80-o3",
-        "source": "tests/cuda/nvvm-helper-copyable-values.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "568f100c72c4be0115003de4384d6761fa4bec55ce109376a935bb2ba7236242",
-        "cubin_sha256": "b271959f20d98b62f648217289d4e8c5666e102ab0826510e2249c247dcde188"
-      },
-      {
-        "id": "conventional-global-multi-resource-sm80-o0",
-        "source": "tests/cuda/nvvm-conventional-global-multi-resource.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 0,
-        "status": "passed",
-        "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "c10b8dac8a7eb43170835b77751e95f70e9d670ee8becd6636eed6b60a472414",
-        "cubin_sha256": "91d71210d922198f83f0852e8d4ae8ff2ec4ea7493d8ffbc3b166db50726c216"
-      },
-      {
-        "id": "conventional-global-multi-resource-sm80-o3",
-        "source": "tests/cuda/nvvm-conventional-global-multi-resource.slang",
-        "entry": "computeMain",
-        "architecture": 80,
-        "optimization": 3,
-        "status": "passed",
-        "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
-        "actual_ptx_target": 80,
-        "ptx_sha256": "22e38dc4c27658f8970577eb4fdb761422695a360c218a65248627626ba982a7",
-        "cubin_sha256": "9db73003c34bde673d36b7afc1bf1b548238382b35256f956b248b9e1eda2972"
-      }
-    ]
-  },
-  "contracts": {
-    "passed": 97,
-    "skipped": 1,
-    "evidence": {
-      "path": "build/nvvm-record-array-helpers/contracts.json",
-      "sha256": "d04b9984640cdfe6d025fe341f1813408d511f20c6b5d8e818827eff9272631f"
-    }
-  },
-  "focused": {
-    "gpu": {
-      "passed": 51,
-      "gate": {
-        "command": [
-          "build/RelWithDebInfo/bin/slang-test",
-          "-disable-retries",
-          "tests/cuda/nvvm-bf16-local-vectors.slang",
-          "tests/cuda/nvvm-bf16-local-records.slang",
-          "tests/cuda/nvvm-borrowed-vector-storage.slang",
-          "tests/cuda/nvvm-compact-vector-storage.slang",
-          "tests/cuda/nvvm-nested-substandard-records.slang",
-          "tests/cuda/nvvm-nested-substandard-dynamic.slang",
-          "tests/cuda/nvvm-nested-integer-record-stores.slang",
-          "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang",
-          "tests/cuda/nvvm-local-substandard-record-arrays.slang",
-          "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
-          "tests/cuda/nvvm-aggregate-index-material.slang",
-          "tests/cuda/nvvm-aggregate-index-snapshot.slang",
-          "tests/cuda/nvvm-column-major-compact.slang",
-          "tests/cuda/nvvm-nested-array-root.slang",
-          "tests/cuda/nvvm-nested-array-wrapped.slang",
-          "tests/cuda/nvvm-nested-array-multidimensional.slang",
-          "tests/cuda/nvvm-substandard-record-array-parameter.slang",
-          "tests/cuda/nvvm-material-mini-lut.slang"
-        ],
-        "return_code": 0,
-        "elapsed_seconds": 34.53573942184448,
-        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/focused-2-gpu.log",
-        "log_sha256": "f2f771428f765510a16f76f02a714d97b54a72559829d3d4e8b392e285b34c39"
-      },
-      "log": {
-        "path": "build/nvvm-record-array-helpers/focused-2-gpu.log",
-        "sha256": "f2f771428f765510a16f76f02a714d97b54a72559829d3d4e8b392e285b34c39"
-      },
-      "outcomes": {
-        "tests/cuda/nvvm-aggregate-index-material.slang (cuda)": "passed",
-        "tests/cuda/nvvm-aggregate-index-material.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-aggregate-index-material.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-aggregate-index-snapshot.slang (cuda)": "passed",
-        "tests/cuda/nvvm-aggregate-index-snapshot.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-aggregate-index-snapshot.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-records.slang (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-records.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-records.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-vectors.slang (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-vectors.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-bf16-local-vectors.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-borrowed-vector-storage.slang (cuda)": "passed",
-        "tests/cuda/nvvm-borrowed-vector-storage.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-borrowed-vector-storage.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-column-major-compact.slang (cuda)": "passed",
-        "tests/cuda/nvvm-column-major-compact.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-column-major-compact.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-compact-vector-storage.slang (cuda)": "passed",
-        "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-local-substandard-record-array-copies.slang (cuda)": "passed",
-        "tests/cuda/nvvm-local-substandard-record-array-copies.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-local-substandard-record-array-copies.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-local-substandard-record-arrays.slang (cuda)": "passed",
-        "tests/cuda/nvvm-local-substandard-record-arrays.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-local-substandard-record-arrays.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-material-mini-lut.slang (cuda)": "passed",
-        "tests/cuda/nvvm-material-mini-lut.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-material-mini-lut.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang (cuda)": "passed",
-        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-array-multidimensional.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-array-multidimensional.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-array-root.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-array-root.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-array-wrapped.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-array-wrapped.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-integer-record-stores.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-integer-record-stores.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-integer-record-stores.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-dynamic.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-dynamic.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-dynamic.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-records.slang (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-records.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-nested-substandard-records.slang.2 (cuda)": "passed",
-        "tests/cuda/nvvm-substandard-record-array-parameter.slang (cuda)": "passed",
-        "tests/cuda/nvvm-substandard-record-array-parameter.slang.1 (cuda)": "passed",
-        "tests/cuda/nvvm-substandard-record-array-parameter.slang.2 (cuda)": "passed"
-      },
-      "source_sha256": {
-        "tests/cuda/nvvm-bf16-local-vectors.slang": "c5e0a68bc9f0e160c93f92d64bcb56e0beb7b9b939135e9694de7cbbfbe1b364",
-        "tests/cuda/nvvm-bf16-local-records.slang": "19c7db6eb12baa19e2afd91994e2da19a2b6fde61cdb95b106b2e558e4f2a683",
-        "tests/cuda/nvvm-borrowed-vector-storage.slang": "6d125820645d07798266aa1a3c40c44fb9bb678d5a2d849ce77e824e3c08c7cf",
-        "tests/cuda/nvvm-compact-vector-storage.slang": "d94447399a2c09e3099e68cac1354e16b2d5dab6b2432e0ff23f1946628adfe6",
-        "tests/cuda/nvvm-nested-substandard-records.slang": "99d38dd3398bf20bad8b1476d5b7e87495625616b0869557281a731a0246dc3f",
-        "tests/cuda/nvvm-nested-substandard-dynamic.slang": "e42bdfba99aac507bf144da9e266dd85fe19924cf92cb01b1fec2539813f4634",
-        "tests/cuda/nvvm-nested-integer-record-stores.slang": "127f6c8fa24394272518e1cc1dc7b4b82013e52aa31372f3bf8788f4ae217228",
-        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang": "fe73d768fef88d1e858ab4b4e43dcfc2cb242426e558fa89dff72ea30008eddb",
-        "tests/cuda/nvvm-local-substandard-record-arrays.slang": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c",
-        "tests/cuda/nvvm-local-substandard-record-array-copies.slang": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669",
-        "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
-        "tests/cuda/nvvm-aggregate-index-snapshot.slang": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db",
-        "tests/cuda/nvvm-column-major-compact.slang": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
-        "tests/cuda/nvvm-nested-array-root.slang": "763690737027f2a28a6f3465e15a5cbe470c46c40987b20a1d0d236432c1742c",
-        "tests/cuda/nvvm-nested-array-wrapped.slang": "f90e06f3fa4f5b0b7da2c83e35505de3f3af1f2b7400e0d46c4bf06d4326dda4",
-        "tests/cuda/nvvm-nested-array-multidimensional.slang": "7efeccacaf1e1a08a89fbfc846eb7f7ad7796e76bf16ecdc6f8dad5cbf06e932",
-        "tests/cuda/nvvm-substandard-record-array-parameter.slang": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e",
-        "tests/cuda/nvvm-material-mini-lut.slang": "66f6b5650d0e7476821a1446745fcf75ef175efe90b17e89df218b95bcf0e9c4"
-      }
-    },
-    "units": {
-      "passed": 28,
-      "gate": {
-        "command": [
-          "build/RelWithDebInfo/bin/slang-test",
-          "-disable-retries",
-          "-use-test-server",
-          "-server-count",
-          "2",
-          "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles",
-          "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation",
-          "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation",
-          "slang-unit-test-tool/nvvmSlangComposesLocalAggregateElementAndFieldAddresses",
-          "slang-unit-test-tool/nvvmSlangMatrixMemoryUsesSequentialPointerContract",
-          "slang-unit-test-tool/nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract",
-          "slang-unit-test-tool/nvvmSlangFixedDeviceArrayUsesDirectPipeline",
-          "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline",
-          "slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline",
-          "slang-unit-test-tool/nvvmSlangLocalArraysCrossHelperReferenceBoundaries",
-          "slang-unit-test-tool/nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers",
-          "slang-unit-test-tool/nvvmSlangBFloat16LocalVectorsUseQualifiedStorage",
-          "slang-unit-test-tool/nvvmSlangBFloat16LocalRecordsUseQualifiedFields",
-          "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsUseLocalFields",
-          "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles",
-          "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission",
-          "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer",
-          "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation",
-          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses",
-          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries",
-          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles",
-          "slang-unit-test-tool/nvvmIRBuilderPreservesNestedStructStoreLayout",
-          "slang-unit-test-tool/nvvmIRBuilderNestedStructStoresKeepArrayBoundaries",
-          "slang-unit-test-tool/nvvmIRBuilderPreservesNestedArrayStoreLayout",
-          "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI",
-          "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord",
-          "slang-unit-test-tool/nvvmSlangFloat8UnsupportedRolesStopBeforeEmission",
-          "slang-unit-test-tool/nvvmSlangFloat8RecordArrayParametersReturnRecords"
-        ],
-        "return_code": 0,
-        "elapsed_seconds": 17.314430713653564,
-        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/focused-2-units.log",
-        "log_sha256": "bd44ead19f643a5405c369065fc2dbbb6a4df97fe5a635e502918d46ff12f10e"
-      },
-      "log": {
-        "path": "build/nvvm-record-array-helpers/focused-2-units.log",
-        "sha256": "bd44ead19f643a5405c369065fc2dbbb6a4df97fe5a635e502918d46ff12f10e"
-      },
-      "outcomes": {
-        "slang-unit-test-tool/nvvmIRBuilderPreservesNestedStructStoreLayout.internal": "passed",
-        "slang-unit-test-tool/nvvmIRBuilderPreservesNestedArrayStoreLayout.internal": "passed",
-        "slang-unit-test-tool/nvvmIRBuilderNestedStructStoresKeepArrayBoundaries.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangMatrixMemoryUsesSequentialPointerContract.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangComposesLocalAggregateElementAndFieldAddresses.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalArraysCrossHelperReferenceBoundaries.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangFixedDeviceArrayUsesDirectPipeline.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangBFloat16LocalVectorsUseQualifiedStorage.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangBFloat16LocalRecordsUseQualifiedFields.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsUseLocalFields.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangFloat8RecordArrayParametersReturnRecords.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangFloat8UnsupportedRolesStopBeforeEmission.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed",
-        "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal": "passed"
-      },
-      "tested_source": {
-        "path": "build/nvvm-record-array-helpers/review/final-source-2.json",
-        "sha256": "42883c66343033f72786159e71aee5e4d922c5e1c5011a9234211fd8d07c8061"
-      },
-      "note": "Fresh focused and full native gates use final rebuilt unit-plugin bytes and final-source-2; original checkpoint provenance remains unchanged."
-    },
-    "static_units": {
-      "passed": 2,
-      "ignored": 0,
-      "gate": {
-        "command": [
-          "env",
-          "SLANG_NVVM_BUILDER_PATH=/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin",
-          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test",
-          "nvvmLocalRecordArray"
-        ],
-        "return_code": 0,
-        "elapsed_seconds": 7.034114122390747,
-        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/static-units-0.log",
-        "log_sha256": "e0e5738dd655b29c434a2863f2ec51a377fdbcbf2a8bc0f4b6599437e0bbb861"
-      },
-      "identity": {
-        "path": "build/nvvm-record-array-helpers/static-identity.json",
-        "sha256": "6338948d4c85048abb2a281d986309e0bcff2eb5fbdec5748954e0000d6102f1"
-      },
-      "review": {
-        "path": "build/nvvm-record-array-helpers/review/focused-results.json",
-        "sha256": "2740588f80c889755e2e86cccca0c58694a4564f32659417925430ff6bbb7970"
-      }
-    },
-    "scope": "Internal value parameters of existing fixed identity-record arrays; no reference/result/export or external storage admission."
-  },
   "validation_incidents": [
     {
       "kind": "unit-fixture-expectation",
@@ -37680,30 +37234,519 @@
         "sha256": "c4b76c40ddbcd52a6854adc2bc789a95f1dab5e03e1a8157a8d040afeb655b5d"
       },
       "resolution": "The exact FP8-only Payload[2] by-value parameter case for both formats moves to real-builder positive coverage; all 13 remaining negative sources unchanged. Final focused units pass28/28 and native units pass1105 with13 inherited skips. Only the unit-test plugin changed after the shader checkpoint; explicit component refresh preserves that chronology."
+    },
+    {
+      "kind": "ignored-probe-source-ownership-collision",
+      "evidence": {
+        "path": "build/nvvm-cuda-swizzle-set/source3-provenance-incident.json",
+        "sha256": "abf768835a76d9f99f0d6d4fa1665c976751ce4addd234ca7761a879beefa142"
+      },
+      "resolution": "Ambiguous source3 results excluded. Fresh root-owned immutable source4 used for all acceptance source checks."
     }
   ],
-  "acceptance": {
-    "status": "accepted",
-    "old_cells_preserved": 1740,
-    "new_corpus_cells": 0,
-    "reviewed_transitions": [],
-    "reviewed_input_deltas": [],
-    "new_native_units": [
-      "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord.internal",
-      "slang-unit-test-tool/nvvmSlangFloat8RecordArrayParametersReturnRecords.internal",
-      "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal"
-    ],
-    "last_full": "record-array-parameters",
-    "last_targeted": "record-array-parameters",
-    "implementations_since_full": 0,
-    "checkpoint_independent_review": {
-      "path": "build/nvvm-record-array-helpers/review/checkpoint-review.json",
-      "sha256": "009d820dd6397d02cec1010f73e264dd05c907631752e9a0748880e2daf396fd"
-    },
-    "candidate_independent_review": {
-      "path": "build/nvvm-record-array-helpers/review/candidate-review.json",
-      "sha256": "7b20833c57ffa78d65fcff56c2ac84cbd4b3be038e93cfa62fd34686b7e9a914"
+  "limitations": [
+    "36 main unresolved cells: three column-major host-packing mismatches and 33 infrastructure/preflight gaps. One historical NVRTC half-vector source-emission failure is resolved with unchanged inputs.",
+    "Three focused NVRTC optimized nested-array mismatches remain open outside main corpus.",
+    "Internal value parameters of fixed identity-record arrays are qualified. Source array returns become OutParam; reference/result/export roles, wrapper fields, multidimensional arrays, BF3/BF4 elements and external storage remain excluded.",
+    "No arbitrary packed/address-space or Cartesian value coverage; low16 patterns are correlated across fields.",
+    "Large original/candidate NVVM O3 both exceed120s/4GiB; no identical-cause or largeGPU feasibility claim.",
+    "Conservative alignment can change copy widths; no compile-speed or GPU performance claim.",
+    "Default and fixed linear-filtering synthetic-texture material profiles are qualified. The separate mini-LUT fixture uses synthetic data; the registered graph remains analytic. No original assets, arbitrary inputs or application performance claim.",
+    "Direct cache tests cover Value/Storage/HelperParameter first-use orders for flat/nested identity-record arrays. They do not establish arbitrary nested dynamic record combinations or synthetic Generic pointer results.",
+    "Normalization covers numeric/semicolon ANSI SGR presentation, not a general terminal emulator.",
+    "Colored FileCheck reclassification is reporting accuracy, not a newly passing shader or expanded language feature.",
+    "No new physical representation, conversion, provider ABI, lowering pass or general helper-domain expansion. Checked memory/address plans remain authoritative; recursive preflight admission and dedicated resource/conversion debt remain.",
+    "Native Half-vector noinline helper transport has a separately reproduced NVVM O3 wrong-output failure before and after this source-emission fix; tracked in focused evidence outside the main corpus. WGSL is source-checked, not device-executed."
+  ],
+  "runtime_gate": {
+    "status": "passed",
+    "cells": 4,
+    "raw_results": {
+      "path": "build/nvvm-cuda-swizzle-set/checkpoint/runtime/results.json",
+      "sha256": "e958b9c6473fb571353979e73bb6f76302aa44775e736b47a2e09ef916f5c0a1"
     }
+  },
+  "toolkit": {
+    "status": "passed",
+    "required_cell_count": 18,
+    "raw_results": {
+      "path": "build/nvvm-cuda-swizzle-set/toolkit/results.json",
+      "sha256": "2bebfe6d74c6333e1b683128dea9f568d2340986e6d2324eb53dff24a18ea1df"
+    },
+    "cells": [
+      {
+        "id": "core-execution-sm80-o0",
+        "source": "tests/cuda/nvvm-core-execution.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "e3e3e78e3296d49fa9a385d80cf8d25b5f65cfc552c2b3270be699cf3d812589",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "12c3abcfca5ffbb301cb5a293ab6f1b216c587929affedd560257347228b7e78",
+        "cubin_sha256": "7652d0bb1664ff7c148b236c58c211b414561102fa0dbf87c905fd07391d3bfe"
+      },
+      {
+        "id": "core-execution-sm80-o3",
+        "source": "tests/cuda/nvvm-core-execution.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "e3e3e78e3296d49fa9a385d80cf8d25b5f65cfc552c2b3270be699cf3d812589",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "0ad71592fbc3fad3d828f285da5aa9013d46b42c3d612345e3dcc12a4e90a864",
+        "cubin_sha256": "64b001f7857c61284d8a7871250b987b29895dbdd2cb8e8a2c39eecdbaa55874"
+      },
+      {
+        "id": "mixed-numeric-sm80-o0",
+        "source": "tests/cuda/nvvm-mixed-numeric.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "7860270efbfd0a15b31383683e7f6fbfeaafafe9745af00594b3a41f0e447b2e",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "328dc0fe0003bc7b5c8b844d93ae114b51f9ea2cbab6686ed31fcbb3cb166f12",
+        "cubin_sha256": "04ebbfc3a94ee06e3de76a94d6b485f73e1d4e7890f839d3bde0fb246f38c162"
+      },
+      {
+        "id": "mixed-numeric-sm80-o3",
+        "source": "tests/cuda/nvvm-mixed-numeric.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "7860270efbfd0a15b31383683e7f6fbfeaafafe9745af00594b3a41f0e447b2e",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "be08e20809681273fec7c60199c5a3b5aac5df7061b0e1cec405d19b9276c899",
+        "cubin_sha256": "be778a181466ffff0a1f284dae206d6db7b171983d894dd2d82f3aac3427f509"
+      },
+      {
+        "id": "native-float-surface-sm80-o0",
+        "source": "tests/cuda/nvvm-native-float-surface.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "802708c20f945ce3ffbfd7de5ac5121efb3a8ed8d51345fcc83028678c4ab32f",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "37f2839fed30574a64d1613d48c0c8100fbb5fa43f0dfc455044c1380e70ea4d",
+        "cubin_sha256": "b3ef5624ff147dda4e53d28a68702d39ba297bf50b1a9c03b8fd40ecc1e46f22"
+      },
+      {
+        "id": "native-float-surface-sm80-o3",
+        "source": "tests/cuda/nvvm-native-float-surface.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "802708c20f945ce3ffbfd7de5ac5121efb3a8ed8d51345fcc83028678c4ab32f",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "e74bd9a13f27510a476bc46626bcd1853215cc8035e181c1c8fbd9d6780b7999",
+        "cubin_sha256": "17d20eae0cad38f20cac32b7976cb704415df002edd859ab1e2f1ce0648812da"
+      },
+      {
+        "id": "float64-values-sm80-o0",
+        "source": "tests/cuda/nvvm-float64-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "a6a4cfbb73708680345f6d7bbe2b072a93c6b5069683586afdffba53020cdfbd",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "65882b9e7820f13793260580796bbe9ef2cf26a4bd4e46657f152b443c25065b",
+        "cubin_sha256": "cbad5f8e209b8afd4f087d7d33f1839d5a53e5c678f4b1ef28cb8026e9b57e71"
+      },
+      {
+        "id": "float64-values-sm80-o3",
+        "source": "tests/cuda/nvvm-float64-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "a6a4cfbb73708680345f6d7bbe2b072a93c6b5069683586afdffba53020cdfbd",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "3c3476b0c698d9264cd10a17d82975bcfa68825648870df54fccc89d517fac31",
+        "cubin_sha256": "f64224347674a0637de1051daa07ec158e1253e842c25b979ba14e35285f9b34"
+      },
+      {
+        "id": "thread-local-global-context-sm80-o0",
+        "source": "tests/cuda/nvvm-thread-local-global-context.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "03f479d5910edda26e05903947f06a9ff3d615e5283626b92c10c00e28e409f2",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "083ad8ceb46321c74804cc469b00c263f1adae37c24dc7f39b40b579b62d3558",
+        "cubin_sha256": "16f3b63af857d6b4dc9cebc8c88af96c2038c26cc4527daed9cdbb8368bd7c89"
+      },
+      {
+        "id": "thread-local-global-context-sm80-o3",
+        "source": "tests/cuda/nvvm-thread-local-global-context.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "03f479d5910edda26e05903947f06a9ff3d615e5283626b92c10c00e28e409f2",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "93953d0b775b7208e5b031390ac1e83c1ce5975e5bb6639abde0265905f0057c",
+        "cubin_sha256": "41aee3d78f2f06492026cbe02b2238fa7331b2135746ea1e3ad92a96bafdb6d1"
+      },
+      {
+        "id": "half-values-sm80-o0",
+        "source": "tests/cuda/nvvm-half-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "60e87970794702947ca6b31a835283a839bd722fd0ebac819057e9b294597ff9",
+        "cubin_sha256": "5ba58c8928b6a8889c99d5d0a76de784652f0c0e19a591ea86e03cdb96630502"
+      },
+      {
+        "id": "half-values-sm80-o3",
+        "source": "tests/cuda/nvvm-half-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "71f8b3975ed988ec10cabd603ec1d828a12dfb159ed903892bb9c7510f67f266",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "e711393db1a7317f63de166f5bc7862bb524998d8a46d0a587e4d96af30c88e4",
+        "cubin_sha256": "aa8a374416c966a86a6b6f8c16e54e3cb8efaffb3bd5838aa7d75729ea945133"
+      },
+      {
+        "id": "float-matrix-values-sm80-o0",
+        "source": "tests/cuda/nvvm-float-matrix-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "811249e0698322abbbde7c0a5dfb1107a819c5d4220e299dacdc80d7598d8690",
+        "cubin_sha256": "fa562db81df12f3e52b42c65e6868d8ceb1b1007c2d3709c54f9e3842a4eb50e"
+      },
+      {
+        "id": "float-matrix-values-sm80-o3",
+        "source": "tests/cuda/nvvm-float-matrix-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "3b3a93008ab34d062aba2c8dd96ff6af480367dba0701545ebe4a24dd8c94863",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "21cdd27c9d52face22c89bf9de5e1d04bd5b9161451a3dbb9e3dd0734c39d7c0",
+        "cubin_sha256": "667524bc52275f4a811bbf19bb3bf93db9d97f1c06c87816ab2ef90645db8f5a"
+      },
+      {
+        "id": "helper-copyable-values-sm80-o0",
+        "source": "tests/cuda/nvvm-helper-copyable-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "6c5cfca9b324dba78c250d287f0315a6942c56a5a7c5eecbfcc8cde2e9bd8fc0",
+        "cubin_sha256": "a5620800686cfb25c506664b3791311f76b49eed0d9b884f81b7d750e2951e46"
+      },
+      {
+        "id": "helper-copyable-values-sm80-o3",
+        "source": "tests/cuda/nvvm-helper-copyable-values.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "ba6bad934e66c1889315314c5ba02deb8e8b21c50da2f99919a8ccdde065e09a",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "568f100c72c4be0115003de4384d6761fa4bec55ce109376a935bb2ba7236242",
+        "cubin_sha256": "b271959f20d98b62f648217289d4e8c5666e102ab0826510e2249c247dcde188"
+      },
+      {
+        "id": "conventional-global-multi-resource-sm80-o0",
+        "source": "tests/cuda/nvvm-conventional-global-multi-resource.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 0,
+        "status": "passed",
+        "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "c10b8dac8a7eb43170835b77751e95f70e9d670ee8becd6636eed6b60a472414",
+        "cubin_sha256": "91d71210d922198f83f0852e8d4ae8ff2ec4ea7493d8ffbc3b166db50726c216"
+      },
+      {
+        "id": "conventional-global-multi-resource-sm80-o3",
+        "source": "tests/cuda/nvvm-conventional-global-multi-resource.slang",
+        "entry": "computeMain",
+        "architecture": 80,
+        "optimization": 3,
+        "status": "passed",
+        "source_sha256": "89718a32a5fb46ab55426d2c4a595ffb12dec0868e871f2c76826e857ac2e17b",
+        "actual_ptx_target": 80,
+        "ptx_sha256": "22e38dc4c27658f8970577eb4fdb761422695a360c218a65248627626ba982a7",
+        "cubin_sha256": "9db73003c34bde673d36b7afc1bf1b548238382b35256f956b248b9e1eda2972"
+      }
+    ]
+  },
+  "contracts": {
+    "passed": 97,
+    "skipped": 1,
+    "evidence": {
+      "path": "build/nvvm-cuda-swizzle-set/contracts.json",
+      "sha256": "1f7ed702b525b38925e1010c962c71d06a874d2f0ca1c378f36b1e83a4248f74"
+    }
+  },
+  "focused": {
+    "gpu": {
+      "passed": 54,
+      "gate": {
+        "command": [
+          "build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "tests/cuda/nvvm-bf16-local-vectors.slang",
+          "tests/cuda/nvvm-bf16-local-records.slang",
+          "tests/cuda/nvvm-borrowed-vector-storage.slang",
+          "tests/cuda/nvvm-compact-vector-storage.slang",
+          "tests/cuda/nvvm-nested-substandard-records.slang",
+          "tests/cuda/nvvm-nested-substandard-dynamic.slang",
+          "tests/cuda/nvvm-nested-integer-record-stores.slang",
+          "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang",
+          "tests/cuda/nvvm-local-substandard-record-arrays.slang",
+          "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
+          "tests/cuda/nvvm-aggregate-index-material.slang",
+          "tests/cuda/nvvm-aggregate-index-snapshot.slang",
+          "tests/cuda/nvvm-column-major-compact.slang",
+          "tests/cuda/nvvm-nested-array-root.slang",
+          "tests/cuda/nvvm-nested-array-wrapped.slang",
+          "tests/cuda/nvvm-nested-array-multidimensional.slang",
+          "tests/cuda/nvvm-substandard-record-array-parameter.slang",
+          "tests/cuda/nvvm-material-mini-lut.slang",
+          "tests/cuda/nvvm-material-dielectric.slang"
+        ],
+        "return_code": 0,
+        "elapsed_seconds": 38.475194692611694,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/focused-neighbors-gpu.log",
+        "log_sha256": "7924f70bc7228479c98a17daa70c70e9dc3ddcb8f647457f0f0d046295a597c9"
+      },
+      "log": {
+        "path": "build/nvvm-cuda-swizzle-set/focused-neighbors-gpu.log",
+        "sha256": "7924f70bc7228479c98a17daa70c70e9dc3ddcb8f647457f0f0d046295a597c9"
+      },
+      "outcomes": {
+        "tests/cuda/nvvm-aggregate-index-material.slang (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-material.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-material.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-records.slang (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-records.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-records.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-vectors.slang (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-vectors.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-bf16-local-vectors.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-borrowed-vector-storage.slang (cuda)": "passed",
+        "tests/cuda/nvvm-borrowed-vector-storage.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-borrowed-vector-storage.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-column-major-compact.slang (cuda)": "passed",
+        "tests/cuda/nvvm-column-major-compact.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-column-major-compact.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-compact-vector-storage.slang (cuda)": "passed",
+        "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-material-dielectric.slang (cuda)": "passed",
+        "tests/cuda/nvvm-material-dielectric.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-material-dielectric.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-material-mini-lut.slang (cuda)": "passed",
+        "tests/cuda/nvvm-material-mini-lut.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-material-mini-lut.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang (cuda)": "passed",
+        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-multidimensional.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-multidimensional.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-root.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-root.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-wrapped.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-array-wrapped.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-integer-record-stores.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-integer-record-stores.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-integer-record-stores.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-dynamic.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-dynamic.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-dynamic.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-records.slang (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-records.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-nested-substandard-records.slang.2 (cuda)": "passed",
+        "tests/cuda/nvvm-substandard-record-array-parameter.slang (cuda)": "passed",
+        "tests/cuda/nvvm-substandard-record-array-parameter.slang.1 (cuda)": "passed",
+        "tests/cuda/nvvm-substandard-record-array-parameter.slang.2 (cuda)": "passed"
+      },
+      "source_sha256": {
+        "tests/cuda/nvvm-bf16-local-vectors.slang": "c5e0a68bc9f0e160c93f92d64bcb56e0beb7b9b939135e9694de7cbbfbe1b364",
+        "tests/cuda/nvvm-bf16-local-records.slang": "19c7db6eb12baa19e2afd91994e2da19a2b6fde61cdb95b106b2e558e4f2a683",
+        "tests/cuda/nvvm-borrowed-vector-storage.slang": "6d125820645d07798266aa1a3c40c44fb9bb678d5a2d849ce77e824e3c08c7cf",
+        "tests/cuda/nvvm-compact-vector-storage.slang": "d94447399a2c09e3099e68cac1354e16b2d5dab6b2432e0ff23f1946628adfe6",
+        "tests/cuda/nvvm-nested-substandard-records.slang": "99d38dd3398bf20bad8b1476d5b7e87495625616b0869557281a731a0246dc3f",
+        "tests/cuda/nvvm-nested-substandard-dynamic.slang": "e42bdfba99aac507bf144da9e266dd85fe19924cf92cb01b1fec2539813f4634",
+        "tests/cuda/nvvm-nested-integer-record-stores.slang": "127f6c8fa24394272518e1cc1dc7b4b82013e52aa31372f3bf8788f4ae217228",
+        "tests/cuda/nvvm-mutable-pointer-payload-forwarding.slang": "fe73d768fef88d1e858ab4b4e43dcfc2cb242426e558fa89dff72ea30008eddb",
+        "tests/cuda/nvvm-local-substandard-record-arrays.slang": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c",
+        "tests/cuda/nvvm-local-substandard-record-array-copies.slang": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669",
+        "tests/cuda/nvvm-aggregate-index-material.slang": "f849394e05742d3ea0cc425f1b76ddcb2d1635dbc8d68d2055443942394dc4f0",
+        "tests/cuda/nvvm-aggregate-index-snapshot.slang": "429124c71891010cfe832021a1b2919a7534227ea364ce9cb7c05205064062db",
+        "tests/cuda/nvvm-column-major-compact.slang": "221ce234e28f26cb8113b732eb6ca1c7b4ac5e52261be9ccb37a843c56a5124f",
+        "tests/cuda/nvvm-nested-array-root.slang": "763690737027f2a28a6f3465e15a5cbe470c46c40987b20a1d0d236432c1742c",
+        "tests/cuda/nvvm-nested-array-wrapped.slang": "f90e06f3fa4f5b0b7da2c83e35505de3f3af1f2b7400e0d46c4bf06d4326dda4",
+        "tests/cuda/nvvm-nested-array-multidimensional.slang": "7efeccacaf1e1a08a89fbfc846eb7f7ad7796e76bf16ecdc6f8dad5cbf06e932",
+        "tests/cuda/nvvm-substandard-record-array-parameter.slang": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e",
+        "tests/cuda/nvvm-material-mini-lut.slang": "66f6b5650d0e7476821a1446745fcf75ef175efe90b17e89df218b95bcf0e9c4",
+        "tests/cuda/nvvm-material-dielectric.slang": "f23d33fe146dca983878861f59f147c7e3039b1c1e0cf535b1f4d62ab30bc998"
+      }
+    },
+    "units": {
+      "passed": 28,
+      "gate": {
+        "command": [
+          "build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "-use-test-server",
+          "-server-count",
+          "2",
+          "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles",
+          "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation",
+          "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation",
+          "slang-unit-test-tool/nvvmSlangComposesLocalAggregateElementAndFieldAddresses",
+          "slang-unit-test-tool/nvvmSlangMatrixMemoryUsesSequentialPointerContract",
+          "slang-unit-test-tool/nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract",
+          "slang-unit-test-tool/nvvmSlangFixedDeviceArrayUsesDirectPipeline",
+          "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline",
+          "slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline",
+          "slang-unit-test-tool/nvvmSlangLocalArraysCrossHelperReferenceBoundaries",
+          "slang-unit-test-tool/nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers",
+          "slang-unit-test-tool/nvvmSlangBFloat16LocalVectorsUseQualifiedStorage",
+          "slang-unit-test-tool/nvvmSlangBFloat16LocalRecordsUseQualifiedFields",
+          "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsUseLocalFields",
+          "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles",
+          "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission",
+          "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer",
+          "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles",
+          "slang-unit-test-tool/nvvmIRBuilderPreservesNestedStructStoreLayout",
+          "slang-unit-test-tool/nvvmIRBuilderNestedStructStoresKeepArrayBoundaries",
+          "slang-unit-test-tool/nvvmIRBuilderPreservesNestedArrayStoreLayout",
+          "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI",
+          "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord",
+          "slang-unit-test-tool/nvvmSlangFloat8UnsupportedRolesStopBeforeEmission",
+          "slang-unit-test-tool/nvvmSlangFloat8RecordArrayParametersReturnRecords"
+        ],
+        "return_code": 0,
+        "elapsed_seconds": 16.745997667312622,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/focused-neighbors-units.log",
+        "log_sha256": "b06a3dd4a6bcf6ed2a27841aac470cdfec2cd13e5a53e0a1fe09a6e2bde542f2"
+      },
+      "log": {
+        "path": "build/nvvm-cuda-swizzle-set/focused-neighbors-units.log",
+        "sha256": "b06a3dd4a6bcf6ed2a27841aac470cdfec2cd13e5a53e0a1fe09a6e2bde542f2"
+      },
+      "outcomes": {
+        "slang-unit-test-tool/nvvmIRBuilderPreservesNestedStructStoreLayout.internal": "passed",
+        "slang-unit-test-tool/nvvmIRBuilderNestedStructStoresKeepArrayBoundaries.internal": "passed",
+        "slang-unit-test-tool/nvvmIRBuilderPreservesNestedArrayStoreLayout.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangDynamicLocalVectorStoreUsesSequentialPointerContract.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangMatrixMemoryUsesSequentialPointerContract.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangComposesLocalAggregateElementAndFieldAddresses.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalArraysCrossHelperReferenceBoundaries.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangFixedDeviceArrayUsesDirectPipeline.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangBFloat16LocalVectorsUseQualifiedStorage.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangBFloat16LocalRecordsUseQualifiedFields.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsUseLocalFields.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangNestedRecordArrayParameterReturnsRecord.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangFloat8RecordArrayParametersReturnRecords.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangFloat8UnsupportedRolesStopBeforeEmission.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArrayLayoutQueries.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed",
+        "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal": "passed"
+      }
+    },
+    "swizzle_regressions": {
+      "passed": 8,
+      "gate": {
+        "command": [
+          "build/RelWithDebInfo/bin/slang-test",
+          "-disable-retries",
+          "tests/compute/swizzle-set-snapshot.slang",
+          "tests/compute/swizzle-set-source.slang"
+        ],
+        "return_code": 0,
+        "elapsed_seconds": 2.8412258625030518,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-cuda-swizzle-set/focused-permanent-0.log",
+        "log_sha256": "9477d2c63ef6f52a4427a313d61ac4d553b28f438dbba12de15dea7bc9ec104b"
+      },
+      "log": {
+        "path": "build/nvvm-cuda-swizzle-set/focused-permanent-0.log",
+        "sha256": "9477d2c63ef6f52a4427a313d61ac4d553b28f438dbba12de15dea7bc9ec104b"
+      },
+      "outcomes": {
+        "tests/compute/swizzle-set-snapshot.slang (cuda)": "passed",
+        "tests/compute/swizzle-set-snapshot.slang.1 (cuda)": "passed",
+        "tests/compute/swizzle-set-snapshot.slang.2 (cuda)": "passed",
+        "tests/compute/swizzle-set-source.slang": "passed",
+        "tests/compute/swizzle-set-source.slang.1": "passed",
+        "tests/compute/swizzle-set-source.slang.2": "passed",
+        "tests/compute/swizzle-set-source.slang.3": "passed",
+        "tests/compute/swizzle-set-source.slang.4": "passed"
+      }
+    },
+    "historical_static_units": {
+      "passed": 2,
+      "ignored": 0,
+      "gate": {
+        "command": [
+          "env",
+          "SLANG_NVVM_BUILDER_PATH=/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin",
+          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test",
+          "nvvmLocalRecordArray"
+        ],
+        "return_code": 0,
+        "elapsed_seconds": 7.034114122390747,
+        "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-record-array-helpers/static-units-0.log",
+        "log_sha256": "e0e5738dd655b29c434a2863f2ec51a377fdbcbf2a8bc0f4b6599437e0bbb861"
+      },
+      "identity": {
+        "path": "build/nvvm-record-array-helpers/static-identity.json",
+        "sha256": "6338948d4c85048abb2a281d986309e0bcff2eb5fbdec5748954e0000d6102f1"
+      },
+      "review": {
+        "path": "build/nvvm-record-array-helpers/review/focused-results.json",
+        "sha256": "2740588f80c889755e2e86cccca0c58694a4564f32659417925430ff6bbb7970"
+      },
+      "note": "Retained under original static compiler identity. No type-role/address-plan change or new static build in this shared source-emitter qualification."
+    },
+    "scope": "Canonical multi-lane SwizzleSet source spelling and snapshot semantics, existing neighboring GPU/type contracts; no NVVM ABI or representation change."
   },
   "material_runtime": {
     "status": "passed",
@@ -37715,8 +37758,8 @@
         "status": "passed",
         "cells": 3,
         "results": {
-          "path": "build/nvvm-record-array-helpers/material-texel-centers-eval_buffer/results.json",
-          "sha256": "ab122464b2e89e8a50b7315be5185ddc0a05e2d0e85b518874eff37c3a6f0259"
+          "path": "build/nvvm-cuda-swizzle-set/material-texel-centers-eval_buffer/results.json",
+          "sha256": "2d724f7dd5021fd21ce61ed57a0bf9359bb0150b75832d4d7eb8d129ef47327e"
         }
       },
       {
@@ -37725,8 +37768,8 @@
         "status": "passed",
         "cells": 3,
         "results": {
-          "path": "build/nvvm-record-array-helpers/material-texel-centers-sample_buffer/results.json",
-          "sha256": "60193c99be97ddbf3be1b328e88424c34f47cfe891fb8bab94282d6f293af228"
+          "path": "build/nvvm-cuda-swizzle-set/material-texel-centers-sample_buffer/results.json",
+          "sha256": "869d6dde066a127e07d28ae4637559cc61194f46d804a69319e4d280dafebdb6"
         }
       },
       {
@@ -37735,8 +37778,8 @@
         "status": "passed",
         "cells": 3,
         "results": {
-          "path": "build/nvvm-record-array-helpers/material-linear-filtering-eval_buffer/results.json",
-          "sha256": "215ee5a2a23e469869666c5b56ca9eaeff96b35bffa76b159a6ec1638da65f5f"
+          "path": "build/nvvm-cuda-swizzle-set/material-linear-filtering-eval_buffer/results.json",
+          "sha256": "7c9498e6b150b9f2e5612bfb59c6a2b2e1565d6bc5780978ea539a5885317e6e"
         }
       },
       {
@@ -37745,15 +37788,68 @@
         "status": "passed",
         "cells": 3,
         "results": {
-          "path": "build/nvvm-record-array-helpers/material-linear-filtering-sample_buffer/results.json",
-          "sha256": "08800ceecd6f6f474f3075975be7a0bb11f33a577afc7f0e963f7215c2acd3a7"
+          "path": "build/nvvm-cuda-swizzle-set/material-linear-filtering-sample_buffer/results.json",
+          "sha256": "03447257ca724c06e6b642b8e05612f05fafb203221eb556a7e48ec403cb6f12"
         }
       }
     ],
-    "scope": "Fresh default and fixed linear-filtering synthetic-texture correctness, 65 records and 63 guards per cell; no new timing qualification.",
-    "independent_review": {
-      "path": "build/nvvm-record-array-helpers/review/material-final.json",
-      "sha256": "778959a860bcf7c7f49a2a9effe0abde1392a52a39ce9aa0299092fe0bbb2b0e"
+    "scope": "Fresh default and fixed linear-filtering synthetic-texture correctness, 65 records and 63 guards per cell; no timing qualification."
+  },
+  "acceptance": {
+    "status": "independently-reviewed",
+    "old_cell_identities_preserved": 1740,
+    "unchanged_cell_outcomes": 1739,
+    "new_corpus_cells": 0,
+    "reviewed_transitions": [
+      {
+        "corpus": "frozen",
+        "id": "compute/half-vector-calc.slang#cuda-1",
+        "mode": "nvrtc-o3",
+        "before": {
+          "classification": "infrastructure",
+          "return_code": 1,
+          "execution_counts": {
+            "passed": 0,
+            "executed": 1,
+            "ignored": 0,
+            "other_summary_status": 0
+          },
+          "diagnostic": "",
+          "canonical_shape": ""
+        },
+        "after": {
+          "classification": "correct",
+          "return_code": 0,
+          "execution_counts": {
+            "passed": 1,
+            "executed": 1,
+            "ignored": 0,
+            "other_summary_status": 0
+          },
+          "diagnostic": "",
+          "canonical_shape": ""
+        }
+      }
+    ],
+    "reviewed_input_deltas": [],
+    "last_full": "cuda-swizzle-set",
+    "last_targeted": "cuda-swizzle-set",
+    "implementations_since_full": 0,
+    "source_review": {
+      "path": "build/nvvm-cuda-swizzle-set/review/final-source.json",
+      "sha256": "df4f00c6d8e150c44dc87728f84747b63837740977d50f1de7dd15f18d600c0e"
+    },
+    "focused_review": {
+      "path": "build/nvvm-cuda-swizzle-set/review/focused-after.json",
+      "sha256": "ecb6b8485ff4e8935e1c8451bb917678fd28c3467750a80fc06cabc4077cd7c6"
+    },
+    "checkpoint_independent_review": {
+      "path": "build/nvvm-cuda-swizzle-set/review/checkpoint-review.json",
+      "sha256": "917363589efa83d919788453cbe62cccf75536e84e5033fdddd33148f23a9081"
+    },
+    "final_candidate_review": {
+      "path": "build/nvvm-cuda-swizzle-set/review/final-candidate.json",
+      "sha256": "9677146e6ed419588847bc7405dabb0db686993818b250daf000e5fe3e638084"
     }
   }
 }

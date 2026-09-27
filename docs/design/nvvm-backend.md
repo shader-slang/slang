@@ -54,6 +54,14 @@ example, aggregate receiver snapshots must be established before deferred buffer
 aggregate parameters before `deferBufferLoad` preserves the original value across subsequent resource
 writes; emission must not reread storage to reconstruct a saved semantic value.
 
+Canonical IR can also need different legal source spellings. SSA promotion turns a local vector's
+`SwizzledStore` into a pure `SwizzleSet`, preserving the old value and untouched lanes. For example,
+`v.xyz = -v.zwx` must read all replacement lanes from the original value. The shared CLike emitter
+copies the base and emits scalar component assignments for CPU/CUDA/WGPU, which lack writable
+multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary; scalar updates
+and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
+an NVVM representation or shared SSA legalization change.
+
 ## Preflight is a contract, not a trial emission
 
 Preflight validates reachable functions, entry and helper signatures, typed operations, operand

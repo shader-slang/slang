@@ -6352,6 +6352,242 @@
         "Registered graph remains reflection-only; this fixture invokes an existing public library policy.",
         "No production compiler/provider/module/driver changes; all previous focused evidence retains original identities."
       ]
+    },
+    "vector-swizzle-source-emission": {
+      "status": "accepted-focused-gpu-and-source",
+      "contract": "Canonical multi-lane SwizzleSet emits legal scalar lane assignments on CPU/CUDA/WGPU, preserving base snapshots and replacement evaluation. HLSL/GLSL and scalar updates retain their existing path.",
+      "source_sha256": {
+        "tests/compute/swizzle-set-snapshot.slang": "08e56a34611636cdd88d03ee91869abe50c6df339c902dd49386338e20f81cb6",
+        "tests/compute/swizzle-set-source.slang": "110b2964c3776c1521e4085dd4fbf48323d327104e96a1194c15f9088816ffc2"
+      },
+      "compiler_identity": {
+        "revision": "2b8dafc69fc78454d685a37defbb089cac5f1630",
+        "patch_sha256": "7101a82b9f7baa664aa967a9bc66ad1ef81fdb60c7da1419d26388d888ee4aff",
+        "compiler_version": "2026.18.3-328-g2b8dafc69",
+        "provider_abi": 42,
+        "runtime_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "f12039a5ed1d452c2b2c0d8e10e82d82ade80f8dbc014ee1713a158bd079e2df",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "5eb9a71f1ead185ba5ecd8f50b71d0453d8916c8b9713a1a2ac76e40f1c0ab8f",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "d656744bfdf982e8696e67459ac0f320f1ac2a5e43aa734becdcb1d62fc70ec5",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "a37e84461322c76b5e60ef514c1a598ea25f2f3bd3484d853bffba5c577af5b6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "48d4be3b35e29e3c3c76df5798b79ca7ec7ebfdc3eb6b8582d6be1a388c8b0aa",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "415eacb9da4d41afcec36afb626a9f17d3121ea97c43761f3451366df043ebab",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "3a2aa06edb72240002c0645453e6ea79911e175da0a7aca9801c4de60db7b7c3",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "c65ee1f1f7c0d079737ef1b4ebc78174b3dbd729177a7c59de2e4f6d5cbfe164",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "802eeb213569f96fad0258e8b9426fd82a7bb17b17d31ff2d8f367fd01fea439",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ea8e28f53e0fa571be3f7535dbd9f60ae1ffe2635fb51b6e858379feb41abe25",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "05f5f080c4b37f7916d54df2f9255bdadde311ec1f3516ace76e1ca01ec34a9f",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "36a6f1b096f477f6aab49698f86f4765057f3a5f82a09ba112c7d579ccc4a88e",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "bb4672e5a9b39964247c52dfca4cd68da49feff4ab1c00228706c3369a0cd8b5",
+          "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
+          "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+          "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+          "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+          "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+        }
+      },
+      "before_compiler_identity": {
+        "revision": "cef0ffbdfd2d9e2f3b820967bb05ebbe225d07dd",
+        "patch_sha256": "3a1a750089b782f3486c0ac6afac2e50a28157f2f95831dfd9246e0dffa06453",
+        "compiler_version": "2026.18.3-326-gcef0ffbdf",
+        "provider_abi": 42,
+        "runtime_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "af1661de02c02d67f1eab60724558d7ab32269112cfea5a0a95326795ba792c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "f12039a5ed1d452c2b2c0d8e10e82d82ade80f8dbc014ee1713a158bd079e2df",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "5eb9a71f1ead185ba5ecd8f50b71d0453d8916c8b9713a1a2ac76e40f1c0ab8f",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "d656744bfdf982e8696e67459ac0f320f1ac2a5e43aa734becdcb1d62fc70ec5",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "a17aa31ab1a2110b2cb3b43c0f563425a86eb30cb39b4717629a512f5902963b",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "48d4be3b35e29e3c3c76df5798b79ca7ec7ebfdc3eb6b8582d6be1a388c8b0aa",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "a924e219d49407a54febe9eb49520fe361e4a102e7ea294190a3c58915cb659d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "a315dafb6881fa5c1c01cf5ddafb65c0ee987ce222a55af96b7fb4679a95570e",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "492cbdb16ff16f597dffcfd6ff42836d3f2327303753486cc32c036b9beab594",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "e915691e3d08180009528fe836a54f06eaf8786490d2032fb613e4e3bf8db204",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "1ed590d8e03d503e66fd159783823913f239eb01cf62f5b849bde07b843a2cda",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "ec452f8b9b9985eeb76600d77d32a46171ff7ae57d4330ba80b8e8a798bd7b79",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "a813a474c3abef4e24c7691570565b98d5ee3d3879a24f0cdee5e66c3dbd9eea",
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "c31662ab56be492d5ceb3b8cacbf8157b560b1f20a4ae5df40b15e870570d6db",
+          "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
+          "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+          "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+          "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+          "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+        },
+        "identity_snapshot": {
+          "path": "build/nvvm-cuda-swizzle-set/before-accepted-identity.json",
+          "sha256": "8dee3fbe74525265ec240fa2bb97e48358787200d1907902f988612d09cf7025"
+        }
+      },
+      "original_corpus_transition": [
+        {
+          "corpus": "frozen",
+          "id": "compute/half-vector-calc.slang#cuda-1",
+          "mode": "nvrtc-o3",
+          "before": {
+            "classification": "infrastructure",
+            "return_code": 1,
+            "execution_counts": {
+              "passed": 0,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "diagnostic": "",
+            "canonical_shape": ""
+          },
+          "after": {
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "diagnostic": "",
+            "canonical_shape": ""
+          }
+        }
+      ],
+      "oracle": {
+        "original_half_outputs": [75, 220.5, 565, 1108],
+        "runtime_input_float4": [1, 2, 4, 8],
+        "snapshot_output_words": [
+          -4, -8, -1, 8, 8, 2, 4, 2, -4, -8, -1, 8, 1, 3, 31337
+        ],
+        "effectful_helper": "float4 parameter to float3 result, one noinline call with inout counter",
+        "rounding": "Original half case includes ties-to-even 1104.5 to 1104; new integer-valued fixture is exact in half.",
+        "independent_review": {
+          "path": "build/nvvm-cuda-swizzle-set/review/before-oracle.json",
+          "sha256": "251a1a03879d26ffeba98a7e76f04076f6441717194c2a48de7351f2135ba31f"
+        },
+        "chronology": "Reviewer derived oracle without observing GPU output and before compiler edits. Root GPU execution preceded completion of the review artifact; not a pre-execution oracle freeze."
+      },
+      "qualification": {
+        "permanent_gpu_cells": 3,
+        "permanent_source_checks": 5,
+        "original_corpus_gpu_cells": 3,
+        "snapshot_compile_assembly_cells": 3,
+        "cpp_host_syntax": "Before fails on xyz/xw members; after passes.",
+        "unchanged_source": [
+          "HLSL vector updates",
+          "GLSL vector updates",
+          "GLSL legalized scalar image-component update"
+        ],
+        "source_review": {
+          "path": "build/nvvm-cuda-swizzle-set/review/final-source.json",
+          "sha256": "df4f00c6d8e150c44dc87728f84747b63837740977d50f1de7dd15f18d600c0e"
+        },
+        "focused_review": {
+          "path": "build/nvvm-cuda-swizzle-set/review/focused-after.json",
+          "sha256": "ecb6b8485ff4e8935e1c8451bb917678fd28c3467750a80fc06cabc4077cd7c6"
+        },
+        "full_checkpoint": {
+          "path": "build/nvvm-cuda-swizzle-set/checkpoint/checkpoint.json",
+          "sha256": "014af859a609511cacc23c63f45c5f1493d4ca5855ea6c1a70b9d36a3c33d44c"
+        },
+        "final_candidate_review": {
+          "path": "build/nvvm-cuda-swizzle-set/review/final-candidate.json",
+          "sha256": "9677146e6ed419588847bc7405dabb0db686993818b250daf000e5fe3e638084"
+        }
+      },
+      "half_vector_helper_open_failure": {
+        "status": "unresolved-runtime-mismatch",
+        "mode": "nvvm-o3",
+        "probe": {
+          "path": "build/nvvm-cuda-swizzle-set/probe-runtime.slang",
+          "sha256": "c84cd8ccc8430c1062f4e782d0c31f28efd19c51405257410c436c8e3c859b75"
+        },
+        "expected_words": [
+          -4, -8, -1, 8, 8, 2, 4, 2, -4, -8, -1, 8, 1, 3, 31337
+        ],
+        "before": {
+          "nvrtc-o3": "invalid-multi-lane-source",
+          "nvvm-o0": "correct",
+          "nvvm-o3": "runtime-mismatch"
+        },
+        "after": {
+          "nvrtc-o3": "correct",
+          "nvvm-o0": "correct",
+          "nvvm-o3": "runtime-mismatch"
+        },
+        "wrong_lanes": [8, 9, 10],
+        "preserved_lanes": "Pure half overlap and noncontiguous updates, untouched lanes, one-call counter, completion and guard all match.",
+        "diagnosis": "O3 PTX declares the half-vector helper parameter but omits its stores and helper argument/result transfers. O0 retains them; Slang IR dumps match. Existing scalar Half i16 helper ABI workaround is related precedent, not proof of a vector solution.",
+        "scope": "Separate defect reproduced before source-emitter edits; no fixed expected garbage value and no vendor-only root-cause claim. Isolate parameter/result transport and capture provider LLVM before implementation.",
+        "before_gate": {
+          "path": "build/nvvm-cuda-swizzle-set/before-probe-gpu-0.json",
+          "sha256": "77bc0a5edab2e2543599f06a20ad660ba2c236ad0ab23a6e20c7a489bb229572"
+        },
+        "after_gate": {
+          "path": "build/nvvm-cuda-swizzle-set/after-half-helper-control-0.json",
+          "sha256": "7e1720db16a6c2f649cc20077fe02e759c0521a617254d313835d4a048c3e215"
+        },
+        "before_artifacts": {
+          "path": "build/nvvm-cuda-swizzle-set/before-probe-artifacts.json",
+          "sha256": "2386fdecf79399232f322660ab1e8ad16cb3d3bc27cd9355fa47b2e8cf316806"
+        },
+        "after_artifacts": {
+          "path": "build/nvvm-cuda-swizzle-set/after-probe-artifacts.json",
+          "sha256": "751439c52a21dc7ace47f22433f2e03106c485b200b76148ad3104738fed2b6c"
+        },
+        "independent_finding": {
+          "path": "build/nvvm-cuda-swizzle-set/review/half-vector-abi-finding.json",
+          "sha256": "39cdb9f7d03071ea439206818ae0513308914ec9e5b199a991d9fd21bd299c4c"
+        }
+      },
+      "validation_incidents": [
+        {
+          "kind": "source3-provenance-collision",
+          "evidence": {
+            "path": "build/nvvm-cuda-swizzle-set/source3-provenance-incident.json",
+            "sha256": "abf768835a76d9f99f0d6d4fa1665c976751ce4addd234ca7761a879beefa142"
+          },
+          "resolution": "Excluded ambiguous source3 results; root-owned frozen source4 provides source evidence."
+        }
+      ],
+      "limits": [
+        "WGSL has source checks, not downstream validation or device execution.",
+        "Effectful float helper is one ordinary noinline call; no universal forced-intrinsic folding claim.",
+        "Scalar CUDA image-component control encounters the separate existing CUsurfObject subscript failure; only GLSL exercises legalized scalar SwizzleSet in this probe.",
+        "No NVVM type-role, helper ABI, provider, lowering pass or storage representation change. Older focused results retain their original identities."
+      ]
     }
   }
 }

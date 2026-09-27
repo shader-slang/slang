@@ -495,39 +495,36 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     }
 }
 
-void CLikeSourceEmitter::_emitSwizzleStorePerElement(IRInst* inst)
+// Emit component assignments for a stored vector or a fresh SwizzleSet result. For example,
+// `value.xyz = -value.zwx` reads its replacement from the original SSA value, then writes x/y/z
+// of the copied result. Target languages without writable swizzles need these separate writes.
+void CLikeSourceEmitter::_emitSwizzleUpdatePerElement(IRInst* inst)
 {
-    auto subscriptOuter = getInfo(EmitOp::General);
-    auto subscriptPrec = getInfo(EmitOp::Postfix);
+    auto store = as<IRSwizzledStore>(inst);
+    auto update = as<IRSwizzleSet>(inst);
+    SLANG_RELEASE_ASSERT(store || update);
+    IRInst* source = inst->getOperand(1);
+    const UInt elementCount = inst->getOperandCount() - 2;
+    SLANG_RELEASE_ASSERT(as<IRVectorType>(source->getDataType()));
+    auto outerPrec = getInfo(EmitOp::General);
+    auto memberPrec = getInfo(EmitOp::Postfix);
+    char const* components[] = {"x", "y", "z", "w"};
 
-    auto ii = cast<IRSwizzledStore>(inst);
-
-    UInt elementCount = ii->getElementCount();
-    UInt dstIndex = 0;
-    for (UInt ee = 0; ee < elementCount; ++ee)
+    for (UInt element = 0; element < elementCount; ++element)
     {
-        bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
-
-        emitDereferenceOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
+        if (store)
+            emitDereferenceOperand(store->getDest(), leftSide(outerPrec, memberPrec));
+        else
+            emitOperand(update, leftSide(outerPrec, memberPrec));
+        auto index = as<IRIntLit>(inst->getOperand(element + 2));
+        SLANG_RELEASE_ASSERT(index && index->getValue() >= 0 && index->getValue() < 4);
         m_writer->emit(".");
-
-        IRInst* irElementIndex = ii->getElementIndex(ee);
-        SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
-
-        IRConstant* irConst = (IRConstant*)irElementIndex;
-
-        UInt elementIndex = (UInt)irConst->value.intVal;
-        SLANG_RELEASE_ASSERT(elementIndex < 4);
-
-        char const* kComponents[] = {"x", "y", "z", "w"};
-        m_writer->emit(kComponents[elementIndex]);
-
-        maybeCloseParens(needCloseSubscript);
-
+        m_writer->emit(components[index->getValue()]);
         m_writer->emit(" = ");
-        emitOperand(ii->getSource(), getInfo(EmitOp::General));
+        emitOperand(source, leftSide(outerPrec, memberPrec));
+        SLANG_RELEASE_ASSERT(element < 4);
         m_writer->emit(".");
-        m_writer->emit(kComponents[dstIndex++]);
+        m_writer->emit(components[element]);
         m_writer->emit(";\n");
     }
 }
@@ -1849,7 +1846,9 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // Instead, the right-hand-side expression should be generated as a separable
     // statement and stored in a temporary varible, then assign to the left-hand-side
     // variable per element. E.g. vec4.x = vec2.x; vec4.y = vec2.y.
-    if (as<IRSwizzledStore>(user))
+    auto swizzleSet = as<IRSwizzleSet>(user);
+    if (as<IRSwizzledStore>(user) ||
+        (swizzleSet && swizzleSet->getSource() == inst && swizzleSet->getElementCount() > 1))
     {
         if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
             isWGPUTarget(getTargetReq()))
@@ -3378,6 +3377,16 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(";\n");
 
+            // A single-component update already has a legal scalar lvalue on these targets.
+            // Keep that path for scalar replacements, including legalized image component stores.
+            if (ii->getElementCount() > 1 &&
+                (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
+                 isWGPUTarget(getTargetReq())))
+            {
+                _emitSwizzleUpdatePerElement(inst);
+                break;
+            }
+
             auto subscriptOuter = getInfo(EmitOp::General);
             auto subscriptPrec = getInfo(EmitOp::Postfix);
             bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
@@ -3412,7 +3421,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
                 isWGPUTarget(getTargetReq()))
             {
-                _emitSwizzleStorePerElement(inst);
+                _emitSwizzleUpdatePerElement(inst);
             }
             else
             {

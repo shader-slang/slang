@@ -196,8 +196,19 @@ These checks preserve existing support boundaries; initial recursive ancestor ad
 
 ## Known gaps and evidence boundaries
 
-- The current main baseline retains 37 unresolved cells: three column-major host-packing mismatches
-  and 34 infrastructure/preflight outcomes. Keep original bytes, identities and expected outputs.
+- The current main baseline retains 36 unresolved cells: three column-major host-packing mismatches
+  and 33 infrastructure/preflight outcomes. Keep original bytes, identities and expected outputs.
+- Canonical multi-lane vector updates now emit legal component assignments in CUDA/C++/WGSL.
+  [Snapshot coverage](../../tests/compute/swizzle-set-snapshot.slang) checks overlapping Half lanes,
+  noncontiguous updates, untouched lanes and one effectful Float32 helper call in three GPU modes.
+  [Source coverage](../../tests/compute/swizzle-set-source.slang) checks all five source targets;
+  HLSL/GLSL retain multi-lane syntax. WGSL has source checks only. The original Half-vector corpus
+  test is correct in all three modes with unchanged input and oracle.
+- Native Half-vector noinline helper transport has a separately reproduced NVVM O3 wrong-output
+  failure outside the main corpus. A half4 parameter/half3 result probe fails before and after the
+  source-emission repair; NVVM O0 is correct, and repaired NVRTC is correct. O3 omits argument/result
+  transfers in PTX. Parameter/result isolation and the LLVM handoff remain to be investigated;
+  ordinary Half-vector arithmetic and Float32 helper evidence do not qualify this ABI.
 - The qualified column-major `float3x2` uses CUDA column stride 12 and size 24. The permanent
   [compact-column test](../../tests/cuda/nvvm-column-major-compact.slang) checks all six elements
   plus multiplication in three GPU modes (24 exact Float32 components), with fresh 24-byte layout
