@@ -5,7 +5,7 @@
 // CHECK: type: float
 // CHECK-NEXT: 5.500000
 
-//TEST_INPUT:ubuffer(format=R_Float32, data=[1.25 2.5 4.0], stride=4):name=inputBuffer
+//TEST_INPUT:ubuffer(format=R32Float, data=[1.25 2.5 4.0], stride=4):name=inputBuffer
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 T readAt<T, TArray : IArray<T>>(TArray values, uint index)
