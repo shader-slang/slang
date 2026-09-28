@@ -781,7 +781,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::BitfieldPackingRules,
          "-bitfield-packing-rules",
          "-bitfield-packing-rules <bitfield-packing-rules>",
-         "Select one of the Bitfield Packing Rules listed below. Cannot be combined with "
+         "Select the rules to use for packing bitfields. The value must be one of the "
+         "<bitfield-packing-rules> documented below. Cannot be combined with "
          "-msvc-style-bitfield-packing."},
         {OptionKind::UseMSVCStyleBitfieldPacking,
          "-msvc-style-bitfield-packing",

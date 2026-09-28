@@ -451,7 +451,7 @@ Emit reflection data in JSON format to a file.
 
 **-bitfield-packing-rules &lt;[bitfield-packing-rules](#bitfield-packing-rules)&gt;**
 
-Select one of the Bitfield Packing Rules listed below. Cannot be combined with [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). 
+Select the rules to use for packing bitfields. The value must be one of the [&lt;bitfield-packing-rules&gt;](#bitfield-packing-rules) documented below. Cannot be combined with [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). 
 
 
 <a id="msvc-style-bitfield-packing"></a>
