@@ -1,7 +1,10 @@
 // A function that is differentiated compiles under the counting coverage
 // modes. Coverage rewrites its markers into atomic counter increments before
-// autodiff runs, so the derivative functions contain those atomics as
-// non-differentiable side effects.
+// autodiff runs, so the derivative functions carry those atomics as
+// non-differentiable side effects. The forward derivative runs the primal
+// code and keeps them. A backward derivative runs them only when it needs
+// primal values, which this one does not, so only the forward derivative is
+// checked.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry computeMain -trace-coverage -trace-function-coverage -trace-branch-coverage
 
@@ -25,4 +28,6 @@ void computeMain()
     outputBuffer[2] = forward.d + backward.d;
 }
 
+//CHECK-LABEL: s_fwd_scaled_0(DiffPair_float_0
 //CHECK: _slang_atomic_add_u64{{.*}}_slang_coverage
+//CHECK-LABEL: void _computeMain(

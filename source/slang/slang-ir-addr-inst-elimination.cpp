@@ -182,11 +182,13 @@ struct AddressInstEliminationContext
                     break;
                 default:
                     // An atomic operation reads and modifies its memory in place, so its address
-                    // operand has no value form to rewrite into, and we leave it as is. Atomics
-                    // target shared memory, such as a buffer element, a texel, or `groupshared`,
-                    // which SSA promotion does not apply to anyway.
-                    if (auto atomic = as<IRAtomicOperation>(use->getUser());
-                        atomic && atomic->getPtr() == addrInst)
+                    // operand has no value form to rewrite into, and we leave the use as is.
+                    // The address stays in memory form: `isPromotableVar` in `slang-ir-ssa.cpp`
+                    // refuses to promote a var that has any use it does not recognize, so even a
+                    // local var used by an atomic is never promoted out from under it. (The use
+                    // is always the atomic's pointer operand, because `IAtomicable` admits only
+                    // scalar value types.)
+                    if (as<IRAtomicOperation>(use->getUser()))
                         break;
                     sink->diagnose(Diagnostics::UnsupportedUseOfLValueForAutoDiff{
                         .location = use->getUser()->sourceLoc,

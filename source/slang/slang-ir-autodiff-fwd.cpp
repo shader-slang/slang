@@ -2694,7 +2694,8 @@ struct ForwardDiffTranslationContext
                     lookupDiffInst(matSwizzleStore->getDest(), nullptr) == nullptr);
                 return translateNonDiffInst(builder, matSwizzleStore);
             }
-            // Known non-differentiable insts.
+            // Known non-differentiable insts. (The atomic operations are too; they are matched by
+            // their base class after this switch.)
         case kIROp_Not:
         case kIROp_BitAnd:
         case kIROp_BitNot:
@@ -2799,9 +2800,11 @@ struct ForwardDiffTranslationContext
             break;
         }
 
-        // Atomic operations are non-differentiable: like the buffer loads and stores above, they
-        // access memory that carries no derivative, so the primal side effect is kept and no
-        // differential is produced.
+        // Atomic operations are non-differentiable: like the buffer loads and stores in the
+        // known non-differentiable cases of the switch above, they access memory that carries no
+        // derivative, so the primal side effect is kept and no differential is produced. They are
+        // matched by their base class here because a switch on the opcode would have to list all
+        // of them.
         if (as<IRAtomicOperation>(origInst))
             return translateNonDiffInst(builder, origInst);
 
