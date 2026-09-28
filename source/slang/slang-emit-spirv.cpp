@@ -6336,8 +6336,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 List<SpvInst*> params;
                 HashSet<SpvInst*> paramsSet;
                 List<IRInst*> referencedBuiltinIRVars;
-                // `interface` part: reference all global variables that are used by this
-                // entrypoint.
+                HashSet<IRInst*> interfaceDependencies;
+
+                // An unused ray-tracing parameter still declares part of the shader interface.
+                // For example, `void miss(inout Payload p) {}` has no executable reference to p.
+                // Entry-point legalization represents it as a global with a DependsOn decoration
+                // on this entry point. Emit that global and include it in this entry point's
+                // interface, even though the executable reference graph does not contain it.
+                for (auto decor : entryPoint->getDecorations())
+                {
+                    if (auto dependency = as<IRDependsOnDecoration>(decor))
+                    {
+                        auto globalInst = dependency->getOperand(0);
+                        if (as<IRGlobalVar>(globalInst) || as<IRGlobalParam>(globalInst))
+                        {
+                            interfaceDependencies.add(globalInst);
+                            ensureInst(globalInst);
+                        }
+                    }
+                }
+
+                // `interface` part: reference all global variables used by this entry point,
+                // including its explicitly declared interface dependencies.
                 for (auto globalInst : m_irModule->getModuleInst()->getChildren())
                 {
                     switch (globalInst->getOp())
@@ -6353,7 +6373,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             {
                                 // Is this globalInst referenced by this entry point?
                                 auto refSet = m_referencingEntryPoints.tryGetValue(globalInst);
-                                if (refSet && refSet->contains(entryPoint))
+                                if (interfaceDependencies.contains(globalInst) ||
+                                    (refSet && refSet->contains(entryPoint)))
                                 {
                                     if (!isSpirv14OrLater())
                                     {
