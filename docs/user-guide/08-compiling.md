@@ -1147,8 +1147,8 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| BitfieldPackingRules | Selects bitfield packing rules. `intValue0` is a `slang::BitfieldPackingRules` value: `Default` (0) packs LSB-first and permits sharing backing storage across underlying type-size changes; `MSVC` (1) packs LSB-first and starts new backing storage on such changes but rejects zero-width bitfields; `MSBFirstMSVC` (2) starts new backing storage on such changes and packs MSB-first. |
-| UseMSVCStyleBitfieldPacking | Deprecated. When set, retains the historical MSB-first layout with a new backing field on underlying type-size changes; despite its name, this bit order differs from MSVC on little-endian platforms. `intValue0` specifies a bool value. Prefer `BitfieldPackingRules` with `MSVC` for MSVC's LSB-first bit order and type-size split rule, or `MSBFirstMSVC` to retain the historical behavior. |
+| BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
+| UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes, unless `BitfieldPackingRules` is also set. Use `BitfieldPackingRules` instead. |
 
 ### Compiler Option ABI Stability
 

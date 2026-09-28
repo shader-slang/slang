@@ -43,9 +43,9 @@ SLANG_UNIT_TEST(bitfieldPackingRulesCompilerOption)
         {false, slang::BitfieldPackingRules::Default, false, 2},
         {true, slang::BitfieldPackingRules::Default, false, 2},
         {true, slang::BitfieldPackingRules::MSVC, false, 4},
-        {true, slang::BitfieldPackingRules::MSBFirstMSVC, false, 4},
+        {true, slang::BitfieldPackingRules::LegacyMSBFirstMSVC, false, 4},
         {false, slang::BitfieldPackingRules::Default, true, 4},
-        // An explicit new rule must override the legacy boolean through the API.
+        // An explicit named rule overrides the deprecated boolean through the API.
         {true, slang::BitfieldPackingRules::Default, true, 2},
     };
 
@@ -102,6 +102,74 @@ SLANG_UNIT_TEST(bitfieldPackingRulesCompilerOption)
     }
 }
 
+SLANG_UNIT_TEST(bitfieldPackingRulesInheritedCommandLineOptions)
+{
+    auto globalSession = unitTestContext->slangGlobalSession;
+    SLANG_CHECK_ABORT(globalSession != nullptr);
+
+    // A compile request can parse command-line arguments using a session that already has
+    // bitfield options. The deprecated flag must not silently lose to an inherited named rule.
+    slang::CompilerOptionEntry namedOption = {};
+    namedOption.name = slang::CompilerOptionName::BitfieldPackingRules;
+    namedOption.value.kind = slang::CompilerOptionValueKind::Int;
+    namedOption.value.intValue0 = static_cast<int32_t>(slang::BitfieldPackingRules::Default);
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &namedOption;
+
+    ComPtr<slang::ISession> namedSession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, namedSession.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::ICompileRequest> request;
+    SLANG_ALLOW_DEPRECATED_BEGIN
+    SLANG_CHECK_ABORT(namedSession->createCompileRequest(request.writeRef()) == SLANG_OK);
+    const char* legacyArgs[] = {"-msvc-style-bitfield-packing"};
+    SlangResult result =
+        request->processCommandLineArguments(legacyArgs, SLANG_COUNT_OF(legacyArgs));
+    SLANG_ALLOW_DEPRECATED_END
+
+    SLANG_CHECK(SLANG_FAILED(result));
+    auto diagnostics = UnownedStringSlice(request->getDiagnosticOutput());
+    SLANG_CHECK(diagnostics.indexOf(toSlice("error[E00135]")) >= 0);
+
+    // A named command-line rule can replace the deprecated setting inherited from the session.
+    slang::CompilerOptionEntry legacyOption = {};
+    legacyOption.name = slang::CompilerOptionName::UseMSVCStyleBitfieldPacking;
+    legacyOption.value.kind = slang::CompilerOptionValueKind::Int;
+    legacyOption.value.intValue0 = 1;
+    sessionDesc.compilerOptionEntries = &legacyOption;
+
+    ComPtr<slang::ISession> legacySession;
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc, legacySession.writeRef()) == SLANG_OK);
+
+    request = nullptr;
+    SLANG_ALLOW_DEPRECATED_BEGIN
+    SLANG_CHECK_ABORT(legacySession->createCompileRequest(request.writeRef()) == SLANG_OK);
+    const char* namedArgs[] = {"-bitfield-packing-rules", "msvc"};
+    result = request->processCommandLineArguments(namedArgs, SLANG_COUNT_OF(namedArgs));
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
+
+    // Zero-width bitfields produce an error only under the named MSVC rule. The diagnostic
+    // confirms that the request selected that rule rather than the inherited deprecated one.
+    int translationUnit = request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, "bitfieldRules");
+    request->addTranslationUnitSourceString(
+        translationUnit,
+        "bitfield-rules.slang",
+        "struct S { uint a : 1; uint separator : 0; uint b : 1; };\n"
+        "[numthreads(1, 1, 1)] void computeMain() { S s; }\n");
+    request->addEntryPoint(translationUnit, "computeMain", SLANG_STAGE_COMPUTE);
+    request->setCompileFlags(SLANG_COMPILE_FLAG_NO_CODEGEN);
+    result = request->compile();
+    SLANG_ALLOW_DEPRECATED_END
+
+    SLANG_CHECK(SLANG_FAILED(result));
+    diagnostics = UnownedStringSlice(request->getDiagnosticOutput());
+    SLANG_CHECK(diagnostics.indexOf(toSlice("error[E31302]")) >= 0);
+}
+
 SLANG_UNIT_TEST(bitfieldPackingRulesDebugInfo)
 {
     auto globalSession = unitTestContext->slangGlobalSession;
@@ -117,7 +185,8 @@ SLANG_UNIT_TEST(bitfieldPackingRulesDebugInfo)
     options[0].value.intValue0 = 1;
     options[1].name = slang::CompilerOptionName::BitfieldPackingRules;
     options[1].value.kind = slang::CompilerOptionValueKind::Int;
-    options[1].value.intValue0 = static_cast<int32_t>(slang::BitfieldPackingRules::Default);
+    options[1].value.intValue0 =
+        static_cast<int32_t>(slang::BitfieldPackingRules::LegacyMSBFirstMSVC);
     options[2].name = slang::CompilerOptionName::DebugInformation;
     options[2].value.kind = slang::CompilerOptionValueKind::Int;
     options[2].value.intValue0 = 2;
@@ -164,6 +233,6 @@ SLANG_UNIT_TEST(bitfieldPackingRulesDebugInfo)
         SLANG_OK);
     auto assembly =
         UnownedStringSlice((const char*)code->getBufferPointer(), code->getBufferSize());
-    SLANG_CHECK(assembly.indexOf(toSlice("-bitfield-packing-rules default")) != -1);
+    SLANG_CHECK(assembly.indexOf(toSlice("-bitfield-packing-rules legacy-msb-first-msvc")) != -1);
     SLANG_CHECK(assembly.indexOf(toSlice("-msvc-style-bitfield-packing")) == -1);
 }

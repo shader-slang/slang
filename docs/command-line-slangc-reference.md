@@ -446,17 +446,17 @@ Include additional type conformance during linking for dynamic dispatch.
 Emit reflection data in JSON format to a file. 
 
 
-<a id="msvc-style-bitfield-packing"></a>
-### -msvc-style-bitfield-packing
-Deprecated: pack bitfields MSB-first, starting a new storage unit when the underlying type size changes. This differs from MSVC on little-endian platforms. Use [-bitfield-packing-rules](#bitfield-packing-rules-1) msvc for MSVC's LSB-first bit order and type-size grouping, or [-bitfield-packing-rules](#bitfield-packing-rules-1) msb-first-msvc to preserve this behavior. Cannot be combined with [-bitfield-packing-rules](#bitfield-packing-rules-1). 
-
-
 <a id="bitfield-packing-rules-1"></a>
 ### -bitfield-packing-rules
 
-**-bitfield-packing-rules &lt;default|msvc|msb-first-msvc&gt;**
+**-bitfield-packing-rules &lt;[bitfield-packing-rules](#bitfield-packing-rules)&gt;**
 
-Select bitfield packing rules: default packs LSB-first and permits fields of different underlying type sizes to share storage; msvc packs LSB-first (matching MSVC on little-endian platforms) and starts a new storage unit when the underlying type size changes; zero-width bitfields are not supported in msvc mode; msb-first-msvc uses the same type-size rule but packs MSB-first, preserving [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). Cannot be combined with that legacy option. 
+Select one of the Bitfield Packing Rules listed below. Cannot be combined with [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). 
+
+
+<a id="msvc-style-bitfield-packing"></a>
+### -msvc-style-bitfield-packing
+Deprecated. Uses the same packing rules as [-bitfield-packing-rules](#bitfield-packing-rules-1) legacy-msb-first-msvc. Use [-bitfield-packing-rules](#bitfield-packing-rules-1) msvc for MSVC's bit order and type-size grouping on little-endian platforms. Cannot be combined with [-bitfield-packing-rules](#bitfield-packing-rules-1). 
 
 
 
@@ -1278,9 +1278,9 @@ File System Type
 
 Bitfield Packing Rules 
 
-* `default` : LSB-first; fields may share storage across underlying type sizes 
-* `msvc` : LSB-first; start a new storage unit when the underlying type size changes; zero-width bitfields are not supported 
-* `msb-first-msvc` : MSB-first; preserve the legacy [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing) behavior 
+* `default` : Bits are packed LSB-first; fields with different underlying type sizes may share a storage unit. 
+* `msvc` : Bits are packed LSB-first, and a new storage unit starts when the underlying type size changes. Use for MSVC-compatible bitfield packing on little-endian platforms. Zero-width bitfields are not supported. 
+* `legacy-msb-first-msvc` : Bits are packed MSB-first, and a new storage unit starts when the underlying type size changes. Not recommended; use only when the layout produced by [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing) is required. This bit order differs from MSVC on little-endian platforms. 
 
 <a id="source-embed-style"></a>
 ## source-embed-style

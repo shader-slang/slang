@@ -317,19 +317,14 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
             break;
         case CompilerOptionName::BitfieldPackingRules:
             {
-                // Use the parser's value catalog so serialization has the same spellings.
-                const auto categoryIndex = globalSession->m_commandOptions.findCategoryByName(
-                    toSlice("bitfield-packing-rules"));
-                SLANG_RELEASE_ASSERT(categoryIndex >= 0);
                 for (auto v : option.value)
                 {
                     SLANG_RELEASE_ASSERT(v.kind == CompilerOptionValueKind::Int);
-                    const auto valueIndex = globalSession->m_commandOptions.findValueByUserValue(
-                        categoryIndex,
-                        CommandOptions::UserValue((slang::BitfieldPackingRules)v.intValue));
-                    SLANG_RELEASE_ASSERT(valueIndex >= 0);
-                    sb << " " << name << " "
-                       << globalSession->m_commandOptions.getFirstNameForOption(valueIndex);
+                    const auto ruleName = NameValueUtil::findName(
+                        TypeTextUtil::getBitfieldPackingRulesInfos(),
+                        v.intValue);
+                    SLANG_RELEASE_ASSERT(ruleName.getLength() != 0);
+                    sb << " " << name << " " << ruleName;
                 }
                 break;
             }
@@ -382,8 +377,9 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name;
             break;
         case CompilerOptionName::UseMSVCStyleBitfieldPacking:
-            // An explicit rule overrides the legacy boolean through the API. Reconstruct only
-            // the effective rule so the debug-info command line remains valid for the CLI.
+            // API clients can set both bitfield options, and the explicit rule takes precedence.
+            // The CLI rejects both flags on one command line, so we omit this boolean when an
+            // explicit rule is also present in the option set.
             if (!hasOption(CompilerOptionName::BitfieldPackingRules) && option.value.getCount() &&
                 option.value[0].intValue != 0)
                 sb << " " << name;

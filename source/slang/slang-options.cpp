@@ -309,19 +309,7 @@ void initCommandOptions(CommandOptions& options)
             "bitfield-packing-rules",
             "Bitfield Packing Rules",
             UserValue(ValueCategory::BitfieldPackingRules));
-        options.addValue(
-            "default",
-            "LSB-first; fields may share storage across underlying type sizes",
-            UserValue(slang::BitfieldPackingRules::Default));
-        options.addValue(
-            "msvc",
-            "LSB-first; start a new storage unit when the underlying type size changes; "
-            "zero-width bitfields are not supported",
-            UserValue(slang::BitfieldPackingRules::MSVC));
-        options.addValue(
-            "msb-first-msvc",
-            "MSB-first; preserve the legacy -msvc-style-bitfield-packing behavior",
-            UserValue(slang::BitfieldPackingRules::MSBFirstMSVC));
+        options.addValues(TypeTextUtil::getBitfieldPackingRulesInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -790,24 +778,18 @@ void initCommandOptions(CommandOptions& options)
          "-reflection-json",
          "-reflection-json <path>",
          "Emit reflection data in JSON format to a file."},
+        {OptionKind::BitfieldPackingRules,
+         "-bitfield-packing-rules",
+         "-bitfield-packing-rules <bitfield-packing-rules>",
+         "Select one of the Bitfield Packing Rules listed below. Cannot be combined with "
+         "-msvc-style-bitfield-packing."},
         {OptionKind::UseMSVCStyleBitfieldPacking,
          "-msvc-style-bitfield-packing",
          nullptr,
-         "Deprecated: pack bitfields MSB-first, starting a new storage unit when the underlying "
-         "type size changes. This differs from MSVC on little-endian platforms. Use "
-         "-bitfield-packing-rules msvc for MSVC's LSB-first bit order and type-size grouping, or "
-         "-bitfield-packing-rules msb-first-msvc to preserve this behavior. Cannot be combined "
-         "with -bitfield-packing-rules."},
-        {OptionKind::BitfieldPackingRules,
-         "-bitfield-packing-rules",
-         "-bitfield-packing-rules <default|msvc|msb-first-msvc>",
-         "Select bitfield packing rules: default packs LSB-first and permits "
-         "fields of different underlying type sizes to share storage; msvc packs "
-         "LSB-first (matching MSVC on little-endian platforms) and starts a new storage "
-         "unit when the underlying type size changes; zero-width bitfields are not "
-         "supported in msvc mode; msb-first-msvc uses the same type-size rule but packs "
-         "MSB-first, preserving -msvc-style-bitfield-packing. Cannot be combined with "
-         "that legacy option."}};
+         "Deprecated. Uses the same packing rules as -bitfield-packing-rules "
+         "legacy-msb-first-msvc. Use -bitfield-packing-rules msvc for MSVC's bit order and "
+         "type-size grouping on little-endian platforms. Cannot be combined with "
+         "-bitfield-packing-rules."}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -2860,8 +2842,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
     m_reader.init(&args, m_sink);
 
-    bool hasLegacyBitfieldPackingOption = false;
-    bool hasBitfieldPackingRulesOption = false;
+    // A compile request can inherit packing options from its session. A named rule in the option
+    // set makes the deprecated CLI flag ineffective, so we reject that flag. An inherited
+    // deprecated bool can be overridden by a named CLI rule. We track whether the deprecated flag
+    // appears in this argument list so that the two CLI spellings also conflict in either order.
+    bool hasLegacyBitfieldPackingOptionInArgs = false;
 
     while (m_reader.hasArg())
     {
@@ -2902,19 +2887,19 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             m_requestImpl->setLegacyAllowGLSLInput(true);
             break;
         case OptionKind::UseMSVCStyleBitfieldPacking:
-            if (!hasLegacyBitfieldPackingOption)
+            if (!hasLegacyBitfieldPackingOptionInArgs)
                 m_sink->diagnose(Diagnostics::DeprecatedMsvcStyleBitfieldPacking{});
-            if (hasBitfieldPackingRulesOption)
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::BitfieldPackingRules))
             {
                 m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
                 return SLANG_FAIL;
             }
-            hasLegacyBitfieldPackingOption = true;
+            hasLegacyBitfieldPackingOptionInArgs = true;
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::BitfieldPackingRules:
             {
-                if (hasLegacyBitfieldPackingOption)
+                if (hasLegacyBitfieldPackingOptionInArgs)
                 {
                     m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
                     return SLANG_FAIL;
@@ -2922,7 +2907,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 slang::BitfieldPackingRules rules = slang::BitfieldPackingRules::Default;
                 SLANG_RETURN_ON_FAIL(_expectValue(rules));
                 linkage->m_optionSet.set(optionKind, rules);
-                hasBitfieldPackingRulesOption = true;
                 break;
             }
         case OptionKind::NoMangle:

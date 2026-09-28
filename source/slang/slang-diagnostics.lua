@@ -381,10 +381,10 @@ warning(
 warning(
     "deprecated-msvc-style-bitfield-packing",
     134,
-    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC. "
-        .. "Use `-bitfield-packing-rules msvc` for MSVC's LSB-first bit order and type-size "
-        .. "grouping, or "
-        .. "`-bitfield-packing-rules msb-first-msvc` to preserve this behavior"
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC "
+        .. "on little-endian platforms. Use `-bitfield-packing-rules legacy-msb-first-msvc` "
+        .. "for the same packing behavior, or `-bitfield-packing-rules msvc` for MSVC bitfield "
+        .. "packing"
 )
 
 err(

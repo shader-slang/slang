@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -bitfield-packing-rules -compile-arg default
 //TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -bitfield-packing-rules -compile-arg msvc
-//TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -bitfield-packing-rules -compile-arg msb-first-msvc
+//TEST(compute):COMPARE_COMPUTE:-cpu -compile-arg -bitfield-packing-rules -compile-arg legacy-msb-first-msvc
 
 // The first word distinguishes LSB-first from MSB-first packing within one backing uint.
 // In Mixed, default rules fit both fields in one uint16_t backing field.

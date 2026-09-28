@@ -20897,6 +20897,45 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     return true;
 }
 
+struct BitfieldPackingOptions
+{
+    bool shouldPackBitfieldsMSBFirst;
+    bool shouldStartNewBitfieldStorageOnTypeSizeChange;
+};
+
+// Resolve the packing rule selected by the compilation options. An explicit BitfieldPackingRules
+// value takes precedence over the deprecated bool when an API client supplies both. If no named
+// rule is supplied and the bool is false or absent, use the default rule.
+static slang::BitfieldPackingRules getEffectiveBitfieldPackingRules(CompilerOptionSet& optionSet)
+{
+    if (optionSet.hasOption(CompilerOptionName::BitfieldPackingRules))
+    {
+        return optionSet.getEnumOption<slang::BitfieldPackingRules>(
+            CompilerOptionName::BitfieldPackingRules);
+    }
+    if (optionSet.getBoolOption(CompilerOptionName::UseMSVCStyleBitfieldPacking))
+        return slang::BitfieldPackingRules::LegacyMSBFirstMSVC;
+    return slang::BitfieldPackingRules::Default;
+}
+
+// Each rule determines two choices made by the packing loop: which end of a backing integer
+// receives the first field, and whether a change in declared type width starts a new backing
+// integer. For example, MSVC rules put `uint32_t b : 1` into a new backing integer after
+// `uint8_t a : 7`, while the default rules may group those fields together.
+static BitfieldPackingOptions getBitfieldPackingOptions(slang::BitfieldPackingRules rules)
+{
+    switch (rules)
+    {
+    case slang::BitfieldPackingRules::Default:
+        return {false, false};
+    case slang::BitfieldPackingRules::MSVC:
+        return {false, true};
+    case slang::BitfieldPackingRules::LegacyMSBFirstMSVC:
+        return {true, true};
+    }
+    SLANG_UNREACHABLE("invalid bitfield packing rules");
+}
+
 void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 {
     // add the member initialize constructor here to avoid circular checking logic
@@ -20918,26 +20957,10 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         checkRayPayloadStructFields(structDecl);
     }
 
-    // The legacy option retains its original MSB-first layout. An explicit rule takes precedence
-    // when both options are supplied through the API; the command line rejects that combination.
-    auto bitfieldPackingRules = slang::BitfieldPackingRules::Default;
-    if (getOptionSet().hasOption(CompilerOptionName::BitfieldPackingRules))
-    {
-        bitfieldPackingRules = static_cast<slang::BitfieldPackingRules>(
-            getOptionSet().getIntOption(CompilerOptionName::BitfieldPackingRules));
-        SLANG_RELEASE_ASSERT(
-            bitfieldPackingRules == slang::BitfieldPackingRules::Default ||
-            bitfieldPackingRules == slang::BitfieldPackingRules::MSVC ||
-            bitfieldPackingRules == slang::BitfieldPackingRules::MSBFirstMSVC);
-    }
-    else if (getOptionSet().getBoolOption(CompilerOptionName::UseMSVCStyleBitfieldPacking))
-    {
-        bitfieldPackingRules = slang::BitfieldPackingRules::MSBFirstMSVC;
-    }
-    const bool packBitfieldsMSBFirst =
-        bitfieldPackingRules == slang::BitfieldPackingRules::MSBFirstMSVC;
-    const bool startNewBitfieldStorageOnTypeSizeChange =
-        bitfieldPackingRules != slang::BitfieldPackingRules::Default;
+    // We group adjacent bitfields into synthesized backing integers. The selected rules tell us
+    // where to place each bitfield within its backing integer and when to start another one.
+    const auto bitfieldPackingRules = getEffectiveBitfieldPackingRules(getOptionSet());
+    const auto bitfieldPackingOptions = getBitfieldPackingOptions(bitfieldPackingRules);
 
     int backingWidth = 0;
     [[maybe_unused]] int totalWidth = 0;
@@ -20952,6 +20975,13 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 
     int memberIndex = 0;
     int backing_nonce = 0;
+
+    // Some packing rules start a new backing integer when the declared bitfield type changes
+    // size. Consider `uint8_t a : 7; uint32_t b : 1;`: the type width changes from 8 to 32 bits.
+    // We track the type width of the preceding bitfield in the current group. Zero means there
+    // is no preceding bitfield, since every built-in integer type has a nonzero bit width.
+    int previousFieldTypeWidth = 0;
+
     const auto dispatchSomeBitPackedMembers = [&]()
     {
         SLANG_ASSERT(totalWidth <= backingWidth);
@@ -20998,9 +21028,10 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             backingMember->parentDecl = structDecl;
             const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
 
-            if (packBitfieldsMSBFirst)
+            if (bitfieldPackingOptions.shouldPackBitfieldsMSBFirst)
             {
-                // Preserve the legacy MSB-first layout within the backing integer.
+                // With MSB-first packing, the first declared field occupies the high bits of the
+                // backing integer. We count downward by each field's width to assign offsets.
                 int currentBitPosition = backingWidth;
                 for (const auto& m : groupInfo)
                 {
@@ -21013,7 +21044,8 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             }
             else
             {
-                // Both the default and MSVC-compatible rules pack from LSB to MSB.
+                // With LSB-first packing, the first declared field occupies the low bits of the
+                // backing integer. We count upward by each field's width to assign offsets.
                 int bottomOfMember = 0;
                 for (const auto& m : groupInfo)
                 {
@@ -21039,9 +21071,8 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         backingWidth = 0;
         totalWidth = 0;
         groupInfo.clear();
+        previousFieldTypeWidth = 0;
     };
-
-    int previousFieldTypeWidth = 0;
 
     for (; memberIndex < structDecl->getDirectMemberDeclCount(); ++memberIndex)
     {
@@ -21110,12 +21141,11 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
                     Diagnostics::ZeroWidthBitFieldUnsupportedInMsvcPacking{.location = bfm->loc});
             }
             dispatchSomeBitPackedMembers();
-            previousFieldTypeWidth = 0;
         }
 
-        // MSVC-style allocation starts a new backing field if the type size changes.
-        if (startNewBitfieldStorageOnTypeSizeChange && groupInfo.getCount() > 0 &&
-            thisFieldTypeWidth != previousFieldTypeWidth)
+        // Some packing rules start a new backing field if the declared type size changes.
+        if (bitfieldPackingOptions.shouldStartNewBitfieldStorageOnTypeSizeChange &&
+            groupInfo.getCount() > 0 && thisFieldTypeWidth != previousFieldTypeWidth)
         {
             dispatchSomeBitPackedMembers();
         }
