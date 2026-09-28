@@ -2,6 +2,7 @@
 // Nested empty structs and arrays disappear from all three noinline helper signatures, while
 // the branches and atomic writes around the dispatch remain in their original functions.
 // __ref plus noRefInline also opts out of the separate reference-parameter inlining pass.
+// The dummy field carries no logical data: allocate the required storage without initializing it.
 
 //TEST:SIMPLE(filecheck=HLSL): -entry main -stage raygeneration -target hlsl -profile sm_6_6 -O0 -DUSE_CALLABLE=0 -validate-ir
 //TEST:SIMPLE(filecheck=HLSL): -entry main -stage raygeneration -target hlsl -profile sm_6_6 -O3 -DUSE_CALLABLE=0 -validate-ir
@@ -79,6 +80,8 @@ void main()
 // HLSL: void [[leaf:dispatchLeaf[A-Za-z0-9_]*]](uint {{[A-Za-z0-9_]+}})
 // HLSL: InterlockedAdd
 // HLSL: [[payloadType]] [[payload:[A-Za-z0-9_]+]];
+// HLSL-NOT: [[payload]]._slang_dummy
+// HLSL-NOT: [[payload]] =
 // HLSL: {{TraceRay|CallShader}}({{.*}}[[payload]]);
 // HLSL: InterlockedAdd
 // HLSL: void [[middle:forwardMiddle[A-Za-z0-9_]*]](uint {{[A-Za-z0-9_]+}})
@@ -96,6 +99,7 @@ void main()
 
 // DXIL: %struct.Dummy{{Ray|Callable}}Payload{{[A-Za-z0-9_]*}} = type { i32 }
 // DXIL: define internal fastcc void {{.*}}dispatchLeaf{{.*}}(i32 %{{[A-Za-z0-9_]+}})
+// DXIL-NOT: store
 // DXIL: call void @dx.op.{{traceRay|callShader}}.
 // DXIL: define internal fastcc void {{.*}}forwardMiddle{{.*}}(i32 %{{[A-Za-z0-9_]+}})
 // DXIL: call fastcc void {{.*}}dispatchLeaf

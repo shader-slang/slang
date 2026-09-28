@@ -2,6 +2,7 @@
 // changes its physical signature before fixEntryPointCallsites later clones that function for
 // ordinary callers, so those calls must already supply the matching physical argument.
 // Other helper parameters remain logical: recordEvent's Empty parameter disappears normally.
+// The replacement argument needs storage, but its dummy field does not need an initial value.
 
 //TEST:SIMPLE(filecheck=HLSL): -entry caller -entry callee -target hlsl -profile sm_6_6 -whole-program -O0 -validate-ir-detailed
 //TEST:SIMPLE(filecheck=HLSL): -entry caller -entry callee -target hlsl -profile sm_6_6 -whole-program -O3 -validate-ir-detailed
@@ -46,7 +47,8 @@ void caller(inout Empty payload)
 // HLSL: void caller(inout [[payloadType]] {{[A-Za-z0-9_]+}})
 // HLSL: [[record]](1U);
 // HLSL: [[payloadType]] [[physical:[A-Za-z0-9_]+]];
-// HLSL: [[physical]]._slang_dummy{{.*}} = 0U;
+// HLSL-NOT: [[physical]]._slang_dummy
+// HLSL-NOT: [[physical]] =
 // HLSL: [[clone]]([[physical]]);
 // HLSL: [[record]](2U);
 
@@ -58,5 +60,6 @@ void caller(inout Empty payload)
 // DXIL: define void {{.*}}caller{{.*}}([[payloadType]]* {{.*}})
 // DXIL: [[physical:%[A-Za-z0-9_]+]] = alloca [[payloadType]]
 // DXIL: call fastcc void @[[record]](i32 1)
+// DXIL-NOT: store
 // DXIL: call fastcc void @[[clone]]([[payloadType]]* {{.*}}[[physical]])
 // DXIL: call fastcc void @[[record]](i32 2)

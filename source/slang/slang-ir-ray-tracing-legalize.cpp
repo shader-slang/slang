@@ -171,7 +171,7 @@ struct RayTracingPayloadLegalizationContext
         return type;
     }
 
-    // Create initialized local storage for a D3D intrinsic's empty argument.
+    // Create uninitialized local storage for a D3D call's empty payload argument.
     // Consider this example:
     //
     //     struct Empty {};
@@ -182,45 +182,46 @@ struct RayTracingPayloadLegalizationContext
     // (shown schematically), using the one-uint type from getOrCreateDummyPayloadType:
     //
     //     dummy = var DummyCallablePayload;
-    //     store(dummy, makeStruct(DummyCallablePayload, 0u));
     //
     // It returns dummy to the caller, which uses replaceNativeCallArgumentAndUpdateSignature to
     // produce CallShader(0, dummy). TraceRay uses the same sequence with DummyRayPayload. No source
-    // data needs copying from p or back to p: only the native call uses dummy, and helper keeps its
-    // Empty parameter until normal type legalization erases it. Initialization supplies a defined
-    // value for the artificial field passed to the native inout parameter; emitDefaultConstruct
-    // builds the struct from its zero-initialized uint field.
+    // data needs copying from p or back to p: in this example only the native call uses dummy,
+    // and helper keeps its Empty parameter until normal type legalization erases it. The artificial
+    // field has no logical value to preserve or observe, so it needs storage but no initialization
+    // store. legalizeEntryPoint also uses this allocation for ordinary calls to a shader entry
+    // point whose physical payload parameter has been adapted.
     IRInst* createDummyPayloadArgument(IRCall* call, bool isRayPayload)
     {
         auto type = getOrCreateDummyPayloadType(isRayPayload);
         IRBuilder builder(call);
         builder.setInsertBefore(call);
-        auto var = builder.emitVar(type);
-        builder.emitStore(var, builder.emitDefaultConstruct(type));
-        return var;
+        return builder.emitVar(type);
     }
 
     // Replace one native-call argument and update the corresponding parameter and function
     // type. This changes only the specialized intrinsic declaration, never a user helper.
     //
-    // Consider the native CallShader declaration selected for an Empty payload. Supplying the
-    // variable from createDummyPayloadArgument changes the call schematically from
+    // Consider the native CallShader declaration selected for an Empty payload. CallShaderMain
+    // below names Slang's specialized IRFunc for that intrinsic, NOT a callable shader entry
+    // point or a function declaration emitted into HLSL. It has a target-intrinsic mapping to
+    // the native name CallShader. Supplying the variable from createDummyPayloadArgument changes
+    // the typed IR schematically from
     //
-    //     void CallShaderMain(uint index, inout Empty payload);
+    //     CallShaderMain : (uint, inout Empty) -> void;  // maps to native CallShader
     //     logical = var Empty;
     //     call CallShaderMain(0, logical);
     //
     // to
     //
-    //     void CallShaderMain(uint index, inout DummyCallablePayload payload);
+    //     CallShaderMain : (uint, inout DummyCallablePayload) -> void;
     //     logical = var Empty;
     //     dummy = var DummyCallablePayload;
-    //     store(dummy, makeStruct(DummyCallablePayload, 0u));
     //     call CallShaderMain(0, dummy);
     //
     // Here logical is addressable storage for an Empty value: the IR var produces the pointer
-    // passed to the inout parameter. dummy is the separate storage created by the caller, and
-    // CallShaderMain denotes the selected native intrinsic declaration in both examples.
+    // passed to the inout parameter. This helper leaves it alone because other ordinary uses
+    // may still need the original type. In this isolated example it is now unused; normal DCE
+    // and type legalization remove it later. dummy is separate storage created by the caller.
     //
     // Replacing only the argument would leave an Empty parameter that type legalization can
     // erase, and the call would disagree with its declaration. Preserve the parameter's pointer
@@ -228,6 +229,12 @@ struct RayTracingPayloadLegalizationContext
     // describe a target intrinsic's signature; they are not an ordinary helper body whose typed
     // uses would also need rewriting. The callers adapt every call to that specialization using
     // shared physical types, so repeated calls finish with the same declaration and argument type.
+    // fixUpFuncType rebuilds only Slang's IR function type from those parameters. The intrinsic
+    // mapping stays unchanged: the HLSL emitter omits the intrinsic declaration and emits
+    // CallShader(0U, dummy), using the struct-typed payload accepted by the native operation.
+    // A receiving shader instead has a signature such as
+    // [shader("callable")] void callableMain(inout Empty payload), with no shader-index parameter;
+    // legalizeEntryPoint handles that separate interface.
     void replaceNativeCallArgumentAndUpdateSignature(IRCall* call, UInt index, IRInst* arg)
     {
         auto callee = cast<IRFunc>(call->getCallee());
@@ -315,6 +322,21 @@ struct RayTracingPayloadLegalizationContext
     // the matching native declaration's signature. Empty data needs no copy-in/copy-out. The
     // ordinary helper chain keeps its original types until normal legalization erases its empty
     // arguments; before(), after(), and all other work in those helpers remain intact.
+    // For just the CallShader part of the example, the intermediate IR is schematically:
+    //
+    //     // Native intrinsic declaration: maps to HLSL CallShader, not a shader entry point.
+    //     CallShaderMain : (uint, inout DummyCallablePayload) -> void;
+    //     void helper(inout Empty p)
+    //     {
+    //         before();
+    //         dummy = var DummyCallablePayload;
+    //         call CallShaderMain(0, dummy);
+    //         after();
+    //     }
+    //
+    // Later legalization removes helper's empty parameter, and HLSL emission writes
+    // CallShader(0U, dummy) inside helper. It emits no CallShaderMain declaration. TraceRay gets
+    // its own DummyRayPayload local at its native call in the same way.
     //
     // CallShader's HLSL arm is a native intrinsic identified by KnownBuiltinDeclName::CallShader;
     // it has no struct-only marker. Its empty second argument gets a DummyCallablePayload local.
@@ -383,7 +405,9 @@ struct RayTracingPayloadLegalizationContext
     // Prepare a decorated empty global's physical interface before instruction rewriting.
     // Transfer its decorations and DependsOn references to dummy storage and record the
     // logical-to-physical mapping. Leave ordinary loads/stores using the logical global so
-    // their types stay consistent. See legalizeKhronosInstruction for the complete transformation.
+    // their types stay consistent. The logical global is not replaced or retyped here; only
+    // interface uses are redirected to the physical global. Ordinary type legalization later
+    // erases the empty logical storage and copies. See legalizeKhronosInstruction for an example.
     void separateEmptyGlobal(IRGlobalVar* logical)
     {
         auto rayDecor = logical->findDecoration<IRVulkanRayPayloadDecoration>();
@@ -657,25 +681,36 @@ void legalizeRayTracingPayloads(IRModule* module, TargetProgram* targetProgram)
     context.module = module;
     context.targetProgram = targetProgram;
 
-    // Snapshot globals before inserting physical types/variables. Binding separation precedes
-    // instruction rewriting so location queries can refer to the original-to-physical mapping.
-    List<IRGlobalVar*> globals;
-    List<IRFunc*> funcs;
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (auto global = as<IRGlobalVar>(inst))
-            globals.add(global);
-        if (auto func = as<IRFunc>(inst))
-            funcs.add(func);
-    }
+    // Prepare Khronos bindings before rewriting location queries. D3D does not use payload
+    // globals. Walk directly instead of collecting every global/function into temporary lists:
+    // this pass creates types/globals but never removes or reorders existing globals/functions.
+    // Advance before transforming; physical globals inserted before the current logical global
+    // do not need another visit, and appended types/keys are ignored by the global-variable test.
     if (isKhronosTarget(target))
-        for (auto global : globals)
-            context.separateEmptyGlobal(global);
-
-    for (auto func : funcs)
     {
-        context.legalizeInstructions(func);
-        context.legalizeEntryPoint(func);
+        for (auto inst = module->getModuleInst()->getFirstChild(); inst;)
+        {
+            auto current = inst;
+            inst = inst->getNextInst();
+            if (auto global = as<IRGlobalVar>(current))
+                context.separateEmptyGlobal(global);
+        }
+    }
+
+    // Every defined function can contain a native dispatch, including ordinary nested helpers
+    // with no payload-related decoration or parameter. Skip declarations without blocks, but
+    // do not filter to entry points or builtins. No transformation here creates new functions.
+    for (auto inst = module->getModuleInst()->getFirstChild(); inst;)
+    {
+        auto current = inst;
+        inst = inst->getNextInst();
+        if (auto func = as<IRFunc>(current))
+        {
+            if (!func->isDefinition())
+                continue;
+            context.legalizeInstructions(func);
+            context.legalizeEntryPoint(func);
+        }
     }
 
     // Normalize qualifiers after creating physical ray types as well as marking nonempty

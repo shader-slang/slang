@@ -43,7 +43,7 @@ void rgen()
 //     struct EmptyArrayPayloadCarrier { uint _slang_dummy; };
 //     void rgen()
 //     {
-//         EmptyArrayPayloadCarrier carrier = { 0 };
+//         EmptyArrayPayloadCarrier carrier;
 //         CallShader(0U, carrier);
 //     }
 //     void callableMain(inout EmptyArrayPayloadCarrier payload) {}
