@@ -14,7 +14,8 @@ A block statement (also known as compound statement) groups a sequence of [state
 single statement. The statements are executed in sequential order.
 
 Every block statement has its own declaration scope, which is nested within the parent scope. Declarations in
-a block are visible to later statements in the same block, but not to statements outside of the block.
+a block are visible to later statements in the same block, but not to earlier statements or statements
+outside of the block.
 
 When control is transferred out of the block (i.e., the block is exited),
 [deferred statements](statements-defer.md) scheduled for that block are executed, regardless of how control
