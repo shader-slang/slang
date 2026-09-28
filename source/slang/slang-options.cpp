@@ -801,7 +801,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::BitfieldPackingRules,
          "-bitfield-packing-rules",
          "-bitfield-packing-rules <default|msvc|msb-first-msvc>",
-         "Select packing rules for struct bitfields: default packs LSB-first and permits "
+         "Select bitfield packing rules: default packs LSB-first and permits "
          "fields of different underlying type sizes to share storage; msvc packs "
          "LSB-first (matching MSVC on little-endian platforms) and starts a new storage "
          "unit when the underlying type size changes; zero-width bitfields are not "

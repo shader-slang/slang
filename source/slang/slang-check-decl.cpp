@@ -568,18 +568,6 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
     {
         validateDeclNesting(this, decl);
         checkModifiers(decl);
-
-        if (auto bitFieldModifier = decl->findModifier<BitFieldModifier>())
-        {
-            if (bitFieldModifier->width == 0 &&
-                getOptionSet().hasOption(CompilerOptionName::BitfieldPackingRules) &&
-                getOptionSet().getIntOption(CompilerOptionName::BitfieldPackingRules) ==
-                    int(slang::BitfieldPackingRules::MSVC))
-            {
-                getSink()->diagnose(Diagnostics::ZeroWidthBitFieldUnsupportedInMsvcPacking{
-                    .location = bitFieldModifier->loc});
-            }
-        }
     }
 
     void visitStructDecl(StructDecl* structDecl);
@@ -21116,6 +21104,11 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         // If there's a 0 width type, dispatch the current group
         if (thisFieldWidth == 0)
         {
+            if (bitfieldPackingRules == slang::BitfieldPackingRules::MSVC)
+            {
+                getSink()->diagnose(
+                    Diagnostics::ZeroWidthBitFieldUnsupportedInMsvcPacking{.location = bfm->loc});
+            }
             dispatchSomeBitPackedMembers();
             previousFieldTypeWidth = 0;
         }

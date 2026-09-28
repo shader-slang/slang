@@ -456,7 +456,7 @@ Deprecated: pack bitfields MSB-first, starting a new storage unit when the under
 
 **-bitfield-packing-rules &lt;default|msvc|msb-first-msvc&gt;**
 
-Select packing rules for struct bitfields: default packs LSB-first and permits fields of different underlying type sizes to share storage; msvc packs LSB-first (matching MSVC on little-endian platforms) and starts a new storage unit when the underlying type size changes; zero-width bitfields are not supported in msvc mode; msb-first-msvc uses the same type-size rule but packs MSB-first, preserving [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). Cannot be combined with that legacy option. 
+Select bitfield packing rules: default packs LSB-first and permits fields of different underlying type sizes to share storage; msvc packs LSB-first (matching MSVC on little-endian platforms) and starts a new storage unit when the underlying type size changes; zero-width bitfields are not supported in msvc mode; msb-first-msvc uses the same type-size rule but packs MSB-first, preserving [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). Cannot be combined with that legacy option. 
 
 
 
