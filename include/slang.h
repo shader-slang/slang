@@ -1213,9 +1213,9 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32 = 126,
         DenormalModeFp64 = 127,
 
-        // Deprecated bool. When no BitfieldPackingRules value is supplied, true selects MSB-first
+        // Deprecated. When no BitfieldPackingRules value is supplied, true selects MSB-first
         // packing and starts new storage on underlying type-size changes.
-        UseMSVCStyleBitfieldPacking = 128,
+        UseMSVCStyleBitfieldPacking = 128, // bool
 
         ForceCLayout = 129, // bool
 
