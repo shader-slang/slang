@@ -15,7 +15,7 @@ Slang has preliminary support for producing CPU source and binaries.
 These limitations apply to Slang transpiling to C++. 
 
 * Barriers are not supported (making these work would require an ABI change)
-* Atomics are not currently supported
+* Atomics are limited to `add` on `Atomic<T>` with a 32- or 64-bit integer `T`; other atomic operations, float atomics, and the HLSL `Interlocked*` functions are not supported
 * Limited support for [out of bounds](#out-of-bounds) accesses handling
 * Entry point/s cannot be named `main` (this is because downstream C++ compiler/s expecting a regular `main`)
 * `float16_t` type is not currently supported
