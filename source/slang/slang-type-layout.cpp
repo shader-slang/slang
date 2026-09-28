@@ -1315,6 +1315,18 @@ struct CUDARayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
 };
 
 DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
+
+// Scalar layout as revised by layout rules version 202c: the struct size is rounded up to the
+// struct's alignment, which the default rules deliberately skip (see
+// `DefaultLayoutRulesImpl::EndStructLayout`). Field placement and scalar sizes are unchanged.
+struct ScalarRoundedLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+ScalarRoundedLayoutRulesImpl kScalarRoundedLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 FXCShaderResourceLayoutRulesImpl kFXCShaderResourceLayoutRulesImpl;
@@ -1860,6 +1872,20 @@ LayoutRulesImpl kScalarLayoutRulesImpl_ = {
     &kGLSLObjectLayoutRulesImpl,
 };
 
+LayoutRulesImpl kScalarRoundedLayoutRulesImpl_ = {
+    &kGLSLLayoutRulesFamilyImpl,
+    &kScalarRoundedLayoutRulesImpl,
+    &kGLSLObjectLayoutRulesImpl,
+};
+
+// Return the rules that scalar layout uses for the target described by `options`, which depend on
+// the layout rules version (see `isScalarLayoutRoundedUpToAlignment`).
+static LayoutRulesImpl* getScalarLayoutRules(CompilerOptionSet& options)
+{
+    return isScalarLayoutRoundedUpToAlignment(options) ? &kScalarRoundedLayoutRulesImpl_
+                                                       : &kScalarLayoutRulesImpl_;
+}
+
 LayoutRulesImpl kFXCShaderResourceLayoutRulesFamilyImpl = {
     &kGLSLLayoutRulesFamilyImpl,
     &kFXCShaderResourceLayoutRulesImpl,
@@ -2050,7 +2076,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
-            return &kScalarLayoutRulesImpl_;
+            return getScalarLayoutRules(compilerOptions);
         case ASTNodeType::CDataLayoutType:
             return &kCLayoutRulesImpl_;
         case ASTNodeType::DefaultDataLayoutType:
@@ -2062,7 +2088,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     }
     // Default layout types fall through to global options.
     if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
+        return getScalarLayoutRules(compilerOptions);
     else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
@@ -2081,7 +2107,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getParameterBlockRules(
     CompilerOptionSet& compilerOptions)
 {
     if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
+        return getScalarLayoutRules(compilerOptions);
     else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
@@ -2109,7 +2135,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getTextureBufferRules(
     CompilerOptionSet& compilerOptions)
 {
     if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
+        return getScalarLayoutRules(compilerOptions);
     else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
@@ -2137,7 +2163,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getShaderStorageBufferRules(
     CompilerOptionSet& compilerOptions)
 {
     if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
+        return getScalarLayoutRules(compilerOptions);
     else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
@@ -2165,7 +2191,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getStructuredBufferRules(
     CompilerOptionSet& compilerOptions)
 {
     if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
+        return getScalarLayoutRules(compilerOptions);
     else if (compilerOptions.shouldUseCLayout())
         return &kCLayoutRulesImpl_;
     else if (compilerOptions.shouldUseDXLayout())
@@ -3312,6 +3338,17 @@ bool isKhronosTarget(TargetRequest* targetReq)
 bool isSPIRV(CodeGenTarget codeGenTarget)
 {
     return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
+}
+
+bool isScalarLayoutRoundingRequested(CompilerOptionSet& options)
+{
+    return options.getLayoutRulesVersion() >= SLANG_LANGUAGE_VERSION_202C;
+}
+
+bool isScalarLayoutRoundedUpToAlignment(CompilerOptionSet& options)
+{
+    return isScalarLayoutRoundingRequested(options) && isSPIRV(options.getTarget()) &&
+           options.shouldEmitSPIRVDirectly();
 }
 
 bool isCPUTarget(TargetRequest* targetReq)
@@ -4524,8 +4561,15 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     Type* elementType)
 {
     // look up the appropriate rules via the `LayoutRulesFamily`
-    auto structuredBufferLayoutRules =
-        context.getRulesFamily()->getStructuredBufferRules(context.targetReq->getOptionSet());
+    auto& options = context.targetReq->getOptionSet();
+    auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules(options);
+
+    // Code generation always honors an explicit `ScalarDataLayout` on a structured buffer. When
+    // that selects rounded scalar layout, reflection must use it as well to agree with the code.
+    auto sbType = as<HLSLStructuredBufferTypeBase>(structuredBufferType);
+    if (sbType && as<ScalarDataLayoutType>(sbType->getLayoutType()) &&
+        isScalarLayoutRoundedUpToAlignment(options))
+        structuredBufferLayoutRules = getScalarLayoutRules(options);
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout =
@@ -5732,9 +5776,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         ptrLayout->addResourceUsage(info.kind, info.size);
 
         TypeLayoutResult valueTypeLayout;
-        if (context.rules != &kScalarLayoutRulesImpl_)
+        auto scalarRules = getScalarLayoutRules(context.targetReq->getOptionSet());
+        if (context.rules != scalarRules)
         {
-            auto subContext = context.with(&kScalarLayoutRulesImpl_);
+            auto subContext = context.with(scalarRules);
             valueTypeLayout = _createTypeLayout(subContext, ptrType->getValueType());
         }
         else

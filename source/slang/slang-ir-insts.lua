@@ -479,6 +479,7 @@ local insts = {
 			{ MetalParameterBlockLayout = { struct_name = "MetalParameterBlockLayoutType", hoistable = true } },
 			{ CUDALayout = { struct_name = "CUDABufferLayoutType", hoistable = true } },
 			{ LLVMLayout = { struct_name = "LLVMBufferLayoutType", hoistable = true } },
+			{ NaturalLayout = { struct_name = "NaturalBufferLayoutType", hoistable = true } },
 			{
 				SubpassInputType = {
 					operands = { { "elementType", "IRType" }, { "isMultisampleInst" } },

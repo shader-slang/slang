@@ -448,6 +448,15 @@ struct CompilerOptionSet
         return (SlangLanguageVersion)getIntOption(CompilerOptionName::LanguageVersion);
     }
 
+    SlangLanguageVersion getLayoutRulesVersion()
+    {
+        if (!hasOption(CompilerOptionName::LayoutRulesVersion))
+        {
+            return SLANG_LANGUAGE_VERSION_DEFAULT;
+        }
+        return (SlangLanguageVersion)getIntOption(CompilerOptionName::LayoutRulesVersion);
+    }
+
     List<String> getDownstreamArgs(String downstreamToolName);
 
     void serialize(SerializedOptionsData* outData);

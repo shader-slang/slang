@@ -218,6 +218,12 @@ warning(
 )
 
 err(
+    "layout-rules-version-unsupported-for-target",
+    23,
+    "layout rules version 202c and later is only supported when emitting SPIR-V directly; target '~target' is generated through GLSL, where type sizes cannot be rounded up to their alignment"
+)
+
+err(
     "separate-debug-info-requires-output-path",
     109,
     "`-separate-debug-info` requires an output file path; use `-o <path>` or `-separate-debug-info-output <path>`"

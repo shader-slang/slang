@@ -431,6 +431,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
         break;
     case kIROp_ScalarBufferLayoutType:
+    case kIROp_NaturalBufferLayoutType:
     case kIROp_CBufferLayoutType:
     case kIROp_Std140BufferLayoutType:
     case kIROp_Std430BufferLayoutType:
@@ -683,6 +684,19 @@ struct NaturalLayoutRules : IRTypeLayoutRules
         IRIntegerValue count)
     {
         return IRSizeAndAlignment(element.size * count, element.alignment);
+    }
+};
+
+// Scalar layout as revised by layout rules version 202c: like natural layout, but the size of an
+// aggregate is rounded up to its alignment, as C does (unlike `CLayoutRules`, `bool` keeps its
+// natural 4-byte size).
+struct ScalarRoundedLayoutRules : NaturalLayoutRules
+{
+    ScalarRoundedLayoutRules() { ruleName = IRTypeLayoutRuleName::ScalarRounded; }
+
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
+    {
+        return IRSizeAndAlignment(elementSize.getStride(), elementSize.alignment);
     }
 };
 
@@ -983,6 +997,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getNatural()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getScalarRounded()
+{
+    static ScalarRoundedLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getC()
 {
     static CLayoutRules rules;
@@ -1026,6 +1046,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:
         return getLLVM();
+    case IRTypeLayoutRuleName::ScalarRounded:
+        return getScalarRounded();
     default:
         return nullptr;
     }
@@ -1045,6 +1067,7 @@ std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
     case kIROp_Std430BufferLayoutType:
         return IRTypeLayoutRuleName::Std430;
     case kIROp_ScalarBufferLayoutType:
+    case kIROp_NaturalBufferLayoutType:
         return IRTypeLayoutRuleName::Natural;
     case kIROp_CBufferLayoutType:
         return IRTypeLayoutRuleName::C;
@@ -1069,6 +1092,7 @@ IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName)
     case IRTypeLayoutRuleName::Std430:
         return kIROp_Std430BufferLayoutType;
     case IRTypeLayoutRuleName::Natural:
+    case IRTypeLayoutRuleName::ScalarRounded:
         return kIROp_ScalarBufferLayoutType;
     case IRTypeLayoutRuleName::C:
         return kIROp_CBufferLayoutType;

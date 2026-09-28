@@ -254,6 +254,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
             }
             break;
         case CompilerOptionName::LanguageVersion:
+        case CompilerOptionName::LayoutRulesVersion:
             for (auto v : option.value)
             {
                 sb << " " << name << " "

@@ -530,6 +530,7 @@ enum class IRTypeLayoutRuleName
     C,
     CUDA,
     LLVM,
+    ScalarRounded,
     _Count,
 };
 

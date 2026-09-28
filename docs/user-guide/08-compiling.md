@@ -1148,6 +1148,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| LayoutRulesVersion | Specifies the `-layout-rules-version` option: the revision of the buffer layout rules, independent of `LanguageVersion`. `intValue0` encodes a `SlangLanguageVersion` value. From `SLANG_LANGUAGE_VERSION_202C` on, scalar layout (including `ScalarDataLayout` buffers and pointer pointees) rounds the size of each aggregate type up to a multiple of its alignment, matching DXC; this is supported when SPIR-V is emitted directly, and generating GLSL (or SPIR-V via GLSL) with it is an error. `sizeof`/`alignof` and `ByteAddressBuffer` loads/stores keep natural layout. |
 
 ### Compiler Option ABI Stability
 

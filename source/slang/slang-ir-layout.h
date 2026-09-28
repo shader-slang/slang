@@ -85,6 +85,7 @@ public:
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();
+    static IRTypeLayoutRules* getScalarRounded();
     static IRTypeLayoutRules* getC();
     static IRTypeLayoutRules* getCUDA();
     static IRTypeLayoutRules* getConstantBuffer();
@@ -142,6 +143,10 @@ Result getStd430SizeAndAlignment(
 ///
 Result getStd430Offset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset);
 
+/// Return the layout rule that the data-layout op `layoutTypeOp` names at the language level, or
+/// `defaultLayout` for a default data layout. `sizeof` and `alignof` use this meaning, in which
+/// `ScalarDataLayout` is natural layout on every target. The storage layout of a buffer or
+/// pointer on a given target can differ from it (see `getTypeLayoutRuleNameForBuffer`).
 std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
     IROp layoutTypeOp,
     IRTypeLayoutRuleName defaultLayout);

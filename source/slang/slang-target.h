@@ -82,6 +82,20 @@ bool isKhronosTarget(CodeGenTarget target);
 /// Are we generating code where SPIRV is the target?
 bool isSPIRV(CodeGenTarget codeGenTarget);
 
+/// Does the layout rules version in `options` (`-layout-rules-version`) ask scalar layout to round
+/// the size of each aggregate type up to a multiple of its alignment? That is the case from 202c
+/// on. Whether the target honors the request is `isScalarLayoutRoundedUpToAlignment`.
+bool isScalarLayoutRoundingRequested(CompilerOptionSet& options);
+
+/// Does scalar layout round the size of each aggregate type up to a multiple of its alignment
+/// for the target described by `options`?
+///
+/// Rounding is part of layout rules version 202c and later (`-layout-rules-version`). We only
+/// apply it when SPIR-V is emitted directly, because that is the only Khronos path where Slang,
+/// rather than glslang, chooses the member offsets and array strides of the emitted code; applying
+/// it anywhere else would make reflection disagree with the generated code.
+bool isScalarLayoutRoundedUpToAlignment(CompilerOptionSet& options);
+
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
 bool isCUDATarget(CodeGenTarget codeGenTarget);
