@@ -2799,6 +2799,12 @@ struct ForwardDiffTranslationContext
             break;
         }
 
+        // Atomic operations are non-differentiable: like the buffer loads and stores above, they
+        // access memory that carries no derivative, so the primal side effect is kept and no
+        // differential is produced.
+        if (as<IRAtomicOperation>(origInst))
+            return translateNonDiffInst(builder, origInst);
+
         return InstPair(nullptr, nullptr);
     }
 

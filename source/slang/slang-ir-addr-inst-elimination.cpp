@@ -181,6 +181,13 @@ struct AddressInstEliminationContext
                 case kIROp_GetOffsetPtr:
                     break;
                 default:
+                    // An atomic operation reads and modifies its memory in place, so its address
+                    // operand has no value form to rewrite into, and we leave it as is. Atomics
+                    // target shared memory, such as a buffer element, a texel, or `groupshared`,
+                    // which SSA promotion does not apply to anyway.
+                    if (auto atomic = as<IRAtomicOperation>(use->getUser());
+                        atomic && atomic->getPtr() == addrInst)
+                        break;
                     sink->diagnose(Diagnostics::UnsupportedUseOfLValueForAutoDiff{
                         .location = use->getUser()->sourceLoc,
                     });
