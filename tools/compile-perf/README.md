@@ -80,6 +80,13 @@ timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per ru
   `confirm.py measure` runs before publication, while `confirm.py report`
   emits the final verdict on the notification host. Direct `trend.py` calls
   remain useful for inspecting unconfirmed historical changes.
+- **Matrix workload size:** all five `backend_matrix_*` targets default to
+  512, with 256 retained in the size sweep. A local same-binary Windows study
+  with interleaved sampling found lower HLSL/GLSL total-time variation and
+  fewer Metal simplification spikes at 512. The larger inputs cost more time
+  and did not improve every counter; confirmation is still required. Keep the
+  family sizes equal for cross-target comparisons. Size provenance excludes
+  the old 256-size measurements from the new alert baseline.
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one
