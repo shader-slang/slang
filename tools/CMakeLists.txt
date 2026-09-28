@@ -56,7 +56,33 @@ function(generator dir)
     endif()
 endfunction()
 
-if(NOT SLANG_OVERRIDE_LUA_PATH)
+if(SLANG_USE_SYSTEM_LUA)
+    if(SLANG_OVERRIDE_LUA_PATH)
+        message(
+            FATAL_ERROR
+            "SLANG_USE_SYSTEM_LUA and SLANG_OVERRIDE_LUA_PATH cannot be combined"
+        )
+    endif()
+    find_package(Lua 5.4 REQUIRED)
+    # The bundled translation unit compiles Lua's private onelua.c source.
+    slang_glob_sources(slang_fiddle_sources slang-fiddle)
+    list(
+        REMOVE_ITEM slang_fiddle_sources
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
+    )
+    generator(
+        slang-fiddle
+        EXPLICIT_SOURCE
+        ${slang_fiddle_sources}
+        LINK_WITH_PRIVATE
+        compiler-core
+        ${LUA_LIBRARIES}
+        INCLUDE_DIRECTORIES_PRIVATE
+        ${LUA_INCLUDE_DIR}
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        SLANG_USE_SYSTEM_LUA=1
+    )
+elseif(NOT SLANG_OVERRIDE_LUA_PATH)
     generator(
         slang-fiddle
         LINK_WITH_PRIVATE

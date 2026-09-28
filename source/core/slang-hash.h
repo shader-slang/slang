@@ -6,6 +6,7 @@
 
 #include <ankerl/unordered_dense.h>
 #include <cstring>
+#include <string_view>
 #include <type_traits>
 
 namespace Slang
@@ -135,7 +136,8 @@ auto getHashCode(const TKey& key)
 
 inline HashCode64 getHashCode(const char* buffer, std::size_t len)
 {
-    return ankerl::unordered_dense::detail::wyhash::hash(buffer, len);
+    // The public string-view hash works with both bundled and installed unordered_dense.
+    return ankerl::unordered_dense::hash<std::string_view>{}(std::string_view(buffer, len));
 }
 
 template<typename T>

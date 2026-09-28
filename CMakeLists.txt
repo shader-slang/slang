@@ -230,6 +230,7 @@ option(SLANG_ENABLE_REPLAYER "Enable slang-replay tool" ON)
 
 advanced_option(SLANG_USE_SYSTEM_MINIZ "Build using system Miniz library" OFF)
 advanced_option(SLANG_USE_SYSTEM_LZ4 "Build using system LZ4 library" OFF)
+advanced_option(SLANG_USE_SYSTEM_LUA "Build slang-fiddle using system Lua" OFF)
 advanced_option(
     SLANG_USE_SYSTEM_VULKAN_HEADERS
     "Build using system Vulkan headers"
@@ -619,9 +620,18 @@ if(${SLANG_USE_SYSTEM_MINIZ})
 endif()
 
 if(${SLANG_USE_SYSTEM_LZ4})
-    find_package(lz4 REQUIRED)
+    find_package(lz4 CONFIG QUIET)
+    if(NOT lz4_FOUND)
+        # Homebrew's LZ4 exposes pkg-config metadata but no CMake package.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(LZ4 REQUIRED IMPORTED_TARGET GLOBAL liblz4)
+    endif()
     if(NOT TARGET lz4_static)
-        add_library(lz4_static ALIAS LZ4::lz4)
+        if(lz4_FOUND)
+            add_library(lz4_static ALIAS LZ4::lz4)
+        else()
+            add_library(lz4_static ALIAS PkgConfig::LZ4)
+        endif()
     endif()
 endif()
 
@@ -630,13 +640,20 @@ if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
 endif()
 
 if(${SLANG_USE_SYSTEM_SPIRV_TOOLS})
+    # The wrapper links the opt and link libraries, which are separate CMake packages.
     find_package(SPIRV-Tools REQUIRED)
+    find_package(SPIRV-Tools-opt REQUIRED)
+    find_package(SPIRV-Tools-link REQUIRED)
 endif()
 
 if(${SLANG_USE_SYSTEM_GLSLANG})
     find_package(glslang REQUIRED)
     if(NOT TARGET glslang)
         add_library(glslang ALIAS glslang::glslang)
+    endif()
+    if(NOT TARGET SPIRV)
+        # Keep the wrapper's target name while using the installed glslang library location.
+        add_library(SPIRV ALIAS glslang::SPIRV)
     endif()
 endif()
 

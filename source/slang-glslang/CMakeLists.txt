@@ -2,6 +2,15 @@
 # Our wrapper for glslang
 #
 if(SLANG_ENABLE_SLANG_GLSLANG)
+    if(SLANG_USE_SYSTEM_GLSLANG)
+        # Installed glslang places SPIRV/GlslangToSpv.h below include/glslang.
+        find_path(
+            SLANG_GLSLANG_SPIRV_INCLUDE_DIR
+            NAMES SPIRV/GlslangToSpv.h
+            PATH_SUFFIXES glslang
+            REQUIRED
+        )
+    endif()
     slang_add_target(
         .
         MODULE
@@ -20,6 +29,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         INCLUDE_DIRECTORIES_PRIVATE
             ${slang_SOURCE_DIR}/include
             ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
+            ${SLANG_GLSLANG_SPIRV_INCLUDE_DIR}
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
@@ -61,31 +71,27 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     )
     if(APPLE)
         file(
-            READ
-            "${slang_glslang_version_script}"
+            READ "${slang_glslang_version_script}"
             _slang_glslang_version_script_content
         )
         # Isolate the `global:` allow-list block; CMake regex `.` matches newlines, so `(.*)` spans
         # the whole multi-line block up to `local:`. The captured group is read from CMAKE_MATCH_1.
         string(
-            REGEX MATCH
-            "global:(.*)local:"
+            REGEX MATCH "global:(.*)local:"
             _slang_glslang_ignored
             "${_slang_glslang_version_script_content}"
         )
         set(_slang_glslang_global_block "${CMAKE_MATCH_1}")
         # Drop `#` comment lines so a commented-out name is not exported.
         string(
-            REGEX REPLACE
-            "#[^\n]*"
+            REGEX REPLACE "#[^\n]*"
             ""
             _slang_glslang_global_block
             "${_slang_glslang_global_block}"
         )
         # Each exported entry is `name;`; pull the names, then prepend `_` for ld64's C-symbol spelling.
         string(
-            REGEX MATCHALL
-            "[A-Za-z_][A-Za-z0-9_]*[ \t]*;"
+            REGEX MATCHALL "[A-Za-z_][A-Za-z0-9_]*[ \t]*;"
             _slang_glslang_exported_names
             "${_slang_glslang_global_block}"
         )
@@ -104,15 +110,13 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         # must be whitespace. Anything left means an entry was not in the expected form and its export
         # would be silently dropped -- fail loud instead of shipping an under-bounded list.
         string(
-            REGEX REPLACE
-            "[A-Za-z_][A-Za-z0-9_]*[ \t]*;"
+            REGEX REPLACE "[A-Za-z_][A-Za-z0-9_]*[ \t]*;"
             ""
             _slang_glslang_global_block_residual
             "${_slang_glslang_global_block}"
         )
         string(
-            REGEX REPLACE
-            "[ \t\r\n]"
+            REGEX REPLACE "[ \t\r\n]"
             ""
             _slang_glslang_global_block_residual
             "${_slang_glslang_global_block_residual}"
@@ -131,8 +135,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         set(_slang_glslang_exported_symbols_existing "")
         if(EXISTS "${_slang_glslang_exported_symbols_file}")
             file(
-                READ
-                "${_slang_glslang_exported_symbols_file}"
+                READ "${_slang_glslang_exported_symbols_file}"
                 _slang_glslang_exported_symbols_existing
             )
         endif()
@@ -142,8 +145,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
                 _slang_glslang_exported_symbols_list
         )
             file(
-                WRITE
-                "${_slang_glslang_exported_symbols_file}"
+                WRITE "${_slang_glslang_exported_symbols_file}"
                 "${_slang_glslang_exported_symbols_list}"
             )
         endif()
