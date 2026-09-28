@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:25Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#builtinoperationintval-and-the-single-representation-invariant
-//META: doc_section_digest=4229b55a01470c7ad99014966f3313e48dd3d9bca875bef59b0f7b4c86cbc182
-//META: purpose=After substitution the type checker reasons with the folded constant, not the symbolic division: initializing an int[5] from a Half<9> member typed int[N / 2] is rejected with the folded size 4 in the message.
+//META: doc_section_digest=7294e983132681667c88eb7937aa63061a1f9c975bb9567ce8dd36184dcda775
+//META: purpose=After substitution the checker reasons with the folded constant rather than the symbolic division, so a size mismatch against an int[N / 2] member is reported with the folded bound.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that once N = 9 is substituted, the member's array bound is
-// the folded ConstantIntVal 4 (not a residual symbolic value): the
+// the folded constant 4 and not a residual symbolic value: the
 // mismatch diagnostic names 'int[4]', and the pinned E30019 confirms
 // the checker rejected the cross-size initialization.
 

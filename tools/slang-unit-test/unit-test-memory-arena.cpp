@@ -1,8 +1,8 @@
 // unit-test-free-list.cpp
 
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-memory-arena.h"
-#include "../../source/core/slang-random-generator.h"
+#include "core/slang-list.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-random-generator.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <stdio.h>

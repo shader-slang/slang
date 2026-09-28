@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target glsl -profile glsl_460 -entry fragMain -stage fragment
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl-intrinsic/texture-shadow-cube-array-bias-ext.slang -target glsl -profile glsl_460 -entry fragMain -stage fragment
 
 // The GLSL-source texture(samplerCubeArrayShadow, vec4 P, float compare, float bias) builtin is a
 // GL_EXT_texture_shadow_lod form, so lowering it must emit the extension directive (a regression that

@@ -5,6 +5,7 @@
 
 RWStructuredBuffer<float> outputBuffer;
 
+[noinline]
 T sqr<T : IArithmetic>(T x) { return x * x; }
 
 [ForceInline]

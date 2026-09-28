@@ -8,6 +8,7 @@
 
 RWStructuredBuffer<int> outputBuffer;
 
+[noinline]
 uint3 f() { return WorkgroupSize(); }
 
 [shader("compute")]

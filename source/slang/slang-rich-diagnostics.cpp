@@ -1,6 +1,6 @@
 #include "slang-rich-diagnostics.h"
 
-#include "../compiler-core/slang-rich-diagnostics-render.h"
+#include "compiler-core/slang-rich-diagnostics-render.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-type.h"
 #include "slang-ir.h"

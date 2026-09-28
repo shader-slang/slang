@@ -225,30 +225,6 @@ public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
 
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
-[OverloadRank(15)]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
-{
-    return mul(m2, m1);
-}
-
 [ForceInline]
 [OverloadRank(15)]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
@@ -357,22 +333,6 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 [ForceInline]
 [OverloadRank(14)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
-{
-    return all(equal(left, right));
-}
-
-[ForceInline]
-[OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
-{
-    return any(notEqual(left, right));
-}
-
-[ForceInline]
-[OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -385,30 +345,6 @@ public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 {
     return any(notEqual(left, right));
 }
-
-${
-for (auto type : kBaseTypes) {
-    char const* typeName = type.name;
-    if (!type.flags) continue;
-$}
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
-{
-    return all(equal(left, right));
-}
-
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
-{
-    return any(notEqual(left, right));
-}
-${
-}
-$}
 
 /// Array length
 __generic<T, let N : int>
@@ -979,11 +915,11 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
     {
     case glsl: __intrinsic_asm "uaddCarry";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$uint = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$uint = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpIAddCarry $x $y;
+        %__carry:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &carry %__carry;
+        result:$$uint = OpCompositeExtract %__temp 0
     };
     default:
         let result = x * y;
@@ -1002,11 +938,11 @@ public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, 
     {
     case glsl: __intrinsic_asm "uaddCarry";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpIAddCarry $x $y;
+        %__carry:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &carry %__carry;
+        result:$$vector<uint,N> = OpCompositeExtract %__temp 0
     };
     default:
         VECTOR_MAP_TRINARY(uint, N, uaddCarry, x, y, carry);
@@ -1022,11 +958,11 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
     {
     case glsl: __intrinsic_asm "usubBorrow";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$uint = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$uint = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpISubBorrow $x $y;
+        %__borrow:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &borrow %__borrow;
+        result:$$uint = OpCompositeExtract %__temp 0
     };
     default:
         borrow = (y > x) ? 1 : 0;
@@ -1044,11 +980,11 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
     {
     case glsl: __intrinsic_asm "usubBorrow";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpISubBorrow $x $y;
+        %__borrow:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &borrow %__borrow;
+        result:$$vector<uint,N> = OpCompositeExtract %__temp 0
     };
     default:
         VECTOR_MAP_TRINARY(uint, N, usubBorrow, x, y, borrow);
@@ -1064,12 +1000,12 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
     {
     case glsl: __intrinsic_asm "umulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$uint = OpCompositeExtract %temp 0;
-        %msb:$$uint = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpUMulExtended $x $y;
+        %__lsb:$$uint = OpCompositeExtract %__temp 0;
+        %__msb:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         uint64_t result = uint64_t(x) * uint64_t(y);
@@ -1088,12 +1024,12 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
     {
     case glsl: __intrinsic_asm "umulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$vector<uint,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpUMulExtended $x $y;
+        %__lsb:$$vector<uint,N> = OpCompositeExtract %__temp 0;
+        %__msb:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         [ForceUnroll]
@@ -1113,12 +1049,12 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
     {
     case glsl: __intrinsic_asm "imulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$int $$int;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$int = OpCompositeExtract %temp 0;
-        %msb:$$int = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$int $$int;
+        %__temp:%__ResType = OpSMulExtended $x $y;
+        %__lsb:$$int = OpCompositeExtract %__temp 0;
+        %__msb:$$int = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         int64_t result = int64_t(x) * int64_t(y);
@@ -1137,12 +1073,12 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
     {
     case glsl: __intrinsic_asm "imulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$vector<int,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<int,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
+        %__temp:%__ResType = OpSMulExtended $x $y;
+        %__lsb:$$vector<int,N> = OpCompositeExtract %__temp 0;
+        %__msb:$$vector<int,N> = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         [ForceUnroll]
@@ -1968,7 +1904,7 @@ public float texture(sampler1DShadow sampler, vec3 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float texture(sampler1DShadow sampler, vec3 p, float bias)
 {
     float location = p.x;
@@ -2003,7 +1939,7 @@ public float texture(sampler2DShadow sampler, vec3 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float texture(sampler2DShadow sampler, vec3 p, float bias)
 {
     vec2 location = p.xy;
@@ -2037,7 +1973,7 @@ public float texture(samplerCubeShadow sampler, vec4 p)
         return sampler.SampleCmpLevelZero(p.xyz, p.w);
 }
 
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 {
@@ -2063,7 +1999,7 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 [ForceInline]
 public float texture(samplerCubeArrayShadow sampler, vec4 location, float compareValue, float bias)
 {
@@ -2099,7 +2035,7 @@ public float texture(sampler1DArrayShadow sampler, vec3 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 {
     vec2 location = p.xy;
@@ -2135,7 +2071,7 @@ public float texture(sampler2DArrayShadow sampler, vec4 p)
 
 // A GL_EXT_texture_shadow_lod form; the extension is requested branch-locally inside SampleCmpBias's wrapper.
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float texture(sampler2DArrayShadow sampler, vec4 p, float bias)
 {
     if (__targetHasImplicitDerivatives())
@@ -2383,7 +2319,7 @@ public float textureProj(sampler1DShadow sampler, vec4 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
@@ -2431,7 +2367,7 @@ public float textureProj(sampler2DShadow sampler, vec4 p)
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 {
     if (!__targetHasImplicitDerivatives())
@@ -2633,7 +2569,7 @@ public vector<T.Element,4> textureOffset(Sampler3D<T> sampler, vec3 p, constexpr
 // No-bias offset shadow sample. Kept as a distinct overload (not a `bias = 0.0` default on the
 // biased form) so that no-bias callers — e.g. `textureProjOffset(sampler2DShadow, vec4, ivec2)` —
 // bind here and stay at the SM4.1/GLSL-150 baseline, never inheriting the biased form's
-// `texture_shadowgrad` (SM6.8) requirement. This mirrors the split already used for
+// `texture_shadowbias` (SM6.8) requirement. This mirrors the split already used for
 // `textureOffset(sampler1DShadow, ...)`.
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
@@ -2660,7 +2596,7 @@ public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offs
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offset, float bias)
 {
     vec2 location = p.xy;
@@ -2709,7 +2645,7 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset, float bias)
 {
     float location = p.x;
@@ -2781,7 +2717,7 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int offset, float bias)
 {
     vec2 location = p.xy;
@@ -2817,7 +2753,7 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 
 // A GL_EXT_texture_shadow_lod form; the extension is requested branch-locally inside SampleCmpBias's wrapper.
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
     if (__targetHasImplicitDerivatives())
@@ -3190,7 +3126,7 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset, float bias)
 {
     if (!__targetHasImplicitDerivatives())
@@ -3238,7 +3174,7 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 }
 
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_shadowgrad)]
+[require(glsl_hlsl_spirv, texture_shadowbias)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
     if (!__targetHasImplicitDerivatives())
@@ -4420,7 +4356,7 @@ public vec4 shadow1D(sampler1DShadow sampler, vec3 coord)
     return texture(sampler, coord);
 }
 
-[require(glsl_spirv, texture_shadowgrad)]
+[require(glsl_spirv, texture_shadowbias)]
 public vec4 shadow1D(sampler1DShadow sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
@@ -4432,7 +4368,7 @@ public vec4 shadow2D(sampler2DShadow sampler, vec3 coord)
     return texture(sampler, coord);
 }
 
-[require(glsl_spirv, texture_shadowgrad)]
+[require(glsl_spirv, texture_shadowbias)]
 public vec4 shadow2D(sampler2DShadow sampler, vec3 coord, float bias)
 {
     return texture(sampler, coord, bias);
@@ -4444,7 +4380,7 @@ public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord)
     return textureProj(sampler, coord);
 }
 
-[require(glsl_spirv, texture_shadowgrad)]
+[require(glsl_spirv, texture_shadowbias)]
 public vec4 shadow1DProj(sampler1DShadow sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
@@ -4456,7 +4392,7 @@ public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord)
     return textureProj(sampler, coord);
 }
 
-[require(glsl_spirv, texture_shadowgrad)]
+[require(glsl_spirv, texture_shadowbias)]
 public vec4 shadow2DProj(sampler2DShadow sampler, vec4 coord, float bias)
 {
     return textureProj(sampler, coord, bias);
@@ -4565,6 +4501,17 @@ internal typealias __ImagePtr<T> =
 // Kept outside spirv_asm so NonUniform propagates to the texel pointer.
 __intrinsic_op($(kIROp_ImageTexelPointer))
 __ImagePtr<T> __imageTexelPointer<T, TImage, TCoord>(TImage image, TCoord coord, int sample);
+
+// Internal SPIR-V-legalization helper for the image-atomic snippets below. Its
+// `GetLegalizedSPIRVGlobalParamAddr` inst has no emitter; the SPIR-V legalize
+// pass only strips it while rewriting a global parameter's uses. A user call
+// passes an ordinary rvalue, not a global parameter, so that rewrite never
+// reaches it and the inst would survive to emit and abort. `internal` keeps the
+// name out of user scope; it is declared here, in the same module as its only
+// callers (the image-atomic snippets below), so those callers can still see it.
+internal __generic<T>
+__intrinsic_op($(kIROp_GetLegalizedSPIRVGlobalParamAddr))
+__Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 ${
 {
@@ -5296,8 +5243,8 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
         {
             return spirv_asm
             {
-                %mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
-                result:$$mat3x4 = OpTranspose %mat
+                %__mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %__mat
             };
         }
         }
@@ -5343,8 +5290,8 @@ public property mat3x4 gl_WorldToObject3x4EXT
         {
             return spirv_asm
             {
-                %mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
-                result:$$mat3x4 = OpTranspose %mat
+                %__mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %__mat
             };
         }
         }
@@ -7006,8 +6953,8 @@ __glsl_extension(GL_EXT_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing_position_fetch)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl, ser_raygen_closesthit_miss)]
-[require(spirv, ser_raygen_closesthit_miss)]
+[require(glsl, ser_position_raygen_closesthit_miss)]
+[require(spirv, ser_position_raygen_closesthit_miss)]
 public void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitObject, out vec3 positions[3])
 {
     __target_switch
@@ -7015,15 +6962,14 @@ public void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitO
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
     case spvShaderInvocationReorderEXT:
-        spirv_asm
+        typedef vec3[3] vec3Arr3;
+        positions = spirv_asm
         {
             OpExtension "SPV_KHR_ray_tracing_position_fetch";
             OpCapability RayTracingPositionFetchKHR;
             OpExtension "SPV_EXT_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderEXT;
-            OpHitObjectGetIntersectionTriangleVertexPositionsEXT
-                &hitObject
-                &positions;
+            result: $$vec3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &hitObject;
         };
     }
 }
@@ -10027,7 +9973,7 @@ public uint atomicCounterDecrement(atomic_uint c)
         // we want a discarded side effect and then return the new value
         return spirv_asm
         {
-            %discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
+            %__discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
             OpLoad $$uint result $c
         };
     }

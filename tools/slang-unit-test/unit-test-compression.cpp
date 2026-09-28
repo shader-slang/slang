@@ -1,6 +1,6 @@
 // unit-compression.cpp
-#include "../../source/core/slang-deflate-compression-system.h"
-#include "../../source/core/slang-lz4-compression-system.h"
+#include "core/slang-deflate-compression-system.h"
+#include "core/slang-lz4-compression-system.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

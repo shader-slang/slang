@@ -1,7 +1,7 @@
 // slang-ir-string-hash.h
 #pragma once
 
-#include "../core/slang-string-slice-pool.h"
+#include "core/slang-string-slice-pool.h"
 #include "slang-ir.h"
 
 namespace Slang

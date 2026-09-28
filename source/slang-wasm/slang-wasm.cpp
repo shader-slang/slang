@@ -1,8 +1,8 @@
 #include "slang-wasm.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-exception.h"
-#include "../slang/slang-language-server.h"
+#include "core/slang-blob.h"
+#include "core/slang-exception.h"
+#include "slang/slang-language-server.h"
 
 #include <slang.h>
 #include <vector>
@@ -96,6 +96,18 @@ Session* GlobalSession::createSession(int compileTarget)
     }
 
     return new Session(session);
+}
+
+std::string GlobalSession::getBuiltinModuleSource(const std::string& moduleName)
+{
+    Slang::ComPtr<ISlangBlob> blob;
+    SlangResult result = Slang::getBuiltinModuleSource(
+        Slang::UnownedStringSlice(moduleName.c_str()),
+        blob.writeRef());
+    // The callee always succeeds: an unrecognized name yields an empty blob, not a failure.
+    SLANG_ASSERT(result == SLANG_OK);
+    SLANG_UNUSED(result);
+    return std::string((const char*)blob->getBufferPointer(), blob->getBufferSize());
 }
 
 Session::~Session()

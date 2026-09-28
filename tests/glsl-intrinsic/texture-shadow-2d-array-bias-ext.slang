@@ -2,9 +2,9 @@
 // compiled as its own entry point, so the #extension directive is asserted per form — a shared
 // check would still pass if only one of the three still requested the extension.
 
-//TEST:SIMPLE(filecheck=CHECK_BIAS): -allow-glsl -target glsl -profile glsl_460 -entry biasMain -stage fragment
-//TEST:SIMPLE(filecheck=CHECK_BIAS_OFFSET): -allow-glsl -target glsl -profile glsl_460 -entry biasOffsetMain -stage fragment
-//TEST:SIMPLE(filecheck=CHECK_LOD_OFFSET): -allow-glsl -target glsl -profile glsl_460 -entry lodOffsetMain -stage fragment
+//TEST:SIMPLE_EX(filecheck=CHECK_BIAS): -lang glsl tests/glsl-intrinsic/texture-shadow-2d-array-bias-ext.slang -target glsl -profile glsl_460 -entry biasMain -stage fragment
+//TEST:SIMPLE_EX(filecheck=CHECK_BIAS_OFFSET): -lang glsl tests/glsl-intrinsic/texture-shadow-2d-array-bias-ext.slang -target glsl -profile glsl_460 -entry biasOffsetMain -stage fragment
+//TEST:SIMPLE_EX(filecheck=CHECK_LOD_OFFSET): -lang glsl tests/glsl-intrinsic/texture-shadow-2d-array-bias-ext.slang -target glsl -profile glsl_460 -entry lodOffsetMain -stage fragment
 
 uniform sampler2DArrayShadow s;
 

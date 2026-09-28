@@ -11,7 +11,7 @@
 #pragma pop_macro("NOMINMAX")
 #pragma pop_macro("WIN32_LEAN_AND_MEAN")
 
-#include "../d3d/d3d-util.h"
+#include "gfx/d3d/d3d-util.h"
 #include "slang-com-ptr.h"
 
 #include <d3d12.h>

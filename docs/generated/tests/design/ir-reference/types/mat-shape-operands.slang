@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vec-and-mat
-//META: doc_section_digest=3375fc96f25274ba6b5f61268aab7b799044240063cd3b64ac3928c13a5702fc
+//META: doc_section_digest=d0336b3ea55b3ff0fce576141345cc9ee2235732d9657d0e6dc4ff8430e31a5e
 //META: purpose=A matrix value is typed Mat(elementType, rowCount, columnCount, layout) in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `Mat(elementType, rowCount, columnCount, layout)`
-// "adds two shape operands and a `layout` int literal that selects
-// the row-major / column-major convention". A `float4x4` uniform
-// shows the full four-operand form in the IR dump.
+// A matrix value is typed Mat(elementType, rowCount, columnCount,
+// layout) in the IR dump. A `float4x4` uniform shows the full four-
+// operand form in the IR dump.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform float4x4 m;
 uniform float4 v;
@@ -27,4 +26,4 @@ void main()
     buf[0] = r.x;
 }
 
-// IR: let {{.*}}%m{{.*}}: Mat(Float, 4 : Int, 4 : Int, {{[0-9]+}} : Int){{.*}}= global_param
+// IR: let {{.*}}%m{{.*}}: Mat(Float, 4 : Int, 4 : Int, {{[0-9]+}} : Enum(Int)){{.*}}= global_param

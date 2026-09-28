@@ -16,6 +16,7 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CPUCHECK):-cpu -output-using-type
 //TEST:SIMPLE(filecheck=EMITHLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=EMITGLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=EMITSPV):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=EMITMETAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=EMITWGSL):-target wgsl -entry computeMain -stage compute
@@ -55,6 +56,9 @@ void computeMain(uint3 id : SV_DispatchThreadID)
 // CPUCHECK: 3
 // EMITHLSL: defaultImpl
 // EMITHLSL: OverrideUser_compute
+// EMITGLSL: defaultImpl
+// EMITGLSL: OverrideUser_compute
+// EMITGLSL: local_size_x
 // EMITSPV: LocalSize
 // EMITSPV: OpIAdd
 // EMITSPV: OpIMul

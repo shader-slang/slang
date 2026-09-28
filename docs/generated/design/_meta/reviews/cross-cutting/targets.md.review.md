@@ -1,45 +1,48 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:29:34+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:06:23+00:00
 target_doc: cross-cutting/targets.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 target_doc_watched_paths_digest: 720cbadffe0ddbcfd07c03b208f3f7cbad55f384b2abb3ca09da30eb7d155f95
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
   completeness: pass
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: fail
   front_matter_validity: pass
-finding_count: 1
+finding_count: 5
 severity_breakdown:
-  critical: 0
-  major: 1
-  minor: 0
+  critical: 2
+  major: 2
+  minor: 1
   nit: 0
 ---
 
 # Review report for cross-cutting/targets.md
 
 ## Summary
-The page satisfies the required structure and most sampled capability/profile claims match the checked sources. The target table has one substantive backend-mapping issue: it groups object-code and host-callable CPU targets under the C++ source emitter even though the checked emit path routes those `CodeGenTarget` cases through the LLVM emitter when using LLVM-backed CPU output.
+The page has the required structure, valid links, and mostly accurate capability definitions, but it contains five source-alignment issues. Most importantly, its `-target spirv -profile glsl_450` example describes an impossible mixed-target capability set, and its new-target checklist incorrectly instructs backend authors to include an embedded prelude as a header.
 
 ## Items checked
-- Ran `regenerate.py show cross-cutting/targets.md` and reviewed the target document, the common contract, its per-document prompt, and the resolved watched-file set (`source/slang/slang-capabilities.capdef`, `source/slang/slang-capability.cpp`, `source/slang/slang-capability.h`, `source/slang/slang-emit-base.cpp`, `source/slang/slang-emit-base.h`, plus 35 more).
-- Checked front matter for all required keys, the recorded source commit, the warning string, and a 64-character hex watched-path digest.
-- Reviewed the page against its per-document prompt and common generated-doc contract, including the required targets, capability system, profiles, IR-target effects, and new-target checklist sections.
-- Checked relative markdown links in the document body for workspace-relative shape and existing workspace targets.
-- Spot-checked more than 10 source-backed claims and named symbols against the watched and directly cited files, including `SourceLanguage`, `Profile`, `ProfileVersion`, `CapabilitySet`, `join`, `abstract target`, `abstract stage`, `glsl`, `spirv`, `raytracing`, `abort`, `rayquery_sphere_nv`, `rayquery_lss_nv`, `subgroup_workgroup_index`, `emitEntryPointsSourceFromIR`, `CPPSourceEmitter`, `GLSLSourceEmitter`, `HLSLSourceEmitter`, `CUDASourceEmitter`, `MetalSourceEmitter`, `WGSLSourceEmitter`, and `TorchCppSourceEmitter`.
-- Confirmed the page has no markdown source line-anchor citations requiring exhaustive line-anchor verification.
+- Read the target page, `_common.md`, the per-document prompt, both dependency pages, and all 40 resolved watched files reported by `regenerate.py show`.
+- Verified source against the recorded commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, which was also `HEAD` at review time.
+- Spot-checked more than 10 claims, including the complete public target enum, `SourceLanguage`, capability definition forms and keyholes, latest-version aliases/accessors, `CapabilitySet`, `Profile`, `TargetRequest::getTargetCaps`, explicit-capability diagnostics, target/stage specialization, emitter dispatch, prelude insertion, and Slang re-emission.
+- Ran the generated-doc structural lint successfully, checked all relative link targets and peer-doc manifest entries, and confirmed the 21,849-byte page is under its 24,576-byte cap.
+- Verified every body line-number citation: the page contains none.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Targets` table, lines 32-45 | The `C++ host` row groups `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, and `SLANG_OBJECT_CODE` under `slang-emit-cpp.cpp` and describes binaries as downstream-compiled. The checked target mapping and emit path show the object-code and host-callable `CodeGenTarget` cases are handled by `emitLLVMForEntryPoints`/`slang-emit-llvm.cpp` when using the LLVM-backed CPU path, so this row sends readers to the wrong backend for those formats. | `source/slang/slang-target.h:49-50` maps `SLANG_OBJECT_CODE` and `SLANG_HOST_HOST_CALLABLE` to `CodeGenTarget::ShaderObjectCode` and `CodeGenTarget::HostHostCallable`; `source/slang/slang-target.h:58-60` maps `SLANG_HOST_OBJECT_CODE`, `SLANG_HOST_LLVM_IR`, and `SLANG_SHADER_LLVM_IR`. `source/slang/slang-emit.cpp:3338-3388` implements `emitLLVMForEntryPoints`, with object-code cases calling `emitLLVMObjectFromIR` and host-callable cases calling `emitLLVMJITFromIR`. | Split the CPU/host row: keep C/C++ source/header and downstream C++ executable/shared-library flows with `slang-emit-cpp.cpp`, and move LLVM IR, object code, and LLVM/JIT host-callable cases to a row that points at `slang-emit-llvm.cpp` and `source/slang-llvm/`. |
+| F-001 | critical | `## Profiles`, lines 258-260 | The example says ``-target spirv -profile glsl_450`` produces a `CapabilitySet` containing both `glsl_450` atoms and the `spirv` target key. Those target atoms are incompatible, and the implementation never constructs that combination: direct SPIR-V keeps only SPIR-V version/extension atoms from the profile, while the via-GLSL path selects `glsl`. | `source/slang/slang-target.cpp:99-150` implements the two SPIR-V paths; `source/slang/slang-target.cpp:209-213` joins profile capabilities only when compatible. `source/slang/slang-capabilities.capdef:162-180` shows SPIR-V versions derive from `spirv` while GLSL versions derive from `glsl`. | Replace the example with separate direct-SPIR-V and SPIR-V-via-GLSL cases, stating which target atom and compatible version family each path retains. |
+| F-002 | major | `## Profiles`, lines 239-256 | The section says profiles “bundle a target choice” and that `Profile` carries a target-language hint. `Profile` actually encodes a stage and version, derives its family from the version, and has no target-format or language-hint field; the format/profile pairing belongs to `TargetDesc`/`TargetRequest`. | `source/slang/slang-profile.h:68-115` lists every `Profile` field and accessor. `include/slang.h:4353-4367` places `format` and `profile` together in `TargetDesc`. | Define `Profile` as stage plus version (with family derived from the version), remove the language-hint claim, and attribute the format/profile pairing to `TargetDesc` or `TargetRequest`. |
+| F-003 | major | `## Targets` table, line 45 | The “Slang round-trip” row claims the internal path re-emits Slang source. At the recorded commit the only such helper is a stub that leaves the output unchanged, and there is no `CodeGenTarget::Slang`. | `source/slang/slang-emit-slang.cpp:6-14` ignores all inputs and returns success without writing output. `source/slang/slang-target.h:24-61` contains no Slang code-generation target. | Remove this from the supported-target table, or label it explicitly as an unimplemented internal stub that currently produces no source. |
+| F-004 | critical | `## Adding a new target`, step 4, lines 367-369 | The checklist instructs a backend author to emit a `#include` for a prelude header. Existing language preludes are embedded strings registered on the global session and written directly into generated source; following the instruction would create an undeployed-header dependency instead of integrating the prelude. | `source/slang/slang-global-session.cpp:125-128` registers the CUDA, C++, and HLSL prelude strings. `source/slang/slang-emit.cpp:2937-2952` writes the selected prelude string directly through `SourceWriter`. | Say to embed/register the prelude for the new `SourceLanguage` and let `emitEntryPointsSourceFromIR` write it. Mention `#include` only for a separate runtime header that is deliberately shipped with generated output. |
+| F-005 | minor | `## Targets` table, line 35 | The GLSL row calls `SLANG_GLSL_VULKAN_*` “aliases.” The API instead contains two specifically named deprecated-and-removed enum slots; they are not aliases and the wildcard spelling is not an identifier readers can search for. | `include/slang.h:687-689` declares `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` and labels them deprecated/removed. | Name both enumerators explicitly and describe them as retained deprecated enum values, not aliases. |
 
 ## No-issues notes
-- The document keeps generated-doc links workspace-relative and avoids absolute source paths.
-- The page stays within the documented scope for its family and does not copy handwritten documentation prose.
-- The source citations are concentrated in the watched paths listed by the manifest entry.
+- All mandatory front-matter keys are present, and the recorded digest is a valid SHA-256 value.
+- The capability keyhole arithmetic, latest-version aliases/accessors, auto-doc groups, and explicit `-capability` conflict diagnostic matched source.
+- The required target, capability, profile, IR-effects, and new-target sections are all present.

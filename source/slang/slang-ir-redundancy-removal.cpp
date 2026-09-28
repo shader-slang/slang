@@ -108,19 +108,22 @@ struct RedundancyRemovalContext
     }
 };
 
-bool removeRedundancy(IRModule* module, bool hoistLoopInvariantInsts)
+bool removeRedundancy(
+    IRModule* module,
+    bool hoistLoopInvariantInsts,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     bool changed = false;
     for (auto inst : module->getGlobalInsts())
     {
         if (auto genericInst = as<IRGeneric>(inst))
         {
-            removeRedundancyInFunc(genericInst, hoistLoopInvariantInsts);
+            removeRedundancyInFunc(genericInst, hoistLoopInvariantInsts, calleeSideEffectCache);
             inst = findGenericReturnVal(genericInst);
         }
         if (auto func = as<IRFunc>(inst))
         {
-            changed |= removeRedundancyInFunc(func, hoistLoopInvariantInsts);
+            changed |= removeRedundancyInFunc(func, hoistLoopInvariantInsts, calleeSideEffectCache);
         }
     }
     return changed;
@@ -315,7 +318,10 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
     return overallChanged;
 }
 
-bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariantInsts)
+bool removeRedundancyInFunc(
+    IRGlobalValueWithCode* func,
+    bool hoistLoopInvariantInsts,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     auto root = func->getFirstBlock();
     if (!root)
@@ -351,7 +357,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariant
     }
     if (auto normalFunc = as<IRFunc>(func))
     {
-        result |= eliminateRedundantLoadStore(normalFunc);
+        result |= eliminateRedundantLoadStore(normalFunc, calleeSideEffectCache);
         result |= eliminateRedundantTemporaryCopyInFunc(normalFunc);
     }
     return result;
@@ -447,7 +453,10 @@ static MemoryScope getMemoryScopeOfLoadStore(IRInst* inst)
     return (MemoryScope)getIntVal(memoryScope->getMemoryScope());
 }
 
-bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStoreBase* store)
+bool tryRemoveRedundantStore(
+    IRGlobalValueWithCode* func,
+    IRStoreBase* store,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     // We perform a quick and conservative check:
     // A store is redundant if it is followed by another store to the same address in
@@ -561,7 +570,7 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStoreBase* store)
             }
             break;
         default:
-            if (canInstHaveSideEffectAtAddress(func, next, store->getPtr()))
+            if (canInstHaveSideEffectAtAddress(func, next, store->getPtr(), calleeSideEffectCache))
             {
                 hasAddrUse = true;
             }
@@ -603,7 +612,11 @@ bool tryRemoveRedundantStore(IRGlobalValueWithCode* func, IRStoreBase* store)
                 {
                     if (inst == store)
                         break;
-                    if (canInstHaveSideEffectAtAddress(func, inst, store->getPtr()))
+                    if (canInstHaveSideEffectAtAddress(
+                            func,
+                            inst,
+                            store->getPtr(),
+                            calleeSideEffectCache))
                     {
                         valueMayChange = true;
                         break;
@@ -641,7 +654,10 @@ bool isExternallyModifiableAddr(IRInst* rootVar)
     return false;
 }
 
-bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
+bool tryRemoveRedundantLoad(
+    IRGlobalValueWithCode* func,
+    IRLoad* load,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     bool changed = false;
 
@@ -669,7 +685,7 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
             }
         }
 
-        if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr()))
+        if (canInstHaveSideEffectAtAddress(func, prev, load->getPtr(), calleeSideEffectCache))
         {
             break;
         }
@@ -678,7 +694,9 @@ bool tryRemoveRedundantLoad(IRGlobalValueWithCode* func, IRLoad* load)
     return changed;
 }
 
-bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
+bool eliminateRedundantLoadStore(
+    IRGlobalValueWithCode* func,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
     bool changed = false;
     for (auto block : func->getBlocks())
@@ -689,11 +707,11 @@ bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func)
             nextInst = inst->getNextInst();
             if (auto load = as<IRLoad>(inst))
             {
-                changed |= tryRemoveRedundantLoad(func, load);
+                changed |= tryRemoveRedundantLoad(func, load, calleeSideEffectCache);
             }
             else if (auto store = as<IRStoreBase>(inst))
             {
-                changed |= tryRemoveRedundantStore(func, store);
+                changed |= tryRemoveRedundantStore(func, store, calleeSideEffectCache);
             }
             else if (auto getElementPtr = as<IRGetElementPtr>(inst))
             {

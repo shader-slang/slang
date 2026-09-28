@@ -2,7 +2,7 @@
 #ifndef SLANG_ARTIFACT_IMPL_H
 #define SLANG_ARTIFACT_IMPL_H
 
-#include "../core/slang-com-object.h"
+#include "core/slang-com-object.h"
 #include "slang-artifact.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"

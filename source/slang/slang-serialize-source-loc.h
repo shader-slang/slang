@@ -2,11 +2,11 @@
 #ifndef SLANG_SERIALIZE_SOURCE_LOC_H
 #define SLANG_SERIALIZE_SOURCE_LOC_H
 
-#include "../compiler-core/slang-name.h"
-#include "../compiler-core/slang-source-loc.h"
-#include "../core/slang-array-view.h"
-#include "../core/slang-riff.h"
-#include "../core/slang-string-slice-pool.h"
+#include "compiler-core/slang-name.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-array-view.h"
+#include "core/slang-riff.h"
+#include "core/slang-string-slice-pool.h"
 #include "slang-serialize-types.h"
 #include "slang-serialize.h"
 

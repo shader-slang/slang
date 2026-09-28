@@ -1,7 +1,7 @@
 // unit-test-test-tool-util.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "core/slang-io.h"
+#include "core/slang-test-tool-util.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

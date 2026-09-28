@@ -2,7 +2,7 @@
 #ifndef SLANG_EMIT_C_LIKE_H
 #define SLANG_EMIT_C_LIKE_H
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-emit-precedence.h"

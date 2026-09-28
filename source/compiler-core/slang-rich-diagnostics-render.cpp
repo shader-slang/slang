@@ -1,12 +1,12 @@
 #include "slang-rich-diagnostics-render.h"
 
-#include "../core/slang-char-encode.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-list.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-string.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-char-encode.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-list.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
 
 #include <algorithm>
 #include <cctype>

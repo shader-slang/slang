@@ -14,6 +14,8 @@
 // (divergence); once every thread exits, all reconverge at the post-loop point.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry computeMain -stage compute
@@ -37,6 +39,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // SPIRV: OpLoopMerge marks the block where all threads reconverge after the loop.
 // CHECK: OpLoopMerge
+
+// HLSL: for-loop lowered to a top-test infinite loop with a break; the code
+// after the loop is the reconvergence point.
+// CHECK_HLSL: for(;;)
+// CHECK_HLSL: break
+
+// GLSL: for-loop lowered to a top-test infinite loop with a break.
+// CHECK_GLSL: for(;;)
+// CHECK_GLSL: break
 
 // Metal: for-loop lowered to a top-test infinite loop with a break.
 // CHECK_METAL: for(;;)

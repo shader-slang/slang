@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T20:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
-//META: purpose=A `matrix<half, 3, 2>` rectangular matrix lowers with IR type `Mat(Half, 3 : Int, 2 : Int, 0 : Int)`.
+//META: doc_section_digest=73a8b7d64d9596c97c899fba163502910f89289de9adea3eac1da3e0599596e6
+//META: purpose=A `matrix<half, 3, 2>` rectangular matrix lowers with IR type `Mat(Half, 3 : Int, 2 : Int, 0 : Enum(Int))`.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
@@ -12,7 +12,7 @@
 // Boundary: combined axes — rectangular shape AND narrow element
 // type. Verifies both axes commute through the Mat(...) row.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform matrix<half, 3, 2> m;
 uniform RWStructuredBuffer<half> buf;
@@ -24,4 +24,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: [nameHint("m")]
-// CHECK: let {{.*}}m{{.*}}: Mat(Half, 3 : Int, 2 : Int, 0 : Int){{.*}}= global_param
+// CHECK: let {{.*}}m{{.*}}: Mat(Half, 3 : Int, 2 : Int, 0 : Enum(Int)){{.*}}= global_param

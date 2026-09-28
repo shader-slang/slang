@@ -569,7 +569,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -1016,7 +1016,7 @@ float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler
 // So the grad wrappers never require the extension, and only the *_ext bias wrappers do.
 
 // Core (no extension): texture(sampler, P, bias) for the GLSL-1.50 baseline shadow types.
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl150_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
 {
     __target_switch
@@ -1027,7 +1027,7 @@ float __glsl150_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float b
 
 // Extension: texture(sampler2DArrayShadow, vec4 P, float bias). Added by GL_EXT_texture_shadow_lod.
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl_shadow_lod_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
 {
     __target_switch
@@ -1042,7 +1042,7 @@ float __glsl_shadow_lod_texture_bias<TSampler, TCoord>(TSampler s, TCoord value,
 // value is a separate argument here (the coordinate is already a full vec4), unlike the other
 // forms where it is packed into the coordinate vector.
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl_shadow_lod_texture_bias_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare, float bias)
 {
     __target_switch
@@ -1055,7 +1055,7 @@ float __glsl_shadow_lod_texture_bias_cube_array_shadow<TSampler, TCoord>(TSample
 
 // Core (no extension): textureOffset(sampler, P, offset, bias) for the GLSL-1.50 baseline types.
 // Note the GLSL argument order is (sampler, P, offset, bias) — offset precedes bias.
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl150_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1066,7 +1066,7 @@ float __glsl150_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoor
 
 // Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl_shadow_lod_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1224,7 +1224,7 @@ float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture
 // core (__glsl150_*) vs GL_EXT_texture_shadow_lod (__glsl_shadow_lod_*) capability split.
 
 // Core (no extension): texture(sampler, P, bias).
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl150_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
 {
     __target_switch
@@ -1235,7 +1235,7 @@ float __glsl150_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonStat
 
 // Extension: texture(sampler2DArrayShadow, vec4 P, float bias).
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl_shadow_lod_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
 {
     __target_switch
@@ -1248,7 +1248,7 @@ float __glsl_shadow_lod_texture_bias<TTexture, TCoord>(TTexture t, SamplerCompar
 
 // Extension: texture(samplerCubeArrayShadow, vec4 P, float compare, float bias) — compare separate.
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl_shadow_lod_texture_bias_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare, float bias)
 {
     __target_switch
@@ -1260,7 +1260,7 @@ float __glsl_shadow_lod_texture_bias_cube_array_shadow<TTexture, TCoord>(TTextur
 }
 
 // Core (no extension): textureOffset(sampler, P, offset, bias).
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl150_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1271,7 +1271,7 @@ float __glsl150_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, Sampl
 
 // Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowgrad)]
+[require(glsl, texture_shadowbias)]
 float __glsl_shadow_lod_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
 {
     __target_switch
@@ -1485,10 +1485,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayered<float4>($0, ($1).x, int(($1).y)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($1).x, int(($1).y)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($1).x, int(($1).y)))";
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($1).x, int(($1).y))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($1).x, ($1).y, int(($1).z)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($1).x, ($1).y, int(($1).z)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($1).x, ($1).y, int(($1).z)))";
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w)))";
                         __intrinsic_asm "texCubemapLayered<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
                     default: __intrinsic_asm "invalid texture shape";
                     }
@@ -1498,12 +1516,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1D<float4>($0, ($1)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($1)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($1)))";
                         __intrinsic_asm "tex1D<$T0>($0, ($1))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($1).x, ($1).y))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($1).x, ($1).y))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($1).x, ($1).y))";
                         __intrinsic_asm "tex2D<$T0>($0, ($1).x, ($1).y)";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($1).x, ($1).y, ($1).z))";
                         __intrinsic_asm "tex3D<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($1).x, ($1).y, ($1).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($1).x, ($1).y, ($1).z))";
                         __intrinsic_asm "texCubemap<$T0>($0, ($1).x, ($1).y, ($1).z)";
                     default: __intrinsic_asm "invalid texture shape";
                     }
@@ -1595,13 +1637,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location ConstOffset|MinLod $offset $clamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location ConstOffset|MinLod $offset $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
         default:
@@ -1686,13 +1728,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract  %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
         }
@@ -1700,7 +1742,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -1738,7 +1780,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -1778,7 +1820,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1829,20 +1871,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue ConstOffset|MinLod $offset $clamp;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue ConstOffset|MinLod $offset $clamp;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1894,7 +1936,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
@@ -1953,7 +1995,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -2017,13 +2059,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -2106,20 +2148,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
@@ -2172,7 +2214,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -2213,7 +2255,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -2229,13 +2271,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -2341,13 +2383,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
         }
@@ -2371,15 +2413,39 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureLod($0, $1, $2)$z";
             case cuda:
+                // The 'tex*Lod<T>' CUDA runtime built-ins below are specialized only
+                // for float/uint/int vector types (no __half overload), so a half texel
+                // produces CUDA that NVRTC rejects. Reject it here; the shape catch-all
+                // below does not.
+                static_assert(!__isHalf<T>(),
+                    "'SampleLevel' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
                 if (isArray != 0)
                 {
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredLod<float4>($0, ($1).x, int(($1).y), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredLod<int4>($0, ($1).x, int(($1).y), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredLod<uint4>($0, ($1).x, int(($1).y), ($2)))";
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($1).x, int(($1).y), ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredLod<float4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredLod<int4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredLod<uint4>($0, ($1).x, ($1).y, int(($1).z), ($2)))";
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredLod<float4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredLod<int4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredLod<uint4>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2)))";
                         __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2390,12 +2456,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLod<float4>($0, ($1), ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLod<int4>($0, ($1), ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLod<uint4>($0, ($1), ($2)))";
                         __intrinsic_asm "tex1DLod<$T0>($0, ($1), ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLod<float4>($0, ($1).x, ($1).y, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLod<int4>($0, ($1).x, ($1).y, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLod<uint4>($0, ($1).x, ($1).y, ($2)))";
                         __intrinsic_asm "tex2DLod<$T0>($0, ($1).x, ($1).y, ($2))";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DLod<float4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DLod<int4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DLod<uint4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
                         __intrinsic_asm "tex3DLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLod<float4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLod<int4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLod<uint4>($0, ($1).x, ($1).y, ($1).z, ($2)))";
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2456,13 +2546,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
         }
@@ -2814,10 +2904,28 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayered<float4>($0, ($2).x, int(($2).y)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($2).x, int(($2).y)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($2).x, int(($2).y)))";
                         __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($2).x, ($2).y, int(($2).z)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($2).x, ($2).y, int(($2).z)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($2).x, ($2).y, int(($2).z)))";
                         __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
                         __intrinsic_asm "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -2828,12 +2936,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1D<float4>($0, ($2)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($2)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($2)))";
                         __intrinsic_asm "tex1D<$T0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($2).x, ($2).y))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($2).x, ($2).y))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($2).x, ($2).y))";
                         __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($2).x, ($2).y, ($2).z))";
                         __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($2).x, ($2).y, ($2).z))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($2).x, ($2).y, ($2).z))";
                         __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -3001,13 +3133,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location ConstOffset|MinLod $offset $clamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location ConstOffset|MinLod $offset $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
         default:
@@ -3165,13 +3297,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location Bias|ConstOffset|MinLod $bias $offset $clamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location Bias|ConstOffset|MinLod $bias $offset $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
        }
@@ -3179,7 +3311,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -3233,7 +3365,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -3266,7 +3398,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -3332,20 +3464,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue ConstOffset|MinLod $offset $clamp;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue ConstOffset|MinLod $offset $clamp;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -3453,7 +3585,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -3521,13 +3653,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Lod|ConstOffset $level $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Lod|ConstOffset $level $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -3611,20 +3743,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
@@ -3674,7 +3806,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -3714,7 +3846,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -3732,13 +3864,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -3943,13 +4075,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
        }
@@ -3999,15 +4131,39 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureLod($p, $2, $3)$z";
             case cuda:
+                // The 'tex*Lod<T>' CUDA runtime built-ins below are specialized only
+                // for float/uint/int vector types (no __half overload), so a half texel
+                // produces CUDA that NVRTC rejects. Reject it here; the shape catch-all
+                // below does not.
+                static_assert(!__isHalf<T>(),
+                    "'SampleLevel' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
                 if (isArray != 0)
                 {
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLayeredLod<float4>($0, ($2).x, int(($2).y), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayeredLod<int4>($0, ($2).x, int(($2).y), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayeredLod<uint4>($0, ($2).x, int(($2).y), ($3)))";
                         __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayeredLod<float4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayeredLod<int4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayeredLod<uint4>($0, ($2).x, ($2).y, int(($2).z), ($3)))";
                         __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayeredLod<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayeredLod<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayeredLod<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3)))";
                         __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -4018,12 +4174,36 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex1DLod<float4>($0, ($2), ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLod<int4>($0, ($2), ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLod<uint4>($0, ($2), ($3)))";
                         __intrinsic_asm "tex1DLod<$T0>($0, ($2), ($3))";
                     case $(SLANG_TEXTURE_2D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLod<float4>($0, ($2).x, ($2).y, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLod<int4>($0, ($2).x, ($2).y, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLod<uint4>($0, ($2).x, ($2).y, ($3)))";
                         __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))";
                     case $(SLANG_TEXTURE_3D):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3DLod<float4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3DLod<int4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3DLod<uint4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
                         __intrinsic_asm "tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     case $(SLANG_TEXTURE_CUBE):
+                        if (T is float3)
+                            __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLod<float4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is int3)
+                            __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLod<int4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
+                        if (T is uint3)
+                            __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLod<uint4>($0, ($2).x, ($2).y, ($2).z, ($3)))";
                         __intrinsic_asm "texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
@@ -4137,13 +4317,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             {
                 OpCapability SparseResidency;
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Lod|ConstOffset $level $offset;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Lod|ConstOffset $level $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
+                OpStore &status %__residentCode;
                 __truncate $$T result __sampledType(T) %__sampled;
             };
         }
@@ -4678,7 +4858,7 @@ $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -4727,7 +4907,7 @@ $}
             // CUDA tex2Dgather doesn't support offset - ignore offset parameter
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -4843,6 +5023,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case hlsl:
             __intrinsic_asm ".Load";
 		case cuda:
+            // The 'tex*fetch_int<T>' prelude templates below have no half implementation
+            // (specialized only for float/uint/int, and the 1D template's body is a stub),
+            // so a half texel produces broken CUDA. Reject it here; the shape catch-all
+            // below does not.
+            static_assert(!__isHalf<T>(),
+                "'Load' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
             if (isArray != 0)
             {
                 switch(Shape.flavor)
@@ -5042,14 +5228,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
                      // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                     %sparseResult:%sparseResultType = OpImageSparseFetch $image $coord Lod|ConstOffset $lod $offset;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $image $coord Lod|ConstOffset $lod $offset;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                     OpStore &status %residentCode;
+                     OpStore &status %__residentCode;
                      __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
@@ -5058,13 +5244,13 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %__sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract  %__sparseResult 1;
 
-                     OpStore &status %residentCode;
+                     OpStore &status %__residentCode;
                      __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
@@ -5256,14 +5442,14 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
                      // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                     %sparseResult:%sparseResultType = OpImageSparseFetch $image $location ConstOffset|Sample $offset $sampleIndex;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $image $location ConstOffset|Sample $offset $sampleIndex;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                     OpStore &status %residentCode;
+                     OpStore &status %__residentCode;
                      __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
@@ -5272,13 +5458,13 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %__sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                     OpStore &status %residentCode;
+                     OpStore &status %__residentCode;
                      __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
@@ -8042,8 +8228,8 @@ bool all(vector<T,N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpINotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAll $$bool result %castResult
+                OpINotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAll $$bool result %__castResult
             };
         }
         else
@@ -8051,8 +8237,8 @@ bool all(vector<T,N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAll $$bool result %castResult
+                OpFUnordNotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAll $$bool result %__castResult
             };
         }
     case wgsl:
@@ -8234,8 +8420,8 @@ bool any(vector<T, N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpINotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAny $$bool result %castResult
+                OpINotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAny $$bool result %__castResult
             };
         }
         else
@@ -8243,8 +8429,8 @@ bool any(vector<T, N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAny $$bool result %castResult
+                OpFUnordNotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAny $$bool result %__castResult
             };
         }
     case wgsl:
@@ -8298,8 +8484,8 @@ double asdouble(uint lowbits, uint highbits)
     case cpp: __intrinsic_asm "$P_asdouble($0, $1)";
     case cuda: __intrinsic_asm "$P_asdouble($0, $1)";
     case spirv: return spirv_asm {
-        %v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
-        result:$$double = OpExtInst glsl450 59 %v
+        %__v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
+        result:$$double = OpExtInst glsl450 59 %__v
     };
     case llvm:
         uint64_t val = uint64_t(lowbits) | (uint64_t(highbits)<<32u);
@@ -10403,12 +10589,104 @@ T dot(T x, T y)
     }
 }
 
+// Computes a vector dot product with scalar arithmetic for targets without a native operation.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+T __vectorDotFallback(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    [ForceUnroll]
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
+
+// Implements the target-specific vector dot product behavior for the broad builtin-arithmetic
+// overload below. Keep its target arms and `N == 1` rule synchronized with the retained
+// floating-point and integer overloads below. Their pre-existing zero-width behavior remains
+// target-path-specific and is not normalized here.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
+    // Follow the builtin signatures defined by each target language. The HLSL `dot` type table and
+    // WGSL section 17.5.20 include integer and floating-point vectors. GLSL 4.60 section 8.5 and
+    // Metal Shading Language section 6.8 declare `dot` only for floating-point vectors. SPIR-V uses
+    // OpDot for floating-point vectors and SPV_KHR_integer_dot_product for integer vectors. Other
+    // targets use the scalar-arithmetic fallback above.
+    __target_switch
+    {
+    case glsl:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case hlsl: __intrinsic_asm "dot";
+    case metal:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case spirv:
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                OpDot $$T result $x $y
+            };
+        }
+        else
+        {
+            spirv_asm
+            {
+                OpCapability DotProduct;
+                OpCapability DotProductInputAll;
+                OpExtension "SPV_KHR_integer_dot_product";
+            };
+
+            if (__isSignedInt<T>())
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpSDot $x $y;
+                };
+            }
+            else
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpUDot $x $y;
+                };
+            }
+        }
+    case wgsl: __intrinsic_asm "dot";
+    default: return __vectorDotFallback(x, y);
+    }
+}
+
+// Keep the established floating-point and integer overloads so that concrete calls retain their
+// overload ranking and floating-point calls retain the derivative registrations on `__d_dot` in
+// `diff.meta.slang`. Those registrations bind to the floating-point signature by overload
+// resolution, so that overload remains distinct from the broader arithmetic signature.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Handle 1-vector case explicitly since many backends don't support it natively
+    // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
+    // wrapper leaves a helper in textual output, while forcing the worker inline expands it early
+    // enough to perturb existing CUDA caller-control-flow optimization. Keeping this overload's
+    // original target switch preserves both behaviors; `tests/cuda/vector-dot-unroll.slang`
+    // protects the emitted CUDA and C++ structure. Keep this switch and the `N == 1` rule
+    // synchronized with `__vectorDotImpl` above.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10425,34 +10703,10 @@ T dot(vector<T, N> x, vector<T, N> y)
     case wgsl: __intrinsic_asm "dot";
     default:
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
-    }
-}
-
-
-BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
-{
-    // Handle 1-vector case explicitly since many backends don't support it natively
-    if (N == 1)
-    {
-        return BFloat16(float(x[0]) * float(y[0]));
-    }
-    if (N == 0)
-    {
-        return BFloat16(0.0f);
-    }
-
-    __target_switch
-    {
-    case spirv:
-        return spirv_asm {
-            OpCapability BFloat16DotProductKHR;
-            OpDot $$BFloat16 result $x $y
-        };
-    case cuda:
-        __intrinsic_asm "_slang_vector_dot";
     }
 }
 
@@ -10461,7 +10715,9 @@ __generic<T : __BuiltinIntegerType, let N : int>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Handle 1-vector case explicitly since many backends don't support it natively
+    // Preserve the established concrete integer intrinsic path for the same reason as the
+    // floating-point overload above. Keep this switch and the `N == 1` rule synchronized with
+    // `__vectorDotImpl`.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10497,9 +10753,48 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
     default:
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+// Keep this broad overload below the default-rank family-specific overloads. Slang 202c removes the
+// deprecated generic-parameter-count tie-breaker, so rank -1 preserves those overloads for concrete
+// calls while still making this one available to generic code that can prove only
+// __BuiltinArithmeticType.
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorDotImpl(x, y);
+}
+
+BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return BFloat16(float(x[0]) * float(y[0]));
+    }
+    if (N == 0)
+    {
+        return BFloat16(0.0f);
+    }
+
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm {
+            OpCapability BFloat16DotProductKHR;
+            OpDot $$BFloat16 result $x $y
+        };
+    case cuda:
+        __intrinsic_asm "_slang_vector_dot";
     }
 }
 
@@ -10718,9 +11013,9 @@ T EvaluateAttributeSnapped(__constref T x, int2 offset)
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
             OpCapability InterpolationFunction;
-            %foffset:$$float2 = OpConvertSToF $offset;
-            %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$T = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
+            %__foffset:$$float2 = OpConvertSToF $offset;
+            %__offsetdiv16:$$float2 = OpFDiv %__foffset $tmp;
+            result:$$T = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %__offsetdiv16
         };
     }
     }
@@ -10742,9 +11037,9 @@ vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
             OpCapability InterpolationFunction;
-            %foffset:$$float2 = OpConvertSToF $offset;
-            %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
+            %__foffset:$$float2 = OpConvertSToF $offset;
+            %__offsetdiv16:$$float2 = OpFDiv %__foffset $tmp;
+            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %__offsetdiv16
         };
     }
     }
@@ -10967,9 +11262,9 @@ float f16tof32(uint value)
     case spirv:
     {
         return spirv_asm {
-            %lowBits = OpUConvert $$uint16_t $value;
-            %half = OpBitcast $$half %lowBits;
-            result:$$float = OpFConvert %half
+            %__lowBits = OpUConvert $$uint16_t $value;
+            %__half = OpBitcast $$half %__lowBits;
+            result:$$float = OpFConvert %__half
         };
     }
     case wgsl: __intrinsic_asm "unpack2x16float($0).x";
@@ -10992,9 +11287,9 @@ vector<float, N> f16tof32(vector<uint, N> value)
     case spirv:
     {
         return spirv_asm {
-            %lowBits = OpUConvert $$vector<uint16_t,N> $value;
-            %half = OpBitcast $$vector<half,N> %lowBits;
-            result:$$vector<float,N> = OpFConvert %half
+            %__lowBits = OpUConvert $$vector<uint16_t,N> $value;
+            %__half = OpBitcast $$vector<half,N> %__lowBits;
+            result:$$vector<float,N> = OpFConvert %__half
         };
     }
     default:
@@ -11020,9 +11315,9 @@ uint f32tof16(float value)
     case spirv:
     {
         return spirv_asm {
-            %half = OpFConvert $$half $value;
-            %lowBits = OpBitcast $$uint16_t %half;
-            result:$$uint = OpUConvert %lowBits
+            %__half = OpFConvert $$half $value;
+            %__lowBits = OpBitcast $$uint16_t %__half;
+            result:$$uint = OpUConvert %__lowBits
         };
     }
     case wgsl: __intrinsic_asm "pack2x16float(vec2f($0,0.0))";
@@ -11045,9 +11340,9 @@ vector<uint, N> f32tof16(vector<float, N> value)
     case spirv:
     {
         return spirv_asm {
-            %half = OpFConvert $$vector<half,N> $value;
-            %lowBits = OpBitcast $$vector<uint16_t,N> %half;
-            result:$$vector<uint,N> = OpUConvert %lowBits
+            %__half = OpFConvert $$vector<half,N> $value;
+            %__lowBits = OpBitcast $$vector<uint16_t,N> %__half;
+            result:$$vector<uint,N> = OpUConvert %__lowBits
         };
     }
     default:
@@ -11795,7 +12090,7 @@ void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp
     __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -11841,7 +12136,7 @@ T fwidth(T p)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(glsl_hlsl_spirv_wgsl, fragmentprocessing)]
+[require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
 vector<T, N> fwidth(vector<T, N> x)
 {
     __requireComputeDerivative();
@@ -11850,6 +12145,8 @@ vector<T, N> fwidth(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "fwidth($0)";
     case glsl:
+        __intrinsic_asm "fwidth($0)";
+    case metal:
         __intrinsic_asm "fwidth($0)";
     case spirv:
         return spirv_asm
@@ -11863,7 +12160,7 @@ vector<T, N> fwidth(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
 matrix<T, N, M> fwidth(matrix<T, N, M> x)
 {
     __target_switch
@@ -12846,8 +13143,8 @@ T log10(T x)
     {
         const T tmp = T(0.43429448190325182765112891891661);
         return spirv_asm {
-            %baseElog:$$T = OpExtInst glsl450 Log $x;
-            result:$$T = OpFMul %baseElog $tmp
+            %__baseElog:$$T = OpExtInst glsl450 Log $x;
+            result:$$T = OpFMul %__baseElog $tmp
         };
     }
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
@@ -12869,8 +13166,8 @@ vector<T,N> log10(vector<T,N> x)
     {
         const T tmp = T(0.43429448190325182765112891891661);
         return spirv_asm {
-            %baseElog:$$vector<T,N> = OpExtInst glsl450 Log $x;
-            result:$$vector<T,N> = OpVectorTimesScalar %baseElog $tmp
+            %__baseElog:$$vector<T,N> = OpExtInst glsl450 Log $x;
+            result:$$vector<T,N> = OpVectorTimesScalar %__baseElog $tmp
         };
     }
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
@@ -13788,7 +14085,7 @@ void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
     __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -14394,9 +14691,9 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 /// @param T The variadic type pack parameter for the arguments to be printed.
 /// @param format The format string.
 /// @param args (optional) The arguments to be printed.
-/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, and maps to `OpDebugPrintf` for SPIR-V target,
-/// and maps to `debugPrintfEXT` for GLSL target. Depending on the target and execution environment, the function may have
-/// no effect.
+/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, maps to `OpDebugPrintf` for SPIR-V target,
+/// maps to `debugPrintfEXT` for GLSL target, and maps to `os_log_default.log` for Metal target.
+/// Depending on the target and execution environment, the function may have no effect.
 /// @example
 /// ```cpp
 /// void test(int x, float y)
@@ -14405,7 +14702,7 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 ///     printf(R"(x = "%d", y = "%f")", x, y);
 /// }
 /// ```
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, printf)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, printf)]
 [require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
@@ -15064,8 +15361,8 @@ int sign(T x)
         if (__isFloat<T>())
             return spirv_asm
             {
-                %fsign:$$T = OpExtInst glsl450 FSign $x;
-                result:$$int = OpConvertFToS %fsign
+                %__fsign:$$T = OpExtInst glsl450 FSign $x;
+                result:$$int = OpConvertFToS %__fsign
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
@@ -15090,8 +15387,8 @@ vector<int, N> sign(vector<T, N> x)
         if (__isFloat<T>())
             return spirv_asm
             {
-                %fsign:$$vector<T, N> = OpExtInst glsl450 FSign $x;
-                result:$$vector<int, N> = OpConvertFToS %fsign
+                %__fsign:$$vector<T, N> = OpExtInst glsl450 FSign $x;
+                result:$$vector<int, N> = OpConvertFToS %__fsign
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
@@ -15258,7 +15555,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
     }
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : MatrixLayoutMode, let L2 : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -16207,8 +16504,8 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
         return spirv_asm
         {
             OpCapability GroupNonUniformBallot;
-            %mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %mask
+            %__mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %__mask
         };
     }
 }
@@ -17856,6 +18153,7 @@ __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveIsFirstLane))]
 bool WaveIsFirstLane()
 {
     __target_switch
@@ -18400,6 +18698,7 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 T WaveReadLaneFirst(T expr)
 {
     __target_switch
@@ -18422,6 +18721,7 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
@@ -18441,6 +18741,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 {
     __target_switch
@@ -18669,8 +18970,8 @@ uint WavePrefixCountBits(bool value)
         return spirv_asm
         {
             OpCapability GroupNonUniformBallot;
-            %mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %mask
+            %__mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %__mask
         };
     default:
         return WaveMaskPrefixCountBits(WaveGetActiveMask(), value);
@@ -19829,15 +20130,10 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    // Here, we don't require 'raytracing' capability, instead, we add the
-    // extension directly in the generated code. The reason is that this
-    // struct is used in both raytracing and rayquery APIs, our current capability
-    // system cannot represent this struct with raytracing OR rayquery capability.
-    // So, we cannot add capability requirement on the struct itself.
-    // However, any use of this type will definitely require either raytracing or rayquery,
-    // so we have the guarantee that either raytracing or rayquery capability will be present.
-    // But if rayquery want to use this struct that is constructed from a descriptor handle,
-    // we need to make sure the raytracing extension is present.
+    // Shared by the raytracing and rayquery APIs; since the capability system cannot
+    // express "raytracing OR rayquery", this struct carries no capability of its own.
+    // Its SPIR-V type-emit supplies the required extension via the "any" mechanism,
+    // resolving to whichever ray capability is actually in effect.
     __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl_spirv)]
     [__readNone]
@@ -19847,7 +20143,6 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
-                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
@@ -19914,11 +20209,14 @@ int __callablePayloadLocation(__ref Payload payload);
 /// @remarks Used to implement dynamic shader calls during ray tracing
 /// @category raytracing
 __generic<Payload>
-[require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+[require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
     {
+    // $0 is the shader index, and $1 is the already-pointer-typed inout payload, matching the
+    // callee's pointer parameter. CallShader always returns void; results flow back through $1.
+    case cuda: __intrinsic_asm "optixDirectCall<void>($0, $1)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:
         {
@@ -20220,6 +20518,16 @@ bool __reportIntersection(float tHit, uint hitKind)
     }
 }
 
+//@hidden:
+// Marker for the OptiX write side of a portable `ReportHit`. The `attributes` aggregate is
+// passed as a single operand; the CUDA varying-param legalization pass flattens it field-wise
+// into scalar attribute leaves before emission (see `legalizeOptiXReportIntersections`).
+__generic<A>
+__intrinsic_op($(kIROp_ReportOptiXIntersection))
+[require(cuda, raytracing_intersection)]
+bool __reportOptiXIntersection(float tHit, uint hitKind, A attributes);
+//@public:
+
 /// Reports a hit from an intersection shader.
 /// @param tHit Distance along the ray where the intersection occurred
 /// @param hitKind User-defined value identifying the type of hit
@@ -20229,7 +20537,7 @@ bool __reportIntersection(float tHit, uint hitKind)
 /// @category raytracing
 __generic<A>
 [ForceInline]
-[require(glsl_hlsl_spirv, raytracing_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     __target_switch
@@ -20242,6 +20550,8 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
         static A a;
         a = attributes;
         return __reportIntersection(tHit, hitKind);
+    case cuda:
+        return __reportOptiXIntersection(tHit, hitKind, attributes);
     }
 }
 
@@ -20281,7 +20591,7 @@ void IgnoreHit()
     case spirv:
         spirv_asm
         {
-            OpIgnoreIntersectionKHR; %_ = OpLabel
+            OpIgnoreIntersectionKHR; %___ = OpLabel
         };
     }
 }
@@ -20301,7 +20611,7 @@ void AcceptHitAndEndSearch()
     case spirv:
         spirv_asm
         {
-            OpTerminateRayKHR; %_ = OpLabel
+            OpTerminateRayKHR; %___ = OpLabel
         };
     }
 }
@@ -20596,8 +20906,8 @@ float3x4 ObjectToWorld3x4()
     case spirv:
         return spirv_asm
         {
-            %mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
-            result:$$float3x4 = OpTranspose %mat;
+            %__mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
+            result:$$float3x4 = OpTranspose %__mat;
         };
     }
 }
@@ -20618,8 +20928,8 @@ float3x4 WorldToObject3x4()
     case spirv:
         return spirv_asm
         {
-            %mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
-            result:$$float3x4 = OpTranspose %mat;
+            %__mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
+            result:$$float3x4 = OpTranspose %__mat;
         };
     }
 }
@@ -20735,9 +21045,9 @@ float4 GetSpherePositionAndRadius()
             OpExtension "SPV_NV_linear_swept_spheres";
             OpCapability RayTracingLinearSweptSpheresGeometryNV;
             OpCapability RayTracingSpheresGeometryNV;
-            %pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
-            %rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
-            result:$$float4 = OpCompositeConstruct %pos %rad;
+            %__pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
+            %__rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
+            result:$$float4 = OpCompositeConstruct %__pos %__rad;
         };
     }
 }
@@ -20761,15 +21071,15 @@ float2x4 GetLssPositionsAndRadii()
             OpExtension "SPV_NV_linear_swept_spheres";
             OpCapability RayTracingLinearSweptSpheresGeometryNV;
             OpCapability RayTracingSpheresGeometryNV;
-            %positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
-            %radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
-            %r0:$$float = OpCompositeExtract %radii 0;
-            %r1:$$float = OpCompositeExtract %radii 1;
-            %p0:$$float3 = OpCompositeExtract %positions 0;
-            %p1:$$float3 = OpCompositeExtract %positions 1;
-            %a:$$float4 = OpCompositeConstruct %p0 %r0;
-            %b:$$float4 = OpCompositeConstruct %p1 %r1;
-            result:$$float2x4 = OpCompositeConstruct %a %b;
+            %__positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
+            %__radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
+            %__r0:$$float = OpCompositeExtract %__radii 0;
+            %__r1:$$float = OpCompositeExtract %__radii 1;
+            %__p0:$$float3 = OpCompositeExtract %__positions 0;
+            %__p1:$$float3 = OpCompositeExtract %__positions 1;
+            %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+            %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+            result:$$float2x4 = OpCompositeConstruct %__a %__b;
         };
 
     }
@@ -21046,8 +21356,8 @@ uint dot4add_u8packed(uint x, uint y, uint acc)
             OpCapability DotProduct;
             OpCapability DotProductInput4x8BitPacked;
             OpExtension "SPV_KHR_integer_dot_product";
-            %dotResult = OpUDot $$uint $x $y 0;
-            result:$$uint = OpIAdd %dotResult $acc;
+            %__dotResult = OpUDot $$uint $x $y 0;
+            result:$$uint = OpIAdd %__dotResult $acc;
         };
     default:
         uint4 vecX = unpackUint4x8ToUint32(x);
@@ -21074,8 +21384,8 @@ int dot4add_i8packed(uint x, uint y, int acc)
             OpCapability DotProduct;
             OpCapability DotProductInput4x8BitPacked;
             OpExtension "SPV_KHR_integer_dot_product";
-            %dotResult = OpSDot $$int $x $y 0;
-            result:$$int = OpIAdd %dotResult $acc;
+            %__dotResult = OpSDot $$int $x $y 0;
+            result:$$int = OpIAdd %__dotResult $acc;
         };
     default:
         int4 vecX = unpackInt4x8ToInt32(x);
@@ -21163,7 +21473,7 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
             OpEmitMeshTasksEXT $threadGroupCountX $threadGroupCountY $threadGroupCountZ &meshPayload;
             // OpEmitMeshTasksExt is a terminator, so we need to start a new
             // block to hold whatever comes after this intrinsic
-            %_ = OpLabel
+            %___ = OpLabel
         };
     }
 }
@@ -21412,8 +21722,8 @@ float3 HitTriangleVertexPosition(uint index)
                 OpCapability RayTracingPositionFetchKHR;
                 OpExtension "SPV_KHR_ray_tracing";
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
-                %addr : $$Ptr<float3, Access::Read, AddressSpace::VaryingInput> = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
-                result:$$float3 = OpLoad %addr;
+                %__addr : $$Ptr<float3, Access::Read, AddressSpace::VaryingInput> = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
+                result:$$float3 = OpLoad %__addr;
             };
     }
 }
@@ -21788,8 +22098,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 0;
             return spirv_asm
             {
-                %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
-                result:$$bool = OpLogicalNot %rr;
+                %__rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
+                result:$$bool = OpLogicalNot %__rr;
             };
         }
     }
@@ -22351,7 +22661,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
 ${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
-    const char* kCandidateCommittedMetal[] = {"get_candidate_", "get_committed_"};
+    // Middle piece of the MSL method name. Callers add the "get_" or "is_" prefix.
+    const char* kCandidateCommittedMetal[] = {"candidate_", "committed_"};
 
     // Access Candidate and Committed Matrices.
     for (uint32_t candidateOrCommitted = 0; candidateOrCommitted < 2; candidateOrCommitted++)
@@ -22444,13 +22755,13 @@ $}
         {
         case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(method.name)EXT($0, $(ccTF)))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)3x4";
-        case metal: __intrinsic_asm "transpose($0->$(ccNameMetal)$(method.metalName)())";
+        case metal: __intrinsic_asm "transpose($0->get_$(ccNameMetal)$(method.metalName)())";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
             {
-                %m:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
-                result:$$float3x4 = OpTranspose %m;
+                %__m:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
+                result:$$float3x4 = OpTranspose %__m;
             };
         }
     }
@@ -22468,7 +22779,7 @@ $}
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.name)EXT($0, $(ccTF))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)4x3";
-        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
+        case metal: __intrinsic_asm "$0->get_$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -22500,6 +22811,8 @@ ${
         {"float2", "TriangleBarycentrics", "Barycentrics", "triangle_barycentric_coord"},
     };
     for (auto method : rayQueryMethods) {
+        // MSL names boolean queries "is_" and everything else "get_".
+        auto metalPrefix = strcmp(method.type, "bool") == 0 ? "is_" : "get_";
 $}
 
     __glsl_extension(GL_EXT_ray_query)
@@ -22512,7 +22825,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
-        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
+        case metal: __intrinsic_asm "$0->$(metalPrefix)$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -22681,9 +22994,9 @@ $}
             {
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability RayTracingSpheresGeometryNV;
-                %pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCandidate;
-                %rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCandidate;
-                result:$$float4 = OpCompositeConstruct %pos %rad;
+                %__pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCandidate;
+                %__rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCandidate;
+                result:$$float4 = OpCompositeConstruct %__pos %__rad;
             };
         }
     }
@@ -22709,9 +23022,9 @@ $}
             {
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability RayTracingSpheresGeometryNV;
-                %pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCommitted;
-                %rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCommitted;
-                result:$$float4 = OpCompositeConstruct %pos %rad;
+                %__pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCommitted;
+                %__rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCommitted;
+                result:$$float4 = OpCompositeConstruct %__pos %__rad;
             };
         }
     }
@@ -22750,15 +23063,15 @@ $}
             {
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
-                %positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCandidate;
-                %radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCandidate;
-                %p0:$$float3 = OpCompositeExtract %positions 0;
-                %p1:$$float3 = OpCompositeExtract %positions 1;
-                %r0:$$float = OpCompositeExtract %radii 0;
-                %r1:$$float = OpCompositeExtract %radii 1;
-                %a:$$float4 = OpCompositeConstruct %p0 %r0;
-                %b:$$float4 = OpCompositeConstruct %p1 %r1;
-                result:$$float2x4 = OpCompositeConstruct %a %b;
+                %__positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCandidate;
+                %__radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCandidate;
+                %__p0:$$float3 = OpCompositeExtract %__positions 0;
+                %__p1:$$float3 = OpCompositeExtract %__positions 1;
+                %__r0:$$float = OpCompositeExtract %__radii 0;
+                %__r1:$$float = OpCompositeExtract %__radii 1;
+                %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+                %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+                result:$$float2x4 = OpCompositeConstruct %__a %__b;
             };
         }
     }
@@ -22797,15 +23110,15 @@ $}
             {
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
-                %positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCommitted;
-                %radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCommitted;
-                %p0:$$float3 = OpCompositeExtract %positions 0;
-                %p1:$$float3 = OpCompositeExtract %positions 1;
-                %r0:$$float = OpCompositeExtract %radii 0;
-                %r1:$$float = OpCompositeExtract %radii 1;
-                %a:$$float4 = OpCompositeConstruct %p0 %r0;
-                %b:$$float4 = OpCompositeConstruct %p1 %r1;
-                result:$$float2x4 = OpCompositeConstruct %a %b;
+                %__positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCommitted;
+                %__radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCommitted;
+                %__p0:$$float3 = OpCompositeExtract %__positions 0;
+                %__p1:$$float3 = OpCompositeExtract %__positions 1;
+                %__r0:$$float = OpCompositeExtract %__radii 0;
+                %__r1:$$float = OpCompositeExtract %__radii 1;
+                %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+                %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+                result:$$float2x4 = OpCompositeConstruct %__a %__b;
             };
         }
     }
@@ -24096,9 +24409,12 @@ struct HitObject
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
-        /// shader is invoked. (DXR 1.3 variant without AccelerationStructure parameter)
+        /// shader is invoked. (Native SER variant without AccelerationStructure parameter — the accel
+        /// structure is baked into the HitObject. Lowers on every SER target except NVAPI, whose Invoke
+        /// has no AccelerationStructure-free form.)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -24118,6 +24434,55 @@ struct HitObject
                 "NVAPI shader-execution-reordering target call "
                 "HitObject::Invoke(accelerationStructure, hitObject, payload), or compile for a "
                 "native DXR 1.3 SER target.");
+        // These cases match the 3-argument Invoke overload. The SPIR-V/GLSL bodies pass the hit
+        // object and payload to their helpers explicitly and never mention the AccelerationStructure
+        // (it is baked into the HitObject; the explicit TLAS is a pure NVAPI/DXIL artifact). The cuda
+        // case emits `optixInvoke`, whose arguments are forwarded positionally, so this 2-argument
+        // overload emits optixInvoke(hitObject, payload); the matching prelude wrapper ignores the
+        // hit-object handle and reorders on implicit thread state.
+        case _GL_NV_shader_invocation_reorder:
+            {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
+                Payload = p;
+            }
+        case glsl: // use GL_EXT until KHR is available.
+            {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __glslInvokeEXT(HitOrMiss, __rayPayloadLocation(p));
+                Payload = p;
+            }
+        case cuda: __intrinsic_asm "optixInvoke";
+        case spvShaderInvocationReorderNV:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
+                    OpHitObjectExecuteShaderNV
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __spirvExecuteShaderEXT(HitOrMiss, p);
+                Payload = p;
+            }
         }
     }
 
@@ -24242,22 +24607,22 @@ struct HitObject
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
-                %origin:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
-                %tmin:$$float = OpHitObjectGetRayTMinNV &this;
-                %direction:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
-                %tmax:$$float = OpHitObjectGetRayTMaxNV &this;
-                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+                %__origin:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
+                %__tmin:$$float = OpHitObjectGetRayTMinNV &this;
+                %__direction:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
+                %__tmax:$$float = OpHitObjectGetRayTMaxNV &this;
+                result:$$RayDesc = OpCompositeConstruct %__origin %__tmin %__direction %__tmax;
             };
         case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderEXT;
-                %origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
-                %tmin:$$float = OpHitObjectGetRayTMinEXT &this;
-                %direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
-                %tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
-                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+                %__origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+                %__tmin:$$float = OpHitObjectGetRayTMinEXT &this;
+                %__direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+                %__tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
+                result:$$RayDesc = OpCompositeConstruct %__origin %__tmin %__direction %__tmax;
             };
         }
     }
@@ -24551,9 +24916,9 @@ struct HitObject
                 OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
-                %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
-                %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
-                result:$$float4 = OpCompositeConstruct %position %radius;
+                %__position:$$float3 = OpHitObjectGetSpherePositionNV &this;
+                %__radius:$$float = OpHitObjectGetSphereRadiusNV &this;
+                result:$$float4 = OpCompositeConstruct %__position %__radius;
             };
         }
     }
@@ -24579,15 +24944,15 @@ struct HitObject
                 OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
-                %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
-                %radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
-                %r0:$$float = OpCompositeExtract %radii 0;
-                %r1:$$float = OpCompositeExtract %radii 1;
-                %p0:$$float3 = OpCompositeExtract %positions 0;
-                %p1:$$float3 = OpCompositeExtract %positions 1;
-                %a:$$float4 = OpCompositeConstruct %p0 %r0;
-                %b:$$float4 = OpCompositeConstruct %p1 %r1;
-                result:$$float2x4 = OpCompositeConstruct %a %b;
+                %__positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
+                %__radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
+                %__r0:$$float = OpCompositeExtract %__radii 0;
+                %__r1:$$float = OpCompositeExtract %__radii 1;
+                %__p0:$$float3 = OpCompositeExtract %__positions 0;
+                %__p1:$$float3 = OpCompositeExtract %__positions 1;
+                %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+                %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+                result:$$float2x4 = OpCompositeConstruct %__a %__b;
             };
         }
     }
@@ -24920,6 +25285,62 @@ struct HitObject
             }
         }
     }
+
+        /// GLSL helper: fetches the triangle vertex positions into an out array.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    [require(glsl, ser_position_raygen_closesthit_miss)]
+    [__NoSideEffect]
+    void __glslGetTriangleVertexPositions(out float3 arr[3])
+    {
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+        __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
+    }
+
+        /// Returns the world-space vertex positions of the triangle that was hit.
+        /// Valid if the hit object represents a triangle hit.
+        /// @return Array of three vertex positions in world space
+        /// @remarks Requires ray tracing position fetch extension
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    [ForceInline]
+    [require(glsl_spirv, ser_position_raygen_closesthit_miss)]
+    [__NoSideEffect]
+    float3[3] GetTriangleVertexPositions()
+    {
+        typedef float3[3] float3Arr3;
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder:
+            float3 output[3];
+            __glslGetTriangleVertexPositions(output);
+            return output;
+        // A HitObject built under the NV capability is emitted as OpTypeHitObjectNV,
+        // but OpHitObjectGetIntersectionTriangleVertexPositionsEXT (the only opcode for
+        // this query) requires an OpTypeHitObjectEXT operand. There is no NV opcode, and
+        // mixing an NV-typed HitObject with the EXT op produces invalid SPIR-V, so this
+        // combination is rejected at compile time rather than emitted. Note that
+        // spvShaderInvocationReorderNV inherits from spvShaderInvocationReorderEXT for
+        // capability purposes, but the emitted HitObject type still follows the NV/EXT
+        // split, so we cannot simply fall through to the EXT case below.
+        case spvShaderInvocationReorderNV:
+            static_assert(false,
+                "GetTriangleVertexPositions() has no SPIRV NV equivalent. "
+                "Use the spvShaderInvocationReorderEXT capability instead.");
+            return float3Arr3();
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_KHR_ray_tracing_position_fetch";
+                OpCapability RayTracingPositionFetchKHR;
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &this;
+            };
+        }
+    }
+
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
@@ -26923,9 +27344,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26952,9 +27373,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Bias $bias;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Bias $bias;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26983,9 +27404,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel MinLod $lodClamp;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel MinLod $lodClamp;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -27015,9 +27436,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -27045,9 +27466,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Lod $lod;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Lod $lod;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -27079,9 +27500,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Grad $dx $dy;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Grad $dx $dy;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -27112,9 +27533,9 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
                 // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -27636,6 +28057,48 @@ interface IOpaqueDescriptor
     static const DescriptorAccess descriptorAccess;
 }
 
+/// True when `T` lowers to a texture or sampler type — the types whose `DescriptorHandle` is a native
+/// `uint64` handle under `spvBindlessTextureNV` rather than a `uint2` heap index. Folds to a
+/// compile-time constant once `T` is concrete (peephole over `kIROp_IsBindlessTextureNVEncodable`), so
+/// it serves as a `static_assert` condition and lets dead-branch elimination drop the native cast for a
+/// non-encodable `T`. The fold calls the IR classifier `isBindlessTextureNVEncodableResourceType`
+/// (`slang-ir-util.cpp`) — the single source of truth; the AST twin `_isBindlessTextureNVUInt64ElementType`
+/// (`slang-type-layout.cpp`, for layout/reflection) must stay in agreement.
+__generic<T>
+__intrinsic_op($(kIROp_IsBindlessTextureNVEncodable))
+bool __isBindlessTextureNVEncodable_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBindlessTextureNVEncodable()
+{
+    return __isBindlessTextureNVEncodable_impl(__declVal<T>());
+}
+
+/// True when `T`'s `DescriptorHandle` uses the native `SPV_NV_bindless_texture` `uint64` representation
+/// on the current SPIR-V target: `spvBindlessTextureNV` is enabled and `T` is an encodable
+/// texture/sampler. It pairs the capability check with `__isBindlessTextureNVEncodable<T>()` for call
+/// sites not already inside a `case spvBindlessTextureNV:` — e.g. a `static_assert` condition or a
+/// target-agnostic comparison. (The native-cast dispatch in `defaultGetDescriptorFromHandle` calls
+/// `__isBindlessTextureNVEncodable<T>()` directly, since its arms already select the capability.) The
+/// `case spirv:`/`default` arm keeps the switch's inferred SPIR-V
+/// capability at `{spirv}`, so a caller does not inherit a spurious `spvBindlessTextureNV` requirement on
+/// the default model. `[ForceInline]` inlines the `__target_switch` at each call site so it folds to a
+/// compile-time constant — required both to use it as a `static_assert` condition and to let dead-branch
+/// elimination drop the native cast for a non-encodable `T`.
+[ForceInline]
+bool usesNativeSpirvDescriptorHandle<T : IOpaqueDescriptor>()
+{
+    __target_switch
+    {
+    case spvBindlessTextureNV:
+        return __isBindlessTextureNVEncodable<T>();
+    case spirv:
+    default:
+        return false;
+    }
+}
+
 __magic_type(DynamicResourceType)
 __intrinsic_type($(kIROp_DynamicResourceType))
 struct __DynamicResource<let kind = __DynamicResourceKind.General>
@@ -27682,7 +28145,60 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+        // A single `ResourceDescriptorHeap[i]` index carries no sampler index, so building a combined
+        // texture-sampler from it hard-codes the sampler to heap slot 0. Reject that only on the
+        // targets whose `defaultGetDescriptorFromHandle` arm routes a `CombinedTextureSampler`
+        // through `__makeCombinedTextureSamplerFromHandle`, i.e. consumes a separate sampler index:
+        // HLSL and SPIR-V `spvDescriptorHeapEXT`. Default SPIR-V and GLSL instead load one native
+        // combined descriptor by `.x`, where the single index is correct, so they are accepted.
+        // WGSL is not covered here: it splits a combined sampler into two descriptors in the later
+        // `lowerCombinedTextureSamplers` pass, which runs before this `static_assert` is checked and
+        // itself fails on a combined sampler built from the heap, so this guard cannot turn that into
+        // a clean diagnostic. These `case`s mirror the combined-sampler branches in
+        // `defaultGetDescriptorFromHandle`; the two lists are kept in agreement.
+        __target_switch
+        {
+        case hlsl:
+        case spvDescriptorHeapEXT:
+            static_assert(This.kind != DescriptorKind.CombinedTextureSampler, "Cannot initialize a combined texture-sampler from a single ResourceDescriptorHeap index; load the texture and sampler separately from ResourceDescriptorHeap and SamplerDescriptorHeap.");
+            break;
+        case spirv:
+            // Explicit plain-SPIR-V arm: without it the `spvDescriptorHeapEXT` case claims the whole
+            // SPIR-V family, forcing an implicit capability upgrade (E41012) on plain-SPIR-V compiles.
+            break;
+        default:
+            break;
+        }
+        return getDescriptorFromExplicitHeapIndex<This>(uint2(__getUntypedResourceHandleIndex(h), 0));
+    }
+}
+
+// A SubpassInput / SubpassInputMS is an opaque image descriptor, so like `_Texture` above it can be
+// recovered from the `UntypedResourceHandle` that `ResourceDescriptorHeap[i]` yields.
+__generic<T, let isMS : int>
+extension __SubpassImpl<T, isMS> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+
+    typealias Handle = DescriptorHandle<This>;
+
+    static const DescriptorKind kind = DescriptorKind.Texture;
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<This> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromExplicitHeapIndex<This>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
 
@@ -27700,10 +28216,10 @@ const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
     { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "RasterizerOrdered" },
     { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
     { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "RasterizerOrdered" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
     { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
     { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },
@@ -27748,7 +28264,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     [ForceInline]
     __init($(untypedHandleType) h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0)));
+        return getDescriptorFromExplicitHeapIndex<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0));
     }
 }
 
@@ -27797,19 +28313,28 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         }
     }
 
+    // Ordering compares in the handle's native representation. Handles that are `uint64` — all kinds on
+    // `cuda`, and on SPIR-V exactly the types `usesNativeSpirvDescriptorHandle` identifies (an encodable
+    // texture/sampler under `spvBindlessTextureNV`) — compare as `uint64`; everything else uses the
+    // `uint2` lexicographic order. The SPIR-V split keys on `__isBindlessTextureNVEncodable<T>()`, not on
+    // `DescriptorKind`: buffers and acceleration structures are `uint2`, and so are `SubpassInput` and
+    // `TextureBuffer`, which share a texture/texel `DescriptorKind` but are not encodable texture/sampler
+    // types. `equals` needs no such split: bit-equality is the same in either representation.
     [ForceInline]
     bool lessThan(DescriptorHandle<T> other)
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this < (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
+            break;
         }
+        if (usesNativeSpirvDescriptorHandle<T>())
+            return (uint64_t)this < (uint64_t)other;
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
     }
 
     [ForceInline]
@@ -27817,14 +28342,16 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this <= (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
+            break;
         }
+        if (usesNativeSpirvDescriptorHandle<T>())
+            return (uint64_t)this <= (uint64_t)other;
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
     }
 }
 
@@ -27916,6 +28443,48 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
+        // A `ResourceDescriptorHeap[i]` index cannot be stored in a native bindless `.Handle` (a
+        // `uint64` under `spvBindlessTextureNV` for an encodable texture/sampler): there is no faithful
+        // place for the index, so we diagnose rather than reinterpret the bits.
+        // `usesNativeSpirvDescriptorHandle<T>()` is the single source of that decision (see its
+        // definition for the `[ForceInline]`/capability-scoping rationale). Non-native and
+        // heap-index-only representations (including `spvDescriptorHeapEXT` alone) convert normally and
+        // are not diagnosed here.
+        static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
+        // A single `ResourceDescriptorHeap[i]` index also cannot build a combined texture-sampler on the
+        // targets whose `defaultGetDescriptorFromHandle` combined-sampler branch consumes a separate
+        // sampler index (HLSL, SPIR-V `spvDescriptorHeapEXT`). Under NV+EXT the native-handle assertion
+        // above already owns the diagnosis, so the check below is refined to `spvDescriptorHeapEXT`
+        // without NV (the nested switch).
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+            break;
+        case spvDescriptorHeapEXT:
+            // With `spvBindlessTextureNV` also enabled, an encodable combined sampler is a native handle
+            // and the native-handle assertion above already rejects it with the single message; adding
+            // the combined-sampler message too would be a contradictory second diagnostic (the explicit
+            // `uint2` form it recommends is itself invalid for a native handle). The check is therefore
+            // restricted to `spvDescriptorHeapEXT` without NV. The outer `case spirv:` sibling below still
+            // collapses this switch's SPIR-V capability to `{spirv}`, so the inner `spvBindlessTextureNV`
+            // arm does not leak NV onto a plain-SPIR-V compile.
+            __target_switch
+            {
+            case spvBindlessTextureNV:
+                break;
+            default:
+                static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+                break;
+            }
+            break;
+        case spirv:
+            // Explicit plain-SPIR-V arm (see the `_Texture` conversion above): avoids the implicit
+            // `spvDescriptorHeapEXT` capability upgrade (E41012) on plain-SPIR-V compiles.
+            break;
+        default:
+            break;
+        }
         return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
@@ -27927,6 +28496,10 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedSamplerHandle h)
     {
+        // As in the resource constructor: a `SamplerDescriptorHeap[j]` index cannot be stored in a native
+        // bindless sampler `.Handle` (a `uint64` under `spvBindlessTextureNV`), so diagnose via the same
+        // `usesNativeSpirvDescriptorHandle<T>()` decision and the same common message.
+        static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
         return DescriptorHandle<T>(uint2(__getUntypedSamplerHandleIndex(h), 0));
     }
 }
@@ -27998,25 +28571,19 @@ public enum BindlessDescriptorOptions
     VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
 
-/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
-/// to a descriptor object.
+/// Look up `handleValue` in the Vulkan dynamic-resource heap and return the descriptor. This is the
+/// `uint2`-handle path used directly on plain SPIR-V / GLSL (the `spirv`/`glsl` arm of
+/// `defaultGetDescriptorFromHandle`); the descriptors `spvBindlessTextureNV` does not convert (buffers
+/// and acceleration structures) reach it via that same `spirv` arm when only `spvBindlessTextureNV` is
+/// enabled (that capability implies `spirv`) — with `spvDescriptorHeapEXT` also enabled they take the
+/// EXT arm instead. So the dynamic-heap lowering lives in exactly one place. Capabilities are
+/// inferred from the body (as for `defaultGetDescriptorFromHandle`) rather than declared, so the
+/// acceleration-structure path's `__asuint64` / ray-tracing requirements are picked up automatically.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+T getDescriptorFromDynamicResourceHeap<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions)
 {
-    __target_switch
+    switch(bindlessOptions)
     {
-    case hlsl:
-        if (T.kind == DescriptorKind.Sampler)
-            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
-        else if (T.kind == DescriptorKind.CombinedTextureSampler)
-            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
-        else
-            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spirv:
-    case glsl:
-
-        switch(bindlessOptions)
-        {
 ${
 {
     static const struct
@@ -28086,17 +28653,101 @@ $}
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     }
     }
-    case wgsl:
-        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
-    case spvDescriptorHeapEXT:
+}
+
+/// Load a descriptor from the `spvDescriptorHeapEXT` descriptor heap. The single-descriptor kinds use
+/// only `handle.x` as the heap index: samplers load from the sampler heap, every other kind from the
+/// resource heap. A combined texture-sampler is the exception — it is assembled from both components of
+/// the handle (a combined descriptor carries a texture part and a sampler part), so
+/// `__makeCombinedTextureSamplerFromHandle` receives the whole `uint2` rather than just `.x`. This is
+/// the single lowering for the EXT heap, shared by the `spvDescriptorHeapEXT` arm of
+/// `defaultGetDescriptorFromHandle` and by the untyped-handle→resource constructors that convert a
+/// `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index directly to a resource, so the two
+/// paths stay in agreement.
+[ForceInline]
+T getDescriptorFromDescriptorHeapEXT<T:IOpaqueDescriptor>(uint2 handle)
+{
+    if (T.kind == DescriptorKind.Sampler)
+        return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), handle.x);
+    else if (T.kind == DescriptorKind.CombinedTextureSampler)
+        return __makeCombinedTextureSamplerFromHandle<T>(handle);
+    else
+        return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), handle.x);
+}
+
+/// Convert an explicit descriptor-heap index (from `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]`,
+/// packed as `handle.x`) into a descriptor `T`. Shared by every untyped-handle→resource constructor.
+///
+/// When the handle would use the native SPIR-V representation — `usesNativeSpirvDescriptorHandle<T>()`,
+/// i.e. `spvBindlessTextureNV` enabled and `T` an encodable texture/sampler — routing the index through the
+/// `(type, capability)`-keyed `getDescriptorFromHandle` would let the NV dispatch in
+/// `defaultGetDescriptorFromHandle` reinterpret it as a native `uint64` handle (issue #13070). In that
+/// case, load directly from the EXT heap when one also exists (`spvBindlessTextureNV + spvDescriptorHeapEXT`);
+/// when it does not (plain `spvBindlessTextureNV`), there is no heap to load from and the index conversion
+/// is unsupported — fall through to `getDescriptorFromHandle` (whose `.Handle` counterpart is diagnosed in
+/// the constructors above). In every other case defer to `getDescriptorFromHandle`, which is correct for
+/// the index and preserves a user override — this includes `spvDescriptorHeapEXT` alone
+/// (`usesNativeSpirvDescriptorHandle` is false without NV, so the override is honored) and non-native types
+/// on any target. The EXT-direct load is deliberately nested inside the `usesNativeSpirvDescriptorHandle`
+/// guard rather than keyed on `spvDescriptorHeapEXT` alone: gating it behind NV is what lets
+/// `spvDescriptorHeapEXT`-only compiles keep honoring a user `getDescriptorFromHandle` override, since only
+/// the NV+EXT combination must bypass it to avoid the `uint64` reinterpretation.
+[ForceInline]
+T getDescriptorFromExplicitHeapIndex<T:IOpaqueDescriptor>(uint2 handle)
+{
+    if (usesNativeSpirvDescriptorHandle<T>())
+    {
+        __target_switch
+        {
+        case spvDescriptorHeapEXT:
+            return getDescriptorFromDescriptorHeapEXT<T>(handle);
+        case spirv:
+        default:
+            break;
+        }
+    }
+    return getDescriptorFromHandle(DescriptorHandle<T>(handle));
+}
+
+/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
+/// to a descriptor object.
+[ForceInline]
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+{
+    __target_switch
+    {
+    case hlsl:
         if (T.kind == DescriptorKind.Sampler)
-            return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);
+            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
         else if (T.kind == DescriptorKind.CombinedTextureSampler)
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
-            return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), ((uint2)handleValue).x);
+            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spirv:
+    case glsl:
+        // This arm also collapses the switch's inferred SPIR-V requirement to `{spirv}`, so the
+        // `spvBindlessTextureNV` cases below do not force that capability onto a plain-SPIR-V compile.
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case wgsl:
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        if (__isBindlessTextureNVEncodable<T>())
+            return __castDescriptorHandleToResource<T>(handleValue);
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case spvDescriptorHeapEXT:
+        // `spvDescriptorHeapEXT` is more specific than `spvBindlessTextureNV`, so re-check NV here to
+        // keep an encodable texture/sampler on its native `uint64` cast rather than a `uint2` heap index
+        // (#13070); everything else falls through to the EXT heap.
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            if (__isBindlessTextureNVEncodable<T>())
+                return __castDescriptorHandleToResource<T>(handleValue);
+            break;
+        default:
+            break;
+        }
+        return getDescriptorFromDescriptorHeapEXT<T>((uint2)handleValue);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
     }
@@ -29121,8 +29772,8 @@ struct CoopMat
             let alignment = 16U;
             return spirv_asm
             {
-                %pointer:$$T* = OpPtrAccessChain $buffer $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+                OpCooperativeMatrixStoreKHR %__pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -29155,8 +29806,8 @@ struct CoopMat
         const int32_t scope = (int32_t)memoryScope;
         return spirv_asm
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+            %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+            OpCooperativeMatrixStoreKHR %__pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -29402,8 +30053,8 @@ $}
             let alignment = 16;
             return spirv_asm
             {
-                %pointer:$$T* = OpPtrAccessChain $buffer $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %__pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -29439,8 +30090,8 @@ $}
         const int32_t scope = (int32_t)memoryScope;
         return spirv_asm
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
+            %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %__pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -32642,6 +33293,18 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
+CoopVec<T, N> exp10<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    // No cooperative-vector backend provides a dedicated exp10 intrinsic, so map the scalar
+    // operation across the lanes.
+    CoopVec<T, N> ret;
+    for(int i = 0; i < N; ++i)
+        ret[i] = exp10(x[i]);
+    return ret;
+}
+
+// [ForceInline]
+[require(cooperative_vector)]
 [require(optix_coopvec)]
 CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
@@ -34356,8 +35019,8 @@ uint32_t4 unpackUint4x8ToUint32(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
-            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
+            %__u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint32_t, 4> = OpUConvert %__u8Vec
         };
     default:
         return uint32_t4
@@ -34382,8 +35045,8 @@ uint16_t4 unpackUint4x8ToUint16(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
-            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
+            %__u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint16_t, 4> = OpUConvert %__u8Vec
         };
     default:
         return uint16_t4
@@ -34409,8 +35072,8 @@ int32_t4 unpackInt4x8ToInt32(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
-            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
+            %__s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int32_t, 4> = OpSConvert %__s8Vec
         };
     default:
         return int32_t4
@@ -34435,8 +35098,8 @@ int16_t4 unpackInt4x8ToInt16(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
-            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
+            %__s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int16_t, 4> = OpSConvert %__s8Vec
         };
     default:
         return int16_t4

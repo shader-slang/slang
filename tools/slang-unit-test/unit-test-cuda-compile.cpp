@@ -1,7 +1,7 @@
 // unit-test-cuda-compile.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
+#include "core/slang-io.h"
+#include "core/slang-process.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"

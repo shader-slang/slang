@@ -153,7 +153,8 @@ IRFunc* emitWitnessTableWrapper(
     IRModule* module,
     IRInst* funcInst,
     IRFuncType* effectiveFuncType,
-    IRFuncType* interfaceRequirementVal)
+    IRFuncType* interfaceRequirementVal,
+    TargetRequest* targetReq)
 {
     auto funcTypeInInterface = interfaceRequirementVal;
     auto targetFuncType = effectiveFuncType;
@@ -167,6 +168,31 @@ IRFunc* emitWitnessTableWrapper(
     if (auto func = as<IRFunc>(funcInst))
         if (auto name = _getWitnessTableWrapperFuncName(module, func))
             builder->addNameHintDecoration(wrapperFunc, name);
+
+    // This wrapper only marshals arguments between the interface's `AnyValue`-based
+    // signature and the concrete implementation's signature -- it is compiler-synthesized
+    // glue, not a call the downstream target compiler has any reason to keep as a distinct
+    // function. Every other synthesized marshalling helper in the compiler (e.g. the
+    // pack/unpack storage helpers in slang-ir-lower-buffer-element-type.cpp) is force-inlined
+    // the same way for the same reason. Without this, whether the wrapper (and, transitively,
+    // the switch-based dispatch function built around it in `createDispatchFunc`) survives to
+    // the final target output is left entirely to the downstream compiler's own heuristic
+    // inliner, which can decline once the wrapped method body is non-trivial (observed on the
+    // CUDA/NVRTC backend specifically).
+    //
+    // Excluded on the CPU/LLVM-JIT target: force-inlining a wrapper that declares a local
+    // (the pack-after-call temp `maybeUnpackArg` creates for by-reference/setter-style
+    // parameters) into a caller that also force-inlines a sibling wrapper from a different
+    // concrete-type case corrupts that target's own debug-info generation -- confirmed via a
+    // real crash (LLVM's DwarfDebug::finalizeModuleInfo, on conflicting IRLocalVariable
+    // metadata for the two inlined instances) in
+    // tests/language-feature/dynamic-dispatch/special-members-setter.slang's property/subscript
+    // setter case. This is a latent bug in that target's own debug-info emission
+    // (source/slang-llvm/slang-llvm-builder.cpp), not something this pass can fix -- skipping
+    // force-inline here is a target-specific carve-out, not a claim that force-inlining itself
+    // is wrong.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder->addForceInlineDecoration(wrapperFunc);
 
     builder->setInsertInto(wrapperFunc);
     auto block = builder->emitBlock();
@@ -247,7 +273,8 @@ UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 //
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
-    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping)
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
+    TargetRequest* targetReq)
 {
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
@@ -264,6 +291,16 @@ IRFunc* createDispatchFunc(
     auto func = builder.createFunc();
     builder.setInsertInto(func);
     func->setFullType(dispatchFuncType);
+
+    // Same reasoning as `emitWitnessTableWrapper`'s force-inline decoration above: this
+    // function only exists because `mapping` is a closed, statically-enumerable set of
+    // concrete-type implementations (that's the only case this pass runs for), so the
+    // `switch` built below is itself the already-resolved dispatch. Leaving it as a separate,
+    // non-force-inlined function defeats that resolution by handing the decision back to a
+    // downstream heuristic inliner. Same CPU/LLVM-JIT exclusion as `emitWitnessTableWrapper`
+    // -- see the comment there.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder.addForceInlineDecoration(func);
 
     auto entryBlock = builder.emitBlock();
     builder.setInsertInto(entryBlock);
@@ -312,7 +349,8 @@ IRFunc* createDispatchFunc(
             funcInst->getModule(),
             funcInst,
             effectiveFuncType,
-            innerDispatchFuncType);
+            innerDispatchFuncType,
+            targetReq);
 
         // Create case block
         auto caseBlock = builder.emitBlock();
@@ -584,6 +622,32 @@ struct TagOpsLoweringContext : public InstPassBase
     }
 };
 
+/// Returns the only payload-bearing type in `typeSet`, ignoring the zero-sized `none` element.
+///
+/// For example, `{Foo, none}` and `{Foo}` return `Foo`, while `{Foo, Bar, none}` and `{none}`
+/// return `nullptr`.
+///
+/// Untagged-union lowering uses this classification to store a single concrete payload directly;
+/// the surrounding tagged union continues to carry the `uint` tag that distinguishes `Foo` from
+/// `none` and participates in the existing subset/superset tag conversions.
+static IRType* tryGetSinglePayloadType(IRTypeSet* typeSet)
+{
+    IRType* payloadType = nullptr;
+    for (UInt i = 0; i < typeSet->getCount(); ++i)
+    {
+        auto element = typeSet->getElement(i);
+        if (as<IRNoneTypeElement>(element))
+            continue;
+
+        auto elementType = as<IRType>(element);
+        SLANG_RELEASE_ASSERT(elementType);
+        if (payloadType)
+            return nullptr;
+        payloadType = elementType;
+    }
+    return payloadType;
+}
+
 // This context lowers `TypeSet` instructions.
 struct UntaggedUnionLoweringContext : public InstPassBase
 {
@@ -704,6 +768,52 @@ struct UntaggedUnionLoweringContext : public InstPassBase
 
     void lowerUntaggedUnionType(IRUntaggedUnionType* untaggedUnionType)
     {
+        // `none` has no payload, so a set with one real type needs no AnyValue container. For
+        // example, `UntaggedUnion({Foo, none})` can store `Foo` directly while the tagged union's
+        // separate witness-table tag continues to record whether the value is `Foo` or `none`.
+        if (auto payloadType =
+                tryGetSinglePayloadType(cast<IRTypeSet>(untaggedUnionType->getSet())))
+        {
+            List<IRPackAnyValue*> packsToInspect;
+            for (auto use = untaggedUnionType->firstUse; use; use = use->nextUse)
+            {
+                if (auto pack = as<IRPackAnyValue>(use->getUser()))
+                {
+                    if (pack->getDataType() == untaggedUnionType)
+                        packsToInspect.add(pack);
+                }
+            }
+
+            untaggedUnionType->replaceUsesWith(payloadType);
+
+            // A pack into `{Foo, none}` either carries a `Foo` or supplies the irrelevant payload
+            // for the `none` tag. The first case is now `PackAnyValue<Foo>(foo)`; leave that
+            // identity for ordinary AnyValue marshalling to remove. In the second case, replace
+            // the old zero-sized placeholder with a well-formed default `Foo`, matching the
+            // representation expected by the now-direct payload field.
+            for (auto pack : packsToInspect)
+            {
+                auto value = pack->getValue();
+                auto valueStorageType = value->getDataType();
+                if (auto valueUnionType = as<IRUntaggedUnionType>(valueStorageType))
+                {
+                    if (auto valuePayloadType =
+                            tryGetSinglePayloadType(cast<IRTypeSet>(valueUnionType->getSet())))
+                        valueStorageType = valuePayloadType;
+                }
+                if (valueStorageType == payloadType)
+                    continue;
+
+                IRBuilder builder(pack);
+                builder.setInsertBefore(pack);
+                auto replacement = builder.emitDefaultConstruct(payloadType);
+                pack->replaceUsesWith(replacement);
+                pack->removeAndDeallocate();
+            }
+
+            return;
+        }
+
         // Type collections are replaced with `AnyValueType` large enough to hold
         // any of the types in the collection.
         //

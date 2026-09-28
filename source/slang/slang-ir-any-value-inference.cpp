@@ -1,6 +1,6 @@
 #include "slang-ir-any-value-inference.h"
 
-#include "../core/slang-func-ptr.h"
+#include "core/slang-func-ptr.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"

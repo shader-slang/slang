@@ -11,7 +11,6 @@
 #include "slang-type-layout.h"
 #include "slang.h"
 
-#include <assert.h>
 
 // Don't signal errors for stuff we don't implement here,
 // and instead just try to return things defensively
@@ -1638,6 +1637,25 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getContainerVarL
     if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         return convert(parameterGroupTypeLayout->containerVarLayout.Ptr());
+    }
+
+    return nullptr;
+}
+
+SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetContentVarLayout(
+    SlangReflectionTypeLayout* inTypeLayout)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout)
+        return nullptr;
+
+    if (auto parameterGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
+    {
+        return convert(parameterGroupTypeLayout->elementVarLayout.Ptr());
+    }
+    else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+    {
+        return convert(structuredBufferTypeLayout->contentVarLayout.Ptr());
     }
 
     return nullptr;

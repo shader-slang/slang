@@ -1,5 +1,5 @@
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -specialize F -validate-ir
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -specialize F -validate-ir -O0
 
 // Test: lambda capture of outer-scope variables when the lambda body contains
 // a generic method call. The two-phase parsing's generic disambiguation
@@ -44,6 +44,7 @@ void computeMain<TBias: IPackedVal>(
     invoke(lambda, 0, 1.0f);
 }
 
+[noinline]
 void invoke(IFunc<float, uint, float> f, uint x, float value)
 {
     f(x, value);

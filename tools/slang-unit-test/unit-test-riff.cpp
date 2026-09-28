@@ -1,7 +1,7 @@
 // unit-test-riff.cpp
 
-#include "../../source/core/slang-random-generator.h"
-#include "../../source/core/slang-riff.h"
+#include "core/slang-random-generator.h"
+#include "core/slang-riff.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

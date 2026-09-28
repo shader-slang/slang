@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-unconditional-branches
-//META: doc_section_digest=563b78aadce87b91aef5ce139690f111186f2e0b9b1747c80e149bf3ead75206
+//META: doc_section_digest=4962589b5989729b48bd363a6bb21d740a9f4c8c1244aa21f8fb89e4dfab0256
 //META: purpose=Boundary: a `break;` inside a nested inner loop targets the inner loop's breakLabel only — the outer loop's break/continue labels are unchanged and both `loop` terminators retain their independent structured-join operands.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -15,7 +15,7 @@
 // the inner break's unconditionalBranch targets the inner loop's
 // break label.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int n;
 uniform int m;

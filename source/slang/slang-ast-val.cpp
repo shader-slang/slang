@@ -12,7 +12,6 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
-#include <assert.h>
 #include <typeinfo>
 
 namespace Slang
@@ -2141,6 +2140,10 @@ Val* TypeCastIntVal::tryFoldImpl(
         case BaseType::UInt8:
             resultValue = (uint8_t)resultValue;
             return true;
+        case BaseType::Bool:
+            // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
+            resultValue = (resultValue != 0);
+            return true;
         default:
             return false;
         }
@@ -3223,19 +3226,11 @@ Val* WitnessLookupIntVal::_substituteImplOverride(
 
 Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key)
 {
-    // Check if we can find an entry for this key.
-    auto unspecializedEntry = getUnspecializedLookupRec(astBuilder, key, witness);
-
-    // If we found a relevant entry, try to specialize it.
-    switch (unspecializedEntry.getFlavor())
+    auto lookedUpEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
+    switch (lookedUpEntry.getFlavor())
     {
     case RequirementWitness::Flavor::val:
-        {
-            auto specializedEntry = specializeLookedUpRec(astBuilder, witness, unspecializedEntry);
-            SLANG_ASSERT(specializedEntry.getFlavor() == RequirementWitness::Flavor::val);
-            return specializedEntry.getVal();
-        }
-        break;
+        return lookedUpEntry.getVal();
     default:
         break;
     }

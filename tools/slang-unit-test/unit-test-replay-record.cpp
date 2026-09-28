@@ -7,12 +7,12 @@
 //
 // Future: Load and playback the recordings to verify determinism
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-stable-hash.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/slang-record-replay/replay-context.h"
-#include "../../source/slang-record-replay/replay-stream-decoder.h"
+#include "core/slang-io.h"
+#include "core/slang-process-util.h"
+#include "core/slang-stable-hash.h"
+#include "core/slang-string-util.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-stream-decoder.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

@@ -3,10 +3,10 @@
 #ifndef PARSE_DIAGNOSTIC_UTIL_H
 #define PARSE_DIAGNOSTIC_UTIL_H
 
-#include "../../source/compiler-core/slang-artifact-diagnostic-util.h"
-#include "../../source/compiler-core/slang-downstream-compiler.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-string.h"
+#include "compiler-core/slang-artifact-diagnostic-util.h"
+#include "compiler-core/slang-downstream-compiler.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
 #include "slang-com-ptr.h"
 
 struct ParseDiagnosticUtil

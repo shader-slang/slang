@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#linking-and-validation
-//META: doc_section_digest=58fa3369415eb3c0f619a693173bd6b5687b7ba23f5dcacb867f675d1811ebbf
+//META: doc_section_digest=667952fd5b9698b654c70c639e18194281145ed55e05baa506681d6bf7a7125d
 //META: purpose=The check-optional-none-usage validation pass rejects an Optional.value read when the value is always `none`.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

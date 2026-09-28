@@ -1,14 +1,13 @@
 // slang-reflection-test-main.cpp
 
-#include "../../source/compiler-core/slang-pretty-writer.h"
-#include "../../source/core/slang-char-util.h"
-#include "../../source/core/slang-string-escape-util.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "compiler-core/slang-pretty-writer.h"
+#include "core/slang-char-util.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

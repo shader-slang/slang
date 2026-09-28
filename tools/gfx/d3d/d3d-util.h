@@ -1,9 +1,9 @@
 // d3d-util.h
 #pragma once
 
-#include "../flag-combiner.h"
 #include "core/slang-basic.h"
 #include "core/slang-platform.h"
+#include "gfx/flag-combiner.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang-gfx.h"

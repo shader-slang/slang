@@ -18,6 +18,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
 
 [[vk::specialization_constant]]
 const int WORK_SIZE = 4;
@@ -42,3 +43,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // WGSL: @id(
 // WGSL-DAG: override WORK_SIZE_
 // WGSL-DAG: override SCALE_FACTOR_
+// GLSL emits both specialization constants as `layout(constant_id = N) const` declarations.
+// GLSL: layout(constant_id = {{[0-9]+}})
+// GLSL-NEXT: const int WORK_SIZE_
+// GLSL: layout(constant_id = {{[0-9]+}})
+// GLSL-NEXT: const float SCALE_FACTOR_

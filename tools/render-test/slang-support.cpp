@@ -4,13 +4,12 @@
 
 #include "slang-support.h"
 
-#include "../../source/compiler-core/slang-artifact-desc-util.h"
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-file-system.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "options.h"
 
-#include <assert.h>
 #include <stdio.h>
 
 namespace renderer_test
@@ -157,6 +156,20 @@ static SlangResult _compileProgramImpl(
         {
             sessionOptionEntries.add(option);
         }
+    }
+
+    if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        // `-source-language` describes how render-test's primary source file must be parsed, not
+        // merely which language-specific preprocessor macro to define. The deprecated compile
+        // request API accepted this value when it created the translation unit. Preserve that
+        // contract with the module API by carrying the explicit selection into the session that
+        // loads the primary module.
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::Language;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(input.sourceLanguage);
+        sessionOptionEntries.add(entry);
     }
 
     List<slang::PreprocessorMacroDesc> macros;

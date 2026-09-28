@@ -51,7 +51,7 @@ Options:
                      by dashes. In review mode, defaults to
                      ../review-pr-<number>.
   --tmux             Start a tmux session named after the branch or review in
-                     the new worktree after setup completes.
+                     the new worktree and use the branch as the terminal title.
   --no-submodules    Skip submodule initialization.
   -h, --help         Show this help.
 
@@ -167,12 +167,16 @@ is_git_repository() {
 start_tmux_session() {
   local sessionName="$1"
   local sessionDir="$2"
+  local branchName="$3"
+  local titleFormat="${branchName//\#/##}"
 
+  "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
+  "$TMUX_EXE" set-option -t "$sessionName" set-titles on
+  "$TMUX_EXE" set-option -t "$sessionName" set-titles-string "$titleFormat"
   if [[ -n "${TMUX:-}" ]]; then
-    "$TMUX_EXE" new-session -d -s "$sessionName" -c "$sessionDir"
     "$TMUX_EXE" switch-client -t "=$sessionName"
   else
-    "$TMUX_EXE" new-session -s "$sessionName" -c "$sessionDir"
+    "$TMUX_EXE" attach-session -t "=$sessionName"
   fi
 }
 
@@ -502,5 +506,5 @@ fi
 
 if [[ $startTmux -eq 1 ]]; then
   log "Starting tmux session: $sessionName"
-  start_tmux_session "$sessionName" "$dstDirShell"
+  start_tmux_session "$sessionName" "$dstDirShell" "$branchName"
 fi

@@ -16,6 +16,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 static groupshared int sharedCounter[16];
 
@@ -32,3 +34,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 // METAL: threadgroup {{.*}} sharedCounter{{.*}}
 // WGSL maps groupshared to var<workgroup>.
 // WGSL: var<workgroup> sharedCounter{{.*}}
+// HLSL emits the same Group-shared array with the `groupshared` qualifier.
+// HLSL: static groupshared int{{.*}} sharedCounter_
+// SPIRV emits it with the Workgroup storage class.
+// SPIRV: %sharedCounter = OpVariable {{.*}} Workgroup

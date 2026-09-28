@@ -1,7 +1,7 @@
 // unit-test-replay-modes.cpp
 // Unit tests for ReplayContext mode and state management
 
-#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.h"
+#include "slang-record-replay/proxy/proxy-mutable-file-system.h"
 #include "unit-test-replay-common.h"
 
 // =============================================================================

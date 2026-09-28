@@ -1,10 +1,10 @@
 #ifndef TEST_SERVER_DIAGNOSTICS_H
 #define TEST_SERVER_DIAGNOSTICS_H
 
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
-#include "../../source/compiler-core/slang-source-loc.h"
-#include "../../source/core/slang-basic.h"
-#include "../../source/core/slang-writer.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-basic.h"
+#include "core/slang-writer.h"
 
 namespace TestServer
 {

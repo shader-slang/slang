@@ -118,8 +118,9 @@ static const NamesDescriptionValue s_languageInfos[] = {
 
 static const NamesDescriptionValue s_languageVersionInfos[] = {
     {SLANG_LANGUAGE_VERSION_LEGACY, "legacy,default,2018", "Legacy Slang language"},
-    {SLANG_LANGUAGE_VERSION_2025, "2025", "Slang language rules for 2025 and older"},
-    {SLANG_LANGUAGE_VERSION_2026, "2026,latest", "Slang language rules for 2026 and newer"},
+    {SLANG_LANGUAGE_VERSION_2025, "2025,202a", "Slang language rules for 2025 and older"},
+    {SLANG_LANGUAGE_VERSION_2026, "2026,202b,latest", "Slang language rules for 2026"},
+    {SLANG_LANGUAGE_VERSION_202C, "202c,next", "Slang language rules for 202c"},
 };
 
 static const NamesDescriptionValue s_compilerInfos[] = {
@@ -209,7 +210,10 @@ static const NamesDescriptionValue s_optimizationLevels[] = {
 };
 
 static const NamesDescriptionValue s_debugLevels[] = {
-    {SLANG_DEBUG_INFO_LEVEL_NONE, "0,none", "Don't emit debug information at all."},
+    {SLANG_DEBUG_INFO_LEVEL_NONE,
+     "0,none",
+     "Don't emit debug information. This is the default. For SPIR-V, OpSource, OpName and "
+     "OpMemberName are still emitted."},
     {SLANG_DEBUG_INFO_LEVEL_MINIMAL,
      "1,minimal",
      "Emit as little debug information as possible, while still supporting stack traces."},

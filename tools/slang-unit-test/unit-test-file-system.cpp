@@ -1,14 +1,14 @@
 // unit-test-file-system.cpp
 
-#include "../../source/core/slang-blob.h"
-#include "../../source/core/slang-castable.h"
-#include "../../source/core/slang-deflate-compression-system.h"
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-lz4-compression-system.h"
-#include "../../source/core/slang-memory-file-system.h"
-#include "../../source/core/slang-riff-file-system.h"
-#include "../../source/core/slang-zip-file-system.h"
+#include "core/slang-blob.h"
+#include "core/slang-castable.h"
+#include "core/slang-deflate-compression-system.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-lz4-compression-system.h"
+#include "core/slang-memory-file-system.h"
+#include "core/slang-riff-file-system.h"
+#include "core/slang-zip-file-system.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <limits>

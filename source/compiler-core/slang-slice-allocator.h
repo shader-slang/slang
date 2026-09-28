@@ -3,7 +3,7 @@
 #define SLANG_SLICE_ALLOCATOR_H
 
 // Has definition of CharSlice
-#include "../core/slang-memory-arena.h"
+#include "core/slang-memory-arena.h"
 #include "slang-artifact.h"
 #include "slang-com-ptr.h"
 
@@ -30,6 +30,10 @@ struct SliceUtil
     static TerminatedCharSlice asTerminatedCharSlice(const String& in)
     {
         auto unowned = in.getUnownedSlice();
+        // An empty String has a null buffer, so TerminatedCharSlice(nullptr, 0) would dereference
+        // in[0] to check its NUL terminator. Return the empty terminated slice (backed by "").
+        if (unowned.getLength() == 0)
+            return TerminatedCharSlice();
         return TerminatedCharSlice(unowned.begin(), unowned.getLength());
     }
 

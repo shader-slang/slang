@@ -1,8 +1,8 @@
 
-#include "../../source/compiler-core/slang-json-lexer.h"
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/core/slang-string-escape-util.h"
+#include "compiler-core/slang-json-lexer.h"
+#include "compiler-core/slang-json-parser.h"
+#include "compiler-core/slang-json-value.h"
+#include "core/slang-string-escape-util.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

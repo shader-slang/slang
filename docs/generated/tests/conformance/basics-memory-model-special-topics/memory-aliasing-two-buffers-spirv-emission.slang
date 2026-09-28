@@ -16,6 +16,10 @@
 // layer, which is the precondition for the data-race scenario the doc describes.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=MTL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> bufA;
 RWStructuredBuffer<int> bufB;
@@ -33,3 +37,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: OpDecorate %bufA{{.*}} Binding
 // CHECK-DAG: OpDecorate %bufB{{.*}} Binding
 // CHECK-DAG: OpVariable {{.*}} StorageBuffer
+
+// GLSL: layout(std430, binding = {{[0-9]+}}) buffer StructuredBuffer_int_t_{{[0-9]+}}
+// GLSL: layout(std430, binding = {{[0-9]+}}) buffer StructuredBuffer_int_t_{{[0-9]+}}
+
+// HLSL: RWStructuredBuffer<int > bufA_{{[0-9]+}} : register(u{{[0-9]+}})
+// HLSL: RWStructuredBuffer<int > bufB_{{[0-9]+}} : register(u{{[0-9]+}})
+
+// MTL: int device{{.*}} bufA_{{[0-9]+}};
+// MTL: int device{{.*}} bufB_{{[0-9]+}};
+
+// WGSL: var<storage, read_write> bufA_{{[0-9]+}} : array<i32>
+// WGSL: var<storage, read_write> bufB_{{[0-9]+}} : array<i32>

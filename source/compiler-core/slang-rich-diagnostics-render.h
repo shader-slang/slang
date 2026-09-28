@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../core/slang-list.h"
-#include "../core/slang-string.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-list.h"
+#include "core/slang-string.h"
 
 namespace Slang
 {

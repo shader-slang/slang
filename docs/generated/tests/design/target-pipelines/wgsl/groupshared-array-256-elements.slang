@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00Z
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#specializeaddressspaceforwgsl
-//META: doc_section_digest=4dfc10b6dcfc7de02c4480f005a0e2eb0f14d6a66ef8d5fb6ce781d9a448550f
+//META: doc_section_digest=7430da3e9233ea2bf55c1bea479c7ce668cf06b5f720da136de2a6800f764369
 //META: purpose=A 256-element groupshared array emits as var<workgroup> ... : array<u32, i32(256)>
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

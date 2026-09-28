@@ -1,0 +1,96 @@
+schema_version: 1
+id: spirv-optional-pointer-return-hangs
+bundle: coverage/emit
+suspected_kind: sigsegv
+title: "slangc never terminates on -target spirv for a function returning Optional<T*>"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: spirv
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/emitcov/opt4.slang -target spirv-asm -entry computeMain -stage compute"
+  repro_source: |
+    RWStructuredBuffer<int> outputBuffer;
+    struct Node { int value; }
+    Optional<Node*> pick(Node* p, bool cond)
+    {
+        if (cond)
+            return p;
+        return none;
+    }
+    [numthreads(1,1,1)]
+    void computeMain(uint3 tid : SV_DispatchThreadID)
+    {
+        Node n;
+        n.value = int(tid.x);
+        Optional<Node*> maybe = pick(&n, tid.x > 0);
+        outputBuffer[0] = maybe.hasValue ? 1 : -1;
+    }
+  source_slang: tests/language-feature/nested-optional.slang
+  observed_summary: |
+    A helper that returns `Optional<Node*>` and can return `none` makes `slangc` spin
+    forever on the SPIR-V target. The process produces no output and no diagnostic; it
+    was killed after 20 minutes on the first observation and reproduces deterministically
+    at a 40-second timeout (exit code 124 from `timeout`).
+
+    Repro (whole file):
+
+      RWStructuredBuffer<int> outputBuffer;
+      struct Node { int value; }
+      Optional<Node*> pick(Node* p, bool cond)
+      {
+          if (cond)
+              return p;
+          return none;
+      }
+      [numthreads(1,1,1)]
+      void computeMain(uint3 tid : SV_DispatchThreadID)
+      {
+          Node n;
+          n.value = int(tid.x);
+          Optional<Node*> maybe = pick(&n, tid.x > 0);
+          outputBuffer[0] = maybe.hasValue ? 1 : -1;
+      }
+
+    Per-target results for that file:
+      -target spirv-asm : hangs (no termination)
+      -target cuda      : exit 0, compiles
+      -target cpp       : exit 0, compiles
+      -target hlsl      : exit 255, E36107 "unavailable features in entry point" (pointers)
+      -target glsl      : exit 255
+      -target metal     : exit 255
+
+    The hang needs the function boundary. Constructing the optional inline in the entry
+    point instead --
+
+      Optional<Node*> maybe = &n;
+      outputBuffer[0] = maybe.hasValue ? maybe.value.value : -1;
+
+    -- compiles to SPIR-V in well under a second (exit 0), and so does the same helper
+    when its result is only tested for `hasValue` at the call site without the local
+    (that variant hangs too, so it is the `none`-returning helper, not the local, that
+    matters). A plain `Ptr<int>` parameter tested with `if (p)` also compiles fine, so
+    ordinary pointer handling on SPIR-V is not implicated.
+
+    Found while probing `SPIRVEmitContext::emitCastPtrToBool` (slang-emit-spirv.cpp:9554)
+    for the coverage/emit bundle: that function is the SPIR-V lowering of the
+    `CastPtrToBool` inst which `slang-ir-lower-optional-type.cpp:226` produces for exactly
+    this construct, and it is still uncovered by the whole shipped suite. No test was
+    committed, because the compile does not terminate.
+  exit_code: 124
+  stderr_tail: "(no output; process killed by timeout after 20m on first observation, reproduced with timeout 40)"
+expected:
+  claim: |
+    Compilation must terminate. `Optional<T*>` returned across a function boundary should
+    either lower to SPIR-V the way the inline form already does, or be rejected with a
+    diagnostic naming the unsupported construct, as the HLSL, GLSL and Metal targets do.
+  citation_kind: sibling-test
+  citation: tests/language-feature/nested-optional.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/06-emit.md
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Merely slow rather than non-terminating: not distinguished, but 20 minutes for a 15-line shader that CUDA and CPU compile instantly is indistinguishable from a hang for any practical purpose."
+    - "Invalid shader: ruled out — the same file compiles cleanly on -target cuda and -target cpp, and the targets that cannot express pointers reject it with a proper diagnostic instead of hanging."
+    - "Pointers on SPIR-V are broken in general: ruled out — a `Ptr<int>` parameter and an inline `Optional<Node*>` both compile to SPIR-V without incident."

@@ -1,8 +1,8 @@
 // slang-target.cpp
 #include "slang-target.h"
 
-#include "../core/slang-type-text-util.h"
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-type-layout.h"
 
@@ -115,7 +115,8 @@ CapabilitySet TargetRequest::getTargetCaps()
                 {
                     for (auto atom : profileCapAtomSet)
                     {
-                        if (isTargetVersionAtom(asAtom(atom)))
+                        // SPIR-V code-gen path: pull only SPIR-V version atoms from the profile.
+                        if (isSpirvVersionAtom(asAtom(atom)))
                         {
                             atoms.add((CapabilityName)atom);
                             hasTargetVersionAtom = true;

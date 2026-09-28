@@ -1,6 +1,6 @@
-#include "../core/slang-array-view.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-blob.h"
+#include "core/slang-array-view.h"
+#include "core/slang-basic.h"
+#include "core/slang-blob.h"
 
 #ifdef SLANG_EMBED_CORE_MODULE
 

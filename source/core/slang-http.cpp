@@ -208,6 +208,7 @@ HTTPPacketConnection::HTTPPacketConnection(BufferedReadStream* readStream, Strea
     : m_readStream(readStream)
     , m_writeStream(writeStream)
     , m_readState(ReadState::Header)
+    , m_readError(ReadError::None)
     , m_readResult(SLANG_OK)
 {
 }
@@ -225,7 +226,8 @@ SlangResult HTTPPacketConnection::_handleHeader()
 
     // Okay we can parse the header
     UnownedStringSlice slice((const char*)m_readStream->getBuffer(), size_t(index));
-    SLANG_RETURN_ON_FAIL(_updateReadResult(HTTPHeader::parse(slice, m_readHeader)));
+    SLANG_RETURN_ON_FAIL(
+        _setReadError(HTTPHeader::parse(slice, m_readHeader), ReadError::InvalidHeader));
 
     // Consume the header
     m_readStream->consume(index);
@@ -258,23 +260,7 @@ SlangResult HTTPPacketConnection::update()
         break;
     }
 
-    SLANG_RETURN_ON_FAIL(_updateReadResult(m_readStream->update()));
-
-    // Note will only indicate end if the buffer *and* backing stream are end/empty
-    if (m_readStream->isEnd())
-    {
-        if (m_readState == ReadState::Header)
-        {
-            m_readState = ReadState::Closed;
-        }
-        else
-        {
-            // Closed without completing
-            m_readState = ReadState::Error;
-            m_readResult = SLANG_FAIL;
-        }
-        return SLANG_OK;
-    }
+    SLANG_RETURN_ON_FAIL(_setReadError(m_readStream->update(), ReadError::Stream));
 
     switch (m_readState)
     {
@@ -295,6 +281,24 @@ SlangResult HTTPPacketConnection::update()
         }
     default:
         break;
+    }
+
+    // Process the buffered bytes before checking EOF: the peer may have closed immediately after
+    // writing one complete final packet. Use the backing-stream state rather than
+    // BufferedReadStream::isEnd(), which stays false while partial packet bytes remain buffered.
+    if (m_readState != ReadState::Done && m_readStream->isSourceEnd())
+    {
+        if (m_readState == ReadState::Header && m_readStream->getCount() == 0)
+        {
+            m_readState = ReadState::Closed;
+        }
+        else
+        {
+            // The buffered bytes cannot complete once the source has ended.
+            m_readState = ReadState::Error;
+            m_readResult = SLANG_FAIL;
+            m_readError = ReadError::UnexpectedEnd;
+        }
     }
 
     return m_readResult;
@@ -404,6 +408,7 @@ void HTTPPacketConnection::consumeContent()
         m_readStream->consume(Index(m_readHeader.m_contentLength));
         // Back looking for the header again
         m_readState = ReadState::Header;
+        m_readError = ReadError::None;
     }
 }
 

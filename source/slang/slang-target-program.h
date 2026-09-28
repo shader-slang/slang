@@ -7,7 +7,7 @@
 // linked program/binary and/or its entry points.
 //
 
-#include "../core/slang-smart-pointer.h"
+#include "core/slang-smart-pointer.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-ir.h"
 #include "slang-linkable.h"

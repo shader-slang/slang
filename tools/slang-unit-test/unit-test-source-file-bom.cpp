@@ -1,6 +1,6 @@
 
-#include "../../source/compiler-core/slang-source-loc.h"
-#include "../../source/core/slang-blob.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-blob.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

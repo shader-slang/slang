@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#nodes
-//META: doc_section_digest=5cae24401ed06bd3567242934951f344da434f10804637bdd679d55ab6b5bb2b
+//META: doc_section_digest=0b0dfab9f13850a71e13b9ce6f8fb9a433ddb72267a526bf6454583638151a5b
 //META: purpose=A LogicOperatorShortCircuitExpr `&&` does not evaluate the right operand when the left is false.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names LogicOperatorShortCircuitExpr with flavor `And`/`Or`
-// and says short-circuit semantics are preserved. We observe this by
-// using a side-effecting right operand that increments a counter:
-// when the left is false, the counter must not advance.
+// Verifies that `&&` leaves its right operand unevaluated once the left
+// operand decides the result. The right operand increments a counter through
+// an `inout` parameter; the CHECKs compare the counter after a false-left and
+// a true-left evaluation, so the counter advancing exactly once proves the
+// skip.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
