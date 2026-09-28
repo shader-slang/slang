@@ -615,7 +615,7 @@ def _reap_posix(proc, wait4=None):
         # ChildProcessError and substitutes returncode = 0, so a compile that
         # FAILED would be recorded as a clean run with no memory number.
         # Raising is what keeps a fabricated success out of results.json;
-        # main() then books this workload as failed and moves on.
+        # WorkloadRun.measure retains the failure for result() to report.
         raise RuntimeError(
             "os.wait4 could not reap the compile child (ECHILD): the "
             "environment reaped it first, which happens when SIGCHLD is set "
@@ -637,8 +637,8 @@ def run_once(cmd):
 
     Raises RuntimeError on POSIX if the child cannot be reaped (see
     _reap_posix): the exit code is unrecoverable there, so it propagates
-    instead of returning a tuple whose rc would be a guess. main()'s
-    per-workload try/except turns that into one failed workload."""
+    instead of returning a tuple whose rc would be a guess. WorkloadRun.measure
+    catches it and records this workload as failed."""
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -655,7 +655,7 @@ def run_once(cmd):
     else:
         # No try/except: _reap_posix already translates ECHILD into a
         # RuntimeError explaining why no trustworthy rc exists, and letting it
-        # reach main()'s per-workload handler is the point.
+        # reach WorkloadRun.measure's per-workload handler is the point.
         rss = _reap_posix(proc)
     wall = (time.perf_counter() - t0) * 1000.0
     text = out.decode("utf-8", "replace")
@@ -763,8 +763,8 @@ assert classify_sample(0xC0000005, "error[E30019]: type mismatch in expression",
 class WorkloadRun:
     """Keep setup and accumulated samples for one workload/size until all passes finish.
 
-    Preparation happens once. Each later visit runs one fresh compiler process;
-    warmup visits are excluded, while timed visits use the existing per-sample
+    Preparation happens once. Each invocation runs one fresh compiler process;
+    warmup invocations are excluded, while timed invocations supply samples for
     validation. A Python exception stops only this workload, and remains a failed
     result even if earlier samples succeeded.
     """
@@ -846,13 +846,13 @@ class WorkloadRun:
         self.expected_diags = expected_diags
         self.benign = benign
 
-    def measure(self, warmup=False):
+    def measure(self, is_warmup=False):
         """Run one compiler process, excluding warmups from every statistic."""
         if self.failure is not None:
             return
         try:
             rc, wall, text, rss = run_once(self.timed)
-            if not warmup:
+            if not is_warmup:
                 self.add_sample(rc, wall, text, rss)
         except Exception as exc:  # Keep other workloads running after an execution failure.
             self.failure = str(exc) or type(exc).__name__
@@ -993,7 +993,7 @@ def run_workloads(slangc, cases, samples, warmup, src_root, out_root, api=None,
                 print(f"[warmup {warmup_index + 1}/{warmup}] {len(group)} workload/size case(s)",
                       flush=True)
             for run in group:
-                run.measure(warmup=True)
+                run.measure(is_warmup=True)
         for sample_index in range(samples):
             if verbose:
                 print(f"[sample {sample_index + 1}/{samples}] {len(group)} workload/size case(s)",
