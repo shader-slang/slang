@@ -256,6 +256,7 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
+      verify-system-lua: true
 
   # Exercise the default macOS DXC source-build path on macOS 27, which catches
   # host-specific failures such as #13077 where DXC's clang-tblgen is not
