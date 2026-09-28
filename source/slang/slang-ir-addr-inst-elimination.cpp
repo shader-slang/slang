@@ -182,12 +182,12 @@ struct AddressInstEliminationContext
                     break;
                 default:
                     // An atomic operation reads and modifies its memory in place, so its address
-                    // operand has no value form to rewrite into, and we leave the use as is.
-                    // The address stays in memory form: `isPromotableVar` in `slang-ir-ssa.cpp`
-                    // refuses to promote a var that has any use it does not recognize, so even a
-                    // local var used by an atomic is never promoted out from under it. (The use
-                    // is always the atomic's pointer operand, because `IAtomicable` admits only
-                    // scalar value types.)
+                    // operand has no value form to rewrite into, and we leave the use as is. In
+                    // any program that compiles, that memory is a device buffer or `groupshared`:
+                    // the atomic-destination validation that runs after autodiff
+                    // (`validateAtomicOperations`, E41403) rejects every other address, and SSA
+                    // promotion applies to neither. (The use is always the atomic's pointer
+                    // operand, because `IAtomicable` admits only scalar value types.)
                     if (as<IRAtomicOperation>(use->getUser()))
                         break;
                     sink->diagnose(Diagnostics::UnsupportedUseOfLValueForAutoDiff{
