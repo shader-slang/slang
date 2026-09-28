@@ -201,22 +201,26 @@ struct RayTracingPayloadLegalizationContext
     // Replace one native-call argument and update the corresponding parameter and function
     // type. This changes only the specialized intrinsic declaration, never a user helper.
     //
-    // Consider the native CallShader declaration selected for an Empty payload. CallShaderMain
-    // below names Slang's specialized IRFunc for that intrinsic, NOT a callable shader entry
-    // point or a function declaration emitted into HLSL. It has a target-intrinsic mapping to
-    // the native name CallShader. Supplying the variable from createDummyPayloadArgument changes
-    // the typed IR schematically from
+    // Consider the specialized declaration and call site for CallShader with an Empty payload.
+    // In this schematic IR, source-like declaration syntax describes Slang's IRFunc for the
+    // intrinsic, not a receiving shader entry point or a declaration emitted into HLSL:
     //
-    //     CallShaderMain : (uint, inout Empty) -> void;  // maps to native CallShader
+    //     // Specialized declaration:
+    //     void CallShader(uint shaderIndex, inout Empty payload);
+    //
+    //     // Call site:
     //     logical = var Empty;
-    //     call CallShaderMain(0, logical);
+    //     call CallShader(0, logical);
     //
-    // to
+    // Supplying the variable from createDummyPayloadArgument changes both to:
     //
-    //     CallShaderMain : (uint, inout DummyCallablePayload) -> void;
+    //     // Specialized declaration:
+    //     void CallShader(uint shaderIndex, inout DummyCallablePayload payload);
+    //
+    //     // Call site:
     //     logical = var Empty;
     //     dummy = var DummyCallablePayload;
-    //     call CallShaderMain(0, dummy);
+    //     call CallShader(0, dummy);
     //
     // Here logical is addressable storage for an Empty value: the IR var produces the pointer
     // passed to the inout parameter. This helper leaves it alone because other ordinary uses
@@ -324,19 +328,17 @@ struct RayTracingPayloadLegalizationContext
     // arguments; before(), after(), and all other work in those helpers remain intact.
     // For just the CallShader part of the example, the intermediate IR is schematically:
     //
-    //     // Native intrinsic declaration: maps to HLSL CallShader, not a shader entry point.
-    //     CallShaderMain : (uint, inout DummyCallablePayload) -> void;
     //     void helper(inout Empty p)
     //     {
     //         before();
     //         dummy = var DummyCallablePayload;
-    //         call CallShaderMain(0, dummy);
+    //         call CallShader(0, dummy);
     //         after();
     //     }
     //
     // Later legalization removes helper's empty parameter, and HLSL emission writes
-    // CallShader(0U, dummy) inside helper. It emits no CallShaderMain declaration. TraceRay gets
-    // its own DummyRayPayload local at its native call in the same way.
+    // CallShader(0U, dummy) inside helper. TraceRay gets its own DummyRayPayload local at its
+    // native call in the same way.
     //
     // CallShader's HLSL arm is a native intrinsic identified by KnownBuiltinDeclName::CallShader;
     // it has no struct-only marker. Its empty second argument gets a DummyCallablePayload local.
