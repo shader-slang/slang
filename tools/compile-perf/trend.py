@@ -329,9 +329,9 @@ def main():
         wl, _, counter = key.partition("|")
         if not judged(wl, counter):
             continue
-        # Two more provenance axes, alongside the runner fingerprint and the
-        # point kind that the window was already filtered on. Both are checked
-        # HERE rather than on the window because both vary PER WORKLOAD within a
+        # Per-workload provenance axes, alongside the runner fingerprint and the
+        # point kind that the window was already filtered on. These are checked
+        # HERE rather than on the window because they vary PER WORKLOAD within a
         # single point, so dropping whole points would discard good baselines to
         # repair bad ones:
         #
@@ -347,15 +347,21 @@ def main():
         #     when no default-size row exists, so a point swept before a resize
         #     publishes the SAME metric key measured at the old size.
         #
-        # Both were live on the 2026-09-20 nightly, which flagged 25 regressions
+        # Those two were live on the 2026-09-20 nightly, which flagged 25 regressions
         # against a commit identical to the night before: 7 from the schema
         # change, 12 from #13035's resizes. Neither is a code change.
+        #
+        # Sampling strategy also matters: ABC ABC ABC spaces a workload's
+        # samples differently from AAA BBB CCC, changing cache/host exposure.
+        # A switch to interleaving must fill a compatible baseline instead of
+        # attributing that measurement-method change to the compiler.
         #
         # An absent marker (data predating the field) counts as NOT matching
         # rather than as a wildcard — the same refusal the runner check makes.
         # Admitting unknown provenance risks a false alert; excluding it costs a
         # few nights of reduced coverage while the window refills.
-        prov_keys = (f"{wl}|{analyze.SCHEMA_MARKER}", f"{wl}|{analyze.SIZE_MARKER}")
+        prov_keys = (f"{wl}|{analyze.SCHEMA_MARKER}", f"{wl}|{analyze.SIZE_MARKER}",
+                     f"{wl}|{analyze.SAMPLING_MARKER}")
         present = [p for p in window if key in p.get("metrics", {})]
         baseline = comparable_metric_values(current, present, key, prov_keys)
         if len(baseline) < args.min_baseline:
@@ -392,12 +398,12 @@ def main():
         shown = sorted(provenance_skipped)
         listed = ", ".join(shown[:6]) + (f", +{len(shown) - 6} more" if len(shown) > 6 else "")
         msg = (f"{len(shown)} workload(s) not judged: their trailing points were "
-               f"measured under a different timer schema or at a different size "
-               f"({listed}). A re-attributed or resized counter is not a "
+               f"measured with different or unknown timer schema, size, or sampling "
+               f"strategy ({listed}). A measurement-method change is not a "
                f"regression; judgement resumes once the window refills with "
                f"comparable points.")
         print(f"WARNING: {msg}")
-        emit_gha_command(f"::warning title=Perf timer schema::{msg}")
+        emit_gha_command(f"::warning title=Perf measurement provenance::{msg}")
 
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
@@ -495,13 +501,14 @@ assert point_runner({"kind": "release"}, "r1") == "r1"
 assert point_runner({"kind": "daily"}, "r1") == ""
 assert point_runner({"kind": "daily", "runner": "r2"}, "r1") == "r2"
 
-# Complete, equal per-workload provenance admits a metric. Missing either
+# Complete, equal per-workload provenance admits a metric. Missing any
 # marker on either side admits nothing — most importantly, two missing values
 # do not become a false match through None == None.
 _PROV_KEYS = (f"minimal|{analyze.SCHEMA_MARKER}",
-              f"minimal|{analyze.SIZE_MARKER}")
+              f"minimal|{analyze.SIZE_MARKER}",
+              f"minimal|{analyze.SAMPLING_MARKER}")
 _KNOWN_METRICS = {"minimal|compileInner": 100.0,
-                  _PROV_KEYS[0]: 1.0, _PROV_KEYS[1]: 64.0}
+                  _PROV_KEYS[0]: 1.0, _PROV_KEYS[1]: 64.0, _PROV_KEYS[2]: 1.0}
 _CURRENT = {"metrics": dict(_KNOWN_METRICS)}
 assert comparable_metric_values(
     _CURRENT, [{"metrics": dict(_KNOWN_METRICS)}],
@@ -649,6 +656,7 @@ def _warnings_output_selfcheck():
         for workload in workloads:
             metrics[f"{workload}|{analyze.SCHEMA_MARKER}"] = 1.0
             metrics[f"{workload}|{analyze.SIZE_MARKER}"] = 64.0
+            metrics[f"{workload}|{analyze.SAMPLING_MARKER}"] = 1.0
         return {"label": label, "date": date, "kind": "daily",
                 "runner": "r1", "metrics": metrics}
 
@@ -756,7 +764,7 @@ def _warnings_output_selfcheck():
         report = stdout.getvalue()
         assert code == 0 and "OK — no compile-perf regression" in report, \
             "a size transition must suppress comparison, not become a regression"
-        assert "Perf timer schema" in report and "(minimal)" in report, \
+        assert "Perf measurement provenance" in report and "(minimal)" in report, \
             "a provenance skip must emit an Actions warning naming the workload"
         assert "newcomer" not in report, \
             "a new workload with too little history is not a provenance skip"
@@ -805,6 +813,7 @@ def _daily_baseline_selfcheck():
                 "minimal|compileInner": 120.0,
                 f"minimal|{analyze.SCHEMA_MARKER}": 1.0,
                 f"minimal|{analyze.SIZE_MARKER}": 64.0,
+                f"minimal|{analyze.SAMPLING_MARKER}": 1.0,
             },
         }
         with analyze.open_output(os.path.join(d, "tracking", "tracking.json")) as fh:
@@ -817,6 +826,7 @@ def _daily_baseline_selfcheck():
                 json.dump([{
                     "workload": "minimal", "size": 64,
                     "timer_schema": "detailed",
+                    "sampling_strategy": "interleaved",
                     "timers": {"compileInner": {"median": value}},
                 }], fh)
             with analyze.open_output(os.path.join(path, "meta.json")) as fh:

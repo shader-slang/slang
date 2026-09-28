@@ -45,11 +45,23 @@ timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per ru
   Attribution therefore uses **leaf** timers (a jump in `generateOutput` is just
   its child `linkAndOptimizeIR`, whose jump is its child `specializeModule`…).
 
-- **Robustness:** each data point is `1 warmup + 5 timed` runs; the **median** is
-  saved and used for cross-version comparison (reflects the typical run, and is
-  steadier than the min when a build's run-to-run spread shifts). All of
-  `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
-  take `--metric` to switch (default `median`).
+- **Robustness:** prepare inputs and dependencies once, then run one warmup
+  pass and five timed passes over all selected workload/size pairs. For A, B,
+  and C, the timed order is `ABC ABC ABC ABC ABC`, rather than `AAAAA BBBBB CCCCC`.
+  This spreads each workload's samples across the suite so a short host
+  disturbance is less likely to affect most of its five samples. The **median**
+  remains the default comparison metric. Raw samples and
+  `median`/`min`/`mean`/`stdev` remain in `results.json`; reporting tools accept
+  `--metric` to switch. `--warmup` and `--samples` set the number of complete
+  passes; generation and module precompilation are not repeated between passes.
+  Interleaving does not remove disturbances lasting the whole suite.
+- **Sampling provenance:** each record identifies `sampling_strategy` as
+  `interleaved` (the CLI) or `consecutive` (the isolated `run_spec` API).
+  The nightly trend gate compares only matching known strategies, in addition
+  to matching runner, size, and timer schema. Older records without the marker
+  remain available for historical reporting but cannot seed the new gate's
+  baseline. Judgement resumes after enough comparable points accumulate; a
+  skipped comparison is reported explicitly rather than treated as a pass.
 - **Memory:** peak RSS per compile is captured when the platform query
   succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
   `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
