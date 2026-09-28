@@ -133,9 +133,10 @@ counters are inserted, with examples, see
      `IncrementBranchCoverageCounter` for `if` / `else` arms and
      loop-condition true/false arms (`for`, `while`, `do while`) and
      source `switch` case/default dispatch arms, including the
-     implicit no-match default path when no `default` label exists.
-     Expression-level short-circuit and ternary branches are not
-     instrumented yet.
+     implicit no-match default path when no `default` label exists,
+     and for the true/false arms of the expression-level branches:
+     the condition of a scalar `?:` and the left operand of a
+     short-circuiting `&&` / `||`.
    - Marker ops are opaque void IR instructions. They do not reference
      a buffer at this point; the IR coverage pass rewrites them later.
    - The marker source position rides on the standard per-instruction
