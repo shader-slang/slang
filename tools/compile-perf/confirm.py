@@ -35,10 +35,10 @@ def source_digest(directory):
 
 
 def candidate_rows(plan):
-    """Yield each initially flagged counter with its initial severity."""
+    """Read archived MetricChange objects and pair each with its initial severity."""
     for tier, key in (("error", "regressions"), ("warning", "warnings")):
         for row in plan[key]:
-            yield tier, row
+            yield tier, trend.MetricChange(**row)
 
 
 def rerun(plan, original, slangc):
@@ -49,7 +49,7 @@ def rerun(plan, original, slangc):
     trend. The deterministic generators and pinned corpus are the same as the
     first sweep, and the compiler executable is reused without rebuilding it.
     """
-    wanted = {row[0] for _, row in candidate_rows(plan)}
+    wanted = {change.workload for _, change in candidate_rows(plan)}
     selected = [r for r in analyze.canonical_runs(original) if r["workload"] in wanted]
     if len(selected) != len(wanted):
         raise ValueError("candidate workload missing from original results")
@@ -77,14 +77,18 @@ def confirmed_changes(plan, original, repeated):
     For example, a 12% first increase followed by 3% is unconfirmed; 12% followed
     by 7% confirms only a warning. A 7% first increase followed by 12% also confirms
     only a warning: two error-level measurements are required for a red alarm.
-    Missing or invalid measurements cannot establish recovery.
+    Return (errors, warnings, cleared) lists of MetricChange objects. A valid
+    rerun below both thresholds goes in cleared. Missing, invalid, incomplete
+    or incompatible measurements instead raise ValueError: callers report an
+    evaluation failure, never recovery.
     """
     first = {r["workload"]: r for r in analyze.canonical_runs(original)}
     second = {r["workload"]: r for r in analyze.canonical_runs(repeated)}
     errors, warnings, cleared = [], [], []
     limits = plan["thresholds"]
-    for initial_tier, row in candidate_rows(plan):
-        wl, counter, baseline, initial, _, _ = row
+    for initial_tier, candidate in candidate_rows(plan):
+        wl, counter = candidate.workload, candidate.counter
+        baseline, initial = candidate.baseline, candidate.value
         a, b = first.get(wl), second.get(wl)
         if a is None or b is None or not a.get("ok") or not b.get("ok"):
             raise ValueError(f"{wl}: original or confirmation workload failed or is missing")
@@ -108,7 +112,7 @@ def confirmed_changes(plan, original, repeated):
         ratio, delta = value / baseline, value - baseline
         tier = trend.classify_metric(ratio, delta, limits["rel"], limits["warn_rel"],
                                      trend.abs_floor_for(counter, limits["abs"]))
-        item = (wl, counter, baseline, value, ratio, delta)
+        item = trend.MetricChange(wl, counter, baseline, value)
         if tier is None:
             cleared.append(item)
         elif initial_tier == "error" and tier == "error":
@@ -137,7 +141,7 @@ def measure(args, directory):
                             "--candidates", str(plan_path)], check=True)
             result["plan"] = analyze.read_json(plan_path)
         original = analyze.read_json(directory / "results.json")
-        workloads = sorted({row[0] for _, row in candidate_rows(result["plan"])})
+        workloads = sorted({change.workload for _, change in candidate_rows(result["plan"])})
         print("Confirmation workloads: " + (", ".join(workloads) or "none"), flush=True)
         result["repeated"] = rerun(result["plan"], original, str(args.slangc.resolve()))
         confirmed_changes(result["plan"], original, result["repeated"])
@@ -180,7 +184,7 @@ def report(args, directory):
     # Append the confirmation explanation even when the shared renderer exits
     # with EXIT_REGRESSION.
     try:
-        trend.report_changes(limits, {"label": args.label}, plan["runner"],
+        trend.report_changes(limits, args.label, plan["runner"],
                              f"{labels[0]}..{labels[-1]}" if labels else "none",
                              len(labels), errors, warnings)
     finally:

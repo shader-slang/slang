@@ -18,24 +18,58 @@ import trend
 
 
 def record(value, workload="minimal", size=64):
+    """Build a valid five-sample record with one measured timer."""
     return {"workload": workload, "size": size, "ok": True, "samples": 5, "warmup": 1,
             "sampling_strategy": "interleaved", "timer_schema": "detailed",
             "timers": {"compileInner": bench.stats([value] * 5)}}
 
 
 def plan(value=120.0, counter="compileInner", workload="minimal", baseline=100.0):
+    """Build an archived candidate with explicit measurement field names."""
     tier = trend.classify_metric(value / baseline, value - baseline, 1.10, 1.05,
                                  trend.abs_floor_for(counter, 2.0))
-    return {"label": "2026-01-04-test", "runner": "test-runner", "metrics": {},
+    change = {"workload": workload, "counter": counter, "baseline": baseline, "value": value}
+    return {"label": "2026-01-04-test", "runner": "test-runner",
             "thresholds": {"rel": 1.10, "warn_rel": 1.05, "abs": 2.0},
             "baseline_labels": ["a", "b", "c"], "notes": [],
-            "regressions": [[workload, counter, baseline, value,
-                             value / baseline, value - baseline]] if tier == "error" else [],
-            "warnings": [[workload, counter, baseline, value,
-                          value / baseline, value - baseline]] if tier == "warning" else []}
+            "regressions": [change] if tier == "error" else [],
+            "warnings": [change] if tier == "warning" else []}
 
 
 class ConfirmationDecisionTests(unittest.TestCase):
+    def test_candidate_must_match_original_measurement(self):
+        with self.assertRaisesRegex(ValueError, "candidate does not match original"):
+            confirm.confirmed_changes(plan(120), [record(130)], [record(120)])
+
+    def test_frozen_baseline_must_be_finite_and_positive(self):
+        for baseline in (0.0, -1.0, float("nan"), float("inf"), -float("inf")):
+            candidate = plan()
+            candidate["regressions"][0]["baseline"] = baseline
+            with self.subTest(baseline=baseline), \
+                    self.assertRaisesRegex(ValueError, "invalid frozen baseline"):
+                confirm.confirmed_changes(candidate, [record(120)], [record(120)])
+
+    def test_matching_consecutive_batches_cannot_confirm_an_interleaved_plan(self):
+        consecutive = dict(record(120), sampling_strategy="consecutive")
+        with self.assertRaisesRegex(ValueError, "requires interleaved sampling"):
+            confirm.confirmed_changes(plan(), [consecutive], [consecutive])
+
+    def test_missing_candidate_workload_cannot_start_a_rerun(self):
+        with patch.object(bench, "run_workloads") as run, \
+                self.assertRaisesRegex(ValueError, "candidate workload missing"):
+            confirm.rerun(plan(workload="parse"), [record(120)], "slangc")
+        run.assert_not_called()
+
+    def test_inconsistent_sampling_counts_cannot_start_a_rerun(self):
+        candidate = plan()
+        candidate["warnings"] = plan(107, workload="parse")["warnings"]
+        for field, value in (("samples", 10), ("warmup", 2)):
+            other = dict(record(107, "parse"), **{field: value})
+            with self.subTest(field=field), patch.object(bench, "run_workloads") as run, \
+                    self.assertRaisesRegex(ValueError, "inconsistent sample/warmup counts"):
+                confirm.rerun(candidate, [record(120), other], "slangc")
+            run.assert_not_called()
+
     def test_both_batches_must_cross_each_severity_threshold(self):
         for first, second, expected in (
                 (120, 120, (1, 0, 0)), (120, 100, (0, 0, 1)),
@@ -58,7 +92,8 @@ class ConfirmationDecisionTests(unittest.TestCase):
                              ("warmup", 0)):
             variants.append([dict(record(100), **{field: value})])
         for stat in (None, bench.stats([100] * 4),
-                     {"n": 5, "samples": [100] * 5, "median": float("nan")}):
+                     {"n": 5, "samples": [100] * 5, "median": float("nan")},
+                     {"n": 5, "samples": [float("nan")] + [100] * 4, "median": 100}):
             variants.append([dict(record(100), timers={"compileInner": stat})])
         for repeated in variants:
             with self.subTest(repeated=repeated), self.assertRaises(ValueError):
@@ -78,8 +113,8 @@ class ConfirmationDecisionTests(unittest.TestCase):
     def test_reruns_each_affected_workload_once_at_the_original_size(self):
         original = [record(120), record(120, "parse", 128), record(100, "serialize")]
         candidates = plan()
-        candidates["warnings"] = [["minimal", "SemanticChecking", 100, 107, 1.07, 7],
-                                   ["parse", "compileInner", 100, 107, 1.07, 7]]
+        candidates["warnings"] = (plan(107, counter="SemanticChecking")["warnings"]
+                                   + plan(107, workload="parse")["warnings"])
         with patch.object(bench, "run_workloads", return_value=[]) as run:
             confirm.rerun(candidates, original, "slangc")
         run.assert_called_once()
@@ -161,7 +196,9 @@ class ConfirmationArchiveTests(unittest.TestCase):
         self.assertIn("1 confirmed regression(s)", output)
         self.assertIn("::error title=Perf regressions", output)
         archive = analyze.read_json(self.directory / "confirmation.json")
-        self.assertEqual(archive["plan"]["regressions"][0][2], 100)
+        self.assertEqual(archive["plan"]["regressions"][0], {
+            "workload": "minimal", "counter": "compileInner", "baseline": 100, "value": 120})
+        self.assertNotIn("metrics", archive["plan"])
         self.assertEqual(archive["repeated"][0]["timers"]["compileInner"]["samples"], [120]*5)
 
     def test_recovery_is_archived_without_performance_alarm(self):
@@ -195,6 +232,30 @@ class ConfirmationArchiveTests(unittest.TestCase):
         self.write("results.json", [record(101)])
         with self.assertRaisesRegex(ValueError, "does not belong"):
             self.render()
+
+    def test_changed_commit_metadata_invalidates_confirmation(self):
+        self.collect([record(100)])
+        self.write("meta.json", {"commit": "different-commit", "runner": "test-runner"})
+        with self.assertRaisesRegex(ValueError, "does not belong"):
+            self.render()
+
+    def test_candidate_label_must_match_the_confirmation(self):
+        self.collect([record(100)])
+        archive = analyze.read_json(self.directory / "confirmation.json")
+        archive["plan"]["label"] = "another-night"
+        self.write("confirmation.json", archive)
+        with self.assertRaisesRegex(ValueError, "candidate label does not match"):
+            self.render()
+
+    def test_candidate_field_order_does_not_change_the_verdict(self):
+        self.collect([record(120)])
+        archive = analyze.read_json(self.directory / "confirmation.json")
+        candidate = archive["plan"]["regressions"][0]
+        archive["plan"]["regressions"][0] = dict(reversed(list(candidate.items())))
+        self.write("confirmation.json", archive)
+        code, output = self.render()
+        self.assertEqual(code, trend.EXIT_REGRESSION)
+        self.assertIn("1 confirmed regression(s)", output)
 
     def test_archive_from_previous_workflow_attempt_is_rejected(self):
         self.collect([record(100)])

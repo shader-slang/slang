@@ -847,7 +847,12 @@ class WorkloadRun:
         self.benign = benign
 
     def measure(self, is_warmup=False):
-        """Run one compiler process, excluding warmups from every statistic."""
+        """Run one compiler process, excluding warmups from timing and exit-code checks.
+
+        An exception during either a warmup or timed invocation fails this
+        workload and stops its later invocations. A warmup's returned crash
+        code is ignored; timed invocations still determine sample validity.
+        """
         if self.failure is not None:
             return
         try:
@@ -973,7 +978,7 @@ def run_workloads(slangc, cases, samples, warmup, src_root, out_root, api=None,
     apart makes a short disturbance less likely to occupy most of a workload's
     median-of-five window. It does not eliminate effects lasting the whole run.
 
-    The consecutive option supports isolated run_spec callers and controlled
+    Setting interleave=False supports isolated run_spec callers and controlled
     comparisons of sampling order. Both schedules retain the same result shape.
     """
     if samples < 1 or warmup < 0:
@@ -986,6 +991,8 @@ def run_workloads(slangc, cases, samples, warmup, src_root, out_root, api=None,
         except Exception as exc:  # A missing corpus or setup failure costs only this case.
             run.failure = str(exc) or type(exc).__name__
 
+    # One group containing all cases repeats the full suite on each pass.
+    # One group per case finishes all its passes before starting the next case.
     groups = [runs] if interleave else [[run] for run in runs]
     for group in groups:
         for warmup_index in range(warmup):

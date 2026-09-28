@@ -23,6 +23,7 @@ compares only against same-runner points.
     python3 trend.py --results <dir> --window 7 --rel 1.10 --abs 2.0
 """
 import argparse
+from dataclasses import asdict, dataclass
 import json
 import os
 import statistics
@@ -36,6 +37,31 @@ from lib import analyze, manifest
 # stay stdlib-only, and importing them from there is what keeps the producer
 # and the classifier from drifting apart.
 from slack_status import EXIT_CANNOT_EVALUATE, EXIT_REGRESSION
+
+
+@dataclass(frozen=True)
+class MetricChange:
+    """One workload counter's measured value compared with a frozen baseline median.
+
+    Candidate archives store these four named fields as a JSON object. In a
+    candidate, value is the first batch's median; in a confirmed change, it is
+    the rerun's median. Ratio and delta are derived so they cannot drift from
+    the measurements they describe. Units follow the counter (ms or KiB).
+    """
+    workload: str
+    counter: str
+    baseline: float
+    value: float
+
+    @property
+    def ratio(self):
+        """Return the measured value relative to the positive baseline."""
+        return self.value / self.baseline
+
+    @property
+    def delta(self):
+        """Return the increase in the counter's native unit."""
+        return self.value - self.baseline
 
 
 def abort(msg):
@@ -182,16 +208,16 @@ def comparable_metric_values(current, points, key, provenance_keys):
 def save_candidates(args, current, window, regressions, warnings, notes):
     """Freeze the first comparison before confirmation can change any measurements.
 
-    Rows retain the baseline median and the first batch's value. Saving the
-    window labels, thresholds and per-workload provenance makes the remote
+    MetricChange objects retain the baseline median and the first batch's value.
+    Saving the window labels and thresholds makes the remote
     reporting job independent of changes to the rolling history after this run.
     """
     with analyze.open_output(args.candidates) as fh:
         json.dump({"label": current["label"], "runner": current.get("runner", ""),
-                   "metrics": current.get("metrics", {}),
                    "baseline_labels": [p["label"] for p in window],
                    "thresholds": {"rel": args.rel, "warn_rel": args.warn_rel, "abs": args.abs},
-                   "regressions": regressions, "warnings": warnings, "notes": notes},
+                   "regressions": [asdict(change) for change in regressions],
+                   "warnings": [asdict(change) for change in warnings], "notes": notes},
                   fh, indent=2)
 
 
@@ -414,9 +440,9 @@ def main():
         verdict = classify_metric(ratio, delta, args.rel, args.warn_rel,
                                   abs_floor_for(counter, args.abs))
         if verdict == "error":
-            regressions.append((wl, counter, med, cur, ratio, delta))
+            regressions.append(MetricChange(wl, counter, med, cur))
         elif verdict == "warning":
-            warnings.append((wl, counter, med, cur, ratio, delta))
+            warnings.append(MetricChange(wl, counter, med, cur))
 
     # Surfaced rather than silent: a workload dropping out of judgement looks
     # identical to a workload that passed, and the whole point of the schema
@@ -438,29 +464,32 @@ def main():
     if args.candidates:
         save_candidates(args, current, window, regressions, warnings, notes)
         return
-    report_changes(args, current, cur_runner, base_labels, len(window),
+    report_changes(args, current["label"], cur_runner, base_labels, len(window),
                    regressions, warnings)
 
 
-def report_changes(args, current, cur_runner, base_labels, window_count,
+def report_changes(limits, label, cur_runner, base_labels, window_count,
                    regressions, warnings):
     """Render a classified comparison and publish its warning count and exit code.
 
     The nightly confirmation reader uses this same renderer after checking the
     second batch against the saved baseline; ad-hoc trend checks use it directly.
+    limits supplies rel/warn_rel ratio thresholds, abs (the ms floor), and
+    no_fail (whether to suppress the regression exit). label identifies the
+    measured point; regressions and warnings contain MetricChange objects.
     """
-    regressions.sort(key=lambda r: -r[4])
-    warnings.sort(key=lambda r: -r[4])
+    regressions.sort(key=lambda change: -change.ratio)
+    warnings.sort(key=lambda change: -change.ratio)
 
     # The absolute floor is quoted per unit, and read back out of
     # abs_floor_for rather than restated: the memory floor is not --abs, so a
-    # single "{args.abs} ms" would misreport the gate every memory counter is
+    # single "{limits.abs} ms" would misreport the gate every memory counter is
     # actually judged against.
-    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", args.abs))
+    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", limits.abs))
     print(f"baseline: trailing {window_count} point(s) [{base_labels}], "
-          f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
-          f">= {args.warn_rel}, both gated on an absolute delta of "
-          f">= {args.abs} ms for timers / {mem_floor} for memory counters\n")
+          f"median per metric; ERROR at ratio >= {limits.rel}, WARNING at "
+          f">= {limits.warn_rel}, both gated on an absolute delta of "
+          f">= {limits.abs} ms for timers / {mem_floor} for memory counters\n")
 
     # `warnings` is the ONLY key the workflow reads, and the only one it
     # needs: the Slack step distinguishes a warnings-only night from a clean
@@ -482,8 +511,8 @@ def report_changes(args, current, cur_runner, base_labels, window_count,
             fh.write(f"warnings={len(warnings)}\n")
 
     if not regressions and not warnings:
-        print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
-        write_step_summary(f"### Compile-perf trend — {current['label']}\n\n"
+        print(f"OK — no compile-perf regression in {label} vs trailing median.")
+        write_step_summary(f"### Compile-perf trend — {label}\n\n"
                 f"OK — no regression vs trailing {window_count}-point median "
                 f"(`{base_labels}`).")
         return
@@ -496,15 +525,18 @@ def report_changes(args, current, cur_runner, base_labels, window_count,
     # 200 MB peak as "204800.0 ms". The column headers say "median"/"Δ"
     # without a unit for the same reason — fmt_qty puts the unit on each value.
     print(f"{'workload':20s}{'counter':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
-    rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
+    rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + label,
             f"\nvs trailing {window_count}-point median (`{base_labels}`), "
-            f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
+            f"runner `{cur_runner}`. ERROR ≥ {limits.rel}×, WARNING ≥ {limits.warn_rel}×.\n"]
 
     def table(items, kind, gha):
         rows.append(f"\n**{kind}** ({len(items)}):\n")
         rows.append("| workload | counter | median | current | ratio | Δ |")
         rows.append("|---|---|--:|--:|--:|--:|")
-        for wl, counter, med, cur, ratio, delta in items:
+        for change in items:
+            wl, counter = change.workload, change.counter
+            med, cur = change.baseline, change.value
+            ratio, delta = change.ratio, change.delta
             print(f"{wl:20s}{counter:26s}{analyze.fmt_qty(counter, med):>12s}"
                   f"{analyze.fmt_qty(counter, cur):>12s}{ratio:7.2f}x"
                   f"{analyze.fmt_qty(counter, delta, signed=True):>12s}")
@@ -524,7 +556,7 @@ def report_changes(args, current, cur_runner, base_labels, window_count,
     write_step_summary("\n".join(rows))
 
     print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
-    if regressions and not args.no_fail:
+    if regressions and not limits.no_fail:
         raise SystemExit(EXIT_REGRESSION)
 
 

@@ -111,6 +111,20 @@ class SamplingTests(unittest.TestCase):
         self.assertEqual([e[1] for e in self.events if e[0] == "compile"], list("ABABABAB"))
         self.assertEqual(records[0]["timers"]["compileInner"]["samples"], [3.001, 4.001])
 
+    def test_warmup_exception_fails_but_returned_crash_code_is_excluded(self):
+        self.responses[("crash", 1, 1)] = (-11, 500, "warmup crash", 1000)
+        self.responses[("exception", 1, 1)] = OSError("cannot start warmup")
+        recovered, failed, healthy = self.measure(
+            [(spec(name), 1) for name in ("crash", "exception", "healthy")], samples=2)
+        self.assertTrue(recovered["ok"])
+        self.assertIsNone(recovered["crash_codes"])
+        self.assertEqual(recovered["timers"]["compileInner"]["samples"], [2.001, 3.001])
+        self.assertFalse(failed["ok"])
+        self.assertEqual(failed["error"], "cannot start warmup")
+        self.assertEqual(self.visits[("exception", 1)], 1)
+        self.assertEqual(failed["timers"], {})
+        self.assertTrue(healthy["ok"])
+
     def test_short_disturbance_cannot_fill_one_workloads_median_window(self):
         cases = [(spec(name), 1) for name in "ABC"]
 
