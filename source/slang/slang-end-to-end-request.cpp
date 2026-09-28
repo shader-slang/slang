@@ -1259,7 +1259,10 @@ void EndToEndCompileRequest::generateOutput()
 
         maybeWriteContainer(m_containerOutputPath);
 
-        writeDependencyFile(this);
+        if (SLANG_FAILED(writeDependencyFile(this)))
+        {
+            getSink()->diagnose(Diagnostics::CannotWriteOutputFile{.path = m_dependencyOutputPath});
+        }
     }
 }
 
@@ -2057,6 +2060,7 @@ SlangResult EndToEndCompileRequest::compile()
         else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
         {
             getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = String(reflectionPath)});
+            return SLANG_FAIL;
         }
     }
 
