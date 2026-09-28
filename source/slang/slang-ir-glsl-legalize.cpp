@@ -1044,11 +1044,10 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    // Traverse the entire access chain for the current leaf var and see if
-    // there are interpolation mode decorations along the way.
-    // Make sure we respect the decoration on the inner most node.
-    // So that the decoration on a struct field overrides the outer decoration
-    // on a parameter of the struct type.
+    // Use the innermost interpolation mode, but scan the entire declaration
+    // chain for precise. A field may specify nointerpolation while its enclosing
+    // output parameter specifies precise; both qualifiers apply to the field.
+    bool foundInterpolationMode = false;
     for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
         auto paramInfo = outerParamInfo->outerParam;
@@ -1064,11 +1063,16 @@ void createVarLayoutForLegalizedGlobalParam(
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(globalParam);
         }
-        if (auto interpolationModeDecor =
-                decorParent->findDecoration<IRInterpolationModeDecoration>())
+        if (!foundInterpolationMode)
         {
-            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
-            break;
+            if (auto interpolationModeDecor =
+                    decorParent->findDecoration<IRInterpolationModeDecoration>())
+            {
+                builder->addInterpolationModeDecoration(
+                    globalParam,
+                    interpolationModeDecor->getMode());
+                foundInterpolationMode = true;
+            }
         }
     }
 
