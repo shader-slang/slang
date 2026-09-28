@@ -14,8 +14,8 @@ disabled thread terminates or whether it continues with side effects suppressed.
 
 Writes to buffers and textures performed before execution of the `discard` statement take effect.
 
-A `discard` statement is valid only on the [fragment stage](shaders-and-kernels.md). It is an error to use it
-on any other stage.
+A `discard` statement is valid only in the [fragment stage](shaders-and-kernels.md). It is an error to use it
+in any other stage.
 
 A `discard` statement does not trigger the execution of [deferred statements](statements-defer.md) before the
 thread is disabled. Therefore, pending deferred statements have no effect.
