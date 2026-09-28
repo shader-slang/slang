@@ -315,6 +315,24 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << " " << (v.intValue * 8);
             }
             break;
+        case CompilerOptionName::BitfieldPackingRules:
+            {
+                // Use the parser's value catalog so serialization has the same spellings.
+                const auto categoryIndex = globalSession->m_commandOptions.findCategoryByName(
+                    toSlice("bitfield-packing-rules"));
+                SLANG_RELEASE_ASSERT(categoryIndex >= 0);
+                for (auto v : option.value)
+                {
+                    SLANG_RELEASE_ASSERT(v.kind == CompilerOptionValueKind::Int);
+                    const auto valueIndex = globalSession->m_commandOptions.findValueByUserValue(
+                        categoryIndex,
+                        CommandOptions::UserValue((slang::BitfieldPackingRules)v.intValue));
+                    SLANG_RELEASE_ASSERT(valueIndex >= 0);
+                    sb << " " << name << " "
+                       << globalSession->m_commandOptions.getFirstNameForOption(valueIndex);
+                }
+                break;
+            }
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
         case CompilerOptionName::ForceCLayout:
@@ -344,7 +362,6 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::IncompleteLibrary:
         case CompilerOptionName::EnableExperimentalDynamicDispatch:
         case CompilerOptionName::GenerateWholeProgram:
-        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
         case CompilerOptionName::ExperimentalFeature:
         case CompilerOptionName::EmitSeparateDebug:
         case CompilerOptionName::TraceCoverage:
@@ -362,6 +379,13 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:
             if (option.value.getCount() && option.value[0].intValue != 0)
+                sb << " " << name;
+            break;
+        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
+            // An explicit rule overrides the legacy boolean through the API. Reconstruct only
+            // the effective rule so the debug-info command line remains valid for the CLI.
+            if (!hasOption(CompilerOptionName::BitfieldPackingRules) && option.value.getCount() &&
+                option.value[0].intValue != 0)
                 sb << " " << name;
             break;
         default:

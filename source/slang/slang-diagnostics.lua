@@ -378,6 +378,21 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-msvc-style-bitfield-packing",
+    134,
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC. "
+        .. "Use `-bitfield-packing-rules msvc` for MSVC's LSB-first bit order and type-size "
+        .. "grouping, or "
+        .. "`-bitfield-packing-rules msb-first-msvc` to preserve this behavior"
+)
+
+err(
+    "conflicting-bitfield-packing-rules-options",
+    135,
+    "`-msvc-style-bitfield-packing` cannot be combined with `-bitfield-packing-rules`"
+)
+
 err(
     "unknown-source-language",
     19,

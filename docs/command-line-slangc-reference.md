@@ -32,6 +32,7 @@ slangc -help-style markdown -h
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
 * [file-system-type](#file-system-type)
+* [bitfield-packing-rules](#bitfield-packing-rules)
 * [source-embed-style](#source-embed-style)
 * [target](#target-1)
 * [stage](#stage)
@@ -447,7 +448,15 @@ Emit reflection data in JSON format to a file.
 
 <a id="msvc-style-bitfield-packing"></a>
 ### -msvc-style-bitfield-packing
-Pack bitfields according to MSVC rules (msb first, new field when underlying type size changes) rather than gcc-style (lsb first) 
+Deprecated: pack bitfields MSB-first, starting a new storage unit when the underlying type size changes. This differs from MSVC on little-endian platforms. Use [-bitfield-packing-rules](#bitfield-packing-rules-1) msvc for MSVC's LSB-first bit order and type-size grouping, or [-bitfield-packing-rules](#bitfield-packing-rules-1) msb-first-msvc to preserve this behavior. Cannot be combined with [-bitfield-packing-rules](#bitfield-packing-rules-1). 
+
+
+<a id="bitfield-packing-rules-1"></a>
+### -bitfield-packing-rules
+
+**-bitfield-packing-rules &lt;default|msvc|msb-first-msvc&gt;**
+
+Select bitfield packing rules: default packs LSB-first and permits fields of different underlying type sizes to share storage; msvc packs LSB-first (matching MSVC on little-endian platforms) and starts a new storage unit when the underlying type size changes; msb-first-msvc uses the same type-size rule but packs MSB-first, preserving [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). Cannot be combined with that legacy option. 
 
 
 
@@ -1264,6 +1273,15 @@ File System Type
 * `load-file` : Just implements loadFile interface, so will be wrapped with CacheFileSystem internally. 
 * `os` : Use the OS based file system directly (without file system caching) 
 
+<a id="bitfield-packing-rules"></a>
+## bitfield-packing-rules
+
+Bitfield Packing Rules 
+
+* `default` : LSB-first; fields may share storage across underlying type sizes 
+* `msvc` : LSB-first; start a new storage unit when the underlying type size changes 
+* `msb-first-msvc` : MSB-first; preserve the legacy [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing) behavior 
+
 <a id="source-embed-style"></a>
 ## source-embed-style
 
@@ -1945,6 +1963,7 @@ Available help categories for the [-h](#h) option
 * `optimization-level` : Optimization Level 
 * `debug-level` : Debug Level 
 * `file-system-type` : File System Type 
+* `bitfield-packing-rules` : Bitfield Packing Rules 
 * `source-embed-style` : Source Embed Style 
 * `target` : Target 
 * `stage` : Stage 
