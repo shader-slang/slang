@@ -63,11 +63,22 @@ if(SLANG_USE_SYSTEM_LUA)
             "SLANG_USE_SYSTEM_LUA and SLANG_OVERRIDE_LUA_PATH cannot be combined"
         )
     endif()
-    find_package(Lua 5.4 REQUIRED)
+    find_package(Lua 5.4 QUIET)
+    if(LUA_FOUND)
+        set(slang_fiddle_lua_library ${LUA_LIBRARIES})
+        set(slang_fiddle_lua_include_dirs ${LUA_INCLUDE_DIR})
+    else()
+        # FindLua in CMake 3.22 does not search Lua 5.5. Its pkg-config file does.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SLANG_LUA55 REQUIRED IMPORTED_TARGET lua-5.5)
+        set(slang_fiddle_lua_library PkgConfig::SLANG_LUA55)
+        set(slang_fiddle_lua_include_dirs ${SLANG_LUA55_INCLUDE_DIRS})
+    endif()
     # The bundled translation unit compiles Lua's private onelua.c source.
     slang_glob_sources(slang_fiddle_sources slang-fiddle)
     list(
-        REMOVE_ITEM slang_fiddle_sources
+        REMOVE_ITEM
+        slang_fiddle_sources
         "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
     )
     generator(
@@ -76,9 +87,9 @@ if(SLANG_USE_SYSTEM_LUA)
         ${slang_fiddle_sources}
         LINK_WITH_PRIVATE
         compiler-core
-        ${LUA_LIBRARIES}
+        ${slang_fiddle_lua_library}
         INCLUDE_DIRECTORIES_PRIVATE
-        ${LUA_INCLUDE_DIR}
+        ${slang_fiddle_lua_include_dirs}
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
         SLANG_USE_SYSTEM_LUA=1
     )

@@ -136,7 +136,8 @@ auto getHashCode(const TKey& key)
 
 inline HashCode64 getHashCode(const char* buffer, std::size_t len)
 {
-    // The public string-view hash works with both bundled and installed unordered_dense.
+    // In the bundled version, this hashes view.data() and sizeof(char) * view.size() with
+    // wyhash, producing the same value as the former direct wyhash call.
     return ankerl::unordered_dense::hash<std::string_view>{}(std::string_view(buffer, len));
 }
 
