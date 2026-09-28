@@ -40,7 +40,8 @@ in a `break` statement does not match any enclosing breakable statement.
 A `break` or `continue` does not cancel [deferred statements](statements-defer.md). The deferred statements
 are executed when their respective scopes are exited.
 
-A `break` or `continue` may not escape an enclosing deferred statement.
+A `break` or `continue` may not escape an enclosing deferred statement or a
+[lambda expression](expressions-lambda.md).
 
 > 📝 **Remark 1:** A `continue` statement within a [switch](statements-switch.md) statement continues the
 > enclosing loop.
