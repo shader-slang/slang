@@ -337,6 +337,72 @@ review the intentional harness identity transition before replacing accepted evi
 sample files and generated charts stay under ignored `build/`; current qualifications belong in the
 `corpus-dispatch-performance` entry of focused evidence, replacing superseded observations in place.
 
+## Original-input corpus code quality
+
+Use `extras/capture-nvvm-corpus-code.py` to capture final specialized PTX through the same
+render-test binding and entry-point path as the original-input dispatch experiment. This is a
+fresh diagnostic execution with the original oracle and effective `-g0`/backend/optimization
+options, not a new timing run. Existing `-dump-intermediates` and a unique per-cell prefix capture
+the artifact returned by `getEntryPointCode`, which CUDA RHI loads unchanged. Exactly one PTX
+module with one entry and target SM80 is required; dump ordinal numbers never choose a module.
+Failures and ambiguous captures remain explicit. A previously failing cell that fails again is
+not automatically proof of an identical diagnostic or failure mechanism.
+
+```bash
+python3 issue-nvvm-backend/test-nvvm-corpus-code-capture.py
+python3 issue-nvvm-backend/test-nvvm-corpus-code-analysis.py
+cp issue-nvvm-backend/focused-evidence.json "$NVVM_RESULTS/accepted-runtime-evidence.json"
+python3 extras/capture-nvvm-corpus-code.py \
+  --runtime-manifest "$NVVM_RUNTIME/manifest.json" --output "$NVVM_RESULTS/code-capture"
+python3 extras/analyze-nvvm-corpus-code.py \
+  --capture "$NVVM_RESULTS/code-capture/results.json" --output "$NVVM_RESULTS/code-analysis" \
+  --runtime-summary "$NVVM_RUNTIME/summary.json" \
+  --runtime-evidence "$NVVM_RESULTS/accepted-runtime-evidence.json" \
+  --ptxas "$CUDA_PATH/bin/ptxas" --architecture 89 \
+  --cuobjdump "$NVVM_CUOBJDUMP" --nvdisasm "$NVVM_NVDISASM"
+```
+
+`NVVM_RUNTIME` is the accepted dispatch collection directory. Set the two disassembler variables
+to existing, versioned binaries; `cuobjdump` invokes `nvdisasm`, whose directory the analyzer adds
+to its subprocess PATH. Record tool versions and hashes. The current experiment uses portable
+NVIDIA CUDA 12.9 tools under ignored `build/`; it changes neither the installed toolkit nor the
+compiler/harness. See NVIDIA's [binary utilities documentation](https://docs.nvidia.com/cuda/archive/12.9.1/cuda-binary-utilities/index.html).
+
+The collector pins original selections, commands, test dependencies, runtime binaries and mirror
+inputs; serial authoritative test logs bind each result to its case and mode. The analyzer consumes
+only original-oracle-qualified captures and revalidates those bindings. It assembles with explicit
+SM89 for the L4, obtains named-function hardware resources from `ptxas -v`, and disassembles the
+cubin. All three modes use the assembler's default O3; NVVM O0 labels the earlier compilation
+route, not an unoptimized assembler invocation. These are offline CUDA 12.9 results, not the
+driver-JIT machine code recorded during timing.
+Historical timed PTX was not retained, so matching source/options establishes the same compilation
+route, not exact identity to those historical timed bytes. The older standalone 504-case CLI
+compilation cohort remains a separate qualification.
+
+Report entry and reachable-helper PTX instruction counts, typed virtual-register declarations,
+branches, calls, shuffles and memory instruction families separately from hardware register
+allocation, stack/spills, SASS instruction counts and executable bytes. PTX declarations are not
+physical registers. Reachable totals count each resolved helper once, not once per dynamic call.
+Unresolved calls remain visible. SASS counts include padding instructions and must exactly cover
+all executable sections at 16 bytes per instruction for SM80/89. Missing data is never zero.
+
+Raw PTX equality, normalized reachable instruction equality and complete named executable-section
+byte equality are distinct observations. Normalization preserves literals, predicates, modifiers,
+branch destinations and operand reuse while renaming generated symbols. It excludes declarations
+and global data and is not semantic equivalence; scoped register redeclarations disable its exact
+hash, and duplicate labels require explicit scope support. The heuristic similar-profile category
+requires opcode-order similarity at least 0.9, SASS entry counts within 10%, hardware registers
+within two, and equal stack/spills. This is triage, not a performance prediction.
+
+`cases.csv` retains every case/mode outcome and metric; `pairs.csv` adds O3/O3 comparisons and
+the separately accepted dispatch observations, with O0 retained in both tables. Report generation
+recomputes metrics from pinned PTX, assembly logs, SASS and cubins. Timing joins require the exact
+accepted manifest/summary hashes and case/corpus identities. Use `--report-only` with the same
+arguments to regenerate tables from retained artifacts. Static size cannot account for loop trip
+counts, mask activity, dependency chains or memory behavior; inspect representative source and
+control flow before proposing a performance cause. Keep raw data and presentation packages ignored,
+and replace the current focused code-quality evidence after independent review.
+
 ## Fixed simple-shader quality subset
 
 ```bash

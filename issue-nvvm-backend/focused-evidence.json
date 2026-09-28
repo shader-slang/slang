@@ -8346,6 +8346,206 @@
           "sha256": "b05a7920519637170af22bbfd667afcc53e529b359dea9f01ebdad3e04b77bd2"
         }
       }
+    },
+    "corpus-code-quality": {
+      "status": "accepted-static-code-quality",
+      "date": "2026-09-28",
+      "scope": "Fresh original-input runtime-route PTX; offline CUDA 12.9 ptxas default O3 / SM89 machine code. No new timings or compiler changes.",
+      "identity": {
+        "starting_revision": "151582edaf00b650f5bd0f3f6fce5211d84d50e4",
+        "accepted_identity": {
+          "path": "issue-nvvm-backend/accepted-identity.json",
+          "sha256": "b7937b1ac2f4fcc034feb99cd5a839731980bb26f52730e42c8a3cd74d95fff0"
+        },
+        "prior_runtime_evidence": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/accepted-runtime-evidence.json",
+          "sha256": "7adc00ece3ffae1203a04fed892345aae61ed0aca2ea00a49413b070021e3f45"
+        },
+        "compiler_provider_harness_inputs": "Unchanged; capture provenance revalidated before and after execution."
+      },
+      "coverage": {
+        "cases": 580,
+        "sources": 576,
+        "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+        "cells": 1740,
+        "capture_counts": {
+          "qualified": 1704,
+          "known-oracle-gap": 36
+        },
+        "analysis_counts": {
+          "analyzed": 1704,
+          "capture-excluded": 36
+        },
+        "paired_cases": 567,
+        "paired_runtime_status": {
+          "short-interval": 557,
+          "ratio-eligible": 9,
+          "incomplete": 1
+        },
+        "cpu_contracts": {
+          "capture": 8,
+          "analysis": 15
+        }
+      },
+      "comparisons": {
+        "paired": 567,
+        "similarity_counts": {
+          "identical-offline-executable-bytes": 194,
+          "different-static-profile": 327,
+          "similar-static-profile": 46,
+          "incomplete": 13
+        },
+        "nvvm_hardware_registers": {
+          "fewer": 103,
+          "equal": 402,
+          "more": 62
+        },
+        "nvvm_ptx_instructions": {
+          "fewer": 467,
+          "equal": 13,
+          "more": 87
+        },
+        "nvvm_sass_entry_instructions": {
+          "fewer": 97,
+          "equal": 415,
+          "more": 55
+        }
+      },
+      "findings": [
+        "Narrow masked integer min/max: captured O3 PTX 11613 versus 5671 instructions and offline 47 versus 34 registers (NVRTC/NVVM); same 112-byte stack and no spills. Prior NVVM interval is 2.113 times NVRTC. Eligible-mask fast paths and aggregate traversal differ; whole-fixture cost is not causally apportioned.",
+        "Floating min/max already preserves logarithmic tree semantics. Optimized NVVM PTX retains tree/fallback selection inside each stage and independent scalar-leaf traversal; NaN payload, signed-zero and operand-order semantics constrain refactoring.",
+        "Interface-return dispatch: PTX 33 versus 94, offline SASS 40 versus 104 instructions including padding, hardware registers 18 versus 12. Correlated returned type tags retain extra branches/reconvergence. Short runtime is below the comparison cutoff; no measured slowdown claim.",
+        "Empty-switch has identical bytes in every named offline executable section. FP8 byte transport retains corresponding helper bodies/unrolling and near-parity prior dispatch intervals; arithmetic and exported ABI are outside this qualification."
+      ],
+      "next_investigations": [
+        "Eligible-mask fast paths for narrow integer wave operations.",
+        "Collective lowering with algorithm choice outside loops and shared traversal for aggregate accumulators, preserving floating operand order.",
+        "Post-inlining tag/payload scalarization, constant propagation and control-flow simplification for interface dispatch; locate the responsible IR boundary first."
+      ],
+      "raw": {
+        "collection/manifest.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/collection/manifest.json",
+          "sha256": "6d6db8c67c73508766f7687fe04128baf3b1204eb3770478dc9dd91c4ce8eaf8"
+        },
+        "collection/results.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/collection/results.json",
+          "sha256": "fb4cd0d911ee6b2240acff24279e2cfe47ab9e8e4926f7c92fe25ba658db475b"
+        },
+        "collection/provenance.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/collection/provenance.json",
+          "sha256": "a0d16987e68a0c6d8c647e64544708656ed332292dad39966b414d58f7e85f77"
+        },
+        "collection-process.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/collection-process.json",
+          "sha256": "e5e72727d70023f07b4e6bb07d4e6a087c8381af479e4e6c75116793da02e27d"
+        },
+        "analysis/results.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/analysis/results.json",
+          "sha256": "ccf02925bc6a2bc12d0d629fedf2d197c8523ca72135a7157a031963ee9728a1"
+        },
+        "analysis/summary.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/analysis/summary.json",
+          "sha256": "0905c74c1ae66ee3c32d261c60d76c5877d127e97143be1165f7c34a2cd51391"
+        },
+        "analysis/cases.csv": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/analysis/cases.csv",
+          "sha256": "3c709af190aff8f79f0753f8e62d092be542c22c6f2b364de356e938a32aa905"
+        },
+        "analysis/pairs.csv": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/analysis/pairs.csv",
+          "sha256": "72fe1a09d8ad7845e38d59f27026dbedbf2e26b88ba41cf42455ba8a690c8084"
+        },
+        "analysis-process.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/analysis-process.json",
+          "sha256": "13a3281fac21b045139c10538d2a5b825a3de596c269616e3645e809324e3569"
+        },
+        "presentation-inventory.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/presentation-inventory.json",
+          "sha256": "fc957a3c43f2843b28c401e925e207a12cc1e999f7b2c6ed36083800de9b7b5f"
+        },
+        "deepdives/narrow-masked-minmax.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/deepdives/narrow-masked-minmax.json",
+          "sha256": "f5ced99250d86507f18cf23c689a5bcbc8cd7fc664d7a8ece1fe0754203ea8b7"
+        },
+        "deepdives/float-and-fp8-evidence.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/deepdives/float-and-fp8-evidence.json",
+          "sha256": "6e3e3e7f714d8866e0aa711a3f19a0cb9a961fa14d14f67666e6bad57ab65765"
+        },
+        "interface-return-outlier/results.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/interface-return-outlier/results.json",
+          "sha256": "c36506009bba861641cc9809b424c37a37a57c2ecb40fffdf06af7d6859cca5b"
+        },
+        "tools/tool-provenance.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/tools/tool-provenance.json",
+          "sha256": "fa08cbff2a090e5c83fdd4f7c383a237750eebb14c174e65046b64aca23bc40f"
+        },
+        "tools/nvdisasm-provenance.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/tools/nvdisasm-provenance.json",
+          "sha256": "9dabc89d05321b73aecc0205e5106d7e3ddfe37b56eca1d7e44d5430a595f5dd"
+        },
+        "parser-corpus-final.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/parser-corpus-final.json",
+          "sha256": "a404971e251b6a7bb2179bcde27e35b1fb158f8eed765fd493d089b84bea31b5"
+        },
+        "final-qualification-audit.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/final-qualification-audit.json",
+          "sha256": "3272fadaf2782630d88f00a8e9fc4590203aacd2d0d5b683c2dbed583deddc5e"
+        }
+      },
+      "reviews": {
+        "protocol-review.md": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/protocol-review.md",
+          "sha256": "e2757c9b48dcaf8f576deb6eec764ee23befbbbe0c0b84eb0fecaf691472232d"
+        },
+        "capture-source-review.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/capture-source-review.json",
+          "sha256": "5ba67da627878213c6e20addfb6c6c9b91f0f8dfa5c0c980e085fd5eee93ebd8"
+        },
+        "analyzer-source-review.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/analyzer-source-review.json",
+          "sha256": "03cae0e3d9b792860dd1e1054f0887a598f39ca021320c127a0daf3d0ad03620"
+        },
+        "full-capture-review.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/full-capture-review.json",
+          "sha256": "4a444491325af65eddabbf6fc111eabd17577e78e4183f26bb3afaca7cea37c1"
+        },
+        "full-analysis-review.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/full-analysis-review.json",
+          "sha256": "ef351af224ce808e6459825f10aeb87cc792ed3e4f4ec2169fb75027158b2018"
+        },
+        "final-candidate-review.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-code1/final-candidate-review.json",
+          "sha256": "9a6f7e1e3957baf9cd43af935b1c2ac8983a622443a71607642fb4cd3ce435f1"
+        }
+      },
+      "failure_history": [
+        {
+          "attempt": "portable-disassembler-probe",
+          "outcome": "cuobjdump initially failed because nvdisasm was unavailable; full-binary NVDISASM_PATH also failed.",
+          "resolution": "Verified official portable nvdisasm added only to subprocess PATH; final full analysis succeeds. Original failed probe logs retained under raw root."
+        },
+        {
+          "attempt": "ordinary-corpus-capture",
+          "outcome": "36 prior noncorrect cells fail again; no status transitions.",
+          "resolution": "Excluded from static qualification. This status comparison does not assert identical diagnostics or mechanisms; all prior baseline and focused failure histories are unchanged."
+        }
+      ],
+      "limitations": [
+        "Fresh runtime-route captures match original source/options but historical timed PTX was not retained, so exact timed-byte identity is not proved.",
+        "Offline SM89 ptxas output is not recorded driver-JIT code. PTX virtual declarations are not allocated registers.",
+        "Instruction counts are static, include helper bodies once in reachable totals, and do not describe trip counts or lane activity.",
+        "Executable section hashes include padding; exact class compares every named text section, not global data, relocations or module semantic equivalence. Entry-only equality is also reported but does not qualify the exact class.",
+        "Normalized PTX instruction equality omits declarations/global data and is not a semantic proof. Opcode similarity is SequenceMatcher with autojunk; similar profile threshold is heuristic.",
+        "No performance ratios are newly derived for short-interval cases. Prior dispatch observations retain their original scope and identity.",
+        "All three modes use ptxas default O3; NVVM O0 labels the earlier compilation route.",
+        "The shared-context case qualifies ordinary static capture but retains its earlier repeated-dispatch failure. Static-pair coverage is not runtime-pair coverage."
+      ],
+      "tooling": {
+        "extras/capture-nvvm-corpus-code.py": "6b2b77a799096bb0db7e00abb1f6b5ecba8e7c50539a0d8314865aee6f8f3e39",
+        "extras/analyze-nvvm-corpus-code.py": "6a19bce56efad3f66c06aedb4575b16a925a303293270f4bef159d442899a380",
+        "issue-nvvm-backend/test-nvvm-corpus-code-capture.py": "ebf37f093bd47e69db431db1b7fa03a0a287eea14d577f10d164412db3f4f502",
+        "issue-nvvm-backend/test-nvvm-corpus-code-analysis.py": "8960c215fd75303b361a2a1cdcf5e6e4b51683dd47ecc59f140679e1d0b038f6"
+      }
     }
   }
 }

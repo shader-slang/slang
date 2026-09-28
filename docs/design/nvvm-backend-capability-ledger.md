@@ -266,6 +266,27 @@ throughput or application-performance claim follows. See the
 [protocol](../../issue-nvvm-backend/RESULTS.md#original-input-corpus-dispatch-timing) and
 `corpus-dispatch-performance` in [current evidence](../../issue-nvvm-backend/focused-evidence.json).
 
+Fresh original-input code capture covers all 580 cases and three modes: 1,704 qualified cells,
+36 retained gaps, and 567 complete O3/O3 comparisons. Offline SM89 assembly finds 194 cases
+with identical bytes in every named executable section, 0 additional normalized-PTX matches,
+46 similar static profiles, 327 different profiles, and 13 incomplete comparisons.
+Similarity is a triage heuristic, not performance proof. NVVM uses fewer/equal/more hardware
+registers in 103/402/62 paired cases.
+The narrow masked min/max slowdown coexists with smaller PTX and fewer offline registers:
+eligible-mask fast paths and aggregate traversal differ. Floating min/max already uses trees,
+but retains mode selection within loops and repeated component traversal. Interface-return dispatch
+shows a separate tag/control-flow simplification opportunity (33→94 PTX, 40→104 SASS instructions);
+its short fixture does not support a runtime regression claim. Static metrics use fresh captures
+and offline ptxas, not historical timed PTX or recorded driver-JIT machine code. No new timings,
+compiler changes or broader feature qualification are implied.
+
+See the [capture tool](../../extras/capture-nvvm-corpus-code.py),
+[analyzer](../../extras/analyze-nvvm-corpus-code.py),
+[protocol](../../issue-nvvm-backend/RESULTS.md#original-input-corpus-code-quality) and
+`corpus-code-quality` in [current evidence](../../issue-nvvm-backend/focused-evidence.json).
+The current presentation includes every case, resource/instruction tables and six source/PTX/SASS
+case studies. Existing semantic qualifications and failure histories remain unchanged.
+
 ## Known gaps and evidence boundaries
 
 - The current main baseline retains 36 unresolved cells: three column-major host-packing mismatches

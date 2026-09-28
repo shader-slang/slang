@@ -1,6 +1,6 @@
 # NVVM current status
 
-The Monday results refresh is complete. This finite request does not resume feature development;
+The Monday results refresh and corpus code-quality comparison are complete. This finite request does not resume feature development;
 the next implementation still awaits the maintainer's scope decision below. Earlier authorization
 permits independently reviewed local commits, with regressions or maintainer decisions stopping
 continuation. Skip Slack; no push or system changes. Keep working plans, reports and raw artifacts
@@ -48,8 +48,10 @@ Compiler, provider, modules, configurations and original corpus bytes are unchan
 The fresh full checkpoint preserves all 1,740 exact outcomes and input identities. Native units,
 semantic regressions, runtime, toolkit and material compile/assembly gates were rerun successfully.
 Earlier focused GPU/static/ABI and material-runtime qualifications retain their original identities.
-Current raw evidence and the combined presentation are under
-`build/nvvm-results/2026-09-28-corpus-device1/` (`presentation-final/` and `monday-nvvm-data.zip`).
+Current code-quality evidence and the expanded presentation are under
+`build/nvvm-results/2026-09-28-corpus-code1/` (`presentation-final/` and `monday-nvvm-data.zip`).
+The unchanged original-input timing evidence remains under
+`build/nvvm-results/2026-09-28-corpus-device1/`.
 Earlier compilation and synthetic material measurements remain unchanged under
 `build/nvvm-results/2026-09-27-monday-refresh1/`.
 
@@ -69,7 +71,27 @@ enqueue gaps, and the shaders include correctness checks. They do not establish 
 throughput. All 78 excluded mode-round cells are retained: 72 reproduce the 36 accepted gaps;
 six expose the shared context repeatability issue below. See RESULTS for the full protocol.
 
+Fresh original-input code capture covers all 580 cases and three modes: 1,704 qualified cells,
+36 retained gaps, and 567 complete O3/O3 comparisons. Offline SM89 assembly finds 194 cases
+with identical bytes in every named executable section, 0 additional normalized-PTX matches,
+46 similar static profiles, 327 different profiles, and 13 incomplete comparisons.
+Similarity is a triage heuristic, not performance proof. NVVM uses fewer/equal/more hardware
+registers in 103/402/62 paired cases.
+The narrow masked min/max slowdown coexists with smaller PTX and fewer offline registers:
+eligible-mask fast paths and aggregate traversal differ. Floating min/max already uses trees,
+but retains mode selection within loops and repeated component traversal. Interface-return dispatch
+shows a separate tag/control-flow simplification opportunity (33→94 PTX, 40→104 SASS instructions);
+its short fixture does not support a runtime regression claim. Static metrics use fresh captures
+and offline ptxas, not historical timed PTX or recorded driver-JIT machine code. No new timings,
+compiler changes or broader feature qualification are implied.
+
 ## Boundaries and next action
+
+The code comparison prioritizes narrow integer wave fast paths, a collective lowering that shares
+aggregate traversal and separates loop-invariant algorithm selection, and investigation of
+post-inlining interface tag/payload simplification. Preserve floating operand-order semantics and
+measure each bounded change before assigning causes to whole-fixture timings. No implementation
+slice has started.
 
 - Checked memory/address plans remain authoritative. A transforming local-storage pass is deferred
   because the reviewed rewrite would leave existing conversion responsibilities in place. Recursive
