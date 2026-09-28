@@ -351,6 +351,34 @@ warning(
 )
 
 err(
+    "unsupported-serialized-module-version",
+    130,
+    "cannot load IR module version ~actualVersion; this compiler supports IR module versions ~minimumVersion through ~maximumVersion",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-version",
+    131,
+    "ignoring IR module version ~actualVersion because this compiler supports IR module versions ~minimumVersion through ~maximumVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+err(
+    "unsupported-serialized-module-format-version",
+    132,
+    "cannot load serialized module format version ~actualVersion; regenerate the serialized module with this compiler",
+    span { loc = "location" }
+)
+
+warning(
+    "ignoring-unsupported-serialized-module-format-version",
+    133,
+    "ignoring unsupported serialized module format version ~actualVersion; regenerate or remove the serialized module",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -506,6 +534,12 @@ err(
     "unable-to-set-default-downstream-compiler",
     87,
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
+)
+
+standalone_note(
+    "module-format-not-finalized",
+    88,
+    "the Slang module file format is not yet finalized and is not versioned across compiler releases; a compiled Slang module can only be loaded by the exact same Slang compiler version that produced it"
 )
 
 err("expecting-slang-riff-container", 89, "expecting a slang riff container")
@@ -2155,7 +2189,7 @@ err(
 )
 
 err(
-    "generic-argument-does-not-satisfy-constraint",
+    "generic-argument-does-not-satisfy-constraint", -- span message kept in sync with note E40023
     30440,
     "generic constraint not satisfied",
     span { loc = "location", message = "could not satisfy the generic constraint '~constraint:String'" }
@@ -4176,6 +4210,26 @@ standalone_note(
     span { loc = "location" }
 )
 
+-- Note-severity companions to the E38029 / E30440 constraint-failure errors, attached to the
+-- "no overload applicable" error for a rejected generic candidate. The DSL binds severity at
+-- definition time, so a note cannot reuse an error's text; each message string below is
+-- intentionally identical to the *span* message of E38029 / E30440 respectively (not that error's
+-- top-level header) and MUST be kept in sync — rewording either error's span message should update
+-- its companion note here (and vice versa).
+standalone_note(
+    "overload-candidate-type-argument-does-not-conform", -- keep in sync with E38029's span message
+    40022,
+    "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'",
+    span { loc = "location" }
+)
+
+standalone_note(
+    "overload-candidate-generic-constraint-not-satisfied", -- keep in sync with E30440's span message
+    40023,
+    "could not satisfy the generic constraint '~constraint:String'",
+    span { loc = "location" }
+)
+
 warning(
     "deprecated-generic-parameter-count-overload-tie-breaker",
     40021,
@@ -4438,6 +4492,12 @@ err(
     span { loc = "location", message = "generic entry point '~entryPoint:Name' must be specialized with concrete generic arguments (e.g. via '-specialize' or 'addEntryPointEx'); an unspecialized generic entry point cannot be compiled" }
 )
 
+err(
+    "entry-point-index-out-of-range",
+    38015,
+    "entry point index ~entryPointIndex:int is out of range; the program's entry-point count is ~entryPointCount:int"
+)
+
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
 -- (inlined from slang-diagnostics-semantic-checking-10.lua)
@@ -4574,7 +4634,7 @@ err(
 )
 
 err(
-    "type-argument-does-not-conform-to-interface",
+    "type-argument-does-not-conform-to-interface", -- span message kept in sync with note E40022
     38029,
     "type argument doesn't conform to interface",
     span { loc = "location", message = "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'" }

@@ -1197,8 +1197,15 @@ void MetalSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
 
 void MetalSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
-    // Does not apply to metal.
-    SLANG_UNUSED(decoration);
+    switch (decoration->getOp())
+    {
+    case kIROp_NoInlineDecoration:
+        m_writer->emit("__attribute__((noinline))\n");
+        break;
+
+    default:
+        break;
+    }
 }
 
 void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)

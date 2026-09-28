@@ -70,8 +70,11 @@ func fs_main(VertexOutput input)->FragmentOutput
     return output;
 }
 
-//WGSL: fn s_dispatch_IShape_getArea_{{[0-9]+}}( _S{{[0-9]+}} : u32, _S{{[0-9]+}} : AnyValue8) -> f32
-//WGSL-NEXT:{
-//WGSL-DAG:            return U_SR14switch_2Dxcase6Circle7getAreap0pf_wtwrapper_0(_S{{[0-9]+}});
-//WGSL-DAG:            return U_SR14switch_2Dxcase9Rectangle7getAreap0pf_wtwrapper_0(_S{{[0-9]+}});
-//WGSL:}
+// The witness-table dispatch switch below is force-inlined into `vs_main` (see
+// slang-ir-lower-dynamic-dispatch-insts.cpp) rather than living in a separately named
+// `s_dispatch_...` function, so what's checked is the surviving `switch` with calls into
+// both concrete `getArea` implementations.
+//WGSL: fn vs_main
+//WGSL: switch
+//WGSL-DAG: Circle_getArea_0
+//WGSL-DAG: Rectangle_getArea_0

@@ -326,7 +326,7 @@ Instrument the shader with per-function-entry coverage counters. Shares the synt
 
 <a id="trace-branch-coverage"></a>
 ### -trace-branch-coverage
-Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths, and for the true/false arms of scalar `?:` conditions and short-circuiting `&amp;&amp;` / `||` left operands. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
 <a id="trace-coverage-boolean"></a>
@@ -1872,6 +1872,7 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_position_raygen_closesthit_miss` 
 * `ser_nv_raygen` 
 * `ser_nv_raygen_closesthit_miss` 
 * `ser_nv_motion_raygen_closesthit_miss` 

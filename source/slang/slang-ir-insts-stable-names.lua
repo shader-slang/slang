@@ -575,6 +575,7 @@ return {
 	["IsUnsignedInt"] = 587,
 	["IsSignedInt"] = 588,
 	["IsVector"] = 589,
+	["IsBindlessTextureNVEncodable"] = 904,
 	["GetDynamicResourceHeap"] = 590,
 	["DispatchKernel"] = 596,
 	["CudaKernelLaunch"] = 597,

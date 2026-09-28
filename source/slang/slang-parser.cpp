@@ -10493,6 +10493,7 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
     GLSLLayoutLocalSizeAttribute* numThreadsAttrib = nullptr;
     GLSLLayoutDerivativeGroupQuadAttribute* derivativeGroupQuadAttrib = nullptr;
     GLSLLayoutDerivativeGroupLinearAttribute* derivativeGroupLinearAttrib = nullptr;
+    GLSLLayoutEarlyFragmentTestsAttribute* earlyFragmentTestsAttrib = nullptr;
     GLSLInputAttachmentIndexLayoutAttribute* inputAttachmentIndexLayoutAttribute = nullptr;
     ImageFormat format;
 
@@ -10558,6 +10559,11 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         {
             derivativeGroupLinearAttrib =
                 parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
+        }
+        else if (nameText == "early_fragment_tests")
+        {
+            earlyFragmentTestsAttrib =
+                parser->astBuilder->create<GLSLLayoutEarlyFragmentTestsAttribute>();
         }
         else if (findImageFormatByName(nameText.getUnownedSlice(), &format))
         {
@@ -10638,6 +10644,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         listBuilder.add(derivativeGroupQuadAttrib);
     if (derivativeGroupLinearAttrib)
         listBuilder.add(derivativeGroupLinearAttrib);
+    if (earlyFragmentTestsAttrib)
+        listBuilder.add(earlyFragmentTestsAttrib);
     if (inputAttachmentIndexLayoutAttribute)
         listBuilder.add(inputAttachmentIndexLayoutAttribute);
 

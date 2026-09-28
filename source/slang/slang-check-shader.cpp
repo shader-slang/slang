@@ -2110,6 +2110,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
+    // point, not on the function; lift it onto the fragment entry point as the canonical
+    // EarlyDepthStencilAttribute (as the local_size_* -> NumThreadsAttribute lift below does).
+    // Resolve the scope with getParentDecl, not the raw parentDecl: a *specialized* generic
+    // fragment entry point's immediate parent is the GenericDecl, not the module scope holding the
+    // EmptyDecl, so the raw parentDecl would miss the marker and silently drop the mode. Require
+    // the `in` direction: the qualifier is input-only, so `out;`/bare forms stay inert.
+    if (stage == Stage::Fragment && !entryPointFuncDecl->findModifier<EarlyDepthStencilAttribute>())
+    {
+        if (auto parentDecl = getParentDecl(entryPointFuncDecl))
+        {
+            for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+            {
+                if (emptyDecl->findModifier<GLSLLayoutEarlyFragmentTestsAttribute>() &&
+                    emptyDecl->findModifier<InModifier>())
+                {
+                    addModifier(
+                        entryPointFuncDecl,
+                        getCurrentASTBuilder()->create<EarlyDepthStencilAttribute>());
+                    break;
+                }
+            }
+        }
+    }
+
     // For compute, mesh, and amplification (task) entry points using GLSL
     // syntax, the thread group size is specified via layout(local_size_x = N)
     // on a sibling EmptyDecl rather than via [numthreads] on the entry point
