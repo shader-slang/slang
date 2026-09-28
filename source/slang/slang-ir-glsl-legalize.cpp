@@ -1055,6 +1055,15 @@ void createVarLayoutForLegalizedGlobalParam(
         auto decorParent = paramInfo;
         if (auto field = as<IRStructField>(decorParent))
             decorParent = field->getKey();
+        // A precise output field or parameter remains precise after scalarization.
+        // Keep that qualifier on the resulting output address so the SPIR-V backend
+        // can trace the values stored into it after the original declaration is gone.
+        if (kind == LayoutResourceKind::VaryingOutput &&
+            decorParent->findDecoration<IRPreciseDecoration>() &&
+            !globalParam->findDecoration<IRPreciseDecoration>())
+        {
+            builder->addSimpleDecoration<IRPreciseDecoration>(globalParam);
+        }
         if (auto interpolationModeDecor =
                 decorParent->findDecoration<IRInterpolationModeDecoration>())
         {

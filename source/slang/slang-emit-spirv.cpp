@@ -10567,15 +10567,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 workList.add(inst);
         };
 
-        // Seed from every `precise`-decorated value inside a function body, then walk backward
-        // to a fixpoint. Propagation stays within a function: a value computed in a callee is
+        // Seed from every `precise`-decorated value inside a function body and every
+        // legalized precise output address, then walk backward to a fixpoint. Propagation
+        // stays within a function: a value computed in a callee is
         // reached only if that callee is inlined before emit. Making a called function's body
         // precise for one precise call site -- without penalizing its other, non-precise
         // callers -- would require specializing the callee, which is out of scope here. (A
-        // `precise` global variable is likewise not covered: by the time the SPIR-V emitter
-        // runs, its decoration is no longer reachable from the module's global insts.)
+        // source-level `precise` global variable is likewise not covered: by the time the
+        // SPIR-V emitter runs, its decoration is no longer reachable from the module's
+        // global insts.)
         for (auto globalInst : m_irModule->getGlobalInsts())
         {
+            if (as<IRGlobalParam>(globalInst) && globalInst->findDecoration<IRPreciseDecoration>())
+                enqueue(globalInst);
             auto func = as<IRGlobalValueWithCode>(globalInst);
             if (!func)
                 continue;
