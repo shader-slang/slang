@@ -21,7 +21,7 @@ When control is transferred out of the block (i.e., the block is exited),
 [deferred statements](statements-defer.md) scheduled for that block are executed, regardless of how control
 is transferred. An exception is the `do` body of the
 [`do-catch` statement](statements-do-catch.md), which executes the pending deferred statements at the end
-of the `catch` body when an exception is caught. See [`defer` statement](statements-defer.md) for details.
+of the `catch` body when an error object is caught. See [`defer` statement](statements-defer.md) for details.
 
 A block may be empty. An empty block does nothing, and it is generally preferable to an
 [empty statement](statements-empty.md) when a statement is required but no action is wanted.

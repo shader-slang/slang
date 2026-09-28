@@ -7,7 +7,7 @@ Slang statements are divided into the following categories:
 
 - Control flow statements
 - Expression and declaration statements
-- Exception handling statements
+- Error handling statements
 - Miscellaneous statements
 
 Control flow statements define the control flow of the program. The control flow statements are:
@@ -36,11 +36,12 @@ successive statements in the current scope:
   [variable assignment](expressions-operators.md)) or indirectly (e.g., via a
   [call expression](expressions-operators.md)).
 
-Exception handling statements:
+Error handling statements provide a structured mechanism to handle errors. Errors are signaled by throwing
+error objects and handled by catching them. All thrown error objects must eventually be caught.
 
-- [`do-catch` statement](statements-do-catch.md) — handles exceptions thrown within its `do` body, including
-  those propagated from a [try expression](expressions-try.md).
-- [`throw` statement](statements-throw.md) — throws an exception.
+- [`do-catch` statement](statements-do-catch.md) — handles error objects thrown within its `do` body,
+  including those propagated from a [try expression](expressions-try.md).
+- [`throw` statement](statements-throw.md) — throws an error object.
 
 Miscellaneous:
 

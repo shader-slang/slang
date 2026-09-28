@@ -40,14 +40,14 @@ When the enclosing function returns, deferred statements are executed after the 
 been evaluated.
 
 If a deferred statement is scheduled within the `do` body of a
-[`do-catch` statement](statements-do-catch.md) and an exception is caught, the deferred statement is
+[`do-catch` statement](statements-do-catch.md) and an error object is caught, the deferred statement is
 executed after the `catch` body has been executed. This applies to every scope nested within the `do` body
-that is still active when the exception is thrown. The pending deferred statements of those scopes are
+that is still active when the error object is thrown. The pending deferred statements of those scopes are
 executed after the `catch` body, in LIFO order across the scopes. A nested scope that has already exited
 normally is unaffected, because its deferred statements were executed at that exit.
 
-If an exception propagates out of the enclosing function, the deferred statements of the exited scopes are
-executed before the exception is delivered to the `catch` body of the caller.
+If an error object propagates out of the enclosing function, the deferred statements of the exited scopes are
+executed before the error object propagates to the caller.
 
 A [`discard` statement](statements-discard.md) does not trigger the execution of deferred statements before
 the thread is disabled. As a result, pending deferred statements have no effect.
@@ -97,7 +97,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 ```
 
-A deferred statement and structured error handling:
+A deferred statement and error handling:
 
 ```hlsl
 struct DivisionByZero
@@ -148,14 +148,14 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         // if no error was thrown, the deferred statement is
         // executed here
     }
-    catch (ex : DivisionByZero)
+    catch (err : DivisionByZero)
     {
         // the divisor was zero, so report the dividend as the
         // result and flag the error
-        output[index].result = ex.dividend;
+        output[index].result = err.dividend;
         output[index].error = true;
 
-        // if an exception is caught, the deferred statement
+        // if an error object is caught, the deferred statement
         // is executed here
     }
 }

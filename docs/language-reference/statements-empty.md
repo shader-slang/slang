@@ -60,13 +60,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         output[tid.x + 16 * tid.y] =
             try checkedDivide(tid.x, tid.y);
     }
-    catch (ex : DivisionByZero)
+    catch (err : DivisionByZero)
     {
-        // Ignore this exception silently with an empty block.
+        // Ignore this error silently with an empty block.
         //
         // In Slang 2026, this can also be written as
         //
-        //    catch (ex : DivisionByZero) ;
+        //    catch (err : DivisionByZero) ;
         //
         // However, an empty statement in a catch body may
         // become an error in a future Slang version.
