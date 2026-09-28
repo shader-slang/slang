@@ -1738,9 +1738,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         break;
     }
 
-    // Having dealt with all of the cases where we *must* fold things
-    // above, we can now deal with the more general cases where we
-    // *should not* fold things.
     // Don't fold something with no users:
     if (!inst->hasUses())
         return false;
@@ -1778,6 +1775,11 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     SLANG_ASSERT(!use->nextUse);
 
     auto user = use->getUser();
+
+    // The target-intrinsic and `SwizzledStore` checks below look only at the direct `user`.
+    // When `user` is always folded, the text of `inst` can still be repeated through it,
+    // which repeats its evaluation but cannot reorder it, since `isSafeToFoldIntoUseSites`
+    // checks every point where it is emitted.
 
     // Check if the use is a call using a target intrinsic that uses the parameter more than once
     // in the intrinsic definition.
@@ -1877,16 +1879,18 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 bool CLikeSourceEmitter::isSafeToFoldIntoUseSites(IRInst* inst)
 {
     if (!m_foldSafetyCache)
-        return isSafeToFoldIntoUseSitesImpl(inst);
+        return isSafeToFoldIntoUseSitesUncached(inst);
     if (auto cached = m_foldSafetyCache->tryGetValue(inst))
         return *cached;
-    bool result = isSafeToFoldIntoUseSitesImpl(inst);
+    bool result = isSafeToFoldIntoUseSitesUncached(inst);
     m_foldSafetyCache->add(inst, result);
     return result;
 }
 
-bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesImpl(IRInst* inst)
+bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
 {
+    // The scan below follows the order of instructions within one block, so every user of
+    // `inst` has to be in that block.
     UInt remainingUseCount = 0;
     for (auto use = inst->firstUse; use; use = use->nextUse)
     {
@@ -1894,35 +1898,36 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesImpl(IRInst* inst)
             return false;
         remainingUseCount++;
     }
+    if (remainingUseCount == 0)
+        return true;
 
-    // We scan forward from `inst` once, counting off its uses as we reach their users, so
-    // the scan ends at the last use. Every earlier use lies inside that window, so if any
-    // instruction in it might have side effects, then lets bail out now.
-    for (auto ii = inst->getNextInst(); remainingUseCount != 0; ii = ii->getNextInst())
+    // Each use requires that nothing between `inst` and its user might have side effects.
+    // The window before the last use contains the windows of all the other uses, so we scan
+    // forward once and count off uses as we reach their users. A user's uses are counted
+    // before its own side effects are tested: the last user may have side effects, because
+    // they happen after it evaluates `inst`, but an earlier user may not, because the later
+    // uses would observe them.
+    for (auto ii = inst->getNextInst();; ii = ii->getNextInst())
     {
         if (!ii)
         {
-            // We somehow reached the end of the block without finding
-            // every user, which doesn't make sense if uses dominate
-            // defs. Let's just play it safe and bail out.
+            // Every user of `inst` follows it in this block and we count both operand and
+            // type uses, so valid IR never gets here. We bail out to be safe.
             return false;
         }
 
-        UInt useCountInII = 0;
+        UInt useCountOfInst = ii->getFullType() == inst ? 1 : 0;
         for (UInt i = 0; i < ii->getOperandCount(); i++)
         {
             if (ii->getOperand(i) == inst)
-                useCountInII++;
+                useCountOfInst++;
         }
-        if (useCountInII != 0)
+        if (useCountOfInst != 0)
         {
-            // As a safeguard, we should not allow an instruction that references
-            // a block parameter to be folded into a unconcditonal branch
-            // (which includes arguments for the parameters of the target block).
-            //
-            // For simplicity, we will just disallow folding of intructions
-            // into an unconditonal branch completely, and leave a more refined
-            // version of this check for later.
+            // As a safeguard, we do not fold an instruction into an unconditional branch,
+            // whose operands include the arguments for the parameters of its target block,
+            // or into an always-folded instruction whose text ends up in such a branch.
+            // A more refined version of this check is left for later.
             //
             if (as<IRUnconditionalBranch>(ii))
                 return false;
@@ -1937,14 +1942,17 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesImpl(IRInst* inst)
             // After `simplifyForEmit` defers the load of `s.a[...]` to its use, the IR is
             // `%i = load(%top); %p = getElementPtr(%a, %i); store(%top, ...); %f = load(%p)`.
             // `getElementPtr` is always folded, so `%p` is emitted inside `%f`, after the
-            // store, and folding `%i` into `%p` would read the decremented `s.top`.
+            // store, and folding `%i` into `%p` would read the decremented `s.top`. The
+            // recursive check applies every condition of this function at those points,
+            // including that they are in the same block and are not unconditional branches.
             //
             // A user whose policy is `WhenSafe` is only folded after passing this same test,
+            // because an override of `shouldFoldInstIntoUseSites` may only decline a fold,
             // so it needs no further check.
             if (getFoldPolicy(ii) == FoldPolicy::Always && !isSafeToFoldIntoUseSites(ii))
                 return false;
 
-            remainingUseCount -= useCountInII;
+            remainingUseCount -= useCountOfInst;
             if (remainingUseCount == 0)
                 return true;
         }
@@ -1952,7 +1960,6 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesImpl(IRInst* inst)
         if (ii->mightHaveSideEffects())
             return false;
     }
-    return true;
 }
 
 void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec)
@@ -3958,10 +3965,14 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
 
     // Now emit high-level code from that structured region tree.
     //
+    // We cache the results of `isSafeToFoldIntoUseSites` only from this point on. They depend
+    // on the positions and uses of the instructions in the body, which `fixValueScoping` has
+    // just changed, and emission itself only adds module-level types and constants.
+    //
+    SLANG_ASSERT(!m_foldSafetyCache);
     Dictionary<IRInst*, bool> foldSafetyCache;
-    auto outerFoldSafetyCache = m_foldSafetyCache;
     m_foldSafetyCache = &foldSafetyCache;
-    SLANG_DEFER(m_foldSafetyCache = outerFoldSafetyCache);
+    SLANG_DEFER(m_foldSafetyCache = nullptr);
     emitRegionTree(regionTree);
 }
 

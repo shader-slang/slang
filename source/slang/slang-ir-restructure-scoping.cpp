@@ -1,6 +1,7 @@
 // slang-ir-restructure-scoping.cpp
 #include "slang-ir-restructure-scoping.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir.h"
@@ -35,6 +36,17 @@ static SimpleRegion* getFirstRegionForInst(RegionTree* regionTree, IRInst* inst)
     }
 
     return nullptr;
+}
+
+/// Return true if code emitted for `region` can refer to `inst`, either because `inst` is
+/// defined outside the body of the function, or because `region` is nested inside a region
+/// for the block that defines `inst`.
+static bool isInstInScopeForRegion(RegionTree* regionTree, IRInst* inst, SimpleRegion* region)
+{
+    auto block = as<IRBlock>(inst->getParent());
+    if (!block || block->getParent() != regionTree->irCode)
+        return true;
+    return region->isDescendentOf(block);
 }
 
 /// Compute the depth of a node in the region tree.
@@ -199,7 +211,7 @@ static void fixValueScopingForInst(
     IRInst* def,
     SimpleRegion* defRegion,
     RegionTree* regionTree,
-    bool isInstAlwaysFolded)
+    const Func<bool, IRInst*>& shouldFoldInst)
 {
     // This algorithm should not consider "phi nodes" for now,
     // because the emit logic will already create variables for them.
@@ -207,6 +219,9 @@ static void fixValueScopingForInst(
     // into this function, but that would add a lot of complexity for now.
     if (def->getOp() == kIROp_Param)
         return;
+
+    bool isInstFolded = shouldFoldInst(def);
+    bool isInstCopiedToUses = false;
 
     // We would have a scoping violation if there exists some
     // use `u` of `def` such that the region containing `u`
@@ -293,13 +308,32 @@ static void fixValueScopingForInst(
         // If we've gotten this far, we know that `u` is a "bad"
         // use of `def`, and needs fixing.
         //
-        // For insts that are always fold into use sites, we try to hoist them
-        // to as early as possible, and then leave it there.
+        // A folded inst has no declaration of its own for a temporary to
+        // replace, so we first try to hoist it as early as possible.
         //
-        if (isInstAlwaysFolded)
+        if (isInstFolded)
         {
             def->removeFromParent();
             addHoistableInst(&builder, def);
+            if (isInstInScopeForRegion(regionTree, def, useRegion))
+                continue;
+
+            // Hoisting cannot move `def` above an operand that is defined in a region
+            // that does not enclose the use. Consider:
+            //
+            //     if (c) { x = s.a[t * 2]; } else { return 0; }
+            //     s.a[t * 2] = x + 7;
+            //
+            // Redundancy removal makes the store use the `getElementPtr` from the `if`
+            // block, and `t * 2` is a temporary declared in that block. The text of a
+            // folded `def` is emitted at each use anyway, so we give this use its own
+            // copy of `def`. Its operands then have a use in `useRegion`, which we fix
+            // below like any other bad use.
+            //
+            builder.setInsertBefore(user);
+            IRCloneEnv cloneEnv;
+            u->set(cloneInst(&cloneEnv, &builder, def));
+            isInstCopiedToUses = true;
             continue;
         }
 
@@ -426,9 +460,22 @@ static void fixValueScopingForInst(
         builder.setInsertBefore(tmp->getNextInst());
         defaultInitializeVar(&builder, tmp, def->getDataType());
     }
+
+    // The copies of `def` gave its operands new uses, which may be bad even if the
+    // operands have already been visited.
+    //
+    if (isInstCopiedToUses)
+    {
+        for (UInt i = 0; i < def->getOperandCount(); i++)
+        {
+            auto operand = def->getOperand(i);
+            if (auto operandRegion = getFirstRegionForInst(regionTree, operand))
+                fixValueScopingForInst(operand, operandRegion, regionTree, shouldFoldInst);
+        }
+    }
 }
 
-void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAlwaysFoldInst)
+void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldFoldInst)
 {
     // We are going to have to walk through every instruction
     // in the code of the function to detect an bad cases.
@@ -462,16 +509,15 @@ void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAl
         //
         // We defensively cache the next instruction to visit so that
         // we can continue our iteration after `inst` even if it gets
-        // moved. For now we are confident that the operations on
-        // `inst` won't affect `nextInst`, since the pass is not supposed
-        // to move or delete any *other* instructions.
+        // moved. The operations on `inst` won't affect `nextInst`: the
+        // only other instructions that the pass moves are operands of
+        // `inst`, directly or transitively, and those are defined before it.
         //
         IRInst* nextInst = nullptr;
         for (auto inst = block->getFirstOrdinaryInst(); inst; inst = nextInst)
         {
             nextInst = inst->getNextInst();
-            bool isInstAlwaysFolded = shouldAlwaysFoldInst(inst);
-            fixValueScopingForInst(inst, parentRegion, regionTree, isInstAlwaysFolded);
+            fixValueScopingForInst(inst, parentRegion, regionTree, shouldFoldInst);
         }
     }
 }

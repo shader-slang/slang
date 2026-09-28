@@ -36,6 +36,8 @@ void computeMain(uint groupIndex : SV_GroupIndex)
     float val = 0.0f;
 
     // InterlockedAdd
+    // Each pointer is held in a temporary because it is used again after the atomic, and the
+    // fold check does not move a value past an instruction with side effects.
     //MTL: array<uint, int(4)> threadgroup* [[UI:_S[0-9]+]] = {{.*}}shareMemUI
     //MTL: atomic_uint threadgroup*{{.*}}[[UI]]
     //LIB: call {{.*}}.atomic.local.add.u.i32

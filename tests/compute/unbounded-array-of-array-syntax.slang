@@ -36,6 +36,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
     // CHECK: OpStore %{{.*}} %[[N4]]
     // CUDA: Array<RWStructuredBuffer<int>>  g_aoa_0;
+    // `baseIndex` is held in a temporary because the element is used again after the
+    // `GetDimensions` call, and the fold check does not move a value past a call.
     // CUDA: [[BASE:baseIndex_[0-9]+]] = index_0 >> int(2);
     // CUDA: globalParams_0->g_aoa_0{{\[}}[[BASE]]{{\]}}.GetDimensions
     // CUDA: _S1{{\[}}[[BASE]]{{\]}}

@@ -21,6 +21,11 @@ struct IRInst;
 /// to survive across blocks are communicated through variables
 /// declared at a sufficiently broad scope.
 ///
-void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldAlwaysFoldInst);
+/// An instruction for which `shouldFoldInst` returns true has no declaration of its own,
+/// because its text is emitted as part of each use. Instead of a temporary, such an
+/// instruction is hoisted, or copied to a use that its hoisted position does not enclose,
+/// and its operands are then scoped for that use.
+///
+void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldFoldInst);
 
 } // namespace Slang
