@@ -2828,6 +2828,7 @@ local insts = {
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
+	{ IsBindlessTextureNVEncodable = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
 	{ TranslateBase = {
 		hoistable = true,
