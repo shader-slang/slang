@@ -4127,6 +4127,13 @@ err(
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
 )
 
+err(
+    "zero-width-bit-field-unsupported-in-msvc-packing",
+    31302,
+    "zero-width bit fields are not supported by `-bitfield-packing-rules msvc`",
+    span { loc = "location", message = "this zero-width bit field has no defined MSVC packing behavior in Slang" }
+)
+
 --
 -- 314xx: declaration nesting validation
 --

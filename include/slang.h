@@ -1034,7 +1034,7 @@ typedef uint32_t SlangSizeT;
     enum class BitfieldPackingRules
     {
         Default = 0,      // Pack from the least significant bit; fields may share a storage unit.
-        MSVC = 1,         // LSB-first; start a new unit when the underlying type size changes.
+        MSVC = 1,         // LSB-first; split on underlying type size. Reject zero-width bitfields.
         MSBFirstMSVC = 2, // Preserve the legacy MSB-first behavior of -msvc-style-bitfield-packing.
     };
 
