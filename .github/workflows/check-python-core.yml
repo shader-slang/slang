@@ -111,7 +111,7 @@ jobs:
               new_release_check, sweep, sweep_report, track, trend, \
               compare_repro, ladder_scaling, fetch_releases, slack_status"
 
-      - name: Test compile-perf sampling and provenance
+      - name: Test compile-perf sampling, provenance and confirmation
         run: python3 -m unittest discover -s tools/compile-perf -p 'test_*.py'
 
   # The compile-perf suite's only Windows consumer is the scheduled nightly,
@@ -155,5 +155,5 @@ jobs:
               new_release_check, sweep, sweep_report, track, trend, \
               compare_repro, ladder_scaling, fetch_releases, slack_status"
 
-      - name: Test compile-perf sampling and provenance
+      - name: Test compile-perf sampling, provenance and confirmation
         run: python -m unittest discover -s tools/compile-perf -p 'test_*.py'

@@ -67,6 +67,19 @@ timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per ru
   `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
   memory charts is that, not a bug) — see the Memory footprint section
   below.
+- **Nightly alert confirmation:** a warning (5%) or regression (10%) first
+  triggers one additional batch for the affected workloads on the same runner
+  and compiler. The rerun uses the original sizes, sample count (default five),
+  and warmup count. Only the same counter crossing the original, frozen
+  baseline in both batches can alert. Two error-level crossings are required
+  for a red alarm; an error followed by a warning confirms only a warning.
+  Clean runs do no extra measurements. A failed or incomplete rerun is an
+  evaluation failure, not recovery. Original graph points stay unchanged;
+  `daily/<label>/confirmation.json` preserves the baseline, candidate rows and
+  rerun's raw samples, and both batches are also uploaded as a CI artifact.
+  `confirm.py measure` runs before publication, while `confirm.py report`
+  emits the final verdict on the notification host. Direct `trend.py` calls
+  remain useful for inspecting unconfirmed historical changes.
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one

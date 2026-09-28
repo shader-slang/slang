@@ -179,6 +179,22 @@ def comparable_metric_values(current, points, key, provenance_keys):
     return values
 
 
+def save_candidates(args, current, window, regressions, warnings, notes):
+    """Freeze the first comparison before confirmation can change any measurements.
+
+    Rows retain the baseline median and the first batch's value. Saving the
+    window labels, thresholds and per-workload provenance makes the remote
+    reporting job independent of changes to the rolling history after this run.
+    """
+    with analyze.open_output(args.candidates) as fh:
+        json.dump({"label": current["label"], "runner": current.get("runner", ""),
+                   "metrics": current.get("metrics", {}),
+                   "baseline_labels": [p["label"] for p in window],
+                   "thresholds": {"rel": args.rel, "warn_rel": args.warn_rel, "abs": args.abs},
+                   "regressions": regressions, "warnings": warnings, "notes": notes},
+                  fh, indent=2)
+
+
 def main():
     # The Windows runner's Python defaults to a cp1252 console encoding, which
     # cannot encode this report's non-ASCII table headers — and the flag table
@@ -225,7 +241,11 @@ def main():
     # the label it registered so the right point is judged unconditionally.
     ap.add_argument("--label", default=None,
                     help="judge the point with this label instead of the last point")
+    ap.add_argument("--candidates", metavar="JSON",
+                    help="save the baseline and candidate changes for a confirmation run; "
+                         "do not emit performance alarms")
     args = ap.parse_args()
+    notes = []
 
     # argparse cannot express a relation between two options, so the gate's
     # central precondition is checked here. See check_threshold_order.
@@ -237,7 +257,10 @@ def main():
     series = analyze.read_json(tpath)
     pts = series.get("points", [])
     if len(pts) < 2:
-        print("not enough points to trend (need >= 2)")
+        msg = "not enough points to trend (need >= 2)"
+        print(msg)
+        if args.candidates:
+            save_candidates(args, pts[-1] if pts else {"label": args.label}, [], [], [], [msg])
         return
 
     hist_runner = series.get("runner", "")
@@ -311,14 +334,19 @@ def main():
                f"was built on '{hist_runner}'. Comparing against same-runner points "
                f"only; re-run perf-compile-release-sweep (force=true) to resync the "
                f"history to this machine.")
+        notes.append(msg)
         print(f"WARNING: {msg}")
-        emit_gha_command(f"::warning title=Perf runner mismatch::{msg}")
+        if not args.candidates:
+            emit_gha_command(f"::warning title=Perf runner mismatch::{msg}")
 
     if len(window) < args.min_baseline:
         msg = (f"only {len(window)} comparable trailing point(s) "
                f"(need {args.min_baseline}); skipping trend judgement.")
         print(msg)
-        emit_gha_command(f"::warning title=Perf trend::{msg}")
+        if args.candidates:
+            save_candidates(args, current, window, [], [], notes + [msg])
+        else:
+            emit_gha_command(f"::warning title=Perf trend::{msg}")
         return
 
     base_labels = f"{window[0]['label']}..{window[-1]['label']}"
@@ -402,9 +430,25 @@ def main():
                f"strategy ({listed}). A measurement-method change is not a "
                f"regression; judgement resumes once the window refills with "
                f"comparable points.")
+        notes.append(msg)
         print(f"WARNING: {msg}")
-        emit_gha_command(f"::warning title=Perf measurement provenance::{msg}")
+        if not args.candidates:
+            emit_gha_command(f"::warning title=Perf measurement provenance::{msg}")
 
+    if args.candidates:
+        save_candidates(args, current, window, regressions, warnings, notes)
+        return
+    report_changes(args, current, cur_runner, base_labels, len(window),
+                   regressions, warnings)
+
+
+def report_changes(args, current, cur_runner, base_labels, window_count,
+                   regressions, warnings):
+    """Render a classified comparison and publish its warning count and exit code.
+
+    The nightly confirmation reader uses this same renderer after checking the
+    second batch against the saved baseline; ad-hoc trend checks use it directly.
+    """
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
 
@@ -413,7 +457,7 @@ def main():
     # single "{args.abs} ms" would misreport the gate every memory counter is
     # actually judged against.
     mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", args.abs))
-    print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
+    print(f"baseline: trailing {window_count} point(s) [{base_labels}], "
           f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
           f">= {args.warn_rel}, both gated on an absolute delta of "
           f">= {args.abs} ms for timers / {mem_floor} for memory counters\n")
@@ -425,7 +469,7 @@ def main():
     # (EXIT_REGRESSION), so an `errors` key would be a second
     # spelling of the same fact — one that no reader would notice going stale.
     #
-    # This write must stay AHEAD of every path that leaves main() below — the
+    # This write must stay AHEAD of every path that leaves this renderer — the
     # clean-night `return` and the regression `SystemExit(EXIT_REGRESSION)`.
     # Both are exits
     # the workflow still reads the output on, and an unwritten key falls back
@@ -440,7 +484,7 @@ def main():
     if not regressions and not warnings:
         print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
         write_step_summary(f"### Compile-perf trend — {current['label']}\n\n"
-                f"OK — no regression vs trailing {len(window)}-point median "
+                f"OK — no regression vs trailing {window_count}-point median "
                 f"(`{base_labels}`).")
         return
 
@@ -453,7 +497,7 @@ def main():
     # without a unit for the same reason — fmt_qty puts the unit on each value.
     print(f"{'workload':20s}{'counter':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
     rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
-            f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
+            f"\nvs trailing {window_count}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
 
     def table(items, kind, gha):

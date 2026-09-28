@@ -32,7 +32,7 @@ import sys
 # 5-10% warning tier, which is what a yellow triangle beside a yellow circle
 # conveys.
 REGRESSION = (":red_circle:",
-              "Regression detected (>=10% over trailing median) — see CI run "
+              "Regression confirmed on rerun (>=10% over trailing median) — see CI run "
               "for details")
 JOB_FAILED = (":x:", "Nightly job failed — see CI run for details")
 TREND_ERROR = (":x:", "Trend check could not evaluate this run — see CI run "
@@ -68,7 +68,7 @@ EXIT_CANNOT_EVALUATE = 2
 def warnings_status(n):
     """The yellow warning-tier line for `n` warning-level changes."""
     return (":large_yellow_circle:",
-            f"{n} warning-level change(s) (>=5%, below the 10% error gate) "
+            f"{n} confirmed warning-level change(s) (>=5%, below the 10% error gate) "
             f"— see CI summary")
 
 
@@ -181,7 +181,7 @@ def main():
 # ladder could not have.
 assert classify("success", "success", 0) == CLEAN
 assert classify("success", "success", 3)[0] == ":large_yellow_circle:"
-assert "3 warning-level" in classify("success", "success", 3)[1]
+assert "3 confirmed warning-level" in classify("success", "success", 3)[1]
 assert classify("skipped", "success", 0) == NOT_RUN
 assert classify("failure", "failure", 0, EXIT_REGRESSION) == REGRESSION
 assert classify("", "failure", 0) == JOB_FAILED
