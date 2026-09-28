@@ -105,6 +105,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     CommandLineReader reader(&args, &sink);
 
     List<CommandLineArg> positionalArgs;
+    bool hasCudaDispatchCounts = false;
 
     typedef Options::ShaderProgramType ShaderProgramType;
     typedef Options::InputLanguageID InputLanguageID;
@@ -226,6 +227,35 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         else if (argValue == "-performance-profile")
         {
             outOptions.performanceProfile = true;
+        }
+        else if (argValue == "-cuda-dispatch-profile")
+        {
+            SLANG_RETURN_ON_FAIL(reader.expectArg(outOptions.cudaDispatchProfile));
+        }
+        else if (argValue == "-cuda-dispatch-warmups" || argValue == "-cuda-dispatch-samples")
+        {
+            String value;
+            SLANG_RETURN_ON_FAIL(reader.expectArg(value));
+            int count = 0;
+            bool valid = value.getLength() > 0;
+            for (auto c : value.getUnownedSlice())
+            {
+                if (c < '0' || c > '9' || count > 1000)
+                {
+                    valid = false;
+                    break;
+                }
+                count = count * 10 + c - '0';
+            }
+            bool isSamples = argValue == "-cuda-dispatch-samples";
+            if (!valid || count > 1000 || (isSamples && count == 0))
+            {
+                stdError.print(
+                    "error: CUDA dispatch counts require warmups 0..1000 and samples 1..1000\n");
+                return SLANG_E_INVALID_ARG;
+            }
+            (isSamples ? outOptions.cudaDispatchSamples : outOptions.cudaDispatchWarmups) = count;
+            hasCudaDispatchCounts = true;
         }
         else if (argValue == "-output-using-type")
         {
@@ -380,6 +410,21 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         return SLANG_FAIL;
     }
 
+    if (hasCudaDispatchCounts && !outOptions.cudaDispatchProfile.getLength())
+    {
+        stdError.print("error: CUDA dispatch counts require -cuda-dispatch-profile\n");
+        return SLANG_E_INVALID_ARG;
+    }
+    if (outOptions.cudaDispatchProfile.getLength() &&
+        (outOptions.deviceType != DeviceType::CUDA ||
+         outOptions.shaderType != ShaderProgramType::Compute ||
+         !outOptions.outputPath.getLength() || outOptions.onlyStartup ||
+         outOptions.performanceProfile))
+    {
+        stdError.print(
+            "error: CUDA dispatch profiling requires CUDA compute, -o, and exclusive profiling\n");
+        return SLANG_E_INVALID_ARG;
+    }
     return SLANG_OK;
 }
 

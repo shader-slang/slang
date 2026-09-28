@@ -70,6 +70,11 @@ struct Options
 
     bool performanceProfile = false;
 
+    // Write checked CUDA dispatch event samples to a separate JSONL file.
+    Slang::String cudaDispatchProfile;
+    int cudaDispatchWarmups = 3;
+    int cudaDispatchSamples = 9;
+
     bool dontAddDefaultEntryPoints = false;
 
     bool disableDebugInfo = false;

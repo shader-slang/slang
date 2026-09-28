@@ -280,6 +280,63 @@ exclusions, slower cases and distribution plots visible. These ratios do not pre
 application compile time, and quartiles do not establish statistical significance. Whole-census
 elapsed time includes setup and validation; it supplies neither compile latency nor GPU performance.
 
+## Original-input corpus dispatch timing
+
+`extras/measure-nvvm-corpus-runtime.py` measures the original 452 frozen / 128 discovery contracts
+through render-test. Use the qualified optimized harness, unchanged compiler/provider bytes and
+the CUDA environment above. Run without competing builds, GPU suites or CPU-heavy reviews.
+
+```bash
+python3 issue-nvvm-backend/test-nvvm-corpus-runtime.py
+python3 extras/test-cuda-dispatch-profile.py --output "$NVVM_RESULTS/dispatch-contracts"
+python3 extras/measure-nvvm-corpus-runtime.py --output "$NVVM_RESULTS/corpus-dispatch"
+```
+
+Each invocation requires a new repository-local output path without whitespace or quotes, because
+the test directive parser does not remove shell quoting. The runner preserves the original shader,
+TEST_INPUT, dispatch size, specialization and output oracle in disposable mirrors. It explicitly
+selects NVRTC O3/NVVM O0/NVVM O3 and release `-g0`. Final legacy compiler arguments are intentional:
+render-test extracts uppercase `-Xslang` first, then appends legacy `-compile-arg`/`-xslang` options.
+An original legacy `-O3` or `-g2` must not override the requested measurement mode.
+
+The fixed protocol has two rounds with reversed case/mode order, three warmups and nine samples
+per case/mode/round, plus one reference dispatch. A single test server executes each batch serially.
+Native CUDA events bracket the RHI compute pass. **The interval includes the global-parameter
+upload and host enqueue gaps; it is not kernel-only time.** Compilation, specialization, command
+encoding, allocation, reset and output readback remain outside the events. Clocks are not locked;
+brief workloads do not establish steady-state peak-clock performance.
+
+The harness binds once and snapshots every registered buffer/counter and texture subresource.
+Before every launch it restores the same allocations outside timing, preserving resolved addresses
+and packed input data. It uses a fresh RHI command buffer with the retained root object. Every
+repeat must match the reference's existing output serialization exactly; the ordinary test oracle
+must separately accept that reference. Serialization can contain aggregate padding, so equality
+can conservatively exclude cases. Focused contracts cover explicitly initialized per-invocation
+static globals. The bare static aggregate in `nvvm-copyable-kernel-context` fails repetition in
+both backends and remains excluded pending resolution of its initialization contract. Arbitrary
+persistent external device globals are not a supported replay contract.
+
+The runner attempts every selected cell, retains failed sidecars/logs, rejects incomplete or ambiguous
+batch execution and never retries silently. `manifest.json` freezes the cases, options, schedule,
+provenance and all mirrored inputs/oracles. `results.json` binds each cell to its original-oracle
+result, sidecar, reference output and batch log. Reporting revalidates those bindings, hashes,
+inventories and classifications. `per-case.csv` includes pooled and round medians; `samples.csv`
+contains every accepted measured sample; `paired.csv` and `summary.json` retain complete pairs and
+explicit exclusions. Regenerate them with `--report-only --output EXISTING_DIRECTORY` while the
+recorded raw artifacts remain available and unchanged.
+
+Keep short intervals visible. Ratios are withheld unless all three modes have both rounds and all
+three pooled medians reach 0.1 ms. This is a conservative publication cutoff, not calibrated CUDA
+resolution or proof of reliable speedup. Round ratios additionally require that round's medians to
+reach the cutoff. Do not infer application throughput from these original correctness fixtures or
+combine their dispatch intervals with the separately measured material kernels.
+
+Changes to this shared harness or corpus runner require the full checkpoint and native/semantic,
+toolkit and runner gates above, plus the focused replay contracts. Preserve exact old outcomes and
+review the intentional harness identity transition before replacing accepted evidence. Raw attempts,
+sample files and generated charts stay under ignored `build/`; current qualifications belong in the
+`corpus-dispatch-performance` entry of focused evidence, replacing superseded observations in place.
+
 ## Fixed simple-shader quality subset
 
 ```bash

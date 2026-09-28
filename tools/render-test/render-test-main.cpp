@@ -24,11 +24,15 @@
 #pragma comment(lib, "advapi32")
 #endif
 
+#include <cmath>
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
 #include <stdio.h>
 #include <stdlib.h>
+#if defined(RENDER_TEST_CUDA)
+#include <slang-rhi/cuda-driver-api.h>
+#endif
 #define ENABLE_RENDERDOC_INTEGRATION 0
 
 #if ENABLE_RENDERDOC_INTEGRATION
@@ -231,6 +235,198 @@ struct TestResourceContext
     List<ComPtr<IResource>> resources;
 };
 
+#if defined(RENDER_TEST_CUDA)
+// Keep the initialized allocations alive and restore their bytes, rather than reapplying
+// TEST_INPUT. For example, data=[otherBuffer] contains a resolved device address after binding,
+// and stride=1 data has already been packed. Rebinding would mutate that representation again.
+struct DispatchResourceSnapshot
+{
+    ComPtr<IBuffer> buffer;
+    ComPtr<ITexture> texture;
+    ComPtr<ISlangBlob> data;
+    SubresourceLayout layout = {};
+    uint32_t layer = 0;
+    uint32_t mip = 0;
+};
+
+static Result captureDispatchResources(
+    IDevice* device,
+    const TestResourceContext& context,
+    List<DispatchResourceSnapshot>& snapshots)
+{
+    for (const auto& resource : context.resources)
+    {
+        DispatchResourceSnapshot snapshot;
+        resource->queryInterface(IBuffer::getTypeGuid(), (void**)snapshot.buffer.writeRef());
+        if (snapshot.buffer)
+        {
+            SLANG_RETURN_ON_FAIL(device->readBuffer(
+                snapshot.buffer,
+                0,
+                snapshot.buffer->getDesc().size,
+                snapshot.data.writeRef()));
+            snapshots.add(snapshot);
+            continue;
+        }
+        resource->queryInterface(ITexture::getTypeGuid(), (void**)snapshot.texture.writeRef());
+        if (snapshot.texture)
+        {
+            const auto& desc = snapshot.texture->getDesc();
+            for (uint32_t layer = 0; layer < desc.getLayerCount(); ++layer)
+            {
+                for (uint32_t mip = 0; mip < desc.mipCount; ++mip)
+                {
+                    snapshot.layer = layer;
+                    snapshot.mip = mip;
+                    SLANG_RETURN_ON_FAIL(device->readTexture(
+                        snapshot.texture,
+                        layer,
+                        mip,
+                        snapshot.data.writeRef(),
+                        &snapshot.layout));
+                    snapshots.add(snapshot);
+                }
+            }
+            continue;
+        }
+        ComPtr<ISampler> sampler;
+        resource->queryInterface(ISampler::getTypeGuid(), (void**)sampler.writeRef());
+        if (!sampler)
+        {
+            StdWriters::getError().print("error: unsupported CUDA dispatch replay resource\n");
+            return SLANG_FAIL;
+        }
+        // Samplers are immutable. All buffer and texture allocations, including hidden counters,
+        // were captured above regardless of whether they are marked as outputs.
+    }
+    return SLANG_OK;
+}
+
+static Result restoreDispatchResources(
+    ICommandQueue* queue,
+    const List<DispatchResourceSnapshot>& snapshots)
+{
+    ComPtr<ICommandEncoder> encoder;
+    SLANG_RETURN_ON_FAIL(queue->createCommandEncoder({}, encoder.writeRef()));
+    for (const auto& snapshot : snapshots)
+    {
+        if (snapshot.buffer)
+        {
+            SLANG_RETURN_ON_FAIL(encoder->uploadBufferData(
+                snapshot.buffer,
+                0,
+                snapshot.data->getBufferSize(),
+                snapshot.data->getBufferPointer()));
+        }
+        else
+        {
+            SubresourceData data = {};
+            data.data = snapshot.data->getBufferPointer();
+            data.rowPitch = snapshot.layout.rowPitch;
+            data.slicePitch = snapshot.layout.slicePitch;
+            SubresourceRange range = {snapshot.layer, 1, snapshot.mip, 1};
+            SLANG_RETURN_ON_FAIL(encoder->uploadTextureData(
+                snapshot.texture,
+                range,
+                {},
+                snapshot.layout.size,
+                &data,
+                1));
+        }
+    }
+    ComPtr<ICommandBuffer> commands;
+    SLANG_RETURN_ON_FAIL(encoder->finish({}, commands.writeRef()));
+    SLANG_RETURN_ON_FAIL(queue->submit(commands));
+    return queue->waitOnHost();
+}
+
+static Result checkDispatchCudaResult(CUresult result)
+{
+    if (result == CUDA_SUCCESS)
+        return SLANG_OK;
+    const char* name = "unknown CUDA error";
+    cuGetErrorName(result, &name);
+    StdWriters::getError().print("error: CUDA dispatch profiling: %s\n", name);
+    return SLANG_FAIL;
+}
+
+// Callbacks bracket the RHI compute pass on its own CUDA stream. This measures the dispatch
+// interval, including RHI's global-parameter upload and host enqueue gaps, not kernel-only time.
+struct DispatchEventTimer
+{
+    CUevent events[2] = {};
+    CUstream streams[2] = {};
+    uint32_t calls[2] = {};
+    CUresult result = CUDA_SUCCESS;
+
+    ~DispatchEventTimer() { close(); }
+
+    Result close()
+    {
+        Result status = SLANG_OK;
+        for (auto& event : events)
+        {
+            if (event)
+            {
+                if (SLANG_FAILED(checkDispatchCudaResult(cuEventDestroy(event))))
+                    status = SLANG_FAIL;
+                event = nullptr;
+            }
+        }
+        return status;
+    }
+
+    static void SLANG_MCALL record(
+        const ExecuteCallbackContext* context,
+        void* userObject,
+        const void* userData,
+        Size userDataSize)
+    {
+        auto timer = static_cast<DispatchEventTimer*>(userObject);
+        SLANG_RELEASE_ASSERT(userDataSize == sizeof(uint32_t));
+        uint32_t index;
+        memcpy(&index, userData, sizeof(index));
+        SLANG_RELEASE_ASSERT(index < 2);
+        ++timer->calls[index];
+        if (context->nativeHandle.type != NativeHandleType::CUstream)
+        {
+            timer->result = CUDA_ERROR_INVALID_HANDLE;
+            return;
+        }
+        timer->streams[index] = reinterpret_cast<CUstream>(context->nativeHandle.value);
+        if (timer->result == CUDA_SUCCESS)
+            timer->result = cuEventRecord(timer->events[index], timer->streams[index]);
+    }
+
+    void encode(ICommandEncoder* encoder, uint32_t index)
+    {
+        ExecuteCallbackDesc callback = {};
+        callback.callback = record;
+        callback.userObject = this;
+        callback.userData = &index;
+        callback.userDataSize = sizeof(index);
+        encoder->executeCallback(callback);
+    }
+};
+
+// The sidecar is incremental so a failed or interrupted run never resembles completed evidence.
+struct DispatchProfileFile
+{
+    FILE* file = nullptr;
+    bool completed = false;
+    ~DispatchProfileFile()
+    {
+        if (file)
+        {
+            if (!completed)
+                fputs("{\"record\":\"summary\",\"status\":\"failed\"}\n", file);
+            fclose(file);
+        }
+    }
+    Result flush() { return fflush(file) == 0 && !ferror(file) ? SLANG_OK : SLANG_FAIL; }
+};
+#endif
+
 
 class RenderTestApp
 {
@@ -249,6 +445,8 @@ public:
     Result applyBinding(IShaderObject* rootObject);
     void setProjectionMatrix(IShaderObject* rootObject);
     Result writeBindingOutput(const String& fileName);
+    Result writeBindingOutput(ISlangWriter* writer);
+    Result profileCudaDispatch();
 
     Result writeScreen(const String& filename);
 
@@ -601,7 +799,7 @@ struct AssignValsFromLayoutContext
                 // resource, then assign to that.
                 ShaderInputLayout::BufferVal counterVal;
                 counterVal.bufferData.add(srcBuffer.counter);
-                assignBuffer(explicitCounterCursor, &counterVal);
+                SLANG_RETURN_ON_FAIL(assignBuffer(explicitCounterCursor, &counterVal));
             }
             else
             {
@@ -1358,7 +1556,7 @@ void RenderTestApp::finalize()
 Result RenderTestApp::writeBindingOutput(const String& fileName)
 {
     // Wait until everything is complete
-    m_queue->waitOnHost();
+    SLANG_RETURN_ON_FAIL(m_queue->waitOnHost());
 
     FILE* f = nullptr;
     if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
@@ -1366,7 +1564,11 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
         return SLANG_FAIL;
     }
     FileWriter writer(f, WriterFlags(0));
+    return writeBindingOutput(&writer);
+}
 
+Result RenderTestApp::writeBindingOutput(ISlangWriter* writer)
+{
     for (auto outputItem : m_outputPlan.items)
     {
         auto resource = outputItem.resource;
@@ -1378,8 +1580,9 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
             const size_t bufferSize = bufferDesc.size;
 
             ComPtr<ISlangBlob> blob;
-            m_device->readBuffer(buffer, 0, bufferSize, blob.writeRef());
+            auto readResult = m_device->readBuffer(buffer, 0, bufferSize, blob.writeRef());
             buffer->release();
+            SLANG_RETURN_ON_FAIL(readResult);
 
             if (!blob)
             {
@@ -1403,13 +1606,15 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 typeLayout,
                 blob->getBufferPointer(),
                 bufferSize,
-                &writer);
+                writer);
             SLANG_RETURN_ON_FAIL(res);
         }
         else
         {
             auto typeName = outputItem.typeLayout->getName();
             printf("invalid output type '%s'.\n", typeName ? typeName : "UNKNOWN");
+            if (m_options.cudaDispatchProfile.getLength())
+                return SLANG_FAIL;
         }
     }
     return SLANG_OK;
@@ -1428,8 +1633,152 @@ Result RenderTestApp::writeScreen(const String& filename)
         layout.rowPitch);
 }
 
+Result RenderTestApp::profileCudaDispatch()
+{
+#if !defined(RENDER_TEST_CUDA)
+    StdWriters::getError().print("error: CUDA dispatch profiling is unavailable in this build\n");
+    return SLANG_FAIL;
+#else
+    DispatchProfileFile report;
+    if (File::exists(m_options.cudaDispatchProfile) ||
+        fopen_s(&report.file, m_options.cudaDispatchProfile.getBuffer(), "wb") != 0 || !report.file)
+    {
+        StdWriters::getError().print("error: CUDA dispatch profile requires a new writable file\n");
+        return SLANG_FAIL;
+    }
+    fprintf(
+        report.file,
+        "{\"record\":\"header\",\"schema_version\":1,"
+        "\"scope\":\"cuda-dispatch-including-global-parameter-upload-and-host-enqueue-gaps\","
+        "\"timing\":\"cuda-event-ms\",\"warmups\":%d,\"samples\":%d}\n",
+        m_options.cudaDispatchWarmups,
+        m_options.cudaDispatchSamples);
+    SLANG_RETURN_ON_FAIL(report.flush());
+
+    DeviceScope deviceScope(m_device);
+    DispatchEventTimer timer;
+    for (auto& event : timer.events)
+        SLANG_RETURN_ON_FAIL(checkDispatchCudaResult(cuEventCreate(&event, CU_EVENT_DEFAULT)));
+    NativeHandle queueHandle;
+    SLANG_RETURN_ON_FAIL(m_queue->getNativeHandle(&queueHandle));
+    if (queueHandle.type != NativeHandleType::CUstream)
+        return SLANG_FAIL;
+    auto expectedStream = reinterpret_cast<CUstream>(queueHandle.value);
+
+    ComPtr<IShaderObject> rootObject;
+    SLANG_RETURN_ON_FAIL(m_device->createRootShaderObject(m_shaderProgram, rootObject.writeRef()));
+    SLANG_RETURN_ON_FAIL(applyBinding(rootObject));
+    if (m_outputPlan.items.getCount() == 0)
+    {
+        StdWriters::getError().print("error: CUDA dispatch profiling requires an output oracle\n");
+        return SLANG_FAIL;
+    }
+    // Capture each allocation's initialized bytes once. The root object retains its bindings and
+    // specialization arguments, while each dispatch gets a fresh single-use RHI command buffer.
+    List<DispatchResourceSnapshot> snapshots;
+    SLANG_RETURN_ON_FAIL(captureDispatchResources(m_device, m_resourceContext, snapshots));
+    uint64_t resetBytes = 0;
+    for (const auto& snapshot : snapshots)
+        resetBytes += snapshot.data->getBufferSize();
+    fprintf(
+        report.file,
+        "{\"record\":\"resources\",\"allocations\":%lld,\"snapshots\":%lld,"
+        "\"reset_bytes\":%llu,\"outputs\":%lld}\n",
+        (long long)m_resourceContext.resources.getCount(),
+        (long long)snapshots.getCount(),
+        (unsigned long long)resetBytes,
+        (long long)m_outputPlan.items.getCount());
+    SLANG_RETURN_ON_FAIL(report.flush());
+
+    String referenceOutput;
+    int launchCount = 1 + m_options.cudaDispatchWarmups + m_options.cudaDispatchSamples;
+    for (int launch = 0; launch < launchCount; ++launch)
+    {
+        SLANG_RETURN_ON_FAIL(restoreDispatchResources(m_queue, snapshots));
+        ComPtr<ICommandEncoder> encoder;
+        SLANG_RETURN_ON_FAIL(m_queue->createCommandEncoder({}, encoder.writeRef()));
+        timer.encode(encoder, 0);
+        auto pass = encoder->beginComputePass();
+        pass->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()), rootObject);
+        pass->dispatchCompute(
+            m_options.computeDispatchSize[0],
+            m_options.computeDispatchSize[1],
+            m_options.computeDispatchSize[2]);
+        pass->end();
+        timer.encode(encoder, 1);
+        ComPtr<ICommandBuffer> commands;
+        SLANG_RETURN_ON_FAIL(encoder->finish({}, commands.writeRef()));
+        timer.calls[0] = timer.calls[1] = 0;
+        timer.result = CUDA_SUCCESS;
+        SLANG_RETURN_ON_FAIL(m_queue->submit(commands));
+        SLANG_RETURN_ON_FAIL(m_queue->waitOnHost());
+        SLANG_RETURN_ON_FAIL(checkDispatchCudaResult(timer.result));
+        if (timer.calls[0] != 1 || timer.calls[1] != 1 || timer.streams[0] != expectedStream ||
+            timer.streams[1] != expectedStream)
+        {
+            StdWriters::getError().print("error: incomplete CUDA dispatch event callbacks\n");
+            return SLANG_FAIL;
+        }
+        float milliseconds = 0;
+        SLANG_RETURN_ON_FAIL(checkDispatchCudaResult(
+            cuEventElapsedTime(&milliseconds, timer.events[0], timer.events[1])));
+        if (!std::isfinite(milliseconds) || milliseconds < 0)
+            return SLANG_FAIL;
+
+        StringBuilder output;
+        StringWriter writer(&output);
+        SLANG_RETURN_ON_FAIL(writeBindingOutput(&writer));
+        bool equal = launch == 0 || output.getUnownedSlice() == referenceOutput.getUnownedSlice();
+        if (launch == 0)
+        {
+            referenceOutput = output.produceString();
+            // slang-test applies the unchanged TEST_OUTPUT/FileCheck oracle to this reference.
+            // Equality of every subsequent serialized output transfers that oracle to every row.
+            SLANG_RETURN_ON_FAIL(File::writeAllText(m_options.outputPath, referenceOutput));
+        }
+        const char* phase = launch == 0                               ? "reference"
+                            : launch <= m_options.cudaDispatchWarmups ? "warmup"
+                                                                      : "sample";
+        int index = launch == 0 ? 0
+                    : launch <= m_options.cudaDispatchWarmups
+                        ? launch - 1
+                        : launch - 1 - m_options.cudaDispatchWarmups;
+        fprintf(
+            report.file,
+            "{\"record\":\"launch\",\"phase\":\"%s\",\"index\":%d,\"device_ms\":%.9g,"
+            "\"output_equal\":%s,\"start_callbacks\":1,\"end_callbacks\":1}\n",
+            phase,
+            index,
+            double(milliseconds),
+            equal ? "true" : "false");
+        SLANG_RETURN_ON_FAIL(report.flush());
+        if (!equal)
+        {
+            StdWriters::getError().print(
+                "error: CUDA dispatch output is not repeatable after reset\n");
+            return SLANG_FAIL;
+        }
+    }
+    SLANG_RETURN_ON_FAIL(timer.close());
+    fprintf(
+        report.file,
+        "{\"record\":\"summary\",\"status\":\"completed\",\"launches\":%d,"
+        "\"warmups\":%d,\"samples\":%d}\n",
+        launchCount,
+        m_options.cudaDispatchWarmups,
+        m_options.cudaDispatchSamples);
+    SLANG_RETURN_ON_FAIL(report.flush());
+    report.completed = true;
+    auto file = report.file;
+    report.file = nullptr;
+    return fclose(file) == 0 ? SLANG_OK : SLANG_FAIL;
+#endif
+}
+
 Result RenderTestApp::update()
 {
+    if (m_options.cudaDispatchProfile.getLength())
+        return profileCudaDispatch();
     auto encoder = m_queue->createCommandEncoder();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
@@ -2049,9 +2398,10 @@ static SlangResult _innerMain(
         RenderTestApp app;
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app.initialize(session, deviceWrapper.get(), options, input));
-        app.update();
+        auto updateResult = app.update();
         renderDocEndFrame();
         app.finalize();
+        SLANG_RETURN_ON_FAIL(updateResult);
     }
 
     return SLANG_OK;

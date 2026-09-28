@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "status": "accepted-identity",
-  "meaning": "Exact accepted compiler/provider/standard-module/configuration/layout identity for Half-vector helper integer-bit transport; old focused measurements retain their original tested binaries.",
-  "verified_repository_revision": "3c250bff847674a72bb95c89b19841620c920d72",
+  "meaning": "Exact accepted compiler/provider/standard-module/configuration/layout identity after the corpus-dispatch harness qualification. Compiler and provider unchanged; earlier focused evidence retains its original binaries.",
+  "verified_repository_revision": "481ce48d1080a87490071c25bc20c4136f9a02fc",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "2bdc74eb56dff3717319ef2f84ac8e09b9bd3fb549977e8af265aa06b37d026f"
+    "sha256": "e965f82b137cc2daea3f49baa6947183150a1d1fda7c5c74128cf52a69d6b115"
   },
   "unit_component_refresh": {
     "path": "build/nvvm-half-vector-helper-abi/unit-component-refresh.json",
@@ -20,12 +20,12 @@
     "sha256": "a8b194918c17a18d45d12ec3ab29ce51fa26e408f697ecd8e1a7309ca9f05c6f"
   },
   "corpus_execution_provenance": {
-    "path": "build/nvvm-half-vector-helper-abi/checkpoint/provenance.json",
-    "sha256": "e1d532d2a23178e821176461463448b0d71e7efe4405853b86a03220095bc189"
+    "path": "build/nvvm-results/2026-09-28-corpus-device1/checkpoint/provenance.json",
+    "sha256": "448af095aebb0c56210d0fc29e76f52200e6c2510b6a678b62a4b0a5478334a9"
   },
   "verification_evidence": {
-    "path": "build/nvvm-half-vector-helper-abi/fixture-refresh/provenance.json",
-    "sha256": "613e7d75ad1edb9ee3a9de96a9fb636b4d95f4e52b802755d9fa447c020d15ba"
+    "path": "build/nvvm-results/2026-09-28-corpus-device1/qualification-audit.json",
+    "sha256": "e0e89a19cae1fc36853a84ce82a2d0b10380b026742239ab7eb817740ee34096"
   },
   "accepted_identity": {
     "revision": "3c250bff847674a72bb95c89b19841620c920d72",
@@ -43,7 +43,7 @@
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "dfa51d92efd77c566d18cb2d750ee37492b044ea2cfef4f4248564b7a7f3333b",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "24812f7f6d637ec7009e02034fc698fb99b8cdf010176dd1b72d81fc9f1310ac",
-    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
+    "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "dc48eac65c46d563630b48052650dafd199035879f635693be7bd84893a16113",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
@@ -258,11 +258,11 @@
       "mode": 420
     },
     "lib/librender-test-tool.so": {
-      "sha256": "15e8286564c6596fc2cc90d7d0108047545d5c049311c4c344222ca5d7a3b948",
+      "sha256": "dc48eac65c46d563630b48052650dafd199035879f635693be7bd84893a16113",
       "mode": 493
     },
     "lib/librender-test-tool.so.dwarf": {
-      "sha256": "024d5c8ff5cc653a1fea76892aa5d4a2823749bac219281f90a0edfef29b4abf",
+      "sha256": "b508ab2fff95adafcb569eea241a00ac8f6cc49200452f119ff3c24fbe4ca702",
       "mode": 420
     },
     "lib/libslang-compiler.so": {
@@ -512,8 +512,33 @@
     }
   },
   "device": "name, uuid, driver_version, compute_cap\nNVIDIA L4, GPU-502ada78-9ff3-cb9f-3e8e-e60d8c98c5a9, 580.126.09, 8.9\n",
-  "final_candidate_review": {
+  "compiled_source_repository_revision": "3c250bff847674a72bb95c89b19841620c920d72",
+  "harness_component_refresh": {
+    "path": "build/nvvm-results/2026-09-28-corpus-device1/identity-transition.json",
+    "sha256": "15f133453e4a1c352f19940dced826a719415bedfd442b7c0bca58cb1ff8d162"
+  },
+  "measurement_source_sha256": {
+    "tools/render-test/options.h": "7dd383a2c6930ee61d765050b7df0c8c0df608e66a80ebe57bc5f88b5b88537d",
+    "tools/render-test/options.cpp": "472e5709a33a3623e7ff5fb9c43ea06b5cce932e1c6b5196920a74f07171604c",
+    "tools/render-test/render-test-main.cpp": "bf54ca88a9a2b104a3ed2316d1fc6433c75f7ecdb78efdff514ddbc6e4a567c8",
+    "extras/test-cuda-dispatch-profile.py": "ea9f3a79cb2b3d7b9f784e64b3714e27c528208cf8e9e3b7cb685f85a569b47d",
+    "extras/measure-nvvm-corpus-runtime.py": "6d9f183f5f6a1a4690c21da859d53a9f0939f7ada6f9f4d3dee0c378d192ef89",
+    "issue-nvvm-backend/test-nvvm-corpus-runtime.py": "1c2d2b2b000f9da0820a50b2242a19ceed6405561a0de859bafee6571207ca95",
+    "tests/cuda/dispatch-profile-replay.slang": "1a8109485d63aa3b4fdbf8f89135c15d2fed48aba24e36519e04fed68e21a5ca",
+    "tests/cuda/dispatch-profile-texture-replay.slang": "a11033229ac81fb212ac903e5b59ac95da39966c15ecd635b4e7378476bc9802",
+    "external/slang-rhi/include/slang-rhi/cuda-driver-api.h": "351181cf152cb65e306f11ec6545582c422f3c72283edadbd5b1a2b590273fa1",
+    "external/slang-rhi/src/cuda/cuda-command.cpp": "75047c7729c9f574f4b34979369a79713a060ee903e39047c580afa90ff9f489"
+  },
+  "source_review": {
+    "path": "build/nvvm-results/2026-09-28-corpus-device1/source-runner-review.json",
+    "sha256": "1dae2507659b129bc248ca319f24d1f9f78f183932d17737ae6aa453944d078c"
+  },
+  "previous_final_candidate_review": {
     "path": "build/nvvm-half-vector-helper-abi/review/final-candidate.json",
     "sha256": "2d12375eb5dff2f32c98cc9758c3d271b08712e76951691c2d20182a539dffef"
+  },
+  "final_candidate_review": {
+    "path": "build/nvvm-results/2026-09-28-corpus-device1/final-candidate-review.json",
+    "sha256": "4af95d79278bddb267ed3c82b4f9faf7f6cdd3039d4f0592b0ae6c6278a55421"
   }
 }

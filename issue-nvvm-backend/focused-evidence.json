@@ -4,8 +4,11 @@
   "meaning": "Selected focused qualifications outside the full baseline. Each feature retains its own tested identity, outcomes and failed attempts. The top-level baseline/archive revision applies to the older archived features, not later qualifications. Replace by feature after reviewed qualification, retaining failure transitions. Historical paths resolve through HISTORY.md.",
   "archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "baseline": {
-    "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "2bdc74eb56dff3717319ef2f84ac8e09b9bd3fb549977e8af265aa06b37d026f"
+    "path": "build/nvvm-results/2026-09-28-corpus-device1/before-accepted-baseline.json",
+    "sha256": "2bdc74eb56dff3717319ef2f84ac8e09b9bd3fb549977e8af265aa06b37d026f",
+    "revision": "481ce48d1080a87490071c25bc20c4136f9a02fc",
+    "repository_path": "issue-nvvm-backend/accepted-baseline.json",
+    "meaning": "Historical baseline inherited by earlier features; use accepted-baseline.json for current full qualification. Each newer feature retains its own explicit evidence."
   },
   "features": {
     "inheritance-initialization-constants": {
@@ -2860,7 +2863,7 @@
         {
           "attempt": "independent-normal-control-v1",
           "outcome": "Independent closed-form check caught a missing denominator in a reviewer shortcut before GPU execution.",
-          "resolution": "Corrected denominator to 1+alpha\u00b2; actual scalar reference and source were unchanged.",
+          "resolution": "Corrected denominator to 1+alpha²; actual scalar reference and source were unchanged.",
           "evidence": {
             "path": "build/nvvm-material-sample/review/scalar-replay.v1.json",
             "sha256": "8ffa7f200d59a8f02c43a469194f57f87dda1776de7786f5f2182c5af53b97fc"
@@ -7762,6 +7765,587 @@
         "Equal-case aggregate ratios do not predict application compilation cost. Observed differences and IQRs do not establish statistical significance.",
         "Frozen/discovery test elapsed time is not kernel runtime; only the separately qualified material protocol supplies device-event observations."
       ]
+    },
+    "corpus-dispatch-performance": {
+      "status": "accepted-with-explicit-exclusions",
+      "meaning": "Original-input CUDA dispatch observations for all frozen/discovery contracts, distinct from whole-test wall time, standalone PTX and synthetic material timing.",
+      "retention": "Replace this feature after an independently reviewed timing refresh, preserving unresolved/resolved repeatability and failed-attempt histories. Raw profiles, mirrors, samples and presentations remain ignored under build/.",
+      "compiler_identity": {
+        "source_compiler_revision": "3c250bff847674a72bb95c89b19841620c920d72",
+        "source_compiler_patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+        "compiler_version": "2026.18.3-329-g3c250bff8",
+        "provider_abi": 42
+      },
+      "harness_identity": {
+        "render_test_sha256": "dc48eac65c46d563630b48052650dafd199035879f635693be7bd84893a16113",
+        "transition": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/identity-transition.json",
+          "sha256": "15f133453e4a1c352f19940dced826a719415bedfd442b7c0bca58cb1ff8d162"
+        },
+        "current_source_sha256": {
+          "tools/render-test/options.h": "7dd383a2c6930ee61d765050b7df0c8c0df608e66a80ebe57bc5f88b5b88537d",
+          "tools/render-test/options.cpp": "472e5709a33a3623e7ff5fb9c43ea06b5cce932e1c6b5196920a74f07171604c",
+          "tools/render-test/render-test-main.cpp": "bf54ca88a9a2b104a3ed2316d1fc6433c75f7ecdb78efdff514ddbc6e4a567c8",
+          "extras/test-cuda-dispatch-profile.py": "ea9f3a79cb2b3d7b9f784e64b3714e27c528208cf8e9e3b7cb685f85a569b47d",
+          "extras/measure-nvvm-corpus-runtime.py": "6d9f183f5f6a1a4690c21da859d53a9f0939f7ada6f9f4d3dee0c378d192ef89",
+          "issue-nvvm-backend/test-nvvm-corpus-runtime.py": "1c2d2b2b000f9da0820a50b2242a19ceed6405561a0de859bafee6571207ca95",
+          "tests/cuda/dispatch-profile-replay.slang": "1a8109485d63aa3b4fdbf8f89135c15d2fed48aba24e36519e04fed68e21a5ca",
+          "tests/cuda/dispatch-profile-texture-replay.slang": "a11033229ac81fb212ac903e5b59ac95da39966c15ecd635b4e7378476bc9802",
+          "external/slang-rhi/include/slang-rhi/cuda-driver-api.h": "351181cf152cb65e306f11ec6545582c422f3c72283edadbd5b1a2b590273fa1",
+          "external/slang-rhi/src/cuda/cuda-command.cpp": "75047c7729c9f574f4b34979369a79713a060ee903e39047c580afa90ff9f489"
+        },
+        "source_review": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/source-runner-review.json",
+          "sha256": "1dae2507659b129bc248ca319f24d1f9f78f183932d17737ae6aa453944d078c"
+        }
+      },
+      "protocol": {
+        "scope": "cuda-dispatch-including-global-parameter-upload-and-host-enqueue-gaps",
+        "rounds": 2,
+        "warmups": 3,
+        "samples": 9,
+        "ratio_min_median_ms": 0.1
+      },
+      "selection": {
+        "cases": 580,
+        "sources": 576,
+        "frozen_cases": 452,
+        "discovery_cases": 128,
+        "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+        "debug_info": "g0",
+        "ordering": "Case and mode order reversed in second round; strict per-batch execution-order validation."
+      },
+      "counts": {
+        "mode_round_cells": 3480,
+        "measured": 3402,
+        "excluded": 78,
+        "accepted_reference_launches": 3402,
+        "accepted_warmup_launches": 10206,
+        "accepted_sample_launches": 30618,
+        "complete_three_mode_cases": 566,
+        "short_interval_cases": 557,
+        "ratio_eligible_cases": 9
+      },
+      "corpora": {
+        "frozen": {
+          "short-interval": 447,
+          "incomplete": 3,
+          "ratio-eligible": 2
+        },
+        "discovery": {
+          "short-interval": 110,
+          "incomplete": 11,
+          "ratio-eligible": 7
+        }
+      },
+      "longer_cases": [
+        {
+          "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-max.slang#cuda-1",
+          "corpus": "frozen",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 0.122304,
+          "nvvm_o0_ms": 0.263567999,
+          "nvvm_o3_ms": 0.2554399965,
+          "nvrtc_over_nvvm_o3": 0.4787973758056327,
+          "nvrtc_over_nvvm_o0": 0.46403205421004085,
+          "round0_nvrtc_over_nvvm_o3": 0.48387096164477106,
+          "round1_nvrtc_over_nvvm_o3": 0.47617857570793864
+        },
+        {
+          "id": "hlsl-intrinsic/wave-multi/wave-multi-prefix-min.slang#cuda-1",
+          "corpus": "frozen",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 0.1025119985,
+          "nvvm_o0_ms": 0.267264009,
+          "nvvm_o3_ms": 0.2131040025,
+          "nvrtc_over_nvvm_o3": 0.48104210759720484,
+          "nvrtc_over_nvvm_o0": 0.3835608052261163,
+          "round0_nvrtc_over_nvvm_o3": 0.47936601283628294,
+          "round1_nvrtc_over_nvvm_o3": 0.4807692211986293
+        },
+        {
+          "id": "cuda/nvvm-fp32-minmax-order.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 0.110592,
+          "nvvm_o0_ms": 0.289792001,
+          "nvvm_o3_ms": 0.267264009,
+          "nvrtc_over_nvvm_o3": 0.41379308951397187,
+          "nvrtc_over_nvvm_o0": 0.3816254403792187,
+          "round0_nvrtc_over_nvvm_o3": 0.40839696635392025,
+          "round1_nvrtc_over_nvvm_o3": 0.42611436527871954
+        },
+        {
+          "id": "cuda/nvvm-fp64-minmax-order.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 0.315391988,
+          "nvvm_o0_ms": 0.5774399935,
+          "nvvm_o3_ms": 0.5544959899999999,
+          "nvrtc_over_nvvm_o3": 0.5687903856617611,
+          "nvrtc_over_nvvm_o0": 0.5461900657215216,
+          "round0_nvrtc_over_nvvm_o3": 0.5674150465759469,
+          "round1_nvrtc_over_nvvm_o3": 0.5726086259107137
+        },
+        {
+          "id": "cuda/nvvm-fp64-prefix-minmax-order.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 0.317440003,
+          "nvvm_o0_ms": 0.618496001,
+          "nvvm_o3_ms": 0.590848029,
+          "nvrtc_over_nvvm_o3": 0.5372616771477798,
+          "nvrtc_over_nvvm_o0": 0.5132450371332312,
+          "round0_nvrtc_over_nvvm_o3": 0.5346020884513003,
+          "round1_nvrtc_over_nvvm_o3": 0.5426079460325577
+        },
+        {
+          "id": "cuda/nvvm-narrow-masked-minmax.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 6.9335041,
+          "nvvm_o0_ms": 25.669632,
+          "nvvm_o3_ms": 14.648448,
+          "nvrtc_over_nvvm_o3": 0.47332687394596346,
+          "nvrtc_over_nvvm_o0": 0.2701053174428056,
+          "round0_nvrtc_over_nvvm_o3": 0.4732610814992971,
+          "round1_nvrtc_over_nvvm_o3": 0.4733936511356968
+        },
+        {
+          "id": "cuda/nvvm-i64-masked-minmax.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 6.12556791,
+          "nvvm_o0_ms": 31.45113565,
+          "nvvm_o3_ms": 13.03457595,
+          "nvrtc_over_nvvm_o3": 0.4699476172832458,
+          "nvrtc_over_nvvm_o0": 0.1947646017672497,
+          "round0_nvrtc_over_nvvm_o3": 0.4699037942453786,
+          "round1_nvrtc_over_nvvm_o3": 0.4699504889958809
+        },
+        {
+          "id": "cuda/nvvm-fp16-masked-minmax.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 3.075584055,
+          "nvvm_o0_ms": 5.472304104999999,
+          "nvvm_o3_ms": 5.61766386,
+          "nvrtc_over_nvvm_o3": 0.547484529449934,
+          "nvrtc_over_nvvm_o0": 0.5620272550624269,
+          "round0_nvrtc_over_nvvm_o3": 0.5474161780836776,
+          "round1_nvrtc_over_nvvm_o3": 0.5475756714286567
+        },
+        {
+          "id": "cuda/nvvm-fp8-scalar-transport.slang#discovery-1",
+          "corpus": "discovery",
+          "status": "ratio-eligible",
+          "nvrtc_o3_ms": 0.190048002,
+          "nvvm_o0_ms": 0.2554080035,
+          "nvvm_o3_ms": 0.19609600300000002,
+          "nvrtc_over_nvvm_o3": 0.969157958818773,
+          "nvrtc_over_nvvm_o0": 0.7440957189894796,
+          "round0_nvrtc_over_nvvm_o3": 0.9789473639304883,
+          "round1_nvrtc_over_nvvm_o3": 0.9596760743029731
+        }
+      ],
+      "observations": "Eight longer wave/min/max fixtures show NVVM O3 intervals 1.76–2.42 times NVRTC O3; FP8 scalar transport is near parity at 1.03. These targeted correctness workloads include shader checks and do not define general shader throughput.",
+      "correctness": {
+        "original_outcomes_preserved": 1740,
+        "input_deltas": [],
+        "checkpoint": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/checkpoint/checkpoint.json",
+          "sha256": "9a07daa4e7e109a4c9b526e61f957aa630b741a6182bf5e3563a6d072a4ff625"
+        },
+        "qualification": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/qualification-audit.json",
+          "sha256": "e0e89a19cae1fc36853a84ce82a2d0b10380b026742239ab7eb817740ee34096"
+        },
+        "exclusion_transition": "72 exclusions reproduce all36 prior non-correct mode cells in two rounds; six additional exclusions are copyable-context repeatability failures. No previously non-correct cell becomes measured."
+      },
+      "repeatability_failure": {
+        "status": "diagnosed-uninitialized-private-state-in-both-backends",
+        "case": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+        "scope": "Bounded read-only diagnosis; no tracked file/binary modifications, no input or oracle changes, no performance measurements accepted from diagnostics.",
+        "original_source": {
+          "path": "tests/cuda/nvvm-copyable-kernel-context.slang",
+          "sha256": "60d1c5d9e4655c13dd63b8074d190eb7f1ec9078dc683f8c060403a8edabd641"
+        },
+        "conclusion": "The shader assumes its uninitialized static aggregate state is zero before assigning it. Both CUDA source and NVVM emit that state as uninitialized per-invocation local KernelContext storage. Explicit flag/visits initializers are preserved; state has no initializer body from the first dumped IR. This is a shared initialization/fixture semantic issue exposed by repeated dispatch, not an NVVM-only performance result.",
+        "inference": "Reused GPU local storage makes later reads observe nonzero previous state; source/PTX prove undefined initial bytes, while host debugger proves the third launch returns32zero failure sentinels instead of6400..6431. GPU local-memory contents were not directly inspected.",
+        "open_semantic_decision": "Confirm intended bare static aggregate initialization guarantee before deciding whether producer initialization must be synthesized or the fixture needs an explicit initializer. No fix authorized/applied in this bounded diagnosis.",
+        "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+        "rounds": [0, 1],
+        "evidence": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/copyable-context-diagnosis/diagnosis.json",
+          "sha256": "f95dfb4bc22485089faecdf1b11500c3fcc24da6d6a1d184d54505b1e3670c53"
+        }
+      },
+      "preparation_history": [
+        {
+          "status": "resolved",
+          "issue": "Build prototype used IWriter instead of ISlangWriter.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/worker-build1.log",
+            "sha256": "53420d10d14186a3557eb541179c7000a087b40b20523f9892e36c20d1005b5a"
+          }
+        },
+        {
+          "status": "resolved",
+          "issue": "Raw cuda.h function declarations collided with the existing RHI dynamic function-pointer API, causing SIGSEGV; use public RHI CUDA driver table.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/worker-review.md",
+            "sha256": "bfde3b3fe5fd3514d7d2d91b5bd92097e625bc1ed7f4d69aa0dbc70bf3309a3c"
+          }
+        },
+        {
+          "status": "resolved",
+          "issue": "Absolute test selectors selected no tests; use repository-relative selectors.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/worker-review.md",
+            "sha256": "bfde3b3fe5fd3514d7d2d91b5bd92097e625bc1ed7f4d69aa0dbc70bf3309a3c"
+          }
+        },
+        {
+          "status": "resolved",
+          "issue": "Reused command buffer was retired on wait; preserve root/resources and build a fresh command buffer per launch. Callback checks caught zero executions.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/worker-review.md",
+            "sha256": "bfde3b3fe5fd3514d7d2d91b5bd92097e625bc1ed7f4d69aa0dbc70bf3309a3c"
+          }
+        },
+        {
+          "status": "open-feature-boundary",
+          "issue": "Layered NVVM surface-write preflight rejects GenericAsm; keep the layered/3D/cube fixture NVRTC-only and supported native32 2D texture replay in allthree modes.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/worker-review.md",
+            "sha256": "bfde3b3fe5fd3514d7d2d91b5bd92097e625bc1ed7f4d69aa0dbc70bf3309a3c"
+          }
+        },
+        {
+          "status": "resolved",
+          "issue": "First pilot quoted profile paths; directive lexer preserves quotes, so all18 profiles failed to open. Validate and use unquoted no-whitespace paths; freshpilot2 has18 accepted measurements and6 known column-major failures.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/pilot1/results.json",
+            "sha256": "0dea516341cf8f1d3417af1db3e8c6e9d283e9e8ec7e9634ceb64d1d609d3d0f"
+          }
+        },
+        {
+          "status": "resolved",
+          "issue": "Final parser guard verifies actual batch case order, not just membership; final13 CPU contracts and pilot revalidation pass. Scheduling and harness bytes unchanged.",
+          "evidence": {
+            "path": "build/nvvm-results/2026-09-28-corpus-device1/source-runner-review.json",
+            "sha256": "1dae2507659b129bc248ca319f24d1f9f78f183932d17737ae6aa453944d078c"
+          }
+        }
+      ],
+      "raw": {
+        "collection/manifest.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/manifest.json",
+          "sha256": "23fea2f811fb999723141ca211b8ca068b4663d7f23d1f753a5dd25f29cd38f1"
+        },
+        "collection/results.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/results.json",
+          "sha256": "edbb544b28325eb5209e41cb5d082f2265473c1f1120ac3819951ed0c9ed0e87"
+        },
+        "collection/summary.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/summary.json",
+          "sha256": "8c2bff04e18dc796f602134967ec25713631c7d9aec109c0c5cdbfcff257d43b"
+        },
+        "collection/provenance.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/provenance.json",
+          "sha256": "f5171fe61accc397bf87e76b367bafeebeb40806cc4d116ac6cbe347b9bf491e"
+        },
+        "collection/per-case.csv": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/per-case.csv",
+          "sha256": "163a2f50ca8b08e3d852a48bd2f3c73d1d1783ff72d6d954f3d3c5329a06b72a"
+        },
+        "collection/paired.csv": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/paired.csv",
+          "sha256": "c61222d47742032db743464cabba2760b214ada58f18c95fca450644db9a5a47"
+        },
+        "collection/samples.csv": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/samples.csv",
+          "sha256": "4730eb325f4a9617cca846e617d325b4801f74d08d5dce46c9cb853baefb53f0"
+        },
+        "collection-process.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection-process.json",
+          "sha256": "19146f8053a38d69b4cd8e27a74fb3d898278e809893a09130a9e3330eb81c7a"
+        },
+        "copyable-context-diagnosis/diagnosis.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/copyable-context-diagnosis/diagnosis.json",
+          "sha256": "f95dfb4bc22485089faecdf1b11500c3fcc24da6d6a1d184d54505b1e3670c53"
+        },
+        "presentation-inventory.json": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/presentation-inventory.json",
+          "sha256": "1ccb37e1646e4d31d9b69580aeb8b0a7c74e5e583be2adc6e6c6b8cf0a09e469"
+        }
+      },
+      "review": {
+        "path": "build/nvvm-results/2026-09-28-corpus-device1/measurement-review.json",
+        "sha256": "59d844a393cb023310667234bc481bfd621973c24ea92c515cfb2b0f3586a78d"
+      },
+      "limits": [
+        "CUDA event intervals include RHI global-parameter upload and host enqueue gaps. Compilation, specialization, encoding, allocations, resets and readback are excluded.",
+        "Original inputs and dispatch sizes retained; most tests launch little work. No ratio below the prespecified 0.1ms pooled-median threshold in any mode; cutoff is policy, not calibrated resolution or proof of statistical significance.",
+        "Clocks are not locked. Brief workloads need not reach steady-state peak clocks.",
+        "Exact serialized-repeat comparison may conservatively reject aggregate padding changes; the context failure is typeduint32 failure output, not padding.",
+        "No arbitrary persistent external device globals, new shader support, application frame times or performance qualification of prior standalone CLI PTX bytes."
+      ],
+      "exclusions": {
+        "total_mode_round_cells": 78,
+        "prior_noncorrect_mode_round_cells": 72,
+        "new_repeatability_mode_round_cells": 6,
+        "cases": [
+          {
+            "corpus": "frozen",
+            "id": "compute/byte-address-buffer-atomic-mixed-width-12265.slang#cuda-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "frozen",
+            "id": "compute/texture-subscript.slang#cuda-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "compute/constexpr.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "compute/texture-get-dimensions.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "compute/texture-subscript-multisample.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "compute/non-square-column-major.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "runtime-mismatch"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "runtime-mismatch"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "runtime-mismatch"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "language-feature/pointer/data-layouts.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "compute/atomics-buffer.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "language-feature/pointer/redundant-coherent-load.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "infrastructure"
+              }
+            }
+          },
+          {
+            "corpus": "discovery",
+            "id": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+            "modes": {
+              "nvrtc-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "correct"
+              },
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "correct"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "correct"
+              }
+            }
+          },
+          {
+            "corpus": "frozen",
+            "id": "cuda/require-prelude.slang#cuda-1",
+            "modes": {
+              "nvvm-o0": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "preflight"
+              },
+              "nvvm-o3": {
+                "rounds": [0, 1],
+                "accepted_original_classification": "preflight"
+              }
+            }
+          }
+        ],
+        "raw_results": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/collection/results.json",
+          "sha256": "edbb544b28325eb5209e41cb5d082f2265473c1f1120ac3819951ed0c9ed0e87"
+        },
+        "presentation_table": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/presentation-final/corpus-runtime-exclusions.csv",
+          "sha256": "b05a7920519637170af22bbfd667afcc53e529b359dea9f01ebdad3e04b77bd2"
+        }
+      }
     }
   }
 }
