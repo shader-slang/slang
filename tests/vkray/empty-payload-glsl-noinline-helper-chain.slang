@@ -95,7 +95,7 @@ void main()
 // The physical type contains exactly one uint. Neither original logical type is emitted.
 // GLSL-NOT: struct Payload
 // GLSL-NOT: struct Empty_
-// GLSL: struct [[physicalType:Empty(Ray|Callable)Payload[A-Za-z0-9_]*]]
+// GLSL: struct [[physicalType:Dummy(Ray|Callable)Payload[A-Za-z0-9_]*]]
 // GLSL-NEXT: {
 // GLSL-NEXT: uint _slang_dummy{{[A-Za-z0-9_]*}};
 // GLSL-NEXT: };

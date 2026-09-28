@@ -26,7 +26,7 @@ void main()
     }
 }
 
-// CHECK: OpMemberName %[[payloadType:EmptyRayPayload[A-Za-z0-9_]*]] 0 "_slang_dummy"
+// CHECK: OpMemberName %[[payloadType:DummyRayPayload[A-Za-z0-9_]*]] 0 "_slang_dummy"
 // CHECK: %[[uint:[A-Za-z0-9_]+]] = OpTypeInt 32 0
 // CHECK: %[[payloadType]] = OpTypeStruct %[[uint]]{{$}}
 // CHECK: %[[pointer:[A-Za-z0-9_]+]] = OpTypePointer RayPayloadKHR %[[payloadType]]

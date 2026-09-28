@@ -143,17 +143,18 @@ struct RayTracingPayloadLegalizationContext
 {
     IRModule* module;
     TargetProgram* targetProgram;
-    IRStructType* emptyRayPayloadType = nullptr;
-    IRStructType* emptyCallablePayloadType = nullptr;
+    IRStructType* dummyRayPayloadType = nullptr;
+    IRStructType* dummyCallablePayloadType = nullptr;
     Dictionary<IRGlobalVar*, IRGlobalVar*> physicalGlobals;
     Dictionary<IRType*, IRStructType*> forcedStructTypes;
     Dictionary<IRType*, IRStructType*> forcedRayPayloadTypes;
 
-    // Return a nonempty physical type without changing the source payload type. Even direct
-    // SPIR-V uses a real field here, so unmodified empty-type legalization can preserve it.
-    IRStructType* getEmptyPayloadType(bool isRayPayload)
+    // Return the cached dummy struct for this payload role, creating it on first use. Its single
+    // uint field provides physical storage without changing the original empty source type.
+    // Even direct SPIR-V uses a real field so ordinary empty-type legalization preserves it.
+    IRStructType* getOrCreateDummyPayloadType(bool isRayPayload)
     {
-        auto& type = isRayPayload ? emptyRayPayloadType : emptyCallablePayloadType;
+        auto& type = isRayPayload ? dummyRayPayloadType : dummyCallablePayloadType;
         if (type)
             return type;
         IRBuilder builder(module);
@@ -161,7 +162,7 @@ struct RayTracingPayloadLegalizationContext
         type = builder.createStructType();
         builder.addNameHintDecoration(
             type,
-            UnownedStringSlice(isRayPayload ? "EmptyRayPayload" : "EmptyCallablePayload"));
+            UnownedStringSlice(isRayPayload ? "DummyRayPayload" : "DummyCallablePayload"));
         auto key = builder.createStructKey();
         builder.addNameHintDecoration(key, UnownedStringSlice("_slang_dummy"));
         builder.createStructField(type, key, builder.getUIntType());
@@ -178,20 +179,20 @@ struct RayTracingPayloadLegalizationContext
     //
     // Ordinary type legalization can erase p, but native HLSL CallShader still requires its
     // second argument. Immediately before that call, this function inserts the following IR
-    // (shown schematically), using the one-uint type from getEmptyPayloadType:
+    // (shown schematically), using the one-uint type from getOrCreateDummyPayloadType:
     //
-    //     dummy = var EmptyCallablePayload;
-    //     store(dummy, makeStruct(EmptyCallablePayload, 0u));
+    //     dummy = var DummyCallablePayload;
+    //     store(dummy, makeStruct(DummyCallablePayload, 0u));
     //
-    // It returns dummy to the caller, which uses setNativeArgument to produce CallShader(0,
-    // dummy). TraceRay uses the same sequence with EmptyRayPayload. There is no source data to
-    // copy from p or back to p: only the native call uses dummy, and helper keeps its Empty
-    // parameter until normal type legalization erases it. Initialization supplies a defined
+    // It returns dummy to the caller, which uses replaceNativeCallArgumentAndUpdateSignature to
+    // produce CallShader(0, dummy). TraceRay uses the same sequence with DummyRayPayload. No source
+    // data needs copying from p or back to p: only the native call uses dummy, and helper keeps its
+    // Empty parameter until normal type legalization erases it. Initialization supplies a defined
     // value for the artificial field passed to the native inout parameter; emitDefaultConstruct
     // builds the struct from its zero-initialized uint field.
-    IRInst* createEmptyArgument(IRCall* call, bool isRayPayload)
+    IRInst* createDummyPayloadArgument(IRCall* call, bool isRayPayload)
     {
-        auto type = getEmptyPayloadType(isRayPayload);
+        auto type = getOrCreateDummyPayloadType(isRayPayload);
         IRBuilder builder(call);
         builder.setInsertBefore(call);
         auto var = builder.emitVar(type);
@@ -203,15 +204,23 @@ struct RayTracingPayloadLegalizationContext
     // type. This changes only the specialized intrinsic declaration, never a user helper.
     //
     // Consider the native CallShader declaration selected for an Empty payload. Supplying the
-    // variable from createEmptyArgument changes the call schematically from
+    // variable from createDummyPayloadArgument changes the call schematically from
     //
-    //     nativeCallShader(uint index, inout Empty payload);
-    //     call nativeCallShader(0, logical);
+    //     void CallShaderMain(uint index, inout Empty payload);
+    //     logical = var Empty;
+    //     call CallShaderMain(0, logical);
     //
     // to
     //
-    //     nativeCallShader(uint index, inout EmptyCallablePayload payload);
-    //     call nativeCallShader(0, dummy);
+    //     void CallShaderMain(uint index, inout DummyCallablePayload payload);
+    //     logical = var Empty;
+    //     dummy = var DummyCallablePayload;
+    //     store(dummy, makeStruct(DummyCallablePayload, 0u));
+    //     call CallShaderMain(0, dummy);
+    //
+    // Here logical is addressable storage for an Empty value: the IR var produces the pointer
+    // passed to the inout parameter. dummy is the separate storage created by the caller, and
+    // CallShaderMain denotes the selected native intrinsic declaration in both examples.
     //
     // Replacing only the argument would leave an Empty parameter that type legalization can
     // erase, and the call would disagree with its declaration. Preserve the parameter's pointer
@@ -219,7 +228,7 @@ struct RayTracingPayloadLegalizationContext
     // describe a target intrinsic's signature; they are not an ordinary helper body whose typed
     // uses would also need rewriting. The callers adapt every call to that specialization using
     // shared physical types, so repeated calls finish with the same declaration and argument type.
-    void setNativeArgument(IRCall* call, UInt index, IRInst* arg)
+    void replaceNativeCallArgumentAndUpdateSignature(IRCall* call, UInt index, IRInst* arg)
     {
         auto callee = cast<IRFunc>(call->getCallee());
         // These declarations are native target intrinsics, not wrapper bodies with typed uses
@@ -285,7 +294,11 @@ struct RayTracingPayloadLegalizationContext
         return type;
     }
 
-    // Adapt D3D native calls that require payload storage or a struct argument. Consider:
+    // Adapt native D3D calls to their struct-storage requirements before type legalization.
+    // D3D requires nonempty struct storage for ray/callable payloads. An empty source struct
+    // cannot supply that storage, and the following type legalization would erase its values
+    // and parameters, leaving the native operation without its required payload argument.
+    // Consider this example:
     //
     //     struct Empty {};
     //     void helper(inout Empty p)
@@ -296,11 +309,18 @@ struct RayTracingPayloadLegalizationContext
     //         after();
     //     }
     //
+    // Changing helper's parameter to a dummy struct would also require changing its callers,
+    // which may forward the empty value through arbitrarily many other helpers. Instead, create
+    // dummy storage next to each native intrinsic and pass it only to that operation, updating
+    // the matching native declaration's signature. Empty data needs no copy-in/copy-out. The
+    // ordinary helper chain keeps its original types until normal legalization erases its empty
+    // arguments; before(), after(), and all other work in those helpers remain intact.
+    //
     // CallShader's HLSL arm is a native intrinsic identified by KnownBuiltinDeclName::CallShader;
-    // it has no struct-only marker. Its empty second argument gets an EmptyCallablePayload local.
+    // it has no struct-only marker. Its empty second argument gets a DummyCallablePayload local.
     // TraceRay's HLSL arm instead passes p through ForceVarIntoRayPayloadStructTemporarily, which
-    // identifies the argument needing an EmptyRayPayload local. Both native signatures are
-    // updated by setNativeArgument, while helper's Empty parameter and other work stay intact.
+    // identifies the argument needing a DummyRayPayload local. Both use
+    // replaceNativeCallArgumentAndUpdateSignature to keep the native call and signature consistent.
     // Nonempty structs pass through unchanged; nonempty scalars behind a struct-only marker keep
     // their real values through the wrapper and copy-in/copy-out sequence shown above.
     void legalizeD3DCall(IRCall* call)
@@ -310,7 +330,10 @@ struct RayTracingPayloadLegalizationContext
             SLANG_RELEASE_ASSERT(call->getArgCount() == 2);
             auto ptrType = cast<IRPtrTypeBase>(call->getArg(1)->getDataType());
             if (isEmptyType(ptrType->getValueType()))
-                setNativeArgument(call, 1, createEmptyArgument(call, false));
+                replaceNativeCallArgumentAndUpdateSignature(
+                    call,
+                    1,
+                    createDummyPayloadArgument(call, false));
         }
 
         for (UInt i = 0; i < call->getArgCount(); ++i)
@@ -327,11 +350,14 @@ struct RayTracingPayloadLegalizationContext
             builder.setInsertBefore(call);
             if (isRayPayload && isEmptyType(valueType))
             {
-                setNativeArgument(call, i, createEmptyArgument(call, true));
+                replaceNativeCallArgumentAndUpdateSignature(
+                    call,
+                    i,
+                    createDummyPayloadArgument(call, true));
             }
             else if (auto structType = as<IRStructType>(valueType))
             {
-                setNativeArgument(call, i, logical);
+                replaceNativeCallArgumentAndUpdateSignature(call, i, logical);
                 if (isRayPayload)
                     addRayPayloadDecorationIfNeeded(builder, structType);
             }
@@ -347,40 +373,17 @@ struct RayTracingPayloadLegalizationContext
                 auto data =
                     builder.emitFieldAddress(builder.getPtrType(valueType), var, field->getKey());
                 builder.emitStore(data, builder.emitLoad(logical));
-                setNativeArgument(call, i, var);
+                replaceNativeCallArgumentAndUpdateSignature(call, i, var);
                 builder.setInsertAfter(call);
                 builder.emitStore(logical, builder.emitLoad(data));
             }
         }
     }
 
-    // Create physical storage for a decorated empty global and move its interface metadata.
-    // Consider a CallShader(0, payload) call with an Empty payload. The standard library's GLSL
-    // arm stages the value through a global. Before this pass, its IR is schematically:
-    //
-    //     [VulkanCallablePayload(location)] logical = globalVar Empty;
-    //     store(logical, load(payload));
-    //     location = getVulkanRayTracingPayloadLocation(logical);
-    //     executeCallable(0, location);
-    //     store(payload, load(logical));
-    //
-    // This function creates physical, moves the decorations (including the payload location),
-    // redirects any DependsOn interface references, and records logical -> physical. The later
-    // legalizeKhronosInstruction visit uses that mapping to redirect the location query. Together
-    // these two steps produce:
-    //
-    //     logical = globalVar Empty;
-    //     [VulkanCallablePayload(location)] physical = globalVar EmptyCallablePayload;
-    //     store(logical, load(payload));
-    //     location = getVulkanRayTracingPayloadLocation(physical);
-    //     executeCallable(0, location);
-    //     store(payload, load(logical));
-    //
-    // Both copies remain correctly typed Empty-to-Empty until normal type legalization erases
-    // them and logical. The nonempty physical global and its location query survive. Replacing
-    // every use of logical would instead make those copies mix Empty and EmptyCallablePayload.
-    // Ray payloads use the same separation; direct SPIR-V dispatch operands are redirected by
-    // legalizeKhronosInstruction instead of going through a GLSL location query.
+    // Prepare a decorated empty global's physical interface before instruction rewriting.
+    // Transfer its decorations and DependsOn references to dummy storage and record the
+    // logical-to-physical mapping. Leave ordinary loads/stores using the logical global so
+    // their types stay consistent. See legalizeKhronosInstruction for the complete transformation.
     void separateEmptyGlobal(IRGlobalVar* logical)
     {
         auto rayDecor = logical->findDecoration<IRVulkanRayPayloadDecoration>();
@@ -393,7 +396,7 @@ struct RayTracingPayloadLegalizationContext
         if (!isEmptyType(ptrType->getValueType()))
             return;
 
-        auto type = getEmptyPayloadType(isRayPayload);
+        auto type = getOrCreateDummyPayloadType(isRayPayload);
         IRBuilder builder(module);
         builder.setInsertBefore(logical);
         auto physical = builder.createGlobalVar(type);
@@ -422,7 +425,7 @@ struct RayTracingPayloadLegalizationContext
         }
         IRBuilder builder(module);
         builder.setInsertInto(module);
-        auto physical = builder.createGlobalVar(getEmptyPayloadType(isRayPayload));
+        auto physical = builder.createGlobalVar(getOrCreateDummyPayloadType(isRayPayload));
         if (isRayPayload)
             builder.addVulkanRayPayloadDecoration(physical, -1);
         else
@@ -430,8 +433,39 @@ struct RayTracingPayloadLegalizationContext
         return physical;
     }
 
-    // Replace only a Khronos dispatch's interface operand. In GLSL that operand belongs to
-    // the location query, not to executeCallableEXT/traceRayEXT, which take integer locations.
+    // Adapt the payload operands of native Khronos ray-tracing instructions. In GLSL the native
+    // dispatch takes an integer location, so its associated query must reference a surviving
+    // payload global. In direct SPIR-V the dispatch instead references the payload storage
+    // itself. Either reference would lose its storage if an empty logical value were erased.
+    //
+    // Consider a CallShader(0, payload) call, where payload is storage for an Empty value. The
+    // standard library's GLSL arm stages that value through a global. Before this pass, its IR
+    // is schematically as follows. The -1 decoration operand requests automatic location
+    // assignment, which assignRayPayloadHitObjectAttributeLocations performs later:
+    //
+    //     [VulkanCallablePayload(-1)] logical = globalVar Empty;
+    //     store(logical, load(payload));
+    //     location = getVulkanRayTracingPayloadLocation(logical);
+    //     executeCallable(0, location);
+    //     store(payload, load(logical));
+    //
+    // The pass driver first calls separateEmptyGlobal to create physical storage, move binding
+    // decorations and DependsOn references to it, and record logical -> physical. This instruction
+    // visit then redirects the location query using that mapping. Together these steps produce:
+    //
+    //     logical = globalVar Empty;
+    //     [VulkanCallablePayload(-1)] physical = globalVar DummyCallablePayload;
+    //     store(logical, load(payload));
+    //     location = getVulkanRayTracingPayloadLocation(physical);
+    //     executeCallable(0, location);
+    //     store(payload, load(logical));
+    //
+    // Both copies remain correctly typed Empty-to-Empty until normal type legalization erases
+    // them and logical. The nonempty physical global and its location query survive. Replacing
+    // every use of logical would instead make those copies mix Empty and DummyCallablePayload.
+    // Ray payloads use the same separation. For a direct SPIR-V dispatch, this function replaces
+    // its payload operand with a prepared global or fresh outgoing dummy storage. It does not
+    // change the containing helper's signature; receiving entry points are adapted separately.
     void legalizeKhronosInstruction(IRInst* inst)
     {
         if (inst->getOp() == kIROp_GetVulkanRayTracingPayloadLocation)
@@ -466,7 +500,10 @@ struct RayTracingPayloadLegalizationContext
         asmInst->setOperand(index, builder.emitSPIRVAsmOperandInst(physical));
     }
 
-    // Visit instruction bodies without replacing or inlining the functions containing them.
+    // Visit function bodies to adapt native dispatches and their payload-location queries.
+    // The target helpers may create storage and update a native intrinsic's signature, but leave
+    // ordinary helper signatures and bodies otherwise intact. Receiving shader interfaces are
+    // handled separately by legalizeEntryPoint.
     void legalizeInstructions(IRInst* parent)
     {
         for (auto inst : parent->getChildren())
@@ -491,26 +528,26 @@ struct RayTracingPayloadLegalizationContext
     //
     // On D3D, this function changes the IR to the equivalent of:
     //
-    //     [shader("miss")] void missMain(inout EmptyRayPayload physical)
+    //     [shader("miss")] void missMain(inout DummyRayPayload physical)
     //     {
     //         Empty logical;
     //         helper(logical);
     //     }
     //
     // The original Empty type and helper signature remain unchanged. Rewriting just p's type
-    // would instead pass EmptyRayPayload to helper(inout Empty), so the original body uses are
+    // would instead pass DummyRayPayload to helper(inout Empty), so the original body uses are
     // redirected to logical before changing the entry-point parameter and function type.
     //
     // On Khronos targets, the receiving interface is a global. This function leaves p and its
     // uses unchanged and adds the following IR, schematically:
     //
-    //     [VulkanRayPayloadIn(0)] physical = globalVar EmptyRayPayload;
+    //     [VulkanRayPayloadIn(0)] physical = globalVar DummyRayPayload;
     //     [DependsOn(physical)] [shader("miss")]
     //     void missMain(inout Empty p) { helper(p); }
     //
     // Normal type legalization can then erase p and helper's empty argument; the DependsOn
     // decoration retains physical as an entry-point interface even without executable uses.
-    // Callable receivers use EmptyCallablePayload and VulkanCallablePayloadIn instead.
+    // Callable receivers use DummyCallablePayload and VulkanCallablePayloadIn instead.
     // For callable data, retaining this unused incoming storage is a policy choice to keep the
     // same physical representation as outgoing dispatches; an unused callable input could be
     // omitted. Vulkan ray-payload declarations, however, must survive even without shader uses.
@@ -558,13 +595,13 @@ struct RayTracingPayloadLegalizationContext
         if (payloadParams.getCount() == 0 || !allEmpty)
             return;
 
-        auto type = getEmptyPayloadType(isRayPayload);
+        auto type = getOrCreateDummyPayloadType(isRayPayload);
         IRBuilder builder(module);
         if (isKhronosTarget(targetProgram->getTargetReq()))
         {
             builder.setInsertBefore(func);
             auto physical = builder.createGlobalVar(type);
-            builder.addNameHintDecoration(physical, UnownedStringSlice("incomingEmptyPayload"));
+            builder.addNameHintDecoration(physical, UnownedStringSlice("incomingDummyPayload"));
             if (isRayPayload)
                 builder.addVulkanRayPayloadInDecoration(physical, 0);
             else
@@ -601,7 +638,9 @@ struct RayTracingPayloadLegalizationContext
                     if (auto call = as<IRCall>(use->getUser()))
                     {
                         if (call->getCallee() == func)
-                            call->setArg(paramIndex, createEmptyArgument(call, isRayPayload));
+                            call->setArg(
+                                paramIndex,
+                                createDummyPayloadArgument(call, isRayPayload));
                     }
                 });
         }

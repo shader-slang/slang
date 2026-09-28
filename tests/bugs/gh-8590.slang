@@ -30,7 +30,7 @@ void rayGenShaderMakeQueryInvokeNOP()
     HitObject.Invoke(sceneBVH, hitObjectNOP, payload);
 }
 
-// HLSL: struct EmptyRayPayload{{[A-Za-z0-9_]*}}
+// HLSL: struct DummyRayPayload{{[A-Za-z0-9_]*}}
 // HLSL-NEXT: {
 // HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };

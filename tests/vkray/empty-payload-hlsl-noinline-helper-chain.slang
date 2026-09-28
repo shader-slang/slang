@@ -72,7 +72,7 @@ void main()
     forwardOuter(rayData, callableData, DispatchRaysIndex().x);
 }
 
-// HLSL: struct {{(\[raypayload\] )?}}[[payloadType:Empty(Ray|Callable)Payload[A-Za-z0-9_]*]]
+// HLSL: struct {{(\[raypayload\] )?}}[[payloadType:Dummy(Ray|Callable)Payload[A-Za-z0-9_]*]]
 // HLSL-NEXT: {
 // HLSL-NEXT: uint _slang_dummy{{.*}};
 // HLSL-NEXT: };
@@ -94,7 +94,7 @@ void main()
 // HLSL: void main()
 // HLSL: [[outer]]({{[^,;]+}});
 
-// DXIL: %struct.Empty{{Ray|Callable}}Payload{{[A-Za-z0-9_]*}} = type { i32 }
+// DXIL: %struct.Dummy{{Ray|Callable}}Payload{{[A-Za-z0-9_]*}} = type { i32 }
 // DXIL: define internal fastcc void {{.*}}dispatchLeaf{{.*}}(i32 %{{[A-Za-z0-9_]+}})
 // DXIL: call void @dx.op.{{traceRay|callShader}}.
 // DXIL: define internal fastcc void {{.*}}forwardMiddle{{.*}}(i32 %{{[A-Za-z0-9_]+}})

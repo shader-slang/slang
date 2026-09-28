@@ -37,7 +37,7 @@ void caller(inout Empty payload)
 
 // HLSL: void [[record:recordEvent[A-Za-z0-9_]*]](uint {{[A-Za-z0-9_]+}})
 // HLSL: InterlockedAdd
-// HLSL: struct [[payloadType:EmptyRayPayload[A-Za-z0-9_]*]]
+// HLSL: struct [[payloadType:DummyRayPayload[A-Za-z0-9_]*]]
 // HLSL: uint _slang_dummy{{.*}};
 // HLSL: void [[clone:callee_[A-Za-z0-9_]+]](inout [[payloadType]] {{[A-Za-z0-9_]+}})
 // HLSL: [[record]](0U);
@@ -50,7 +50,7 @@ void caller(inout Empty payload)
 // HLSL: [[clone]]([[physical]]);
 // HLSL: [[record]](2U);
 
-// DXIL: [[payloadType:%struct.EmptyRayPayload[A-Za-z0-9_]*]] = type { i32 }
+// DXIL: [[payloadType:%struct.DummyRayPayload[A-Za-z0-9_]*]] = type { i32 }
 // DXIL: define internal fastcc void @[[record:"[^"]*recordEvent[^"]*"]](i32 %{{[A-Za-z0-9_]+}})
 // DXIL: define internal fastcc void @[[clone:"[^"]*callee_[^"]*"]]([[payloadType]]* {{.*}})
 // DXIL: call fastcc void @[[record]](i32 0)
