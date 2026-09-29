@@ -478,6 +478,7 @@ jobs:
           # quiet "trend did not run" line only when the job also succeeded,
           # so the failed-sweep case still reports as a job failure.
           TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_JUDGED_COUNT: ${{ steps.trend.outputs.judged_count }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
           # Empty when the trend step was skipped, or when it died before
           # publishing a code. Only trend.py's EXIT_REGRESSION produces the

@@ -186,7 +186,7 @@ def report(args, directory):
     try:
         trend.report_changes(limits, args.label, plan["runner"],
                              f"{labels[0]}..{labels[-1]}" if labels else "none",
-                             len(labels), errors, warnings)
+                             len(labels), errors, warnings, plan["judged_count"])
     finally:
         trend.write_step_summary(message)
 
@@ -209,6 +209,7 @@ def main():
             measure(args, directory)
         else:
             report(args, directory)
+    # SystemExit(EXIT_REGRESSION) must reach the shell unchanged.
     except Exception as exc:
         print(f"confirmation could not evaluate: {exc}", file=sys.stderr)
         raise SystemExit(EXIT_CANNOT_EVALUATE)

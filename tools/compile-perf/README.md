@@ -67,6 +67,11 @@ timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per ru
   `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
   memory charts is that, not a bug) — see the Memory footprint section
   below.
+- **Comparison coverage:** the candidate archive records how many metrics had
+  a usable baseline. If none were judged, the CI summary and Slack report
+  “Insufficient comparable history” instead of a clean performance verdict.
+  This is informational, not a performance alarm; normal comparisons resume
+  as compatible history accumulates.
 - **Nightly alert confirmation:** a warning (5%) or regression (10%) first
   triggers one additional batch for the affected workloads on the same runner
   and compiler. The rerun uses the original sizes, sample count (default five),

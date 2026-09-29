@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Classify one compile-perf nightly into the icon + sentence Slack shows.
 
-The Slack step has four signals to work from — the trend step's outcome and
-exit code, the job's overall status, and the warning count — and has to turn
+The Slack step uses the trend outcome and exit code, job statuses, warning
+count, and number of metrics judged — and has to turn
 them into a single line a human reads at a glance. That mapping lived in the
 workflow as a five-branch bash ladder, where nothing could test it: the branch
 ORDER is load-bearing (see classify), and getting it wrong produces a plausible
@@ -39,6 +39,8 @@ TREND_ERROR = (":x:", "Trend check could not evaluate this run — see CI run "
                       "for details")
 ANALYZE_FAILED = (":x:", "Trend analysis job failed before it could judge — "
                          "see CI run for details")
+INSUFFICIENT_HISTORY = (":information_source:",
+                        "Insufficient comparable history — no metrics judged")
 CLEAN = (":white_check_mark:", "No regressions detected")
 NOT_RUN = (":information_source:",
            "Trend check did not run — see CI run for details")
@@ -73,12 +75,13 @@ def warnings_status(n):
 
 
 def classify(trend_outcome, job_status, warnings, trend_exit=None,
-             analyze_status=""):
+             analyze_status="", judged_count=None):
     """Return the ``(icon, status)`` pair for one nightly.
 
     `trend_outcome` is the trend step's GitHub Actions outcome ("success",
     "failure", or "skipped"), `job_status` is the MEASUREMENT job's overall
-    status, `warnings` is the count trend.py wrote to GITHUB_OUTPUT (0 when it
+    status. `judged_count` is the original comparison coverage; zero means no
+    verdict is available. `warnings` is the count trend.py wrote to GITHUB_OUTPUT (0 when it
     wrote nothing, via the workflow's `|| '0'` fallback), `trend_exit` is
     trend.py's exit code when the workflow captured one, and `analyze_status`
     is the analysis job's own status at the point the Slack step runs (empty
@@ -120,6 +123,8 @@ def classify(trend_outcome, job_status, warnings, trend_exit=None,
         return ANALYZE_FAILED
     if trend_outcome == "success" and warnings:
         return warnings_status(warnings)
+    if trend_outcome == "success" and judged_count == 0:
+        return INSUFFICIENT_HISTORY
     if trend_outcome == "success":
         return CLEAN
     return NOT_RUN
@@ -136,6 +141,17 @@ def _warnings_from_env(raw):
         print(f"::warning title=Slack status::could not parse "
               f"TREND_WARNINGS={raw!r}; treating as non-zero", file=sys.stderr)
         return 1
+
+
+def _judged_from_env(raw):
+    """Require an explicit nonnegative coverage count before claiming a clean run."""
+    try:
+        count = int(raw)
+        if count >= 0:
+            return count
+    except (TypeError, ValueError):
+        pass
+    raise ValueError("missing or invalid TREND_JUDGED_COUNT")
 
 
 def _exit_from_env(raw):
@@ -166,7 +182,9 @@ def main():
                             os.environ.get("JOB_STATUS", ""),
                             _warnings_from_env(os.environ.get("TREND_WARNINGS")),
                             _exit_from_env(os.environ.get("TREND_EXIT")),
-                            os.environ.get("ANALYZE_STATUS", ""))
+                            os.environ.get("ANALYZE_STATUS", ""),
+                            (_judged_from_env(os.environ.get("TREND_JUDGED_COUNT"))
+                             if os.environ.get("TREND_OUTCOME") == "success" else None))
     if args.field == "icon":
         print(icon)
     elif args.field == "status":

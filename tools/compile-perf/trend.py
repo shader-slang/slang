@@ -205,7 +205,7 @@ def comparable_metric_values(current, points, key, provenance_keys):
     return values
 
 
-def save_candidates(args, current, window, regressions, warnings, notes):
+def save_candidates(args, current, window, regressions, warnings, notes, judged_count):
     """Freeze the first comparison before confirmation can change any measurements.
 
     MetricChange objects retain the baseline median and the first batch's value.
@@ -217,7 +217,8 @@ def save_candidates(args, current, window, regressions, warnings, notes):
                    "baseline_labels": [p["label"] for p in window],
                    "thresholds": {"rel": args.rel, "warn_rel": args.warn_rel, "abs": args.abs},
                    "regressions": [asdict(change) for change in regressions],
-                   "warnings": [asdict(change) for change in warnings], "notes": notes},
+                   "warnings": [asdict(change) for change in warnings], "notes": notes,
+                   "judged_count": judged_count},
                   fh, indent=2)
 
 
@@ -286,7 +287,7 @@ def main():
         msg = "not enough points to trend (need >= 2)"
         print(msg)
         if args.candidates:
-            save_candidates(args, pts[-1] if pts else {"label": args.label}, [], [], [], [msg])
+            save_candidates(args, pts[-1] if pts else {"label": args.label}, [], [], [], [msg], 0)
         return
 
     hist_runner = series.get("runner", "")
@@ -370,7 +371,7 @@ def main():
                f"(need {args.min_baseline}); skipping trend judgement.")
         print(msg)
         if args.candidates:
-            save_candidates(args, current, window, [], [], notes + [msg])
+            save_candidates(args, current, window, [], [], notes + [msg], 0)
         else:
             emit_gha_command(f"::warning title=Perf trend::{msg}")
         return
@@ -379,6 +380,7 @@ def main():
     regressions = []
     warnings = []
     provenance_skipped = set()
+    judged_count = 0
     for key, cur in sorted(current.get("metrics", {}).items()):
         wl, _, counter = key.partition("|")
         if not judged(wl, counter):
@@ -429,6 +431,7 @@ def main():
         med = statistics.median(baseline)
         if med <= 0:
             continue
+        judged_count += 1
         ratio = cur / med
         delta = cur - med
         # The floor is PER COUNTER, not the flat --abs: this series carries
@@ -462,14 +465,14 @@ def main():
             emit_gha_command(f"::warning title=Perf measurement provenance::{msg}")
 
     if args.candidates:
-        save_candidates(args, current, window, regressions, warnings, notes)
+        save_candidates(args, current, window, regressions, warnings, notes, judged_count)
         return
     report_changes(args, current["label"], cur_runner, base_labels, len(window),
-                   regressions, warnings)
+                   regressions, warnings, judged_count)
 
 
 def report_changes(limits, label, cur_runner, base_labels, window_count,
-                   regressions, warnings):
+                   regressions, warnings, judged_count):
     """Render a classified comparison and publish its warning count and exit code.
 
     The nightly confirmation reader uses this same renderer after checking the
@@ -477,6 +480,8 @@ def report_changes(limits, label, cur_runner, base_labels, window_count,
     limits supplies rel/warn_rel ratio thresholds, abs (the ms floor), and
     no_fail (whether to suppress the regression exit). label identifies the
     measured point; regressions and warnings contain MetricChange objects.
+    judged_count counts metrics compared in the original batch, including those
+    below the alert thresholds; zero means no performance verdict is available.
     """
     regressions.sort(key=lambda change: -change.ratio)
     warnings.sort(key=lambda change: -change.ratio)
@@ -491,24 +496,18 @@ def report_changes(limits, label, cur_runner, base_labels, window_count,
           f">= {limits.warn_rel}, both gated on an absolute delta of "
           f">= {limits.abs} ms for timers / {mem_floor} for memory counters\n")
 
-    # `warnings` is the ONLY key the workflow reads, and the only one it
-    # needs: the Slack step distinguishes a warnings-only night from a clean
-    # one, which the exit code alone cannot do since warnings deliberately do
-    # not fail the job. A regression is already carried by the exit code
-    # (EXIT_REGRESSION), so an `errors` key would be a second
-    # spelling of the same fact — one that no reader would notice going stale.
-    #
-    # This write must stay AHEAD of every path that leaves this renderer — the
-    # clean-night `return` and the regression `SystemExit(EXIT_REGRESSION)`.
-    # Both are exits
-    # the workflow still reads the output on, and an unwritten key falls back
-    # to the step's `|| '0'`, which reports a warnings-only night as clean:
-    # the one state this key exists to distinguish. Classify, emit, then
-    # report — do not move reporting logic above this block.
+    # Publish both outputs before any return or regression exit. Zero candidates
+    # can mean either a clean comparison or no comparable history at all.
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as fh:
-            fh.write(f"warnings={len(warnings)}\n")
+            fh.write(f"warnings={len(warnings)}\njudged_count={judged_count}\n")
+
+    if judged_count == 0:
+        message = "Insufficient comparable history — no metrics judged."
+        print(message)
+        write_step_summary(f"### Compile-perf trend — {label}\n\n{message}")
+        return
 
     if not regressions and not warnings:
         print(f"OK — no compile-perf regression in {label} vs trailing median.")

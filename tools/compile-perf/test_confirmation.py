@@ -15,6 +15,7 @@ import bench
 import confirm
 from lib import analyze
 import trend
+import slack_status
 
 
 def record(value, workload="minimal", size=64):
@@ -31,7 +32,7 @@ def plan(value=120.0, counter="compileInner", workload="minimal", baseline=100.0
     change = {"workload": workload, "counter": counter, "baseline": baseline, "value": value}
     return {"label": "2026-01-04-test", "runner": "test-runner",
             "thresholds": {"rel": 1.10, "warn_rel": 1.05, "abs": 2.0},
-            "baseline_labels": ["a", "b", "c"], "notes": [],
+            "baseline_labels": ["a", "b", "c"], "notes": [], "judged_count": 1,
             "regressions": [change] if tier == "error" else [],
             "warnings": [change] if tier == "warning" else []}
 
@@ -207,14 +208,14 @@ class ConfirmationArchiveTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("1 not reproduced", output)
         self.assertNotIn("::error", output)
-        self.assertEqual((self.root / "output").read_text().strip(), "warnings=0")
+        self.assertEqual((self.root / "output").read_text().strip(), "warnings=0\njudged_count=1")
 
     def test_warning_confirmation_keeps_warning_output_contract(self):
         self.collect([record(107)])
         code, output = self.render()
         self.assertEqual(code, 0)
         self.assertIn("1 confirmed warning(s)", output)
-        self.assertEqual((self.root / "output").read_text().strip(), "warnings=1")
+        self.assertEqual((self.root / "output").read_text().strip(), "warnings=1\njudged_count=1")
 
     def test_failed_rerun_is_preserved_and_cannot_report_clean(self):
         failed = dict(record(100), ok=False)
@@ -277,6 +278,65 @@ class ConfirmationArchiveTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "did not complete"):
             self.render()
 
+    def test_partial_coverage_still_reports_a_real_comparison(self):
+        series = analyze.read_json(self.tracking)
+        series["points"][-1]["metrics"]["new_workload|compileInner"] = 100
+        self.tracking.write_text(json.dumps(series))
+        self.collect([record(100)])
+        archive = analyze.read_json(self.directory / "confirmation.json")
+        self.assertEqual(archive["plan"]["judged_count"], 1)
+        code, output = self.render()
+        self.assertEqual(code, 0)
+        self.assertNotIn("Insufficient comparable history", output)
+
+    def test_slack_coverage_input_preserves_status_priority(self):
+        cases = [
+            ("success", "success", "0", "0", "0", slack_status.INSUFFICIENT_HISTORY),
+            ("success", "success", "0", "0", "1", slack_status.CLEAN),
+            ("success", "success", "1", "0", "1", slack_status.warnings_status(1)),
+            ("failure", "success", "0", "3", "", slack_status.REGRESSION),
+            ("failure", "success", "0", "2", "", slack_status.TREND_ERROR),
+            ("skipped", "success", "0", "", "", slack_status.NOT_RUN),
+            ("success", "failure", "0", "0", "0", slack_status.JOB_FAILED),
+        ]
+        for outcome, job, warnings, exit_code, count, expected in cases:
+            with self.subTest(expected=expected), patch.dict(os.environ, {
+                    "TREND_OUTCOME": outcome, "JOB_STATUS": job,
+                    "TREND_WARNINGS": warnings, "TREND_EXIT": exit_code,
+                    "TREND_JUDGED_COUNT": count, "ANALYZE_STATUS": "success"}), \
+                    patch.object(sys, "argv", ["slack_status.py"]):
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    slack_status.main()
+                self.assertEqual(output.getvalue().splitlines(), list(expected))
+        for raw in (None, "", "bad", "-1"):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                slack_status._judged_from_env(raw)
+
+    def test_insufficient_history_survives_confirmation_without_compiling(self):
+        original = analyze.read_json(self.tracking)
+        for count in (0, 1, 2, 3):
+            with self.subTest(points=count):
+                series = dict(original, points=original["points"][-count:] if count else [])
+                self.tracking.write_text(json.dumps(series))
+                with patch.object(bench, "run_workloads") as run:
+                    confirm.measure(self.args, self.directory)
+                run.assert_not_called()
+                archive = analyze.read_json(self.directory / "confirmation.json")
+                self.assertEqual(archive["status"], "complete")
+                self.assertEqual(archive["plan"]["judged_count"], 0)
+                self.assertTrue(archive["plan"]["notes"])
+                code, output = self.render()
+                self.assertEqual(code, 0)
+                self.assertIn("Insufficient comparable history", output)
+                self.assertNotIn("OK — no", output)
+                self.assertIn("::warning title=Perf comparison coverage", output)
+                outputs = dict(line.split("=", 1) for line in
+                               (self.root / "output").read_text().splitlines())
+                self.assertEqual(slack_status.classify("success", "success",
+                    int(outputs["warnings"]), judged_count=int(outputs["judged_count"])),
+                    slack_status.INSUFFICIENT_HISTORY)
+
     def test_clean_plan_preserves_coverage_notes_without_running_compiler(self):
         series = analyze.read_json(self.tracking)
         # Three baseline points exist, but their missing sampling provenance
@@ -290,6 +350,7 @@ class ConfirmationArchiveTests(unittest.TestCase):
         code, output = self.render()
         self.assertEqual(code, 0)
         self.assertIn("not judged", output)
+        self.assertIn("Insufficient comparable history", output)
         self.assertIn("::warning title=Perf comparison coverage", output)
 
 
