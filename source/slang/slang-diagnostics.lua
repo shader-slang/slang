@@ -551,7 +551,7 @@ err(
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
 )
 
-warning(
+standalone_note(
     "module-format-not-finalized",
     88,
     "the Slang module file format is not yet finalized and is not versioned across compiler releases; a compiled Slang module can only be loaded by the exact same Slang compiler version that produced it"

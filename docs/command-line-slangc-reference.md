@@ -261,6 +261,14 @@ all - Treat all warnings as errors.
 Disable specific warnings, given by numeric id or name. A numeric id that this compiler version does not recognize is silently ignored, so one option value can be shared across compiler versions that do not all define the warning; an unrecognized warning name is still reported as an error. 
 
 
+<a id="notes-disable"></a>
+### -notes-disable
+
+**-notes-disable &lt;id&gt;\[,&lt;id&gt;...\]**
+
+Disable specific notes, given by numeric id or name. Numeric IDs are silently ignored when they are not defined by this compiler version.
+
+
 <a id="wall"></a>
 ### -Wall, -Wextra, -Wpedantic
 

@@ -6,6 +6,6 @@ public int add(int a, int b)
     return a + b;
 }
 
-//CHECK: warning[E00088]
+//CHECK: note[E00088]
 //CHECK-SAME: not versioned across compiler releases
 //CHECK-SAME: exact same Slang compiler version
