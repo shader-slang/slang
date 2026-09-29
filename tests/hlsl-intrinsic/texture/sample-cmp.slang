@@ -5,6 +5,20 @@
 // GLSL has no sparse-residency shadow forms, so USE_SPARSE is left off for the GLSL run.
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -stage fragment -entry fragmentMain -target glsl
 
+// fragmentMain calls every SampleCmpBias form, so one form that still requests
+// GL_EXT_texture_shadow_lod satisfies the shared CHECK_GLSL check below for all of them. The four
+// hlsl.meta.slang wrappers that request the extension for SampleCmpBias on their own (separate-
+// sampler __glsl_shadow_lod_texture_bias, __glsl_shadow_lod_texture_bias_offset and
+// __glsl_shadow_lod_texture_bias_cube_array_shadow, plus the combined-sampler overload of the last)
+// are therefore each also compiled from their own entry point at the end of this file. Each check
+// pins the 0.375 bias argument, because the no-bias cube-array wrappers request the same
+// extension. The combined sampler2DArrayShadow bias forms are isolated in
+// tests/glsl-intrinsic/texture-shadow-2d-array-bias-ext.slang.
+//TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_2DARRAY): -stage fragment -entry extBias2DArray -target glsl -profile glsl_460
+//TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_OFFSET_2DARRAY): -stage fragment -entry extBiasOffset2DArray -target glsl -profile glsl_460
+//TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_CUBEARRAY): -stage fragment -entry extBiasCubeArray -target glsl -profile glsl_460
+//TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_COMBINED_CUBEARRAY): -stage fragment -entry extBiasCombinedCubeArray -target glsl -profile glsl_460
+
 // The shader below uses sampler2DArrayShadow / samplerCubeArrayShadow bias forms, which are the
 // only shapes in the GL_EXT_texture_shadow_lod extension. Positively assert the #extension pragma
 // is emitted (the extension directive is written at the top of the output, so this must be the
@@ -387,5 +401,37 @@ PSOutput fragmentMain(PSInput input)
 
     output.color = float4(finalShadow, finalShadow, finalShadow, 1.0);
     return output;
+}
+
+// CHECK_EXT_BIAS_2DARRAY: #extension GL_EXT_texture_shadow_lod
+// CHECK_EXT_BIAS_2DARRAY: texture(sampler2DArrayShadow({{.*}}, (0.375))
+float4 extBias2DArray(float4 pos : SV_Position) : SV_Target
+{
+    float r = shadowMap2DArray.SampleCmpBias(shadowSampler, float3(0.1, 0.2, 0.0), 0.5, 0.375);
+    return float4(r, r, r, 1.0);
+}
+
+// CHECK_EXT_BIAS_OFFSET_2DARRAY: #extension GL_EXT_texture_shadow_lod
+// CHECK_EXT_BIAS_OFFSET_2DARRAY: textureOffset(sampler2DArrayShadow({{.*}}, (0.375))
+float4 extBiasOffset2DArray(float4 pos : SV_Position) : SV_Target
+{
+    float r = shadowMap2DArray.SampleCmpBias(shadowSampler, float3(0.1, 0.2, 0.0), 0.5, 0.375, int2(1, 0));
+    return float4(r, r, r, 1.0);
+}
+
+// CHECK_EXT_BIAS_CUBEARRAY: #extension GL_EXT_texture_shadow_lod
+// CHECK_EXT_BIAS_CUBEARRAY: texture(samplerCubeArrayShadow({{.*}}, (0.375))
+float4 extBiasCubeArray(float4 pos : SV_Position) : SV_Target
+{
+    float r = shadowMapCubeArray.SampleCmpBias(shadowSampler, float4(0.1, 0.2, 0.3, 0.0), 0.5, 0.375);
+    return float4(r, r, r, 1.0);
+}
+
+// CHECK_EXT_BIAS_COMBINED_CUBEARRAY: #extension GL_EXT_texture_shadow_lod
+// CHECK_EXT_BIAS_COMBINED_CUBEARRAY: texture((samplerCubeArrayShadow_{{[0-9]+}}), {{.*}}, (0.375))
+float4 extBiasCombinedCubeArray(float4 pos : SV_Position) : SV_Target
+{
+    float r = samplerCubeArrayShadow.SampleCmpBias(float4(0.1, 0.2, 0.3, 0.0), 0.5, 0.375);
+    return float4(r, r, r, 1.0);
 }
 
