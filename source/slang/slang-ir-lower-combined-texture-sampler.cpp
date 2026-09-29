@@ -16,6 +16,16 @@ struct LoweredCombinedSamplerStructInfo
     IRTypeLayout* typeLayout;
 };
 
+IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
+{
+    auto textureType = as<IRTextureTypeBase>(typeInst);
+    if (!textureType)
+        return nullptr;
+    if (!textureType->isCombined())
+        return nullptr;
+    return textureType;
+}
+
 struct LowerCombinedSamplerContext
 {
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
@@ -25,7 +35,7 @@ struct LowerCombinedSamplerContext
     std::optional<LoweredCombinedSamplerStructInfo> getLoweredTypeInfo(
         IRType* textureTypeOrLoweredType)
     {
-        if (auto combinedSamplerType = as<IRTextureTypeBase>(textureTypeOrLoweredType))
+        if (auto combinedSamplerType = isCombinedTextureSamplerType(textureTypeOrLoweredType))
         {
             return lowerCombinedTextureSamplerType(combinedSamplerType);
         }
@@ -131,16 +141,6 @@ IRTypeLayout* maybeCreateArrayLayout(
         return arrayTypeLayoutBuilder.build();
     }
     return elementTypeLayout;
-}
-
-IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
-{
-    auto textureType = as<IRTextureTypeBase>(typeInst);
-    if (!textureType)
-        return nullptr;
-    if (!textureType->isCombined())
-        return nullptr;
-    return textureType;
 }
 
 void lowerCombinedTextureSamplers(
