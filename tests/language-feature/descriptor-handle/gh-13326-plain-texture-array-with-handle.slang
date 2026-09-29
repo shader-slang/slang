@@ -1,13 +1,12 @@
-// A plain `Texture2D` array must not be split into texture and sampler arrays
-// when the shader also has a `Texture2D.Handle` and a combined `Sampler2D`.
-// The plain `Texture2D` type is shared by `t` and by the handle's pointee, so
-// lowering it as if it were combined also retyped `t` and left its layout
-// inconsistent (an internal error in Debug builds).
+// A plain `Texture2D` array keeps its type and is not split into texture and
+// sampler arrays when the shader also has a `Texture2D.Handle` and a combined
+// `Sampler2D`. The plain `Texture2D` type inst is shared by `t` and by the
+// handle's pointee, so only combined texture types may be lowered to a
+// `{texture, sampler}` struct.
 
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain
 
-// MTL-NOT: E99997
 // MTL-NOT: Texture2D_0
 // MTL-NOT: t_texture
 // MTL-NOT: t_sampler

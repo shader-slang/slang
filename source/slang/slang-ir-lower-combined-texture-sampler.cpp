@@ -50,6 +50,7 @@ struct LowerCombinedSamplerContext
 
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
     {
+        SLANG_RELEASE_ASSERT(textureType->isCombined());
         if (auto loweredInfo = mapTypeToLoweredInfo.tryGetValue(textureType))
             return *loweredInfo;
         LoweredCombinedSamplerStructInfo info;
@@ -257,10 +258,12 @@ void lowerCombinedTextureSamplers(
                         auto handle = inst->getOperand(0);
                         if (as<IRDescriptorHandleType>(handle->getDataType()))
                         {
-                            // If handle is still a DescriptorHandle, we are on a target that
-                            // where native resource handles are already bindless, e.g. metal.
-                            // On these platforms, the handle is a struct containing texture
-                            // and sampler fields, so we just need to insert the extract operations.
+                            // If handle is still a DescriptorHandle, we are on a target where
+                            // native resource handles are already bindless, e.g. metal.
+                            // On these platforms, a handle to a combined texture-sampler is a
+                            // struct containing texture and sampler fields, so we just need to
+                            // insert the extract operations. A handle to any other resource is
+                            // the resource itself, so its cast has no lowered info and is kept.
                             auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
                             if (!loweredInfo)
                                 continue;
