@@ -317,6 +317,7 @@ works for any given binary.
 | `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
 | `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
 | `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                 |
+| `SLANG_ENABLE_RECORD_REPLAY`          | `TRUE`                        | Build the API record-replay layer; when `FALSE`, exclude its sources and stub out its C API (forces `SLANG_ENABLE_REPLAYER` off)         |
 | `SLANG_ENABLE_PCH`                    | `TRUE`                        | Enable precompiled headers for faster builds (auto-disabled when using sccache)                                                          |
 | `SLANG_STANDARD_MODULE_DEVELOP_BUILD` | `TRUE`                        | Enable development build for standard modules (enables `UNIT_TEST` macro); disable for release builds                                    |
 | `SLANG_LIB_TYPE`                      | `SHARED`                      | How to build the slang library                                                                                                           |
