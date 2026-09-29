@@ -6,8 +6,9 @@
 //
 // A local array of structs, each carrying a logical-storage-class pointer, is indexed by a
 // constant and written through the pointer. Type legalization turns the array of structs into an
-// array of the split-out pointers, so no composite carries a pointer. The checks run at -O0 and at
-// -O1, where the SPIRV-Tools optimizer runs.
+// array of the split-out pointers, and element-address access to it builds no composite that
+// carries a pointer. The same holds for a struct field that is itself an array of pointers. The
+// checks run at -O0 and at -O1, where the SPIRV-Tools optimizer runs.
 
 struct View<let A : AddressSpace>
 {
@@ -19,10 +20,16 @@ struct View<let A : AddressSpace>
     }
 }
 
+struct Pair
+{
+    Ptr<float, Access.ReadWrite, AddressSpace.GroupShared> ptrs[2];
+    float tag;
+}
+
 groupshared float gsA[64];
 groupshared float gsB[64];
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 // CHECK: OpEntryPoint
@@ -44,4 +51,13 @@ void computeMain()
     outputBuffer[0] = gsA[0];
     // BUF: 4
     outputBuffer[1] = gsB[0];
+
+    Pair pair;
+    pair.ptrs[0] = __getAddress(gsA[1]);
+    pair.ptrs[1] = __getAddress(gsB[1]);
+    pair.tag = 2.0f;
+    pair.ptrs[0][0] = pair.tag;
+    pair.ptrs[1][0] = pair.tag + 3.0f;
+    // BUF: 7
+    outputBuffer[2] = gsA[1] + gsB[1];
 }

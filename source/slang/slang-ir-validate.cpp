@@ -822,16 +822,16 @@ bool validateStructuredBufferResourceTypes(
 }
 
 /// Returns true if a pointer into `addrSpace` may point to memory that holds a logical pointer.
-/// SPIR-V only allows a logical pointer in a function-local or private variable. Before
-/// address-space specialization, local and `static` variables are typed with the `Generic`
-/// address space.
+/// SPIR-V only allows a logical pointer in a `Function` or `Private` (`ThreadLocal`) variable.
+/// Before address-space specialization, local and `static` variables are typed with the `Generic`
+/// address space, so we accept it as local here; `isLogicalPointerType` likewise treats a
+/// `Generic` pointer as logical, since it is not physical either.
 static bool canAddressSpaceHoldLogicalPointer(AddressSpace addrSpace)
 {
     switch (addrSpace)
     {
     case AddressSpace::Generic:
     case AddressSpace::ThreadLocal:
-    case AddressSpace::Global:
     case AddressSpace::Function:
         return true;
     default:
@@ -841,14 +841,15 @@ static bool canAddressSpaceHoldLogicalPointer(AddressSpace addrSpace)
 
 /// If the global `inst` describes memory that is shared across invocations or supplied from
 /// outside the shader, returns the type of the data held there, and otherwise null. A type inst
-/// qualifies when it is a structured buffer or parameter group (its element) or a pointer into a
-/// non-local address space (its pointee); a global variable qualifies when it is `groupshared`
-/// or a global varying input or output.
+/// qualifies when it is a structured buffer, a parameter group or GLSL buffer block (its element),
+/// or a pointer into a non-local address space (its pointee); a global variable qualifies when it
+/// is `groupshared` or `__global`, a global varying input or output, or a ray-tracing payload or
+/// attribute.
 static IRType* getNonLocalMemoryValueType(IRInst* inst)
 {
     if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(inst))
         return bufferType->getElementType();
-    if (auto groupType = as<IRParameterGroupType>(inst))
+    if (auto groupType = as<IRPointerLikeType>(inst))
         return groupType->getElementType();
     if (auto ptrType = as<IRPtrType>(inst))
     {
@@ -859,53 +860,48 @@ static IRType* getNonLocalMemoryValueType(IRInst* inst)
     if (auto globalVar = as<IRGlobalVar>(inst))
     {
         bool isNonLocal = as<IRGroupSharedRate>(globalVar->getRate()) ||
+                          as<IRActualGlobalRate>(globalVar->getRate()) ||
                           globalVar->findDecoration<IRGlobalInputDecoration>() ||
-                          globalVar->findDecoration<IRGlobalOutputDecoration>();
+                          globalVar->findDecoration<IRGlobalOutputDecoration>() ||
+                          getRayTracingInterfaceAddressSpace(globalVar) != AddressSpace::Generic;
         return isNonLocal ? globalVar->getDataType()->getValueType() : nullptr;
     }
     return nullptr;
 }
 
 /// Diagnoses the memory described by the global type `type`, which holds a logical pointer in
-/// its values of type `valueType`. We report at a shader parameter or struct field declared with
-/// `type` when one has a location. A shader parameter without a location is one of the implicit
-/// parameter groups that collect global and entry-point `uniform` parameters; its fields stand
-/// for those parameters, so we report at each field that holds a logical pointer. Failing both,
-/// we report at some other use of `type` (in use-list order, not source order).
+/// its values of type `valueType`. The implicit parameter groups that collect global and
+/// entry-point `uniform` parameters have no declaration of their own, but their fields stand for
+/// those parameters, so we report at each field that holds a logical pointer. Otherwise we report
+/// at a shader parameter or struct field declared with `type`, or failing that, at some other use
+/// of `type` (in use-list order, not source order).
 static void diagnoseNonLocalMemoryType(IRInst* type, IRType* valueType, DiagnosticSink* sink)
 {
-    bool isImplicitParameterGroup = false;
+    auto structType = as<IRStructType>(valueType);
+    if (structType && structType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+    {
+        for (auto field : structType->getFields())
+        {
+            if (typeContainsLogicalPointer(field->getFieldType()))
+            {
+                sink->diagnose(
+                    Diagnostics::LogicalPointerInNonLocalMemory{.location = field->sourceLoc});
+            }
+        }
+        return;
+    }
+
     for (auto use = type->firstUse; use; use = use->nextUse)
     {
         auto user = use->getUser();
-        if (!as<IRGlobalParam>(user) && !as<IRStructField>(user))
-            continue;
-        if (user->sourceLoc.isValid())
+        if ((as<IRGlobalParam>(user) || as<IRStructField>(user)) && user->sourceLoc.isValid())
         {
             sink->diagnose(
                 Diagnostics::LogicalPointerInNonLocalMemory{.location = user->sourceLoc});
             return;
         }
-        if (as<IRGlobalParam>(user))
-            isImplicitParameterGroup = true;
     }
-
-    bool isReported = false;
-    auto structType = as<IRStructType>(valueType);
-    if (isImplicitParameterGroup && structType)
-    {
-        for (auto field : structType->getFields())
-        {
-            if (!field->sourceLoc.isValid() || !typeContainsLogicalPointer(field->getFieldType()))
-                continue;
-            sink->diagnose(
-                Diagnostics::LogicalPointerInNonLocalMemory{.location = field->sourceLoc});
-            isReported = true;
-        }
-    }
-    if (!isReported)
-        sink->diagnose(
-            Diagnostics::LogicalPointerInNonLocalMemory{.location = findFirstUseLoc(type)});
+    sink->diagnose(Diagnostics::LogicalPointerInNonLocalMemory{.location = findFirstUseLoc(type)});
 }
 
 /// Diagnoses the varying parameters and the result of the entry point `func` that hold a logical
@@ -937,7 +933,8 @@ static bool validateEntryPointInterface(IRFunc* func, DiagnosticSink* sink)
 
 /// Identifies a kind of type-described non-local memory holding a value of type `valueType`, so
 /// that structurally distinct type insts describing the same memory are reported once. A pointer
-/// type is told apart by its address space, and every other container by its opcode.
+/// type is told apart by its address space, and every other container by its opcode alone (with
+/// `addressSpace` left `Generic`).
 struct NonLocalMemoryKey
 {
     IROp op;
@@ -954,7 +951,8 @@ bool validateLogicalPointerStorage(IRModule* module, DiagnosticSink* sink)
 {
     bool isValid = true;
 
-    // For example, a parameter group type appears both with and without a layout operand.
+    // A parameter group type, for example, appears both with and without a layout operand, so we
+    // report type-described memory once per `NonLocalMemoryKey`. Each variable is its own memory.
     List<NonLocalMemoryKey> reported;
     for (auto globalInst : module->getGlobalInsts())
     {

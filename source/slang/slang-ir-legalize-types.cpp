@@ -13,6 +13,7 @@
 #include "compiler-core/slang-name.h"
 #include "core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
+#include "slang-ir-explicit-global-init.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
@@ -4137,7 +4138,8 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
     bool isSpecialType(IRType* type) override
     {
         // For resource type legalization, the "special" types
-        // we are working with are resource types.
+        // we are working with are resource types and, on some
+        // targets, logical pointers.
         //
         if (isResourceType(type))
             return true;
@@ -4270,9 +4272,29 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 // wrappers around `legalizeTypes()` that pick an appropriately
 // specialized context type to use to get the job done.
 
+static bool hasInitializedGlobalVarHoldingLogicalPointer(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto globalVar = as<IRGlobalVar>(inst);
+        if (globalVar && globalVar->getFirstBlock() &&
+            typeContainsLogicalPointer(globalVar->getDataType()->getValueType()))
+            return true;
+    }
+    return false;
+}
+
 void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
+
+    // Type legalization cannot split a global variable that has an initializer, and on these
+    // targets a `static` variable holding a logical pointer is split. These targets move every
+    // global initializer onto the entry points after this pass anyway, so when a module has such a
+    // variable we move all of the initializers now, in one pass that keeps their order.
+    if (doesTargetLegalizeLogicalPointers(target->getTargetReq()) &&
+        hasInitializedGlobalVarHoldingLogicalPointer(module))
+        moveGlobalVarInitializationToEntryPoints(module, target);
 
     IRResourceTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);

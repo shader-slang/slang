@@ -120,6 +120,11 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
+// Returns the SPIR-V ray-tracing interface address space (ray payload, callable payload, hit
+// attributes or hit-object attributes) that a decoration on the global variable `inst` places it
+// in, or `AddressSpace::Generic` if it has no such decoration.
+AddressSpace getRayTracingInterfaceAddressSpace(IRInst* inst);
+
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 

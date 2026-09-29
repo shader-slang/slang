@@ -54,6 +54,14 @@ groupshared Tagged gt2;
 //CHECK:           ^^^ logical pointer in shared or external memory
 //CHECK:           ^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
 
+// A `__global` variable is one variable shared by all invocations, with or without an initializer.
+__global Tagged actualGlobal;
+//CHECK:        ^^^^^^^^^^^^ logical pointer in shared or external memory
+//CHECK:        ^^^^^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
+__global Tagged initializedActualGlobal = {};
+//CHECK:        ^^^^^^^^^^^^^^^^^^^^^^^ logical pointer in shared or external memory
+//CHECK:        ^^^^^^^^^^^^^^^^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
+
 // The pointee of a physical pointer lives in device memory, which is not function-local either.
 uniform Ptr<Tagged> pt;
 //CHECK:            ^^ logical pointer in shared or external memory
@@ -75,6 +83,24 @@ struct Node
     Ptr<Node, Access.ReadWrite, AddressSpace.GroupShared> next;
     float value;
 }
+
+// A logical pointer held directly, rather than in a struct field, is rejected the same way.
+typealias GroupSharedFloatPtr = Ptr<float, Access.ReadWrite, AddressSpace.GroupShared>;
+StructuredBuffer<GroupSharedFloatPtr> sbDirect;
+//CHECK:                              ^^^^^^^^ logical pointer in shared or external memory
+//CHECK:                              ^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
+ConstantBuffer<GroupSharedFloatPtr> cbDirect;
+//CHECK:                            ^^^^^^^^ logical pointer in shared or external memory
+//CHECK:                            ^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
+uniform GroupSharedFloatPtr uniformDirect;
+//CHECK:                    ^^^^^^^^^^^^^ logical pointer in shared or external memory
+//CHECK:                    ^^^^^^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
+groupshared GroupSharedFloatPtr gsDirect;
+//CHECK:                        ^^^^^^^^ logical pointer in shared or external memory
+//CHECK:                        ^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
+uniform Ptr<GroupSharedFloatPtr> ptDirect;
+//CHECK:                         ^^^^^^^^ logical pointer in shared or external memory
+//CHECK:                         ^^^^^^^^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
 
 ByteAddressBuffer bab;
 
@@ -102,7 +128,11 @@ void computeMain(uniform Tagged u)
 //CHECK:                                  ^ logical pointer in shared or external memory
 //CHECK:                                  ^ this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables
     gt2.tag = ut.tag + u.tag;
+    actualGlobal.tag = gt2.tag;
+    initializedActualGlobal.tag = initializedActualGlobal.tag + 1;
     gts[1].tag = loaded.tag + node.value;
+    gsDirect = uniformDirect;
+    gt2.tag += sbDirect[0][0] + cbDirect[0] + (*ptDirect)[0] + gsDirect[0];
 
     // A pointer to an element of a groupshared array is a pointer into groupshared memory that
     // holds a logical pointer, so it is reported as well.

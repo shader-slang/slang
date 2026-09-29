@@ -2050,9 +2050,9 @@ Result linkAndOptimizeIR(
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
             return SLANG_FAIL;
 
-        // Resource type legalization below splits logical pointers out of aggregates on these
-        // targets, but it cannot split them out of memory that is shared across invocations or
-        // supplied from outside the shader, so we reject those shapes before it runs.
+        // SPIR-V only allows a logical pointer in `Function` and `Private` storage. Resource type
+        // legalization below splits logical pointers out of aggregates held there, but it cannot
+        // split them out of any other memory, so we reject those shapes before it runs.
         if (doesTargetLegalizeLogicalPointers(targetRequest) &&
             !validateLogicalPointerStorage(irModule, sink))
             return SLANG_FAIL;

@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O0
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O1
+//TEST:SIMPLE(filecheck=PARAM):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O0
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
 
 // A struct holding a logical-storage-class pointer crosses function boundaries: it is returned by
 // value, passed `inout`, and passed by value to functions that are not inlined. Type legalization
@@ -23,12 +25,13 @@ struct Mixed
 
 groupshared float gs[4];
 
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// CHECK: OpEntryPoint
 // CHECK-NOT: OpTypeStruct {{.*}}%_ptr_Workgroup
 // CHECK-NOT: OpCompositeExtract %_ptr_Workgroup
-// CHECK: OpFunctionParameter %_ptr_Workgroup_float
+
+// PARAM: OpFunctionParameter %_ptr_Workgroup_float
 
 [noinline]
 View makeView(int i)
@@ -67,9 +70,14 @@ void computeMain()
     bump(v);
     outputBuffer[1] = readView(v);
 
+    gs[2] = 5.0f;
     Mixed m;
     m.buffer = outputBuffer;
     m.data = __getAddress(gs[2]);
     m.tag = 2.0f;
     writeMixed(m);
+
+    // Element 0 holds `m.data[0] + m.tag` from `writeMixed`, and element 1 holds `readView(v)`.
+    // BUF: 7
+    // BUF-NEXT: 6
 }

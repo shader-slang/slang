@@ -27,6 +27,36 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
+AddressSpace getRayTracingInterfaceAddressSpace(IRInst* inst)
+{
+    auto addressSpace = AddressSpace::Generic;
+    for (auto decor : inst->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_VulkanRayPayloadDecoration:
+            addressSpace = AddressSpace::RayPayloadKHR;
+            break;
+        case kIROp_VulkanRayPayloadInDecoration:
+            addressSpace = AddressSpace::IncomingRayPayload;
+            break;
+        case kIROp_VulkanCallablePayloadDecoration:
+            addressSpace = AddressSpace::CallableDataKHR;
+            break;
+        case kIROp_VulkanCallablePayloadInDecoration:
+            addressSpace = AddressSpace::IncomingCallableData;
+            break;
+        case kIROp_VulkanHitObjectAttributesDecoration:
+            addressSpace = AddressSpace::HitObjectAttribute;
+            break;
+        case kIROp_VulkanHitAttributesDecoration:
+            addressSpace = AddressSpace::HitAttribute;
+            break;
+        }
+    }
+    return addressSpace;
+}
+
 bool isAddressInst(IRInst* inst)
 {
     switch (inst->getOp())
