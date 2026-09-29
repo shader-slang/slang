@@ -13,7 +13,6 @@
 // logic also orchestrates the overall flow and how
 // and when things get checked.
 
-#include "../core/slang-type-text-util.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-ast-iterator.h"
 #include "slang-ast-print.h"
