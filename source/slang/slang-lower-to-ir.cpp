@@ -847,6 +847,35 @@ struct TryClauseEnvironment
     IRBlock* catchBlock = nullptr;
 };
 
+// Give an atomic's output value the same derivative-free representation as a direct atomic
+// result. Consider `InterlockedAdd(buffer[0], detach(x), original); accumulator.add(original);`.
+// Passing `original` directly by address leaves a load from an escaped local, which the
+// differentiability checker must conservatively assume can carry a derivative. Instead, receive
+// the atomic result in a temporary and copy back a detached value. SSA can then propagate that
+// value through the caller, without treating later assignments to `original` as derivative-free.
+static void detachAtomicOutArguments(IRBuilder* builder, IRCall* call)
+{
+    if (getBuiltinFuncEnum(call->getCallee()) != KnownBuiltinDeclName::AtomicOperation)
+        return;
+
+    auto funcType = cast<IRFuncType>(call->getCallee()->getFullType());
+    SLANG_ASSERT(funcType->getParamCount() == call->getArgCount());
+    for (UInt i = 0; i < call->getArgCount(); i++)
+    {
+        auto [direction, valueType] = splitParameterDirectionAndType(funcType->getParamType(i));
+        if (direction.kind != ParameterDirectionInfo::Kind::Out)
+            continue;
+
+        auto destination = call->getArg(i);
+        IRBuilder tempBuilder(builder->getModule());
+        tempBuilder.setInsertBefore(call);
+        auto temporary = tempBuilder.emitVar(valueType);
+        call->setArg(i, temporary);
+        auto value = builder->emitLoad(temporary);
+        builder->emitStore(destination, builder->emitDetachDerivative(valueType, value));
+    }
+}
+
 // Given a `LoweredValInfo` for something callable, along with a
 // bunch of arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToVal(
@@ -885,11 +914,10 @@ LoweredValInfo emitCallToVal(
                 }
                 else
                 {
-                    return LoweredValInfo::simple(builder->emitCallInst(
-                        type,
-                        getSimpleVal(context, funcVal),
-                        argCount,
-                        args));
+                    auto call =
+                        builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args);
+                    detachAtomicOutArguments(builder, call);
+                    return LoweredValInfo::simple(call);
                 }
             }
 

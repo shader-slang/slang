@@ -238,7 +238,7 @@ public:
     DeferStmt* ParseDeferStatement();
     ThrowStmt* ParseThrowStatement();
     RequireCapabilityStmt* ParseRequireCapabilityStatement();
-    ExpressionStmt* ParseExpressionStatement();
+    ExpressionStmt* ParseExpressionStatement(Modifiers& modifiers);
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
     // Parse an expression that might be used in an initializer or argument context, so we should
@@ -7026,44 +7026,6 @@ Stmt* parseCompileTimeStmt(Parser* parser)
     }
 }
 
-// Move a leading `no_diff` from an expression statement's modifiers onto the call it prefixes.
-//
-// Consider this statement inside a differentiable function:
-//
-//     no_diff InterlockedAdd(buffer[0], x);
-//
-// `ParseStatement` reads the statement's modifiers before it knows that an expression follows,
-// so `ParseModifiers` consumes `no_diff` as a `NoDiffModifier` and the call is then parsed as an
-// ordinary expression statement. Nothing reads modifiers on an expression statement, so the
-// marker would be dropped. We wrap the call in the same `TreatAsDifferentiableExpr` that `no_diff`
-// produces in expression position (`let r = no_diff f(x);`), which makes both spellings mean the
-// same thing to semantic checking, lowering, and the differentiability checker.
-static void moveNoDiffModifierOntoCall(Parser* parser, ExpressionStmt* stmt, Modifiers& modifiers)
-{
-    Expr* callee = stmt->expression;
-    while (auto parenExpr = as<ParenExpr>(callee))
-        callee = parenExpr->base;
-    if (!as<InvokeExpr>(callee))
-        return;
-
-    for (Modifier** link = &modifiers.first; *link; link = &(*link)->next)
-    {
-        auto noDiffModifier = as<NoDiffModifier>(*link);
-        if (!noDiffModifier)
-            continue;
-
-        auto noDiffExpr = parser->astBuilder->create<TreatAsDifferentiableExpr>();
-        noDiffExpr->innerExpr = stmt->expression;
-        noDiffExpr->scope = parser->currentScope;
-        noDiffExpr->flavor = TreatAsDifferentiableExpr::Flavor::NoDiff;
-        noDiffExpr->loc = noDiffModifier->loc;
-        stmt->expression = noDiffExpr;
-
-        *link = noDiffModifier->next;
-        return;
-    }
-}
-
 Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowCaseDefault)
 {
     auto modifiers = ParseModifiers(this);
@@ -7135,7 +7097,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
     }
     else if (LookAheadToken("try"))
     {
-        statement = ParseExpressionStatement();
+        statement = ParseExpressionStatement(modifiers);
     }
     else if (LookAheadToken("throw"))
     {
@@ -7234,7 +7196,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
         // Fallback: reset and parse an expression
         hasSeenCompletionToken = prevHasSeenCompletionToken;
         tokenReader.setCursor(startPos);
-        statement = ParseExpressionStatement();
+        statement = ParseExpressionStatement(modifiers);
     }
     else if (LookAheadToken(TokenType::Semicolon))
     {
@@ -7254,11 +7216,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
     {
         // Default case should always fall back to parsing an expression,
         // and then let that detect any errors
-        statement = ParseExpressionStatement();
+        statement = ParseExpressionStatement(modifiers);
     }
-
-    if (auto exprStmt = as<ExpressionStmt>(statement))
-        moveNoDiffModifierOntoCall(this, exprStmt, modifiers);
 
     if (statement && !as<DeclStmt>(statement))
     {
@@ -7753,11 +7712,39 @@ ThrowStmt* Parser::ParseThrowStatement()
     return throwStatement;
 }
 
-ExpressionStmt* Parser::ParseExpressionStatement()
+static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData*/)
+{
+    auto noDiffExpr = parser->astBuilder->create<TreatAsDifferentiableExpr>();
+    noDiffExpr->innerExpr = parser->ParseLeafExpression();
+    noDiffExpr->scope = parser->currentScope;
+    noDiffExpr->flavor = TreatAsDifferentiableExpr::Flavor::NoDiff;
+    return noDiffExpr;
+}
+
+static Expr* parseInfixExprWithPrecedence(Parser* parser, Expr* inExpr, Precedence prec);
+
+ExpressionStmt* Parser::ParseExpressionStatement(Modifiers& modifiers)
 {
     ExpressionStmt* statement = astBuilder->create<ExpressionStmt>();
 
     FillPosition(statement);
+    // ParseModifiers consumed a leading `no_diff` before we knew this was an expression.
+    // Consider `no_diff f(x) + g(x);`: the prefix belongs to f(x), not to the addition.
+    // Use the ordinary prefix parser before parsing the remaining infix expression, just
+    // as expression-position `no_diff` does. Declaration statements keep their modifier.
+    for (Modifier** link = &modifiers.first; *link; link = &(*link)->next)
+    {
+        if (auto noDiff = as<NoDiffModifier>(*link))
+        {
+            auto prefix =
+                as<TreatAsDifferentiableExpr>(parseTreatAsDifferentiableExpr(this, nullptr));
+            prefix->loc = noDiff->loc;
+            *link = noDiff->next;
+            statement->expression = parseInfixExprWithPrecedence(this, prefix, Precedence::Comma);
+            ReadToken(TokenType::Semicolon);
+            return statement;
+        }
+    }
     statement->expression = ParseExpression();
 
     ReadToken(TokenType::Semicolon);
@@ -8348,15 +8335,6 @@ static NodeBase* parseTryExpr(Parser* parser, void* /*userData*/)
     tryExpr->base = parser->ParseLeafExpression();
     tryExpr->scope = parser->currentScope;
     return tryExpr;
-}
-
-static NodeBase* parseTreatAsDifferentiableExpr(Parser* parser, void* /*userData*/)
-{
-    auto noDiffExpr = parser->astBuilder->create<TreatAsDifferentiableExpr>();
-    noDiffExpr->innerExpr = parser->ParseLeafExpression();
-    noDiffExpr->scope = parser->currentScope;
-    noDiffExpr->flavor = TreatAsDifferentiableExpr::Flavor::NoDiff;
-    return noDiffExpr;
 }
 
 static IntegerLiteralValue _fixIntegerLiteral(

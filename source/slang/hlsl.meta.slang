@@ -5914,6 +5914,7 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5930,6 +5931,7 @@ void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_bfloat16)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_add(__ref BFloat16 val, BFloat16 value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
@@ -5942,6 +5944,7 @@ void __atomic_reduce_add(__ref BFloat16 val, BFloat16 value, MemoryOrder order =
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_bfloat16)]
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
@@ -5954,6 +5957,7 @@ void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> valu
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5970,6 +5974,7 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5986,6 +5991,7 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 [ForceInline]
 [require(atomic_reduce)]
 __cuda_sm_version(7.0)
+[KnownBuiltin($( (int)KnownBuiltinDeclName::AtomicOperation))]
 void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch

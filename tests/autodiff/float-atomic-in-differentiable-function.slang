@@ -14,7 +14,10 @@ RWStructuredBuffer<Atomic<float>> accumulator;
 float f(float x)
 {
     float original = no_diff accumulator[0].add(x * 2.0f);
-    return x * x + original;
+    float interlockedOriginal;
+    no_diff InterlockedAdd(floatBuffer[3], x, interlockedOriginal);
+    accumulator[1].add(interlockedOriginal);
+    return x * x + original + interlockedOriginal;
 }
 
 [shader("compute")]
