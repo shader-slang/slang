@@ -4285,9 +4285,9 @@ void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSi
     SLANG_PROFILE;
 
     // Type legalization cannot split a global variable that has an initializer, and on these
-    // targets a `static` variable holding a logical pointer is split. These targets move every
-    // global initializer onto the entry points after this pass anyway, so when a module has such a
-    // variable we move all of the initializers now, in one pass that keeps their order.
+    // targets a `static` variable holding a logical pointer is split. These targets move the
+    // initializers of `static` globals onto the entry points after this pass anyway, so when a
+    // module has such a variable we move them all now, in one pass that keeps their order.
     if (doesTargetLegalizeLogicalPointers(target->getTargetReq()) &&
         hasInitializedGlobalVarHoldingLogicalPointer(module))
         moveGlobalVarInitializationToEntryPoints(module, target);
