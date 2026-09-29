@@ -27,8 +27,10 @@ slang-test -bindir path/to/bin -category full tests/compute/array-param
 - `-bindir <path>`: Set directory for binaries (default: the path to the `slang-test`
   executable)
 - `-test-dir <path>`: Set directory for test files (default: `tests/`)
-- `-v [level]`: Set verbosity level (`verbose`, `info`, `failure`). Using `-v` without a
-  level selects `verbose`; otherwise the default is `info`
+- `-v [level]`: Set verbosity level. Without `-v`, the default is `info`; `-v` alone
+  selects `verbose`; `-v <level>` selects the named level (`verbose`, `info`, or
+  `failure`). The levels are ordered from most to least output as `verbose`, `info`,
+  then `failure`.
 - `-verbose-paths`: Use verbose paths in output
 - `-hide-ignored`: Hide results from ignored tests
 
@@ -60,6 +62,11 @@ Additional categories may appear in the tree. Common examples include `unit-test
 `optix`, `wave`, `wave-mask`, `wave-active`, `windows`, `unix`, `64-bit`, and
 `shared-library`.
 
+Category filters are supported because existing automation and local workflows still use
+them, but they are not the preferred way to debug an individual test. Prefer passing a
+specific test path, or excluding a known-bad subtest with `-exclude-prefix`, when narrowing a
+local run.
+
 ### API Control Options
 
 - `-api <expr>`: Enable specific APIs, for example `vk+dx12` or `+dx11`
@@ -89,6 +96,10 @@ Available API names:
 - WebGPU: `wgpu`, `webgpu`
 - LLVM: `llvm`
 
+API filters are supported for compatibility with existing test selection flows, but they are
+not the preferred way to debug backend behavior. Prefer a targeted test directive or direct
+tool arguments that name the backend/API being exercised.
+
 ### Test Execution Options
 
 - `-server-count <n>`: Set number of test servers (default: 1)
@@ -117,10 +128,13 @@ Available API names:
 - `-capability <name>`: Compile with the given capability
 - `-shuffle-tests`: Shuffle tests in directories
 - `-shuffle-seed <seed>`: Set shuffle seed (default: 1)
-- `-ignore-abort-msg`: Ignore abort message dialog popup on Windows
 - `-enable-debug-layers [true|false]`: Enable or disable Validation Layer for Vulkan and
   Debug Device for DirectX
 - `-cache-rhi-device [true|false]`: Enable or disable RHI device caching (default: true)
+
+Abort-dialog suppression is not a `slang-test` command-line option. On Windows, configure the
+build with the `SLANG_IGNORE_ABORT_MSG` CMake option and use the `SLANG_ASSERT` environment
+variable to control assertion behavior.
 
 `-skip-list` and `-exclude-prefix` use the same matching rule: an entry of the form
 `<path>.<n>` selects exactly that expanded subtest, so `foo.slang.6` never matches
@@ -184,35 +198,35 @@ ignored by the selected test command.
 
 The command name after `//TEST:` selects the runner callback. The most common commands are:
 
-| Command | What it runs | Output check |
-| --- | --- | --- |
-| `SIMPLE` | Runs `slangc` on the current test file plus directive arguments. | Compares the wrapped result output with `<test>.expected`, or uses `filecheck`. |
-| `SIMPLE_EX` | Runs `slangc` with only the directive arguments. The current file is not added automatically, so the directive must name every input file itself. | Same as `SIMPLE`. |
-| `SIMPLE_LINE` | Runs `slangc`, parses diagnostics, and checks the first diagnostic line number. | Compares that line number with expected output, or uses `filecheck`. |
-| `INTERPRET` | Runs `slangi` on the current file. | Same wrapped-output validation as `SIMPLE`. |
-| `REFLECTION` | Runs `slang-reflection-test` on the current file. | Validates JSON output when compilation succeeds, then compares or FileChecks the wrapped output. |
-| `CPU_REFLECTION` | Same as `REFLECTION`, but writes architecture-specific reflection baselines using a `.32` or `.64` suffix. | Same as `REFLECTION`. |
-| `LANG_SERVER` | Starts the language-server test flow for requests such as completion, hover, and signature help. | Uses language-server-specific expected output. |
-| `COMPARE_COMPUTE` | Runs `render-test` and appends implicit `-slang -compute` arguments. | Validates process output, then compares the rendered buffer with `<test>.expected.txt` or `filecheck-buffer`. |
-| `COMPARE_COMPUTE_EX` | Runs `render-test` without implicit language/stage arguments. Use this when the directive needs to name the API and stage explicitly, such as `-vk -compute`, `-dx12 -compute`, `-cuda -compute`, or `-cpu -compute`. | Same as `COMPARE_COMPUTE`. |
-| `COMPARE_RENDER_COMPUTE` | Runs `render-test` and appends implicit `-slang -gcompute` arguments. | Same as `COMPARE_COMPUTE`. |
-| `COMPILE` | Runs `slangc` with exactly the directive arguments and expects compilation to succeed. | Fails on a non-zero compiler result; `filecheck` can be used for compiler output. |
-| `COMPILE_TARGET` | Synthesized internally from render tests to make sure an explicit render target also compiles. It is rarely written by hand. | Fails on a non-zero `render-test -compile-only` result. |
+| Command                  | What it runs                                                                                                                                                                                                          | Output check                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `SIMPLE`                 | Runs `slangc` on the current test file plus directive arguments.                                                                                                                                                      | Compares the wrapped result output with `<test>.expected`, or uses `filecheck`.                               |
+| `SIMPLE_EX`              | Runs `slangc` with only the directive arguments. The current file is not added automatically, so the directive must name every input file itself.                                                                     | Same as `SIMPLE`.                                                                                             |
+| `SIMPLE_LINE`            | Runs `slangc`, parses diagnostics, and checks the first diagnostic line number.                                                                                                                                       | Compares that line number with expected output, or uses `filecheck`.                                          |
+| `INTERPRET`              | Runs `slangi` on the current file.                                                                                                                                                                                    | Same wrapped-output validation as `SIMPLE`.                                                                   |
+| `REFLECTION`             | Runs `slang-reflection-test` on the current file.                                                                                                                                                                     | Validates JSON output when compilation succeeds, then compares or FileChecks the wrapped output.              |
+| `CPU_REFLECTION`         | Same as `REFLECTION`, but writes architecture-specific reflection baselines using a `.32` or `.64` suffix.                                                                                                            | Same as `REFLECTION`.                                                                                         |
+| `LANG_SERVER`            | Starts the language-server test flow for requests such as completion, hover, and signature help.                                                                                                                      | Uses language-server-specific expected output.                                                                |
+| `COMPARE_COMPUTE`        | Runs `render-test` and appends implicit `-slang -compute` arguments.                                                                                                                                                  | Validates process output, then compares the rendered buffer with `<test>.expected.txt` or `filecheck-buffer`. |
+| `COMPARE_COMPUTE_EX`     | Runs `render-test` without implicit language/stage arguments. Use this when the directive needs to name the API and stage explicitly, such as `-vk -compute`, `-dx12 -compute`, `-cuda -compute`, or `-cpu -compute`. | Same as `COMPARE_COMPUTE`.                                                                                    |
+| `COMPARE_RENDER_COMPUTE` | Runs `render-test` and appends implicit `-slang -gcompute` arguments.                                                                                                                                                 | Same as `COMPARE_COMPUTE`.                                                                                    |
+| `COMPILE`                | Runs `slangc` with exactly the directive arguments and expects compilation to succeed.                                                                                                                                | Fails on a non-zero compiler result; `filecheck` can be used for compiler output.                             |
+| `COMPILE_TARGET`         | Synthesized internally from render tests to make sure an explicit render target also compiles. It is rarely written by hand.                                                                                          | Fails on a non-zero `render-test -compile-only` result.                                                       |
 
 Specialized commands exist for narrower infrastructure tests:
 
-| Command | Purpose |
-| --- | --- |
-| `COMMAND_LINE_SIMPLE` | Reuses the `SIMPLE` runner but treats the source file path as the output stem. This is mainly useful for command-line diagnostics where the expected files are anchored to the source path. |
-| `COMPARE_DXIL` | Compiles through Slang and `dxc`, then compares DXIL assembly output. It is not currently used by tests in the tree. |
-| `CPP_COMPILER_COMPILE` | Compiles C or C++ output through the configured downstream C/C++ compiler and fails if compilation fails. |
-| `CPP_COMPILER_SHARED_LIBRARY` | Builds a C/C++ source file as a shared library and calls an exported `test` function. |
-| `CPP_COMPILER_EXECUTE` | Builds C/C++ output as an executable, runs it, and compares the executable output. |
-| `PERFORMANCE_PROFILE` | Runs `render-test -performance-profile`, extracts the measured time, and records it in the test report. |
-| `DOC` | Runs `slangc` and compares wrapped output against `<test>.expected`, defaulting to an empty-success result when no expected file exists. It is not currently used by tests in the tree. |
-| `EXECUTABLE` | Compiles the Slang file to a host executable, runs that executable, and compares its wrapped output with `<test>.expected`. |
-| `SPVDB_DEBUGGER` | When built with SPVDB support, compiles SPIR-V with debug info and runs `//SPVDB-CMD:` debugger commands embedded in the test file. |
-| `DISPATCHER` | Runs `slang-dispatcher`; this is a narrow tool test rather than a typical shader test. |
+| Command                       | Purpose                                                                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COMMAND_LINE_SIMPLE`         | Reuses the `SIMPLE` runner but treats the source file path as the output stem. This is mainly useful for command-line diagnostics where the expected files are anchored to the source path. |
+| `COMPARE_DXIL`                | Compiles through Slang and `dxc`, then compares DXIL assembly output. It is not currently used by tests in the tree.                                                                        |
+| `CPP_COMPILER_COMPILE`        | Compiles C or C++ output through the configured downstream C/C++ compiler and fails if compilation fails.                                                                                   |
+| `CPP_COMPILER_SHARED_LIBRARY` | Builds a C/C++ source file as a shared library and calls an exported `test` function.                                                                                                       |
+| `CPP_COMPILER_EXECUTE`        | Builds C/C++ output as an executable, runs it, and compares the executable output.                                                                                                          |
+| `PERFORMANCE_PROFILE`         | Runs `render-test -performance-profile`, extracts the measured time, and records it in the test report.                                                                                     |
+| `DOC`                         | Runs `slangc` and compares wrapped output against `<test>.expected`, defaulting to an empty-success result when no expected file exists. It is not currently used by tests in the tree.     |
+| `EXECUTABLE`                  | Compiles the Slang file to a host executable, runs that executable, and compares its wrapped output with `<test>.expected`.                                                                 |
+| `SPVDB_DEBUGGER`              | When built with SPVDB support, compiles SPIR-V with debug info and runs `//SPVDB-CMD:` debugger commands embedded in the test file.                                                         |
+| `DISPATCHER`                  | Runs `slang-dispatcher`; this is a narrow tool test rather than a typical shader test.                                                                                                      |
 
 Deprecated commands remain available for old tests, but new tests should normally use
 `SIMPLE`, `COMPARE_COMPUTE`, `COMPARE_COMPUTE_EX`, `COMPARE_RENDER_COMPUTE`, or one of the
@@ -305,17 +319,17 @@ Prefer `name=<path>` in new tests. Names may include fields and array indices, f
 
 ### Resource Types
 
-| Resource | Meaning | Options |
-| --- | --- | --- |
-| `ubuffer` | Storage or structured buffer. | `data`, `stride`, `count`, `counter`, `random`, `format` |
-| `cbuffer` | Constant-buffer object initialized from `data`. | `data` |
-| `uniform` | Uniform data used in object fields or entry-point parameters. | `data` |
-| `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube` | Read-only textures. | `size`, `arrayLength`, `content`, `format`, `depth`, `sampleCount`, `mipMaps` |
-| `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTextureCube` | Read-write textures. | Same texture options |
-| `RWTextureBuffer` | Buffer resource represented as a texture buffer. | Same options as `ubuffer` |
-| `Sampler` | Sampler state. | `depthCompare`, `filteringMode` |
-| `TextureSampler1D`, `TextureSampler2D`, `TextureSampler3D`, `TextureSamplerCube` | Combined texture/sampler handle. | Texture options plus sampler options |
-| `AccelerationStructure` | Ray-tracing acceleration structure placeholder. | No options |
+| Resource                                                                         | Meaning                                                       | Options                                                                       |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ubuffer`                                                                        | Storage or structured buffer.                                 | `data`, `stride`, `count`, `counter`, `random`, `format`                      |
+| `cbuffer`                                                                        | Constant-buffer object initialized from `data`.               | `data`                                                                        |
+| `uniform`                                                                        | Uniform data used in object fields or entry-point parameters. | `data`                                                                        |
+| `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`                             | Read-only textures.                                           | `size`, `arrayLength`, `content`, `format`, `depth`, `sampleCount`, `mipMaps` |
+| `RWTexture1D`, `RWTexture2D`, `RWTexture3D`, `RWTextureCube`                     | Read-write textures.                                          | Same texture options                                                          |
+| `RWTextureBuffer`                                                                | Buffer resource represented as a texture buffer.              | Same options as `ubuffer`                                                     |
+| `Sampler`                                                                        | Sampler state.                                                | `depthCompare`, `filteringMode`                                               |
+| `TextureSampler1D`, `TextureSampler2D`, `TextureSampler3D`, `TextureSamplerCube` | Combined texture/sampler handle.                              | Texture options plus sampler options                                          |
+| `AccelerationStructure`                                                          | Ray-tracing acceleration structure placeholder.               | No options                                                                    |
 
 ### Buffer Options
 
