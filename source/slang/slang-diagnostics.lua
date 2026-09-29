@@ -1576,6 +1576,20 @@ err(
 )
 
 err(
+    "this-param-mode-attribute-without-effective-this-param",
+    30428,
+    "attribute requires an effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is only allowed on a declaration with an effective `this` parameter." }
+)
+
+err(
+    "this-param-mode-attribute-on-class-member",
+    30429,
+    "attribute cannot change a source-declared class member's effective `this` parameter",
+    span { loc = "attribute:Modifier", message = "attribute '~attribute' is not allowed on a class member; source-declared class methods pass their effective `this` parameter by value." }
+)
+
+err(
     "expected-a-type",
     30060,
     "expected a type",
@@ -4101,6 +4115,27 @@ err(
     31109,
     "'set' parameter type mismatch",
     span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actualType:Type' which does not match the expected type '~expectedType:Type'" }
+)
+
+err(
+    "set-accessor-param-cannot-have-default-value",
+    31163,
+    "a 'set' parameter cannot have a default value",
+    span { loc = "initExpr:Expr", message = "the value passed to a 'set' accessor is always supplied by an assignment" }
+)
+
+err(
+    "set-accessor-param-must-be-input-only",
+    31164,
+    "a 'set' parameter must be input-only",
+    span { loc = "param:Decl", message = "'set' parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
+)
+
+err(
+    "subscript-param-must-be-input-only",
+    31165,
+    "a subscript parameter must be input-only",
+    span { loc = "param:Decl", message = "subscript parameter '~param' has parameter-passing mode '~mode:ParamPassingMode'; only 'in' and immutable-borrow modes are allowed" }
 )
 
 err(

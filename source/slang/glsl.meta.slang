@@ -5398,7 +5398,6 @@ public bool rayQueryProceedEXT(inout rayQueryEXT q)
 
 __glsl_extension(GL_EXT_ray_query)
 [require(glsl_spirv, rayquery)]
-[mutating]
 [ForceInline]
 public void rayQueryTerminateEXT(inout rayQueryEXT q)
 {
