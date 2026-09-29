@@ -825,11 +825,15 @@ WORKLOADS = [
     # at N=512 `legalizeMatrixTypes` measures 0.0 ms on every target, while
     # GLSL spends 560 ms of 686 and CUDA 1254 ms of 1974 in `simplifyNonSSAIR`.
     # GLSL runs at N^1.60 and CUDA at N^1.98 against SPIR-V's N^0.78.
+    # Use N=512 across the family to reduce relative timing noise. A same-binary
+    # interleaved Windows study found steadier HLSL/GLSL totals and fewer Metal
+    # simplification spikes at this size. Keep N=256 in the sweep for scaling
+    # comparisons; size provenance prevents mixing the old and new baselines.
     WorkloadSpec(
         name="backend_matrix_spirv",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "spirv", "-emit-spirv-directly"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -844,7 +848,7 @@ WORKLOADS = [
         name="backend_matrix_hlsl",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "hlsl", "-entry", "computeMain"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -856,7 +860,7 @@ WORKLOADS = [
         name="backend_matrix_glsl",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "glsl", "-entry", "computeMain"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -867,7 +871,7 @@ WORKLOADS = [
         name="backend_matrix_metal",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "metal"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
@@ -878,7 +882,7 @@ WORKLOADS = [
         name="backend_matrix_cuda",
         bucket="backend_legalize",
         gen=workloads.gen_matrix_chain,
-        default_size=256,
+        default_size=512,
         mode="target",
         extra_flags=["-target", "cuda"],
         primary_timers=["compileInner", "linkAndOptimizeIR", "simplifyNonSSAIR",
