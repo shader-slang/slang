@@ -2845,21 +2845,19 @@ bool SemanticsVisitor::_coerce(
         {
             bool suppressGeneralWarning = false;
 
-            // Check integer -> integer and integer -> float constant value conversions
+            // Check integer -> integer and integer -> float literal value conversions
             if (cost < kConversionCost_Explicit && (getMaximumTypeBitSize(fromType) > 0) &&
                 (isFloatingPointType(toType) || isScalarNonBoolIntegerType(toType)))
             {
-                // Check if we have a known integer value
                 std::optional<TypedIntegerLiteralValue> val{};
 
+                // Check if we have a known integer value
                 if (auto litNode = as<IntegerLiteralExpr>(fromExpr))
                     val = TypedIntegerLiteralValue(*litNode);
-                else if (
-                    auto valNode = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
-                        fromExpr,
-                        ConstantFoldingKind::CompileTime,
-                        nullptr)))
-                    val = TypedIntegerLiteralValue(*valNode);
+
+                // Note: we'll check for integer constant value overflows in
+                // SCCP (slang-ir-sccp.cpp), so we don't try to do constant
+                // folding here.
 
                 if (val)
                 {
