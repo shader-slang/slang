@@ -16,6 +16,7 @@
 #include "slang/slang-check-impl.h"
 #include "slang/slang-mangle.h"
 #include "slang/slang-module.h"
+#include "slang/slang-syntax.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -316,6 +317,212 @@ SLANG_UNIT_TEST(synthesizedDeclarationRegistryDrainsNewRoots)
     SLANG_CHECK(synthesizedStruct->checkState.getState() == DeclCheckState::ReadyForConformances);
     SLANG_CHECK(synthesizedProperty->checkState.getState() == DeclCheckState::ReadyForConformances);
     SLANG_CHECK(sink.getErrorCount() == 0);
+}
+
+// Moving mangling to the checked effective `this` parameter information must not change the
+// established names. In particular, only explicitly `[mutating]` and `[__ref]` ordinary methods
+// had mode suffixes; a borrowed method, a setter's writable default, and a direct function-type
+// declaration did not.
+SLANG_UNIT_TEST(checkedEffectiveThisManglingPreservesLegacySuffixes)
+{
+    StaticUnitTestEnv env(unitTestContext);
+
+    String diagnostics;
+    Module* module = env.checkModuleFromSource(
+        "checkedEffectiveThisManglingPreservesLegacySuffixes",
+        "struct Receiver\n"
+        "{\n"
+        "    [constref] int ordinaryBorrow(int value) { return value; }\n"
+        "    [mutating] int ordinaryMutating(int value) { return value; }\n"
+        "    [__ref] int ordinaryRef(int value) { return value; }\n"
+        "    [mutating] [__ref] int overlappingModes(int value) { return value; }\n"
+        "    [NoDiffThis] static int staticNoDiffThis(int value) { return value; }\n"
+        "    property int item { get { return 0; } set {} }\n"
+        "}\n"
+        "[__NonCopyableType]\n"
+        "struct NonCopyableReceiver\n"
+        "{\n"
+        "    int defaultBorrow() { return 0; }\n"
+        "}\n"
+        "interface DirectRequirement\n"
+        "{\n"
+        "    [constref] __associatedfunc functype(int) -> int directBorrow;\n"
+        "    [mutating] __associatedfunc functype(int) -> int directMutating;\n"
+        "    [__ref] __associatedfunc functype(int) -> int directRef;\n"
+        "}\n"
+        "[NoDiffThis] int freeNoDiffThis(int value) { return value; }\n",
+        &diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto moduleDecl = module->getModuleDecl();
+    auto receiverDecl = findMemberDecl<StructDecl>(moduleDecl, "Receiver");
+    auto nonCopyableReceiverDecl = findMemberDecl<StructDecl>(moduleDecl, "NonCopyableReceiver");
+    auto interfaceDecl = findMemberDecl<InterfaceDecl>(moduleDecl, "DirectRequirement");
+    auto freeNoDiffThis = findMemberDecl<FuncDecl>(moduleDecl, "freeNoDiffThis");
+    SLANG_CHECK_ABORT(receiverDecl != nullptr);
+    SLANG_CHECK_ABORT(nonCopyableReceiverDecl != nullptr);
+    SLANG_CHECK_ABORT(interfaceDecl != nullptr);
+    SLANG_CHECK_ABORT(freeNoDiffThis != nullptr);
+
+    auto ordinaryBorrow = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryBorrow");
+    auto ordinaryMutating = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryMutating");
+    auto ordinaryRef = findMemberDecl<FuncDecl>(receiverDecl, "ordinaryRef");
+    auto overlappingModes = findMemberDecl<FuncDecl>(receiverDecl, "overlappingModes");
+    auto staticNoDiffThis = findMemberDecl<FuncDecl>(receiverDecl, "staticNoDiffThis");
+    auto propertyDecl = findMemberDecl<PropertyDecl>(receiverDecl, "item");
+    auto defaultBorrow = findMemberDecl<FuncDecl>(nonCopyableReceiverDecl, "defaultBorrow");
+    auto directBorrow = findMemberDecl<FuncDecl>(interfaceDecl, "directBorrow");
+    auto directMutating = findMemberDecl<FuncDecl>(interfaceDecl, "directMutating");
+    auto directRef = findMemberDecl<FuncDecl>(interfaceDecl, "directRef");
+    SLANG_CHECK_ABORT(ordinaryBorrow != nullptr);
+    SLANG_CHECK_ABORT(ordinaryMutating != nullptr);
+    SLANG_CHECK_ABORT(ordinaryRef != nullptr);
+    SLANG_CHECK_ABORT(overlappingModes != nullptr);
+    SLANG_CHECK_ABORT(staticNoDiffThis != nullptr);
+    SLANG_CHECK_ABORT(propertyDecl != nullptr);
+    SLANG_CHECK_ABORT(defaultBorrow != nullptr);
+    SLANG_CHECK_ABORT(directBorrow != nullptr);
+    SLANG_CHECK_ABORT(directMutating != nullptr);
+    SLANG_CHECK_ABORT(directRef != nullptr);
+
+    SetterDecl* setterDecl = nullptr;
+    for (auto member : propertyDecl->getDirectMemberDecls())
+    {
+        if (auto setter = as<SetterDecl>(member))
+        {
+            setterDecl = setter;
+            break;
+        }
+    }
+    SLANG_CHECK_ABORT(setterDecl != nullptr);
+
+    auto astBuilder = env.getASTBuilder();
+    SLANG_CHECK(getMangledName(astBuilder, freeNoDiffThis).endsWith("n"));
+    SLANG_CHECK(getMangledName(astBuilder, ordinaryBorrow).endsWith("ii"));
+    SLANG_CHECK(getMangledName(astBuilder, ordinaryMutating).endsWith("m"));
+    SLANG_CHECK(getMangledName(astBuilder, ordinaryRef).endsWith("r"));
+    SLANG_CHECK(getMangledName(astBuilder, overlappingModes).endsWith("mr"));
+    SLANG_CHECK(getMangledName(astBuilder, staticNoDiffThis).endsWith("n"));
+    SLANG_CHECK(!getMangledName(astBuilder, setterDecl).endsWith("m"));
+    SLANG_CHECK(!getMangledName(astBuilder, defaultBorrow).endsWith("c"));
+    SLANG_CHECK(getMangledName(astBuilder, directBorrow).endsWith("B"));
+    SLANG_CHECK(getMangledName(astBuilder, directMutating).endsWith("B"));
+    SLANG_CHECK(getMangledName(astBuilder, directRef).endsWith("B"));
+}
+
+// Synthesized witness wrappers use the checked effective `this` parameter mode as part of their
+// internal symbol identity. This keeps wrappers with different calling conventions distinct when
+// linking coalesces declarations with the same mangled name.
+SLANG_UNIT_TEST(synthesizedEffectiveThisManglingEncodesMode)
+{
+    StaticUnitTestEnv env(unitTestContext);
+
+    String diagnostics;
+    Module* module = env.checkModuleFromSource(
+        "synthesizedEffectiveThisManglingEncodesMode",
+        "struct Receiver { int method() { return 0; } }\n",
+        &diagnostics);
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    auto receiverDecl = findMemberDecl<StructDecl>(module->getModuleDecl(), "Receiver");
+    SLANG_CHECK_ABORT(receiverDecl != nullptr);
+    auto methodDecl = findMemberDecl<FuncDecl>(receiverDecl, "method");
+    SLANG_CHECK_ABORT(methodDecl != nullptr);
+    auto thisParamInfo = methodDecl->findModifier<ThisParamInfoAttribute>();
+    SLANG_CHECK_ABORT(thisParamInfo != nullptr);
+
+    auto astBuilder = env.getASTBuilder();
+    auto legacyName = getMangledName(astBuilder, methodDecl);
+    auto synthesizedMode = astBuilder->create<SynthesizedParamPassingModeModifier>();
+    addModifier(methodDecl, synthesizedMode);
+
+    struct ModeCase
+    {
+        ParamPassingMode mode;
+        char const* suffix;
+    };
+    ModeCase cases[] = {
+        {ParamPassingMode::In, "ti_"},
+        {ParamPassingMode::Out, "to_"},
+        {ParamPassingMode::BorrowInOut, "tio_"},
+        {ParamPassingMode::BorrowIn, "tc_"},
+        {ParamPassingMode::Ref, "tr_"},
+    };
+
+    List<String> mangledNames;
+    for (auto modeCase : cases)
+    {
+        synthesizedMode->mode = modeCase.mode;
+        thisParamInfo->info.mode = modeCase.mode;
+        auto mangledName = getMangledName(astBuilder, methodDecl);
+        SLANG_CHECK(mangledName.endsWith(modeCase.suffix));
+        SLANG_CHECK(mangledName != legacyName);
+        for (auto previousName : mangledNames)
+            SLANG_CHECK(mangledName != previousName);
+        mangledNames.add(mangledName);
+    }
+}
+
+// `ParamInfo` and a type carrying a parameter-passing-mode wrapper are two encodings of the same
+// information. The wrapper represents only the mode; semantic modifiers such as `no_diff` remain
+// part of the value type in both directions.
+SLANG_UNIT_TEST(paramInfoWrappedTypeRoundTrips)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    auto astBuilder = env.getASTBuilder();
+    auto noDiffIntType =
+        astBuilder->getModifiedType(astBuilder->getIntType(), astBuilder->getNoDiffModifierVal());
+
+    ParamPassingMode modes[] = {
+        ParamPassingMode::In,
+        ParamPassingMode::Out,
+        ParamPassingMode::BorrowInOut,
+        ParamPassingMode::BorrowIn,
+        ParamPassingMode::Ref,
+    };
+    for (auto mode : modes)
+    {
+        ParamInfo original;
+        original.type = noDiffIntType;
+        original.mode = mode;
+
+        auto wrappedType = getParamTypeWithModeWrapper(astBuilder, original);
+        auto decoded = getParamInfoFromTypeWithModeWrapper(wrappedType);
+
+        SLANG_CHECK(decoded.mode == original.mode);
+        SLANG_CHECK(decoded.type->equals(original.type));
+        SLANG_CHECK(doesTypeHaveNoDiffModifier(decoded.type));
+    }
+}
+
+// Unchecked callable headers cannot query their checked effective `this` parameter information
+// without creating a semantic-checking cycle. The syntax-only policy used to bootstrap lookup must
+// nevertheless use the same modifier precedence as the checked producer.
+SLANG_UNIT_TEST(effectiveThisParamModePolicyPrecedence)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    auto astBuilder = env.getASTBuilder();
+    auto setterDecl = astBuilder->create<SetterDecl>();
+
+    SLANG_CHECK(
+        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
+        ParamPassingMode::BorrowInOut);
+
+    addModifier(setterDecl, astBuilder->create<NonmutatingAttribute>());
+    SLANG_CHECK(applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::In);
+
+    addModifier(setterDecl, astBuilder->create<RefAttribute>());
+    SLANG_CHECK(
+        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::Ref);
+
+    addModifier(setterDecl, astBuilder->create<ConstRefAttribute>());
+    SLANG_CHECK(
+        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) == ParamPassingMode::BorrowIn);
+
+    addModifier(setterDecl, astBuilder->create<MutatingAttribute>());
+    SLANG_CHECK(
+        applyThisParamModePolicy(setterDecl, ParamPassingMode::In) ==
+        ParamPassingMode::BorrowInOut);
 }
 
 // Source that fails to check reports a diagnostic rather than returning a
