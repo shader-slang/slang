@@ -5033,13 +5033,13 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_PatchConstantFuncDecoration, patchConstantFunc);
     }
 
-    void addGLSLPatchDecoration(IRInst* value)
-    {
-        // A decoration that marks a global output variable as belonging to
-        // the patch constant function output of a hull (tessellation control) shader.
-        // This is needed for SPIR-V/GLSL where patch constant function outputs require the `Patch` decoration.
-        addDecoration(value, kIROp_GLSLPatchDecoration);
-    }
+    /// Marks a global variable as belonging to the patch constant interface of a
+    /// tessellation shader, so that emit can distinguish it from per-control-point I/O:
+    /// SPIR-V emits the `Patch` decoration (SpvDecorationPatch), while GLSL emits the
+    /// patch storage qualifier. The interface consists of patch constant function
+    /// outputs in a hull (tessellation control) shader and patch constant inputs in a
+    /// domain (tessellation evaluation) shader.
+    void addGLSLPatchDecoration(IRInst* value) { addDecoration(value, kIROp_GLSLPatchDecoration); }
 
     void addImportDecoration(IRInst* value, UnownedStringSlice const& mangledName)
     {
