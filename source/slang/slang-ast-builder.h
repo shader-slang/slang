@@ -161,6 +161,11 @@ protected:
 
 struct ValKey
 {
+    // The hash is `Hasher`'s result, which is already well distributed, so the map does not need
+    // to mix it again. This has to be a member of the key: `DetectAvalanchingHash` looks for
+    // `T::kHasUniformHash`, so declaring it anywhere else says nothing to the map.
+    static constexpr bool kHasUniformHash = true;
+
     Val* val;
     HashCode hashCode;
     ValKey() = default;

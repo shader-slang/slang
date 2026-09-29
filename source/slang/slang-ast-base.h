@@ -514,6 +514,7 @@ struct ValSet
         {
         }
 
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const { return val ? val->getHashCode() : 0; }
         bool operator==(const ValItem other) const
         {
@@ -602,6 +603,7 @@ struct TypePair
 {
     Type* type0;
     Type* type1;
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(Slang::getHashCode(type0), Slang::getHashCode(type1));

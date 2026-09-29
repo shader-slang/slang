@@ -48,24 +48,33 @@
 #include <ankerl/unordered_dense.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_FLAT
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_NODE
 #include <boost/unordered/unordered_node_map.hpp>
+#include <boost/unordered/unordered_node_set.hpp>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_UNORDERED
 #include <boost/unordered/unordered_map.hpp>
+#include <boost/unordered/unordered_set.hpp>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_ABSL_FLAT
 #include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_ABSL_NODE
 #include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_GTL_FLAT
 #include <gtl/phmap.hpp>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_ROBIN
 #include <tsl/robin_map.h>
+#include <tsl/robin_set.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_HOPSCOTCH
 #include <tsl/hopscotch_map.h>
+#include <tsl/hopscotch_set.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_SPARSE
 #include <tsl/sparse_map.h>
+#include <tsl/sparse_set.h>
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_STD
 #include <unordered_map>
+#include <unordered_set>
 #else
 #error "SLANG_HASHMAP_IMPL is not set to one of the SLANG_HASHMAP_* values"
 #endif
@@ -82,6 +91,8 @@ namespace HashMapImpl
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = ankerl::unordered_dense::map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = ankerl::unordered_dense::set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "ankerl::unordered_dense::map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_UNORDERED_DENSE_SEGMENTED
@@ -95,36 +106,48 @@ constexpr const char* kName = "ankerl::unordered_dense::map";
 // every access.
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = ankerl::unordered_dense::segmented_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = ankerl::unordered_dense::segmented_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "ankerl::unordered_dense::segmented_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_FLAT
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = boost::unordered_flat_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = boost::unordered_flat_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "boost::unordered_flat_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_NODE
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = boost::unordered_node_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = boost::unordered_node_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "boost::unordered_node_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_BOOST_UNORDERED
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = boost::unordered_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = boost::unordered_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "boost::unordered_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_ABSL_FLAT
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = absl::flat_hash_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = absl::flat_hash_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "absl::flat_hash_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_ABSL_NODE
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = absl::node_hash_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = absl::node_hash_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "absl::node_hash_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_GTL_FLAT
@@ -137,12 +160,16 @@ constexpr const char* kName = "absl::node_hash_map";
 // its hash values may escape into a serialized module.
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = gtl::flat_hash_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = gtl::flat_hash_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "gtl::flat_hash_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_ROBIN
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = tsl::robin_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = tsl::robin_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "tsl::robin_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_HOPSCOTCH
@@ -154,6 +181,8 @@ constexpr const char* kName = "tsl::robin_map";
 // backend here using that strategy.
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = tsl::hopscotch_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = tsl::hopscotch_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "tsl::hopscotch_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_TSL_SPARSE
@@ -164,12 +193,16 @@ constexpr const char* kName = "tsl::hopscotch_map";
 // when the question is peak memory rather than wall clock.
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = tsl::sparse_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = tsl::sparse_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "tsl::sparse_map";
 
 #elif SLANG_HASHMAP_IMPL == SLANG_HASHMAP_STD
 
 template<typename TKey, typename TValue, typename Hash, typename KeyEqual>
 using Map = std::unordered_map<TKey, TValue, Hash, KeyEqual>;
+template<typename TKey, typename Hash, typename KeyEqual>
+using Set = std::unordered_set<TKey, Hash, KeyEqual>;
 constexpr const char* kName = "std::unordered_map";
 
 #endif

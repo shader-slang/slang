@@ -1956,6 +1956,7 @@ public:
         hashCode = _getHashCode();
     }
     IRInstKey& operator=(const IRInstKey&) = default;
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const { return hashCode; }
     IRInst* getInst() const { return inst; }
 
@@ -1988,6 +1989,7 @@ struct IRConstantKey
     IRConstant* inst;
 
     bool operator==(const IRConstantKey& rhs) const { return inst->equal(rhs.inst); }
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
@@ -2000,6 +2002,7 @@ struct AnnotationCacheKey
         return inst == other.inst && associationKind == other.associationKind;
     }
 
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         Hasher hasher;

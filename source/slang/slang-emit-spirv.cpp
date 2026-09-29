@@ -1111,7 +1111,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         bool operator==(const ConstantValueKey& other) const
         {
-            return type == other.type && value == other.value;
+            // Compare the bits of `value` rather than using `==`.
+            //
+            // For a floating point constant those are different questions: `0.0 == -0.0` is
+            // true, but the two are not the same SPIR-V constant and must not be shared, since
+            // `1.0 / -0.0` is -inf where `1.0 / 0.0` is +inf. `Hash<double>` already keeps them
+            // apart on purpose, and a hash map may assume that keys comparing equal also hash
+            // equally -- abseil checks that assumption in its debug build, and aborted here.
+            return type == other.type && ::memcmp(&value, &other.value, sizeof(value)) == 0;
         }
     };
     Dictionary<ConstantValueKey<IRIntegerValue>, SpvInst*> m_spvIntConstants;
@@ -1951,7 +1958,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             return instWords == other.instWords && extraKeyData == other.extraKeyData;
         }
-        const static bool kHasUniformHash = true;
+        static constexpr bool kHasUniformHash = true;
         // Spelled out rather than deduced with `auto`, because this is a nested
         // class: see the comment on SLANG_COMPONENTWISE_HASHABLE_1 in
         // slang-hash.h for why a deduced return type here would make
@@ -7285,6 +7292,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return builtinName == other.builtinName && storageClass == other.storageClass &&
                    flat == other.flat && pointeeType == other.pointeeType;
         }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(
@@ -7306,6 +7314,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                    arrayStride == other.arrayStride;
         }
 
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(
@@ -11607,8 +11616,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         SpvInst* last = nullptr;
 
-        // This keeps track of the named IDs used in the asm block
-        Dictionary<UnownedStringSlice, SpvWord> idMap;
+        // This keeps track of the named IDs used in the asm block.
+        //
+        // It is an `OrderedDictionary` because we walk it at the end of this function to emit an
+        // `OpName` for each named ID, and so its iteration order is the order those names appear
+        // in the debug-names section of the SPIR-V we produce. Iterating a plain `Dictionary`
+        // would make that order a function of where the names happened to land in the hash
+        // table; keeping insertion order means the names come out in the order they are written
+        // in the `spirv_asm` block.
+        OrderedDictionary<UnownedStringSlice, SpvWord> idMap;
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -11722,7 +11738,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         if (!idMap.tryGetValue(idName, id))
                         {
                             id = freshID();
-                            idMap.set(idName, id);
+                            idMap[idName] = id;
                         }
                         emitOperand(id);
                         break;

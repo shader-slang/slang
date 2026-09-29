@@ -135,6 +135,7 @@ public:
     {
         Type* type;
         slang::LayoutRules rules;
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             Hasher hasher;

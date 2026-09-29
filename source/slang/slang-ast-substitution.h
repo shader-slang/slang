@@ -35,6 +35,7 @@ struct SubstitutionCache
             return val == other.val && packExpansionIndex == other.packExpansionIndex;
         }
 
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(val), Slang::getHashCode(packExpansionIndex));

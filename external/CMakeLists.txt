@@ -211,7 +211,73 @@ if(SLANG_HASH STREQUAL "ABSL")
 elseif(SLANG_HASH STREQUAL "RAPIDHASH")
     slang_hashmap_use_header_only(rapidhash rapidhash.h)
 elseif(SLANG_HASH STREQUAL "KOMIHASH")
-    slang_hashmap_use_header_only(komihash komihash.h)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/komihash/komihash.h")
+        message(
+            FATAL_ERROR
+            "external/komihash/komihash.h is missing. Run: git submodule update --init external/komihash"
+        )
+    endif()
+
+    # komihash declares every function KOMIHASH_INLINE, which expands to
+    # `static inline`, so calling it straight from Slang::HashImpl::hashBytes --
+    # an inline function with external linkage -- would name an internal-linkage
+    # entity from the body of an external-linkage inline function. That is
+    # ill-formed, no diagnostic required, and it is exactly the defect that made
+    # XXH3 miscompile at -O3 and produce a Dictionary that could not find keys it
+    # had just inserted.
+    #
+    # komihash.h has no macro to make its functions external -- KOMIHASH_STATIC
+    # is defined outright rather than behind an #ifndef -- so instead the header
+    # is compiled into one translation unit that exposes a single ordinary
+    # function for Slang to call.
+    #
+    # rapidhash needs none of this: in C++ its RAPIDHASH_INLINE expands to plain
+    # `inline` with no `static`, so its functions already have external linkage.
+    # Its secrets are namespace-scope constexpr, which an inline function may
+    # name across translation units because they are const objects of literal
+    # type initialized with constant expressions.
+    set(komihash_shim_dir "${CMAKE_CURRENT_BINARY_DIR}/slang-komihash-shim")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/komihash/komihash.h"
+        "${komihash_shim_dir}/slang-komihash-impl.h"
+        COPYONLY
+    )
+    file(
+        GENERATE
+        OUTPUT "${komihash_shim_dir}/slang-komihash.h"
+        CONTENT
+            "#pragma once\n#include <stddef.h>\n#include <stdint.h>\n#ifdef __cplusplus\nextern \"C\" {\n#endif\nuint64_t slangKomihash(const void* data, size_t size);\n#ifdef __cplusplus\n}\n#endif\n"
+    )
+    # Seed 0: komihash takes a seed so a caller can decorrelate two hashes of the
+    # same data, which Slang has no need of, and a fixed seed keeps the hash
+    # reproducible across runs for anything that reaches a serialized module.
+    file(
+        GENERATE
+        OUTPUT "${komihash_shim_dir}/slang-komihash.c"
+        CONTENT
+            "#include \"slang-komihash.h\"\n#include \"slang-komihash-impl.h\"\nuint64_t slangKomihash(const void* data, size_t size)\n{\n    return komihash(data, size, 0);\n}\n"
+    )
+
+    add_library(slang-komihash STATIC "${komihash_shim_dir}/slang-komihash.c")
+    target_include_directories(slang-komihash PUBLIC "${komihash_shim_dir}")
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set_target_properties(slang-komihash PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            slang-komihash
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
+
+    target_link_libraries(slang-hashmap INTERFACE slang-komihash)
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${komihash_shim_dir}"
+    )
 elseif(SLANG_HASH STREQUAL "XXH3")
     if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h")
         message(
@@ -231,7 +297,7 @@ elseif(SLANG_HASH STREQUAL "XXH3")
     # link order rather than from either target's own property.
     #
     # So give xxHash a name nothing else can claim: copy the header next to a
-    # small wrapper that sets XXH_INLINE_ALL, and include the wrapper.
+    # wrapper, and include the wrapper.
     #
     # The wrapper reaches the copy as a plain sibling, with no absolute path and
     # no "..", because slang-embed also walks these include directories. It
@@ -241,50 +307,95 @@ elseif(SLANG_HASH STREQUAL "XXH3")
     # appears in. Handed an absolute path it builds a nonsensical one, fails to
     # read it, and aborts on the SLANG_ASSERT in tools/slang-embed.
     #
-    # XXH_INLINE_ALL lives in the wrapper rather than in a compile definition so
-    # that the name and the mode it is included in stay together. It compiles
-    # XXH3 into whichever translation unit hashes instead of linking the
-    # libxxhash that xxHash's own build would produce, which matters because
-    # Slang only calls XXH3_64bits, on keys of a handful of bytes, where call
-    # overhead is a significant part of the cost.
+    # xxHash is compiled once, into its own translation unit, rather than pulled
+    # into every translation unit with XXH_INLINE_ALL. Inlining it looked
+    # attractive -- Slang only calls XXH3_64bits, on keys of a handful of bytes,
+    # where call overhead is a real fraction of the cost -- but XXH_INLINE_ALL
+    # makes every xxHash function `static`, and
+    # Slang::HashImpl::hashBytes is an `inline` function with external linkage.
+    # An inline function whose body names an internal-linkage entity is
+    # ill-formed, no diagnostic required: each translation unit defines the same
+    # COMDAT symbol with a different callee, and the linker keeps one of them
+    # arbitrarily.
     #
-    # Neither file is rewritten when its content is unchanged -- configure_file
-    # and file(GENERATE) both compare first -- so reconfiguring does not rebuild
-    # all of core.
+    # That is not theoretical. At -Og the copies behaved alike and it went
+    # unnoticed; at -O3, with xxHash's always_inline SIMD kernels folded in, the
+    # surviving copy disagreed with the one that had been used to insert, and
+    # slang-spirv-embed-generator aborted with "The key does not exist in
+    # dictionary" looking up an SpvOp it had just added
+    # (tools/slang-spirv-embed-generator/spirv-embed-generator-main.cpp).
+    # Defining XXH_NO_INLINE_HINTS made it go away, which is a workaround for a
+    # miscompilation and not a fix for the linkage.
+    #
+    # Neither generated file is rewritten when its content is unchanged --
+    # configure_file and file(GENERATE) both compare first -- so reconfiguring
+    # does not rebuild all of core.
     set(xxhash_shim_dir "${CMAKE_CURRENT_BINARY_DIR}/slang-xxhash-shim")
     configure_file(
         "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h"
         "${xxhash_shim_dir}/slang-xxhash-impl.h"
         COPYONLY
     )
+    # Declarations only: without XXH_IMPLEMENTATION or XXH_INLINE_ALL, xxhash.h
+    # declares the API with external linkage and defines nothing.
     file(
-        GENERATE OUTPUT "${xxhash_shim_dir}/slang-xxhash.h"
+        GENERATE
+        OUTPUT "${xxhash_shim_dir}/slang-xxhash.h"
+        CONTENT "#pragma once\n#include \"slang-xxhash-impl.h\"\n"
+    )
+    # The one translation unit that holds the implementation.
+    #
+    # XXH_STATIC_LINKING_ONLY as well as XXH_IMPLEMENTATION: the implementation
+    # needs the state structs, and xxhash.h only defines them behind that macro.
+    # Without it the build fails on "invalid application of sizeof to incomplete
+    # type XXH32_state_t".
+    file(
+        GENERATE
+        OUTPUT "${xxhash_shim_dir}/slang-xxhash-impl.c"
         CONTENT
-            "#pragma once\n#define XXH_INLINE_ALL\n#include \"slang-xxhash-impl.h\"\n"
+            "#define XXH_STATIC_LINKING_ONLY\n#define XXH_IMPLEMENTATION\n#include \"slang-xxhash-impl.h\"\n"
     )
-    target_include_directories(
-        slang-hashmap
-        ${system}
-        INTERFACE "${xxhash_shim_dir}"
-    )
+
+    add_library(slang-xxhash STATIC "${xxhash_shim_dir}/slang-xxhash-impl.c")
+    target_include_directories(slang-xxhash PUBLIC "${xxhash_shim_dir}")
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set_target_properties(slang-xxhash PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    # With link-time optimization on, this recovers the cross-translation-unit
+    # inlining that XXH_INLINE_ALL used to provide, without the linkage that
+    # made it ill-formed. Slang's own targets get this from slang_add_target;
+    # this is a plain add_library, so it has to ask for it.
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            slang-xxhash
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
 
     # XXH3's SSE2 kernels are marked always_inline, and GCC refuses to inline a
     # function carrying __target__("sse2") into a caller without it unless it is
     # optimizing properly -- "inlining failed in call to always_inline
-    # XXH3_accumulate_sse2", which is an error, not a warning.
+    # XXH3_accumulate_sse2", which is an error, not a warning. xxHash guards
+    # against this itself, but only by looking for __NO_INLINE__, which GCC
+    # defines at -O0 and not at -Og, and Slang's Debug configuration is -Og (see
+    # the top of the root CMakeLists.txt).
     #
-    # xxHash guards against this itself, but only by looking for __NO_INLINE__,
-    # which GCC defines at -O0 and not at -Og. Slang's Debug configuration is
-    # -Og (see the top of the root CMakeLists.txt), so it falls through the
-    # guard and fails to build. Setting the hint explicitly is what upstream
-    # would have done had it recognised the flag.
-    #
-    # Debug only: Release is -O3 and RelWithDebInfo is -O2, both of which inline
-    # fine, and those are the configurations a measurement would use. Forcing
-    # this everywhere would hand XXH3 a handicap the other hashes do not carry.
+    # PRIVATE, and only for the configuration that needs it: this is now the
+    # sole translation unit compiling xxHash, so the hint cannot differ between
+    # translation units the way it did when every one of them compiled its own
+    # copy.
     target_compile_definitions(
+        slang-xxhash
+        PRIVATE $<$<CONFIG:Debug>:XXH_NO_INLINE_HINTS=1>
+    )
+
+    target_link_libraries(slang-hashmap INTERFACE slang-xxhash)
+    target_include_directories(
         slang-hashmap
-        INTERFACE $<$<CONFIG:Debug>:XXH_NO_INLINE_HINTS=1>
+        ${system}
+        INTERFACE "${xxhash_shim_dir}"
     )
 endif()
 
@@ -501,7 +612,8 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             INTERFACE_INCLUDE_DIRECTORIES
         )
         cmake_path(
-            GET SPIRV-Headers_SOURCE_DIR
+            GET
+            SPIRV-Headers_SOURCE_DIR
             PARENT_PATH SPIRV-Headers_SOURCE_DIR
         )
     endif()

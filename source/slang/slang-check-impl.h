@@ -203,6 +203,7 @@ struct BasicTypeKeyPair
                type2.getRaw() != BasicTypeKey::invalid().getRaw();
     }
 
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const { return combineHash(type1.getRaw(), type2.getRaw()); }
 };
 
@@ -806,6 +807,7 @@ struct SpecializeInterfaceInheritanceWitnessKey
     SubtypeWitness* selfIsSubtypeOfBase = nullptr;
     SubtypeWitness* baseIsSubtypeOfFacet = nullptr;
 
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(
@@ -836,6 +838,7 @@ struct ImplicitCastMethodKey
     Type* toType;
     uint64_t constantVal;
     bool isConstant;
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(

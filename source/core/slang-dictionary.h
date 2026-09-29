@@ -101,6 +101,22 @@ SLANG_FORCE_INLINE const VALUE* getValue(const KeyValuePair<KEY, VALUE>* in)
 
 const float kMaxLoadFactor = 0.7f;
 
+/// Declares `is_avalanching` only when the selected hash implementation avalanches.
+///
+/// `is_avalanching` is a member type, so it cannot be switched on with a constant the way
+/// `kHasUniformHash` can; the declaration has to be inherited from a specialization instead.
+/// This is the same shape as `DetectAvalanchingHash` in slang-hash.h, keyed directly on the
+/// implementation rather than on a key type.
+template<bool avalanching>
+struct DeclareAvalanching
+{
+};
+template<>
+struct DeclareAvalanching<true>
+{
+    using is_avalanching = void;
+};
+
 /// Hashes any of the interchangeable text key types -- `UnownedStringSlice`,
 /// `String`, `ImmutableHashedString` -- so that a dictionary keyed by one of
 /// them can be probed with any of the others.
@@ -118,13 +134,13 @@ const float kMaxLoadFactor = 0.7f;
 /// those members is rejected at compile time rather than silently hashed some
 /// other way; in particular a bare `const char*` is not a text key, because
 /// hashing it would hash the pointer.
-struct TextKeyHash
+struct TextKeyHash : DeclareAvalanching<HashImpl::kIsAvalanching>
 {
     using is_transparent = void;
     /// All the text key types hash their bytes with the selected hash
-    /// function, so the result needs no further mixing by the map. This
-    /// matches the `kHasUniformHash` that the types themselves declare.
-    using is_avalanching = void;
+    /// function, so the result needs no further mixing by the map -- but only
+    /// when that function avalanches, which is what the base class above
+    /// checks. This matches the `kHasUniformHash` the types themselves declare.
 
     template<typename T, typename = typename T::IsTextKey>
     HashCode64 operator()(const T& key) const
@@ -573,11 +589,65 @@ public:
     void remove(const T& obj) { dict.remove(obj); }
     bool contains(const T& obj) const { return dict.containsKey(obj); }
 };
-template<typename T>
-class HashSet : public HashSetBase<T, Dictionary<T, _DummyClass>>
+/// A set of `T`, backed by the selected implementation's own set type.
+///
+/// This used to be a `Dictionary<T, _DummyClass>`, which stores an empty value beside every key.
+/// The value is not free: alignment rounds the entry up, so `HashSet<IRInst*>` took sixteen bytes
+/// an entry where the key needs eight. Entry size decides how many entries share a cache line,
+/// which is most of what a probe costs, and the compiler's hot sets are sets of pointers.
+template<typename T, typename Hash = Slang::Hash<T>, typename KeyEqual = std::equal_to<T>>
+class HashSet
 {
+private:
+    using InnerSet = HashMapImpl::Set<T, Hash, KeyEqual>;
+    InnerSet set;
+
+    void init() {} // Base case for recursion
+    template<typename... Args>
+    void init(const T& v, Args... args)
+    {
+        add(v);
+        init(args...);
+    }
+
 public:
-    using HashSetBase<T, Dictionary<T, _DummyClass>>::HashSetBase;
+    HashSet() = default;
+    HashSet(const HashSet&) = default;
+    HashSet(HashSet&&) = default;
+    HashSet& operator=(const HashSet&) = default;
+    HashSet& operator=(HashSet&&) = default;
+
+    /// Construct from elements, as `HashSet<int> s(1, 2, 3)`.
+    template<typename... Args>
+    HashSet(const T& arg, Args... args)
+    {
+        init(arg, args...);
+    }
+
+    using Iterator = typename InnerSet::const_iterator;
+    Iterator begin() const { return set.begin(); }
+    Iterator end() const { return set.end(); }
+
+    auto getCount() const { return set.size(); }
+    auto getBucketCount() const { return set.bucket_count(); }
+
+    void clear()
+    {
+        if (!set.empty())
+            set.clear();
+    }
+
+    /// Empties the set and hands its memory back, where `clear` keeps it for reuse.
+    void clearAndDeallocate()
+    {
+        InnerSet emptySet(0, set.hash_function(), set.key_eq(), set.get_allocator());
+        set.swap(emptySet);
+    }
+
+    bool add(const T& obj) { return set.insert(obj).second; }
+    bool add(T&& obj) { return set.insert(std::move(obj)).second; }
+    void remove(const T& obj) { set.erase(obj); }
+    bool contains(const T& obj) const { return set.find(obj) != set.end(); }
 };
 
 template<typename TKey, typename TValue>

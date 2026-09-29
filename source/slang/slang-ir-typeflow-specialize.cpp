@@ -141,6 +141,7 @@ struct InstWithContext
         return context == other.context && inst == other.inst;
     }
 
+    static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const { return combineHash(HashCode(context), HashCode(inst)); }
 };
 
