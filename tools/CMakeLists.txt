@@ -77,7 +77,8 @@ if(SLANG_USE_SYSTEM_LUA)
     # The bundled translation unit compiles Lua's private onelua.c source.
     slang_glob_sources(slang_fiddle_sources slang-fiddle)
     list(
-        REMOVE_ITEM slang_fiddle_sources
+        REMOVE_ITEM
+        slang_fiddle_sources
         "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
     )
     generator(
