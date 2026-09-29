@@ -4234,7 +4234,7 @@ static bool computeTypePackUnificationMapping(
     Type* secondType,
     ShortList<Type*>& outFlattenedFirst,
     ShortList<Type*>& outFlattenedSecond,
-    ShortList<FlattenedTypeRangePair>& outMapping)
+    ShortList<FlattenedTypeRangePair, 2>& outMapping)
 {
     // The flattened arrays are owned by the caller because later recursive
     // unification needs to turn each mapping span back into a `QualType`.
@@ -4409,7 +4409,14 @@ bool SemanticsVisitor::TryUnifyTypes(
     // unification. For example, a single expansion can correspond to several
     // concrete elements on the other side, so compute spans first and then
     // convert each span back into the `QualType` shape expected by recursion.
-    ShortList<FlattenedTypeRangePair> typeMapping;
+    // Two inline slots rather than `ShortList`'s default of sixteen. Unlike a `ShortList` of
+    // pointers, whose inline array is left uninitialised, every slot here is default-constructed:
+    // `FlattenedTypeRangePair` holds two `FlattenedTypeRange`s and each zeroes an index and a
+    // count, so sixteen slots means 512 bytes written on every construction. This declaration is
+    // reached on the ordinary unification path, 202 million times over a Falcor profile, and in
+    // that profile plus a benchmark one -- 220 million constructions between them -- the list was
+    // empty 99.98% of the time and never held more than a single element.
+    ShortList<FlattenedTypeRangePair, 2> typeMapping;
     ShortList<Type*> flattenedFirst;
     ShortList<Type*> flattenedSecond;
     if (computeTypePackUnificationMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping) &&

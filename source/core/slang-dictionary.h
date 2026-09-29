@@ -2,6 +2,7 @@
 #define SLANG_CORE_DICTIONARY_H
 
 #include "slang-common.h"
+#include "slang-container-stats.h"
 #include "slang-exception.h"
 #include "slang-hash.h"
 #include "slang-hashmap-impl.h"
@@ -203,6 +204,7 @@ class Dictionary
     using InnerMap = HashMapImpl::Map<TKey, TValue, Hash, KeyEqual>;
     using ThisType = Dictionary<TKey, TValue, Hash, KeyEqual>;
     InnerMap map;
+    SLANG_CONTAINER_STATS_MEMBER
 
     // A caller may pass a value such as a string literal that can construct
     // TKey but is not a transparent probe type. In that case materialize one
@@ -232,14 +234,60 @@ class Dictionary
     }
 
 public:
+#if SLANG_ENABLE_CONTAINER_STATS
+    // These five are `= default` in a normal build; see the `#else` branch below. They are spelled
+    // out here only so that each one can record the site at which it was called. The defaulted
+    // `slangContainerStatsSite` parameter is evaluated at the point of call, so for a local
+    // variable it resolves to that variable's declaration line.
+    Dictionary(SLANG_CONTAINER_STATS_SITE_PARAM)
+        : SLANG_CONTAINER_STATS_INIT(ThisType, TKey, TValue)
+    {
+    }
+
+    Dictionary(const Dictionary& rhs, SLANG_CONTAINER_STATS_SITE_PARAM)
+        : map(rhs.map), SLANG_CONTAINER_STATS_INIT(ThisType, TKey, TValue)
+    {
+        // A copy is its own declaration, so it gets its own site and starts its own peak.
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+    }
+
+    Dictionary(Dictionary&& rhs, SLANG_CONTAINER_STATS_SITE_PARAM)
+        : map(std::move(rhs.map)), SLANG_CONTAINER_STATS_INIT(ThisType, TKey, TValue)
+    {
+        // A move continues the moved-from container's life, so its accumulated peak and operation
+        // history transfer here rather than being folded in at the source's site.
+        m_containerStatsProbe.takeFrom(rhs.m_containerStatsProbe);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+    }
+
+    ThisType& operator=(const ThisType& rhs)
+    {
+        map = rhs.map;
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return *this;
+    }
+
+    ThisType& operator=(ThisType&& rhs)
+    {
+        map = std::move(rhs.map);
+        SLANG_CONTAINER_STATS_NOTE_OP(MoveAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return *this;
+    }
+#else
     Dictionary() = default;
     Dictionary(const Dictionary&) = default;
     Dictionary(Dictionary&&) = default;
     ThisType& operator=(const ThisType&) = default;
     ThisType& operator=(ThisType&&) = default;
-    Dictionary(std::initializer_list<typename InnerMap::value_type> inits)
-        : map(inits)
+#endif
+
+    Dictionary(std::initializer_list<typename InnerMap::value_type> inits
+                   SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : map(inits) SLANG_CONTAINER_STATS_INIT_NEXT(ThisType, TKey, TValue)
     {
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
     }
 
     //
@@ -258,8 +306,19 @@ public:
     // `for (auto& [key, value] : dict) value.clear();`. That needs the
     // HashMapImpl::mutableIterator shim because tsl::robin_map's iterator
     // dereferences to a const pair; see its comment for the details.
-    auto begin() { return HashMapImpl::mutableIterator(map.begin()); }
-    auto begin() const { return map.begin(); }
+    //
+    // Iteration and `getCount` are recorded because `ShortDictionary` offers neither, so a site
+    // that uses them is disqualified from conversion regardless of how small it stays.
+    auto begin()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Iterate);
+        return HashMapImpl::mutableIterator(map.begin());
+    }
+    auto begin() const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Iterate);
+        return map.begin();
+    }
     auto end() { return HashMapImpl::mutableIterator(map.end()); }
     auto end() const { return map.end(); }
 
@@ -270,6 +329,7 @@ public:
     // Removes all values from the map
     void clear()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Clear);
         if (!map.empty())
             map.clear();
     }
@@ -277,18 +337,24 @@ public:
     // Removes all values and releases backing storage.
     void clearAndDeallocate()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(ClearAndDeallocate);
         InnerMap emptyMap(0, map.hash_function(), map.key_eq(), map.get_allocator());
         map.swap(emptyMap);
     }
 
     // Erases the value at the specified key if it exists
-    void remove(const TKey& key) { map.erase(key); }
+    void remove(const TKey& key)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
+        map.erase(key);
+    }
 
     // Removes all values satifying the predicate:
     // bool predicate(pair<Key, Value>)
     template<typename Predicate>
     void removeIf(Predicate&& predicate)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(RemoveIf);
         // Iterates the backing map directly rather than through begin()/end(),
         // because eraseAndAdvance needs the map's own iterator type, and the
         // predicate only reads the entry.
@@ -307,16 +373,31 @@ public:
     }
 
     // Reserves enough space for the specified number of values
-    void reserve(Index size) { map.reserve(std::size_t(size)); };
+    void reserve(Index size)
+    {
+        // Only the operation is recorded, not `size`. The statistic being collected is how many
+        // elements a container actually holds; a `reserve` states what the caller anticipated,
+        // which may be far larger, and folding it into the peak would bias the ranking.
+        SLANG_CONTAINER_STATS_NOTE_OP(Reserve);
+        map.reserve(std::size_t(size));
+    };
 
     // Swap with another map
-    void swapWith(ThisType& rhs) { std::swap(*this, rhs); }
+    void swapWith(ThisType& rhs)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Swap);
+        std::swap(*this, rhs);
+    }
 
     //
     // Query capacity
     //
 
-    std::size_t getCount() const { return map.size(); }
+    std::size_t getCount() const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(GetCount);
+        return map.size();
+    }
     std::size_t getBucketCount() const { return map.bucket_count(); }
 
     //
@@ -327,6 +408,7 @@ public:
     template<typename K>
     bool containsKey(const K& k) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         // Spelled with find() rather than contains() because std::unordered_map
         // only gained contains() in C++20 and we build as C++17.
         return _find(k) != map.end();
@@ -337,6 +419,7 @@ public:
     template<typename K>
     const TValue* tryGetValue(const K& key) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         auto i = _find(key);
         return i == map.end() ? nullptr : &(i->second);
     }
@@ -345,6 +428,7 @@ public:
     template<typename K>
     TValue* tryGetValue(const K& key)
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         auto i = _find(key);
         return i == map.end() ? nullptr : std::addressof(HashMapImpl::valueOf(i));
     }
@@ -354,6 +438,7 @@ public:
     template<typename K>
     bool tryGetValue(const K& key, TValue& value) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         auto i = _find(key);
         if (i == map.end())
             return false;
@@ -388,7 +473,9 @@ public:
     // Returns nullptr if insertion was successful.
     TValue* tryGetValueOrAdd(const typename InnerMap::value_type& kvPair)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
         const auto& [iterator, inserted] = map.insert(kvPair);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
         return inserted ? nullptr : std::addressof(HashMapImpl::valueOf(iterator));
     }
     // Tries to insert the given element, if a value was already present at
@@ -396,7 +483,9 @@ public:
     // Returns nullptr if insertion was successful.
     TValue* tryGetValueOrAdd(typename InnerMap::value_type&& kvPair)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
         const auto& [iterator, inserted] = map.insert(std::move(kvPair));
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
         return inserted ? nullptr : std::addressof(HashMapImpl::valueOf(iterator));
     }
     /// Looks `key` up and, if it is absent, inserts an entry whose value is
@@ -421,15 +510,19 @@ public:
     template<typename... Args>
     std::pair<TValue*, bool> tryEmplace(const TKey& key, Args&&... args)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
         auto [iterator, inserted] = map.try_emplace(key, std::forward<Args>(args)...);
-        return {std::addressof(iterator->second), inserted};
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return {std::addressof(HashMapImpl::valueOf(iterator)), inserted};
     }
     /// Overload of `tryEmplace` that moves the key when it has to be stored.
     template<typename... Args>
     std::pair<TValue*, bool> tryEmplace(TKey&& key, Args&&... args)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
         auto [iterator, inserted] = map.try_emplace(std::move(key), std::forward<Args>(args)...);
-        return {std::addressof(iterator->second), inserted};
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return {std::addressof(HashMapImpl::valueOf(iterator)), inserted};
     }
 
     // Tries to insert the given element, if a value was already present at
@@ -450,10 +543,26 @@ public:
 
     // Returns a reference to the value at the specified key, default
     // initializing it if it doesn't already exist
-    TValue& operator[](const TKey& key) { return map[key]; }
+    TValue& operator[](const TKey& key)
+    {
+        // `operator[]` can be used to overwrite an existing value, which `ShortDictionary` cannot
+        // express, so it is recorded as an update as well as an insertion.
+        SLANG_CONTAINER_STATS_NOTE_OP(IndexUpdate);
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        TValue& result = map[key];
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return result;
+    }
     // Returns a reference to the value at the specified key, default
     // initializing it if it doesn't already exist
-    TValue& operator[](TKey&& key) { return map[std::move(key)]; }
+    TValue& operator[](TKey&& key)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(IndexUpdate);
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        TValue& result = map[std::move(key)];
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+        return result;
+    }
 
     //
     // Insertion
@@ -507,7 +616,13 @@ public:
     }
 
     // Inserts into the dictionary or assigns if the key already exists
-    void set(const TKey& key, const TValue& value) { map.insert_or_assign(key, value); }
+    void set(const TKey& key, const TValue& value)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Set);
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        map.insert_or_assign(key, value);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(map.size());
+    }
 };
 
 /* We may want to rename this, as strictly speaking _Caps names are reserved */
@@ -531,14 +646,39 @@ private:
     }
 
 public:
+    // The site is captured here and forwarded into `dict`, rather than letting `dict` capture its
+    // own. A member is constructed in the context of its enclosing constructor, so without this
+    // forwarding every `HashSet` in the codebase would report this line in this header instead of
+    // the line the user declared it on, collapsing all of them into a single record per element
+    // type.
+#if SLANG_ENABLE_CONTAINER_STATS
+    HashSetBase(SLANG_CONTAINER_STATS_SITE_PARAM)
+        : dict(SLANG_CONTAINER_STATS_FORWARD)
+    {
+    }
+    HashSetBase(const HashSetBase& set, SLANG_CONTAINER_STATS_SITE_PARAM)
+        : dict(SLANG_CONTAINER_STATS_FORWARD)
+    {
+        operator=(set);
+    }
+    HashSetBase(HashSetBase&& set, SLANG_CONTAINER_STATS_SITE_PARAM)
+        : dict(SLANG_CONTAINER_STATS_FORWARD)
+    {
+        operator=(_Move(set));
+    }
+#else
     HashSetBase() {}
+    HashSetBase(const HashSetBase& set) { operator=(set); }
+    HashSetBase(HashSetBase&& set) { operator=(_Move(set)); }
+#endif
+    // This one cannot forward a site: a defaulted parameter cannot follow a parameter pack, so the
+    // contained dictionary falls back to reporting this header. It is only used for the
+    // construct-from-elements form.
     template<typename Arg, typename... Args>
     HashSetBase(Arg arg, Args... args)
     {
         init(arg, args...);
     }
-    HashSetBase(const HashSetBase& set) { operator=(set); }
-    HashSetBase(HashSetBase&& set) { operator=(_Move(set)); }
     HashSetBase& operator=(const HashSetBase& set)
     {
         dict = set.dict;
@@ -583,6 +723,7 @@ public:
     auto getCount() const { return dict.getCount(); }
     auto getBucketCount() const { return dict.getBucketCount(); }
     void clear() { dict.clear(); }
+
     void clearAndDeallocate() { dict.clearAndDeallocate(); }
     bool add(const T& obj) { return dict.addIfNotExists(obj, _DummyClass()); }
     bool add(T&& obj) { return dict.addIfNotExists(_Move(obj), _DummyClass()); }
@@ -601,6 +742,7 @@ class HashSet
 private:
     using InnerSet = HashMapImpl::Set<T, Hash, KeyEqual>;
     InnerSet set;
+    SLANG_CONTAINER_STATS_MEMBER
 
     void init() {} // Base case for recursion
     template<typename... Args>
@@ -611,13 +753,51 @@ private:
     }
 
 public:
+#if SLANG_ENABLE_CONTAINER_STATS
+    // Spelled out rather than defaulted so that each records the line it was declared on; see the
+    // same constructors on `Dictionary`.
+    HashSet(SLANG_CONTAINER_STATS_SITE_PARAM)
+        : SLANG_CONTAINER_STATS_INIT(HashSet, T, _DummyClass)
+    {
+    }
+    HashSet(const HashSet& rhs, SLANG_CONTAINER_STATS_SITE_PARAM)
+        : set(rhs.set), SLANG_CONTAINER_STATS_INIT(HashSet, T, _DummyClass)
+    {
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+    }
+    HashSet(HashSet&& rhs, SLANG_CONTAINER_STATS_SITE_PARAM)
+        : set(std::move(rhs.set)), SLANG_CONTAINER_STATS_INIT(HashSet, T, _DummyClass)
+    {
+        m_containerStatsProbe.takeFrom(rhs.m_containerStatsProbe);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+    }
+    HashSet& operator=(const HashSet& rhs)
+    {
+        set = rhs.set;
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return *this;
+    }
+    HashSet& operator=(HashSet&& rhs)
+    {
+        set = std::move(rhs.set);
+        SLANG_CONTAINER_STATS_NOTE_OP(MoveAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return *this;
+    }
+#else
     HashSet() = default;
     HashSet(const HashSet&) = default;
     HashSet(HashSet&&) = default;
     HashSet& operator=(const HashSet&) = default;
     HashSet& operator=(HashSet&&) = default;
+#endif
 
     /// Construct from elements, as `HashSet<int> s(1, 2, 3)`.
+    ///
+    /// The first parameter is constrained to `T` so that this does not outcompete the copy and
+    /// move constructors, which would otherwise be a worse match for a `HashSet` argument -- the
+    /// copy needs a derived-to-base conversion and this would be exact.
     template<typename... Args>
     HashSet(const T& arg, Args... args)
     {
@@ -633,6 +813,7 @@ public:
 
     void clear()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Clear);
         if (!set.empty())
             set.clear();
     }
@@ -640,14 +821,39 @@ public:
     /// Empties the set and hands its memory back, where `clear` keeps it for reuse.
     void clearAndDeallocate()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(ClearAndDeallocate);
         InnerSet emptySet(0, set.hash_function(), set.key_eq(), set.get_allocator());
         set.swap(emptySet);
     }
 
-    bool add(const T& obj) { return set.insert(obj).second; }
-    bool add(T&& obj) { return set.insert(std::move(obj)).second; }
-    void remove(const T& obj) { set.erase(obj); }
-    bool contains(const T& obj) const { return set.find(obj) != set.end(); }
+    /// Insert `obj`, returning whether it was not already there.
+    bool add(const T& obj)
+    {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        const bool inserted = set.insert(obj).second;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return inserted;
+    }
+    bool add(T&& obj)
+    {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        const bool inserted = set.insert(std::move(obj)).second;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(set.size());
+        return inserted;
+    }
+
+    void remove(const T& obj)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
+        set.erase(obj);
+    }
+
+    bool contains(const T& obj) const
+    {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
+        // find() rather than contains(): std::unordered_set only gained contains() in C++20.
+        return set.find(obj) != set.end();
+    }
 };
 
 template<typename TKey, typename TValue>
@@ -664,12 +870,15 @@ private:
     }
 
 private:
+    using ThisType = OrderedDictionary<TKey, TValue>;
+
     int m_bucketCountMinusOne;
     int m_count;
     UIntSet m_marks;
 
     LinkedList<KeyValuePair<TKey, TValue>> m_kvPairs;
     LinkedNode<KeyValuePair<TKey, TValue>>** m_hashMap;
+    SLANG_CONTAINER_STATS_MEMBER
     void deallocateAll()
     {
         if (m_hashMap)
@@ -789,6 +998,8 @@ private:
         {
             m_count++;
             _insert(_Move(kvPair), pos.insertionPosition);
+            SLANG_CONTAINER_STATS_NOTE_INSERT();
+            SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
             return true;
         }
 
@@ -802,6 +1013,8 @@ private:
     }
     TValue& set(KeyValuePair<TKey, TValue>&& kvPair)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Set);
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
         maybeRehash();
         auto pos = findPosition(kvPair.key);
         if (pos.objectPosition != -1)
@@ -812,6 +1025,7 @@ private:
         else if (pos.insertionPosition != -1)
         {
             m_count++;
+            SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
             return _insert(_Move(kvPair), pos.insertionPosition);
         }
 
@@ -823,9 +1037,17 @@ public:
     using Iterator = typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator;
     using ConstIterator = typename LinkedList<KeyValuePair<TKey, TValue>>::ConstIterator;
 
-    Iterator begin() { return m_kvPairs.begin(); }
+    Iterator begin()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Iterate);
+        return m_kvPairs.begin();
+    }
     Iterator end() { return m_kvPairs.end(); }
-    ConstIterator begin() const { return m_kvPairs.begin(); }
+    ConstIterator begin() const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Iterate);
+        return m_kvPairs.begin();
+    }
     ConstIterator end() const { return m_kvPairs.end(); }
 
 public:
@@ -844,6 +1066,7 @@ public:
     }
     void remove(const TKey& key)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
         if (m_count > 0)
         {
             auto pos = findPosition(key);
@@ -858,6 +1081,7 @@ public:
     }
     void clear()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Clear);
         m_count = 0;
         m_kvPairs.clear();
         m_marks.resize(0);
@@ -865,6 +1089,7 @@ public:
     template<typename T>
     bool containsKey(const T& key) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         if (m_bucketCountMinusOne == -1)
             return false;
         auto pos = findPosition(key);
@@ -873,6 +1098,7 @@ public:
     template<typename T>
     TValue* tryGetValue(const T& key) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         if (m_bucketCountMinusOne == -1)
             return nullptr;
         auto pos = findPosition(key);
@@ -885,6 +1111,7 @@ public:
     template<typename T>
     bool tryGetValue(const T& key, TValue& value) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         if (m_bucketCountMinusOne == -1)
             return false;
         auto pos = findPosition(key);
@@ -935,10 +1162,22 @@ public:
                 ->set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
         }
     };
-    ItemProxy operator[](const TKey& key) const { return ItemProxy(key, this); }
-    ItemProxy operator[](TKey&& key) const { return ItemProxy(_Move(key), this); }
+    ItemProxy operator[](const TKey& key) const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(IndexUpdate);
+        return ItemProxy(key, this);
+    }
+    ItemProxy operator[](TKey&& key) const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(IndexUpdate);
+        return ItemProxy(_Move(key), this);
+    }
 
-    int getCount() const { return m_count; }
+    int getCount() const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(GetCount);
+        return m_count;
+    }
     KeyValuePair<TKey, TValue>& getFirst() const { return m_kvPairs.getFirst(); }
     KeyValuePair<TKey, TValue>& getLast() const { return m_kvPairs.getLast(); }
 
@@ -951,26 +1190,38 @@ private:
     }
 
 public:
-    OrderedDictionary()
+    OrderedDictionary(SLANG_CONTAINER_STATS_SITE_PARAM)
+        SLANG_CONTAINER_STATS_INIT_ONLY(ThisType, TKey, TValue)
     {
         m_bucketCountMinusOne = -1;
         m_count = 0;
         m_hashMap = 0;
     }
+    // Note that a forwarded site from `HashSetBase`, which instantiates this type as
+    // `OrderedHashSet`, selects the constructor above rather than the variadic one below: both are
+    // exact matches for a `ContainerStatsSite` argument, and a non-template wins that tie.
     template<typename Arg, typename... Args>
     OrderedDictionary(Arg arg, Args... args)
+        SLANG_CONTAINER_STATS_INIT_UNATTRIBUTED_ONLY(ThisType, TKey, TValue, 0)
     {
         init(arg, args...);
     }
-    OrderedDictionary(const OrderedDictionary<TKey, TValue>& other)
-        : m_bucketCountMinusOne(-1), m_count(0), m_hashMap(0)
+    OrderedDictionary(
+        const OrderedDictionary<TKey, TValue>& other SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_bucketCountMinusOne(-1)
+        , m_count(0)
+        , m_hashMap(0) SLANG_CONTAINER_STATS_INIT_NEXT(ThisType, TKey, TValue)
     {
         *this = other;
     }
-    OrderedDictionary(OrderedDictionary<TKey, TValue>&& other)
-        : m_bucketCountMinusOne(-1), m_count(0), m_hashMap(0)
+    OrderedDictionary(
+        OrderedDictionary<TKey, TValue>&& other SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_bucketCountMinusOne(-1)
+        , m_count(0)
+        , m_hashMap(0) SLANG_CONTAINER_STATS_INIT_NEXT(ThisType, TKey, TValue)
     {
         *this = (_Move(other));
+        SLANG_CONTAINER_STATS_TAKE_FROM(other.m_containerStatsProbe);
     }
     OrderedDictionary<TKey, TValue>& operator=(const OrderedDictionary<TKey, TValue>& other)
     {
@@ -979,6 +1230,8 @@ public:
         clear();
         for (auto& item : other)
             add(item.key, item.value);
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
         return *this;
     }
     OrderedDictionary<TKey, TValue>& operator=(OrderedDictionary<TKey, TValue>&& other)
@@ -994,6 +1247,8 @@ public:
         other.m_count = 0;
         other.m_bucketCountMinusOne = -1;
         m_kvPairs = _Move(other.m_kvPairs);
+        SLANG_CONTAINER_STATS_NOTE_OP(MoveAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
         return *this;
     }
     ~OrderedDictionary() { deallocateAll(); }

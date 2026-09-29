@@ -2,6 +2,7 @@
 #define SLANG_CORE_STRING_H
 
 #include "slang-common.h"
+#include "slang-container-stats.h"
 #include "slang-hash.h"
 #include "slang-secure-crt.h"
 #include "slang-smart-pointer.h"
@@ -346,9 +347,17 @@ public:
         return (a == b) || asSlice(a) == asSlice(b);
     }
 
-    static StringRepresentation* createWithCapacityAndLength(Index capacity, Index length)
+    /// Allocates a buffer able to hold `capacity` characters, of which `length` are in use.
+    ///
+    /// Every string buffer in the compiler is allocated here, which is why this is where the
+    /// instrumentation records them. The defaulted trailing parameters carry the attribution and
+    /// vanish entirely when the statistics are not enabled.
+    static StringRepresentation* createWithCapacityAndLength(
+        Index capacity,
+        Index length SLANG_CONTAINER_STATS_STRING_ALLOC_PARAMS_TRAILING)
     {
         SLANG_ASSERT(capacity >= length);
+        SLANG_CONTAINER_STATS_NOTE_STRING_ALLOC(capacity);
         void* allocation = operator new(sizeof(StringRepresentation) + capacity + 1);
         StringRepresentation* obj = new (allocation) StringRepresentation();
         obj->capacity = capacity;
@@ -357,46 +366,26 @@ public:
         return obj;
     }
 
-    static StringRepresentation* createWithCapacity(Index capacity)
+    static StringRepresentation* createWithCapacity(
+        Index capacity SLANG_CONTAINER_STATS_STRING_ALLOC_PARAMS_TRAILING)
     {
-        return createWithCapacityAndLength(capacity, 0);
+        return createWithCapacityAndLength(
+            capacity,
+            0 SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_TRAILING);
     }
 
-    static StringRepresentation* createWithLength(Index length)
+    static StringRepresentation* createWithLength(
+        Index length SLANG_CONTAINER_STATS_STRING_ALLOC_PARAMS_TRAILING)
     {
-        return createWithCapacityAndLength(length, length);
+        return createWithCapacityAndLength(
+            length,
+            length SLANG_CONTAINER_STATS_STRING_ALLOC_FORWARD_TRAILING);
     }
 
     /// Create a representation from the slice. If slice is empty will return nullptr.
     static StringRepresentation* create(const UnownedStringSlice& slice);
     /// Same as create, but representation will have refcount of 1 (if not nullptr)
     static StringRepresentation* createWithReference(const UnownedStringSlice& slice);
-
-    StringRepresentation* cloneWithCapacity(Index newCapacity)
-    {
-        StringRepresentation* newObj = createWithCapacityAndLength(newCapacity, length);
-        memcpy(getData(), newObj->getData(), length + 1);
-        return newObj;
-    }
-
-    StringRepresentation* clone() { return cloneWithCapacity(length); }
-
-    StringRepresentation* ensureCapacity(Index required)
-    {
-        if (capacity >= required)
-            return this;
-
-        Index newCapacity = capacity;
-        if (!newCapacity)
-            newCapacity = 16; // TODO: figure out good value for minimum capacity
-
-        while (newCapacity < required)
-        {
-            newCapacity = 2 * newCapacity;
-        }
-
-        return cloneWithCapacity(newCapacity);
-    }
 
     /// Overload delete to silence ASAN new-delete-type-mismatch errors.
     /// These occur because the allocation size of StringRepresentation
@@ -887,36 +876,94 @@ class ImmutableHashedString
 public:
     String slice;
     HashCode64 hashCode;
-    ImmutableHashedString()
+    SLANG_CONTAINER_STATS_MEMBER
+
+    // These constructors are instrumented separately from the string allocations they cause,
+    // because they answer a question the aggregate string data cannot. Every one of these holds an
+    // interned identifier, and identifiers are short in a way that strings in general are not; the
+    // distribution of *their* lengths is what decides whether this type should carry a small
+    // inline buffer of its own. The `noteInsert` calls mark the constructors that actually build a
+    // buffer, as opposed to those that share one that already exists, so that a copy is still
+    // counted for the memory an inline buffer would cost it without being counted as an allocation
+    // such a buffer would have saved.
+    ImmutableHashedString(SLANG_CONTAINER_STATS_SITE_PARAM)
         : hashCode(0)
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
     }
-    ImmutableHashedString(const UnownedStringSlice& slice)
-        : slice(slice), hashCode(slice.getHashCode())
+    ImmutableHashedString(const UnownedStringSlice& slice SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(slice)
+        , hashCode(slice.getHashCode())
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(this->slice.getLength());
     }
-    ImmutableHashedString(const char* begin, const char* end)
-        : slice(begin, end), hashCode(slice.getHashCode())
+    ImmutableHashedString(
+        const char* begin,
+        const char* end SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(begin, end)
+        , hashCode(slice.getHashCode())
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
     }
-    ImmutableHashedString(const char* begin, size_t len)
-        : slice(UnownedStringSlice(begin, len)), hashCode(slice.getHashCode())
+    ImmutableHashedString(const char* begin, size_t len SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(UnownedStringSlice(begin, len))
+        , hashCode(slice.getHashCode())
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
     }
-    ImmutableHashedString(const char* begin)
-        : slice(begin), hashCode(slice.getHashCode())
+    ImmutableHashedString(const char* begin SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(begin)
+        , hashCode(slice.getHashCode())
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
     }
-    ImmutableHashedString(const String& str)
-        : slice(str), hashCode(str.getHashCode())
+    ImmutableHashedString(const String& str SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(str)
+        , hashCode(str.getHashCode())
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
+        // Shares the argument's buffer rather than allocating one, so no insertion is recorded.
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
     }
-    ImmutableHashedString(String&& str)
-        : slice(_Move(str)), hashCode(str.getHashCode())
+    ImmutableHashedString(String&& str SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(_Move(str))
+        , hashCode(str.getHashCode())
+              SLANG_CONTAINER_STATS_INIT_NEXT(ImmutableHashedString, char, ContainerStatsNoValue)
     {
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
     }
+#if SLANG_ENABLE_CONTAINER_STATS
+    // Spelled out rather than `= default` only because `ContainerStatsProbe` is deliberately not
+    // copyable; see the comment on its deleted operations. Each copy captures its own site, since
+    // a copy is a distinct object that would carry its own inline buffer.
+    ImmutableHashedString(
+        const ImmutableHashedString& other SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : slice(other.slice)
+        , hashCode(other.hashCode)
+        , SLANG_CONTAINER_STATS_INIT(ImmutableHashedString, char, ContainerStatsNoValue)
+    {
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
+    }
+    ImmutableHashedString& operator=(const ImmutableHashedString& other)
+    {
+        slice = other.slice;
+        hashCode = other.hashCode;
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(slice.getLength());
+        return *this;
+    }
+#else
     ImmutableHashedString(const ImmutableHashedString& other) = default;
     ImmutableHashedString& operator=(const ImmutableHashedString& other) = default;
+#endif
     bool operator==(const ImmutableHashedString& other) const
     {
         return hashCode == other.hashCode && slice == other.slice;
