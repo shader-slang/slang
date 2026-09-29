@@ -297,9 +297,13 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
         SLANG_CHECK(getDiagnosticText(diagnostics).getLength() == 0);
     }
 
+    // These versions were accepted before the NVVM target changed capability identities. Even
+    // otherwise well-formed bytes must be rejected before their AST or IR is decoded.
+    const UInt64 historicalVersions[] = {31, 32, 33};
+    for (UInt64 version : historicalVersions)
     {
         List<uint8_t> patched = container;
-        *getModuleVersion(patched) = IRModule::k_minSupportedModuleVersion - 1;
+        *getModuleVersion(patched) = version;
 
         ComPtr<slang::ISession> session;
         SLANG_CHECK_ABORT(
@@ -315,6 +319,19 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
                 patched.getCount(),
                 diagnostics.writeRef()) == nullptr);
         SLANG_CHECK(getDiagnosticText(diagnostics).indexOf(toSlice("error[E00130]")) >= 0);
+
+        // Inspecting metadata does not deserialize the incompatible AST or IR.
+        SlangInt inspectedVersion = 0;
+        const char* compilerVersion = nullptr;
+        const char* moduleName = nullptr;
+        SLANG_CHECK(SLANG_SUCCEEDED(slang_loadModuleInfoFromIRBlob(
+            session,
+            patched.getBuffer(),
+            patched.getCount(),
+            inspectedVersion,
+            compilerVersion,
+            moduleName)));
+        SLANG_CHECK(inspectedVersion == SlangInt(version));
     }
 
     {
@@ -461,10 +478,31 @@ SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
     List<uint8_t> container;
     SLANG_CHECK_ABORT(
         serializeModuleLibrary(unitTestContext, "version_test_library", source, container));
+    SLANG_CHECK_ABORT(getModuleVersion(container));
+    SLANG_CHECK(*getModuleVersion(container) == IRModule::k_maxSupportedModuleVersion);
 
     {
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(
+            createSession(unitTestContext->slangGlobalSession, nullptr, false, session));
+        ComPtr<SlangCompileRequest> request;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompileRequest(request.writeRef())));
+        StringBuilder diagnostics;
+        request->setDiagnosticCallback(collectDiagnostic, &diagnostics);
+
+        SLANG_CHECK(SLANG_SUCCEEDED(spAddLibraryReference(
+            request,
+            "version_test_library.slang-module",
+            container.getBuffer(),
+            container.getCount())));
+        SLANG_CHECK(diagnostics.getLength() == 0);
+    }
+
+    const UInt64 unsupportedVersions[] = {31, 32, 33, IRModule::k_maxSupportedModuleVersion + 1};
+    for (UInt64 version : unsupportedVersions)
+    {
         List<uint8_t> patched = container;
-        *getModuleVersion(patched) = IRModule::k_maxSupportedModuleVersion + 1;
+        *getModuleVersion(patched) = version;
 
         ComPtr<slang::ISession> session;
         SLANG_CHECK_ABORT(
@@ -522,9 +560,12 @@ SLANG_UNIT_TEST(serializedModuleVersionImportFallback)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         fileSystem->saveFile("future.slang", sourceFallback, strlen(sourceFallback))));
 
+    // Both obsolete capability layouts and future semantic versions must use available source.
+    const UInt64 unsupportedVersions[] = {31, 32, 33, IRModule::k_maxSupportedModuleVersion + 1};
+    for (UInt64 version : unsupportedVersions)
     {
         List<uint8_t> patched = container;
-        *getModuleVersion(patched) = IRModule::k_maxSupportedModuleVersion + 1;
+        *getModuleVersion(patched) = version;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             fileSystem->saveFile("future.slang-module", patched.getBuffer(), patched.getCount())));
 

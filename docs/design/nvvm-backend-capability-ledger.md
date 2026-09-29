@@ -53,6 +53,16 @@ selection, including when an explicit `nvvm` capability is supplied. Ordinary co
 `__intrinsic_asm` arguments remain supported. [Target/argument fixture](../../tests/cuda/nvvm-target-switch-explicit-args.slang)
 and [varying composition](../../tests/cuda/nvvm-execution-register-varyings.slang) define the new contracts.
 
+Core bit reinterpretation and Half-value conversions use canonical NVVM `BitCast`/`FloatCast`
+instructions. The [conversion API fixture](../../tests/cuda/nvvm-conversion-intrinsics.slang) checks
+all six signed/unsigned/float reinterpretation directions against exact input bits, scalar and
+heterogeneous vector2/3/4 Half conversions against independent encodings, literal rounding boundaries
+and an untouched guard. Numeric NaNs require NaN class; reinterpretation preserves payload bits.
+The [producer IR test](../../tests/cuda/nvvm-conversion-producers.slang) requires typed casts for
+all six reinterpretation signatures and scalar/vector Half conversion paths. CUDA vector conversion
+uses canonical casts and the existing emitter's per-lane conversion; CUDA's scalar intrinsics cannot
+accept whole vectors. Packed uint Half conversions and Double word assembly remain separate contracts.
+
 Ordinary Var/Load/Store decisions are now retained in the checked emission plan: allocation role,
 alignment, conversion recipe, load flags and pointer ABI/provenance. BF2 identity and BF3/BF4 lane
 conversion are planned before provider mutation. Native readonly borrows remain distinct from compact

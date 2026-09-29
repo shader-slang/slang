@@ -507,8 +507,13 @@ NaNs require NaN class only; unchanged channels and guards require exact bytes. 
 before GPU checks. The ordinary Half-cast regression in `tests/cuda/nvvm-half-narrow-conversion.slang`
 checks conversions independently of surfaces; the math units exercise every finite Half midpoint.
 After producer-tag edits, compare generated NVRTC CUDA source against the accepted
-compiler with identical inputs/options. An old serialized user module should also link against the
-current built-ins; compatibility compilation is separate from fresh physical GPU evidence.
+compiler with identical inputs/options. Check the declared semantic module-version boundary in
+fresh sessions: explicit loads of incompatible historical user modules must fail with `E00130` before
+AST/IR decoding, and modules rebuilt at the supported version must link against current built-ins
+at O0 and O3.
+Metadata inspection of rejected modules remains allowed. Preserve historical failure and wrong-branch
+evidence when adopting an explicitly authorized compatibility break; rejection is not a successful
+old-module load. Compatibility compilation is separate from fresh physical GPU evidence.
 
 The standard `checkpoint` always runs this suite and uses `nvvm-surface-results.py` to validate the
 complete cases × three modes inventory, source/oracle identities, phase return codes and diagnostics,

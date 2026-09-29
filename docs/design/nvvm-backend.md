@@ -54,6 +54,15 @@ void return for the helper. This does not admit arbitrary LLVM snippets or other
 intrinsics.
 Ordinary comma-separated `__intrinsic_asm` arguments remain part of the shared language facility.
 
+Core `asfloat`, `asint` and `asuint` NVVM bodies use canonical `BitCast` instructions. Half-value
+`f16tof32` and `f32tof16_` bodies use canonical `FloatCast`, including vectors. The existing typed
+provider conversion operations remain shared consumers of this IR and of ABI/compound recipes;
+removing source tags does not make those operations obsolete. Runtime narrowing retains the
+qualified `llvm.nvvm.f2h.rn` selection, while literal casts use the shared constant folder. The vector
+APIs use the same canonical constructors for CUDA. Its existing `FloatCast` emitter converts each
+lane, and CUDA Half construction/conversion uses the scalar CUDA intrinsics. Passing a whole vector
+to those scalar functions is not a valid producer shape.
+
 Synchronization helpers remain effectful in Slang IR. The provider retains `convergent` and
 `nounwind` on the barrier intrinsic, and `nounwind` on the two memory fences; it does not mark them
 pure. The existing subgroup and WithGroupSync mappings still use a workgroup barrier, and the
@@ -102,6 +111,12 @@ copies the base and emits scalar component assignments for CPU/CUDA/WGPU, which 
 multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary; scalar updates
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
+
+The NVVM target changes serialized capability identities. The prototype writes and accepts only
+semantic module version 34; older user modules and built-ins must be recompiled for every backend.
+Existing version guards reject incompatible layouts before decoding AST or IR. Container format 2
+and provider ABI44 are separate contracts and remain unchanged. See the
+[module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
 
 ## Preflight is a contract, not a trial emission
 

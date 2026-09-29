@@ -2723,9 +2723,8 @@ local insts = {
 				experimentalModule = {
 					-- Marks a module as experimental in serialized IR.
 					--
-					-- Retained as derived metadata because the AST-gate refactor left
-					-- `IRModule::k_maxSupportedModuleVersion` unchanged, so compatible
-					-- pre-refactor readers still inspect this marker to emit E00104.
+					-- Derived from the checked experimental AST attribute to keep serialized
+					-- IR metadata consistent. Import validation uses the AST attribute.
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},

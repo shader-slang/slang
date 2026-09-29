@@ -70,7 +70,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmAsin", SLANG_NVVM_VALUE_OP_ASIN},
     {"nvvmAtan", SLANG_NVVM_VALUE_OP_ATAN},
     {"nvvmAtan2", SLANG_NVVM_VALUE_OP_ATAN2},
-    {"nvvmBitReinterpret", SLANG_NVVM_VALUE_OP_BIT_REINTERPRET},
     {"nvvmCeil", SLANG_NVVM_VALUE_OP_CEIL},
     {"nvvmCos", SLANG_NVVM_VALUE_OP_COS},
     {"nvvmCosh", SLANG_NVVM_VALUE_OP_COSH},
@@ -79,7 +78,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmExp2", SLANG_NVVM_VALUE_OP_EXP2},
     {"nvvmFirstBitHigh", SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH},
     {"nvvmFirstBitLow", SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW},
-    {"nvvmFloatConvert", SLANG_NVVM_VALUE_OP_FLOAT_CONVERT},
     {"nvvmFloor", SLANG_NVVM_VALUE_OP_FLOOR},
     {"nvvmFma", SLANG_NVVM_VALUE_OP_FMA},
     {"nvvmFmod", SLANG_NVVM_VALUE_OP_FMOD},
@@ -15903,10 +15901,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     context->traceBranchCoverage =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::TraceBranchCoverage);
 
-    // Import validation in this compiler uses the checked AST attribute. Keep emitting the derived
-    // IR marker because this refactor leaves `IRModule::k_maxSupportedModuleVersion` unchanged:
-    // compatible pre-refactor binaries still read newly serialized modules, and their
-    // packaged-standard-module path relies on this marker to emit E00104.
+    // Keep serialized IR metadata consistent with the checked experimental AST attribute.
+    // Import validation itself uses the AST attribute.
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
         builder->addDecoration(module->getModuleInst(), kIROp_ExperimentalModuleDecoration);

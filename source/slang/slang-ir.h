@@ -2257,8 +2257,10 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 31;
-    const static UInt k_maxSupportedModuleVersion = 33;
+    // Version 34 adds the NVVM target and changes serialized capability identities. Modules
+    // from earlier versions must be recompiled before their AST or IR can be decoded safely.
+    const static UInt k_minSupportedModuleVersion = 34;
+    const static UInt k_maxSupportedModuleVersion = 34;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

@@ -3693,6 +3693,85 @@ SLANG_UNIT_TEST(nvvmSlangOpaqueHalfHelpersUseTypedFloatConversions)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+// Checks vector API roles by their types, independently of generated helper names and order.
+SLANG_UNIT_TEST(nvvmSlangHalfConversionAPIsPreserveVectorLanes)
+{
+    static const char source[] = R"(
+[CUDAKernel]
+void computeMain(
+    uniform Ptr<float, Access::ReadWrite, AddressSpace::Device> output,
+    uniform float x, uniform float y, uniform float z, uniform float w)
+{
+    float2 pair = f16tof32(f32tof16_(float2(x, y)));
+    float3 triple = f16tof32(f32tof16_(float3(x, y, z)));
+    float4 quad = f16tof32(f32tof16_(float4(x, y, z, w)));
+    output[0] = pair.x;
+    output[1] = pair.y;
+    output[2] = triple.x;
+    output[3] = triple.y;
+    output[4] = triple.z;
+    output[5] = quad.x;
+    output[6] = quad.y;
+    output[7] = quad.z;
+    output[8] = quad.w;
+}
+)";
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        const SlangResult result =
+            _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            const String diagnosticText = _getBlobText(diagnostics);
+            if (diagnosticText.getLength())
+                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+
+        // A role is (lane count, direction), not a position in emitted operation order.
+        uint32_t narrowWidths = 0;
+        uint32_t widenWidths = 0;
+        for (const FakeNVVMBuilderScalarOperation& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
+                continue;
+            SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingUnary);
+            SLANG_CHECK_ABORT(operation.operandCount == 1);
+            const auto& input = operation.operandTypes[0];
+            const auto& output = operation.resultType;
+            SLANG_CHECK(input.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+            SLANG_CHECK(output.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+            SLANG_CHECK_ABORT(input.laneCount >= 2 && input.laneCount <= 4);
+            SLANG_CHECK(output.laneCount == input.laneCount);
+            if (input.bitWidth == 32)
+            {
+                SLANG_CHECK(output.bitWidth == 16);
+                narrowWidths |= 1u << input.laneCount;
+            }
+            else
+            {
+                SLANG_CHECK(input.bitWidth == 16);
+                SLANG_CHECK(output.bitWidth == 32);
+                widenWidths |= 1u << input.laneCount;
+            }
+        }
+        SLANG_CHECK(narrowWidths == ((1u << 2) | (1u << 3) | (1u << 4)));
+        SLANG_CHECK(widenWidths == narrowWidths);
+        SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmSlangLocalVectorSwizzlePromotesToGenericValues)
 {
     _resetDirectNVVMFakes();

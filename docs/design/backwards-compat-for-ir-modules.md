@@ -78,6 +78,17 @@ Two types of versions are tracked:
    - Currently version 2
    - Allows future changes to serialization structure
 
+### Current Prototype Boundary
+
+The NVVM target changes the numeric identities stored for capabilities, including target-switch
+aliases. This prototype writes semantic module version 34 and accepts only version 34. Recompile
+older user modules and built-ins for every backend; metadata inspection remains available without
+loading their AST or IR. Serialization format 2 is unchanged.
+
+Stable instruction names do not stabilize capability identities. Until capabilities have a stable
+serialized representation, any further renumbering requires another semantic version boundary
+before incompatible AST or IR is decoded.
+
 ### Compiler Version Tracking
 
 Each module stores the exact compiler version (`SLANG_TAG_VERSION`) that created it. This enables version-specific workarounds if needed in the future.

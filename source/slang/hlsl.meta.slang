@@ -8210,8 +8210,9 @@ float asfloat(int x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
-    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
+    case nvvm: return bit_cast<float>(x);
+    case cpp: __intrinsic_asm "$P_asfloat($0)";
+    case cuda: __intrinsic_asm "$P_asfloat($0)";
     case glsl: __intrinsic_asm "intBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8229,8 +8230,9 @@ float asfloat(uint x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
-    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asfloat($0)";
+    case nvvm: return bit_cast<float>(x);
+    case cpp: __intrinsic_asm "$P_asfloat($0)";
+    case cuda: __intrinsic_asm "$P_asfloat($0)";
     case glsl: __intrinsic_asm "uintBitsToFloat";
     case hlsl: __intrinsic_asm "asfloat";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8447,8 +8449,9 @@ int asint(float x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
-    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
+    case nvvm: return bit_cast<int>(x);
+    case cpp: __intrinsic_asm "$P_asint($0)";
+    case cuda: __intrinsic_asm "$P_asint($0)";
     case glsl: __intrinsic_asm "floatBitsToInt";
     case hlsl: __intrinsic_asm "asint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8466,8 +8469,9 @@ int asint(uint x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
-    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asint($0)";
+    case nvvm: return bit_cast<int>(x);
+    case cpp: __intrinsic_asm "$P_asint($0)";
+    case cuda: __intrinsic_asm "$P_asint($0)";
     case glsl: __intrinsic_asm "int($0)";
     case hlsl: __intrinsic_asm "asint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8603,8 +8607,9 @@ uint asuint(float x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
-    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
+    case nvvm: return bit_cast<uint>(x);
+    case cpp: __intrinsic_asm "$P_asuint($0)";
+    case cuda: __intrinsic_asm "$P_asuint($0)";
     case glsl: __intrinsic_asm "floatBitsToUint";
     case hlsl: __intrinsic_asm "asuint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -8622,8 +8627,9 @@ uint asuint(int x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
-    case cuda: __intrinsic_asm(nvvmBitReinterpret) "$P_asuint($0)";
+    case nvvm: return bit_cast<uint>(x);
+    case cpp: __intrinsic_asm "$P_asuint($0)";
+    case cuda: __intrinsic_asm "$P_asuint($0)";
     case glsl: __intrinsic_asm "uint($0)";
     case hlsl: __intrinsic_asm "asuint";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -11059,9 +11065,10 @@ float f16tof32(float16_t value)
 {
     __target_switch
     {
+    case nvvm: return __realCast<float>(value);
     case glsl: __intrinsic_asm "unpackHalf2x16($0).x";
     case hlsl: __intrinsic_asm "f16tof32($0)";
-    case cuda: __intrinsic_asm(nvvmFloatConvert) "__half2float($0)";
+    case cuda: __intrinsic_asm "__half2float($0)";
     case cpp: __intrinsic_asm "f16tof32($0)";
     case metal: __intrinsic_asm "float($0)";
     case spirv:
@@ -11082,7 +11089,8 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__half2float";
+    case nvvm:
+    case cuda: return vector<float, N>(value);
     case hlsl: __intrinsic_asm "f16tof32";
     case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
@@ -11103,7 +11111,8 @@ float16_t f32tof16_(float value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmFloatConvert) "__float2half";
+    case nvvm: return __realCast<float16_t>(value);
+    case cuda: __intrinsic_asm "__float2half";
     case glsl: __intrinsic_asm "packHalf2x16(vec2($0,0.0))";
     case metal: __intrinsic_asm "half($0)";
     case spirv: return spirv_asm {
@@ -11121,7 +11130,8 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmFloatConvert) "__float2half";
+    case nvvm:
+    case cuda: return vector<float16_t, N>(value);
     case metal: __intrinsic_asm "$TR($0)";
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value

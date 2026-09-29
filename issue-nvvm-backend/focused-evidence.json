@@ -10481,6 +10481,1241 @@
         "cross_warp_peer_xor": 32,
         "expected_output": [128, 0, 4544]
       }
+    },
+    "nvvm-canonical-conversions": {
+      "status": "accepted",
+      "contract": "Canonical BitCast/FloatCast producers replace fifteen bit-reinterpret/Half conversion tags; adjacent Half-vector widening produces canonical vector FloatCast. The two vector conversion bodies group CUDA and NVVM on existing canonical vector constructors; existing CUDA FloatCast emission converts each lane after reproduced NVRTC rejection. Existing numeric provider operations and RN-even conversion remain authoritative. The explicitly authorized all-backend semantic module boundary34 rejects older capability catalogs before decoding; freshly recompiled modules are required.",
+      "compiler_identity": {
+        "revision": "bfad03686e9071f3e5368258dd22755ad4d27803",
+        "patch_sha256": "c9ee85205ff9966edaeeec78c65f4a65f942f8fa63a7d10756bbc2a760dfb531",
+        "compiler_version": "2026.18.3-338-gbfad03686",
+        "provider_abi": 44
+      },
+      "complete_provenance": {
+        "path": "build/nvvm-conversion-intrinsics/candidate-complete-provenance.json",
+        "sha256": "bf3b3976a44ae0d37756da6dc5fa45f3a0aa7909ba00edc1bf29f15ff5a9cba6"
+      },
+      "corpus_execution_provenance": {
+        "path": "build/nvvm-conversion-intrinsics/checkpoint-v34/provenance.json",
+        "sha256": "5fa4f352c84b8ab601186549233d25ebf69a1da5455ad74776089dd1415ab65e"
+      },
+      "runtime_sha256": {
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "6b4244498fc2556c55df288609ad1a8baec8b0a987b73af6064d82fe07024ec5",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "4673a7284647512efb476be9687611eff2f523e2761ca914f196c78c6c25565a",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "7fc25638f2ace9cf925c17d83efa482b7b341a91fd01ddfad844e9bd031e1e02",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "6d6eb23100e8b18327fce26cd1e4886a1872be6a41d66f9a2834e75db2c72a2d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "e7f65b0699b2d3541ff2f3006425552062e3e7b48e913535332a0a5ee4de3ffa",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "4f3a41a994d96baed77849c3f18e563bee06989b5776c95be2dbf226eff39397",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "4f3a41a994d96baed77849c3f18e563bee06989b5776c95be2dbf226eff39397",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "ee7a42f086d45142ebab2741aca742b09df727e3ad7166d10219d7264cc1a99d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "12f7580202b6a8316d222b9b87b85f1d59fde7a64db88aea06d4a637e4e1af0d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "4f3a41a994d96baed77849c3f18e563bee06989b5776c95be2dbf226eff39397",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "c812a68ced7120af738d17f90e298a73aa6f157aa6e1ab283bf254d04f4faf16",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "0bb1be042da051628837f2067984a186aacd022a4b05c9c7717977e5c6ddc1f3",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "8847dedf7d831922d73c2e73859bd36f65becb218c7092225847f3b18d8f4f8e",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "22d927118ab69a760ac59e9e9b888a35a9253a007e93b4f6bf2715c003ce7db7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "60059a6f45051ab8261999bddc34505c0c10fd11872ae08fbf8a7fc8fbc7ea59",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "ddd7f4dacb3f46ace36d82decc690aac311b441f4dcf21ae0c4749487268e17f",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "d427b66c8ecc32b8170db46d3f90ca83f5dbfcc3ebb7cd67c910ecbb3dde219a",
+        "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+        "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+        "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+      },
+      "source_sha256": {
+        "extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "issue-nvvm-backend/test-nvvm-results.py": "fe45fb97d1d7a28b8e7a28b1ae3a6cef61e8e9d0dbbece3ba5c5fd23901ac044",
+        "issue-nvvm-backend/test-nvvm-surface-results.py": "f9dbc427eecc11b081133f7f885ec9c86eaa46c73906ad43673f7e22b4a1b1b0",
+        "source/compiler-core/slang-nvvm-ir-builder-api.h": "04d32008f5ef558c73487b03be584778364093dd0604dfebd04b11a22ce7ffdf",
+        "source/compiler-core/slang-nvvm-ir-builder.cpp": "6106507e62fd34c21d807469f9a507fb8163041d79f1348626731d184a0c8712",
+        "source/compiler-core/slang-nvvm-ir-builder.h": "4e5c0f14801c9245976fd5d7b616be5facfd77e1e07973c06904d486369a3f16",
+        "source/compiler-core/slang-nvvm-semantic-catalog.h": "a038d80ef52e1779d3c79008d054ead2a9abcbe74e098a7339a7c4a7f46766d5",
+        "source/core/slang-math.h": "14a6ef54d2152724f041ee7e235e7feef34bb74d853214efff70f98ab00a26ce",
+        "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "01d105bc974e093cbb25439f138eb88241297f27a024bb447b6db4e9772e3c9d",
+        "source/slang/hlsl.meta.slang": "14c7cdd15e7aabd8000d55b3c6d2768bfbaa7a2b0836c59f0c957bb37b54a2a4",
+        "source/slang/slang-capabilities.capdef": "fd3811a5e00e8f601c61c121f2e6ca193af7c563dc8edfa440810d80cf43243a",
+        "source/slang/slang-diagnostics.lua": "8854ee6c777e219d2e2601ad3347d99fc49541ce882abff9b0c88bc280e43643",
+        "source/slang/slang-emit-nvvm-plan.cpp": "a0acf9aea1d676bf57c6f9cd8d81b454784ee87ddd015e2be046df85f4f5cf1a",
+        "source/slang/slang-emit-nvvm-plan.h": "1e60f7d5595116508ee752383d0377896564dc84e6579ffae11be2edb5a63fef",
+        "source/slang/slang-emit-nvvm-type-lowering.cpp": "44220e32e5de3680d7c9de8f0a0fdd813bcc0c16c393569f30fbc26c6317a6e3",
+        "source/slang/slang-emit-nvvm-type-lowering.h": "3ddee6db29f6478fc40c2f2a773b68fb8d61152f3c0895a1acaa8e7ed244b99d",
+        "source/slang/slang-emit-nvvm.cpp": "2c7dea5a343d1f7c6a61006b0b226caa08d70a8aad23e28d3e292740f51dbf0f",
+        "source/slang/slang-emit.cpp": "91e8170517d2af65d6f146fc29c51f1efb2c8c9676d2686cb721a378db71996c",
+        "source/slang/slang-ir-insts-stable-names.cpp": "2cc2cba677372f96a002e77c80209a0a4bbb1bc09681c55cafc8788ffc9eba52",
+        "source/slang/slang-ir-insts-stable-names.lua": "79988d4930d4ddef9a225b5d3c0bb0378e88775506174b0e533641fac172a9ae",
+        "source/slang/slang-ir-insts.h": "0fe173222e77bdf83c10a306134de3ed0964457d093c24e41033b45508c0ec90",
+        "source/slang/slang-ir-insts.lua": "11929fa69ce3edd0004f7c188cb4ecd32b33fb1312acc5684d871280d0f74430",
+        "source/slang/slang-ir-legalize-varying-params.cpp": "604316b88489155cd650af50c575b6c10e3dd732d084028d3833de2eea0ade1c",
+        "source/slang/slang-ir-legalize-varying-params.h": "486f41fc027de37525d1bf43ba2bea9541456fd0acbfbe550059340f1111b92e",
+        "source/slang/slang-ir-nvvm-surface-legalize.cpp": "9a0c0633b9efc440b1cad217bb3de1f6dd3d6169bc7dc28937f3c2119b735452",
+        "source/slang/slang-ir-nvvm-surface-legalize.h": "8d44137fce5831618e760fae33145e7fe1478db251b6463c8a3675960bcdb421",
+        "source/slang/slang-ir.cpp": "739b788ee3b25eb06e9d23f11f097c07ed9c33dd8699b4dde8c8fb185f32585f",
+        "source/slang/slang-ir.h": "4d8f39fa4d578a57150ced6c7cd7e5ddbd77e35b9467384b65f521749ff8bf3d",
+        "source/slang/slang-lower-to-ir.cpp": "c7ec70e9da4fd7fdc1a7bfe1c9d3171d3d3b20d4b781eb1da50272bf0d3393de",
+        "source/slang/slang-nvvm-intrinsic-semantics.h": "b9032a277e52c4926c2c997da63f2334955283594a41666ea5e2cfc8eb9b153c",
+        "source/slang/slang-target-program.cpp": "981ac0f346f530bf2771d0c35de120c1e34775c864e6db92b38c4e3667de154c",
+        "source/slang/slang-target-program.h": "8c099401dd90e7f639d4fff73a4b0e730f918ccb604aa45277a9b1b1b081afa3",
+        "source/slang/slang-target.cpp": "e5e91df76a52c3d25fbbb45f05742c77c51e750e3d6234d878fdf933e4103133",
+        "tests/cuda/nvvm-conversion-intrinsics.slang": "5f1fa934357b35fd992be457f8fc700c2c63aa37ad06c4327752ecd54e933d7e",
+        "tests/cuda/nvvm-conversion-producers.slang": "26a63cbf669cc446d14b0c02fd45ce284b2f08a3639457b34d4ec9d90fabedec",
+        "tests/cuda/nvvm-execution-register-varyings.slang": "7ae06c4ab5d3d5264ab280cb54e05ddc6e03dfa4bc106168a64a1e711036c151",
+        "tests/cuda/nvvm-formatted-surface-1d.slang": "33d99344938e68332ab3383e9aa9e2429f91b0f42319dd59416377e0c887e7db",
+        "tests/cuda/nvvm-formatted-surface-provenance.slang": "0552db2a047458da06b657e13e6134fa5dcd65a988e006f98fd6b1b99e5e67b4",
+        "tests/cuda/nvvm-half-narrow-conversion.slang": "94d4d62c5191ebac109c23bf9c8a13ff8587faea104506a63e75c8093eaf6231",
+        "tests/cuda/nvvm-intrinsic-removed-tag.slang": "58bef803fceff4bb1777328317ca8de7543a4aebb79b916a124e5736af7de7cd",
+        "tests/cuda/nvvm-native-float-surface-unsupported.slang": "87ff9a461478549ce9f05ca5ea8ec841c58bb5d5e28f1de7b65c2b6d7b9eef74",
+        "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "a65c7f557552a5c5751e8d7568ac409955c324d07516557aed78e64d9065b155",
+        "tests/cuda/nvvm-surface-physical-boundaries.slang": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+        "tests/cuda/nvvm-surface-physical-half-load.slang": "336e3472249cb1c8484186cc030425d947fee293d03e1ef453658d79a93eb605",
+        "tests/cuda/nvvm-surface-physical-half-nan.slang": "d85a95b38d14422a72fa85ce4fffe87991e0eacc2c05fcd076756959975c097b",
+        "tests/cuda/nvvm-surface-physical-integers.slang": "f511d4b368d2492a45d38dbdfa8deef58aa141f28dee0294bd011a1aa73f4428",
+        "tests/cuda/nvvm-surface-physical-matrix.slang": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+        "tests/cuda/nvvm-surface-physical-mixed.slang": "17289477e7ef073a3d4274fa9baf1348089e0a3fe96b2d448c950b4a861bbf81",
+        "tests/cuda/nvvm-synchronization-effects.slang": "9100420d9405e71b4a7c6febc4211263e3f56f0f3399a1d7f1dab90f247db3f7",
+        "tests/cuda/nvvm-target-switch-explicit-args.slang": "9e5a98ef37cc14a0dcc6da82be143dc1193c6556fc6a6b7d6e04ce6befe0d086",
+        "tests/cuda/nvvm-varyings-multiple-entries.slang": "426bf32b5116ad9bafcaacc2cc83f7fd1ea342ea89684a2d534a6a2174ca9ded",
+        "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang": "80e6fa88f20d46b794593443b12537d29c9687536bd5f00e9cbe5c39e9b8234d",
+        "tools/slang-static-unit-test/unit-test-module-version.cpp": "ff91458b48d92eab9735c53d6fffee80612520167cd374f8ae2c7c83faf0b0c0",
+        "tools/slang-unit-test/unit-test-math.cpp": "4795db3844aabf94aa8e83dcc6fe05be2dde4b4712a0814fd3cfe5d870a1ef77",
+        "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "f5d9f97d1ce53dda755b1aec03c436a21a0c61eafc3b4ef3fae5296041ee3e62",
+        "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "1ada9bb778031108bc5357d2a2b725f2014e0f7aecfd8996d6404cb14421126a",
+        "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "c6559d802059a47f87617089f18d33ed65cd74930ed995422d469580167f10fe",
+        "tools/slang-unit-test/unit-test-nvvm-routing.cpp": "298b14e6b445d1188c8874a18792be7fa77ce531374076268f778c5d0d3aba15",
+        "tools/slang-unit-test/unit-test-nvvm-support.h": "28d75082349a7787563d140608fa17b77bc19fd7fa13c2089fa8ae1f05ab2c3f"
+      },
+      "focused_gates": {
+        "units": {
+          "record": {
+            "path": "build/nvvm-conversion-intrinsics/focused-units-v34.json",
+            "sha256": "bb8bf2e9c21d0a09ad703d1a3ba307465fc30be2fa6ac6b1f15f2aee7020844d"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "slang-unit-test-tool/nvvmSlangOpaqueHalfHelpersUseTypedFloatConversions",
+              "slang-unit-test-tool/nvvmSlangFloat16ValuesUseGenericTypedPipeline",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies",
+              "slang-unit-test-tool/nvvmSlangHalfConversionAPIsPreserveVectorLanes",
+              "slang-unit-test-tool/nvvmSlangHalfVectorsCrossAllFourHelperBoundaries",
+              "slang-unit-test-tool/nvvmSlangHalfVectorBoundaryCapabilitiesPreflightEveryWidth",
+              "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 15.210492610931396,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/focused-units-v34.log",
+            "log_sha256": "e2d357cf1368ba8f37c4651a3bdbeef1ae6941e796387cf2f10a95f740a5e0cb"
+          },
+          "log": {
+            "path": "build/nvvm-conversion-intrinsics/focused-units-v34.log",
+            "sha256": "e2d357cf1368ba8f37c4651a3bdbeef1ae6941e796387cf2f10a95f740a5e0cb"
+          },
+          "counts": {
+            "passed": 7
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangFloat16ValuesUseGenericTypedPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangHalfVectorsCrossAllFourHelperBoundaries.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangOpaqueHalfHelpersUseTypedFloatConversions.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangHalfConversionAPIsPreserveVectorLanes.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangHalfVectorBoundaryCapabilitiesPreflightEveryWidth.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal": "passed"
+          }
+        },
+        "source_and_gpu": {
+          "record": {
+            "path": "build/nvvm-conversion-intrinsics/focused-source-gpu-v34.json",
+            "sha256": "fd934412c4956987ae28da0c271eeaf5602c116a48f8e4aa9fba263d46b17684"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "tests/cuda/nvvm-conversion-intrinsics.slang",
+              "tests/cuda/nvvm-conversion-producers.slang",
+              "tests/cuda/nvvm-half-narrow-conversion.slang",
+              "tests/cuda/nvvm-half-values.slang",
+              "tests/cuda/nvvm-half-vector-helper-parameters.slang",
+              "tests/cuda/nvvm-half-vector-helper-results.slang",
+              "tests/cuda/nvvm-half-vector-helper-exports.slang",
+              "tests/cuda/nvvm-half-vector-helper-effectful.slang"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 8.487457513809204,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/focused-source-gpu-v34.log",
+            "log_sha256": "13d7e87e91aba0f254bfef84dbc095d130c534fb79ce021bb4666d9c63140010"
+          },
+          "log": {
+            "path": "build/nvvm-conversion-intrinsics/focused-source-gpu-v34.log",
+            "sha256": "13d7e87e91aba0f254bfef84dbc095d130c534fb79ce021bb4666d9c63140010"
+          },
+          "counts": {
+            "passed": 22
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-conversion-producers.slang": "passed",
+            "tests/cuda/nvvm-half-narrow-conversion.slang (cuda)": "passed",
+            "tests/cuda/nvvm-conversion-intrinsics.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-narrow-conversion.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-conversion-intrinsics.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-narrow-conversion.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-conversion-intrinsics.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-half-values.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-effectful.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-values.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-values.slang.2": "passed",
+            "tests/cuda/nvvm-half-vector-helper-effectful.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-exports.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-effectful.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-exports.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-parameters.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-exports.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-parameters.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-results.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-parameters.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-results.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-vector-helper-results.slang.2 (cuda)": "passed"
+          }
+        }
+      },
+      "focused_inventory": {
+        "path": "build/nvvm-conversion-intrinsics/focused-inventory.json",
+        "sha256": "1f082244e10da732a3fbf7a1ebc1f47834aa3257368b1e688a1c98a0c7247c0d"
+      },
+      "reviewed_inventories": {
+        "approval": {
+          "path": "build/nvvm-conversion-intrinsics/review-inventories-v34.json",
+          "sha256": "59fb22aece0f296674b99d511e333352e44550cc8446d560d4dd716522e9d545"
+        },
+        "focused_inventory": {
+          "path": "build/nvvm-conversion-intrinsics/focused-inventory.json",
+          "sha256": "1f082244e10da732a3fbf7a1ebc1f47834aa3257368b1e688a1c98a0c7247c0d"
+        },
+        "new_unit_inventory": {
+          "path": "build/nvvm-conversion-intrinsics/new-unit-inventory.json",
+          "sha256": "403ec97c5107c8dbc5313cfa73594fff348637a024e703e93f67de3d720d5e6d"
+        }
+      },
+      "supplemental_source_compatibility": {
+        "status": "passed",
+        "gate": {
+          "record": {
+            "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2.json",
+            "sha256": "e13f8cc50afd846c048223fe2a449becc16d4c36de5b5ff8c53fbd0e87d7bd2f"
+          },
+          "gate": {
+            "command": [
+              "python3",
+              "build/nvvm-conversion-intrinsics/run-source-compatibility-v34.py",
+              "--source",
+              "build/nvvm-conversion-intrinsics/build5-source.json",
+              "--build-gate",
+              "build/nvvm-conversion-intrinsics/build5.json",
+              "--runtime-reference",
+              "build/nvvm-conversion-intrinsics/checkpoint/provenance.json",
+              "--boundary-inputs",
+              "build/nvvm-conversion-intrinsics/boundary-inputs-v34.json",
+              "--boundary-review",
+              "build/nvvm-conversion-intrinsics/review-boundary-inputs-v34.json",
+              "--output",
+              "build/nvvm-conversion-intrinsics/source-compatibility-v34-2"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 17.965522050857544,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/source-compatibility-v34-2.log",
+            "log_sha256": "ae7ddc61d22da5346884be5e5facfe3f6a49f29f0ea9ae948ccc268e25f85a6f"
+          },
+          "log": {
+            "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2.log",
+            "sha256": "ae7ddc61d22da5346884be5e5facfe3f6a49f29f0ea9ae948ccc268e25f85a6f"
+          }
+        },
+        "results": {
+          "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2/results.json",
+          "sha256": "191d76b2d0e8f55c75aafe0e787d83efe8bc899acf03f0e8fa827a02f30a908a"
+        },
+        "reviewed_inputs": {
+          "path": "build/nvvm-conversion-intrinsics/compatibility-recommendation-inputs.json",
+          "sha256": "7c5078ff343a5f9535c5bf2a87d0b24af09d32d9a58db4839d0316e45d8d3ba4"
+        },
+        "recommendation": {
+          "path": "build/nvvm-conversion-intrinsics/compatibility-recommendation.md",
+          "sha256": "3f0b1d8032577e60029bbdab433593b1eeed24bbac161be4c80da63918eb6045"
+        },
+        "source_comparisons": 36,
+        "old_module_rejection_cells": 6,
+        "fresh_alias_oracle_cells": 2,
+        "fresh_alias_compile_assembly_cells": 4,
+        "fresh_surface_compile_assembly_cells": 4,
+        "module_boundary": {
+          "minimum": 34,
+          "maximum": 34,
+          "format": 2
+        },
+        "boundary_inputs": {
+          "path": "build/nvvm-conversion-intrinsics/boundary-inputs-v34.json",
+          "sha256": "b92b52ba9182fff49558041988d10928add8274d23fd438742ba638458d5ef01"
+        },
+        "boundary_review": {
+          "path": "build/nvvm-conversion-intrinsics/review-boundary-inputs-v34.json",
+          "sha256": "51fd9f5296ca0b344d808511490e63d79c3d95ea3e757bbb9d5420f0bcc41222"
+        },
+        "resolution_history": {
+          "wrong_stage": {
+            "status": "resolved-by-version34-rejection",
+            "explanation": "The unchanged archived version32 surface module decoded compute as fragment and failed E30702. The approved all-backend version34 boundary rejects it before AST/IR decoding; it is not compatible old-module success.",
+            "evidence": [
+              {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility/results.json",
+                "sha256": "6f39056c9ad3ddeb5086a1605f38335fdbf453bdb2f0547599afb367c593512e"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility.json",
+                "sha256": "06fee67c69f4afc8602f4317ba0e08f2c177de909fc024c133f04d5e3a1840de"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility.log",
+                "sha256": "74e637f1251fe8004ed78888ba4392fbad080da790ac8c46513c28871be61feb"
+              }
+            ]
+          },
+          "wrong_branch": {
+            "status": "resolved-by-version34-rejection",
+            "explanation": "The unchanged archived version32 alias module selected89 instead of80 at SM80 under the pre-bump compiler at O0/O3. Version34 rejection replaces silent misinterpretation; rebuilt version34 modules must independently select80.",
+            "evidence": [
+              {
+                "path": "build/nvvm-conversion-intrinsics/compatibility-decision.json",
+                "sha256": "24dd056447c23ac79fbb2d7c1e9daeb27db9089ab05423dbe9006fe35e5b9f4a"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/alias-link-current.json",
+                "sha256": "a3fcee0ec59a06eabbbcfcf28de50d0dc2ca93fbe0e8fabaec09f0a0a767623d"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/alias-link-current-O3.json",
+                "sha256": "2cbb13fbe8870c6fced92ba7cdd3b59a89d320bebb562827e4555b76a9f13124"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/alias-compatibility/current.cu",
+                "sha256": "a7851f8c0b81873c14c2521e611b22397a286f3a2fbc6a4eab77472c2ff8f03f"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/alias-compatibility/current-O3.cu",
+                "sha256": "a7851f8c0b81873c14c2521e611b22397a286f3a2fbc6a4eab77472c2ff8f03f"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/alias-compatibility/old.cu",
+                "sha256": "2de671f3aeace6f669aeb67a13af654c21b7619c1f23ff324bdaba9d5d59cb8f"
+              },
+              {
+                "path": "build/nvvm-conversion-intrinsics/alias-compatibility/old-O3.cu",
+                "sha256": "2de671f3aeace6f669aeb67a13af654c21b7619c1f23ff324bdaba9d5d59cb8f"
+              }
+            ]
+          }
+        },
+        "current_checkpoint_provenance": {
+          "path": "build/nvvm-conversion-intrinsics/checkpoint-v34/provenance.json",
+          "sha256": "5fa4f352c84b8ab601186549233d25ebf69a1da5455ad74776089dd1415ab65e"
+        },
+        "historical_reference_identity": {
+          "revision": "3c250bff847674a72bb95c89b19841620c920d72",
+          "patch_sha256": "0e2ef2f0b68008d8dad4159c4449dd19a63a378dc094b0ab1055f4be1f40cc4d",
+          "compiler_version": "2026.18.3-329-g3c250bff8",
+          "provider_abi": 42
+        },
+        "historical_compiler_sha256": "a38fbec6243e37886b67c0ba803c193d0178819752a2deda93ea154aa7b67654",
+        "chronology": "Version34 integration after the shared build and before the fresh final checkpoint. Before/after current runtime/source/configuration maps must equal that checkpoint at acceptance. The older checkpoint supplies only path inventory/environment, not execution identity.",
+        "historical_scope": "Retained physical-source and serialized-module controls from historical ABI42 compiler; not immediate synchronization compiler output.",
+        "execution_scope": "36 CUDA source/reflection comparisons; fresh-process E00130/no-output rejection of old32/33 modules; fresh34 alias emitted-store80 plus alias/surface PTX/assembly controls. No GPU execution. All targets require old modules to be recompiled."
+      },
+      "module_version_evidence": {
+        "status": "passed",
+        "module_boundary": {
+          "minimum": 34,
+          "maximum": 34,
+          "format": 2
+        },
+        "outcomes": {
+          "serializedModuleVersionImportFallback": "passed",
+          "serializedModuleVersionLibraryReference": "passed",
+          "serializedModuleVersionValidation": "passed"
+        },
+        "configure": {
+          "record": {
+            "path": "build/nvvm-conversion-intrinsics/static-configure-v34.json",
+            "sha256": "6fb4aef316ce3d88b41d3b0df27c43fc09a492fca9153afcfb036fe85fe8084a"
+          },
+          "gate": {
+            "command": [
+              "cmake",
+              "-S",
+              ".",
+              "-B",
+              "build/nvvm-local-record-arrays/static-unit-build",
+              "-U",
+              "SLANG_VERSION_FULL",
+              "-U",
+              "SLANG_VERSION_NUMERIC",
+              "-DSLANG_EMBED_CORE_MODULE=OFF"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 2.490004301071167,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/static-configure-v34.log",
+            "log_sha256": "65b4c8c6a92e477ce9d34f12853f9c0f4e466c548672e48ea50008214eb5803f"
+          },
+          "log": {
+            "path": "build/nvvm-conversion-intrinsics/static-configure-v34.log",
+            "sha256": "65b4c8c6a92e477ce9d34f12853f9c0f4e466c548672e48ea50008214eb5803f"
+          }
+        },
+        "build": {
+          "record": {
+            "path": "build/nvvm-conversion-intrinsics/static-build-v34.json",
+            "sha256": "39cfcf1aa7ec96860e62bf8890affd345a544ba54239a8747c22fe4e5ecb8f86"
+          },
+          "gate": {
+            "command": [
+              "env",
+              "CMAKE_BUILD_PARALLEL_LEVEL=1",
+              "cmake",
+              "--build",
+              "build/nvvm-local-record-arrays/static-unit-build",
+              "--config",
+              "RelWithDebInfo",
+              "--parallel",
+              "4",
+              "--target",
+              "slang-static-unit-test"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 626.6137390136719,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/static-build-v34.log",
+            "log_sha256": "2b6b01d63060229b2ce73d146029ddd1299dd359ba8608b95a5b5706be4e8beb"
+          },
+          "log": {
+            "path": "build/nvvm-conversion-intrinsics/static-build-v34.log",
+            "sha256": "2b6b01d63060229b2ce73d146029ddd1299dd359ba8608b95a5b5706be4e8beb"
+          }
+        },
+        "gate": {
+          "record": {
+            "path": "build/nvvm-conversion-intrinsics/static-module-versions-v34.json",
+            "sha256": "195159c9b03032962fad595af5861a61998d43d9d173e91f10625998460bfb6a"
+          },
+          "gate": {
+            "command": [
+              "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test",
+              "serializedModuleVersion"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 7.0377037525177,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/static-module-versions-v34.log",
+            "log_sha256": "7e68428345a1e93507bcb37b612b4941549094d6e74fa0cb3d7deb6c5ad0225d"
+          },
+          "log": {
+            "path": "build/nvvm-conversion-intrinsics/static-module-versions-v34.log",
+            "sha256": "7e68428345a1e93507bcb37b612b4941549094d6e74fa0cb3d7deb6c5ad0225d"
+          }
+        },
+        "shared_source_freeze": {
+          "path": "build/nvvm-conversion-intrinsics/build5-source.json",
+          "sha256": "622729f28ee7ba668f97da5c73e258449d26abc83455a759127e28a25e30a977"
+        },
+        "during_build_input_capture": {
+          "path": "build/nvvm-conversion-intrinsics/static-v34-build-inputs.json",
+          "sha256": "4cb372a2d74542213be32bec6d29ba900848c90459927d3f9607b25edf97c488"
+        },
+        "input_capture_phase": "During isolated static build after successful configure; no source edits since shared build5 freeze",
+        "isolated_artifact_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "a554a05867b94c2e41d155a0807dda7249befff70b3ecd6aa093638818a3ef28",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-core-module.bin": "d8ba3d4bdc99edfafd9422d148ce9e594bdd6b22f95da93df74f5d154df88db8",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/CMakeCache.txt": "44d6fb2f9d893fe1f991f304a46ad1733863dc379208c45ddd58d24711b064a6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/build.ninja": "62a85e3408db37ddb3e53011d6435d9930e734a1b8cf37abc52ea7440939098f",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/build-RelWithDebInfo.ninja": "800be7ddcd7560e6ac2b1ed9927c6b41c5be6974e29bcf3ed780e82aa9e9f93d",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/CMakeFiles/impl-RelWithDebInfo.ninja": "34c8cf97a8a37a65290213a89528b2135e9e8d4ac548753fd111f66312a45417"
+        },
+        "scope": "Three existing static test identities, built in the separate static configuration from the reviewed shared source. Not additions to the native plugin inventory.",
+        "source_association": "During-build source/configuration capture equals final shared source and current isolated configuration. It occurred after configure while this build ran; no pre-build or every-gate capture is claimed. Final independent review binds the remaining build association."
+      },
+      "validation_incidents": [
+        {
+          "id": "conversion-vector-O0",
+          "status": "resolved",
+          "cause": "Existing vector Half API CUDA bodies name scalar intrinsics; NVVM rejects vector __half2float and NVRTC rejects the vector argument to __float2half.",
+          "correction": "Both vector APIs now use canonical vector conversion constructors for grouped NVVM/CUDA cases. Scalar CUDA bodies and other-target default mapping remain unchanged.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/before-vector-half-widen-O0.json",
+                "sha256": "5dde2910a1ef2a468d80b3a405c398de3810f4480764e4636c96205078996077"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "build/nvvm-conversion-intrinsics/before-vector-half-widen.slang",
+                  "-target",
+                  "ptx",
+                  "-emit-cuda-via-nvvm",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-O0",
+                  "-o",
+                  "build/nvvm-conversion-intrinsics/before-vector-half-widen-O0.ptx"
+                ],
+                "return_code": 255,
+                "elapsed_seconds": 0.3084559440612793,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/before-vector-half-widen-O0.log",
+                "log_sha256": "2b45b1ab219df27ff0f74e929c49a952b136f098f6da9b0b956129a9717204c3"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/before-vector-half-widen-O0.log",
+                "sha256": "2b45b1ab219df27ff0f74e929c49a952b136f098f6da9b0b956129a9717204c3"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/after-vector-half-widen-O0.json",
+              "sha256": "838dd9c6ce9c0fb1970538661a455a666e49f1677fae1f0b14134c2358158c7e"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slangc",
+                "build/nvvm-conversion-intrinsics/before-vector-half-widen.slang",
+                "-target",
+                "ptx",
+                "-emit-cuda-via-nvvm",
+                "-entry",
+                "computeMain",
+                "-stage",
+                "compute",
+                "-capability",
+                "cuda_sm_8_0",
+                "-O0",
+                "-o",
+                "build/nvvm-conversion-intrinsics/after-vector-half-widen-O0.ptx"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 0.2937583923339844,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/after-vector-half-widen-O0.log",
+              "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/after-vector-half-widen-O0.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-vector-O3",
+          "status": "resolved",
+          "cause": "Existing vector Half API CUDA bodies name scalar intrinsics; NVVM rejects vector __half2float and NVRTC rejects the vector argument to __float2half.",
+          "correction": "Both vector APIs now use canonical vector conversion constructors for grouped NVVM/CUDA cases. Scalar CUDA bodies and other-target default mapping remain unchanged.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/before-vector-half-widen-O3.json",
+                "sha256": "15d4f489cfadd5aef32438d4856b8708431a4bb68dfe8f311196b1e6b5ebc9e0"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "build/nvvm-conversion-intrinsics/before-vector-half-widen.slang",
+                  "-target",
+                  "ptx",
+                  "-emit-cuda-via-nvvm",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-O3",
+                  "-o",
+                  "build/nvvm-conversion-intrinsics/before-vector-half-widen-O3.ptx"
+                ],
+                "return_code": 255,
+                "elapsed_seconds": 0.3159067630767822,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/before-vector-half-widen-O3.log",
+                "log_sha256": "2b45b1ab219df27ff0f74e929c49a952b136f098f6da9b0b956129a9717204c3"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/before-vector-half-widen-O3.log",
+                "sha256": "2b45b1ab219df27ff0f74e929c49a952b136f098f6da9b0b956129a9717204c3"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/after-vector-half-widen-O3.json",
+              "sha256": "2a11224f0af1109ad62839a1a9f7ee41cc1dbb9c9073aedced773247e5c07be9"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slangc",
+                "build/nvvm-conversion-intrinsics/before-vector-half-widen.slang",
+                "-target",
+                "ptx",
+                "-emit-cuda-via-nvvm",
+                "-entry",
+                "computeMain",
+                "-stage",
+                "compute",
+                "-capability",
+                "cuda_sm_8_0",
+                "-O3",
+                "-o",
+                "build/nvvm-conversion-intrinsics/after-vector-half-widen-O3.ptx"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 0.2942047119140625,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/after-vector-half-widen-O3.log",
+              "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/after-vector-half-widen-O3.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-vector-nvrtc",
+          "status": "resolved",
+          "cause": "Existing vector Half API CUDA bodies name scalar intrinsics; NVVM rejects vector __half2float and NVRTC rejects the vector argument to __float2half.",
+          "correction": "Both vector APIs now use canonical vector conversion constructors for grouped NVVM/CUDA cases. Scalar CUDA bodies and other-target default mapping remain unchanged.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/before-vector-half-widen-nvrtc.json",
+                "sha256": "cf54739acc1e71277890d5f13b10a3b1c89bb9d47043a8fae4fbeb37a9928f51"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "build/nvvm-conversion-intrinsics/before-vector-half-widen.slang",
+                  "-target",
+                  "ptx",
+                  "-emit-cuda-via-nvrtc",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-O3",
+                  "-o",
+                  "build/nvvm-conversion-intrinsics/before-vector-half-widen-nvrtc.ptx"
+                ],
+                "return_code": 255,
+                "elapsed_seconds": 0.4513874053955078,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/before-vector-half-widen-nvrtc.log",
+                "log_sha256": "77895c12b4f90cae872bca4853bd9ab35813c34b07ed6ea8c77dd608717b2ca2"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/before-vector-half-widen-nvrtc.log",
+                "sha256": "77895c12b4f90cae872bca4853bd9ab35813c34b07ed6ea8c77dd608717b2ca2"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/after-vector-half-widen-nvrtc.json",
+              "sha256": "948f8d2c33c55061de64d906c31122e91278f388e6d231a16b3ca07b668a3cb4"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slangc",
+                "build/nvvm-conversion-intrinsics/before-vector-half-widen.slang",
+                "-target",
+                "ptx",
+                "-emit-cuda-via-nvrtc",
+                "-entry",
+                "computeMain",
+                "-stage",
+                "compute",
+                "-capability",
+                "cuda_sm_8_0",
+                "-O3",
+                "-o",
+                "build/nvvm-conversion-intrinsics/after-vector-half-widen-nvrtc.ptx"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 0.506889820098877,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/after-vector-half-widen-nvrtc.log",
+              "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/after-vector-half-widen-nvrtc.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-probe-entry-abi",
+          "status": "resolved",
+          "cause": "Initial representation probe used an unsupported raw uniform float2 kernel parameter; its dump was useful but compilation failed independently of this slice.",
+          "correction": "Corrected probe uses two scalar entry parameters and builds its vector locally; the unchanged old compiler compiled this corrected probe.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/before-producer-routes.json",
+                "sha256": "d049476f14362177a3cf571af6332f60efe422f3c34fb290385d9504bc2c277e"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "build/nvvm-conversion-intrinsics/producer-routes.slang",
+                  "-target",
+                  "ptx",
+                  "-emit-cuda-via-nvvm",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-O0",
+                  "-dump-ir",
+                  "-dump-intermediates",
+                  "-dump-intermediate-prefix",
+                  "build/nvvm-conversion-intrinsics/before-routes-",
+                  "-o",
+                  "build/nvvm-conversion-intrinsics/before-routes.ptx"
+                ],
+                "return_code": 255,
+                "elapsed_seconds": 0.2992844581604004,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/before-producer-routes.log",
+                "log_sha256": "524c18275ee175e0de315742b36801f64ef98ba777afe2d1e7d5eba4a307501a"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/before-producer-routes.log",
+                "sha256": "524c18275ee175e0de315742b36801f64ef98ba777afe2d1e7d5eba4a307501a"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/before-producer-routes-v2.json",
+              "sha256": "4a0bb4423b0a4fda01e393a519670944efa77e359f8730cac37d1242c4b1cb3c"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slangc",
+                "build/nvvm-conversion-intrinsics/producer-routes-v2.slang",
+                "-target",
+                "ptx",
+                "-emit-cuda-via-nvvm",
+                "-entry",
+                "computeMain",
+                "-stage",
+                "compute",
+                "-capability",
+                "cuda_sm_8_0",
+                "-O0",
+                "-dump-ir",
+                "-dump-intermediates",
+                "-dump-intermediate-prefix",
+                "build/nvvm-conversion-intrinsics/before-routes-v2-",
+                "-o",
+                "build/nvvm-conversion-intrinsics/before-routes-v2.ptx"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 0.32207584381103516,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/before-producer-routes-v2.log",
+              "log_sha256": "646526674962453f58b3e8a1303b5b180838fd62e819172f40ef8d3f80cd02e7"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/before-producer-routes-v2.log",
+              "sha256": "646526674962453f58b3e8a1303b5b180838fd62e819172f40ef8d3f80cd02e7"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-ambiguous-vector-helper",
+          "status": "resolved",
+          "cause": "The first core build found two equally viable existing __real_cast vector helper overloads.",
+          "correction": "Use the existing intrinsic FloatCast vector conversion constructor; do not modify the shared overload set.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/build.json",
+                "sha256": "5e63205b6eb8cdfbda05b867335c63be1fdc88cf236c38d182279cf5405660f8"
+              },
+              "gate": {
+                "command": [
+                  "env",
+                  "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                  "cmake",
+                  "--build",
+                  "--preset",
+                  "releaseWithDebugInfo",
+                  "--parallel",
+                  "4",
+                  "--target",
+                  "slangc",
+                  "slang-test",
+                  "slang-unit-test",
+                  "test-server",
+                  "render-test",
+                  "slang-reflection-test",
+                  "slang-nvvm-provider",
+                  "slang-numerics-modules"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 92.45192551612854,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/build.log",
+                "log_sha256": "79ecb02e16b0987e24047ec923d61fafaa5da3360ec8452e1d91ffddce3c015b"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/build.log",
+                "sha256": "79ecb02e16b0987e24047ec923d61fafaa5da3360ec8452e1d91ffddce3c015b"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/build4.json",
+              "sha256": "833fbe6615b98f69bacae98d8caf64684a0c8bcdb3623c4d3d409ac4f3ba3488"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slangc",
+                "slang-test",
+                "slang-unit-test",
+                "test-server",
+                "render-test",
+                "slang-reflection-test",
+                "slang-nvvm-provider",
+                "slang-numerics-modules"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 86.89656090736389,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/build4.log",
+              "log_sha256": "c4906dcb4454383fb38cb93ffa35e6fca566de17fb9ba7b8cece1ca4ddc94b84"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/build4.log",
+              "sha256": "c4906dcb4454383fb38cb93ffa35e6fca566de17fb9ba7b8cece1ca4ddc94b84"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-default-target-coverage",
+          "status": "resolved",
+          "cause": "Removing CUDA vector arms left a default branch whose inferred targets exclude CUDA once explicit nvvm refines that target.",
+          "correction": "Explicitly cover CUDA and NVVM with a shared canonical constructor body; preserve the checker and public requirements.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/build2.json",
+                "sha256": "3dad5016b2dc243e37c820179f833831a043fdab5e46c12d655fb8748a59d9e4"
+              },
+              "gate": {
+                "command": [
+                  "env",
+                  "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                  "cmake",
+                  "--build",
+                  "--preset",
+                  "releaseWithDebugInfo",
+                  "--parallel",
+                  "4",
+                  "--target",
+                  "slangc",
+                  "slang-test",
+                  "slang-unit-test",
+                  "test-server",
+                  "render-test",
+                  "slang-reflection-test",
+                  "slang-nvvm-provider",
+                  "slang-numerics-modules"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 75.42144799232483,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/build2.log",
+                "log_sha256": "d30f44126a4e42dbfdef1cc155a089b4435ce20f65c872f14dcbf046652143aa"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/build2.log",
+                "sha256": "d30f44126a4e42dbfdef1cc155a089b4435ce20f65c872f14dcbf046652143aa"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/build4.json",
+              "sha256": "833fbe6615b98f69bacae98d8caf64684a0c8bcdb3623c4d3d409ac4f3ba3488"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slangc",
+                "slang-test",
+                "slang-unit-test",
+                "test-server",
+                "render-test",
+                "slang-reflection-test",
+                "slang-nvvm-provider",
+                "slang-numerics-modules"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 86.89656090736389,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/build4.log",
+              "log_sha256": "c4906dcb4454383fb38cb93ffa35e6fca566de17fb9ba7b8cece1ca4ddc94b84"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/build4.log",
+              "sha256": "c4906dcb4454383fb38cb93ffa35e6fca566de17fb9ba7b8cece1ca4ddc94b84"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-grouped-scalar-capability",
+          "status": "resolved",
+          "cause": "The intermediate grouped CUDA/default scalar mapping inherited CUDA SM6 from scalar helper requirements, incomparable with the pure NVVM constructor branch.",
+          "correction": "Share the canonical constructor between CUDA/NVVM; the existing CUDA FloatCast emitter produces per-lane toolkit Half conversions with no extra inferred scalar API requirement.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/build3.json",
+                "sha256": "7d10af960568bd852abdca04e05dcf22f1b6db0c4fb4a141f379321f034d714f"
+              },
+              "gate": {
+                "command": [
+                  "env",
+                  "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                  "cmake",
+                  "--build",
+                  "--preset",
+                  "releaseWithDebugInfo",
+                  "--parallel",
+                  "4",
+                  "--target",
+                  "slangc",
+                  "slang-test",
+                  "slang-unit-test",
+                  "test-server",
+                  "render-test",
+                  "slang-reflection-test",
+                  "slang-nvvm-provider",
+                  "slang-numerics-modules"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 72.13338303565979,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/build3.log",
+                "log_sha256": "7c3e388ddab0c8dd1ecc54750803ad38436a43f180dfcec360aaf9b839e16abd"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/build3.log",
+                "sha256": "7c3e388ddab0c8dd1ecc54750803ad38436a43f180dfcec360aaf9b839e16abd"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/build4.json",
+              "sha256": "833fbe6615b98f69bacae98d8caf64684a0c8bcdb3623c4d3d409ac4f3ba3488"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slangc",
+                "slang-test",
+                "slang-unit-test",
+                "test-server",
+                "render-test",
+                "slang-reflection-test",
+                "slang-nvvm-provider",
+                "slang-numerics-modules"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 86.89656090736389,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/build4.log",
+              "log_sha256": "c4906dcb4454383fb38cb93ffa35e6fca566de17fb9ba7b8cece1ca4ddc94b84"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/build4.log",
+              "sha256": "c4906dcb4454383fb38cb93ffa35e6fca566de17fb9ba7b8cece1ca4ddc94b84"
+            }
+          },
+          "evidence_files": []
+        },
+        {
+          "id": "conversion-blocked-capability-wire-identities",
+          "status": "resolved",
+          "cause": "The NVVM capability addition shifted serialized atom and alias identities while admitting versions31\u201333. The historical32 surface module decoded compute as fragment (E30702), and the historical32 atomic_bfloat16 alias emitted89 instead of80 at SM80 under O0/O3.",
+          "correction": "The maintainer authorized an all-backend prototype compatibility break. Minimum and written semantic versions are34; existing guards reject older bytes before AST/IR decoding. Real old32/33 modules now reject with E00130; identical source rebuilt at34 selects80 and alias/surface PTX assembles at O0/O3. Three static units cover31/32/33 rejection, metadata, current loads and source fallback. Historical loads are not relabeled successful.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility.json",
+                "sha256": "06fee67c69f4afc8602f4317ba0e08f2c177de909fc024c133f04d5e3a1840de"
+              },
+              "gate": {
+                "command": [
+                  "python3",
+                  "build/nvvm-conversion-intrinsics/run-source-compatibility.py"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 12.27421498298645,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/source-compatibility.log",
+                "log_sha256": "74e637f1251fe8004ed78888ba4392fbad080da790ac8c46513c28871be61feb"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility.log",
+                "sha256": "74e637f1251fe8004ed78888ba4392fbad080da790ac8c46513c28871be61feb"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2.json",
+              "sha256": "e13f8cc50afd846c048223fe2a449becc16d4c36de5b5ff8c53fbd0e87d7bd2f"
+            },
+            "gate": {
+              "command": [
+                "python3",
+                "build/nvvm-conversion-intrinsics/run-source-compatibility-v34.py",
+                "--source",
+                "build/nvvm-conversion-intrinsics/build5-source.json",
+                "--build-gate",
+                "build/nvvm-conversion-intrinsics/build5.json",
+                "--runtime-reference",
+                "build/nvvm-conversion-intrinsics/checkpoint/provenance.json",
+                "--boundary-inputs",
+                "build/nvvm-conversion-intrinsics/boundary-inputs-v34.json",
+                "--boundary-review",
+                "build/nvvm-conversion-intrinsics/review-boundary-inputs-v34.json",
+                "--output",
+                "build/nvvm-conversion-intrinsics/source-compatibility-v34-2"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 17.965522050857544,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/source-compatibility-v34-2.log",
+              "log_sha256": "ae7ddc61d22da5346884be5e5facfe3f6a49f29f0ea9ae948ccc268e25f85a6f"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2.log",
+              "sha256": "ae7ddc61d22da5346884be5e5facfe3f6a49f29f0ea9ae948ccc268e25f85a6f"
+            }
+          },
+          "evidence_files": [
+            {
+              "path": "build/nvvm-conversion-intrinsics/compatibility-decision.json",
+              "sha256": "24dd056447c23ac79fbb2d7c1e9daeb27db9089ab05423dbe9006fe35e5b9f4a"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/boundary-inputs-v34.json",
+              "sha256": "b92b52ba9182fff49558041988d10928add8274d23fd438742ba638458d5ef01"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2/results.json",
+              "sha256": "191d76b2d0e8f55c75aafe0e787d83efe8bc899acf03f0e8fa827a02f30a908a"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/static-module-versions-v34.json",
+              "sha256": "195159c9b03032962fad595af5861a61998d43d9d173e91f10625998460bfb6a"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/static-module-versions-v34.log",
+              "sha256": "7e68428345a1e93507bcb37b612b4941549094d6e74fa0cb3d7deb6c5ad0225d"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/module-version-review.md",
+              "sha256": "8463868f21b426e4060048408fbe8c5d513178bcaf09b70a0dd376a043a2d933"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/module-version-worker-report.md",
+              "sha256": "e588df9f735119ea67ebfea8a1c1b0c883506539354b2df3588b7e86f59310eb"
+            }
+          ]
+        },
+        {
+          "id": "conversion-module-rejection-exit-expectation",
+          "status": "resolved",
+          "cause": "The first version34 integration harness required exit255 for an explicit -r rejection. The compiler instead correctly rejected version32 during argument parsing with normal exit1, E00130 and no output; all36 source controls had already passed.",
+          "correction": "Pin the early CLI parsing failure to exit1, independently traced through OptionsParser::_parseReferenceModule and TestToolUtil. Retain exact diagnostic, no-output, timeout and signal checks. Rerun the unchanged compiler and inputs in a fresh directory; all36 source comparisons and23 module phases pass.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34.json",
+                "sha256": "52e7af1ef6825110ab16824d50dd23382663d926c417c678f7ccba662ac82c11"
+              },
+              "gate": {
+                "command": [
+                  "python3",
+                  "build/nvvm-conversion-intrinsics/run-source-compatibility-v34.py",
+                  "--source",
+                  "build/nvvm-conversion-intrinsics/build5-source.json",
+                  "--build-gate",
+                  "build/nvvm-conversion-intrinsics/build5.json",
+                  "--runtime-reference",
+                  "build/nvvm-conversion-intrinsics/checkpoint/provenance.json",
+                  "--boundary-inputs",
+                  "build/nvvm-conversion-intrinsics/boundary-inputs-v34.json",
+                  "--boundary-review",
+                  "build/nvvm-conversion-intrinsics/review-boundary-inputs-v34.json",
+                  "--output",
+                  "build/nvvm-conversion-intrinsics/source-compatibility-v34"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 12.915140867233276,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/source-compatibility-v34.log",
+                "log_sha256": "30667074ade7334410bbedba16ea8fb0f7e43aecddcb22c44c0301555dbcc00d"
+              },
+              "log": {
+                "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34.log",
+                "sha256": "30667074ade7334410bbedba16ea8fb0f7e43aecddcb22c44c0301555dbcc00d"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2.json",
+              "sha256": "e13f8cc50afd846c048223fe2a449becc16d4c36de5b5ff8c53fbd0e87d7bd2f"
+            },
+            "gate": {
+              "command": [
+                "python3",
+                "build/nvvm-conversion-intrinsics/run-source-compatibility-v34.py",
+                "--source",
+                "build/nvvm-conversion-intrinsics/build5-source.json",
+                "--build-gate",
+                "build/nvvm-conversion-intrinsics/build5.json",
+                "--runtime-reference",
+                "build/nvvm-conversion-intrinsics/checkpoint/provenance.json",
+                "--boundary-inputs",
+                "build/nvvm-conversion-intrinsics/boundary-inputs-v34.json",
+                "--boundary-review",
+                "build/nvvm-conversion-intrinsics/review-boundary-inputs-v34.json",
+                "--output",
+                "build/nvvm-conversion-intrinsics/source-compatibility-v34-2"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 17.965522050857544,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-conversion-intrinsics/source-compatibility-v34-2.log",
+              "log_sha256": "ae7ddc61d22da5346884be5e5facfe3f6a49f29f0ea9ae948ccc268e25f85a6f"
+            },
+            "log": {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34-2.log",
+              "sha256": "ae7ddc61d22da5346884be5e5facfe3f6a49f29f0ea9ae948ccc268e25f85a6f"
+            }
+          },
+          "evidence_files": [
+            {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34/results.json",
+              "sha256": "1997b5e2916e07345b5348a07be39cec80eafc2a697fd60f998956e9499d3080"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/source-compatibility-v34/preserved-helpers/preserved.json",
+              "sha256": "86e5dfda879b23f9b9f908b17daa656130418378f05adf8339a8388c293fa785"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/module-boundary-exit-review.md",
+              "sha256": "538136546cca892302d8955644ec06634416d7fa78aced8bd9e2898471ebf1c4"
+            },
+            {
+              "path": "build/nvvm-conversion-intrinsics/review-boundary-runner-v34-2.json",
+              "sha256": "11b4f1222e84ad8bbd97e572225d3a5e9cb62e9fac1ad35fdcfdc3679e58b197"
+            }
+          ]
+        }
+      ],
+      "open_findings": [],
+      "source_review": {
+        "path": "build/nvvm-conversion-intrinsics/independent-source-review.md",
+        "sha256": "a090f9ef28f16e378ca7281ec21cfe4a615422f736d661ce89136397da7297ba"
+      },
+      "limits": [
+        "Coverage is limited to reviewed scalar/vector conversion and bit-transport contracts; compound packed-Half/double recipes, provider numeric operations and other semantic-tag families remain.",
+        "Historical material-runtime, static, external ABI, numeric sweeps and timing claims retain their original identities."
+      ],
+      "acceptance": {
+        "status": "accepted",
+        "baseline": {
+          "path": "issue-nvvm-backend/accepted-baseline.json",
+          "sha256": "c39d42b34b1153d7be081750776aa83a7ac92808d52a9cb9ca78e7bf3abb6994"
+        },
+        "final_review": {
+          "path": "build/nvvm-conversion-intrinsics/review-candidates.json",
+          "sha256": "4d61930b7666650f53fed7ad29a1b94e16cccae331e686eda315232a01d967c7"
+        }
+      },
+      "runtime_contracts": [
+        {
+          "fixture": "tests/cuda/nvvm-conversion-intrinsics.slang",
+          "source_sha256": "5f1fa934357b35fd992be457f8fc700c2c63aa37ad06c4327752ecd54e933d7e",
+          "modes": {
+            "nvrtc-o3": "tests/cuda/nvvm-conversion-intrinsics.slang (cuda)",
+            "nvvm-o0": "tests/cuda/nvvm-conversion-intrinsics.slang.1 (cuda)",
+            "nvvm-o3": "tests/cuda/nvvm-conversion-intrinsics.slang.2 (cuda)"
+          },
+          "oracle": "16 live-input lanes independently check all six 32-bit reinterpretation directions (including NaN payloads), scalar and heterogeneous Half vector widths 2/3/4 against literal IEEE tables; numeric NaNs require classification. Sixteen error masks must be zero. Constant RNE ties/sticky/subnormal/negative/overflow/NaN checks produce 15360,15362,0,1,48128,31744,1024,1. Untouched output guard is 3735928559."
+        }
+      ]
     }
   }
 }
