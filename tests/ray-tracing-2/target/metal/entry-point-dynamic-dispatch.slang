@@ -1,7 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry ClosestHit -stage closesthit -target metal
 
-// Metal keeps a selected structural stage as a logical entry point until its
-// backend adapter is synthesized. Its invoke method is still an executable root.
+// Metal emits a separately selected structural stage as a logical source helper because a
+// physical function-table signature requires a linked schema. Its invoke method is nevertheless
+// an executable root: dynamic dispatch and the address spaces of its resource accesses must both
+// be legalized.
 
 import slang.raytracing;
 
@@ -58,7 +60,11 @@ struct ClosestHit : rt::IClosestHitShader
     }
 }
 
-// METAL: uint s_dispatch_IShape_area_0(uint
-// METAL: switch(
+// METAL-DAG: uint Circle_area_0()
+// METAL-DAG: uint Square_area_0()
+// METAL: struct KernelContext_0
+// METAL: uint device* output_0;
 // METAL: void ClosestHit_invoke_0(
-// METAL: s_dispatch_IShape_area_0(
+// METAL: switch(
+// METAL: _S{{[0-9]+}} = Circle_area_0();
+// METAL: _S{{[0-9]+}} = Square_area_0();

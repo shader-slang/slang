@@ -1,6 +1,8 @@
 //TEST:SIMPLE(filecheck=PRE): -experimental-feature -entry main -stage compute -target metal -dump-ir-after specializeModule
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry main -stage compute -target metal -dump-ir-after prepareMetalStructuralRayTracing
-//TEST:SIMPLE: -experimental-feature -entry main -stage compute -target slang-vm -o descriptor-unused-storage.slang-module
+//TEST:SIMPLE(filecheck=MODULE): -experimental-feature -entry main -stage compute -target slang-vm -o descriptor-unused-storage.slang-module
+
+// MODULE: note[E00088]: the Slang module file format is not yet finalized
 
 import slang.raytracing;
 

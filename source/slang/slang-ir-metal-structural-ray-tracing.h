@@ -60,10 +60,13 @@ void prepareMetalStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>
 ///
 /// Structural ray-generation entry points are physically emitted as Metal compute kernels. This
 /// pass also consumes trace operations whose logical SBT is empty. Later slices extend the same
-/// target-owned boundary with function-table and post-trace dispatch lowering.
+/// target-owned boundary with function-table and post-trace dispatch lowering. Separately selected
+/// stage methods remain logical source helpers; `outSelectedLogicalStageFunctions` records those
+/// executable roots for later target legalization.
 void prepareMetalStructuralRayTracing(
     IRModule* module,
     List<IRFunc*>& entryPoints,
+    List<IRFunc*>& outSelectedLogicalStageFunctions,
     TargetRequest* targetRequest,
     DiagnosticSink* sink);
 

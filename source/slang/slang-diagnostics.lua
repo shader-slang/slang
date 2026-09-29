@@ -1103,42 +1103,42 @@ err(
 
 err(
     "direct-structural-ray-tracing-stage-invoke",
-    20022,
+    20024,
     "direct invocation of a structural ray-tracing stage",
     span { loc = "location", message = "a structural ray-tracing stage method may only be invoked by compiler-generated dispatch" }
 )
 
 err(
     "structural-ray-tracing-stage-runtime-value",
-    20023,
+    20025,
     "runtime use of a structural ray-tracing stage type",
     span { loc = "location", message = "structural ray-tracing stage type '~type:type' has no runtime representation" }
 )
 
 err(
     "structural-ray-tracing-input-storage",
-    20024,
+    20026,
     "storage of a structural ray-tracing stage input",
     span { loc = "location", message = "ray-tracing stage input type '~type:type' is compiler-provided and may only be used as a value parameter" }
 )
 
 err(
     "structural-ray-tracing-type-construction",
-    20025,
+    20027,
     "construction of a structural ray-tracing type",
     span { loc = "location", message = "structural ray-tracing type '~type:type' cannot be constructed by user code" }
 )
 
 err(
     "structural-ray-tracing-metadata-runtime-value",
-    20026,
+    20028,
     "runtime use of structural ray-tracing metadata",
     span { loc = "location", message = "structural ray-tracing metadata type '~type:type' has no runtime representation" }
 )
 
 err(
     "structural-ray-tracing-input-stage-mismatch",
-    20027,
+    20029,
     "ray-tracing stage input used by the wrong stage",
     span { loc = "location", message = "ray-tracing stage input type '~type:type' requires logical stage '~stage', but function '~function:Decl' is not restricted to that stage" }
 )
@@ -4509,35 +4509,35 @@ err(
 
 err(
     "structural-ray-tracing-entry-point-not-stage",
-    38053,
+    38093,
     "invalid structural ray-tracing entry point",
     span { loc = "stageType:Decl", message = "struct '~stageType' does not implement an executable structural ray-tracing stage interface" }
 )
 
 err(
     "structural-ray-tracing-entry-point-stage-mismatch",
-    38054,
+    38094,
     "structural ray-tracing entry point stage mismatch",
     span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
 )
 
 err(
     "structural-ray-tracing-entry-point-ambiguous-stage",
-    38055,
+    38095,
     "ambiguous structural ray-tracing entry point stage",
     span { loc = "stageType:Decl", message = "struct '~stageType' implements more than one executable ray-tracing stage; use '-stage <name>' to select one" }
 )
 
 err(
     "structural-ray-tracing-stage-instance-field",
-    38056,
+    38096,
     "stateful structural ray-tracing stage",
     span { loc = "field:Decl", message = "instance field '~field' is not allowed because structural ray-tracing stage implementations are compiler-created" }
 )
 
 err(
     "mixed-ray-tracing-apis",
-    38057,
+    38097,
     "cannot mix legacy and structural ray-tracing APIs in one module",
     span { loc = "currentDecl:Decl", message = "this declaration uses the ~currentAPI API" },
     note { message = "the same module also uses the ~otherAPI API", span { loc = "otherDecl:Decl" } }

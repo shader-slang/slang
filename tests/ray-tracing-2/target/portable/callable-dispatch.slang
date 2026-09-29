@@ -95,7 +95,7 @@ void main()
 // CUDA: extern "C" __constant__ GlobalParams_0 SLANG_globalParams;
 // CUDA-NOT: extern "C" __constant__ TestCallableRecord_0 SLANG_globalParams;
 // CUDA-DAG: (*((TestCallableRecord_0*)optixGetSbtDataPointer())).value_{{[0-9]+}}
-// CUDA-DAG: optixDirectCall<void>((0U),
+// CUDA-DAG: optixDirectCall<void>(0U,
 // CUDA-DAG: extern "C" __device__ void __direct_callable__TestCallable(TestCallableData_0 * data_{{[0-9]+}})
 // PTX-DAG: _optix_get_sbt_data_ptr
 // PTX-DAG: _optix_call_direct_callable

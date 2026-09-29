@@ -1059,6 +1059,11 @@ Result linkAndOptimizeIR(
     // bodies without replacing those global IRFunc objects, so their identity remains valid until
     // stage-input lowering consumes the set below.
     HashSet<IRFunc*> selectedStructuralRayTracingEntryPointAdapters;
+    // A separately compiled Metal stage remains a logical source helper because its physical VFT
+    // or IFT signature depends on a linked schema. Keep its exact function identity so later Metal
+    // address-space legalization can process the retained body without treating it as a native
+    // Metal shader stage.
+    List<IRFunc*> selectedMetalStructuralRayTracingStageFunctions;
 
     // If our linking step resulted in errors, abort. We can't assume that
     // our IR is complete.
@@ -1625,7 +1630,12 @@ Result linkAndOptimizeIR(
          requiredLoweringPassSet.structuralRayTracingStageInput ||
          requiredLoweringPassSet.structuralRayTracingProgramDescriptor))
     {
-        SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints, targetRequest, sink);
+        SLANG_PASS(
+            prepareMetalStructuralRayTracing,
+            irEntryPoints,
+            selectedMetalStructuralRayTracingStageFunctions,
+            targetRequest,
+            sink);
     }
 
     if (sink->getErrorCount() != 0)
@@ -2754,7 +2764,9 @@ Result linkAndOptimizeIR(
     }
     else if (isMetalTarget(targetRequest))
     {
-        SLANG_PASS(specializeAddressSpaceForMetal);
+        SLANG_PASS(
+            specializeAddressSpaceForMetal,
+            selectedMetalStructuralRayTracingStageFunctions.getArrayView());
     }
     else if (isWGPUTarget(targetRequest))
     {

@@ -60,11 +60,14 @@ void main()
     layoutOutput[0] = layoutProbe.value;
 }
 
-// HLSL-DAG: struct EmptyCallableData
-// The D3D callable ABI requires one physical parameter. HLSL legalization pads the otherwise
-// empty data type so DXC does not see an invalid zero-parameter callable entry point.
-// HLSL-DAG: int _slang_dummy
-// HLSL: [shader("callable")]void EmptyCallable(inout EmptyCallableData
+// The D3D callable ABI requires one physical parameter. HLSL legalization creates a separate
+// one-uint carrier so DXC does not see an invalid zero-parameter callable entry point, while the
+// logical EmptyCallableData type remains empty everywhere else.
+// HLSL: struct [[carrier:DummyCallablePayload_[A-Za-z0-9_]+]]
+// HLSL-NEXT: {
+// HLSL-NEXT: uint _slang_dummy{{.*}};
+// HLSL-NEXT: };
+// HLSL: [shader("callable")]void EmptyCallable(inout [[carrier]]
 // DXIL: EmptyCallable
 
 // SPIR-V and Metal still require concrete native storage even though EmptyCallableData contains no

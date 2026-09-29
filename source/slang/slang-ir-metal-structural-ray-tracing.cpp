@@ -6021,6 +6021,7 @@ static void _prepareMetalProgramDescriptors(
 void prepareMetalStructuralRayTracing(
     IRModule* module,
     List<IRFunc*>& entryPoints,
+    List<IRFunc*>& outSelectedLogicalStageFunctions,
     TargetRequest* targetRequest,
     DiagnosticSink* sink)
 {
@@ -6034,7 +6035,10 @@ void prepareMetalStructuralRayTracing(
         if (func && func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
         {
             hasStructuralEntryPoint = true;
-            hasInvalidStructuralEntryPoint |= !validateStructuralRayTracingEntryPoint(func, sink);
+            if (validateStructuralRayTracingEntryPoint(func, sink))
+                outSelectedLogicalStageFunctions.add(func);
+            else
+                hasInvalidStructuralEntryPoint = true;
         }
     }
     if (operations.getCount() == 0 && !hasStructuralEntryPoint)

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=METAL): -experimental-feature -allow-glsl -target metal -entry rayMain -stage raygeneration -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=METAL): -experimental-feature -target metal -entry rayMain -stage raygeneration -entry fragmentMain -stage fragment
 
 import slang.raytracing;
 
@@ -42,7 +42,7 @@ uniform rt::TraceProgramDescriptor<Schema> program;
 // output varying remains a layout-only field in that wrapper's layout, while `program` requires
 // the same layout to be rewritten to its schema-specific physical Metal descriptor type.
 uniform float scale;
-out vec4 fragmentColor;
+out float4 fragmentColor;
 
 [shader("raygeneration")]
 void rayMain()
@@ -56,7 +56,7 @@ void rayMain()
 [shader("fragment")]
 void fragmentMain()
 {
-    fragmentColor = vec4(scale);
+    fragmentColor = float4(scale);
 }
 
 // The descriptor is physicalized even though its global layout also contains a non-nominal

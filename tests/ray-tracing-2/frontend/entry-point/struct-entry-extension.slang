@@ -1,7 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -experimental-feature -entry ClosestHit -stage closesthit -target hlsl
 
 // CHECK: outputBuffer_0[int(0)] = 7U;
-// CHECK: [shader("closesthit")]void ClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
+// TestPayload is logically empty. Native payload legalization supplies a separate nonempty
+// carrier for HLSL's mandatory payload parameter.
+// CHECK: struct [[payloadType:DummyRayPayload[A-Za-z0-9_]*]]
+// CHECK: [shader("closesthit")]void ClosestHit(inout [[payloadType]] payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // CHECK: ClosestHit_invoke_0();
 
 import slang.raytracing;
