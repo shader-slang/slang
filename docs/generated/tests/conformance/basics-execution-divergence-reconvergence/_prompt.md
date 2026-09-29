@@ -46,6 +46,10 @@ wave/subgroup execution in Slang. Claims fall into four sections:
   runtime behavior is only observable on a GPU. Prefer emission tests that
   pin the structural SPIRV opcodes (`OpSelectionMerge`, `OpSwitch`,
   `OpLoopMerge`).
+- For loop emission on the source targets, the lowered unconditional loop
+  header is `for(;;)` on HLSL, GLSL, Metal, CUDA and C++, but WGSL emits its
+  native `loop` statement instead; match the WGSL header as `{{^ *loop$}}`,
+  never `for(;;)`.
 - Wave-op claims inside divergent branches are observable in emission on
   any target that supports the wave op.
 - Thread-group-tangled UB claim has no slang-test-observable surface;

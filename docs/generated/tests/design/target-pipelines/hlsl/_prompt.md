@@ -45,7 +45,10 @@ HLSL-specific on HLSL.
   `legalizeNonStructParameterToStructForHLSL`,
   `wrapStructuredBuffersOfMatrices`, `legalizeUniformBufferLoad`,
   `legalizeByteAddressBufferOps` defaults, `legalizeLogicalAndOr`
-  (HLSL is in the `isD3DTarget` arm).
+  (HLSL is in the `isD3DTarget` arm). The two ray-payload names are
+  stale in the doc: `legalizeRayTracingPayloads`
+  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) now does that work.
+  See the empty-payload lesson below before testing them.
 - HLSL-specific skips: `lowerCooperativeVectors` (HLSL `break`),
   `lowerAppendConsumeStructuredBuffers` (HLSL has native types).
 - Always-on emit shapes: `[numthreads(...)]`, `register(uN)` /
@@ -160,11 +163,10 @@ pack_matrix(column_major)`, the conditional
   is an IR-level claim that requires `-dump-ir` annotations
   cross-pass which the doc does not anchor to a specific marker.
   These pass-ordering claims live in `pipeline/05-ir-passes`.
-- **`legalizeEmptyRayPayloadsForHLSL` and
-  `legalizeNonStructParameterToStructForHLSL`.** Both require a
+- **`legalizeNonStructParameterToStructForHLSL`.** Requires a
   DXR (`closesthit` / `anyhit`) entry point. The no-GPU compute
   runner does not exercise the ray-tracing pipeline shape, and
-  the doc anchors these to DXR stages.
+  the doc anchors it to DXR stages.
 - **`floatNonUniformResourceIndex`.** Requires the
   `NonUniformResourceIndex(...)` HLSL intrinsic in source, which
   Slang's compute-stage entry point does not have a natural way
@@ -289,6 +291,14 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
 - **DCE strips locally-unused code.** Always write computed values
   to a buffer/return them, or the test pattern will fail to find
   them in the emit.
+- **An empty ray payload is not padded in place.** A `closesthit`
+  entry point compiled with `-target hlsl -profile lib_6_6` is
+  text-emit observable without a GPU. Its empty
+  payload parameter becomes `inout` of a separate one-`uint` struct
+  (currently `DummyRayPayload_<N>`), and the empty source struct does
+  not appear. Capture the struct name from its declaration and match
+  it in the `main(...)` signature rather than pinning either name or
+  the member type.
 - **`static` module-scope variables show their initializer fire
   inside `main`** (the side effect of
   `moveGlobalVarInitializationToEntryPoints`); the global itself

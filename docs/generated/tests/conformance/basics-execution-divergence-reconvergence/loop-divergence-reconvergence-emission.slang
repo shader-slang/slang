@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:03:42+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
+//META: model=claude-opus-5-5[1m]
+//META: generated_at=2026-09-29T08:41:41+00:00
+//META: source_commit=b9199bdaa48162d97fa8f9d3293e6edaf037ffb3
 //META: doc_ref=docs/language-reference/basics-execution-divergence-reconvergence.md#divergence
 //META: doc_section_digest=7748f330eccf2fb718b5ba2c0f9aff0035f24f4197647463775fd43f1b5ebbb9
 //META: purpose=Loop statement: SPIRV emits OpLoopMerge marking the loop merge block where all threads reconverge after the loop exits.
@@ -53,8 +53,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK_METAL: for(;;)
 // CHECK_METAL: break
 
-// WGSL: for-loop lowered to a top-test infinite loop with a break.
-// CHECK_WGSL: for(;;)
+// WGSL: for-loop lowered to its native `loop` statement with a break.
+// CHECK_WGSL: {{^ *loop$}}
 // CHECK_WGSL: break
 
 // CUDA: for-loop lowered to a top-test infinite loop with a break.

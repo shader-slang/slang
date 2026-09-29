@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=claude-opus-5-5[1m]
+//META: generated_at=2026-09-29T08:41:41+00:00
+//META: source_commit=b9199bdaa48162d97fa8f9d3293e6edaf037ffb3
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ast--ir-lowering
 //META: doc_section_digest=58d6fa34e989046b10c5c18ce14f1e0e4d1c1f389944592cfe513724b2c60cae
 //META: purpose=A for-loop statement in the AST becomes a back-edged block structure whose loop header, exit test, and body all reach the emitted target text.
@@ -13,9 +13,10 @@
 // rather than the straight-line join an if/else produces. The trip count
 // comes from the dispatch id so the loop cannot be unrolled or folded away.
 // On the source back-ends the CHECKs pin the canonical lowered shape -- an
-// unconditional `for(;;)` header with the exit test re-expressed as an
-// early `break` -- and on SPIR-V they pin `OpLoopMerge`, the structured
-// marker that names the loop's merge and continue targets.
+// unconditional loop header (`for(;;)`, or WGSL's native `loop`) with the
+// exit test re-expressed as an early `break` -- and on SPIR-V they pin
+// `OpLoopMerge`, the structured marker that names the loop's merge and
+// continue targets.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
@@ -49,7 +50,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // METAL-DAG: for(;;)
 // METAL-DAG: break;
 
-// WGSL-DAG: for(;;)
+// WGSL-DAG: {{^ *loop$}}
 // WGSL-DAG: break;
 
 // CUDA-DAG: for(;;)
