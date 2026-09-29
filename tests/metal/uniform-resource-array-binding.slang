@@ -3,7 +3,7 @@
 // the base `[[texture(N)]]` / `[[sampler(N)]]` attribute. This also holds when
 // the elements are `.Handle`-wrapped, matching the scalar handle case.
 // Without the attribute Metal assigns the first available index instead, so
-// the `register(t8)` / `register(s12)` arrays check that the base follows the
+// the `register(t16)` / `register(s12)` arrays check that the base follows the
 // layout rather than coinciding with that default.
 //
 // Arrays of buffers are excluded: they are not valid direct Metal kernel
@@ -15,7 +15,7 @@
 uniform Texture2D texs[4];
 uniform SamplerState samps[4];
 uniform Texture2D.Handle handleTexs[4];
-uniform Texture2D offsetTexs[4] : register(t8);
+uniform Texture2D offsetTexs[4] : register(t16);
 uniform SamplerState offsetSamps[4] : register(s12);
 RWStructuredBuffer<float> output;
 
@@ -32,7 +32,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL-DAG: {{texs_[0-9]+}} {{\[\[}}texture(
 // MTL-DAG: {{samps_[0-9]+}} {{\[\[}}sampler(
 // MTL-DAG: {{handleTexs_[0-9]+}} {{\[\[}}texture(
-// MTL-DAG: {{offsetTexs_[0-9]+}} {{\[\[}}texture(8)]]
+// MTL-DAG: {{offsetTexs_[0-9]+}} {{\[\[}}texture(16)]]
 // MTL-DAG: {{offsetSamps_[0-9]+}} {{\[\[}}sampler(12)]]
 
 // LIB: computeMain
