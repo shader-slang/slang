@@ -299,6 +299,18 @@ class BuiltinGenericType : public BuiltinType
     Type* getElementType() const;
 };
 
+/// The opaque shader-side handle for a structural ray-tracing program.
+///
+/// Its declaration reference retains the `Schema` generic argument, but the type has no
+/// source-visible fields. A dedicated AST class lets semantic and layout code distinguish this
+/// opaque handle, which exposes no public constructor, from an ordinary empty struct without
+/// recovering its identity from a declaration name.
+FIDDLE()
+class TraceProgramDescriptorType : public DeclRefType
+{
+    FIDDLE(...)
+};
+
 // Types that behave like pointers, in that they can be
 // dereferenced (implicitly) to access members defined
 // in the element type.

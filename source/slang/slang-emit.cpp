@@ -1118,7 +1118,21 @@ Result linkAndOptimizeIR(
         }
         foundUnloweredStructuralOperation = true;
     }
-    if (foundUnloweredStructuralEntryPoint || foundUnloweredStructuralOperation)
+    // The descriptor is an opaque source type. A later adapter pass must replace it with the
+    // target's resources before ordinary parameter layout can interpret its representation.
+    // Concrete descriptor types are hoisted to module scope, including shader parameters that
+    // remain in the interface even when their values are not read by an entry point.
+    bool foundUnloweredDescriptor = false;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (!as<IRTraceProgramDescriptorType>(inst))
+            continue;
+        sink->diagnose(
+            Diagnostics::UnloweredTraceProgramDescriptor{.location = findFirstUseLoc(inst)});
+        foundUnloweredDescriptor = true;
+    }
+    if (foundUnloweredStructuralEntryPoint || foundUnloweredStructuralOperation ||
+        foundUnloweredDescriptor)
         return SLANG_FAIL;
 
     // Create the post-emit metadata object up-front so that IR passes

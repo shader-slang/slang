@@ -4698,6 +4698,13 @@ err(
 )
 
 err(
+    "unlowered-trace-program-descriptor",
+    38086,
+    "structural ray-tracing program descriptor must be lowered before target code generation",
+    span { loc = "location", message = "target adapter lowering must choose the descriptor's physical representation" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",

@@ -1,3 +1,5 @@
+//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage compute -target hlsl
+// HLSL: void main()
 //TEST:SIMPLE: -experimental-feature -entry main -stage compute -no-codegen
 
 import slang.raytracing;

@@ -55,9 +55,9 @@ endif()
 add_custom_command(
     OUTPUT ${raytracing_module_file}
     COMMAND
-        ${RAYTRACING_SLANG_COMPILER} -load-core-module
-        ${core_module_archive_without_timestamp} -I ${CMAKE_CURRENT_SOURCE_DIR}
-        raytracing.slang -o raytracing.slang-module
+        ${RAYTRACING_SLANG_COMPILER} -compile-slang-raytracing-module
+        -load-core-module ${core_module_archive_without_timestamp} -I
+        ${CMAKE_CURRENT_SOURCE_DIR} raytracing.slang -o raytracing.slang-module
     DEPENDS
         ${raytracing_copied_files}
         ${RAYTRACING_SLANG_COMPILER_DEPENDENCY}

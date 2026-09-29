@@ -3,6 +3,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-decl.h"
 #include "slang-check-impl.h"
+#include "slang-ir-insts.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-module.h"
@@ -1410,6 +1411,31 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     auto rayTraversalDescType = as<AggTypeDecl>(_findNamedDecl(module, "RayTraversalDesc"));
     auto traceProgramDescriptorType =
         as<AggTypeDecl>(_findNamedDecl(module, "TraceProgramDescriptor"));
+    // Consider `TraceProgramDescriptor<MySchema>`. The existing intrinsic-type lowering emits
+    // the schema type and its conformance witness directly from the checked substitution. Check
+    // that the packaged declaration supplies exactly those operands before consumers use it.
+    auto descriptorGeneric = as<GenericDecl>(
+        traceProgramDescriptorType ? traceProgramDescriptorType->parentDecl : nullptr);
+    auto descriptorParameter = _getOnlyGenericTypeParameter(descriptorGeneric);
+    auto descriptorMagic = traceProgramDescriptorType
+                               ? traceProgramDescriptorType->findModifier<MagicTypeModifier>()
+                               : nullptr;
+    auto descriptorIntrinsic =
+        traceProgramDescriptorType
+            ? traceProgramDescriptorType->findModifier<IntrinsicTypeModifier>()
+            : nullptr;
+    SLANG_RELEASE_ASSERT(
+        descriptorParameter && descriptorMagic && descriptorIntrinsic &&
+        descriptorMagic->magicNodeType.getTag() == ASTNodeType::TraceProgramDescriptorType &&
+        descriptorIntrinsic->irOp == kIROp_TraceProgramDescriptorType &&
+        descriptorIntrinsic->irOperands.getCount() == 0 &&
+        descriptorGeneric->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>().getCount() ==
+            1 &&
+        _findConformanceConstraint(
+            descriptorGeneric,
+            DeclRefType::create(module->getASTBuilder(), makeDeclRef(descriptorParameter)),
+            traceProgramSchemaInterface));
+
     auto accelerationStructureRequirement = getAssociatedTypeRequirement(
         StructuralRayTracingAssociatedTypeKind::TraceAccelerationStructure);
     auto motionRequirement =

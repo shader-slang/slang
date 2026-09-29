@@ -530,6 +530,12 @@ struct TypeTagContext
             return TypeTag((int(tags) & ~int(TypeTag::Unsized)) | int(TypeTag::Opaque));
         }
 
+        // The descriptor declaration has no fields by design, but it is a host-bound handle rather
+        // than an ordinary empty value. Classifying its dedicated AST type as opaque prevents generic
+        // layout and initialization checks from treating it like a fieldless user struct.
+        if (as<TraceProgramDescriptorType>(type))
+            return TypeTag::Opaque;
+
         // The compiler's resource type classes describe opaque values directly. Their builtin
         // declarations do not describe the fields that a compiled resource value would store.
         if (as<UntypedBufferResourceType>(type))

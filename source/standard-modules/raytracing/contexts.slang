@@ -9,10 +9,8 @@ namespace rt
 /// this common traversal context.
 public interface ITraceContext
 {
-    associatedtype AccelerationStructure;
-    __constraint AccelerationStructure : IAccelerationStructure;
-    associatedtype Motion;
-    __constraint Motion : IRayMotion;
+    associatedtype AccelerationStructure : IAccelerationStructure;
+    associatedtype Motion : IRayMotion;
 }
 
 /// Describes state common to every executable structural ray-tracing stage.
@@ -22,8 +20,7 @@ public interface ITraceContext
 /// Different stage contexts may share the same `TraceContext` while using different records.
 public interface IStageContext
 {
-    associatedtype TraceContext;
-    __constraint TraceContext : ITraceContext;
+    associatedtype TraceContext : ITraceContext;
     associatedtype Record;
 }
 
@@ -39,8 +36,7 @@ public interface IPayloadContext : IStageContext
 /// Describes the primitive and payload contract shared by every stage in one hit group.
 public interface IHitContext : IPayloadContext
 {
-    associatedtype Primitive;
-    __constraint Primitive : IIntersectionPrimitive;
+    associatedtype Primitive : IIntersectionPrimitive;
 }
 
 /// Describes the data and record types used by a callable stage.

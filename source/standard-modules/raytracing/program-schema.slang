@@ -9,14 +9,10 @@ namespace rt
 /// may place the same group in any number of records and provide different `Context.Record` values.
 public interface IHitGroup
 {
-    associatedtype Context;
-    __constraint Context : IHitContext;
-    associatedtype ClosestHit;
-    __constraint ClosestHit : IClosestHitShader;
-    associatedtype AnyHit;
-    __constraint AnyHit : IAnyHitShader;
-    associatedtype Intersection;
-    __constraint Intersection : IIntersectionStage;
+    associatedtype Context : IHitContext;
+    associatedtype ClosestHit : IClosestHitShader;
+    associatedtype AnyHit : IAnyHitShader;
+    associatedtype Intersection : IIntersectionStage;
     __constraint ClosestHit.Context == Context;
     __constraint AnyHit.Context == Context;
     __constraint Intersection.Context == Context;
@@ -128,14 +124,10 @@ public struct NoCallableShaders : ICallableShaderList
 /// identifiers or link-specific function indices that the host writes into runtime records.
 public interface ITraceProgramSchema
 {
-    associatedtype TraceContext;
-    __constraint TraceContext : ITraceContext;
-    associatedtype HitGroups;
-    __constraint HitGroups : IHitGroupList;
-    associatedtype MissShaders;
-    __constraint MissShaders : IMissShaderList;
-    associatedtype CallableShaders;
-    __constraint CallableShaders : ICallableShaderList;
+    associatedtype TraceContext : ITraceContext;
+    associatedtype HitGroups : IHitGroupList;
+    associatedtype MissShaders : IMissShaderList;
+    associatedtype CallableShaders : ICallableShaderList;
 }
 
 } // namespace rt

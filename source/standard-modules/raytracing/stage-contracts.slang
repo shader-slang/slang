@@ -11,8 +11,7 @@ namespace rt
 [require(structural_raytracing_closesthit)]
 public interface IClosestHitShader
 {
-    associatedtype Context;
-    __constraint Context : IHitContext;
+    associatedtype Context : IHitContext;
     void invoke(in ClosestHitInput<Context> input);
 }
 
@@ -24,8 +23,7 @@ public interface IClosestHitShader
 [require(structural_raytracing_anyhit)]
 public interface IAnyHitShader
 {
-    associatedtype Context;
-    __constraint Context : IHitContext;
+    associatedtype Context : IHitContext;
     void invoke(in AnyHitInput<Context> input);
 }
 
@@ -37,8 +35,7 @@ public interface IAnyHitShader
 [sealed]
 public interface IIntersectionStage
 {
-    associatedtype Context;
-    __constraint Context : IHitContext;
+    associatedtype Context : IHitContext;
 }
 
 /// Represents the source implementation of a procedural-primitive intersection stage.
@@ -59,8 +56,7 @@ public interface IIntersectionShader : IIntersectionStage
 [require(structural_raytracing_miss)]
 public interface IMissShader
 {
-    associatedtype Context;
-    __constraint Context : IPayloadContext;
+    associatedtype Context : IPayloadContext;
     void invoke(in MissInput<Context> input);
 }
 
@@ -71,8 +67,7 @@ public interface IMissShader
 [require(structural_raytracing_callable)]
 public interface ICallableShader
 {
-    associatedtype Context;
-    __constraint Context : ICallableContext;
+    associatedtype Context : ICallableContext;
     void invoke(in CallableInput<Context> input);
 }
 

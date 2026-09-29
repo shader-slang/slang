@@ -735,6 +735,19 @@ local insts = {
 				},
 			},
 			{
+				TraceProgramDescriptor = {
+					-- An opaque structural ray-tracing program descriptor. Its operands retain the
+					-- schema type argument and conformance witness without exposing any
+					-- target-specific resource representation in source or IR.
+					struct_name = "TraceProgramDescriptorType",
+					operands = {
+						{ "schema", "IRType" },
+						{ "schemaWitness" },
+					},
+					hoistable = true,
+				},
+			},
+			{
 				struct = {
 					-- A user-defined structure declaration at the IR level.
 					-- Unlike in the AST where there is a distinction between
