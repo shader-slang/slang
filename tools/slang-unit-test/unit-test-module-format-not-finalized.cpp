@@ -48,7 +48,8 @@ ModuleCompileResult compileModuleContainer(const char* outputPath, bool commandL
 
     ModuleCompileResult result;
     result.compiled = SLANG_SUCCEEDED(processResult) && SLANG_SUCCEEDED(compileResult);
-    result.foundModuleFormatDiagnostic = diagnostics && strstr(diagnostics, "E00088") != nullptr;
+    result.foundModuleFormatDiagnostic =
+        diagnostics && strstr(diagnostics, "warning[E00088]") != nullptr;
 
     spDestroyCompileRequest(request);
     spDestroySession(session);

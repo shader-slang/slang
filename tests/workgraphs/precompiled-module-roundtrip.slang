@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=PRODUCE): -o tests/workgraphs/precompiled-module-roundtrip.slang-module -experimental-feature
-//PRODUCE: note[E00088]
+//PRODUCE: warning[E00088]
 //TEST:SIMPLE(filecheck=CHK): -target hlsl -stage node -entry dispatchMain -profile lib_6_8 -experimental-feature tests/workgraphs/precompiled-module-roundtrip.slang-module
 import experimental.workgraph;
 
