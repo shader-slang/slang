@@ -2034,6 +2034,30 @@ public:
     GlobalValueNumberingMap& getGlobalValueNumberingMap() { return m_globalValueNumberingMap; }
     Dictionary<IRInst*, IRInst*>& getInstReplacementMap() { return m_instReplacementMap; }
 
+    /// Return the instruction that `inst` has been superseded by, or `inst`
+    /// itself when it has not been superseded.
+    ///
+    /// A hoistable instruction that is still alive but has been deduplicated
+    /// away gets an entry in the replacement map, so every operand handed to
+    /// the builder has to be resolved through that map before it can be used
+    /// to form or look up an instruction. That makes this one of the most
+    /// frequently executed lookups in the compiler: it runs once per operand
+    /// of every instruction created.
+    ///
+    /// The map is empty except while a deduplication-invalidating edit is in
+    /// flight, which is why the emptiness test is worth spelling out here
+    /// rather than leaving it to the backing hash map: it turns a hash plus a
+    /// probe into a predictable load and branch in the overwhelmingly common
+    /// case, and not every hash map implementation we can be built against
+    /// short-circuits an empty lookup.
+    IRInst* getReplacement(IRInst* inst)
+    {
+        if (m_instReplacementMap.getCount() == 0)
+            return inst;
+        m_instReplacementMap.tryGetValue(inst, inst);
+        return inst;
+    }
+
     void _addGlobalNumberingEntry(IRInst* inst)
     {
         m_globalValueNumberingMap.add(IRInstKey{inst}, inst);
@@ -2042,12 +2066,17 @@ public:
     }
     void _removeGlobalNumberingEntry(IRInst* inst)
     {
+        // Build the key once: constructing an `IRInstKey` hashes the
+        // instruction's opcode, type and every one of its operands, so
+        // spelling `IRInstKey{inst}` twice would do that O(operandCount) work
+        // twice for a single removal.
+        const IRInstKey key{inst};
         IRInst* value = nullptr;
-        if (m_globalValueNumberingMap.tryGetValue(IRInstKey{inst}, value))
+        if (m_globalValueNumberingMap.tryGetValue(key, value))
         {
             if (value == inst)
             {
-                m_globalValueNumberingMap.remove(IRInstKey{inst});
+                m_globalValueNumberingMap.remove(key);
             }
         }
     }
