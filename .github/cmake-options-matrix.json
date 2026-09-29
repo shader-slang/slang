@@ -27,6 +27,12 @@
     },
     { "option": "SLANG_ENABLE_EXAMPLES" },
     { "option": "SLANG_ENABLE_REPLAYER" },
+    {
+      "option": "SLANG_USE_SYSTEM_LUA",
+      "value": "ON",
+      "macos_only": "true",
+      "brew_packages": "lua pkgconf"
+    },
     { "option": "SLANG_ENABLE_RELEASE_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_SPLIT_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_VALIDATION_IR" },

@@ -35,11 +35,6 @@ on:
         required: false
         type: boolean
         default: false
-      verify-system-lua:
-        description: "Build slang-fiddle with Homebrew Lua and run source generation on macOS"
-        required: false
-        type: boolean
-        default: false
       artifact-name-suffix:
         description: >-
           Optional suffix appended to the build/tests artifact names, so a
@@ -272,23 +267,6 @@ jobs:
             echo "📊 ccache statistics (post-build):"
             ccache --show-stats || true
           fi
-
-      - name: Verify system Lua compiler source generation
-        if: inputs.verify-system-lua
-        run: |
-          brew install lua pkgconf
-          cmake -S . -B build-system-lua -G "Ninja Multi-Config" \
-            -DSLANG_USE_SYSTEM_LUA=ON \
-            -DSLANG_ENABLE_DXIL=OFF \
-            -DSLANG_ENABLE_GFX=OFF \
-            -DSLANG_ENABLE_SLANG_RHI=OFF \
-            -DSLANG_ENABLE_TESTS=OFF \
-            -DSLANG_ENABLE_EXAMPLES=OFF \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-            -DCMAKE_DISABLE_FIND_PACKAGE_Lua=TRUE \
-            -DSLANG_USE_SCCACHE=ON \
-            -DSLANG_ENABLE_PCH=OFF
-          cmake --build build-system-lua --config Release --target slang-fiddle-output --parallel 6
 
       - name: Verify third-party notices ship in the metadata component
         if: inputs.platform != 'wasm' && runner.os == 'Linux'
