@@ -149,6 +149,11 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
     return true;
 }
 
+// Returns true if `key` is the key of a function-valued backward-derivative requirement:
+// `apply_bwd`, `remat` and the legacy combined `bwd_diff` of `IBackwardDifferentiable`, or the
+// propagate function `IBwdCallable.operator()`. These mirror the op families that
+// `isBackwardDerivativeValue` recognizes (primal, remat, legacy combined and propagate); the
+// context types and the `BwdCallable : IBwdCallable` witness are not functions and are excluded.
 static bool isBackwardDerivativeRequirementKey(IRInst* key)
 {
     auto decor = key->findDecoration<IRBuiltinRequirementDecoration>();
@@ -175,15 +180,19 @@ bool isBackwardDerivativeValue(IRInst* inst)
     // `Specialize(BackwardDifferentiate(g), float)` is still recognized.
     inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
 
-    // A backward derivative can also be a requirement of an `IBackwardDifferentiable` witness
-    // rather than a differentiation op: `bwd_diff(fwd_diff(f))` looks up `bwd_diff` on the
-    // conformance synthesized for `fwd_diff(f)`. We recognize those by the requirement's role.
+    // A backward derivative can also be a witness lookup rather than a differentiation op. For a
+    // declared `g`, `bwd_diff(g)` lowers to `LegacyBackwardDifferentiate`, but the
+    // `IBackwardDifferentiable` conformance of `fwd_diff(f)` is a
+    // `SynthesizedBackwardDerivativeWitnessTable` that only the translation pass materializes. Both
+    // `checkAutoDiffUsages` and the translation backstop therefore see `bwd_diff(fwd_diff(f))` and
+    // `__apply(fwd_diff(f))` as a `LookupWitnessMethod`, which we recognize by the requirement's
+    // role.
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
         return isBackwardDerivativeRequirementKey(lookup->getRequirementKey());
 
     switch (inst->getOp())
     {
-    // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
+    // The differentiation ops that yield a backward-derivative function (a `bwd_diff` result),
     // covering the combined form, the primal/remat/propagate split, the legacy (pre-2.0) forms, and
     // the trivial variants. The forward-mode ops (`ForwardDifferentiate`,
     // `ForwardDifferentiatePropagate`, `TrivialForwardDifferentiate`) are deliberately excluded,

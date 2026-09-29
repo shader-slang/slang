@@ -9,7 +9,7 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [Differentiable]
@@ -105,7 +105,7 @@ void computeMain()
     outputBuffer[11] = e.d.d;
 
     // `y'.d = dy * x * x + 2 * x * y * dx` at `x = 3, dx = 1, y = 2, dy = 0`. A gradient on the
-    // output tangent gives `(2 * y * dx, 2 * x * y) = (4, 12)` for `(x, dx)` and
+    // output tangent gives `(2 * x * dy + 2 * y * dx, 2 * x * y) = (4, 12)` for `(x, dx)` and
     // `(2 * x * dx, x * x) = (6, 9)` for `(y, dy)`.
     // CHECK-NEXT: {{^}}4.0
     // CHECK-NEXT: {{^}}12.0
@@ -118,4 +118,41 @@ void computeMain()
     outputBuffer[13] = gx.d.d;
     outputBuffer[14] = gy.d.p;
     outputBuffer[15] = gy.d.d;
+
+    // A non-unit tangent `ds = 2` scales the first entry: `(2 * ds, 2 * s) = (4, 6)`.
+    // CHECK-NEXT: {{^}}4.0
+    // CHECK-NEXT: {{^}}6.0
+    var a2 = diffPair(diffPair(3.0, 2.0));
+    bwd_diff(fwd_diff(f))(a2, diffPair(0.0, 1.0));
+    outputBuffer[16] = a2.d.p;
+    outputBuffer[17] = a2.d.d;
+
+    // With `dy = 0.5`, the `dy` term reaches the `x` gradient: at `x = 3, dx = 1, y = 2`, a
+    // gradient on the output tangent gives `(2 * x * dy + 2 * y * dx, 2 * x * y) = (7, 12)` for
+    // `(x, dx)` and `(2 * x * dx, x * x) = (6, 9)` for `(y, dy)`.
+    // CHECK-NEXT: {{^}}7.0
+    // CHECK-NEXT: {{^}}12.0
+    // CHECK-NEXT: {{^}}6.0
+    // CHECK-NEXT: {{^}}9.0
+    var hx = diffPair(diffPair(3.0, 1.0));
+    var hy = diffPair(diffPair(2.0, 0.5), diffPair(0.0, 1.0));
+    bwd_diff(fwd_diff(sqInout))(hx, hy);
+    outputBuffer[18] = hx.d.p;
+    outputBuffer[19] = hx.d.d;
+    outputBuffer[20] = hy.d.p;
+    outputBuffer[21] = hy.d.d;
+
+    // A gradient on the output primal `y' = y * x * x` gives `(2 * x * y, 0) = (12, 0)` for
+    // `(x, dx)` and `(x * x, 0) = (9, 0)` for `(y, dy)`.
+    // CHECK-NEXT: {{^}}12.0
+    // CHECK-NEXT: {{^}}0.0
+    // CHECK-NEXT: {{^}}9.0
+    // CHECK-NEXT: {{^}}0.0
+    var kx = diffPair(diffPair(3.0, 1.0));
+    var ky = diffPair(diffPair(2.0, 0.5), diffPair(1.0, 0.0));
+    bwd_diff(fwd_diff(sqInout))(kx, ky);
+    outputBuffer[22] = kx.d.p;
+    outputBuffer[23] = kx.d.d;
+    outputBuffer[24] = ky.d.p;
+    outputBuffer[25] = ky.d.d;
 }
