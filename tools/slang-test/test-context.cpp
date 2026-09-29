@@ -69,8 +69,6 @@ void TestContext::setMaxTestRunnerThreadCount(int count)
     {
         ordinal = 0;
     }
-    // List::setCount leaves pointer elements uninitialized, and a non-null entry means "collect
-    // requirements instead of running the test", so every slot starts out null.
     m_testRequirements.setCount(count);
     for (auto& requirements : m_testRequirements)
     {
