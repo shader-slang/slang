@@ -1179,6 +1179,7 @@ IRInst* getOrCreateBuiltinParamForHullShader(
 
 IRTypeLayout* createPatchConstantFuncResultTypeLayout(
     GLSLLegalizationContext* context,
+    CodeGenContext* codeGenContext,
     IRBuilder& irBuilder,
     IRType* type)
 {
@@ -1188,8 +1189,8 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
         for (auto field : structType->getFields())
         {
             auto fieldType = field->getFieldType();
-            IRTypeLayout* fieldTypeLayout =
-                createPatchConstantFuncResultTypeLayout(context, irBuilder, fieldType);
+            IRTypeLayout* fieldTypeLayout = createPatchConstantFuncResultTypeLayout(
+                context, codeGenContext, irBuilder, fieldType);
             IRVarLayout::Builder fieldVarLayoutBuilder(&irBuilder, fieldTypeLayout);
             auto decoration = field->getKey()->findDecoration<IRSemanticDecoration>();
             if (decoration && decoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
@@ -1229,9 +1230,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
     else if (auto arrayType = as<IRArrayTypeBase>(type))
     {
         auto elementTypeLayout = createPatchConstantFuncResultTypeLayout(
-            context,
-            irBuilder,
-            arrayType->getElementType());
+            context, codeGenContext, irBuilder, arrayType->getElementType());
         IRArrayTypeLayout::Builder builder(&irBuilder, elementTypeLayout);
         if (auto sizeAttr =
                 elementTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
@@ -1240,6 +1239,23 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
                 LayoutResourceKind::VaryingOutput,
                 sizeAttr->getSize() * getIntVal(arrayType->getElementCount()));
         }
+        return builder.build();
+    }
+    else if (auto matrixType = as<IRMatrixType>(type))
+    {
+        // A matrix patch output must reserve the same location count the
+        // domain-side varying input layout gives it (the storage-major axis,
+        // see `getSimpleVaryingParameterTypeLayout`).
+        auto rowCount = getIntVal(matrixType->getRowCount());
+        auto columnCount = getIntVal(matrixType->getColumnCount());
+        auto matrixLayoutMode =
+            codeGenContext->getTargetProgram()->getOptionSet().getMatrixLayoutMode();
+        auto locationCount =
+            matrixLayoutMode == kMatrixLayoutMode_ColumnMajor ? columnCount : rowCount;
+        IRTypeLayout::Builder builder(&irBuilder);
+        builder.addResourceUsage(
+            LayoutResourceKind::VaryingOutput,
+            LayoutSize::fromRaw(locationCount));
         return builder.build();
     }
     else
@@ -1380,8 +1396,11 @@ void invokePatchConstantFuncInHullShader(
     builder.setInsertBefore(constantFunc->getFirstBlock()->getFirstOrdinaryInst());
 
     auto constantOutputType = constantFunc->getResultType();
-    IRTypeLayout* constantOutputLayout =
-        createPatchConstantFuncResultTypeLayout(context, builder, constantOutputType);
+    IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(
+        context,
+        codeGenContext,
+        builder,
+        constantOutputType);
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
