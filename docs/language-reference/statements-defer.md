@@ -13,31 +13,23 @@ A `defer` statement schedules the enclosed statement (*`deferred-stmt`*) to be e
 the enclosing scope. The enclosed statement is said to be _deferred_. Multiple deferred statements are
 executed in _last-in, first-out_ (LIFO) order.
 
-A `defer` statement may appear only within the body of a [function](declarations-functions.md).
+A `defer` statement may appear only within the body of a [function](declarations-functions.md) or a
+[lambda expression](expressions-lambda.md).
 
-The enclosing scope is the innermost scope containing the `defer` statement. If the `defer` statement is
-itself the sub-statement of another statement, for example the body of an [`if` statement](statements-if.md)
-written without a [block statement](statements-block.md), that sub-statement is the enclosing scope, and the
-deferred statement is executed at the end of it.
+The enclosing scope of a `defer` statement is the innermost enclosing
+[block statement](statements-block.md). If the `defer` statement is itself a sub-statement of another
+statement without an intervening block, for example the body of an [`if` statement](statements-if.md) or a
+[loop](statements-loop.md), that sub-statement is the enclosing scope. Note that the enclosing scope
+definition is different from the usual [scope](basics-scope.md) definition.
 
-A deferred statement is scheduled when the `defer` statement itself is executed. If control never reaches
-the `defer` statement, nothing is scheduled. If the `defer` statement is executed more than once, for example
-in a loop body, each execution schedules a separate execution of the enclosed statement.
+A deferred statement is scheduled when the `defer` statement itself is executed. Local variables that are
+declared before the `defer` statement are available to the enclosed statement.
 
-Local variables that are declared before the `defer` statement are available to the enclosed statement.
+The enclosed statement is evaluated in its entirety at the time it is executed, that is, on exit from the
+enclosing scope. No part of it is evaluated when it is scheduled by the `defer` statement.
 
-The enclosed statement is evaluated in its entirety at the time it is executed, that is, on scope exit. No
-part of it is evaluated when it is scheduled by the `defer` statement.
-
-The enclosed statement forms a nested scope, limiting the scope of any declarations within it to that
-statement.
-
-A `defer` statement may appear within a deferred statement. The nested deferred statement is scheduled when
-the enclosing deferred statement is executed, and it is executed when the enclosing deferred statement exits
-its scope.
-
-When the enclosing function returns, deferred statements are executed after the return value expression has
-been evaluated.
+When the enclosing function or lambda expression returns, deferred statements are executed after the return
+value expression has been evaluated.
 
 If a deferred statement is scheduled within the `do` body of a
 [`do-catch` statement](statements-do-catch.md) and an error object is caught, the deferred statement is
@@ -46,8 +38,8 @@ that is still active when the error object is thrown. The pending deferred state
 executed after the `catch` body, in LIFO order across the scopes. A nested scope that has already exited
 normally is unaffected, because its deferred statements were executed at that exit.
 
-If an error object propagates out of the enclosing function, the deferred statements of the exited scopes are
-executed before the error object propagates to the caller.
+If an error object propagates out of the enclosing function or lambda expression, the deferred statements of
+the exited scopes are executed before the error object propagates to the caller.
 
 A [`discard` statement](statements-discard.md) does not trigger the execution of deferred statements before
 the thread is disabled. As a result, pending deferred statements have no effect.
@@ -63,6 +55,30 @@ its matching catch handler within that same deferred statement.
 > 📝 **Remark 2:** Writing a `defer` statement as sub-statement of `if` is rarely useful, because the deferred
 > statement is then executed immediately after being scheduled. Use a block statement when the intent is to
 > defer to the end of the surrounding block.
+
+> 📝 **Remark 3:** If control never reaches the `defer` statement, nothing is scheduled. If the `defer`
+> statement is executed more than once, for example in a loop body, each execution schedules a separate
+> execution of the enclosed statement.
+
+> 📝 **Remark 4:** A single `defer` statement never has more than one pending scheduled execution per function
+> invocation. See the first example below.
+
+> 📝 **Remark 5:** `defer` statements do not usually have an additional cost over regular statements. In this
+> context, scheduling refers to the Slang compiler reordering the execution of the statements, essentially
+> moving the execution of deferred statements to after all other statements within the enclosing scope. The
+> exceptions are:
+> - When the enclosing scope has multiple exits (e.g., `break`, `continue`, `return`), the deferred statements
+>   may be replicated at each exit.
+> - When a `defer` statement is in the `do` body of a `do-catch` statement, the compiler may replicate
+>   statements and add runtime conditions for execution.
+
+> ⚠️ **Warning 1:** The enclosed statement does not currently form a nested [scope](basics-scope.md), so
+> declarations within it are visible after the `defer` statement. This is tracked by GitHub issue
+> [#12266](https://github.com/shader-slang/slang/issues/12266).
+
+> ⚠️ **Warning 2:** A `defer` statement may appear as a deferred statement. However, since there is little
+> reason to ever use a `defer defer` construct, it is possible that it will be diagnosed as an error in a
+> future Slang version.
 
 ## Examples
 
