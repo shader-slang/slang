@@ -817,8 +817,9 @@ public:
                     // An atomic writes its value operands into memory that holds no
                     // derivative, so a derivative carried by one of them is lost unless the
                     // atomic is marked `no_diff`. Operand 0 is the destination address; the
-                    // others are values and memory-order constants, and constants never carry
-                    // a derivative.
+                    // others are values and memory-order operands. Checking every one is safe
+                    // because a memory order is an integer constant, which is never in
+                    // `carryNonTrivialDiffSet`.
                     if (atomicInst->findDecoration<IRTreatCallAsDifferentiableDecoration>())
                         continue;
                     for (UInt i = 1; i < atomicInst->getOperandCount(); i++)
@@ -844,9 +845,9 @@ public:
                         if (shouldTreatCallAsDifferentiable(callInst))
                             continue;
                         auto atomicFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
-                        if (!atomicFuncType ||
-                            atomicFuncType->getParamCount() != callInst->getArgCount())
-                            continue;
+                        SLANG_RELEASE_ASSERT(
+                            atomicFuncType &&
+                            atomicFuncType->getParamCount() == callInst->getArgCount());
                         for (UInt a = 0; a < callInst->getArgCount(); a++)
                         {
                             auto direction = std::get<0>(

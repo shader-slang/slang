@@ -853,13 +853,20 @@ struct TryClauseEnvironment
 // differentiability checker must conservatively assume can carry a derivative. Instead, receive
 // the atomic result in a temporary and copy back a detached value. SSA can then propagate that
 // value through the caller, without treating later assignments to `original` as derivative-free.
-static void detachAtomicOutArguments(IRBuilder* builder, IRCall* call)
+//
+// Only the body of a differentiable function is checked for lost derivatives, so we rewrite only
+// there. Elsewhere the call keeps its direct `out` argument, and the emitted code, including the
+// name of the variable that receives the original value, is unchanged.
+static void detachAtomicOutArguments(IRGenContext* context, IRCall* call)
 {
+    if (!context->funcDecl || !context->funcDecl->findModifier<DifferentiableAttribute>())
+        return;
     if (getBuiltinFuncEnum(call->getCallee()) != KnownBuiltinDeclName::AtomicOperation)
         return;
 
-    auto funcType = cast<IRFuncType>(call->getCallee()->getFullType());
-    SLANG_ASSERT(funcType->getParamCount() == call->getArgCount());
+    auto builder = context->irBuilder;
+    auto funcType = as<IRFuncType>(call->getCallee()->getFullType());
+    SLANG_RELEASE_ASSERT(funcType && funcType->getParamCount() == call->getArgCount());
     for (UInt i = 0; i < call->getArgCount(); i++)
     {
         auto [direction, valueType] = splitParameterDirectionAndType(funcType->getParamType(i));
@@ -916,7 +923,7 @@ LoweredValInfo emitCallToVal(
                 {
                     auto call =
                         builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args);
-                    detachAtomicOutArguments(builder, call);
+                    detachAtomicOutArguments(context, call);
                     return LoweredValInfo::simple(call);
                 }
             }
