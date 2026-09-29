@@ -1,3 +1,4 @@
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O0
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O1
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly -Xslang -O1
 
@@ -5,8 +6,8 @@
 //
 // A local array of structs, each carrying a logical-storage-class pointer, is indexed by a
 // constant and written through the pointer. Type legalization turns the array of structs into an
-// array of the split-out pointers, so no composite carries a pointer. The check runs at -O1 so the
-// downstream optimizer runs (slang-test compiles at -O0 unless a level is given).
+// array of the split-out pointers, so no composite carries a pointer. The checks run at -O0 and at
+// -O1, where the SPIRV-Tools optimizer runs.
 
 struct View<let A : AddressSpace>
 {
@@ -25,8 +26,8 @@ groupshared float gsB[64];
 RWStructuredBuffer<float> outputBuffer;
 
 // CHECK: OpEntryPoint
-// CHECK-NOT: OpCompositeExtract
-// CHECK-NOT: OpCompositeConstruct
+// CHECK-NOT: OpTypeStruct {{.*}}%_ptr_Workgroup
+// CHECK-NOT: OpCompositeExtract %_ptr_Workgroup
 
 [shader("compute")]
 [numthreads(1, 1, 1)]

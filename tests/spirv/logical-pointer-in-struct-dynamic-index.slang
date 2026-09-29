@@ -18,8 +18,8 @@ groupshared float gs[64];
 RWStructuredBuffer<float> outputBuffer;
 
 // CHECK: OpEntryPoint
-// CHECK-NOT: OpCompositeExtract %{{.*}}_ptr_Workgroup
-// CHECK-NOT: OpCompositeConstruct %View
+// CHECK-NOT: OpTypeStruct {{.*}}%_ptr_Workgroup
+// CHECK-NOT: OpCompositeExtract %_ptr_Workgroup
 
 [shader("compute")]
 [numthreads(2, 1, 1)]

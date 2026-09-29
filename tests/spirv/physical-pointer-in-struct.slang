@@ -1,8 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly
 
-// A physical (`PhysicalStorageBuffer`) pointer may be a struct member under SPIR-V logical
-// addressing, so type legalization leaves a struct holding one intact, including as the element
-// type of a structured buffer.
+// A physical (`PhysicalStorageBuffer`) pointer may be a struct member, so type legalization does
+// not treat it as special and leaves a struct holding one intact, including as the element type
+// of a structured buffer.
 
 struct View
 {

@@ -6102,10 +6102,10 @@ err(
 )
 
 err(
-    "logical-pointer-in-shared-memory",
+    "logical-pointer-in-non-local-memory",
     57008,
     "logical pointer in shared or external memory",
-    span { loc = "location", message = "this memory holds a pointer to a logical address space, which SPIR-V only allows in function-local or private variables" }
+    span { loc = "location", message = "this memory holds a pointer in a logical address space, which SPIR-V only allows in function-local or private variables" }
 )
 
 -- GLSL Compatibility (58001-58003)

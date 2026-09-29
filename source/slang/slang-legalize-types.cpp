@@ -167,11 +167,14 @@ bool isLogicalPointerType(IRType* type)
         type = arrayType->getElementType();
 
     auto ptrType = as<IRPtrType>(unwrapAttributedType(type));
-    return ptrType && ptrType->getAddressSpace() != AddressSpace::UserPointer;
+    return ptrType && !isUserPointerType(ptrType);
 }
 
 static bool typeContainsLogicalPointerImpl(IRType* type, HashSet<IRType*>& visited)
 {
+    // A type cannot contain itself by value and we do not follow pointees, so `visited` only
+    // avoids re-walking a type reached along several paths; a revisit can report `false`
+    // because a `true` result returns immediately.
     if (!visited.add(type))
         return false;
 
@@ -196,6 +199,11 @@ bool typeContainsLogicalPointer(IRType* type)
 {
     HashSet<IRType*> visited;
     return typeContainsLogicalPointerImpl(type, visited);
+}
+
+bool doesTargetLegalizeLogicalPointers(TargetRequest* targetReq)
+{
+    return isSPIRV(targetReq->getTarget());
 }
 
 bool isResourceType(IRType* type)

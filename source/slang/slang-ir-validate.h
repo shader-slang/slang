@@ -93,12 +93,12 @@ bool validateStructuredBufferResourceTypes(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
-/// Diagnose logical pointers stored in memory that is shared across invocations or supplied from
-/// outside the shader: structured-buffer elements, parameter-group elements, the pointees of
-/// physical pointers, and `groupshared` variables. SPIR-V only allows a logical pointer in a
-/// function-local or private variable, and type legalization can only split logical pointers out
-/// of those.
-void validateLogicalPointerStorage(IRModule* module, DiagnosticSink* sink);
+/// Diagnose logical pointers held in memory that is shared across invocations or supplied from
+/// outside the shader, where a logical pointer value has no meaning: structured-buffer and
+/// byte-address-buffer contents, parameter-group elements (including the implicit groups that
+/// hold global and entry-point `uniform` parameters), the pointees of pointers into non-local
+/// address spaces, and `groupshared` variables. Returns false if any were diagnosed.
+bool validateLogicalPointerStorage(IRModule* module, DiagnosticSink* sink);
 
 // Process kIROp_AssumeAddress instructions. When validate is true, checks that
 // getRootAddr(addr) is not a function-local variable (kIROp_Var) holding a

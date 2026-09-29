@@ -2050,15 +2050,16 @@ Result linkAndOptimizeIR(
         if (!validateStructuredBufferResourceTypes(irModule, sink, targetRequest))
             return SLANG_FAIL;
 
-        if (isSPIRV(target))
-        {
-            validateLogicalPointerStorage(irModule, sink);
-            if (sink->getErrorCount() != 0)
-                return SLANG_FAIL;
-        }
+        // Resource type legalization below splits logical pointers out of aggregates on these
+        // targets, but it cannot split them out of memory that is shared across invocations or
+        // supplied from outside the shader, so we reject those shapes before it runs.
+        if (doesTargetLegalizeLogicalPointers(targetRequest) &&
+            !validateLogicalPointerStorage(irModule, sink))
+            return SLANG_FAIL;
 
         // Many of our target languages and/or downstream compilers
-        // don't support `struct` types that have resource-type fields.
+        // don't support `struct` types that have resource-type fields
+        // (nor, on SPIR-V, fields holding logical pointers).
         // In order to work around this limitation, we will rewrite the
         // IR so that any structure types with resource-type fields get
         // split into a "tuple" that comprises the ordinary fields (still

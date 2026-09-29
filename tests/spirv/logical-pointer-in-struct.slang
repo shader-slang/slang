@@ -1,4 +1,6 @@
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O0
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O1
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly -Xslang -O1
 
 // Regression test for https://github.com/shader-slang/slang/issues/13206.
@@ -10,8 +12,9 @@
 // the same way it splits out resources, and no `OpCompositeExtract`/`OpCompositeConstruct` carries
 // the pointer.
 //
-// The check runs at -O1 so the downstream SPIRV-Tools optimizer runs (slang-test compiles at -O0
-// unless a level is given).
+// The checks run at -O0, where the unsplit struct would be loaded and its pointer extracted, and
+// at -O1, where the SPIRV-Tools optimizer would rebuild it as a composite. Metal allows a
+// `threadgroup` pointer as a struct member, so there the struct is left intact.
 
 struct View<let A : AddressSpace>
 {
@@ -42,12 +45,17 @@ groupshared float gsA[64];
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// These CHECK-NOT directives are the structural regression guard. The `-vk` COMPARE_COMPUTE
+// No struct type has a `Workgroup` pointer member, so no composite value can carry one. These
+// CHECK-NOT directives are the structural regression guard. The `-vk` COMPARE_COMPUTE
 // additionally checks the runtime result; it is not itself a structural check, since a permissive
 // driver could accept invalid-composite SPIR-V and still return the right value.
 // CHECK: OpEntryPoint
-// CHECK-NOT: OpCompositeExtract
-// CHECK-NOT: OpCompositeConstruct
+// CHECK-NOT: OpTypeStruct {{.*}}%_ptr_Workgroup
+// CHECK-NOT: OpCompositeExtract %_ptr_Workgroup
+
+// METAL: struct View
+// METAL-NEXT: {
+// METAL-NEXT: float threadgroup* data
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
