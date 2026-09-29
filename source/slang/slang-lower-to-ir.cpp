@@ -10164,7 +10164,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     StmtLoweringVisitor visitor;
     visitor.context = context;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
@@ -10179,6 +10179,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
 
         visitor.dispatch(stmt);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -10190,6 +10191,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         context->getSink()->noteInternalErrorLoc(stmt->loc);
         throw;
     }
+#endif
 }
 
 /// Create and return a mutable temporary initialized with `val`
@@ -15222,10 +15224,11 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
     DeclLoweringVisitor visitor;
     visitor.context = context;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         return visitor.dispatch(decl);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -15237,6 +15240,7 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
         context->getSink()->noteInternalErrorLoc(decl->loc);
         throw;
     }
+#endif
 }
 
 // We will probably want to put the
