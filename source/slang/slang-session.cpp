@@ -1996,17 +1996,6 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
                                 .moduleName = getText(moduleName)});
                         }
                     }
-                    if (auto irModule = module->getIRModule())
-                    {
-                        if (irModule->getModuleInst()
-                                ->findDecoration<IRExperimentalModuleDecoration>() &&
-                            !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
-                        {
-                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
-                                .module = getText(moduleName),
-                                .loc = requestingLoc});
-                        }
-                    }
                     return module;
                 }
             }
