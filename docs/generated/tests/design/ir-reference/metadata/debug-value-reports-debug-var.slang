@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debug-info-family
-//META: doc_section_digest=8f873a7e67bec608b74c11364d191e8a9af0122bb32b3a8409d1b57ac5e3d4bd
+//META: doc_section_digest=3616dae83508b4ffad03f364c704966c745acf49fe621c5856bbbe38e68899eb
 //META: purpose=DebugValue reports the current value of a DebugVar, taking the variable declaration in operand 0 and the value in operand 1.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
@@ -15,7 +15,7 @@
 // is what makes the report attributable to a specific variable rather than to
 // a position in the block.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g
 
 uniform RWStructuredBuffer<int> buf;
 

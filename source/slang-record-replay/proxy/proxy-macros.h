@@ -103,7 +103,7 @@ struct BlobOutputTempReleaser
 // The temporary is named `_temp_<arg>` and is zero-initialized. Besides the null-redirect above,
 // call sites may redirect `arg` to `&_temp_<arg>` on a failure path so a subsequent RECORD_OUTPUT
 // serializes a defined 0 rather than dereferencing caller memory the wrapped API left unwritten on
-// failure (see GlobalSessionProxy::getDownstreamCompilerVersion, issue #11865).
+// failure (see GlobalSessionProxy::getDownstreamCompilerPath, issue #11865).
 // A BlobOutputTempReleaser is attached so a blob left in `_temp_<arg>` on the
 // replay path is released at scope exit rather than leaked (issue #11936).
 // Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=84a14c8c06fb62977462b222065d70ef81479ad93846db3d8c9e968027e956d2
+//META: doc_section_digest=687130475ff4ddc8d392b53fafb20c7efbd82d162c595dcf4113ef5f326b0274
 //META: purpose=A builtin `a % b` on `double` operands picks `frem` with result IR type `Double` — the floating-point side of the `%` element-type selection at double precision.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // too (the selection is float-vs-not, not float32-specific); the
 // result type carries `Double`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform double a;
 uniform double b;

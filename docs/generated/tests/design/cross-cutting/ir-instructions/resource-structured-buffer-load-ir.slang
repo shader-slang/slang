@@ -14,7 +14,7 @@
 // the `structuredBufferLoad(base, index)` opcode in the IR dump (the
 // read-only sibling that returns a value rather than a pointer).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform StructuredBuffer<int> in_buf;
 uniform RWStructuredBuffer<int> buf;

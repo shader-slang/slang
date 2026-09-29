@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#lowerimmutablebufferloadforcuda
-//META: doc_section_digest=18d5561ebccbbde662de4ad1843df9fd129444c9391f63438c09ff9b8432a453
+//META: doc_section_digest=031d306ccbb9670357e2a8af6d7e786afcb208ea0c4a357ccf9a309fc8034205
 //META: purpose=kIROp_ArrayType is one of the type ops createLoadFuncForType recognizes, so an array field of an immutable-buffer element gets its own generated slang_ldg helper that issues one __ldg per element and reassembles the FixedArray.
 //META: intent=expansion
 //META: pipeline_stage=emit

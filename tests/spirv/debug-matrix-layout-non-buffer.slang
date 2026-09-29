@@ -1,5 +1,5 @@
-// Validate DebugTypeMatrix column major argument for local and function parameter and return value matrices.
-// Expect matrix layout to always be row-major as the layout modifier only applies to buffer types (ConstantBuffer/RWStructuredBuffer/etc).
+// Validate the DebugTypeMatrix Column Major operand for local, parameter, and return-value
+// matrices. Expect every debug type to use SPIR-V's column-vector form (Column Major = true).
 //
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -matrix-layout-row-major
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -g2 -matrix-layout-column-major
@@ -53,6 +53,6 @@ void main()
 }
 
 
-// Check there is no debug info with the SPIR-V DebugTypeMatrix column-major operand false (meaning all matrices are row-major)
+// Check that every DebugTypeMatrix uses SPIR-V's column-vector form (Column Major = true).
 //CHECK-NOT: OpExtInst %void {{.*}} DebugTypeMatrix {{.*}} %false
 //CHECK: OpExtInst %void {{.*}} DebugTypeMatrix {{.*}} %true

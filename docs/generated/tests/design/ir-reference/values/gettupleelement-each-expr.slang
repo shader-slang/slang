@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#reshape-and-pack-helpers
-//META: doc_section_digest=e496f872e856a7097c0418a390ebd876b5c205231e5aaf9b8d85f80f7da0bd56
+//META: doc_section_digest=eb3718cb6b99fd9929a50fd7f641f3667f267902766e80b2d955d2a9bb78d371
 //META: purpose=An `each` expression over a `Tuple<expand each T>` parameter is the surface that emits `getTupleElement(tuple, index)`; positional member access is not, because it rewrites to `swizzle`.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // operand shape, which is what separates this opcode from the `swizzle`
 // that `t._0` would have produced.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<int> buf;
 

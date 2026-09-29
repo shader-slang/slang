@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
+//META: doc_section_digest=73a8b7d64d9596c97c899fba163502910f89289de9adea3eac1da3e0599596e6
 //META: purpose=An `IndexExpr` lowers to `getElement` when its base is a value and to `getElementPtr` when its base is a pointer — the same subscript syntax picks a different opcode from the base's l-value-ness.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // rather than to the index being dynamic — `idx` is a `uniform` in one case and
 // a literal in the other, and both still produce `getElementPtr`.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<int> outputBuffer;
 uniform int idx;

@@ -19,7 +19,7 @@
 // for this program, which is the half of the claim that a positive CHECK
 // alone cannot establish.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 interface IAdder { int addTo(int v); }
 struct Plus3 : IAdder { int addTo(int v) { return v + 3; } }

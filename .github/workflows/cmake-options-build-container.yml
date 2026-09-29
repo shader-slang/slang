@@ -28,11 +28,28 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           sparse-checkout: .github/cmake-options-matrix.json
           sparse-checkout-cone-mode: false
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/cmake-options-matrix.json
+          sparse-checkout-cone-mode: false
+
       - id: set-matrix
         run: |
           {
@@ -49,7 +66,7 @@ jobs:
       contents: read
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
       # Current callers use GitHub-hosted Ubuntu, where the mounted workspace is
       # writable by UID/GID 1001. The published image has no named non-root user.
       options: --user 1001:1001
@@ -63,7 +80,24 @@ jobs:
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Checkout (attempt 1)
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      - name: Wait before retrying checkout
+        if: steps.checkout.outcome == 'failure'
+        shell: bash
+        run: sleep 30
+
+      - name: Checkout (attempt 2)
+        if: steps.checkout.outcome == 'failure'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
           submodules: "recursive"

@@ -14,7 +14,7 @@
 // `Func(%Pair, Int)` form names the struct's IR identity in the
 // result-type slot — distinct from the basic-scalar smoke test.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Pair { int a; int b; }
 

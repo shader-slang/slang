@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/types.md#differentiation-types
-//META: doc_section_digest=2635ba0f0ff347f7bb12fca7370c73e78fa5912a1c4b89ffa316ebba8b10ecf0
+//META: doc_section_digest=bbedc6a4ad0a74e9d5ddf0e304389aa525dce5b68ac8fffe41ddae96584d54a7
 //META: purpose=A [Differentiable] primal function gets the BackwardDiffIntermediateContextType / BackwardDiffMinimalContextType opcode pair in its IBackwardDifferentiable witness table.
 //META: intent=functional
 //META: pipeline_stage=lower-to-ir
@@ -19,7 +19,7 @@
 // this trio pins the pair, not one entry. One test per row of the attribute
 // table, because the rows are separate checker arms rather than one rule.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 

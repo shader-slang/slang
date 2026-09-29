@@ -2287,7 +2287,7 @@ struct LLVMEmitter
                 // if your scope points to something other than the surrounding
                 // function, seemingly making it useless for inlined functions.
 
-                debugInlinedScope = true;
+                debugInlinedScope = as<IRDebugScope>(inst)->getInlinedAt() != nullptr;
             }
             return nullptr;
 

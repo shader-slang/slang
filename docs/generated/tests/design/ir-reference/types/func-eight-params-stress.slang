@@ -14,7 +14,7 @@
 // `Func(Int, Int, Int, Int, Int, Int, Int, Int, Int)` — one result
 // plus eight params.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

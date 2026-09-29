@@ -917,13 +917,13 @@ VMExtFunction getCastHandler(uint32_t extCode)
         switch (arithExtCode.scalarBitWidth)
         {
         case 0:
-            return castHandler<uint8_t, From, vectorSize>;
+            return castHandler<int8_t, From, vectorSize>;
         case 1:
-            return castHandler<uint16_t, From, vectorSize>;
+            return castHandler<int16_t, From, vectorSize>;
         case 2:
-            return castHandler<uint32_t, From, vectorSize>;
+            return castHandler<int32_t, From, vectorSize>;
         case 3:
-            return castHandler<uint64_t, From, vectorSize>;
+            return castHandler<int64_t, From, vectorSize>;
         }
     case kSlangByteCodeScalarTypeUnsignedInt:
         switch (arithExtCode.scalarBitWidth)
@@ -963,13 +963,13 @@ VMExtFunction getCastHandler(uint32_t extCode)
         switch (arithExtCode.scalarBitWidth)
         {
         case 0:
-            return getCastHandler<uint8_t, vectorSize>(extCode);
+            return getCastHandler<int8_t, vectorSize>(extCode);
         case 1:
-            return getCastHandler<uint16_t, vectorSize>(extCode);
+            return getCastHandler<int16_t, vectorSize>(extCode);
         case 2:
-            return getCastHandler<uint32_t, vectorSize>(extCode);
+            return getCastHandler<int32_t, vectorSize>(extCode);
         case 3:
-            return getCastHandler<uint64_t, vectorSize>(extCode);
+            return getCastHandler<int64_t, vectorSize>(extCode);
         }
     case kSlangByteCodeScalarTypeUnsignedInt:
         switch (arithExtCode.scalarBitWidth)

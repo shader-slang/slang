@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#tuples-packs-and-target-tuples
-//META: doc_section_digest=5dd886c6a7091235bb66306bec8f28f82567d9db3e4761919dd9f9bc5d6b0b8c
+//META: doc_section_digest=340a6086a58d3b4b09f103090fa05f6f3ae19060b59ae154ea1dba8c258d6a25
 //META: purpose=Calling a variadic generic produces a value of IR type TypePack(types...) holding one operand per pack element.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // makeValuePack, so the arity of the call site is what determines the
 // operand count of the pack type.
 
-//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o /dev/null
+//TEST:SIMPLE(filecheck=IR):-target hlsl -stage compute -entry main -dump-ir -o -
 
 RWStructuredBuffer<int> outputBuffer;
 

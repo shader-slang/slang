@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#forward-declared-pointer-fixup-phase-d-step-12
-//META: doc_section_digest=5b141f6ca8c23bfe722b54152c20598e6273446b722909669c0514f8c69cbc06
+//META: doc_section_digest=4e0707900992f846340a29eb7812a0a3124ac83e78443467070d3e1993a5936b
 //META: purpose=A struct that contains itself is rejected with E41001, so the SPIR-V pointer type graph the forward-pointer fixup loop drains is always finite.
 //META: intent=negative
 //META: pipeline_stage=check
