@@ -5,6 +5,7 @@
 // so only combined texture types may be lowered to a `{texture, sampler}` struct.
 
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=MTLLIB): -target metallib -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CPP): -target cpp -stage compute -entry computeMain
 
 // MTL-NOT: Texture2D_0
@@ -16,6 +17,8 @@
 // MTL-SAME: array<texture2d<float, access::sample>, int(2)> c_texture_1
 // MTL-SAME: array<sampler, int(2)> c_sampler_1
 // MTL-NOT: Texture2D_0
+
+// MTLLIB: define void @computeMain
 
 // CPP-NOT: Texture2D_0
 // CPP: struct GlobalParams_0
