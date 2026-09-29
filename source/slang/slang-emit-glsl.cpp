@@ -3990,6 +3990,15 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             _requireGLSLExtension(toSlice("GL_EXT_fragment_shader_barycentric"));
             prefix = toSlice("pervertex");
         }
+        else if (as<IRGLSLPatchDecoration>(decoration))
+        {
+            prefix = toSlice("patch");
+            // `patch` is a core GLSL keyword, no need for suffix like EXT
+            postfix = toSlice("");
+            // Unlike the payload branches below, no `layout(location = ...)` here: a patch
+            // variable is an ordinary varying, so its location comes from the normal varying
+            // layout path (`emitLayoutQualifiersImpl`), and emitting one here would duplicate it.
+        }
         else
         {
             IRIntegerValue locationValue = -1;
