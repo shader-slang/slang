@@ -22605,9 +22605,8 @@ void diagnoseMissingCapabilityProvenance(
         {
             for (auto& i : referencedDecl->capabilityRequirementProvenance)
             {
-                if (checkedDecls.contains(i.referencedNode))
+                if (!checkedDecls.add(i.referencedNode))
                     continue;
-                checkedDecls.add(i.referencedNode);
                 auto innerReferencedDecl = as<Decl>(i.referencedNode);
                 if (!(innerReferencedDecl &&
                       CapabilitySet{innerReferencedDecl->inferredCapabilityRequirements}.implies(

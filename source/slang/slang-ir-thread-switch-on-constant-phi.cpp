@@ -367,9 +367,8 @@ static bool tryPlanSwitchThreading(IRSwitch* switchInst, SwitchThreadingPlan& pl
                     return false;
                 // A repeated constant would map two arms to one case block, which
                 // then could not stay single-entry after threading.
-                if (seenConstants.contains(constArg->getValue()))
+                if (!seenConstants.add(constArg->getValue()))
                     return false;
-                seenConstants.add(constArg->getValue());
 
                 if (!isThreadableCaseBlock(caseBlock, mergeBlock, switchInst))
                     return false;

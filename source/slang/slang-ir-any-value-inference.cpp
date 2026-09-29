@@ -89,10 +89,8 @@ void _sortTopologically(
     List<IRInterfaceType*>& sortedInterfaceTypes,
     const Func<HashSet<IRInterfaceType*>, IRInterfaceType*>& getDependencies)
 {
-    if (visited.contains(interfaceType))
+    if (!visited.add(interfaceType))
         return;
-
-    visited.add(interfaceType);
 
     for (auto dependency : getDependencies(interfaceType))
     {

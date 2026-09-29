@@ -2391,9 +2391,8 @@ private:
         // Values can share substructure or contain cycles through canonical
         // nodes. The visited set makes the walk robust and keeps one complex
         // dependent value from expanding exponentially.
-        if (!val || ioVisitedVals.contains(val))
+        if (!val || !ioVisitedVals.add(val))
             return;
-        ioVisitedVals.add(val);
 
         // The dependency protocol is local to decl-ref nodes. A `DeclRefType`,
         // `DeclRefIntVal`, or `DeclaredSubtypeWitness` carries its decl-ref as a

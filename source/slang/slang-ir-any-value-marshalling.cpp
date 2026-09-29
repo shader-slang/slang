@@ -59,11 +59,10 @@ struct AnyValueMarshallingContext
                 return;
         }
 
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     // Stores information about generated `AnyValue` struct types.

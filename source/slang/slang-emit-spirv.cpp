@@ -1430,8 +1430,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         key.instWords.addRange(ourOperands);
         key.extraKeyData = std::move(extraKeyData);
 
-        // If we have seen this before, return the memoized instruction
-        if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
+        // Look the key up and, on a miss, reserve its slot in the same probe.
+        // The instruction cannot be built before the lookup, because building
+        // it mutates the emitter's state, so the slot is reserved empty here
+        // and filled in below. Holding `memoized` across that is sound because
+        // nothing between here and the assignment inserts into
+        // `m_memoizedSpvInsts`: `InstConstructScope` only allocates the
+        // instruction and registers it in `m_mapIRInstToSpvInst`.
+        auto [memoized, inserted] = m_memoizedSpvInsts.tryEmplace(std::move(key), nullptr);
+        if (!inserted)
         {
             // There could be another different slang IR inst that translates to
             // the same spir-v inst.
@@ -1447,7 +1454,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, we can construct our instruction and record the result
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        m_memoizedSpvInsts[key] = spvInst;
+        *memoized = spvInst;
 
         // Emit our operands, this time with the resultId too
         emitOperand(resultId);
@@ -1478,8 +1485,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         key.instWords.add(opcode);
         key.instWords.addRange(ourOperands);
 
-        // If we have seen this before, return the memoized instruction
-        if (SpvInst** memoized = m_memoizedSpvInsts.tryGetValue(key))
+        // Look the key up and, on a miss, reserve its slot in the same probe;
+        // see the matching comment in emitInstMemoizedCustomOperandFunc for why
+        // holding the returned pointer across the construction below is sound.
+        auto [memoized, inserted] = m_memoizedSpvInsts.tryEmplace(std::move(key), nullptr);
+        if (!inserted)
         {
             // Different Slang IR instructions can produce the same no-result
             // SPIR-V instruction, so keep the later IR instruction mapped to
@@ -1492,7 +1502,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Otherwise, construct our instruction and record it in the memoization table.
         InstConstructScope scopeInst(this, opcode, irInst);
         SpvInst* spvInst = scopeInst;
-        m_memoizedSpvInsts[key] = spvInst;
+        *memoized = spvInst;
 
         // Replay operands captured by the memoize scope into the live instruction.
         m_operandStack.addRange(ourOperands);
@@ -10281,10 +10291,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         TypeNeedsStorageFlags& found,
         HashSet<IRType*>& visited)
     {
-        if (visited.contains(type))
+        if (!visited.add(type))
             return false; // Cycle detected, break recursion
-
-        visited.add(type);
 
         switch (type->getOp())
         {

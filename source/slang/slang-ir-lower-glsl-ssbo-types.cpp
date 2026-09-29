@@ -24,10 +24,9 @@ static void overAllInsts(IRModule* module, F f)
 
         for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
         {
-            if (workListSet.contains(child))
+            if (!workListSet.add(child))
                 continue;
             workList.add(child);
-            workListSet.add(child);
         }
     }
 }

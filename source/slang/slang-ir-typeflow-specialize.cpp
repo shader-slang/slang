@@ -1777,10 +1777,8 @@ struct TypeFlowSpecializationContext
         if (!resultType || isConcreteType(resultType))
             return;
 
-        if (diagnosedBitCasts.contains(inst))
+        if (!diagnosedBitCasts.add(inst))
             return;
-
-        diagnosedBitCasts.add(inst);
         sink->diagnose(Diagnostics::BitCastToNonConcreteType{.location = inst->sourceLoc});
     }
 
@@ -2064,9 +2062,8 @@ struct TypeFlowSpecializationContext
                              paramDirection.kind == ParameterDirectionInfo::Kind::BorrowIn) &&
                             typeIncludesDynamicDispatch(paramType))
                         {
-                            if (!diagnosedRefParams.contains(param))
+                            if (diagnosedRefParams.add(param))
                             {
-                                diagnosedRefParams.add(param);
                                 sink->diagnose(
                                     Diagnostics::RefParamWithInterfaceTypeInDynamicDispatch{
                                         .paramKind =

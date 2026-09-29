@@ -191,9 +191,8 @@ static void collectStoredVarsInCase(
         if (block == breakLabel || block == nextCaseLabel)
             continue;
 
-        if (visited.contains(block))
+        if (!visited.add(block))
             continue;
-        visited.add(block);
 
         // Scan instructions for stores to IRVar
         for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
@@ -244,9 +243,8 @@ static void collectLoadedVarsInCase(
         if (block == breakLabel)
             continue;
 
-        if (visited.contains(block))
+        if (!visited.add(block))
             continue;
-        visited.add(block);
 
         // Scan instructions for loads from IRVar
         for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
@@ -298,9 +296,8 @@ static IRBlock* findFallThroughTarget(
         if (block == breakLabel)
             continue;
 
-        if (visited.contains(block))
+        if (!visited.add(block))
             continue;
-        visited.add(block);
 
         // If we reached another case label (not the starting block), that's the fall-through target
         if (block != startBlock && allCaseLabels.contains(block))
@@ -386,16 +383,14 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
         for (UInt i = 0; i < caseCount; i++)
         {
             auto label = switchInst->getCaseLabel(i);
-            if (!allCaseLabels.contains(label))
+            if (allCaseLabels.add(label))
             {
-                allCaseLabels.add(label);
                 caseLabels.add(label);
             }
         }
         // Add default if it's not the break label
-        if (defaultLabel != breakLabel && !allCaseLabels.contains(defaultLabel))
+        if (defaultLabel != breakLabel && allCaseLabels.add(defaultLabel))
         {
-            allCaseLabels.add(defaultLabel);
             caseLabels.add(defaultLabel);
         }
 
@@ -439,9 +434,8 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
                 auto targetLabel = targetsToProcess.getLast();
                 targetsToProcess.removeLast();
 
-                if (processedTargets.contains(targetLabel))
+                if (!processedTargets.add(targetLabel))
                     continue;
-                processedTargets.add(targetLabel);
 
                 // Collect loads in this target
                 HashSet<IRBlock*> visitedForLoad;
