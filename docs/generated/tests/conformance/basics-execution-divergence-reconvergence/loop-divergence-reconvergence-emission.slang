@@ -53,7 +53,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK_METAL: for(;;)
 // CHECK_METAL: break
 
-// WGSL: for-loop lowered to its native `loop` statement with a break.
+// WGSL: for-loop lowered to a top-test infinite loop with a break; WGSL
+// spells the header `loop`.
 // CHECK_WGSL: {{^ *loop$}}
 // CHECK_WGSL: break
 

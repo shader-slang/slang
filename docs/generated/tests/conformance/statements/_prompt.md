@@ -72,10 +72,6 @@ Six claims:
 - `incr` is optional; executed for effects before testing condition on each iteration after first.
 - Variable declared in `init` has scope limited to the for statement.
 
-When a for-loop test checks emitted source text, the lowered unconditional loop header is `for(;;)`
-on HLSL, GLSL, Metal, CUDA and C++, but WGSL emits its native `loop` statement instead; match the
-WGSL header as `{{^ *loop$}}`, never `for(;;)`.
-
 ### Loop Statements — While Statement
 
 Two claims:

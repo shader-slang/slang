@@ -47,7 +47,6 @@ overview bundle records those as "deferred to <bundle>" in
 2. One test file per **verifiable end-to-end claim** in
    `pipeline/overview.md`. Each test should not duplicate a stage-
    specific bundle. The dominant claim families are:
-
    - **multi-target dispatch** — single source emits to several
      backends.
    - **target-sensitive IR pass list** — the same source yields
@@ -130,11 +129,6 @@ per-target divergence happens. The default for this bundle is:
 - Diagnostic claims belong in stage-specific bundles. This bundle
   should not use `DIAGNOSTIC_TEST` unless the claim is genuinely
   cross-stage (and even then, prefer recording the gap).
-
-When a test pins a lowered loop in emitted text, the lowered
-unconditional loop header is `for(;;)` on HLSL, GLSL, Metal, CUDA and
-C++, but WGSL emits its native `loop` statement instead; match the
-WGSL header as `{{^ *loop$}}`, never `for(;;)`.
 
 Do not use any GPU-only directive.
 

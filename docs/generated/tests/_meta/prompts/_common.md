@@ -900,6 +900,13 @@ These are not lint-enforced, but skip them only with a
   parameter-group lowering. A field loaded from a CUDA read-only
   buffer may instead appear inside `__ldg(&...->a_0)`. Use FileCheck
   wildcards like `a_{{[0-9]+}}` rather than literal `a_0`.
+- **WGSL spells the unconditional loop header `loop`.** Structured
+  loops lower to an unconditional header with the exit test as an
+  early `break`; HLSL, GLSL, Metal, CUDA and C++ spell that header
+  `for(;;)`, and WGSL spells it `loop` (only the header token
+  differs). Match the WGSL header as the whole line
+  `{{^ *loop$}}`, because a bare `loop` also matches identifiers
+  that contain it.
 - **CUDA `__ldg` is memory-space-sensitive.** Top-level `uniform`
   values are fields of `SLANG_globalParams`, which CUDA emits in
   `__constant__` memory, so the immutable-load pass must leave those

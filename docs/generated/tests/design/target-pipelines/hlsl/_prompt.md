@@ -45,10 +45,15 @@ HLSL-specific on HLSL.
   `legalizeNonStructParameterToStructForHLSL`,
   `wrapStructuredBuffersOfMatrices`, `legalizeUniformBufferLoad`,
   `legalizeByteAddressBufferOps` defaults, `legalizeLogicalAndOr`
-  (HLSL is in the `isD3DTarget` arm). The two ray-payload names are
-  stale in the doc: `legalizeRayTracingPayloads`
-  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) now does that work.
-  See the empty-payload lesson below before testing them.
+  (HLSL is in the `isD3DTarget` arm). The doc's three ray-payload
+  passes, `legalizeEmptyRayPayloadsForHLSL`,
+  `legalizeNonStructParameterToStructForHLSL` and
+  `legalizeRayPayloadAccessQualifiersForHLSL`, no longer exist: since
+  #13256 `legalizeRayTracingPayloads`
+  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) does their work.
+  Test the emitted HLSL rather than the pass names; the README's
+  doc-gap rows list what changed, and the empty-payload lesson below
+  gives the new empty-payload shape.
 - HLSL-specific skips: `lowerCooperativeVectors` (HLSL `break`),
   `lowerAppendConsumeStructuredBuffers` (HLSL has native types).
 - Always-on emit shapes: `[numthreads(...)]`, `register(uN)` /
@@ -313,8 +318,9 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
       `-profile` (`lib_6_6`, or `sm_6_7` for payload access
       qualifiers). Add a `-target glsl` (or other) sibling
       directive only for HLSL-fires-but-sibling-skips claims.
-- [ ] CHECK patterns avoid raw `[[...]]` and use FileCheck
-      wildcards for mangled identifiers.
+- [ ] CHECK patterns never contain literal `[[...]]` text
+      (FileCheck captures such as `[[P:...]]` are fine) and use
+      FileCheck wildcards for mangled identifiers.
 - [ ] No test depends on a GPU. DXR tests check emitted HLSL
       only; no GPU execution and no graphics pipeline stages
       requiring rasterization.
