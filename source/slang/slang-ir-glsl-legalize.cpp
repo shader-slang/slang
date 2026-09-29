@@ -1183,8 +1183,15 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
     IRBuilder& irBuilder,
     IRType* type)
 {
+    // TODO: there is a more general issue with nested arrayed structs in (#13330)
+    // take this case into account when fixing it as well
     if (auto structType = as<IRStructType>(type))
     {
+        // Field offsets below are relative to this struct; the walker
+        // (createGLSLGlobalVaryingsImpl) adds them to the enclosing binding.
+        const Index structBase =
+            context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
+        UInt reservedCount = 0;
         IRStructTypeLayout::Builder builder(&irBuilder);
         for (auto field : structType->getFields())
         {
@@ -1208,21 +1215,26 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
                 UInt space = 0;
                 varLayoutForKind->space = space;
 
-                auto unusedBinding =
-                    context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-                varLayoutForKind->offset = (UInt)unusedBinding;
-
-                auto sizeAttr =
+                IRTypeSizeAttr *sizeAttr =
                     fieldTypeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput);
                 UInt varyingCount =
                     sizeAttr ? sizeAttr->getFiniteSize() : 1;
+
+                varLayoutForKind->offset = reservedCount;
                 for (UInt i = 0; i < varyingCount; ++i)
                 {
                     context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(
-                        unusedBinding + i);
+                        (Index)(structBase + reservedCount + i));
                 }
+                reservedCount += varyingCount;
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
+        }
+        if (reservedCount != 0)
+        {
+            builder.addResourceUsage(
+                LayoutResourceKind::VaryingOutput,
+                LayoutSize::fromRaw(reservedCount));
         }
         auto typeLayout = builder.build();
         return typeLayout;
@@ -1396,6 +1408,9 @@ void invokePatchConstantFuncInHullShader(
     builder.setInsertBefore(constantFunc->getFirstBlock()->getFirstOrdinaryInst());
 
     auto constantOutputType = constantFunc->getResultType();
+    // Struct field offsets are relative to this base (see createPatchConstantFuncResultTypeLayout).
+    auto constantOutputBase =
+        context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
     IRTypeLayout* constantOutputLayout = createPatchConstantFuncResultTypeLayout(
         context,
         codeGenContext,
@@ -1404,6 +1419,13 @@ void invokePatchConstantFuncInHullShader(
     IRVarLayout::Builder resultVarLayoutBuilder(&builder, constantOutputLayout);
     if (auto semanticDecor = constantFunc->findDecoration<IRSemanticDecoration>())
         resultVarLayoutBuilder.setSystemValueSemantic(semanticDecor->getSemanticName(), 0);
+    if (constantOutputLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+    {
+        auto resultVarInfo =
+            resultVarLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingOutput);
+        resultVarInfo->offset = (UInt)constantOutputBase;
+        resultVarInfo->space = 0;
+    }
 
     context->entryPointFunc = constantFunc;
     context->stage = Stage::Unknown;
