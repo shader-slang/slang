@@ -6,9 +6,9 @@ complete integration reference and is not intended to merge as one change.
 
 | Artifact                                                                                                                           | Purpose                                               | Status                                                |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
-| [Issue #13162](https://github.com/shader-slang/slang/issues/13162) / [PR #13163](https://github.com/shader-slang/slang/pull/13163) | Enforce experimental-module import gates consistently | Fixed on `master` by merged PR #13163 (`282587ac1`)    |
+| [Issue #13162](https://github.com/shader-slang/slang/issues/13162) / [PR #13163](https://github.com/shader-slang/slang/pull/13163) | Enforce experimental-module import gates consistently | Fixed on `master` by merged PR #13163 (`282587ac1`)   |
 | [Fork PR #24](https://github.com/kaizhangNV/slang/pull/24)                                                                         | Structural ray-tracing API and frontend contracts     | PR 1; current head `2a1c2efe2`; rebase onto `master`  |
-| [Draft PR #12691](https://github.com/shader-slang/slang/pull/12691)                                                                | Complete implementation and porting reference          | Keep open as a reference; do not review as one change |
+| [Draft PR #12691](https://github.com/shader-slang/slang/pull/12691)                                                                | Complete implementation and porting reference         | Keep open as a reference; do not review as one change |
 
 The design workspace is carried by draft PR #12691 and the archive branch so external ports can
 use it with the complete implementation. It remains outside PR 1 and the other mergeable slices.
@@ -26,6 +26,13 @@ behavior. Fix it in that PR instead of creating a separate issue.
 
 ### Current Classification
 
+- #12659 is fixed on `master` by merged PR #12690. The draft now uses the upstream associated-type
+  witness behavior instead of carrying a local copy.
+- #12718 and #12731 are fixed on `master` by merged PR #12723. The draft dropped its duplicate
+  empty callable-data legalization and retains only compatibility test updates for the upstream
+  ABI.
+- #12822 is fixed on `master` by merged PR #12835. The draft dropped the obsolete #12752 and
+  #12827 workaround commits.
 - #13162 satisfied the rule and is now fixed on `master` by merged PR #13163. It is no longer a
   prerequisite branch for PR 1.
 - #12692 is independently reproducible, but module dumping is not required by PR 1. It is not a
