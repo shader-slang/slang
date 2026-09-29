@@ -3553,7 +3553,9 @@ bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 
 /// Auto-promote the descriptor_handle capability on the target when DescriptorHandle
 /// types are encountered, but only when no specific profile or capability was requested
-/// by the user (auto-promotion mode).
+/// by the user (auto-promotion mode). We join the capability with the target caps, rather than
+/// adding each branch of the alias as an alternative, so that a CUDA target (for example) does
+/// not also start matching declarations that are specific to HLSL.
 static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
 {
     if (!targetReq)
@@ -3574,12 +3576,15 @@ static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
             break;
         }
     }
-    if (!specificProfileRequested && !specificCapabilityRequested)
-    {
-        auto targetCaps = targetReq->getTargetCaps();
-        targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
-        targetReq->setTargetCaps(targetCaps);
-    }
+    if (specificProfileRequested || specificCapabilityRequested)
+        return;
+
+    auto targetCaps = targetReq->getTargetCaps();
+    CapabilitySet descriptorHandleCaps(CapabilityName::descriptor_handle);
+    if (targetCaps.isIncompatibleWith(descriptorHandleCaps))
+        return;
+    targetCaps.join(descriptorHandleCaps);
+    targetReq->setTargetCaps(targetCaps);
 }
 
 static bool isD3D11Target(TargetRequest*)
