@@ -200,8 +200,7 @@ option(
     "Enable development build for standard modules (enables UNIT_TEST macro). Disable for release builds."
     ON
 )
-set(
-    SLANG_DISABLED_NOTE_IDS
+set(SLANG_DISABLED_NOTE_IDS
     ""
     CACHE STRING
     "Comma-separated note IDs disabled by runtime sessions and module builds"
