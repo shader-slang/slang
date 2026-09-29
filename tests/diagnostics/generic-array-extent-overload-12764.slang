@@ -26,15 +26,11 @@ void getData<let N : uint>(inout Data values[N])
     decode(values);
 }
 
-// Negative case that discriminates the paired-slot predicate from a naive
-// "any generic-extent array argument AND any candidate expecting a
-// literal-extent array" test. Here the generic-extent array `vals` matches both
-// candidates' `flexible[M]` at argument 0, so it is NOT the mismatched slot; the
-// mismatch is at argument 1, where a scalar `int` is passed to a literal-extent
-// array parameter (`Data[2]`/`Data[3]`). A candidate DOES expect a literal-extent
-// array, and an argument IS a generic-extent array — so the naive predicate
-// would wrongly fire — but they are in different slots, so the migration note
-// must NOT appear.
+// The note requires the generic-extent array itself to be the mismatched
+// argument. Here the generic-extent array `values` matches both candidates'
+// `flexible[M]` at argument 0; the mismatch is at argument 1, where a scalar is
+// passed to a fixed-extent array parameter. The generic-extent array is not the
+// mismatched slot, so the note must NOT appear.
 void twoArrays<let M : uint>(Data flexible[M], Data pair[2]) {}
 void twoArrays<let M : uint>(Data flexible[M], Data trio[3]) {}
 
@@ -45,8 +41,23 @@ void mismatchElsewhere<let N : uint>(inout Data values[N], int notAnArray)
     twoArrays(values, notAnArray);
 }
 
+// The note also requires the actual and expected array element types to match.
+// Here the generic-extent argument is `Data[int(N)]` but the candidates expect
+// `Other[1]`/`Other[2]`, so the real problem is the element type, not the
+// extent, and the migration note must NOT appear.
+struct Other { float w; }
+void takeOther(Other values[1]) {}
+void takeOther(Other values[2]) {}
+
+void elementTypeMismatch<let N : uint>(inout Data values[N])
+{
+    //CHECK: E39999
+    //CHECK: no overload for 'takeOther'
+    takeOther(values);
+}
+
 // The migration note names a "generic value parameter"; it must appear exactly
-// once (for the `decode` call above) and never for the mismatch-elsewhere case.
+// once (for the `decode` call above) and never for either negative case.
 //CHECK-NOT: generic value parameter
 
 [shader("compute")]

@@ -296,26 +296,27 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
-/// Returns true if `type` is a sized array whose extent is not a compile-time
-/// literal, i.e. its element count is not a `ConstantIntVal`. This is the shape
-/// produced when a generic value parameter is used as an array extent (e.g. the
-/// parameter `Data values[N]` has element count `int(N)`, a `TypeCastIntVal`
-/// over a `DeclRefIntVal`), as opposed to a fixed-size array like `Data[2]`.
-static bool isArrayWithNonLiteralExtent(Type* type)
+/// Returns true when `actualType` and `expectedType` are the same-element-type
+/// array pair that distinguishes issue #12764's value-parameter-extent case from
+/// any other array mismatch: `actualType` is an array whose extent is not a
+/// compile-time literal (e.g. `Data[int(N)]`, from a generic value parameter `N`
+/// used as an extent — an element count that is a `TypeCastIntVal`/`DeclRefIntVal`
+/// rather than a `ConstantIntVal`), while `expectedType` is an array of the same
+/// element type with a literal extent (e.g. the `Data[2]` parameter of a
+/// fixed-extent overload). The element types must match so that a genuine
+/// element-type mismatch (e.g. `Data[N]` against `Other[2]`) is not mistaken for
+/// this extent-only situation.
+static bool isValueParamExtentAgainstFixedExtent(Type* actualType, Type* expectedType)
 {
-    auto arrayType = as<ArrayExpressionType>(type);
-    if (!arrayType)
+    auto actualArray = as<ArrayExpressionType>(actualType);
+    auto expectedArray = as<ArrayExpressionType>(expectedType);
+    if (!actualArray || !expectedArray)
         return false;
-    auto elementCount = arrayType->getElementCount();
-    return elementCount && !as<ConstantIntVal>(elementCount);
-}
-
-/// Returns true if `type` is a sized array with a compile-time literal extent,
-/// e.g. the fixed-size `Data[2]` parameter of an overload like `decode(Data[2])`.
-static bool isArrayWithLiteralExtent(Type* type)
-{
-    auto arrayType = as<ArrayExpressionType>(type);
-    return arrayType && as<ConstantIntVal>(arrayType->getElementCount());
+    if (!actualArray->getElementType()->equals(expectedArray->getElementType()))
+        return false;
+    auto actualCount = actualArray->getElementCount();
+    return actualCount && !as<ConstantIntVal>(actualCount) &&
+           as<ConstantIntVal>(expectedArray->getElementCount());
 }
 
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
@@ -3616,12 +3617,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
             // Migration hint (issue #12764): fire only when a single rejected
             // argument slot pairs a value-parameter-extent array actual with a
-            // literal-extent array parameter, so the hint is not shown for an
-            // unrelated overload mismatch that merely happens to involve arrays.
+            // same-element-type fixed-extent array parameter, so the hint is not
+            // shown for an unrelated array mismatch (different slots or different
+            // element types).
             for (const auto& candidate : context.bestCandidates)
             {
-                if (isArrayWithNonLiteralExtent(candidate.argMismatchActualType) &&
-                    isArrayWithLiteralExtent(candidate.argMismatchExpectedType))
+                if (isValueParamExtentAgainstFixedExtent(
+                        candidate.argMismatchActualType,
+                        candidate.argMismatchExpectedType))
                 {
                     getSink()->diagnose(Diagnostics::ArrayArgumentExtentIsGenericValueParameter{
                         .location = expr->loc});
