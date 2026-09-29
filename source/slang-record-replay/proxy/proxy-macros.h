@@ -22,17 +22,19 @@ namespace SlangRecord
         ReplayContext::get().marker(label); \
     } while (0)
 
-// Begins a recorded instance method call - locks context, records signature and 'this'
-// Uses compiler-specific macro for full signature including type name
+// Begins a recorded instance method call - records signature and 'this'.
+// SLANG_FUNC_SIG is a compiler-specific macro giving the full signature.
+// Via lockIfActive(), the process-wide mutex is taken only when the record layer
+// is active, so the idle default path does not serialize concurrent callers.
 #define RECORD_CALL()                  \
     auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock();          \
+    auto _lock = _ctx.lockIfActive();  \
     _ctx.beginCall(SLANG_FUNC_SIG, this)
 
 // For static/free functions (no 'this' pointer)
 #define RECORD_STATIC_CALL()           \
     auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock();          \
+    auto _lock = _ctx.lockIfActive();  \
     _ctx.beginStaticCall(SLANG_FUNC_SIG)
 
 // Record an input parameter
