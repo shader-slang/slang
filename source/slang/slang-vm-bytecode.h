@@ -105,6 +105,8 @@ enum class VMOp : uint32_t
     CallExt,
     Call,
     Print,
+    Sin,
+    Cos,
 };
 
 // Represents an operand in the VM bytecode.

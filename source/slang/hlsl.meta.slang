@@ -9424,6 +9424,9 @@ void clip(matrix<T,N,M> x)
     }
 }
 
+__intrinsic_op($(kIROp_Cos))
+T __slangvm_cos<T : __BuiltinFloatingPointType>(T x);
+
 /// Cosine. Returns the cosine of the specified angle.
 /// @param x The angle in radians.
 /// @return The cosine of the specified angle.
@@ -9431,6 +9434,7 @@ void clip(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(slangvm)]
 T cos(T x)
 {
     __target_switch
@@ -9445,6 +9449,7 @@ T cos(T x)
     };
     case wgsl: __intrinsic_asm "cos";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
+    case slangvm: return __slangvm_cos(x);
     }
 }
 
@@ -15109,6 +15114,9 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
     }
 }
 
+__intrinsic_op($(kIROp_Sin))
+T __slangvm_sin<T : __BuiltinFloatingPointType>(T x);
+
 /// Sine.
 /// @param x The angle in radians.
 /// @return The sine of `x`.
@@ -15116,6 +15124,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+[require(slangvm)]
 T sin(T x)
 {
     __target_switch
@@ -15130,6 +15139,7 @@ T sin(T x)
     };
     case wgsl: __intrinsic_asm "sin";
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
+    case slangvm: return __slangvm_sin(x);
     }
 }
 
