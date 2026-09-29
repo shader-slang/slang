@@ -201,10 +201,10 @@ option(
     ON
 )
 set(
-    SLANG_DISABLED_WARNING_IDS
+    SLANG_DISABLED_NOTE_IDS
     ""
     CACHE STRING
-    "Comma-separated warning IDs disabled by runtime sessions and module builds"
+    "Comma-separated note IDs disabled by runtime sessions and module builds"
 )
 
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)

@@ -5,8 +5,8 @@
       "value": "OFF"
     },
     {
-      "option": "SLANG_DISABLED_WARNING_IDS",
-      "value": "38052"
+      "option": "SLANG_DISABLED_NOTE_IDS",
+      "value": "88"
     },
     { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
     { "option": "SLANG_EMBED_CORE_MODULE" },
