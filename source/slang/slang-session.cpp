@@ -70,6 +70,9 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
 {
     namePool = session->getNamePool();
 
+    if (SLANG_DISABLED_WARNING_IDS[0] != '\0')
+        m_optionSet.add(CompilerOptionName::DisableWarnings, String(SLANG_DISABLED_WARNING_IDS));
+
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
 
     setFileSystem(nullptr);

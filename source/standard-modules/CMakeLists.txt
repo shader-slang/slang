@@ -13,6 +13,15 @@ set(SLANG_NEURAL_MODULE_FILE_NAME "neural.slang-module" CACHE STRING "module fil
 # SLANG_WORKGRAPH_MODULE_FILE_NAME is the file name for the experimental workgraph module
 set(SLANG_WORKGRAPH_MODULE_FILE_NAME "workgraph.slang-module" CACHE STRING "module file name for workgraph module")
 
+if(NOT "${SLANG_DISABLED_WARNING_IDS}" STREQUAL "")
+    if(NOT SLANG_DISABLED_WARNING_IDS MATCHES "^[0-9]+(,[0-9]+)*$")
+        message(
+            FATAL_ERROR
+            "SLANG_DISABLED_WARNING_IDS must be comma-separated numeric IDs"
+        )
+    endif()
+endif()
+
 # Determine the library directory based on platform
 # On Windows: shared libraries (.dll) go to bin/
 # On Linux/Mac: shared libraries (.so/.dylib) go to lib/

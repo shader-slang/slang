@@ -200,6 +200,12 @@ option(
     "Enable development build for standard modules (enables UNIT_TEST macro). Disable for release builds."
     ON
 )
+set(
+    SLANG_DISABLED_WARNING_IDS
+    ""
+    CACHE STRING
+    "Comma-separated warning IDs disabled by runtime sessions and module builds"
+)
 
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
