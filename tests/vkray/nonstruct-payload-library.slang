@@ -119,10 +119,14 @@ void callableArray(inout float data[4])
 // HLSL: void callableVector(inout [[vectorData]]
 // HLSL: void callableArray(inout [[arrayData]]
 
-// PAQ: struct [raypayload] RayPayload_t
+// PAQ: struct [raypayload] [[paqPayload:RayPayload_t[A-Za-z0-9_]*]]
 // PAQ-NEXT: {
 // PAQ-NEXT: float4 {{[A-Za-z0-9_]+}} : read(caller, anyhit, closesthit, miss) : write(caller, anyhit, closesthit, miss);
 // PAQ-NOT: [raypayload]
+// PAQ: struct ForceVarIntoStructTemporarily_t
+// PAQ-NOT: [raypayload]
+// PAQ: void closestHit(inout [[paqPayload]]
+// PAQ: void miss(inout [[paqPayload]]
 
 // DXIL-DAG: %struct.[[arrayData:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]] = type { [4 x float] }
 // DXIL-DAG: %struct.[[vectorData:ForceVarIntoStructTemporarily_t[A-Za-z0-9_]*]] = type { <4 x float> }

@@ -38,7 +38,7 @@ void caller(inout float4 payload)
 // HLSL: [[temporary]].[[field]] = [[callerParam]].[[field]];
 // HLSL: [[clone]]([[temporary]]);
 // HLSL: [[callerParam]].[[field]] = [[temporary]].[[field]];
-// HLSL: [[temporary]].[[field]];
+// HLSL: result{{[A-Za-z0-9_]*}}[int(1)] = [[temporary]].[[field]];
 
 // DXIL: [[payloadType:%struct.RayPayload_t[A-Za-z0-9_]*]] = type { <4 x float> }
 // DXIL: define internal fastcc void @[[clone:"[^"]*callee_[^"]*"]]([[payloadType]]*
