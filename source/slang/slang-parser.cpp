@@ -7026,6 +7026,44 @@ Stmt* parseCompileTimeStmt(Parser* parser)
     }
 }
 
+// Move a leading `no_diff` from an expression statement's modifiers onto the call it prefixes.
+//
+// Consider this statement inside a differentiable function:
+//
+//     no_diff InterlockedAdd(buffer[0], x);
+//
+// `ParseStatement` reads the statement's modifiers before it knows that an expression follows,
+// so `ParseModifiers` consumes `no_diff` as a `NoDiffModifier` and the call is then parsed as an
+// ordinary expression statement. Nothing reads modifiers on an expression statement, so the
+// marker would be dropped. We wrap the call in the same `TreatAsDifferentiableExpr` that `no_diff`
+// produces in expression position (`let r = no_diff f(x);`), which makes both spellings mean the
+// same thing to semantic checking, lowering, and the differentiability checker.
+static void moveNoDiffModifierOntoCall(Parser* parser, ExpressionStmt* stmt, Modifiers& modifiers)
+{
+    Expr* callee = stmt->expression;
+    while (auto parenExpr = as<ParenExpr>(callee))
+        callee = parenExpr->base;
+    if (!as<InvokeExpr>(callee))
+        return;
+
+    for (Modifier** link = &modifiers.first; *link; link = &(*link)->next)
+    {
+        auto noDiffModifier = as<NoDiffModifier>(*link);
+        if (!noDiffModifier)
+            continue;
+
+        auto noDiffExpr = parser->astBuilder->create<TreatAsDifferentiableExpr>();
+        noDiffExpr->innerExpr = stmt->expression;
+        noDiffExpr->scope = parser->currentScope;
+        noDiffExpr->flavor = TreatAsDifferentiableExpr::Flavor::NoDiff;
+        noDiffExpr->loc = noDiffModifier->loc;
+        stmt->expression = noDiffExpr;
+
+        *link = noDiffModifier->next;
+        return;
+    }
+}
+
 Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowCaseDefault)
 {
     auto modifiers = ParseModifiers(this);
@@ -7218,6 +7256,9 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowC
         // and then let that detect any errors
         statement = ParseExpressionStatement();
     }
+
+    if (auto exprStmt = as<ExpressionStmt>(statement))
+        moveNoDiffModifierOntoCall(this, exprStmt, modifiers);
 
     if (statement && !as<DeclStmt>(statement))
     {

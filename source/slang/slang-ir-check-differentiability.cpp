@@ -433,6 +433,10 @@ public:
 
         auto isInstProducingDiff = [&](IRInst* inst) -> bool
         {
+            // An atomic operation is non-differentiable: its result is a value read from
+            // memory, which carries no derivative whatever its operands carry.
+            if (as<IRAtomicOperation>(inst))
+                return false;
             switch (inst->getOp())
             {
             case kIROp_FloatLit:
@@ -469,6 +473,8 @@ public:
 
         auto isInstCarryingOverDiff = [&](IRInst* inst) -> bool
         {
+            if (as<IRAtomicOperation>(inst))
+                return false;
             switch (inst->getOp())
             {
             case kIROp_DetachDerivative:
@@ -806,8 +812,59 @@ public:
                             });
                     }
                 }
+                else if (auto atomicInst = as<IRAtomicOperation>(inst))
+                {
+                    // An atomic writes its value operands into memory that holds no
+                    // derivative, so a derivative carried by one of them is lost unless the
+                    // atomic is marked `no_diff`. Operand 0 is the destination address; the
+                    // others are values and memory-order constants, and constants never carry
+                    // a derivative.
+                    if (atomicInst->findDecoration<IRTreatCallAsDifferentiableDecoration>())
+                        continue;
+                    for (UInt i = 1; i < atomicInst->getOperandCount(); i++)
+                    {
+                        if (carryNonTrivialDiffSet.contains(atomicInst->getOperand(i)))
+                        {
+                            sink->diagnose(Diagnostics::LossOfDerivativeInAtomicOperation{
+                                .location = atomicInst->sourceLoc,
+                            });
+                            break;
+                        }
+                    }
+                }
                 else if (auto callInst = as<IRCall>(inst))
                 {
+                    // A call to an atomic entry point such as `InterlockedAdd` is checked like an
+                    // atomic instruction: it is still a call here because the wrappers are
+                    // inlined after this check. Its value arguments are its `in` parameters; the
+                    // destination is a `__ref` parameter and an original value is an `out` one.
+                    if (getBuiltinFuncEnum(callInst->getCallee()) ==
+                        KnownBuiltinDeclName::AtomicOperation)
+                    {
+                        if (shouldTreatCallAsDifferentiable(callInst))
+                            continue;
+                        auto atomicFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
+                        if (!atomicFuncType ||
+                            atomicFuncType->getParamCount() != callInst->getArgCount())
+                            continue;
+                        for (UInt a = 0; a < callInst->getArgCount(); a++)
+                        {
+                            auto direction = std::get<0>(
+                                splitParameterDirectionAndType(atomicFuncType->getParamType(a)));
+                            if (direction.kind != ParameterDirectionInfo::Kind::In &&
+                                direction.kind != ParameterDirectionInfo::Kind::BorrowIn)
+                                continue;
+                            if (carryNonTrivialDiffSet.contains(callInst->getArg(a)))
+                            {
+                                sink->diagnose(Diagnostics::LossOfDerivativeInAtomicOperation{
+                                    .location = callInst->sourceLoc,
+                                });
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+
                     if (!isDifferentiableFunc(
                             diffTypeContext,
                             callInst->getCallee(),
