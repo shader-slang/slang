@@ -30,4 +30,9 @@ static const NVVMIntrinsicSemantic kNVVMIntrinsicSemanticAtomicReduceIncrement =
 static const NVVMIntrinsicSemantic kNVVMIntrinsicSemanticAtomicReduceDecrement =
     kNVVMIntrinsicSemanticAtomicReduceIncrement + 1;
 
+static const NVVMIntrinsicSemantic kNVVMIntrinsicSemanticSurfaceLoad =
+    kNVVMIntrinsicSemanticAtomicReduceDecrement + 1;
+static const NVVMIntrinsicSemantic kNVVMIntrinsicSemanticSurfaceStore =
+    kNVVMIntrinsicSemanticSurfaceLoad + 1;
+
 } // namespace Slang

@@ -7,14 +7,14 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-On 2026-09-27 the maintainer authorized continued work while away. Finish and accept the current
-address-planning refactor, then resume the normal development loop, prioritizing a real material
-workload. Independent source review concluded that a transforming local-storage pass should remain
-deferred because the bounded rewrite cannot retire the existing conversion responsibility. This
-supersedes the earlier stop-after-slice instruction. Accept and locally commit each bounded task
-before proceeding; regressions or decisions requiring maintainer input stop continuation.
-Skip Slack notifications. No push, publication, system installation, driver change or reboot is
-implied. Finite maintenance, results-refresh and documentation requests alone do not resume a loop.
+The maintainer authorized the NVVM-only surface-format legalization pass on 2026-09-29. That bounded
+ownership transfer is complete and accepted; stop after its reviewed local commit. A new explicit
+request is needed to resume general feature work. STATUS records the current evidence and next leads. Earlier independent review
+keeps a transforming local-storage pass deferred because its bounded rewrite cannot retire the
+existing conversion responsibility. Accept and locally commit each bounded task before proceeding;
+regressions or decisions requiring maintainer input stop continuation. Skip Slack notifications.
+No push, publication, system installation, driver change or reboot is implied. Finite maintenance,
+results-refresh and documentation requests alone do not resume the general development loop.
 
 For authorized implementation work, use a fresh bounded worker and independent review when available.
 The lead owns scope, acceptance and commits; one writer owns the checkout at a time. Read-only review

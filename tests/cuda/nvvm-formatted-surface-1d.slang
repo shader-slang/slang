@@ -22,9 +22,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[index] = v4.x + v2.x + v;
 }
 
-// CHECK: sust.p.1d.b32.zero
-// CHECK: sust.p.1d.v2.b32.zero
-// CHECK: sust.p.1d.v4.b32.zero
+// CHECK: sust.b.1d.b16.zero
+// CHECK: sust.b.1d.v2.b16.zero
+// CHECK: sust.b.1d.v4.b16.zero
 // CHECK: suld.b.1d.v4.b16.zero
 // CHECK: suld.b.1d.v2.b16.zero
 // CHECK: suld.b.1d.b16.zero

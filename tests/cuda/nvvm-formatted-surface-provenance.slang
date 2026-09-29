@@ -1,5 +1,5 @@
 // A formatted resource's element type does not carry its physical storage format. The direct
-// backend deliberately resolves `[format]` only when the CUDA-prelude surface helper receives a
+// legalization pass resolves `[format]` only when a tagged standard-library surface helper receives a
 // canonical load from the collected global field. Passing the resource through another helper
 // loses that provenance, so preflight must reject the shape instead of guessing from `float`.
 
@@ -21,4 +21,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = readThroughHelper(inputTexture, int2(dispatchThreadID.xy));
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'nvvmIntrinsic'

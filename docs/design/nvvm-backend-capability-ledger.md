@@ -128,7 +128,7 @@ These details must accompany any widening of a role predicate.
 | Region                                  | Current contract / evidence                                                                                              | Limits / regression                                                                                                                                                                                                                                                                                           |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Sampled textures                        | Selected exact CUDA texture helper families, including level operations and ordinary gather; compile/GPU corpus evidence | Full texture API and every shape/offset/format not implied. [Sample boundary](../../tests/cuda/nvvm-sampled-texture-unsupported.slang), [fetch boundary](../../tests/cuda/nvvm-texture-fetch-unsupported.slang)                                                                                               |
-| Surfaces                                | Qualified native and formatted surface operations with explicit format provenance                                        | Byte-addressed access and element-count geometry differ. [Float surface](../../tests/cuda/nvvm-native-float-surface.slang), [formatted provenance](../../tests/cuda/nvvm-formatted-surface-provenance.slang), [integer boundary](../../tests/cuda/nvvm-native-integer-surface-unsupported.slang)              |
+| Surfaces                                | Typed physical accesses; explicit static Half conversion; masks preserve untouched bits                                  | Byte-addressed access and element-count geometry differ. [Float surface](../../tests/cuda/nvvm-native-float-surface.slang), [formatted provenance](../../tests/cuda/nvvm-formatted-surface-provenance.slang), [integer boundary](../../tests/cuda/nvvm-native-integer-surface-unsupported.slang)              |
 | Read-only texture descriptor conversion | Resource↔descriptor↔uint64 identity for accepted texture families; GPU handles and 64-bit transport                      | Buffer descriptors contain pointer/count and do not inherit integer-handle conversion. [Texture descriptors](../../tests/cuda/nvvm-texture-descriptor-conversion.slang), [buffer negative](../../tests/cuda/nvvm-texture-descriptor-buffer-unsupported.slang)                                                 |
 | Selected non-mip dimensions             | Exact supported geometry helpers                                                                                         | Does not establish requested mip, array count or total/view level count. [Dimensions](../../tests/cuda/nvvm-texture-dimensions.slang), [query negatives](../../tests/cuda/nvvm-texture-query-unsupported.slang)                                                                                               |
 | Undefined ordinary sampler              | Qualified CUDA placeholder semantics                                                                                     | Comparison samplers and arbitrary undefined resources remain excluded. [Sampler](../../tests/cuda/nvvm-undefined-sampler.slang), [comparison negative](../../tests/cuda/nvvm-undefined-comparison-sampler-unsupported.slang), [resource negative](../../tests/cuda/nvvm-undefined-resource-unsupported.slang) |
@@ -139,6 +139,20 @@ with NVRTC can therefore preserve the same error. A texture object and a surface
 interchangeable, and opaque descriptor bytes cannot be inspected as an undocumented metadata API.
 The observed driver lookup failures for `txq.array_size` and `txq.num_mipmap_levels` are specific to
 the qualified stack; `txq.level.width` loaded and executed. No full API repair is implemented.
+
+NVVM surface legalization supports the existing native 32-bit signed/unsigned/Float32 scalar, two-
+and four-channel transfers in admitted 1D/2D/3D and array shapes. Native Half and annotated Half
+storage with Float32 shader values remain limited to non-array 1D/2D. Matching Float32 uses Float32
+payloads directly. Static component masks update physical channels without re-encoding untouched
+NaN payloads. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
+
+The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 43 cases,
+including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
+nonzero guards and zero-boundary accesses. [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
+has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC
+formatted store's observed truncation. NVRTC component source, dynamic component indexing, user
+resource-helper format provenance, three-channel transfers and additional packed/normalized formats
+remain outside this qualification. The pass does not add layered helper writes or general aliases.
 
 The unannotated surface contract requires a matching physical channel width, count and scalar
 interpretation. A focused host-readback experiment binds the same `RWTexture1D<int4>` kernels to

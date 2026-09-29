@@ -1305,6 +1305,10 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Physical CUDA surface transfers. X is a byte coordinate; other dimensions are texels.
+	-- The result/stored value type describes physical storage without format conversion.
+	{ NVVMSurfaceLoad = { operands = { { "surface" }, { "coordinate" } } } },
+	{ NVVMSurfaceStore = { operands = { { "surface" }, { "coordinate" }, { "value" } } } },
 	-- Gather four texels from a sampled image at a coordinate, offset by a texel offset.
 	-- The offset may be a compile-time constant or a runtime value; the SPIR-V backend
 	-- inspects the offset operand and selects the `ConstOffset` image operand (no capability)

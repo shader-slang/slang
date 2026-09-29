@@ -2566,15 +2566,15 @@ static bool _isSelectedLegacyAtomicAccess(
 // `fsub -0.0, value`. Finally, LLVM 14 gives NVVM special-register intrinsics function attributes
 // that the LLVM 7 parser does not know. Removing optimization-only attributes retains each
 // intrinsic's semantic name and type. This applies to both NVVM intrinsics and generic intrinsics
-// such as scalar sqrt that survive into the module. LLVM may share one numbered attribute group
-// between several declarations, so count unique validated semantic attribute sets. LLVM 14's scalar
-// shuffle and synchronized-vote declarations already use the LLVM-7-compatible
-// convergent/inaccessible-memory/nounwind set, but validate their exact signatures and attributes
-// before serializing the mixed dialect. Generic integer scan intrinsics have the same LLVM 14-only
-// optimization attributes as the special-register declarations plus an `immarg` parameter marker;
-// LLVM 7 already understands their signatures and semantics once those newer attributes are
-// removed. The provider exposes exactly one shape of each operation; validate every semantic
-// instruction or declaration before changing its spelling.
+// such as scalar sqrt and Float32-to-Half conversion that survive into the module. LLVM may share
+// one numbered attribute group between several declarations, so count unique validated semantic
+// attribute sets. LLVM 14's scalar shuffle and synchronized-vote declarations already use the
+// LLVM-7-compatible convergent/inaccessible-memory/nounwind set, but validate their exact
+// signatures and attributes before serializing the mixed dialect. Generic integer scan intrinsics
+// have the same LLVM 14-only optimization attributes as the special-register declarations plus an
+// `immarg` parameter marker; LLVM 7 already understands their signatures and semantics once those
+// newer attributes are removed. The provider exposes exactly one shape of each operation; validate
+// every semantic instruction or declaration before changing its spelling.
 static SlangResult _writeLegacyNVVMAssembly(
     ModuleState* state,
     llvm::SmallVectorImpl<char>& outSerializedData)
@@ -2751,13 +2751,19 @@ static SlangResult _writeLegacyNVVMAssembly(
             }
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
-        else if (intrinsicID == llvm::Intrinsic::sqrt)
+        else if (
+            intrinsicID == llvm::Intrinsic::sqrt || intrinsicID == llvm::Intrinsic::nvvm_f2h_rn)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
-            llvm::Type* floatingType = function.getReturnType();
-            if (!function.isDeclaration() ||
-                (!floatingType->isFloatTy() && !floatingType->isDoubleTy()) ||
-                function.arg_size() != 1 || function.arg_begin()->getType() != floatingType ||
+            llvm::Type* resultType = function.getReturnType();
+            const bool isHalfConversion = intrinsicID == llvm::Intrinsic::nvvm_f2h_rn;
+            const bool hasSelectedResult =
+                isHalfConversion ? resultType->isIntegerTy(16)
+                                 : resultType->isFloatTy() || resultType->isDoubleTy();
+            llvm::Type* operandType =
+                isHalfConversion ? llvm::Type::getFloatTy(state->context) : resultType;
+            if (!function.isDeclaration() || !hasSelectedResult || function.arg_size() != 1 ||
+                function.arg_begin()->getType() != operandType ||
                 functionAttributes.getNumAttributes() != 6 ||
                 !function.hasFnAttribute(llvm::Attribute::NoFree) ||
                 !function.hasFnAttribute(llvm::Attribute::NoSync) ||
@@ -3766,6 +3772,33 @@ static SlangResult _emitCatalogOperation(
     }
 }
 
+// Selects the target's round-to-nearest-even conversion for Float32-to-Half values. Consider
+// `half(asfloat(0x7f800001u))`: libNVVM 12.9 at O3 folds fptrunc of this signaling NaN to infinity
+// when its retained payload becomes zero. The target conversion preserves NaN classification.
+// This selection belongs to generic floating conversion; surfaces only supply a FloatCast in IR.
+static llvm::Value* _emitFloat32ToHalf(
+    ModuleState* state,
+    llvm::Value* value,
+    llvm::Type* resultType)
+{
+    auto intrinsic =
+        llvm::Intrinsic::getDeclaration(state->module.get(), llvm::Intrinsic::nvvm_f2h_rn);
+    if (resultType->isHalfTy())
+        return state->builder.CreateBitCast(
+            state->builder.CreateCall(intrinsic, {value}),
+            resultType);
+
+    auto vectorType = llvm::cast<llvm::FixedVectorType>(resultType);
+    llvm::SmallVector<llvm::Value*, 4> elements;
+    for (uint32_t lane = 0; lane < vectorType->getNumElements(); ++lane)
+    {
+        auto operand = state->builder.CreateExtractElement(value, lane);
+        auto bits = state->builder.CreateCall(intrinsic, {operand});
+        elements.push_back(state->builder.CreateBitCast(bits, vectorType->getElementType()));
+    }
+    return _createNVVMVectorConstruct(state, vectorType, elements);
+}
+
 // Converts one qualified BF16/Float32 lane using the scalar SM80 contract. Vector
 // conversion extracts each canonical lane and reuses this recipe, so widening preserves
 // signaling-NaN payloads and narrowing rounds exactly once, including subnormals.
@@ -4376,9 +4409,12 @@ static SlangResult _emitValueOperationFamily(
             operation.operandTypes[0].laneCount);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatConvert:
-        result = operation.resultType.bitWidth < operation.operandTypes[0].bitWidth
-                     ? state->builder.CreateFPTrunc(llvmOperands[0], resultType)
-                     : state->builder.CreateFPExt(llvmOperands[0], resultType);
+        if (operation.resultType.bitWidth == 16 && operation.operandTypes[0].bitWidth == 32)
+            result = _emitFloat32ToHalf(state, llvmOperands[0], resultType);
+        else
+            result = operation.resultType.bitWidth < operation.operandTypes[0].bitWidth
+                         ? state->builder.CreateFPTrunc(llvmOperands[0], resultType)
+                         : state->builder.CreateFPExt(llvmOperands[0], resultType);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::BitReinterpret:
         result = llvmOperands[0]->getType() == resultType
@@ -4441,17 +4477,9 @@ static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& op
     {
         return false;
     }
-    if (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_NATIVE)
-    {
-        return is32BitNumeric ||
-               (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                operation.elementType.bitWidth == 16 && !operation.isArray &&
-                operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
-    }
-    return operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16 &&
-           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-           operation.elementType.bitWidth == 32 && !operation.isArray &&
-           operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
+    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              operation.elementType.bitWidth == 16 && !operation.isArray &&
+                              operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -4469,12 +4497,6 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
 {
     if (!_isSurfaceOperationSupported(operation))
         return llvm::Intrinsic::not_intrinsic;
-    if (operation.operation == SLANG_NVVM_SURFACE_OP_STORE &&
-        operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16)
-    {
-        return llvm::Intrinsic::not_intrinsic;
-    }
-
     static const llvm::Intrinsic::ID kLoadI16[2][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_i16_zero,
          llvm::Intrinsic::nvvm_suld_1d_v2i16_zero,
@@ -4528,9 +4550,7 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
                                : operation.elementType.laneCount == 2 ? 1
                                                                       : 2;
     const uint32_t dimensionIndex = operation.shape - SLANG_NVVM_TEXTURE_SHAPE_1D;
-    const uint32_t physicalBitWidth = operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16
-                                          ? 16
-                                          : operation.elementType.bitWidth;
+    const uint32_t physicalBitWidth = operation.elementType.bitWidth;
     if (physicalBitWidth == 16)
     {
         return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
@@ -4544,42 +4564,6 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
     }
     return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD ? kLoadI32[dimensionIndex][laneIndex]
                                                              : kStoreI32[dimensionIndex][laneIndex];
-}
-
-struct FormattedSurfaceStoreInlineAsm
-{
-    const char* assembly = nullptr;
-    const char* constraints = nullptr;
-};
-
-static FormattedSurfaceStoreInlineAsm _getFormattedSurfaceStoreInlineAsm(
-    const SlangNVVMSurfaceOperationDesc& operation)
-{
-    if (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D)
-    {
-        switch (operation.elementType.laneCount)
-        {
-        case 1:
-            return {"sust.p.1d.b32.zero [$0, {$1}], {$2};", "l,r,f"};
-        case 2:
-            return {"sust.p.1d.v2.b32.zero [$0, {$1}], {$2, $3};", "l,r,f,f"};
-        case 4:
-            return {"sust.p.1d.v4.b32.zero [$0, {$1}], {$2, $3, $4, $5};", "l,r,f,f,f,f"};
-        }
-    }
-    else
-    {
-        switch (operation.elementType.laneCount)
-        {
-        case 1:
-            return {"sust.p.2d.b32.zero [$0, {$1, $2}], {$3};", "l,r,r,f"};
-        case 2:
-            return {"sust.p.2d.v2.b32.zero [$0, {$1, $2}], {$3, $4};", "l,r,r,f,f"};
-        case 4:
-            return {"sust.p.2d.v4.b32.zero [$0, {$1, $2}], {$3, $4, $5, $6};", "l,r,r,f,f,f,f"};
-        }
-    }
-    return {};
 }
 
 static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
@@ -4640,45 +4624,18 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
         }
     }
 
-    const bool isFormattedStore = operation->operation == SLANG_NVVM_SURFACE_OP_STORE &&
-                                  operation->storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
-    const uint32_t physicalBitWidth = operation->storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16
-                                          ? 16
-                                          : operation->elementType.bitWidth;
-    llvm::Type* physicalScalarType =
-        operation->elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
-            ? (physicalBitWidth == 16 ? halfType : floatType)
-            : int32Type;
+    const uint32_t physicalBitWidth = operation->elementType.bitWidth;
     llvm::Type* physicalIntegerType =
         physicalBitWidth == 16 ? llvm::Type::getInt16Ty(state->context) : int32Type;
-    llvm::Intrinsic::ID intrinsicID = llvm::Intrinsic::not_intrinsic;
-    FormattedSurfaceStoreInlineAsm formattedStoreInlineAsm;
-    if (isFormattedStore)
-    {
-        formattedStoreInlineAsm = _getFormattedSurfaceStoreInlineAsm(*operation);
-        if (!formattedStoreInlineAsm.assembly || !formattedStoreInlineAsm.constraints)
-            return SLANG_E_INVALID_ARG;
-    }
-    else
-    {
-        intrinsicID = _getSurfaceIntrinsicID(*operation);
-        if (intrinsicID == llvm::Intrinsic::not_intrinsic)
-            return SLANG_E_INVALID_ARG;
-    }
+    llvm::Intrinsic::ID intrinsicID = _getSurfaceIntrinsicID(*operation);
+    if (intrinsicID == llvm::Intrinsic::not_intrinsic)
+        return SLANG_E_INVALID_ARG;
 
     llvm::SmallVector<llvm::Value*, 7> arguments;
     arguments.push_back(surface);
     llvm::Value* x = coordinateLaneCount == 1
                          ? coordinate
                          : state->builder.CreateExtractElement(coordinate, uint64_t(0));
-    if (!isFormattedStore)
-    {
-        x = state->builder.CreateMul(
-            x,
-            llvm::ConstantInt::get(
-                int32Type,
-                operation->elementType.laneCount * physicalBitWidth / 8u));
-    }
     arguments.push_back(x);
     for (uint32_t dimension = 1; dimension < coordinateLaneCount; ++dimension)
         arguments.push_back(state->builder.CreateExtractElement(coordinate, dimension));
@@ -4690,26 +4647,8 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
             llvm::Value* laneValue = operation->elementType.laneCount == 1
                                          ? storedValue
                                          : state->builder.CreateExtractElement(storedValue, lane);
-            arguments.push_back(
-                isFormattedStore ? laneValue
-                                 : state->builder.CreateBitCast(laneValue, physicalIntegerType));
+            arguments.push_back(state->builder.CreateBitCast(laneValue, physicalIntegerType));
         }
-    }
-
-    if (isFormattedStore)
-    {
-        llvm::SmallVector<llvm::Type*, 7> argumentTypes;
-        for (llvm::Value* argument : arguments)
-            argumentTypes.push_back(argument->getType());
-        llvm::FunctionType* functionType =
-            llvm::FunctionType::get(llvm::Type::getVoidTy(state->context), argumentTypes, false);
-        llvm::InlineAsm* inlineAsm = llvm::InlineAsm::get(
-            functionType,
-            formattedStoreInlineAsm.assembly,
-            formattedStoreInlineAsm.constraints,
-            true);
-        state->builder.CreateCall(inlineAsm, arguments);
-        return SLANG_OK;
     }
 
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
@@ -4720,10 +4659,7 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
     llvm::Value* result = nullptr;
     if (operation->elementType.laneCount == 1)
     {
-        llvm::Value* physicalValue = state->builder.CreateBitCast(call, physicalScalarType);
-        result = operation->storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16
-                     ? state->builder.CreateFPExt(physicalValue, semanticScalarType)
-                     : physicalValue;
+        result = state->builder.CreateBitCast(call, semanticScalarType);
     }
     else
     {
@@ -4731,11 +4667,7 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
         for (uint32_t lane = 0; lane < operation->elementType.laneCount; ++lane)
         {
             llvm::Value* bits = state->builder.CreateExtractValue(call, {lane});
-            llvm::Value* physicalValue = state->builder.CreateBitCast(bits, physicalScalarType);
-            llvm::Value* laneValue =
-                operation->storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16
-                    ? state->builder.CreateFPExt(physicalValue, semanticScalarType)
-                    : physicalValue;
+            llvm::Value* laneValue = state->builder.CreateBitCast(bits, semanticScalarType);
             laneValues.push_back(laneValue);
         }
         result = _createNVVMVectorConstruct(

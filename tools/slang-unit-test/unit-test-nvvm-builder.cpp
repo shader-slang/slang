@@ -856,7 +856,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
         0,
         {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 4},
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
-        SLANG_NVVM_SURFACE_STORAGE_NATIVE,
     };
     SLANG_CHECK(builder.supportsSurfaceOperation(load2D));
 
@@ -869,20 +868,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported = load2D;
     unsupported.boundaryMode = SlangNVVMSurfaceBoundaryMode(1);
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
-    const SlangNVVMSurfaceOperationDesc formattedStore2D = {
+    const SlangNVVMSurfaceOperationDesc physicalStore2D = {
         SLANG_NVVM_SURFACE_OP_STORE,
         SLANG_NVVM_TEXTURE_SHAPE_2D,
         0,
-        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 4},
+        {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 4},
         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
-        SLANG_NVVM_SURFACE_STORAGE_FLOAT16,
     };
-    SLANG_CHECK(builder.supportsSurfaceOperation(formattedStore2D));
-    unsupported = formattedStore2D;
-    unsupported.elementType.bitWidth = 16;
-    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
-    unsupported = load2D;
-    unsupported.storageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
+    SLANG_CHECK(builder.supportsSurfaceOperation(physicalStore2D));
+    unsupported = physicalStore2D;
+    unsupported.elementType.bitWidth = 8;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 
     for (SlangNVVMValueTypeKind kind :
@@ -906,7 +901,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
                         0,
                         {kind, 32, laneCount},
                         SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
-                        SLANG_NVVM_SURFACE_STORAGE_NATIVE,
                     };
                     SLANG_CHECK(builder.supportsSurfaceOperation(native32));
                     if (shape == SLANG_NVVM_TEXTURE_SHAPE_2D)
@@ -922,10 +916,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported = load2D;
     unsupported.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 32, 3};
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
-    unsupported = formattedStore2D;
+    unsupported = physicalStore2D;
     unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
-    unsupported = formattedStore2D;
+    unsupported = physicalStore2D;
     unsupported.isArray = 1;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = load2D;
@@ -4728,14 +4722,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("fsub half")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fcmp olt half")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fpext half")) >= 0);
-        SLANG_CHECK(text.indexOf(toSlice("fptrunc float")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptrunc float")) < 0);
+        SLANG_CHECK(text.indexOf(toSlice("call i16 @llvm.nvvm.f2h.rn(float")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fptosi half")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("sitofp <2 x i32>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fadd <2 x half>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fsub <2 x half>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fcmp oge <2 x half>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fpext <2 x half>")) >= 0);
-        SLANG_CHECK(text.indexOf(toSlice("fptrunc <2 x float>")) >= 0);
+        SLANG_CHECK(text.indexOf(toSlice("fptrunc <2 x float>")) < 0);
+        SLANG_CHECK(_countOccurrences(text, toSlice("call i16 @llvm.nvvm.f2h.rn(float")) == 3);
         SLANG_CHECK(text.indexOf(toSlice("fptosi <2 x half>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("to <2 x double>")) >= 0);
         SLANG_CHECK(text.indexOf(toSlice("fadd <2 x double>")) >= 0);
@@ -4774,7 +4770,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsNumericTypeFamilies)
         SLANG_CHECK(text.indexOf(toSlice("insertelement <2 x i1>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x i1>")) >= 2);
         SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x half>")) == 0);
-        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x i16>")) == 2);
+        // Both the explicit Half2 construction and the narrowed Half2 use integer lane assembly.
+        SLANG_CHECK(_countOccurrences(text, toSlice("insertelement <2 x i16>")) == 4);
         SLANG_CHECK(text.indexOf(toSlice("bitcast <2 x i16>")) >= 0);
         SLANG_CHECK(_countOccurrences(text, toSlice("extractelement <2 x half>")) == 1);
         SLANG_CHECK(_countOccurrences(text, toSlice("select i1")) >= 2);

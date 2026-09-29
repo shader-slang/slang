@@ -278,8 +278,7 @@ SLANG_UNIT_TEST(mathHalfSaturatesAtMax)
     float back = HalfToFloat(h);
     SLANG_CHECK(back == SLANG_HALF_MAX);
 
-    // Values exceeding fp16 max overflow to infinity (the
-    // implementation sets bits 0x7C00 unconditionally for e > 142).
+    // Values beyond the finite rounding range overflow to infinity.
     unsigned short hInf = FloatToHalf(1e30f);
     SLANG_CHECK(Math::IsInf(HalfToFloat(hInf)));
 }
@@ -348,8 +347,8 @@ SLANG_UNIT_TEST(mathFloatE5M2SaturatesAtMax)
 }
 
 // Compute the exact dyadic value from the format definition, independently of the
-// production Float32 bit shifts. Every finite FP8 value is exactly representable here.
-static float getFiniteFloat8Value(unsigned int code, unsigned int fractionBits, int bias)
+// production Float32 bit shifts. Each tested finite FP8 or Half value is exactly representable.
+static float getFiniteBinaryFloatValue(unsigned int code, unsigned int fractionBits, int bias)
 {
     unsigned int fractionCount = 1u << fractionBits;
     unsigned int exponent = code / fractionCount;
@@ -357,6 +356,49 @@ static float getFiniteFloat8Value(unsigned int code, unsigned int fractionBits, 
     return exponent == 0
                ? ldexpf(float(fraction), 1 - bias - int(fractionBits))
                : ldexpf(float(fractionCount + fraction), int(exponent) - bias - int(fractionBits));
+}
+
+SLANG_UNIT_TEST(mathHalfRoundsEveryFiniteBoundaryToNearestEven)
+{
+    // Test all adjacent finite Half pairs, plus the overflow endpoint at 65536. Their
+    // midpoint and its Float32 neighbors are exact dyadic values, independent of the
+    // narrowing implementation. Negative values have the same magnitude rounding rule.
+    for (unsigned int code = 0; code < 0x7c00; ++code)
+    {
+        const float lower = getFiniteBinaryFloatValue(code, 10, 15);
+        const float upper = getFiniteBinaryFloatValue(code + 1, 10, 15);
+        const float midpoint = (lower + upper) * 0.5f;
+        const unsigned int midpointBits = unsigned(FloatAsInt(midpoint));
+        for (unsigned int sign : {0u, 0x80000000u})
+        {
+            const unsigned int halfSign = sign >> 16;
+            SLANG_CHECK(
+                FloatToHalf(IntAsFloat(unsigned(FloatAsInt(lower)) | sign)) == (code | halfSign));
+            SLANG_CHECK(FloatToHalf(IntAsFloat((midpointBits - 1) | sign)) == (code | halfSign));
+            SLANG_CHECK(
+                FloatToHalf(IntAsFloat(midpointBits | sign)) == ((code + (code & 1)) | halfSign));
+            SLANG_CHECK(
+                FloatToHalf(IntAsFloat((midpointBits + 1) | sign)) == ((code + 1) | halfSign));
+        }
+    }
+}
+
+SLANG_UNIT_TEST(mathHalfPreservesSpecialValueClassification)
+{
+    for (unsigned int sign : {0u, 0x80000000u})
+    {
+        const unsigned int halfSign = sign >> 16;
+        for (unsigned int bits : {0u, 1u, 0x007fffffu, 0x00800000u})
+            SLANG_CHECK(FloatToHalf(IntAsFloat(bits | sign)) == halfSign);
+        for (unsigned int bits : {0x47800000u, 0x7f7fffffu, 0x7f800000u})
+            SLANG_CHECK(FloatToHalf(IntAsFloat(bits | sign)) == (halfSign | 0x7c00u));
+        for (unsigned int bits : {0x7f800001u, 0x7fa12345u, 0x7fc12345u, 0x7fffffffu})
+        {
+            const unsigned short result = FloatToHalf(IntAsFloat(bits | sign));
+            SLANG_CHECK((result & 0xfc00u) == (halfSign | 0x7c00u));
+            SLANG_CHECK((result & 0x03ffu) != 0);
+        }
+    }
 }
 
 // Check every encoding, then every finite value and rounding boundary with its two
@@ -378,7 +420,7 @@ static void checkFloat8FiniteConversions(
             if (code <= maxFinite)
             {
                 unsigned int expectedBits =
-                    FloatAsInt(getFiniteFloat8Value(code, fractionBits, bias)) | (sign << 31);
+                    FloatAsInt(getFiniteBinaryFloatValue(code, fractionBits, bias)) | (sign << 31);
                 SLANG_CHECK(unsigned(FloatAsInt(actual)) == expectedBits);
                 SLANG_CHECK(narrow(IntAsFloat(expectedBits)) == encoded);
             }
@@ -392,13 +434,13 @@ static void checkFloat8FiniteConversions(
         }
         for (unsigned int code = 0; code <= maxFinite; code++)
         {
-            float value = getFiniteFloat8Value(code, fractionBits, bias);
+            float value = getFiniteBinaryFloatValue(code, fractionBits, bias);
             for (unsigned int boundary = 0; boundary < 2; boundary++)
             {
                 if (boundary && code == maxFinite)
                     continue;
                 float center =
-                    boundary ? (value + getFiniteFloat8Value(code + 1, fractionBits, bias)) / 2
+                    boundary ? (value + getFiniteBinaryFloatValue(code + 1, fractionBits, bias)) / 2
                              : value;
                 for (int neighbor = -1; neighbor <= 1; neighbor++)
                 {
@@ -406,14 +448,15 @@ static void checkFloat8FiniteConversions(
                         continue;
                     unsigned int inputBits = unsigned(FloatAsInt(center)) + neighbor;
                     float input = IntAsFloat(inputBits);
-                    if (input > getFiniteFloat8Value(maxFinite, fractionBits, bias))
+                    if (input > getFiniteBinaryFloatValue(maxFinite, fractionBits, bias))
                         continue;
                     unsigned int nearest = 0;
                     double distance = input;
                     for (unsigned int candidate = 1; candidate <= maxFinite; candidate++)
                     {
                         double candidateDistance = fabs(
-                            double(input) - getFiniteFloat8Value(candidate, fractionBits, bias));
+                            double(input) -
+                            getFiniteBinaryFloatValue(candidate, fractionBits, bias));
                         if (candidateDistance < distance ||
                             (candidateDistance == distance && (candidate & 1) == 0))
                         {

@@ -337,7 +337,7 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType);
 bool getNVVMSupportedSurfaceField(
     IRStructField* field,
     NVVMSurfaceType& outType,
-    SlangNVVMSurfaceStorageFormat& outStorageFormat);
+    SlangNVVMValueTypeDesc& outPhysicalType);
 
 /// Describes one exact read-only CUDA texture object selected by direct NVVM.
 struct NVVMReadOnlyTextureType

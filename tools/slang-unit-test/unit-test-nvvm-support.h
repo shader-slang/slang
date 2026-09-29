@@ -697,6 +697,7 @@ struct FakeNVVMBuilderState
         scalarOperations.clear();
         emittedValueOperations.clear();
         surfaceOperations.clear();
+        surfaceOperationOperands.clear();
         textureOperations.clear();
         intrinsicOperations.clear();
         intrinsicResultTypes.clear();
@@ -830,6 +831,7 @@ struct FakeNVVMBuilderState
         returnNullIntrinsic = false;
         failIntrinsicAfterWrite = false;
         rejectValueOperation = false;
+        rejectHalfSurfaceOperation = false;
         rejectedValueOperation = 0;
         rejectedValueOperationResultType = {};
         rejectedValueOperationOperandCount = 0;
@@ -1044,6 +1046,8 @@ struct FakeNVVMBuilderState
     List<FakeNVVMBuilderScalarOperation> scalarOperations;
     List<FakeNVVMBuilderScalarOperationKey> emittedValueOperations;
     List<SlangNVVMSurfaceOperationDesc> surfaceOperations;
+    List<List<FakeNVVMBuilderValueRef>> surfaceOperationOperands;
+    bool rejectHalfSurfaceOperation = false;
     List<SlangNVVMTextureOperationDesc> textureOperations;
     List<SlangNVVMValueOperation> intrinsicOperations;
     List<SlangNVVMValueTypeDesc> intrinsicResultTypes;
@@ -6235,17 +6239,9 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     {
         return false;
     }
-    if (operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_NATIVE)
-    {
-        return is32BitNumeric ||
-               (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                operation.elementType.bitWidth == 16 && !operation.isArray &&
-                operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
-    }
-    return operation.storageFormat == SLANG_NVVM_SURFACE_STORAGE_FLOAT16 &&
-           operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-           operation.elementType.bitWidth == 32 && !operation.isArray &&
-           operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
+    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              operation.elementType.bitWidth == 16 && !operation.isArray &&
+                              operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(
@@ -6256,7 +6252,11 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(
         *outSupported = 0;
     if (!operation || !outSupported)
         return SLANG_E_INVALID_ARG;
-    *outSupported = _isFakeNVVMSurfaceOperationSupported(*operation) ? 1u : 0u;
+    *outSupported = _isFakeNVVMSurfaceOperationSupported(*operation) &&
+                            !(gFakeNVVMBuilder.rejectHalfSurfaceOperation &&
+                              operation->elementType.bitWidth == 16)
+                        ? 1u
+                        : 0u;
     return SLANG_OK;
 }
 
@@ -6319,6 +6319,14 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitSurfaceOperation(
 
     const Index resultIndex = gFakeNVVMBuilder.surfaceOperations.getCount();
     gFakeNVVMBuilder.surfaceOperations.add(*operation);
+    List<FakeNVVMBuilderValueRef> capturedOperands;
+    for (size_t i = 0; i < operandCount; ++i)
+    {
+        FakeNVVMBuilderValueRef operand;
+        SLANG_RELEASE_ASSERT(_getFakeNVVMBuilderValueRef(operands[i], operand));
+        capturedOperands.add(operand);
+    }
+    gFakeNVVMBuilder.surfaceOperationOperands.add(capturedOperands);
     if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)
         return SLANG_OK;
     *outValue = _getFakeNVVMBuilderSurfaceOperation(resultIndex);

@@ -879,5 +879,7 @@ return {
 	["reportOptiXIntersection"] = 902,
 	["Decoration.postDepthCoverage"] = 903,
 	["TerminatorInst.nvvmIntrinsic"] = 905,
-	["Decoration.nvvmSemantic"] = 906
+	["Decoration.nvvmSemantic"] = 906,
+	["NVVMSurfaceLoad"] = 907,
+	["NVVMSurfaceStore"] = 908
 }

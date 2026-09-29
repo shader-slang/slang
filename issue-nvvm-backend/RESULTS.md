@@ -72,6 +72,7 @@ python3 issue-nvvm-backend/test-run-compute-discovery.py
 python3 issue-nvvm-backend/test-run-complex-corpus.py
 python3 issue-nvvm-backend/test-nvvm-results.py
 python3 issue-nvvm-backend/test-nvvm-material-runtime.py
+python3 issue-nvvm-backend/test-nvvm-corpus-runtime.py
 ```
 
 Capture each gate's command, exit and log under the results root; use `timeout --kill-after=30s 30m`
@@ -469,6 +470,39 @@ requires the correctness gates prescribed by WORKFLOW before new claims. Preserv
 under the ignored results root. Update the current baseline/identity/focused evidence as applicable,
 STATUS and feature matrix; keep completed working plans/report drafts uncommitted. Make the reviewed
 local commit and stop unless further work was explicitly authorized.
+
+## Physical surface correctness
+
+`extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. Four fixtures under
+`tests/cuda/nvvm-surface-physical-*.slang` supply 43 cases: native Float32 and annotated Half,
+1D/2D scalar/2/4 channels, whole/component writes, exhaustive scalar Half decode, converted NaNs,
+dynamic-component negatives, literal-rounding controls and zero-boundary operations. It generates immutable input/expected
+bytes per run, verifies reflected resource offsets and CUDA descriptors, assembles PTX, and copies
+array bytes directly to the host. Shader roundtrips do not define its oracle.
+
+```bash
+python3 extras/validate-nvvm-surfaces.py --self-test
+python3 extras/validate-nvvm-surfaces.py \
+  --slangc build/RelWithDebInfo/bin/slangc \
+  --provider build/RelWithDebInfo/bin --cuda-root "$CUDA_PATH" \
+  --output "$NVVM_RESULTS/surfaces"
+```
+
+The full matrix returns nonzero while any requested case fails. Preserve every `(case, mode)` result;
+NVRTC component compilation failures, its observed Half truncation differences, and unsupported
+dynamic component indexing are recorded limitations, never passing cells. Compare exact before/after
+identities when accepting intended transitions. `--cases` selects exact names from `--list`, and
+`--modes` supports focused runs. Each run needs a fresh output directory. Raw byte arrays, PTX,
+reflection, subprocess logs and diagnostics stay in the ignored output tree; current compact outcomes
+and failure transitions belong in the feature-keyed focused evidence record.
+
+Finite Half stores use ordinary RN-even conversion, including subnormals and overflow. Converted
+NaNs require NaN class only; unchanged channels and guards require exact bytes. Run the CPU contracts
+before GPU checks. The ordinary Half-cast regression in `tests/cuda/nvvm-half-narrow-conversion.slang`
+checks conversions independently of surfaces; the math units exercise every finite Half midpoint.
+After producer-tag edits, compare generated NVRTC CUDA source against the accepted
+compiler with identical inputs/options. An old serialized user module should also link against the
+current built-ins; compatibility compilation is separate from fresh physical GPU evidence.
 
 ## Material runtime correctness
 

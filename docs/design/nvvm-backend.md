@@ -26,6 +26,7 @@ and NVVM representation must have distinct owners when changing shared pipeline 
 | Boundary                               | Owner and responsibility                                                                                                                                                            |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                                |
+| Physical surface IR                    | [slang-ir-nvvm-surface-legalize.cpp](../../source/slang/slang-ir-nvvm-surface-legalize.cpp): static storage types, conversion, component masks and byte-X coordinates               |
 | NVVM-ready IR                          | [slang-ir-nvvm-legalize.cpp](../../source/slang/slang-ir-nvvm-legalize.cpp): `legalizeIRForNVVM`, typed intrinsic normalization, layout queries, selected bounds policy and cleanup |
 | Type and representation classification | [slang-emit-nvvm-type-lowering.cpp](../../source/slang/slang-emit-nvvm-type-lowering.cpp): `NVVMTypeInfo`, use-specific provider types and caches                                   |
 | Preflight and provider emission        | [slang-emit-nvvm.cpp](../../source/slang/slang-emit-nvvm.cpp): reachable functions, exact operations/signatures, addresses, layout proofs, diagnostics and emitted operations       |
@@ -45,7 +46,8 @@ does not preprocess the CUDA prelude. It preserves each access's own resource ex
 
 Fixed standard-library producers carry typed NVVM intrinsic identities, which legalization consumes
 as `IRNVVMIntrinsic`. The catalog does not infer these semantics from arbitrary CUDA source text.
-Some richer texture, surface, atomic, scalar-out-parameter and compound-wave helpers still have exact
+Surface helpers carry load/store semantic tags and are rewritten per call while static field formats
+and component masks are available. Some richer texture, atomic, scalar-out-parameter and compound-wave helpers still have exact
 whole-body/signature recognizers. `RequirePrelude`, arbitrary GenericAsm and standalone execution
 requirements are not general no-ops; their meaning must be owned before they can be removed.
 
@@ -265,7 +267,7 @@ execution coverage.
 
 The optional `slang-llvm-nvvm` provider owns an isolated LLVM 14.0.6 typed-pointer construction path.
 It exports a versioned Slang C ABI with opaque handles and one generic operation surface. Current
-provider ABI is 42; compiler and provider must negotiate the exact required interface/capabilities.
+provider ABI is 43; compiler and provider must negotiate the exact required interface/capabilities.
 Raw LLVM objects and symbols must not cross into the CPU LLVM provider or the host compiler.
 Handles belong to their creating live module; destroying it invalidates subordinate handles. ABI
 buffers remain caller-owned, and serialization uses a size-query/write protocol. The host retains
@@ -341,13 +343,39 @@ array readback observes whole and component writes affecting neighboring packed 
 RGBA32Sint bindings pass. Shader reads through the same access convention can conceal this mismatch.
 The original texture-subscript corpus result is a shader self-check, not packed-format qualification.
 
-Component-lvalue legalization and storage-format selection are separate responsibilities. The existing
-image-subscript pass creates load/modify/store operations; CUDA source still needs scheduling and
-complete image-operation consumers. Fixing those consumers for native-width storage cannot qualify
-packed bindings. Static format conversion needs authoritative format provenance and matched loads,
-stores and coordinate scaling. Generic runtime formats require a separate design; device queries,
-specialization or explicit binding metadata remain alternatives to investigate. Do not infer format
-from test comments, values, or arbitrary caller walks. A new general lowering pass is not implied.
+`legalizeNVVMSurfaceOperations` runs only for direct NVVM, after specialization and global-parameter
+collection, before shared image-subscript expansion would discard component masks. It rewrites tagged
+standard-library helper calls at each use, using the format decoration on the canonical collected
+field. Equal logical types may therefore access different static formats in the same shader. Arbitrary
+user-helper resource parameters still lack authoritative format provenance and remain unsupported.
+
+`NVVMSurfaceLoad` and `NVVMSurfaceStore` carry physical payload types and byte-X coordinates; other
+coordinates retain their dimension/layer units. Matching Float32 accesses remain Float32. Annotated
+Half storage uses Half accesses and ordinary `FloatCast` instructions. The provider performs only
+mechanical intrinsic bitcasts; it does not select a storage format, scale X, widen a formatted load,
+or emit `sust.p`. Provider ABI43 makes this changed operation contract explicit.
+
+Half stores now use ordinary round-to-nearest, ties-to-even conversion. This intentionally differs
+from the old formatted store's observed truncation toward zero, including subnormal and overflow
+boundaries. Float-to-float rounding is implementation-defined in Slang. Converted NaNs promise a NaN
+result, not a payload or sign. The existing NVRTC surface-format conversion path remains unchanged.
+The shared `FloatToHalf` constant folder uses RN-even with full discarded-bit information, so literal
+conversions agree with runtime narrowing; this correction also applies to other backends' Half
+constants. Generic NVVM Float32-to-Half conversion selects `llvm.nvvm.f2h.rn` and mechanically
+bitcasts its integer result to Half. This avoids libNVVM 12.9 O3 folding low-payload signaling NaNs
+through ordinary `fptrunc` into infinity. It is a general conversion selection, not surface-specific
+NaN handling; Half widening, Double conversion and BF16 keep their separate implementations.
+
+For `image[p].xz = value`, legalization loads the physical texel, converts only replacement lanes,
+and merges them before the physical store. Untouched lanes preserve their exact bits, including
+NaN payloads and signed zero. These updates remain non-atomic. Dynamic component indexing is outside
+this bounded surface lowering. New operations conservatively retain memory effects so reads cannot
+be reused across writes. Unsupported logical accesses remain diagnosable before provider mutation;
+there is no fallback to provider-owned format conversion.
+
+Static format annotations and matching runtime allocations are required. This pass does not infer
+formats from an opaque handle, test values, comments, or arbitrary caller graphs. Packed/normalized
+formats and generic runtime format conversion remain outside the current contract.
 
 **Texture queries.** Selected non-mip geometry has direct lowering. Full mip, array-count and
 allocated/view-level-count semantics remain unresolved. CUDA source helpers ignore requested mip and

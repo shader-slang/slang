@@ -1729,13 +1729,14 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
 bool getNVVMSupportedSurfaceField(
     IRStructField* field,
     NVVMSurfaceType& outType,
-    SlangNVVMSurfaceStorageFormat& outStorageFormat)
+    SlangNVVMValueTypeDesc& outPhysicalType)
 {
     outType = {};
-    outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    outPhysicalType = {};
     if (!field || !getNVVMSupportedSurfaceType(field->getFieldType(), outType))
         return false;
 
+    outPhysicalType = outType.elementType;
     auto formatDecoration = field->getKey()->findDecoration<IRFormatDecoration>();
     if (!formatDecoration)
         return true;
@@ -1768,7 +1769,7 @@ bool getNVVMSupportedSurfaceField(
         return false;
     }
 
-    outStorageFormat = SLANG_NVVM_SURFACE_STORAGE_FLOAT16;
+    outPhysicalType.bitWidth = 16;
     return true;
 }
 
@@ -1978,7 +1979,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     NVVMRawBufferType rawBufferType;
     NVVMSurfaceType surfaceType;
     NVVMReadOnlyTextureType sampledTextureType;
-    SlangNVVMSurfaceStorageFormat storageFormat = SLANG_NVVM_SURFACE_STORAGE_NATIVE;
+    SlangNVVMValueTypeDesc physicalType = {};
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
            asNVVMSupportedResourceStructType(type) ||
@@ -1986,7 +1987,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
            asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
            asNVVMSupportedParameterGroupType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType) ||
-           getNVVMSupportedSurfaceField(field, surfaceType, storageFormat) ||
+           getNVVMSupportedSurfaceField(field, surfaceType, physicalType) ||
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
            asNVVMSupportedDescriptorHandleType(type) || asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type) ||

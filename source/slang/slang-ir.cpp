@@ -9504,6 +9504,12 @@ bool IRInst::mightHaveSideEffects(
     default:
         break;
 
+    // Keep surface reads memory-dependent, like ImageLoad. Treating a read as pure would let
+    // CSE reuse its value across a physical surface write.
+    case kIROp_NVVMSurfaceLoad:
+    case kIROp_NVVMSurfaceStore:
+        return true;
+
     case kIROp_Call:
         {
             // In the general case, a function call must be assumed to

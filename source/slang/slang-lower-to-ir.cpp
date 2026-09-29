@@ -117,6 +117,8 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmWorkgroupMemoryBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER},
     {"nvvmThreadIndex", SLANG_NVVM_VALUE_OP_THREAD_INDEX},
     {"nvvmTextureSample", kNVVMIntrinsicSemanticTextureSample},
+    {"nvvmSurfaceLoad", kNVVMIntrinsicSemanticSurfaceLoad},
+    {"nvvmSurfaceStore", kNVVMIntrinsicSemanticSurfaceStore},
     {"nvvmAtomicReduceAdd", kNVVMIntrinsicSemanticAtomicReduceAdd},
     {"nvvmAtomicReduceSubtract", kNVVMIntrinsicSemanticAtomicReduceSubtract},
     {"nvvmAtomicReduceMin", kNVVMIntrinsicSemanticAtomicReduceMin},

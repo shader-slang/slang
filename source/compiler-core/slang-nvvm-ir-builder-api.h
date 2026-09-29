@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 42u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 43u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -249,17 +249,14 @@ extern "C"
     typedef uint32_t SlangNVVMSurfaceBoundaryMode;
 #define SLANG_NVVM_SURFACE_BOUNDARY_ZERO ((SlangNVVMSurfaceBoundaryMode)0u)
 
-    typedef uint32_t SlangNVVMSurfaceStorageFormat;
-#define SLANG_NVVM_SURFACE_STORAGE_NATIVE ((SlangNVVMSurfaceStorageFormat)0u)
-#define SLANG_NVVM_SURFACE_STORAGE_FLOAT16 ((SlangNVVMSurfaceStorageFormat)1u)
-
     typedef uint32_t SlangNVVMTextureShape;
 #define SLANG_NVVM_TEXTURE_SHAPE_1D ((SlangNVVMTextureShape)1u)
 #define SLANG_NVVM_TEXTURE_SHAPE_2D ((SlangNVVMTextureShape)2u)
 #define SLANG_NVVM_TEXTURE_SHAPE_3D ((SlangNVVMTextureShape)3u)
 #define SLANG_NVVM_TEXTURE_SHAPE_CUBE ((SlangNVVMTextureShape)4u)
 
-    /** Describes one complete typed surface-resource operation. */
+    /** Describes a physical surface transfer. X is bytes; remaining coordinates are texels.
+        elementType is the stored representation. Conversion belongs to the producer IR. */
     typedef struct SlangNVVMSurfaceOperationDesc
     {
         SlangNVVMSurfaceOperation operation;
@@ -267,7 +264,6 @@ extern "C"
         uint32_t isArray;
         SlangNVVMValueTypeDesc elementType;
         SlangNVVMSurfaceBoundaryMode boundaryMode;
-        SlangNVVMSurfaceStorageFormat storageFormat;
     } SlangNVVMSurfaceOperationDesc;
 
     typedef uint32_t SlangNVVMTextureOperation;

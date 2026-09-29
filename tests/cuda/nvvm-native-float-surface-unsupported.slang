@@ -12,4 +12,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = inputTexture[int2(dispatchThreadID.xy)].x;
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'nvvmIntrinsic'

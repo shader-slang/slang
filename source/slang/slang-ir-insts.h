@@ -2019,6 +2019,19 @@ struct IRImageStore : IRInst
     bool hasAuxCoord1() { return getOperandCount() > 3 && getOperand(3) != nullptr; }
     IRInst* getAuxCoord1() { return getOperand(3); }
 };
+// Physical surface accesses have memory effects and never perform format conversion.
+FIDDLE()
+struct IRNVVMSurfaceLoad : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRNVVMSurfaceStore : IRInst
+{
+    FIDDLE(leafInst())
+};
+
 // Terminators
 
 FIDDLE()

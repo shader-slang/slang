@@ -100,6 +100,7 @@
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-nvvm-legalize.h"
+#include "slang-ir-nvvm-surface-legalize.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
@@ -2490,6 +2491,10 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
+    // Preserve component masks while making the direct route's physical accesses explicit.
+    if (emitNVVMDirectly)
+        SLANG_PASS(legalizeNVVMSurfaceOperations);
+
     // Legalize `ImageSubscript` loads.
     switch (target)
     {
@@ -2501,7 +2506,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
+            if (!emitNVVMDirectly)
+                SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
         }
         break;
     default:
