@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Compare physical CUDA surface bytes against independent, generated host expectations.
 
-This bounded two-array harness uses 1D/2D Float32 or Half storage and 1/2/4 channels.
+This bounded harness uses 1D/2D Float32, Half and native integer32 storage with
+1/2/4 channels, including independently initialized mixed-format resources.
 It records failures as failures, including NVRTC component compilation and formatted
 store rounding differences. NaN conversions require class only; untouched bits are exact.
 Run --self-test for CPU oracle/ABI/reflection contracts without a compiler or GPU.
@@ -11,6 +12,7 @@ Run --self-test for CPU oracle/ABI/reflection contracts without a compiler or GP
 import argparse
 from collections import Counter
 import ctypes as C
+import copy
 import hashlib
 import json
 import os
@@ -23,6 +25,10 @@ import tempfile
 import time
 
 REPO = Path(__file__).resolve().parents[1]
+FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed"]
+INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
+                  0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
+FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4)}
 VALUES = [
     0x00000000, 0x80000000, 0x3F800000, 0xBF800000,
     0x3F800FFF, 0x3F801000, 0x3F801001, 0x3F803000,
@@ -64,7 +70,7 @@ def inventory_paths(args, provider):
         paths.update(directory.rglob("*.slang-module"))
     paths.update(args.cuda_root.joinpath("lib64").glob("libnvrtc*.so*"))
     paths.update(REPO / "tests/cuda" / ("nvvm-surface-physical-" + name + ".slang")
-                 for name in ["matrix", "half-load", "half-nan", "boundaries"])
+                 for name in FIXTURES)
     if args.provenance:
         paths.add(args.provenance.resolve())
     return paths
@@ -143,11 +149,121 @@ def cases():
         add("half-oob-" + entry, "boundaries", entry, 8, 3, 1, True, defines=dict(PROBE_OOB=1))
     add("half-1d-1-literal-store", "matrix", "literalStore", 32, 1, 1, True, 1,
         dict(SURFACE_DIM=1, SURFACE_LANES=1, SURFACE_HALF=1, SURFACE_LITERAL_STORE=1))
+    for shape in (1, 2):
+        for lanes in (1, 2, 4):
+            for scalar in ("int32", "uint32"):
+                for entry in ("wholeStore", "componentStore", "loadValues"):
+                    add(f"{scalar}-{shape}d-{lanes}-{entry}", "integers", entry,
+                        32, 1 if shape == 1 else 3, lanes, False, shape,
+                        dict(SURFACE_DIM=shape, SURFACE_LANES=lanes,
+                             SURFACE_SIGNED=int(scalar == "int32")))
+                    rows[-1]["scalar"] = scalar
+        for entry in ("wholeCopies", "componentCopies"):
+            add(f"mixed-{shape}d-{entry}", "mixed", entry, 32,
+                1 if shape == 1 else 3, 4, False, shape, dict(SURFACE_DIM=shape))
     return rows
+
+
+def resource_specs(row):
+    """Describe each resource's physical channel format and reflected logical type in ABI order."""
+    def spec(name, storage, lanes, scalar="float32"):
+        # Integer RW textures carry an inferred format even without a source annotation.
+        # Reflection exposes checkVarDeclCommon's inferredFormatAttribute, so check it exactly.
+        suffix = {"half": "16f", "int32": "32i", "uint32": "32ui"}.get(storage)
+        reflected_format = {1: "r", 2: "rg", 4: "rgba"}[lanes] + suffix if suffix else None
+        return dict(name=name, storage=storage, lanes=lanes, scalar=scalar,
+                    format=reflected_format)
+    if row["fixture"] == "mixed":
+        return [spec(prefix + suffix, storage, lanes)
+                for prefix in ("source", "result")
+                for suffix, storage, lanes in (("Native", "float32", 4), ("R", "half", 1),
+                                               ("RG", "half", 2), ("RGBA", "half", 4))]
+    scalar = row.get("scalar", "float32")
+    return [spec("surface", "half" if row["half"] else scalar, row["lanes"], scalar),
+            spec("observed", scalar, row["lanes"], scalar)]
+
+
+def resource_buffers(row, buffers):
+    """Adapt the original two-array contract without changing its persisted oracle identity."""
+    if "resources" in buffers:
+        return buffers["resources"]
+    return [dict(initial=buffers[a], expected=buffers[b],
+                 nan_positions=buffers["nan_positions"][i],
+                 active_texels=buffers["active_texels"], guard_texels=buffers["guard_texels"])
+            for i, (a, b) in enumerate((("initial", "expected"),
+                                        ("output_initial", "output_expected")))]
+
+
+def oracle_files(row, buffers):
+    """Keep original file keys stable; name added multi-resource inputs by their shader binding."""
+    if "resources" not in buffers:
+        return {key: buffers[key] for key in
+                ("initial", "expected", "output_initial", "output_expected")}
+    return {spec["name"] + "-" + key: data[key]
+            for spec, data in zip(resource_specs(row), buffers["resources"])
+            for key in ("initial", "expected")}
+
+
+def expanded_oracle(row):
+    """Compute new integer and mixed-copy expectations from host inputs, never shader readback."""
+    specs = resource_specs(row)
+    values, expected, exceptions = [], [], []
+    for index, spec in enumerate(specs):
+        n = row["width"] * row["height"] * spec["lanes"]
+        if row["fixture"] == "integers":
+            pattern = INTEGER_VALUES if index == 0 else [0x13579BDF]
+        elif index == 0:
+            pattern = VALUES
+        elif index < 4:
+            pattern = LOAD_HALF
+        else:
+            pattern = INITIAL_HALF if spec["storage"] == "half" else INITIAL_FLOAT
+        # Distinct source phase offsets expose resource substitutions and lane-order mistakes.
+        phase = index * 3 if row["fixture"] == "mixed" else 0
+        values.append([pattern[(i + phase) % len(pattern)] for i in range(n)])
+        expected.append(list(values[-1]))
+        exceptions.append(set())
+    active = 0
+    for y in range(row["height"]):
+        for x in range(row["width"]):
+            if x >= 24 or y >= 2:
+                continue
+            active += 1
+            texel = y * row["width"] + x
+            if row["fixture"] == "integers":
+                for lane in range(row["lanes"]):
+                    i = texel * row["lanes"] + lane
+                    expected[1][i] = values[0][i] if row["entry"] == "loadValues" else 0x12345678
+                    if row["entry"] == "wholeStore" or (row["entry"] == "componentStore" and
+                            lane in ((0, 2) if row["lanes"] == 4 else (0,))):
+                        expected[0][i] = INTEGER_VALUES[(x + y * 24 + 5 * lane) % len(INTEGER_VALUES)]
+            else:
+                partial = row["entry"] == "componentCopies"
+                # Half sources feed distinct native result lanes; destinations are never sources.
+                for lane, (source, source_lane) in enumerate(((1, 0), (2, 1), (3, 2), (3, 3))):
+                    if not partial or lane in (1, 3):
+                        i = texel * specs[source]["lanes"] + source_lane
+                        expected[4][texel * 4 + lane] = widen_half(values[source][i])
+                for target in (5, 6, 7):
+                    lanes = specs[target]["lanes"]
+                    for lane in range(lanes):
+                        if not partial or lane in ((1, 3) if lanes == 4 else (lanes - 1,)):
+                            expected[target][texel * lanes + lane] = narrow_half(values[0][texel * 4 + lane])
+    resources = []
+    for i, spec in enumerate(specs):
+        size = FORMATS[spec["storage"]][1]
+        def pack(data):
+            return b"".join(v.to_bytes(size, "little") for v in data)
+        resources.append(dict(initial=pack(values[i]), expected=pack(expected[i]),
+                              nan_positions=exceptions[i], active_texels=active,
+                              guard_texels=row["width"] * row["height"] - active))
+    return dict(resources=resources)
 
 
 def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
+    if row["fixture"] in ("integers", "mixed"):
+        return expanded_oracle(row)
     n = row["width"] * row["height"] * row["lanes"]
     half, lanes = row["half"], row["lanes"]
     pattern = INITIAL_HALF if half else INITIAL_FLOAT
@@ -206,14 +322,15 @@ def oracle(row):
 
 def compare(row, buffers, index, actual):
     """Check exact channels and only the explicitly designated converted-NaN classes."""
-    expected = buffers["expected" if index == 0 else "output_expected"]
-    size = 2 if index == 0 and row["half"] else 4
+    resource = resource_buffers(row, buffers)[index]
+    expected = resource["expected"]
+    size = FORMATS[resource_specs(row)[index]["storage"]][1]
     require(len(actual) == len(expected), "Wrong physical readback length")
     failures, nan_bits = [], Counter()
     for i in range(len(actual) // size):
         a = int.from_bytes(actual[i * size:(i + 1) * size], "little")
         e = int.from_bytes(expected[i * size:(i + 1) * size], "little")
-        if i in buffers["nan_positions"][index]:
+        if i in resource["nan_positions"]:
             mask, fraction = (0x7C00, 1023) if size == 2 else (0x7F800000, 0x7FFFFF)
             good = a & mask == mask and a & fraction != 0
             nan_bits[hex(a)] += 1
@@ -263,13 +380,14 @@ def validate_host_abi():
 
 
 def run_device(ptx, row, buffers, output):
-    """Initialize two physical arrays, execute once, and independently copy all bytes back."""
+    """Initialize each physical array, execute once, and independently copy all bytes back."""
     validate_host_abi()
     result = dict(status="running", cleanup=[])
     def save():
         write_json(output / "runtime.json", result)
     context, module = VP(), VP()
-    arrays, surfaces = [VP(), VP()], [U64(), U64()]
+    specs, data = resource_specs(row), resource_buffers(row, buffers)
+    arrays, surfaces = [VP() for _ in specs], [U64() for _ in specs]
     driver = None
     try:
         driver = C.CDLL('libcuda.so.1')
@@ -303,10 +421,10 @@ def run_device(ptx, row, buffers, output):
                 driver.cuGetErrorName(code, C.byref(label))
                 driver.cuGetErrorString(code, C.byref(message))
                 raise RuntimeError(f'{name}: {code} {label.value!r} {message.value!r}')
-        def copy_array(array, data, bytes_per_channel, upload):
+        def copy_array(array, data, spec, upload):
             host = C.create_string_buffer(data, len(data))
             copy = Copy2D()
-            pitch = row['width'] * row['lanes'] * bytes_per_channel
+            pitch = row['width'] * spec['lanes'] * FORMATS[spec['storage']][1]
             require(len(data) == pitch * row['height'], 'Host array copy extent mismatch')
             copy.WidthInBytes, copy.Height = pitch, row['height']
             if upload:
@@ -328,9 +446,10 @@ def run_device(ptx, row, buffers, output):
                                 compute_capability=[major.value, minor.value])
         check('cuCtxCreate_v2', C.byref(context), 0, device)
         result['actual_array_descriptors'] = []
-        for i, fmt in enumerate([(0x10 if row['half'] else 0x20), 0x20]):
+        for i, spec in enumerate(specs):
+            fmt = FORMATS[spec['storage']][0]
             desc = Array3DDesc(row['width'], row['height'] if row['shape'] == 2 else 0,
-                               0, fmt, row['lanes'], 2)
+                               0, fmt, spec['lanes'], 2)
             check('cuArray3DCreate_v2', C.byref(arrays[i]), C.byref(desc))
             actual_desc = Array3DDesc()
             check('cuArray3DGetDescriptor_v2', C.byref(actual_desc), arrays[i])
@@ -345,20 +464,21 @@ def run_device(ptx, row, buffers, output):
             check('cuSurfObjectGetResourceDesc', C.byref(queried), surfaces[i])
             require(queried.resType == 0 and queried.res.array == arrays[i].value and
                     queried.flags == 0, 'CUDA surface resource binding mismatch')
-            initial = buffers['initial' if i == 0 else 'output_initial']
-            bpc = (2 if row['half'] else 4) if i == 0 else 4
-            copy_array(arrays[i], initial, bpc, True)
-            require(copy_array(arrays[i], bytes(len(initial)), bpc, False) == initial,
+            initial = data[i]['initial']
+            copy_array(arrays[i], initial, spec, True)
+            require(copy_array(arrays[i], bytes(len(initial)), spec, False) == initial,
                     'Host upload did not preserve the initial array bytes')
+        result['surface_bindings_verified'] = True
         result['initial_host_copies_verified'] = True
         ptx_buffer = C.create_string_buffer(ptx)
         check('cuModuleLoadData', C.byref(module), ptx_buffer)
         globals_pointer, globals_size = U64(), SZ()
         check('cuModuleGetGlobal_v2', C.byref(globals_pointer), C.byref(globals_size),
               module, b'SLANG_globalParams')
-        require(globals_size.value == 16, 'Loaded CUDA module has wrong global size')
-        global_data = (U64 * 2)(surfaces[0].value, surfaces[1].value)
-        check('cuMemcpyHtoD_v2', globals_pointer, global_data, 16)
+        require(globals_size.value == 8 * len(specs), 'Loaded CUDA module has wrong global size')
+        global_data = (U64 * len(specs))(*(surface.value for surface in surfaces))
+        check('cuMemcpyHtoD_v2', globals_pointer, global_data, C.sizeof(global_data))
+        result['global_surface_handles_uploaded'] = True
         function = VP()
         check('cuModuleGetFunction', C.byref(function), module, row['entry'].encode())
         check('cuLaunchKernel', function, row['width'], row['height'], 1,
@@ -366,16 +486,14 @@ def run_device(ptx, row, buffers, output):
         check('cuCtxSynchronize')
         result['launched_and_synchronized'] = True
         result['readbacks'] = []
-        for i in range(2):
-            key = 'expected' if i == 0 else 'output_expected'
-            expected = buffers[key]
-            bpc = (2 if row['half'] else 4) if i == 0 else 4
-            actual = copy_array(arrays[i], bytes(len(expected)), bpc, False)
-            name = 'surface' if i == 0 else 'observed'
+        for i, spec in enumerate(specs):
+            expected = data[i]['expected']
+            actual = copy_array(arrays[i], bytes(len(expected)), spec, False)
+            name = spec['name']
             (output / (name + '-actual.bin')).write_bytes(actual)
             checked = compare(row, buffers, i, actual)
-            checked.update(array=name, active_texels=buffers["active_texels"],
-                           guard_texels=buffers["guard_texels"])
+            checked.update(array=name, active_texels=data[i]["active_texels"],
+                           guard_texels=data[i]["guard_texels"])
             result['readbacks'].append(checked)
         result['status'] = ('runtime-mismatch' if any(x['mismatch_count'] for x in
                             result['readbacks']) else 'passed')
@@ -398,32 +516,33 @@ def run_device(ptx, row, buffers, output):
 
 
 def validate_bindings(reflection, row, ptx, architecture):
-    """Verify each compiled entry's two named resource bindings and actual PTX launch ABI."""
+    """Verify every resource descriptor against reflection and the actual PTX launch ABI."""
     params = reflection.get("parameters", [])
-    require(len(params) == 2, "Expected exactly two global surface bindings")
-    expected_format = {1: "r16f", 2: "rg16f", 4: "rgba16f"}[row["lanes"]]
-    for parameter, name, offset in zip(params, ["surface", "observed"], [0, 8]):
+    specs = resource_specs(row)
+    require(len(params) == len(specs), "Wrong global surface binding count")
+    for i, (parameter, spec) in enumerate(zip(params, specs)):
+        name, offset = spec["name"], i * 8
         binding, ty = parameter["binding"], parameter["type"]
         require(parameter["name"] == name and binding["kind"] == "uniform" and
                 binding["offset"] == offset and binding["size"] == 8, "Surface binding mismatch")
         require(ty["kind"] == "resource" and ty["baseShape"] == f'texture{row["shape"]}D' and
                 ty["access"] == "readWrite", "Surface shape/access mismatch")
         result = ty["resultType"]
-        if row["lanes"] > 1:
-            require(result["kind"] == "vector" and result["elementCount"] == row["lanes"],
+        if spec["lanes"] > 1:
+            require(result["kind"] == "vector" and result["elementCount"] == spec["lanes"],
                     "Surface lane count mismatch")
             result = result["elementType"]
-        require(result["kind"] == "scalar" and result["scalarType"] == "float32",
+        require(result["kind"] == "scalar" and result["scalarType"] == spec["scalar"],
                 "Surface logical element mismatch")
-        expected = expected_format if name == "surface" and row["half"] else None
-        require(parameter.get("format") == expected, "Surface format annotation mismatch")
+        require(parameter.get("format") == spec["format"], "Surface format annotation mismatch")
     entries = [x for x in reflection.get("entryPoints", []) if x.get("name") == row["entry"]]
     require(len(entries) == 1 and entries[0]["stage"] == "compute" and
             entries[0]["threadGroupSize"] == [1, 1, 1], "Entry reflection mismatch")
     require(re.search(r"\.entry\s+" + re.escape(row["entry"]) + r"\s*\(\s*\)", ptx),
             "PTX entry must have no explicit parameters")
-    require(re.search(r"\.const\s+\.align\s+8\s+\.b8\s+SLANG_globalParams\[16\]", ptx),
-            "PTX globals must contain exactly two 64-bit surface handles")
+    require(re.search(r"\.const\s+\.align\s+8\s+\.b8\s+SLANG_globalParams\[" +
+                      str(8 * len(specs)) + r"\]", ptx),
+            "PTX globals must contain exactly the reflected 64-bit surface handles")
     require(re.search(r"\.target\s+sm_" + str(architecture) + r"\b", ptx), "PTX target mismatch")
 
 
@@ -458,9 +577,44 @@ def self_test():
             require(widen_half(value) == expected, "Independent exhaustive widening check failed")
     for row in cases():
         buffers = oracle(row)
-        for index, key in enumerate(["expected", "output_expected"]):
-            require(compare(row, buffers, index, buffers[key])["mismatch_count"] == 0,
+        for index, data in enumerate(resource_buffers(row, buffers)):
+            require(compare(row, buffers, index, data["expected"])["mismatch_count"] == 0,
                     "Reference oracle rejected")
+    # Each added resource has independent storage, including source-only arrays and guard texels.
+    for row in (x for x in cases() if x["fixture"] in ("integers", "mixed")):
+        buffers = oracle(row)
+        specs = resource_specs(row)
+        for index, data in enumerate(resource_buffers(row, buffers)):
+            size = FORMATS[specs[index]["storage"]][1]
+            for position in (0, 24 * specs[index]["lanes"]):
+                damaged = bytearray(data["expected"])
+                damaged[position * size] ^= 1
+                require(compare(row, buffers, index, damaged)["mismatch_count"] == 1,
+                        "Resource or guard corruption was ignored")
+        params = []
+        for index, spec in enumerate(specs):
+            ty = dict(kind="scalar", scalarType=spec["scalar"])
+            if spec["lanes"] > 1:
+                ty = dict(kind="vector", elementCount=spec["lanes"], elementType=ty)
+            params.append(dict(name=spec["name"], format=spec["format"],
+                               binding=dict(kind="uniform", offset=index * 8, size=8),
+                               type=dict(kind="resource", baseShape=f'texture{row["shape"]}D',
+                                         access="readWrite", resultType=ty)))
+        reflection = dict(parameters=params, entryPoints=[dict(name=row["entry"],
+                          stage="compute", threadGroupSize=[1, 1, 1])])
+        ptx = f'.target sm_80\n.const .align 8 .b8 SLANG_globalParams[{len(specs) * 8}]\n'
+        ptx += f'.entry {row["entry"]}()'
+        validate_bindings(reflection, row, ptx, 80)
+        for index in range(len(specs)):
+            for field, value in (("name", "wrongResource"), ("format", "rgba8")):
+                damaged = copy.deepcopy(reflection)
+                damaged["parameters"][index][field] = value
+                try:
+                    validate_bindings(damaged, row, ptx, 80)
+                except ValueError:
+                    pass
+                else:
+                    raise ValueError("Resource binding/format substitution was ignored")
     literal = oracle(next(x for x in cases() if x["case"] == "half-1d-1-literal-store"))
     dynamic = oracle(next(x for x in cases() if x["case"] == "half-1d-1-wholeStore"))
     require(literal == dynamic, "Literal stores changed the frozen whole-store oracle")
@@ -533,7 +687,7 @@ def main():
         config = json.loads(args.device_case.read_text())
         row = config["row"]
         buffers = oracle(row)
-        require(all(sha(buffers[key]) == value for key, value in config["oracle_sha256"].items()),
+        require(all(sha(oracle_files(row, buffers)[key]) == value for key, value in config["oracle_sha256"].items()),
                 "Worker oracle differs from the frozen pre-compilation inputs")
         result = run_device(Path(config["ptx"]).read_bytes(), row, buffers, args.device_case.parent)
         return 0 if result["status"] == "passed" else 1
@@ -562,7 +716,7 @@ def main():
     identity = freeze_identity(inventory_paths(args, provider))
     checked_each_cell = {Path(__file__).resolve()} | {
         REPO / "tests/cuda" / ("nvvm-surface-physical-" + name + ".slang")
-        for name in ["matrix", "half-load", "half-nan", "boundaries"]}
+        for name in FIXTURES}
     provenance = dict(scope="Selected runtime installation and fixture inventory, not a loaded-library trace",
                       artifacts=identity, environment={key: environment.get(key) for key in
                       ["CUDA_PATH", "CUDA_HOME", "LIBNVVM_HOME", "SLANG_NVVM_BUILDER_PATH",
@@ -584,11 +738,12 @@ def main():
         buffers = oracle(row)
         frozen = args.output / row["case"]
         frozen.mkdir()
-        for key in ["initial", "expected", "output_initial", "output_expected"]:
-            (frozen / (key + ".bin")).write_bytes(buffers[key])
-        refs = {key: sha(buffers[key]) for key in ["initial", "expected", "output_initial", "output_expected"]}
+        files = oracle_files(row, buffers)
+        for key, data in files.items():
+            (frozen / (key + ".bin")).write_bytes(data)
+        refs = {key: sha(data) for key, data in files.items()}
         write_json(frozen / "oracle.json", dict(row=row, source_sha256=sha(source.read_bytes()),
-                   file_sha256=refs, converted_nan_positions=[sorted(x) for x in buffers["nan_positions"]]))
+                   file_sha256=refs, converted_nan_positions=[sorted(x["nan_positions"]) for x in resource_buffers(row, buffers)]))
         for mode in args.modes:
             output = frozen / mode
             output.mkdir()

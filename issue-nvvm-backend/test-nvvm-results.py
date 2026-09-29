@@ -10,6 +10,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 
 spec = importlib.util.spec_from_file_location("results", Path(__file__).with_name("nvvm-results.py"))
 results = importlib.util.module_from_spec(spec)
@@ -277,6 +279,72 @@ class Contracts(unittest.TestCase):
         self.assertEqual(rows[1]["registers"], 23)
         self.assertEqual(rows[1]["stack_bytes"], 16)
         self.assertEqual(rows[1]["spill_load_bytes"], 8)
+
+
+class SurfaceCheckpointContracts(unittest.TestCase):
+    def test_mandatory_surface_invocation_and_comparison_control_checkpoint(self):
+        # Fake child processes prove orchestration only. Physical proof replay and adversarial
+        # readbacks are exercised independently in test-nvvm-surface-results.py.
+        for scenario in ("preserved", "bootstrap", "invalid", "timeout"):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                output = root / "output"
+                output.mkdir()
+                compiler, provider = root / "slangc", root / "provider.so"
+                compiler.write_bytes(b"fake compiler; never executed")
+                provider.write_bytes(b"fake provider; never loaded")
+                block = {"schema": 1, "status": "validated", "requested_cells": 3,
+                         "identity": {"slangc": results.reference(compiler), "provider": results.reference(provider)},
+                         "fresh_cell_outcomes": [{"id": "physical", "mode": mode, "status": "compile-failed"}
+                                                 for mode in results.MODES]}
+                baseline = {"status": "accepted-full", "runtime_input_sha256": {},
+                            "corpora": {name: {"fresh_cell_outcomes": outcomes()} for name in ("frozen", "discovery")}}
+                if scenario != "bootstrap":
+                    baseline["surfaces"] = block
+                baseline_path = root / "baseline.json"
+                results.write(baseline_path, baseline)
+                args = SimpleNamespace(baseline=baseline_path, output=output, slangc=compiler,
+                                       provider=provider, cuda_root=root, build_label="fake", jobs=1)
+                runner = SimpleNamespace(read_workloads=lambda *a: {}, load_toolkit_helpers=lambda: None)
+                provenance = {"artifact_sha256": {str(compiler): results.sha(compiler), str(provider): results.sha(provider)}}
+                results.write(output / "provenance.json", provenance)
+                commands = []
+                def fake_run(command, log, environment, timeout):
+                    command = list(map(str, command)); commands.append(command)
+                    name = Path(log).stem
+                    folder = output / name; folder.mkdir()
+                    Path(log).write_text("CPU fake process\n")
+                    if name == "runtime":
+                        fixtures = ["a", "b", "c", "d"]
+                        results.write(folder / "results.json", {"status": "passed", "expected_fixtures": fixtures,
+                            "results": [{"fixture": f, "classification": "correct", "execution_counts":
+                                {"passed": 1, "executed": 1, "ignored": 0, "other_summary_status": 0}} for f in fixtures]})
+                    elif name in ("frozen", "discovery"):
+                        results.write(folder / "results.json", outcomes())
+                    elif name == "complex":
+                        results.write(folder / "results.json", {"cells": [{"id": "material", "status": "passed"}]})
+                    return {"command": command, "log": str(log), "return_code": 1 if name == "surfaces" else 0,
+                            "timed_out": name == "surfaces" and scenario == "timeout"}
+                surface_module = results.load_surface_results()
+                with mock.patch.object(results, "configure", return_value=(runner, {}, provenance)), \
+                     mock.patch.object(results, "run", side_effect=fake_run), \
+                     mock.patch.object(results, "cells_for", return_value=[{"id": "material"}]), \
+                     mock.patch.object(results, "load_surface_results", return_value=surface_module), \
+                     mock.patch.object(surface_module, "validate_report", return_value=block,
+                                       side_effect=ValueError("false pass") if scenario == "invalid" else None) as validate:
+                    record = results.checkpoint(args)
+                surface_commands = [cmd for cmd in commands if any(x.endswith("validate-nvvm-surfaces.py") for x in cmd)]
+                self.assertEqual(len(surface_commands), 1)
+                self.assertNotIn("--cases", surface_commands[0])
+                self.assertNotIn("--modes", surface_commands[0])
+                self.assertEqual(surface_commands[0][surface_commands[0].index("--provider")+1], str(provider.parent))
+                expected = {"preserved": "passed", "bootstrap": "review-required", "invalid": "failed", "timeout": "failed"}[scenario]
+                self.assertEqual(record["status"], expected)
+                self.assertEqual(validate.call_count, 0 if scenario == "timeout" else 1)
+                if scenario in ("preserved", "bootstrap"):
+                    self.assertEqual(results.read(output / "outcomes.json")["surfaces"], block)
+                    self.assertEqual(results.read(output / "surfaces-validated.json"), block)
+                    self.assertEqual(results.read(output / "comparison.json")["surfaces"]["status"], expected)
 
 
 if __name__ == "__main__":

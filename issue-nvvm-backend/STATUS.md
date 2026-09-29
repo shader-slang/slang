@@ -1,7 +1,7 @@
 # NVVM current status
 
-The authorized NVVM-only surface-format legalization pass is complete and accepted. This bounded
-task stops here; it does not resume the general feature loop. Skip Slack; no push or system changes.
+The authorized surface-corpus expansion and recurring checkpoint integration are complete and
+accepted. This bounded task stops here; it does not resume the general feature loop. Skip Slack; no push or system changes.
 Keep plans, reports and raw artifacts ignored and update current documents in place.
 
 Start with the [architecture](../docs/design/nvvm-backend.md),
@@ -15,30 +15,32 @@ Start with the [architecture](../docs/design/nvvm-backend.md),
 [Focused evidence](focused-evidence.json) preserves qualifications and failure histories under their
 actual compiler identities. Performance measurements have not been refreshed for this compiler.
 
-| Evidence                                          | Accepted result                                                                           |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Cases / sources / mode cells                      | 580 / 576 / 1,740                                                                         |
-| Main outcomes                                     | 1,704 correct; 36 unresolved; 21 resolved histories; exact outcomes and inputs unchanged  |
-| Frozen / discovery                                | 1,356 / 384 cells                                                                         |
-| Native units                                      | 1125 identities: 1112 pass, 13 skip; five new tests pass, all old identities unchanged    |
-| Semantic regressions                              | 1248 identities: 1170 pass, 78 skip; unchanged                                            |
-| Surface host-readback matrix                      | 43 cases × 3 modes: 106 passes, 14 compile failures, 9 retained NVRTC rounding mismatches |
-| NVVM surface qualification                        | 41 supported cases pass in each mode; two dynamic-index negatives remain per mode         |
-| Focused units / surface source / Half GPU         | 7 / 6 / 15 pass                                                                           |
-| Direct static units                               | 5 pass, no skip; role/cache, classifier and address-plan contracts                        |
-| Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                                                           |
-| Material runtime                                  | 12 cells pass; two entries × two input profiles × three modes                             |
-| Runner contracts                                  | 97 pass, 1 inherited skip; 43 surface oracle/ABI CPU case contracts pass                  |
-| NVRTC surface source preservation                 | 36 emitted CUDA sources and reflection records byte-identical                             |
-| Last full / targeted / implementations since full | surface-legalization / surface-legalization / 0                                           |
+| Evidence                                          | Accepted result                                                                            |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Cases / sources / mode cells                      | 580 / 576 / 1,740                                                                          |
+| Main outcomes                                     | 1,704 correct; 36 unresolved; 21 resolved histories; exact outcomes and inputs unchanged   |
+| Frozen / discovery                                | 1,356 / 384 cells                                                                          |
+| Native units                                      | 1125 identities: 1112 pass, 13 skip; all identities and skips unchanged                    |
+| Semantic regressions                              | 1248 identities: 1170 pass, 78 skip; unchanged                                             |
+| Surface host-readback matrix                      | 83 cases × 3 modes: 214 passes, 24 compile failures, 11 retained NVRTC rounding mismatches |
+| NVVM surface qualification                        | 81 supported cases pass in each mode; two dynamic-index negatives remain per mode          |
+| Earlier focused units / surface source / Half GPU | 7 / 6 / 15 pass                                                                            |
+| Earlier direct static units                       | 5 pass, no skip; role/cache, classifier and address-plan contracts                         |
+| Runtime / toolkit / material compile and assembly | 4 / 18 / 6 pass                                                                            |
+| Earlier material runtime                          | 12 cells pass; two entries × two input profiles × three modes                              |
+| Runner contracts                                  | 119 pass, 1 inherited skip; 83 surface oracle/ABI CPU case contracts pass                  |
+| Earlier NVRTC surface source preservation         | 36 emitted CUDA sources and reflection records byte-identical                              |
+| Last full / targeted / implementations since full | surface-corpus / surface-corpus / 0                                                        |
 
 Compiler source: `9ebdb016d10fc68172bec515cda7e43d8477789c` plus patch
 `555d6eac1de332680880084610a20da66a6d5bb1870abe1c0e554e326f65b5d8`; version `2026.18.3-334-g9ebdb016d`.
 Loaded compiler SHA256 `15db5def7dd9278a71c51dfe2d009cb8a6598c0a57f246114cbf46df70749bb7`; provider ABI43 SHA256
 `042479d996c7f886bd97dd1a7a06f8a56398211948f8c2eaf86bcb9727aae1a1`. Later commits do not identify rebuilt bytes.
 Qualification uses native Ubuntu24.04, L4 SM89, driver580.126.09, CUDA12.9.2/NVRTC12.9.86,
-LLVM14 and SM80. Installed layout is `build/RelWithDebInfo`; raw validation is under
-`build/nvvm-surface-legalization/`.
+LLVM14 and SM80. Installed layout is `build/RelWithDebInfo`; current checkpoint validation is under
+`build/nvvm-surface-corpus/`. Compiler sources and installed binaries are unchanged. Earlier focused,
+static and material-runtime records retain their original execution identity; those gates were not
+rerun in this test-only slice.
 
 The pass emits physical typed accesses, ordinary Half conversion, byte-X scaling and exact physical
 component merges before emission. Matching Float32 stays Float32. Half stores deliberately use
@@ -46,6 +48,12 @@ RN-even instead of the old formatted-store truncation. Two generic conversion fi
 ties/subnormal sticky bits and NVVM O3 NaNs agree with that contract. The compiled core helper matches
 394,356 independent reference inputs. NVRTC surface-format handling remains unchanged; shared Half
 constant folding receives the rounding correction.
+
+The physical corpus now includes native signed/unsigned32 1D/2D loads and whole/component stores,
+and eight-resource mixed Float32/r16f/rg16f/rgba16f copies in both directions. All 129 original surface
+mode cells are preserved exactly; all 80 new NVVM executions pass. The standard checkpoint now
+validates and compares all 249 surface obligations. Known negative cells remain failures in raw
+results; missing cells, changed diagnostics, source/oracle changes and new outcomes require review.
 
 ## Boundaries and next action
 

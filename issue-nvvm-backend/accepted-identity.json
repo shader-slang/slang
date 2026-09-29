@@ -1,15 +1,15 @@
 {
   "schema": 1,
   "status": "accepted-identity",
-  "meaning": "Build6 source/compiler/provider/module/configuration/layout identity. Earlier timing and external-caller ABI claims retain their original identities.",
-  "verified_repository_revision": "9ebdb016d10fc68172bec515cda7e43d8477789c",
+  "meaning": "Unchanged accepted compiler/provider/modules/configuration/layout; current test/runner sources and full checkpoint provenance. Earlier timing and other focused claims retain their original execution identities.",
+  "verified_repository_revision": "4294e1e6a594cb9ce7a5f889451f22812e9b58b8",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "43d56282c6e59cfa020a3f698873c5e8b7fb247ee5172ac2f64fbecc4056a9c3"
+    "sha256": "6ac70be46dd52af492478d140d837d2f8758bf1b4b16b9b8826ffba15ecb5f69"
   },
   "verification_evidence": {
-    "path": "build/nvvm-surface-legalization/final-identity/provenance.json",
-    "sha256": "c0f33f199e7e1f20c5ddbee0e14c38c80ce9a853f27cdf41c35a13c0e1878dce"
+    "path": "build/nvvm-surface-corpus/checkpoint/provenance.json",
+    "sha256": "8ad181ffe0787b5a9195d971c82479c8c155ed4b1c076fe5bace0a77414cd003"
   },
   "accepted_identity": {
     "revision": "9ebdb016d10fc68172bec515cda7e43d8477789c",
@@ -49,7 +49,9 @@
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "0cedfb30b624aa3a009147cad3029577664aa0debc3f20c9016a42236de117d1",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "ac4df88df8ad82ad0f2993a3d00fbf011fb1bd85d444b6ffc722009a6c0552c8",
     "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "07442093375a659f7d6a51156245ff29d98760c882a4c498bad6d52970eb2e42",
-    "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "4e482524e2a7bf816ff6782b8dbc6f7be30ae359d581396c57009147abc7a184",
+    "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+    "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+    "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
     "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
     "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
     "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
@@ -57,7 +59,7 @@
     "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
   },
   "source_sha256": {
-    "extras/validate-nvvm-surfaces.py": "86ae1ba2f2440d20ae040c8d2ac772c65558fb47198a7e3603bba8857bf00673",
+    "extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
     "source/compiler-core/slang-nvvm-ir-builder-api.h": "f6c672a2ae9bf7c474b1e35aecff5764c1598098d7c55122ded65c490c55c3bd",
     "source/core/slang-math.h": "14a6ef54d2152724f041ee7e235e7feef34bb74d853214efff70f98ab00a26ce",
     "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "b978458e484de9ea086b8b129e3fe96a82995ec074d1fc02a5899bb07cce21ef",
@@ -88,7 +90,13 @@
     "tools/slang-unit-test/unit-test-math.cpp": "4795db3844aabf94aa8e83dcc6fe05be2dde4b4712a0814fd3cfe5d870a1ef77",
     "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "ec34c1bb190c355258c74ecbdbf166c029efe4b20138186c048ce69b81ea03e8",
     "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "ad62560e9294e3963a4f610dd1f05a7aea7a7e486bdbc80c1fbce20d74bcd769",
-    "tools/slang-unit-test/unit-test-nvvm-support.h": "c194b4ac6a6bdfdd63f450d06c6eccd5ba62283c5159e8bed244cc3d40cd8aa8"
+    "tools/slang-unit-test/unit-test-nvvm-support.h": "c194b4ac6a6bdfdd63f450d06c6eccd5ba62283c5159e8bed244cc3d40cd8aa8",
+    "tests/cuda/nvvm-surface-physical-integers.slang": "f511d4b368d2492a45d38dbdfa8deef58aa141f28dee0294bd011a1aa73f4428",
+    "tests/cuda/nvvm-surface-physical-mixed.slang": "17289477e7ef073a3d4274fa9baf1348089e0a3fe96b2d448c950b4a861bbf81",
+    "issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+    "issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+    "issue-nvvm-backend/test-nvvm-results.py": "fe45fb97d1d7a28b8e7a28b1ae3a6cef61e8e9d0dbbece3ba5c5fd23901ac044",
+    "issue-nvvm-backend/test-nvvm-surface-results.py": "f9dbc427eecc11b081133f7f885ec9c86eaa46c73906ad43673f7e22b4a1b1b0"
   },
   "configuration_sha256": {
     "build/CMakeCache.txt": "3f7a8ae5e8c84d5991a1f6c8ed047720d37e1168ffb8a0643121a18189c2c133",
@@ -533,15 +541,23 @@
     }
   },
   "source_review": {
+    "path": "build/nvvm-surface-corpus/review/source-oracles-final2.json",
+    "sha256": "f64158cb0d1b499ed66b88d0de6d2d6ce4cc04ce0d238f087ea1d3981bbe7e38"
+  },
+  "previous_identity": {
+    "path": "build/nvvm-surface-corpus/before-accepted-identity.json",
+    "sha256": "a79f778f621e6d8a4f070e0739b4bf51dee64cd52bb15fe398370bba31e7df2e"
+  },
+  "compiler_source_review": {
     "path": "build/nvvm-surface-legalization/review/final-source2.json",
     "sha256": "49f9ba5898e1c0f644c54f8a6b6df1fc979c7eafe077e796c14b9d4f9697627a"
   },
-  "previous_identity": {
-    "path": "build/nvvm-surface-legalization/before-accepted-identity.json",
-    "sha256": "b7937b1ac2f4fcc034feb99cd5a839731980bb26f52730e42c8a3cd74d95fff0"
+  "integration_review": {
+    "path": "build/nvvm-surface-corpus/review/integration-source-final2.json",
+    "sha256": "a4ee9375bedca4459d30c654403533ee9154fcd71cb6dd9869bb4185b6457aef"
   },
   "final_candidate_review": {
-    "path": "build/nvvm-surface-legalization/review/final-candidate.json",
-    "sha256": "19f1be4c29b4977a7c85e4397beceec3966d9891723949610dad0a3d7d61a596"
+    "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-surface-corpus/review/candidate-final.json",
+    "sha256": "7ad5370dab519a3f6083cd8d9caf4a5668a7bac03bbed7f461653f02812aa294"
   }
 }

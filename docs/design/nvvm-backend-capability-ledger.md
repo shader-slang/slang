@@ -146,9 +146,16 @@ storage with Float32 shader values remain limited to non-array 1D/2D. Matching F
 payloads directly. Static component masks update physical channels without re-encoding untouched
 NaN payloads. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
 
-The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 43 cases,
+The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 83 cases,
 including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
-nonzero guards and zero-boundary accesses. [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
+nonzero guards and zero-boundary accesses. Native signed/unsigned32 cases exercise 1D/2D scalar,
+two- and four-channel loads, whole stores and component stores with exact integer bits. Four mixed
+cases bind eight separate native Float32/r16f/rg16f/rgba16f source/result resources, checking both copy
+directions and untouched channels. All 81 supported cases pass in each NVVM mode; two dynamic-index
+negatives remain per mode. NVRTC has 52 passes, 20 compile failures and 11 rounding mismatches.
+The recurring checkpoint replays physical readbacks and compares all 249 obligations against the
+[current baseline](../../issue-nvvm-backend/accepted-baseline.json), preserving known failures.
+[Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC
 formatted store's observed truncation. NVRTC component source, dynamic component indexing, user
 resource-helper format provenance, three-channel transfers and additional packed/normalized formats

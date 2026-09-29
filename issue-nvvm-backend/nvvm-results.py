@@ -59,6 +59,14 @@ def load_runner():
     return module
 
 
+def load_surface_results():
+    """Load the physical proof comparator shared by checkpoint and CPU contracts."""
+    spec = importlib.util.spec_from_file_location("surface_results", HERE / "nvvm-surface-results.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def run(command, log, environment, timeout):
     """Time fresh process creation through exit; write captured output outside the timer.
 
@@ -177,7 +185,8 @@ def configure(args, output):
         str(libnvvm.parent), str(nvrtc.parent),
         environment.get("LD_LIBRARY_PATH", "")])
     paths = {args.slangc, args.provider, libnvvm, nvrtc, libdevice, ptxas,
-             Path(__file__).resolve(), HERE / "run-complex-corpus.py"}
+             Path(__file__).resolve(), HERE / "run-complex-corpus.py",
+             HERE / "nvvm-surface-results.py", REPO / "extras/validate-nvvm-surfaces.py"}
     # slangc dynamically loads these libraries and its builtin cache. Identify actual bytes.
     paths.update(args.slangc.parent.glob("*.so*"))
     paths.update(args.slangc.parent.glob("*.bin"))
@@ -196,6 +205,10 @@ def configure(args, output):
     paths.update(args.slangc.parent.glob("slang-test*"))
     # Freeze the small tool/runtime inventory before adding the exhaustive source/input map.
     runtime_paths = tuple(paths)
+    # Fresh surface fixtures can be untracked while a corpus extension is being reviewed.
+    surface_harness = load_surface_results().load_harness()
+    paths.update(REPO / "tests/cuda" / ("nvvm-surface-physical-" + row["fixture"] + ".slang")
+                 for row in surface_harness.cases())
     tracked = subprocess.check_output(["git", "ls-files", "source", "include", "prelude",
                                        "external", "CMakeLists.txt", "cmake", "tests", "issue-nvvm-backend/*.py",
                                        "issue-nvvm-backend/*manifest*", "extras/*nvvm*.py"], cwd=REPO, text=True)
@@ -416,8 +429,9 @@ def measure(args):
 
 
 def checkpoint(args):
-    accepted_baseline(args.baseline)
+    baseline = accepted_baseline(args.baseline)
     runner, environment, provenance = configure(args, args.output)
+    surface_results = load_surface_results()
     baseline_inputs = read(args.baseline).get("runtime_input_sha256", {})
     current_inputs = {name: sha(REPO / name) if (REPO / name).is_file() else None
                       for name in baseline_inputs}
@@ -435,6 +449,11 @@ def checkpoint(args):
                          "--config", args.build_label, "--bin-dir", args.slangc.parent,
                          "--provider", args.provider, "--cuda-path", args.cuda_root,
                          "--architecture", "80", "--output", args.output / "runtime"]),
+            ("surfaces", [sys.executable, REPO / "extras/validate-nvvm-surfaces.py",
+                          "--slangc", args.slangc, "--provider", args.provider.parent,
+                          "--cuda-root", args.cuda_root, "--architecture", "80",
+                          "--provenance", args.output / "provenance.json",
+                          "--output", args.output / "surfaces"]),
             ("frozen", [sys.executable, HERE / "run-compute-census.py", *common,
                         "--workload-ids-from", HERE / "census.slice-195.tsv",
                         "--output", args.output / "frozen"]),
@@ -450,6 +469,23 @@ def checkpoint(args):
             row = run(command, args.output / (name + ".log"), environment, 1800)
             record["gates"][name] = row
             write(path, record)
+            if name == "surfaces":
+                # The raw harness deliberately exits1 for known negatives. Prove every phase,
+                # resource and physical readback before comparing their preserved failures.
+                if row["timed_out"]:
+                    raise ValueError("surface checkpoint timed out")
+                surface_block = surface_results.validate_report(
+                    args.output / "surfaces/results.json", row["return_code"])
+                for key, selected in (("slangc", args.slangc), ("provider", args.provider)):
+                    identity = surface_block["identity"][key]
+                    if Path(identity["path"]).resolve() != selected.resolve() or identity["sha256"] != sha(selected):
+                        raise ValueError("surface gate selected a different " + key)
+                write(args.output / "surfaces-validated.json", surface_block)
+                surface_comparison = surface_results.compare(baseline.get("surfaces"), surface_block)
+                record["surface_comparison"] = surface_comparison
+                write(args.output / "surface-comparison.json", surface_comparison)
+                write(path, record)
+                continue
             # Census exit 2 can represent established unsupported cells. Exact outcomes decide.
             if name not in ("frozen", "discovery") or row["return_code"] not in (0, 2):
                 require_success(row)
@@ -478,10 +514,14 @@ def checkpoint(args):
         if any(c["status"] != "passed" for c in complex_result["cells"]):
             raise ValueError("complex compile/assembly failure")
         verify_identity(provenance)
+        comparison["surfaces"] = surface_comparison
+        if surface_comparison["status"] != "passed":
+            comparison["status"] = "review-required"
+        write(args.output / "comparison.json", comparison)
         record["status"] = "review-required" if input_deltas else comparison["status"]
         compact = read(args.output / "outcomes.json")
         compact.update(provenance=provenance, runtime_input_sha256=current_inputs,
-                       complex_corpus=complex_result,
+                       surfaces=surface_block, complex_corpus=complex_result,
                        status="corpus-" + record["status"])
         write(args.output / "outcomes.json", compact)
     except (OSError, ValueError, KeyError) as error:

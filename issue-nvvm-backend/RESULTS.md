@@ -55,9 +55,9 @@ python3 issue-nvvm-backend/nvvm-results.py checkpoint \
   --jobs 4 --output "$NVVM_RESULTS/checkpoint"
 ```
 
-This runs the established four-fixture runtime validator, frozen1356 inventory, discovery manifest
-and every material support cell sequentially. It writes `checkpoint.json`, `comparison.json` and
-`outcomes.json`. Full compiler acceptance **also** needs these gates, sequentially with no benchmark:
+This runs the established four-fixture runtime validator, physical surface suite, frozen1356 inventory,
+discovery manifest and every material support cell sequentially. It writes `checkpoint.json`,
+`comparison.json` and `outcomes.json`. Full compiler acceptance **also** needs these gates, sequentially with no benchmark:
 
 ```bash
 build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries slang-unit-test-tool/
@@ -71,6 +71,7 @@ python3 issue-nvvm-backend/test-run-compute-census.py
 python3 issue-nvvm-backend/test-run-compute-discovery.py
 python3 issue-nvvm-backend/test-run-complex-corpus.py
 python3 issue-nvvm-backend/test-nvvm-results.py
+python3 issue-nvvm-backend/test-nvvm-surface-results.py
 python3 issue-nvvm-backend/test-nvvm-material-runtime.py
 python3 issue-nvvm-backend/test-nvvm-corpus-runtime.py
 ```
@@ -122,11 +123,13 @@ CUDA array. Freeze logical texels and their physical byte encoding before execut
 array's channel format/count/extents, and copy the complete allocation back without shader texture
 loads. Check untouched neighboring texels as well as written channels. Run the same kernels with a
 matching native-width allocation as a control; shader read/write agreement alone can share a wrong
-byte-X scale. The current `surface-physical-format` focused record pins a driver, frozen signed8 and
-signed32 oracles, source and ten launch results. These raw research files stay under ignored `build/`;
+byte-X scale. The historical binding investigation in the `surface-physical-format` focused record
+pins a driver, frozen signed8 and signed32 oracles, source and ten launch results. These raw research files stay under ignored `build/`;
 a production format expansion needs permanent reproducible host-readback coverage.
 
-For CPU-only comparison against a durable old compact baseline, even without the old raw directory:
+For CPU-only comparison of frozen/discovery outcomes against a durable old compact baseline, even
+without the old raw directory, use `compare`. This command does not validate physical surfaces;
+use the full `checkpoint` for recurring surface acceptance:
 
 ```bash
 python3 issue-nvvm-backend/nvvm-results.py compare \
@@ -473,10 +476,13 @@ local commit and stop unless further work was explicitly authorized.
 
 ## Physical surface correctness
 
-`extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. Four fixtures under
-`tests/cuda/nvvm-surface-physical-*.slang` supply 43 cases: native Float32 and annotated Half,
-1D/2D scalar/2/4 channels, whole/component writes, exhaustive scalar Half decode, converted NaNs,
-dynamic-component negatives, literal-rounding controls and zero-boundary operations. It generates immutable input/expected
+`extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. Six fixtures under
+`tests/cuda/nvvm-surface-physical-*.slang` supply 83 cases: native Float32, signed/unsigned32 and
+annotated Half, 1D/2D scalar/2/4 channels, whole/component writes, exhaustive scalar Half decode, converted NaNs,
+dynamic-component negatives, literal-rounding controls and zero-boundary operations. Four mixed-format
+cases bind eight independent native Float32/r16f/rg16f/rgba16f source/result resources and check both
+copy directions, with whole or component stores. Integer cases bind matching native 32-bit channels;
+they do not qualify packed storage. The harness generates immutable input/expected
 bytes per run, verifies reflected resource offsets and CUDA descriptors, assembles PTX, and copies
 array bytes directly to the host. Shader roundtrips do not define its oracle.
 
@@ -494,7 +500,7 @@ dynamic component indexing are recorded limitations, never passing cells. Compar
 identities when accepting intended transitions. `--cases` selects exact names from `--list`, and
 `--modes` supports focused runs. Each run needs a fresh output directory. Raw byte arrays, PTX,
 reflection, subprocess logs and diagnostics stay in the ignored output tree; current compact outcomes
-and failure transitions belong in the feature-keyed focused evidence record.
+belong in the accepted baseline; historical format and conversion failures remain in focused evidence.
 
 Finite Half stores use ordinary RN-even conversion, including subnormals and overflow. Converted
 NaNs require NaN class only; unchanged channels and guards require exact bytes. Run the CPU contracts
@@ -503,6 +509,20 @@ checks conversions independently of surfaces; the math units exercise every fini
 After producer-tag edits, compare generated NVRTC CUDA source against the accepted
 compiler with identical inputs/options. An old serialized user module should also link against the
 current built-ins; compatibility compilation is separate from fresh physical GPU evidence.
+
+The standard `checkpoint` always runs this suite and uses `nvvm-surface-results.py` to validate the
+complete cases × three modes inventory, source/oracle identities, phase return codes and diagnostics,
+reflection, actual array descriptors, binding/upload/launch proof, cleanup and every host readback.
+It writes `surface-comparison.json` and includes the validated `surfaces` block in `outcomes.json`.
+The current per-cell obligations live in `accepted-baseline.json`; focused evidence retains format
+semantics and earlier failure histories without duplicating that inventory. A raw harness exit 1
+can preserve known negatives, but cannot pass checkpoint comparison without complete verified proof.
+Converted NaN payloads are compared by class only; finite values, untouched channels and guards stay
+exact. Known wrong-output signatures stay exact too.
+
+A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires
+review. Bootstrap or expansion is a separate reviewed adoption of validated outcomes, never an
+automatic allow-failures list. Preserve the old inventory and failure history during that adoption.
 
 ## Material runtime correctness
 

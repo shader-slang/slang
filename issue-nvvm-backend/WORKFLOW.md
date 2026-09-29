@@ -7,9 +7,11 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-The maintainer authorized the NVVM-only surface-format legalization pass on 2026-09-29. That bounded
-ownership transfer is complete and accepted; stop after its reviewed local commit. A new explicit
-request is needed to resume general feature work. STATUS records the current evidence and next leads. Earlier independent review
+The maintainer authorized one surface-corpus expansion slice on 2026-09-29: native signed/unsigned
+32-bit cases, mixed Float32/Half resources, and recurring physical checkpoint comparison. This slice
+is complete and accepted; stop after its reviewed local commit. A new explicit request is needed
+to resume feature work.
+STATUS records the current evidence and next leads. Earlier independent review
 keeps a transforming local-storage pass deferred because its bounded rewrite cannot retire the
 existing conversion responsibility. Accept and locally commit each bounded task before proceeding;
 regressions or decisions requiring maintainer input stop continuation. Skip Slack notifications.
@@ -49,8 +51,8 @@ Explain why the chosen coverage bounds the change. Require one result per reques
 compare classification, return code, execution counts, diagnostic and canonical shape. Wrong output,
 crashes, timeouts, skips and missing execution never become passes. Preserve failure histories.
 
-Run full frozen/discovery/all-material checkpoints after three implementations and before a fourth;
-also after shared lowering/type, ABI/provider/library or corpus-runner changes, uncertain impact,
+Run full frozen/discovery/physical-surface/all-material checkpoints after three implementations and
+before a fourth; also after shared lowering/type, ABI/provider/library or corpus-runner changes, uncertain impact,
 host/toolchain/configuration changes, and before publication. Full acceptance includes the native,
 toolkit and runner gates in RESULTS. Use `census.slice-195.tsv` for frozen selection; do not substitute
 unfiltered discovery. STATUS records last full, last targeted and implementations since full.
@@ -59,7 +61,10 @@ Documentation-only consolidation does not create fresh GPU evidence or reset thi
 `compare` rejects missing, duplicate, changed and false-passing cells. Retain review-required results;
 resolve regressions or review intentional transitions before updating the accepted baseline. A manual
 status edit or matching total is insufficient. Compare input hashes and exact native identities,
-including skips. A regression blocks subsequent feature work. Respect user stopping instructions.
+including skips. Surface comparison preserves complete three-mode physical outcomes, exact source/oracle
+contracts and known failures; it never converts an expected failure into a passing shader result.
+New surface cells or changed obligations require explicit reviewed baseline adoption. A regression
+blocks subsequent feature work. Respect user stopping instructions.
 
 ## Measurement
 
