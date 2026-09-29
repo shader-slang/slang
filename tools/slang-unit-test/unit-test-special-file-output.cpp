@@ -53,15 +53,17 @@ SlangResult makeTempDir(const char* prefix, ScopedTempDir& out)
 }
 
 /// Runs slangc on the compute entry point `main` of `slangPath`, writing `target` output to
-/// `outputPath` and the dependency file to `depfilePath`. Returns failure only if slangc could not
-/// be launched; its exit code is in `outResult`.
+/// `outputPath`, the dependency file to `depfilePath` and, if `reflectionPath` is not empty, the
+/// reflection JSON to `reflectionPath`. Returns failure only if slangc could not be launched; its
+/// exit code is in `outResult`.
 SlangResult runSlangc(
     UnitTestContext* context,
     const char* target,
     const String& slangPath,
     const String& outputPath,
     const String& depfilePath,
-    ExecuteResult& outResult)
+    ExecuteResult& outResult,
+    const String& reflectionPath = String())
 {
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slangc"));
@@ -75,6 +77,11 @@ SlangResult runSlangc(
     cmdLine.addArg(outputPath);
     cmdLine.addArg("-depfile");
     cmdLine.addArg(depfilePath);
+    if (reflectionPath.getLength())
+    {
+        cmdLine.addArg("-reflection-json");
+        cmdLine.addArg(reflectionPath);
+    }
     cmdLine.addArg(slangPath);
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, outResult));
     if (outResult.resultCode != 0)
@@ -211,8 +218,14 @@ SLANG_UNIT_TEST(slangcOutputToSpecialFiles)
 
     {
         ExecuteResult result;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            runSlangc(unitTestContext, "spirv", slangPath, kNullDevice, kNullDevice, result)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(runSlangc(
+            unitTestContext,
+            "spirv",
+            slangPath,
+            kNullDevice,
+            kNullDevice,
+            result,
+            kNullDevice)));
         SLANG_CHECK(result.resultCode == 0);
     }
 
@@ -232,10 +245,13 @@ SLANG_UNIT_TEST(slangcOutputToSpecialFiles)
     {
         const String spirvFifoPath = Path::combine(dir.path, "shader.spv");
         const String depfileFifoPath = Path::combine(dir.path, "shader.d");
+        const String reflectionFifoPath = Path::combine(dir.path, "shader.json");
         FifoReader spirvReader;
         FifoReader depfileReader;
+        FifoReader reflectionReader;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(spirvReader.init(spirvFifoPath)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(depfileReader.init(depfileFifoPath)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(reflectionReader.init(reflectionFifoPath)));
 
         ExecuteResult result;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(runSlangc(
@@ -244,7 +260,8 @@ SLANG_UNIT_TEST(slangcOutputToSpecialFiles)
             slangPath,
             spirvFifoPath,
             depfileFifoPath,
-            result)));
+            result,
+            reflectionFifoPath)));
         SLANG_CHECK(result.resultCode == 0);
 
         const List<uint8_t> spirv = spirvReader.readAll();
@@ -260,6 +277,11 @@ SLANG_UNIT_TEST(slangcOutputToSpecialFiles)
         SLANG_CHECK_MSG(
             depfileText.indexOf(toSlice("shader.slang")) >= 0,
             "FIFO did not receive the dependency file");
+
+        const List<uint8_t> reflection = reflectionReader.readAll();
+        SLANG_CHECK_MSG(
+            reflection.getCount() > 0 && reflection[0] == '{',
+            "FIFO did not receive the reflection JSON");
     }
 
     // Text targets take a different write path, which first tries to read the target back. That
