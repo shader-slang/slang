@@ -297,39 +297,39 @@ works for any given binary.
 | `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                                                                                                               |
 | `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux                                                                                                      |
 | `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset                         | `ON`: build DXC from source on Windows, Linux, and macOS; `OFF`: use prebuilt when available; unset: build from source on macOS and auto-select on native Linux x86_64 (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
-| `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
-| `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
-| `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
-| `SLANG_ENABLE_ASAN`                   | `FALSE`                       | Enable ASAN (address sanitizer)                                                                                                          |
-| `SLANG_ENABLE_TSAN`                   | `FALSE`                       | Enable TSAN (thread sanitizer); clang/gcc on non-Windows only, and mutually exclusive with `SLANG_ENABLE_ASAN`                           |
-| `SLANG_ENABLE_COVERAGE`               | `FALSE`                       | Enable code coverage instrumentation                                                                                                     |
-| `SLANG_ENABLE_VALIDATION_IR`          | `FALSE`                       | Enable full IR validation (SLOW!)                                                                                                        |
-| `SLANG_ENABLE_VALIDATION_VM_BYTECODE` | `TRUE`                        | Enable VM bytecode validation in the bytecode interpreter. Disabling skips runtime safety checks for malformed bytecode.                 |
-| `SLANG_ENABLE_VALIDATION_FOSSIL`      | `FALSE`                       | Enable validation when deserializing fossil-format data. Disabling skips bounds and type checks on serialized module contents.           |
-| `SLANG_ENABLE_IR_BREAK_ALLOC`         | `OFF` (Release), `ON` (Debug) | Enable IR BreakAlloc functionality for debugging.                                                                                        |
-| `SLANG_ENABLE_GFX`                    | `TRUE`                        | Enable gfx targets (**deprecated**)                                                                                                      |
-| `SLANG_ENABLE_SLANGD`                 | `TRUE`                        | Enable language server target                                                                                                            |
-| `SLANG_ENABLE_SLANGC`                 | `TRUE`                        | Enable standalone compiler target                                                                                                        |
-| `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                          |
-| `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                    |
-| `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                               |
-| `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                           |
-| `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
-| `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
-| `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                 |
-| `SLANG_ENABLE_RECORD_REPLAY`          | `TRUE`                        | Build the API record-replay layer; when `FALSE`, exclude its sources and stub out its C API (forces `SLANG_ENABLE_REPLAYER` off)         |
-| `SLANG_ENABLE_PCH`                    | `TRUE`                        | Enable precompiled headers for faster builds (auto-disabled when using sccache)                                                          |
-| `SLANG_STANDARD_MODULE_DEVELOP_BUILD` | `TRUE`                        | Enable development build for standard modules (enables `UNIT_TEST` macro); disable for release builds                                    |
-| `SLANG_LIB_TYPE`                      | `SHARED`                      | How to build the slang library                                                                                                           |
-| `SLANG_ENABLE_RELEASE_DEBUG_INFO`     | `TRUE`                        | Enable generating debug info for Release configs                                                                                         |
-| `SLANG_ENABLE_RELEASE_LTO`            | `FALSE`                       | Enable LTO for Release builds                                                                                                            |
-| `SLANG_INSTALL_USER_SKILLS`           | `AUTO`                        | `AUTO`: install the pinned user skills when their exact, clean submodule checkout is available; `ON`: require that checkout; `OFF`: omit them                        |
-| `SLANG_ENABLE_SPLIT_DEBUG_INFO`       | `TRUE`                        | Enable generating split debug info for Debug and RelWithDebInfo configs                                                                  |
-| `SLANG_SLANG_LLVM_FLAVOR`             | `FETCH_BINARY_IF_POSSIBLE`    | How to set up llvm support                                                                                                               |
-| `SLANG_SLANG_LLVM_BINARY_URL`         | System dependent              | URL specifying the location of the slang-llvm prebuilt library                                                                           |
-| `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                     |
-| `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                       |
-| `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
+| `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                                                                                                            |
+| `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                                                                                                                         |
+| `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                                                                                                                   |
+| `SLANG_ENABLE_ASAN`                   | `FALSE`                       | Enable ASAN (address sanitizer)                                                                                                                                                                                                    |
+| `SLANG_ENABLE_TSAN`                   | `FALSE`                       | Enable TSAN (thread sanitizer); clang/gcc on non-Windows only, and mutually exclusive with `SLANG_ENABLE_ASAN`                                                                                                                     |
+| `SLANG_ENABLE_COVERAGE`               | `FALSE`                       | Enable code coverage instrumentation                                                                                                                                                                                               |
+| `SLANG_ENABLE_VALIDATION_IR`          | `FALSE`                       | Enable full IR validation (SLOW!)                                                                                                                                                                                                  |
+| `SLANG_ENABLE_VALIDATION_VM_BYTECODE` | `TRUE`                        | Enable VM bytecode validation in the bytecode interpreter. Disabling skips runtime safety checks for malformed bytecode.                                                                                                           |
+| `SLANG_ENABLE_VALIDATION_FOSSIL`      | `FALSE`                       | Enable validation when deserializing fossil-format data. Disabling skips bounds and type checks on serialized module contents.                                                                                                     |
+| `SLANG_ENABLE_IR_BREAK_ALLOC`         | `OFF` (Release), `ON` (Debug) | Enable IR BreakAlloc functionality for debugging.                                                                                                                                                                                  |
+| `SLANG_ENABLE_GFX`                    | `TRUE`                        | Enable gfx targets (**deprecated**)                                                                                                                                                                                                |
+| `SLANG_ENABLE_SLANGD`                 | `TRUE`                        | Enable language server target                                                                                                                                                                                                      |
+| `SLANG_ENABLE_SLANGC`                 | `TRUE`                        | Enable standalone compiler target                                                                                                                                                                                                  |
+| `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                                                                                                                    |
+| `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                                                                                                              |
+| `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                                                                                                                         |
+| `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                                                                                                                      |
+| `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                                                                                                                     |
+| `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                                                                                                            |
+| `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                                                                                                           |
+| `SLANG_ENABLE_RECORD_REPLAY`          | `TRUE`                        | Build the API record-replay layer; when `FALSE`, exclude its sources and stub out its C API (forces `SLANG_ENABLE_REPLAYER` off)                                                                                                   |
+| `SLANG_ENABLE_PCH`                    | `TRUE`                        | Enable precompiled headers for faster builds (auto-disabled when using sccache)                                                                                                                                                    |
+| `SLANG_STANDARD_MODULE_DEVELOP_BUILD` | `TRUE`                        | Enable development build for standard modules (enables `UNIT_TEST` macro); disable for release builds                                                                                                                              |
+| `SLANG_LIB_TYPE`                      | `SHARED`                      | How to build the slang library                                                                                                                                                                                                     |
+| `SLANG_ENABLE_RELEASE_DEBUG_INFO`     | `TRUE`                        | Enable generating debug info for Release configs                                                                                                                                                                                   |
+| `SLANG_ENABLE_RELEASE_LTO`            | `FALSE`                       | Enable LTO for Release builds                                                                                                                                                                                                      |
+| `SLANG_INSTALL_USER_SKILLS`           | `AUTO`                        | `AUTO`: install the pinned user skills when their exact, clean submodule checkout is available; `ON`: require that checkout; `OFF`: omit them                                                                                      |
+| `SLANG_ENABLE_SPLIT_DEBUG_INFO`       | `TRUE`                        | Enable generating split debug info for Debug and RelWithDebInfo configs                                                                                                                                                            |
+| `SLANG_SLANG_LLVM_FLAVOR`             | `FETCH_BINARY_IF_POSSIBLE`    | How to set up llvm support                                                                                                                                                                                                         |
+| `SLANG_SLANG_LLVM_BINARY_URL`         | System dependent              | URL specifying the location of the slang-llvm prebuilt library                                                                                                                                                                     |
+| `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                                                                                                               |
+| `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                                                                                                                 |
+| `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds)                                                                                           |
 
 #### DXC GLIBC auto-detection
 
@@ -410,6 +410,86 @@ error if they can't be found.
 | `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                  |
 | `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
 | `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
+
+### Hash map and hash function selection
+
+`Slang::Dictionary` and `Slang::HashSet` are thin wrappers around a third-party
+hash map, and `Slang::Hash` falls back to a third-party hash function for types
+that don't define their own `getHashCode()`. Both choices are made at build time
+and are independent of each other, so any map can be paired with any hash. This
+exists so that the alternatives can be benchmarked against each other on real
+compiler workloads.
+
+| Option          | Default           | Description                                                               |
+| --------------- | ----------------- | ------------------------------------------------------------------------- |
+| `SLANG_HASHMAP` | `UNORDERED_DENSE` | Which hash map backs `Slang::Dictionary` and `Slang::HashSet`             |
+| `SLANG_HASH`    | `WYHASH`          | Which hash function `Slang::Hash` uses when a type has no `getHashCode()` |
+
+`SLANG_HASHMAP` accepts:
+
+| Value                       | Implementation                           | Design                              |
+| --------------------------- | ---------------------------------------- | ----------------------------------- |
+| `UNORDERED_DENSE`           | `ankerl::unordered_dense::map`           | Index array over a dense vector     |
+| `UNORDERED_DENSE_SEGMENTED` | `ankerl::unordered_dense::segmented_map` | As above, without whole-map realloc |
+| `BOOST_FLAT`                | `boost::unordered_flat_map`              | SIMD-metadata open addressing       |
+| `BOOST_NODE`                | `boost::unordered_node_map`              | As above, stable references         |
+| `BOOST_UNORDERED`           | `boost::unordered_map`                   | Bucket chaining                     |
+| `ABSL_FLAT`                 | `absl::flat_hash_map`                    | SIMD-metadata open addressing       |
+| `ABSL_NODE`                 | `absl::node_hash_map`                    | As above, stable references         |
+| `GTL_FLAT`                  | `gtl::flat_hash_map`                     | Header-only swisstable              |
+| `TSL_ROBIN`                 | `tsl::robin_map`                         | Robin-hood open addressing          |
+| `TSL_HOPSCOTCH`             | `tsl::hopscotch_map`                     | Hopscotch open addressing           |
+| `TSL_SPARSE`                | `tsl::sparse_map`                        | Sparse groups, lowest footprint     |
+| `STD`                       | `std::unordered_map`                     | Bucket chaining                     |
+
+`SLANG_HASH` accepts:
+
+| Value       | Implementation                               |
+| ----------- | -------------------------------------------- |
+| `WYHASH`    | `ankerl::unordered_dense::hash`, i.e. wyhash |
+| `RAPIDHASH` | `rapidhash`, wyhash's successor              |
+| `KOMIHASH`  | `komihash`                                   |
+| `XXH3`      | `XXH3_64bits` from xxHash                    |
+| `BOOST`     | `boost::hash`                                |
+| `ABSL`      | `absl::Hash`                                 |
+| `STD`       | `std::hash`                                  |
+
+`RAPIDHASH`, `KOMIHASH` and `XXH3` are each a bare byte-range hash rather than a
+family of per-type functors, so `Slang::HashImpl::Detail::ByteRangeHash` supplies
+the per-type layer for them. That costs them slightly on integer and pointer
+keys, where `WYHASH` gets a two-multiply fast path from
+`ankerl::unordered_dense::hash` — read a close result between them as a tie.
+
+For example, to build with Abseil's flat map and Boost's hash:
+
+```bash
+cmake --preset default -DSLANG_HASHMAP=ABSL_FLAT -DSLANG_HASH=BOOST
+```
+
+To build several combinations at once, each into its own `build-<hash>-<map>`
+directory, use [extras/hashmap-matrix.sh](../extras/hashmap-matrix.sh).
+
+All of these libraries are vendored as submodules under
+[./external](./external), so `git submodule update --init --recursive` is enough
+to make every combination available. Boost is vendored as the handful of
+individual [modular boostorg
+repositories](https://github.com/boostorg/unordered) that `boost::unordered`
+needs, under `external/boost/`.
+
+Two caveats when changing these away from the defaults:
+
+- Iteration order over a `Dictionary` differs between implementations. Slang
+  should not depend on it, but a change here can surface a latent ordering
+  dependency as a changed diagnostic order or a changed generated-code layout.
+- `absl::Hash` is deliberately not stable across processes — it is seeded per
+  run. Any hash value that escapes the process (for example into a serialized
+  module) must not come from `SLANG_HASH=ABSL`.
+
+The selection is implemented in
+[source/core/slang-hashmap-impl.h](../source/core/slang-hashmap-impl.h) and
+[source/core/slang-hash-impl.h](../source/core/slang-hash-impl.h); the CMake side
+lives in the `slang-hashmap` interface target in
+[external/CMakeLists.txt](../external/CMakeLists.txt).
 
 ### LLVM Support
 

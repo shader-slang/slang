@@ -12,6 +12,7 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 
+#include <memory>
 #include <set>
 
 namespace Slang
@@ -3574,7 +3575,16 @@ private:
 
     private:
         // Children of member if applicable.
-        Dictionary<IRStructField*, MapStructToFlatStruct> members;
+        //
+        // Held indirectly because this type is its own mapped type: `members`
+        // is declared while `MapStructToFlatStruct` is still an incomplete
+        // type. No unordered container is required to accept an incomplete
+        // mapped type, and the hash maps `Dictionary` can be built on disagree
+        // about whether they do in practice -- `tsl::robin_map`, for one, lays
+        // out a `std::pair<Key, T>` in its bucket type and so needs `T`
+        // complete right there. A `std::unique_ptr` is complete whatever it
+        // points at, which removes the question.
+        Dictionary<IRStructField*, std::unique_ptr<MapStructToFlatStruct>> members;
 
         // Field correlating to MapStructToFlatStruct Node.
         IRInst* node;
@@ -3609,7 +3619,7 @@ private:
         {
             for (auto& field1Pair : node)
             {
-                auto& field1 = field1Pair.second;
+                auto& field1 = *field1Pair.second;
 
                 // Get member of val1
                 IRInst* fieldAddr1 = nullptr;
@@ -3668,7 +3678,13 @@ private:
         void setNode(IRInst* newNode) { node = newNode; }
         // Get 'MapStructToFlatStruct' that is a child of 'parent'.
         // Make 'MapStructToFlatStruct' if no 'member' is currently mapped to 'parent'.
-        MapStructToFlatStruct& getMember(IRStructField* member) { return members[member]; }
+        MapStructToFlatStruct& getMember(IRStructField* member)
+        {
+            auto& child = members[member];
+            if (!child)
+                child = std::make_unique<MapStructToFlatStruct>();
+            return *child;
+        }
         MapStructToFlatStruct& operator[](IRStructField* member) { return getMember(member); }
 
         void setMapping(IRStructField* newTargetMapping) { targetMapping = newTargetMapping; }

@@ -3892,7 +3892,7 @@ static int _calcTotalNumUsedRegistersForLayoutResourceKind(
     LayoutResourceKind kind)
 {
     int numUsed = 0;
-    for (auto& [_, rangeSet] : bindingContext->shared->globalSpaceUsedRangeSets)
+    for (const auto& [_, rangeSet] : bindingContext->shared->globalSpaceUsedRangeSets)
     {
         const auto& usedRanges = rangeSet->usedResourceRanges[kind];
         for (const auto& usedRange : usedRanges.ranges)

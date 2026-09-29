@@ -328,7 +328,7 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 
 TestServer::~TestServer()
 {
-    for (auto& [_, value] : m_unitTestModules)
+    for (const auto& [_, value] : m_unitTestModules)
         value->destroy();
 }
 

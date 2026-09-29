@@ -4,12 +4,12 @@
 #include "slang-common.h"
 #include "slang-exception.h"
 #include "slang-hash.h"
+#include "slang-hashmap-impl.h"
 #include "slang-linked-list.h"
 #include "slang-list.h"
 #include "slang-math.h"
 #include "slang-uint-set.h"
 
-#include <ankerl/unordered_dense.h>
 #include <initializer_list>
 #include <type_traits>
 #include <utility>
@@ -182,7 +182,9 @@ template<
     typename KeyEqual = typename DictionaryDetail::KeyTraits<TKey>::KeyEqual>
 class Dictionary
 {
-    using InnerMap = ankerl::unordered_dense::map<TKey, TValue, Hash, KeyEqual>;
+    // Which hash map actually backs this is a build-time choice; see
+    // slang-hashmap-impl.h and the CMake option SLANG_HASHMAP.
+    using InnerMap = HashMapImpl::Map<TKey, TValue, Hash, KeyEqual>;
     using ThisType = Dictionary<TKey, TValue, Hash, KeyEqual>;
     InnerMap map;
 
@@ -220,7 +222,7 @@ public:
     ThisType& operator=(const ThisType&) = default;
     ThisType& operator=(ThisType&&) = default;
     Dictionary(std::initializer_list<typename InnerMap::value_type> inits)
-        : map(std::move(inits))
+        : map(inits)
     {
     }
 
@@ -236,9 +238,13 @@ public:
     // Iterators
     //
 
-    auto begin() { return map.begin(); }
+    // Iterating a non-const Dictionary yields a mutable mapped value, e.g.
+    // `for (auto& [key, value] : dict) value.clear();`. That needs the
+    // HashMapImpl::mutableIterator shim because tsl::robin_map's iterator
+    // dereferences to a const pair; see its comment for the details.
+    auto begin() { return HashMapImpl::mutableIterator(map.begin()); }
     auto begin() const { return map.begin(); }
-    auto end() { return map.end(); }
+    auto end() { return HashMapImpl::mutableIterator(map.end()); }
     auto end() const { return map.end(); }
 
     //
@@ -267,12 +273,15 @@ public:
     template<typename Predicate>
     void removeIf(Predicate&& predicate)
     {
-        auto it = begin();
-        while (it != end())
+        // Iterates the backing map directly rather than through begin()/end(),
+        // because eraseAndAdvance needs the map's own iterator type, and the
+        // predicate only reads the entry.
+        auto it = map.begin();
+        while (it != map.end())
         {
             if (predicate(*it))
             {
-                it = map.erase(it);
+                it = HashMapImpl::eraseAndAdvance(map, it);
             }
             else
             {
@@ -302,6 +311,8 @@ public:
     template<typename K>
     bool containsKey(const K& k) const
     {
+        // Spelled with find() rather than contains() because std::unordered_map
+        // only gained contains() in C++20 and we build as C++17.
         return _find(k) != map.end();
     }
 
@@ -319,7 +330,7 @@ public:
     TValue* tryGetValue(const K& key)
     {
         auto i = _find(key);
-        return i == map.end() ? nullptr : std::addressof(i->second);
+        return i == map.end() ? nullptr : std::addressof(HashMapImpl::valueOf(i));
     }
 
     // Returns true and copies the element into 'value' if present.
@@ -362,7 +373,7 @@ public:
     TValue* tryGetValueOrAdd(const typename InnerMap::value_type& kvPair)
     {
         const auto& [iterator, inserted] = map.insert(kvPair);
-        return inserted ? nullptr : std::addressof(iterator->second);
+        return inserted ? nullptr : std::addressof(HashMapImpl::valueOf(iterator));
     }
     // Tries to insert the given element, if a value was already present at
     // the given key then returns a pointer to that element instead.
@@ -370,7 +381,7 @@ public:
     TValue* tryGetValueOrAdd(typename InnerMap::value_type&& kvPair)
     {
         const auto& [iterator, inserted] = map.insert(std::move(kvPair));
-        return inserted ? nullptr : std::addressof(iterator->second);
+        return inserted ? nullptr : std::addressof(HashMapImpl::valueOf(iterator));
     }
     /// Looks `key` up and, if it is absent, inserts an entry whose value is
     /// constructed in place from `args`. Returns a pointer to the mapped

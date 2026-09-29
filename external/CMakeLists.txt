@@ -80,6 +80,228 @@ if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     endif()
 endif()
 
+# Hash map and hash function backing Slang::Dictionary and Slang::Hash.
+#
+# Both are chosen at build time (SLANG_HASHMAP, SLANG_HASH) so that they can be
+# compared against each other on real compiler workloads, and they are
+# independent of each other, so any of the 12x7 combinations is valid. The
+# `slang-hashmap` interface target below is the single place that gathers
+# whatever the selected pair needs -- headers, link libraries and the two
+# preprocessor definitions that source/core/slang-hashmap-impl.h and
+# source/core/slang-hash-impl.h switch on -- and `core` links it publicly, so
+# that every translation unit sees the same Dictionary layout.
+add_library(slang-hashmap INTERFACE)
+
+# Builds the vendored library in external/<dir> and links the CMake target it
+# defines into slang-hashmap. Most of these libraries are only checked out when
+# the configuration actually asks for them, so report a missing submodule with
+# the command that fixes it rather than letting add_subdirectory fail.
+function(slang_hashmap_use_submodule dir target)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${dir}/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "external/${dir} is missing. Run: git submodule update --init external/${dir}"
+        )
+    endif()
+    add_subdirectory(${dir} EXCLUDE_FROM_ALL ${system})
+    target_link_libraries(slang-hashmap INTERFACE ${target})
+endfunction()
+
+# Puts the vendored single-header library in external/<dir> on slang-hashmap's
+# include path.
+#
+# This is separate from slang_hashmap_use_submodule because the three hash
+# functions ship a bare header and no CMake package to consume: rapidhash and
+# komihash have no CMakeLists at all, and xxHash's (under cmake_unofficial/)
+# builds a library we do not want, since XXH_INLINE_ALL below makes it
+# header-only.
+function(slang_hashmap_use_header_only dir header)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${dir}/${header}")
+        message(
+            FATAL_ERROR
+            "external/${dir}/${header} is missing. Run: git submodule update --init external/${dir}"
+        )
+    endif()
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/${dir}"
+    )
+endfunction()
+
+# unordered_dense is a dependency of every configuration, not just
+# SLANG_HASHMAP=UNORDERED_DENSE: slang-hash-impl.h uses its `is_avalanching`
+# marker as the (implementation-independent) definition of which types get a
+# library-provided hash rather than a Slang-defined getHashCode().
+target_link_libraries(slang-hashmap INTERFACE unordered_dense::unordered_dense)
+
+if(SLANG_HASHMAP MATCHES "^BOOST_" OR SLANG_HASH STREQUAL "BOOST")
+    # Boost.Unordered and Boost.ContainerHash are header-only, so we add the
+    # modular boostorg repositories' include directories directly instead of
+    # using their CMakeLists, which are written to be driven by the Boost
+    # superproject and would pull in its whole build machinery.
+    add_library(slang-boost-headers INTERFACE)
+    foreach(
+        boost_module
+        IN
+        ITEMS
+            assert
+            config
+            container_hash
+            core
+            describe
+            mp11
+            predef
+            throw_exception
+            unordered
+    )
+        set(boost_module_include
+            "${CMAKE_CURRENT_LIST_DIR}/boost/${boost_module}/include"
+        )
+        if(NOT EXISTS "${boost_module_include}")
+            message(
+                FATAL_ERROR
+                "${boost_module_include} is missing. Run: git submodule update --init external/boost/${boost_module}"
+            )
+        endif()
+        target_include_directories(
+            slang-boost-headers
+            ${system}
+            INTERFACE "${boost_module_include}"
+        )
+    endforeach()
+    target_link_libraries(slang-hashmap INTERFACE slang-boost-headers)
+endif()
+
+if(SLANG_HASHMAP MATCHES "^ABSL_" OR SLANG_HASH STREQUAL "ABSL")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/abseil-cpp/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "external/abseil-cpp is missing. Run: git submodule update --init external/abseil-cpp"
+        )
+    endif()
+    set(ABSL_PROPAGATE_CXX_STD ON)
+    set(ABSL_ENABLE_INSTALL OFF)
+    set(ABSL_BUILD_TESTING OFF)
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    add_subdirectory(abseil-cpp EXCLUDE_FROM_ALL ${system})
+endif()
+
+if(SLANG_HASHMAP STREQUAL "ABSL_FLAT")
+    target_link_libraries(slang-hashmap INTERFACE absl::flat_hash_map)
+elseif(SLANG_HASHMAP STREQUAL "ABSL_NODE")
+    target_link_libraries(slang-hashmap INTERFACE absl::node_hash_map)
+elseif(SLANG_HASHMAP STREQUAL "GTL_FLAT")
+    slang_hashmap_use_submodule(gtl gtl)
+elseif(SLANG_HASHMAP STREQUAL "TSL_ROBIN")
+    slang_hashmap_use_submodule(robin-map tsl::robin_map)
+elseif(SLANG_HASHMAP STREQUAL "TSL_HOPSCOTCH")
+    slang_hashmap_use_submodule(hopscotch-map tsl::hopscotch_map)
+elseif(SLANG_HASHMAP STREQUAL "TSL_SPARSE")
+    slang_hashmap_use_submodule(sparse-map tsl::sparse_map)
+endif()
+
+# UNORDERED_DENSE_SEGMENTED needs nothing here: segmented_map lives in the same
+# header as the default map, which is already linked above.
+
+if(SLANG_HASH STREQUAL "ABSL")
+    target_link_libraries(slang-hashmap INTERFACE absl::hash)
+elseif(SLANG_HASH STREQUAL "RAPIDHASH")
+    slang_hashmap_use_header_only(rapidhash rapidhash.h)
+elseif(SLANG_HASH STREQUAL "KOMIHASH")
+    slang_hashmap_use_header_only(komihash komihash.h)
+elseif(SLANG_HASH STREQUAL "XXH3")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h")
+        message(
+            FATAL_ERROR
+            "external/xxHash/xxhash.h is missing. Run: git submodule update --init external/xxHash"
+        )
+    endif()
+
+    # xxHash cannot simply be put on the include path under its own name.
+    #
+    # lz4 vendors its own copy of xxhash.h, from a version predating XXH3, and
+    # exports external/lz4/lib as a usage requirement. `core` links lz4, so
+    # that directory lands on its -isystem path ahead of ours and
+    # `#include <xxhash.h>` quietly resolves to the copy without XXH3 in it.
+    # Adding ours BEFORE would not help: the two directories are usage
+    # requirements of two different targets, so their relative order comes from
+    # link order rather than from either target's own property.
+    #
+    # So give xxHash a name nothing else can claim: copy the header next to a
+    # small wrapper that sets XXH_INLINE_ALL, and include the wrapper.
+    #
+    # The wrapper reaches the copy as a plain sibling, with no absolute path and
+    # no "..", because slang-embed also walks these include directories. It
+    # inlines the #includes it finds while embedding the C++ preludes, which
+    # reach core/slang-hash.h and therefore this header, and it resolves a
+    # quoted include by gluing it onto the parent directory of the file it
+    # appears in. Handed an absolute path it builds a nonsensical one, fails to
+    # read it, and aborts on the SLANG_ASSERT in tools/slang-embed.
+    #
+    # XXH_INLINE_ALL lives in the wrapper rather than in a compile definition so
+    # that the name and the mode it is included in stay together. It compiles
+    # XXH3 into whichever translation unit hashes instead of linking the
+    # libxxhash that xxHash's own build would produce, which matters because
+    # Slang only calls XXH3_64bits, on keys of a handful of bytes, where call
+    # overhead is a significant part of the cost.
+    #
+    # Neither file is rewritten when its content is unchanged -- configure_file
+    # and file(GENERATE) both compare first -- so reconfiguring does not rebuild
+    # all of core.
+    set(xxhash_shim_dir "${CMAKE_CURRENT_BINARY_DIR}/slang-xxhash-shim")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h"
+        "${xxhash_shim_dir}/slang-xxhash-impl.h"
+        COPYONLY
+    )
+    file(
+        GENERATE OUTPUT "${xxhash_shim_dir}/slang-xxhash.h"
+        CONTENT
+            "#pragma once\n#define XXH_INLINE_ALL\n#include \"slang-xxhash-impl.h\"\n"
+    )
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${xxhash_shim_dir}"
+    )
+
+    # XXH3's SSE2 kernels are marked always_inline, and GCC refuses to inline a
+    # function carrying __target__("sse2") into a caller without it unless it is
+    # optimizing properly -- "inlining failed in call to always_inline
+    # XXH3_accumulate_sse2", which is an error, not a warning.
+    #
+    # xxHash guards against this itself, but only by looking for __NO_INLINE__,
+    # which GCC defines at -O0 and not at -Og. Slang's Debug configuration is
+    # -Og (see the top of the root CMakeLists.txt), so it falls through the
+    # guard and fails to build. Setting the hint explicitly is what upstream
+    # would have done had it recognised the flag.
+    #
+    # Debug only: Release is -O3 and RelWithDebInfo is -O2, both of which inline
+    # fine, and those are the configurations a measurement would use. Forcing
+    # this everywhere would hand XXH3 a handicap the other hashes do not carry.
+    target_compile_definitions(
+        slang-hashmap
+        INTERFACE $<$<CONFIG:Debug>:XXH_NO_INLINE_HINTS=1>
+    )
+endif()
+
+# enum_option has already checked that these name one of the implementations
+# enumerated in slang-hashmap-impl.h / slang-hash-impl.h.
+target_compile_definitions(
+    slang-hashmap
+    INTERFACE
+        SLANG_HASHMAP_IMPL=SLANG_HASHMAP_${SLANG_HASHMAP}
+        SLANG_HASH_IMPL=SLANG_HASH_${SLANG_HASH}
+)
+
+message(
+    STATUS
+    "Slang::Dictionary will use SLANG_HASHMAP=${SLANG_HASHMAP} with SLANG_HASH=${SLANG_HASH}"
+)
+
 # Miniz
 if(NOT ${SLANG_USE_SYSTEM_MINIZ})
     if(NOT SLANG_OVERRIDE_MINIZ_PATH)
@@ -279,8 +501,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             INTERFACE_INCLUDE_DIRECTORIES
         )
         cmake_path(
-            GET
-            SPIRV-Headers_SOURCE_DIR
+            GET SPIRV-Headers_SOURCE_DIR
             PARENT_PATH SPIRV-Headers_SOURCE_DIR
         )
     endif()

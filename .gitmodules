@@ -83,3 +83,54 @@
 [submodule "external/slang-user-skills"]
 	path = external/slang-user-skills
 	url = https://github.com/shader-slang/slang-user-skills.git
+[submodule "external/boost/assert"]
+	path = external/boost/assert
+	url = https://github.com/boostorg/assert.git
+[submodule "external/boost/config"]
+	path = external/boost/config
+	url = https://github.com/boostorg/config.git
+[submodule "external/boost/container_hash"]
+	path = external/boost/container_hash
+	url = https://github.com/boostorg/container_hash.git
+[submodule "external/boost/core"]
+	path = external/boost/core
+	url = https://github.com/boostorg/core.git
+[submodule "external/boost/describe"]
+	path = external/boost/describe
+	url = https://github.com/boostorg/describe.git
+[submodule "external/boost/mp11"]
+	path = external/boost/mp11
+	url = https://github.com/boostorg/mp11.git
+[submodule "external/boost/predef"]
+	path = external/boost/predef
+	url = https://github.com/boostorg/predef.git
+[submodule "external/boost/throw_exception"]
+	path = external/boost/throw_exception
+	url = https://github.com/boostorg/throw_exception.git
+[submodule "external/boost/unordered"]
+	path = external/boost/unordered
+	url = https://github.com/boostorg/unordered.git
+[submodule "external/robin-map"]
+	path = external/robin-map
+	url = https://github.com/Tessil/robin-map.git
+[submodule "external/abseil-cpp"]
+	path = external/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp.git
+[submodule "external/hopscotch-map"]
+	path = external/hopscotch-map
+	url = https://github.com/Tessil/hopscotch-map.git
+[submodule "external/sparse-map"]
+	path = external/sparse-map
+	url = https://github.com/Tessil/sparse-map.git
+[submodule "external/gtl"]
+	path = external/gtl
+	url = https://github.com/greg7mdp/gtl.git
+[submodule "external/rapidhash"]
+	path = external/rapidhash
+	url = https://github.com/Nicoshev/rapidhash.git
+[submodule "external/komihash"]
+	path = external/komihash
+	url = https://github.com/avaneev/komihash.git
+[submodule "external/xxHash"]
+	path = external/xxHash
+	url = https://github.com/Cyan4973/xxHash.git

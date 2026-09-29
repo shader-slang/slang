@@ -1907,7 +1907,7 @@ struct LoweredElementTypeContext
 
         // Remove linkage decorations from specialized functions if they don't
         // cleanly replace the original.
-        for (auto& [original, specializations] : specializedFuncsByOriginal)
+        for (const auto& [original, specializations] : specializedFuncsByOriginal)
         {
             if (original->hasUses() || specializations.getCount() > 1)
             {

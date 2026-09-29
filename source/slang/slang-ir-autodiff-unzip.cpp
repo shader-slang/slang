@@ -1502,7 +1502,7 @@ IRFunc* splitApplyAndPropFuncs(
 
         auto tupleType = builder.getTupleType(fieldTypes);
 
-        for (auto& [key, index] : keyToIndex)
+        for (const auto& [key, index] : keyToIndex)
         {
             List<IRUse*> usesToProcess;
             for (auto use = key->firstUse; use; use = use->nextUse)

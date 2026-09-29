@@ -213,12 +213,21 @@ struct Hash<ValKey>
     auto operator()(const ValNodeDesc& k) const { return Hash<ValNodeDesc>{}(k); }
 };
 
-// A functor which can compare ValKey for equality with ValNodeDesc
+// A functor which can compare ValKey for equality with ValNodeDesc.
+//
+// Both argument orders are provided because a hash map performing a
+// heterogeneous lookup may pass the stored key and the probe key to the
+// comparator in either order, and which one it picks is an unspecified
+// implementation detail: `ankerl::unordered_dense::map` compares
+// `equal(probe, stored)` while `absl::flat_hash_map` and `tsl::robin_map`
+// compare `equal(stored, probe)`. Supplying only one order silently restricts
+// which map implementations `m_cachedNodes` can be built on.
 struct ValKeyEqual
 {
     using is_transparent = void;
     bool operator()(const Slang::ValKey& a, const Slang::ValKey& b) const { return a == b; }
     bool operator()(const Slang::ValNodeDesc& a, const Slang::ValKey& b) const { return b == a; }
+    bool operator()(const Slang::ValKey& a, const Slang::ValNodeDesc& b) const { return a == b; }
 };
 
 class ASTBuilder : public RefObject
