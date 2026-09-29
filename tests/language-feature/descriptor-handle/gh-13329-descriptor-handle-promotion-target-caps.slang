@@ -4,7 +4,10 @@
 // `BuiltInTriangleIntersectionAttributes` and `RayDesc` would be emitted by their HLSL builtin
 // names with no declaration. See shader-slang/slang#13329.
 
-// `-g` keeps the attributes local alive in the CUDA output, which is where the bare name appeared.
+// `BuiltInTriangleIntersectionAttributes` is not available on Metal, and `RayDesc` has a CUDA
+// builtin, so CUDA and GLSL check the closest-hit entry while Metal checks the ray-query entry.
+// The CUDA run uses `-g` because without it the attributes local is optimized away; the second
+// CUDA check needs that local to see the use site as well as the declaration.
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -g -entry closestHit -stage closesthit
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry closestHit -stage closesthit
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute

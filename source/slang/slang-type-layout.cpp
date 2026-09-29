@@ -3553,9 +3553,13 @@ bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 
 /// Auto-promote the descriptor_handle capability on the target when DescriptorHandle
 /// types are encountered, but only when no specific profile or capability was requested
-/// by the user (auto-promotion mode). We join the capability with the target caps, rather than
-/// adding each branch of the alias as an alternative, so that a CUDA target (for example) does
-/// not also start matching declarations that are specific to HLSL.
+/// by the user (auto-promotion mode). The capability is joined into the target caps, so a target
+/// keeps only its own branch of the alias: profile-less HLSL gains `_sm_6_6`, and the other targets
+/// the alias covers are left unchanged. That holds for targets that `getTargetCaps()` gives a
+/// target atom; a target whose caps are empty (such as `host-cpp`) receives the whole alias.
+///
+/// The result is stored on the `TargetRequest`, which every program compiled in the session
+/// shares, so the promotion persists beyond the layout query that triggered it.
 static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
 {
     if (!targetReq)
@@ -3581,6 +3585,8 @@ static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
 
     auto targetCaps = targetReq->getTargetCaps();
     CapabilitySet descriptorHandleCaps(CapabilityName::descriptor_handle);
+    // Targets outside the alias, such as `c` and the LLVM CPU path, don't support DescriptorHandle,
+    // and joining them with it would produce an invalid capability set.
     if (targetCaps.isIncompatibleWith(descriptorHandleCaps))
         return;
     targetCaps.join(descriptorHandleCaps);

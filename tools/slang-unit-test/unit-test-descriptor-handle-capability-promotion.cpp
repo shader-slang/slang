@@ -8,8 +8,9 @@ using namespace Slang;
 
 // Laying out a `DescriptorHandle` on a target with no profile or capability promotes the
 // `descriptor_handle` capability into that target's capabilities, and the target is shared by every
-// program compiled in the session. CUDA already supports descriptor handles, so the promotion adds
-// nothing there and a later, unrelated program must compile exactly as it would on its own.
+// program compiled in the session. CUDA already supports descriptor handles, so the promotion must
+// leave its caps alone: a later, unrelated closest-hit program must still declare the
+// `BuiltInTriangleIntersectionAttributes` struct rather than use the HLSL builtin name.
 // See shader-slang/slang#13329.
 
 static const char* _getDescriptorHandleSource()
@@ -108,11 +109,13 @@ SLANG_UNIT_TEST(descriptorHandleCapabilityPromotionDoesNotAffectLaterCUDAProgram
 {
     slang::IGlobalSession* globalSession = unitTestContext->slangGlobalSession;
 
+    // Baseline: with no DescriptorHandle in the session, the promotion never runs.
     {
         auto session = _createProfileLessCUDASession(globalSession);
         _checkClosestHitCode(session);
     }
 
+    // Laying out `gCounter` runs the promotion, which writes the session's shared target caps.
     {
         auto session = _createProfileLessCUDASession(globalSession);
         auto descriptorHandleProgram = _linkEntryPoint(
