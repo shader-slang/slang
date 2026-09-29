@@ -2177,7 +2177,7 @@ public:
         m_obfuscatedSourceMap = sourceMap;
     }
 
-    ArrayView<IRInst*> findSymbolByMangledName(const ImmutableHashedString& mangledName) const
+    ArrayView<IRInst*> findSymbolByMangledName(UnownedStringSlice mangledName) const
     {
         if (auto list = m_mapMangledNameToGlobalInst.tryGetValue(mangledName))
             return list->getArrayView();

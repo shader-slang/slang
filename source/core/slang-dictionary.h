@@ -11,6 +11,7 @@
 
 #include <ankerl/unordered_dense.h>
 #include <initializer_list>
+#include <type_traits>
 #include <utility>
 
 namespace Slang
@@ -100,16 +101,117 @@ SLANG_FORCE_INLINE const VALUE* getValue(const KeyValuePair<KEY, VALUE>* in)
 
 const float kMaxLoadFactor = 0.7f;
 
+/// Hashes any of the interchangeable text key types -- `UnownedStringSlice`,
+/// `String`, `ImmutableHashedString` -- so that a dictionary keyed by one of
+/// them can be probed with any of the others.
+///
+/// Without this, a `Dictionary<String, V>` probed with an `UnownedStringSlice`
+/// silently converts the slice to a `String` first, because the backing map
+/// only offers its heterogeneous `find` when both the hash and the comparator
+/// declare `is_transparent`. That conversion heap-allocates and copies the
+/// text on every lookup, hit or miss, and then throws the copy away.
+///
+/// The types opt in by declaring a member type `IsTextKey`, and in exchange
+/// must satisfy two things: `getHashCode()` must agree across the family (it
+/// does -- all three hash the same bytes with the same function), and
+/// `getUnownedSlice()` must yield the text being keyed on. Anything without
+/// those members is rejected at compile time rather than silently hashed some
+/// other way; in particular a bare `const char*` is not a text key, because
+/// hashing it would hash the pointer.
+struct TextKeyHash
+{
+    using is_transparent = void;
+    /// All the text key types hash their bytes with the selected hash
+    /// function, so the result needs no further mixing by the map. This
+    /// matches the `kHasUniformHash` that the types themselves declare.
+    using is_avalanching = void;
+
+    template<typename T, typename = typename T::IsTextKey>
+    HashCode64 operator()(const T& key) const
+    {
+        return key.getHashCode();
+    }
+};
+
+/// Compares any two of the interchangeable text key types; see `TextKeyHash`.
+///
+/// Both argument orders have to work, and which one a map uses is an
+/// unspecified implementation detail, so this compares the two slices rather
+/// than relying on a particular `operator==` overload existing between a
+/// specific pair of the types.
+struct TextKeyEqual
+{
+    using is_transparent = void;
+
+    template<
+        typename A,
+        typename B,
+        typename = typename A::IsTextKey,
+        typename = typename B::IsTextKey>
+    bool operator()(const A& a, const B& b) const
+    {
+        return a.getUnownedSlice() == b.getUnownedSlice();
+    }
+};
+
+namespace DictionaryDetail
+{
+/// Selects the hash and comparator a `Dictionary` uses by default for `TKey`.
+///
+/// Key types that declare `IsTextKey` get the transparent pair above, so that
+/// every `Dictionary<String, V>` in the codebase supports slice lookup without
+/// having to be redeclared. Everything else keeps the previous defaults.
+template<typename TKey, typename = void>
+struct KeyTraits
+{
+    using Hash = Slang::Hash<TKey>;
+    using KeyEqual = std::equal_to<TKey>;
+};
+template<typename TKey>
+struct KeyTraits<TKey, std::void_t<typename TKey::IsTextKey>>
+{
+    using Hash = TextKeyHash;
+    using KeyEqual = TextKeyEqual;
+};
+} // namespace DictionaryDetail
+
 template<
     typename TKey,
     typename TValue,
-    typename Hash = Slang::Hash<TKey>,
-    typename KeyEqual = std::equal_to<TKey>>
+    typename Hash = typename DictionaryDetail::KeyTraits<TKey>::Hash,
+    typename KeyEqual = typename DictionaryDetail::KeyTraits<TKey>::KeyEqual>
 class Dictionary
 {
     using InnerMap = ankerl::unordered_dense::map<TKey, TValue, Hash, KeyEqual>;
     using ThisType = Dictionary<TKey, TValue, Hash, KeyEqual>;
     InnerMap map;
+
+    // A caller may pass a value such as a string literal that can construct
+    // TKey but is not a transparent probe type. In that case materialize one
+    // TKey for the lookup; true text-key probes still avoid that allocation.
+    template<typename K>
+    auto _find(const K& key)
+    {
+        if constexpr (
+            std::is_invocable_v<Hash, const K&> &&
+            std::is_invocable_v<KeyEqual, const K&, const TKey&> &&
+            std::is_invocable_v<KeyEqual, const TKey&, const K&>)
+            return map.find(key);
+        else
+            return map.find(TKey(key));
+    }
+
+    template<typename K>
+    auto _find(const K& key) const
+    {
+        if constexpr (
+            std::is_invocable_v<Hash, const K&> &&
+            std::is_invocable_v<KeyEqual, const K&, const TKey&> &&
+            std::is_invocable_v<KeyEqual, const TKey&, const K&>)
+            return map.find(key);
+        else
+            return map.find(TKey(key));
+    }
 
 public:
     Dictionary() = default;
@@ -200,7 +302,7 @@ public:
     template<typename K>
     bool containsKey(const K& k) const
     {
-        return map.contains(k);
+        return _find(k) != map.end();
     }
 
     // Returns a valid pointer to the requested element, or nullptr if it
@@ -208,7 +310,7 @@ public:
     template<typename K>
     const TValue* tryGetValue(const K& key) const
     {
-        auto i = map.find(key);
+        auto i = _find(key);
         return i == map.end() ? nullptr : &(i->second);
     }
     // Returns a valid pointer to the requested element, or nullptr if it
@@ -216,7 +318,7 @@ public:
     template<typename K>
     TValue* tryGetValue(const K& key)
     {
-        auto i = map.find(key);
+        auto i = _find(key);
         return i == map.end() ? nullptr : std::addressof(i->second);
     }
 
@@ -225,7 +327,7 @@ public:
     template<typename K>
     bool tryGetValue(const K& key, TValue& value) const
     {
-        auto i = map.find(key);
+        auto i = _find(key);
         if (i == map.end())
             return false;
         value = i->second;

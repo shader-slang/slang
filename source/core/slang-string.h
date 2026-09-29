@@ -237,6 +237,11 @@ public:
     static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const { return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); }
 
+    /// Marks this as one of the interchangeable text key types; see
+    /// `Slang::TextKeyHash` in slang-dictionary.h for the contract.
+    using IsTextKey = void;
+    UnownedStringSlice getUnownedSlice() const { return *this; }
+
     template<size_t SIZE>
     SLANG_FORCE_INLINE static UnownedStringSlice fromLiteral(const char (&in)[SIZE])
     {
@@ -831,6 +836,50 @@ public:
     }
 
     UnownedStringSlice getUnownedSlice() const { return StringRepresentation::asSlice(m_buffer); }
+
+    /// Marks this as one of the interchangeable text key types; see
+    /// `Slang::TextKeyHash` in slang-dictionary.h for the contract.
+    using IsTextKey = void;
+};
+
+/// Hash and equality functors that let a dictionary keyed on `String` be probed with an
+/// `UnownedStringSlice` without building a `String` for the lookup.
+///
+/// A `Dictionary`'s default `std::equal_to<String>` is not transparent, so a caller that passes a
+/// slice where a `String const&` is expected silently materialises a heap `String`, hashes it,
+/// compares it and then destroys it. Declaring `is_transparent` on both functors is what selects
+/// the heterogeneous overloads of the underlying map, which hash and compare the slice in place.
+///
+/// Use as `Dictionary<String, TValue, StringSliceHash, StringSliceEqual>`. Insertion still stores
+/// an owned `String`, as it must, so only lookups become free.
+///
+/// Correctness rests on these agreeing with `Hash<String>` and `String::operator==`: they do,
+/// because `String::getHashCode` hashes exactly the bytes of `getUnownedSlice()`, and `String`
+/// comparison is bytewise.
+struct StringSliceHash
+{
+    using is_transparent = void;
+    // Both `String` and `UnownedStringSlice` declare `kHasUniformHash`, so the map does not need to
+    // mix the result further.
+    using is_avalanching = void;
+
+    HashCode64 operator()(const UnownedStringSlice& slice) const { return slice.getHashCode(); }
+    HashCode64 operator()(const String& str) const { return str.getHashCode(); }
+};
+
+struct StringSliceEqual
+{
+    using is_transparent = void;
+
+    template<typename TLeft, typename TRight>
+    bool operator()(const TLeft& left, const TRight& right) const
+    {
+        return asSlice(left) == asSlice(right);
+    }
+
+private:
+    static UnownedStringSlice asSlice(const String& str) { return str.getUnownedSlice(); }
+    static UnownedStringSlice asSlice(const UnownedStringSlice& slice) { return slice; }
 };
 
 class ImmutableHashedString
@@ -882,6 +931,11 @@ public:
     bool operator!=(const String& other) const { return slice != other.getUnownedSlice(); }
     bool operator==(const char* other) const { return slice == UnownedStringSlice(other); }
     HashCode64 getHashCode() const { return hashCode; }
+
+    /// Marks this as one of the interchangeable text key types; see
+    /// `Slang::TextKeyHash` in slang-dictionary.h for the contract.
+    using IsTextKey = void;
+    UnownedStringSlice getUnownedSlice() const { return slice.getUnownedSlice(); }
 };
 
 class SLANG_RT_API StringBuilder : public String
