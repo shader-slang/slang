@@ -1,0 +1,58 @@
+schema_version: 1
+id: spirv-track-liveness-malformed-oplifetimestart
+bundle: coverage/emit
+suspected_kind: wrong-codegen
+title: "-track-liveness on direct SPIR-V emits a malformed 5-word OpLifetimeStart"
+observed_at: "2026-08-06T00:00:00+00:00"
+scope: spirv
+evidence:
+  command: "build/Release/bin/slangc docs/generated/tests/coverage/emit/_repro/spirv-track-liveness-invalid.slang -target spirv-asm -entry computeMain -stage compute -track-liveness"
+  source_slang: docs/generated/tests/coverage/emit/_repro/spirv-track-liveness-invalid.slang
+  exit_code: 255
+  observed_summary: |
+    Any shader with a tracked local, compiled with `-target spirv-asm -track-liveness`,
+    fails before producing output:
+      spirv-opt: : error : Invalid instruction OpLifetimeStart starting at word 204:
+      expected no more operands after 3 words, but stated word count is 5.
+    `OpLifetimeStart` takes a Pointer and a Size, so the grammar allows exactly 3 words;
+    the emitted instruction claims 5. Nothing is written to stdout and slangc exits 255.
+    Dropping `-track-liveness` compiles the same file to SPIR-V cleanly (exit 0), and
+    `-target glsl -track-liveness` is also clean -- it emits the declared marker
+    functions the GLSL path expects:
+      void livenessStart_0(spirv_by_reference int _0, spirv_literal int _1);
+      void livenessStart_1(spirv_by_reference float _0, spirv_literal int _1);
+      void livenessEnd_0(spirv_by_reference float _0, spirv_literal int _1);
+    So the flag is only broken on the direct-SPIR-V path, and it is broken for every
+    shader that has a live range to mark, not for some particular construct.
+expected:
+  claim: |
+    `-track-liveness` should either emit a spec-conformant `OpLifetimeStart` on the
+    direct-SPIR-V path or not run the marker-lowering pass there at all. Emitting a
+    module that spirv-opt rejects makes the flag unusable on that target.
+    `applyGLSLLiveness` (source/slang/slang-emit.cpp:2603-2609) is gated on
+    `isKhronosTarget(targetRequest)`, and `isKhronosTarget`
+    (source/slang/slang-type-layout.cpp:3274-3286) returns true for GLSL, SPIRV *and*
+    SPIRVAssembly. The pass exists for the GLSL text path: its own comment
+    (source/slang/slang-emit.cpp:2595-2601) says live-range information "needs to be
+    output to GLSL code that uses a glslang extension for supporting function
+    declarations that map directly to SPIR-V opcodes", and it rewrites each marker into
+    a call to a synthesized `spirv_instruction` function carrying a pointer and a
+    literal zero (source/slang/slang-ir-glsl-liveness.cpp:162-173). On the direct-SPIR-V
+    path those synthesized calls reach the SPIR-V emitter instead of a GLSL source
+    writer, which is where the extra operands come from. The neighbouring pass at
+    source/slang/slang-emit.cpp:2611 shows the predicate the gate is missing --
+    `isKhronosTarget(targetRequest) && emitSpirvDirectly` -- so the fix is likely to
+    restrict `applyGLSLLiveness` to the non-direct path.
+  citation_kind: doc
+  citation: docs/command-line-slangc-reference.md#track-liveness
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/06-emit.md
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug (the flag needs a companion option on SPIR-V): ruled out -- the repro is a 14-line shader with one local, no other flags, and slangc's own help lists -track-liveness without a target restriction."
+    - "spirv-opt is outdated on this box and rejects a valid instruction: ruled out -- the SPIR-V grammar fixes OpLifetimeStart at 3 words (opcode, Pointer, Size), so a 5-word encoding is malformed under any version; the diagnostic is a word-count check, not a feature check."
+    - "The pass is intended to run for direct SPIR-V and the bug is only in how the emitter lowers the synthesized call: possible, and the two are not exclusive -- either the gate or the lowering must change. Recorded here as the gate because the pass is named, commented and shaped for the GLSL text path."
+    - "Pre-existing and already covered elsewhere: ruled out -- `grep -rl track-liveness tests/` returns nothing, so no shipped test passes the flag on any target, and no expected-failure list mentions liveness. That the flag is wholly untested is consistent with the breakage surviving."

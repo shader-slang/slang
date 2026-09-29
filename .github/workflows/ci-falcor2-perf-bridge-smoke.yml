@@ -1,0 +1,30 @@
+name: CI Falcor 2 Perf Bridge Smoke
+
+# Manual bridge smoke. Keep this workflow narrow: call the runner-local
+# entrypoint with a fixed target selector and let the configured bridge own the
+# implementation.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  falcor2-perf-bridge-smoke:
+    name: Falcor 2 perf bridge smoke
+    timeout-minutes: 30
+    runs-on: [Linux, self-hosted, X64, falcor-bridge]
+    # Keep this public workflow thin, matching ci-falcor-test.yml.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Request bridge smoke command
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SLANG_CI_BRIDGE_TARGET: falcor2-perf-smoke
+        run: |
+          set -euo pipefail
+          /opt/slang-ci/run-external-ci

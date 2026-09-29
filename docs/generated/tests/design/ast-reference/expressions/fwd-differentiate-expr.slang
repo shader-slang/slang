@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#differentiate-family-expressions
-//META: doc_section_digest=6c3b730bf3c80deec0b25345c74e483d9dc34ef0c1d176c3675315ff972a5c70
+//META: doc_section_digest=d977436f6dd59b4e5e73cb194cb787b23a56ac21de6d48a23ddc96e540a36a6e
 //META: purpose=A ForwardDifferentiateExpr `__fwd_diff(f)` selects the forward-mode derivative of a [Differentiable] function.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names ForwardDifferentiateExpr as a HigherOrderInvokeExpr
-// that selects the forward-mode derivative of its callable argument.
-// For f(x) = x*x, the forward-mode derivative at x=3 with dx=1 is
-// (9, 6).
+// Verifies that `__fwd_diff(f)` selects the forward-mode derivative of a
+// [Differentiable] function. f(x) = x*x evaluated at x = 3 with dx = 1 must
+// yield the primal 9 and the differential 6; the CHECKs read both halves of
+// the returned pair.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

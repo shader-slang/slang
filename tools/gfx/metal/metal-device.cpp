@@ -384,7 +384,7 @@ Result DeviceImpl::createTextureResource(
     const MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
     if (pixelFormat == MTL::PixelFormat::PixelFormatInvalid)
     {
-        assert(!"Unsupported texture format");
+        SLANG_ASSERT_FAILURE("Unsupported texture format");
         return SLANG_FAIL;
     }
 
@@ -440,7 +440,7 @@ Result DeviceImpl::createTextureResource(
         textureDesc->setDepth(descIn.size.depth);
         break;
     default:
-        assert("!Unsupported texture type");
+        SLANG_ASSERT_FAILURE("Unsupported texture type");
         return SLANG_FAIL;
     }
 

@@ -1,0 +1,51 @@
+schema_version: 1
+id: wgsl-unsupported-int-image-format-falls-back-to-float
+bundle: coverage/emit
+suspected_kind: wrong-codegen
+title: "WGSL falls back to rgba32float for unsupported integer image formats"
+observed_at: "2026-08-06T00:00:00+00:00"
+scope: wgsl
+evidence:
+  command: "build/Release/bin/slangc docs/generated/tests/coverage/emit/_repro/wgsl-int-image-format-fallback.slang -target wgsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/coverage/emit/_repro/wgsl-int-image-format-fallback.slang
+  exit_code: 0
+  observed_summary: |
+    `RWTexture2D<int>` carrying `[format("r16i")]` -- a format WGSL has no spelling for --
+    compiles with only a warning:
+      warning[E31105]: Image format 'r16i' is not explicitly supported by the WGSL
+      backend, using supported format 'rgba32float' instead.
+    but the module it produces is not type-correct WGSL:
+      @binding(1) @group(0) var tex_0 : texture_storage_2d<rgba32float, read_write>;
+      var _S1 : i32 = (textureLoad((tex_0), (vec2<i32>(tid_0.xy))).x);
+    `textureLoad` on an `rgba32float` storage texture yields `vec4<f32>`, so `.x` is an
+    `f32` initializing a variable declared `i32`. The substitution changes the texel
+    *class*, not just its precision, so the warning understates what happened.
+    Across the 27 formats in `spirv-image-format-table.slang`, 8 map faithfully and 19
+    collapse onto `rgba32float`, including every one of the narrow integer formats
+    (`rg16i`, `r16i`, `r8i`, `rg16ui`, `rg8ui`, `r16ui`, ...).
+expected:
+  claim: |
+    A fallback format should preserve the texel class, so an unsupported integer format
+    should fall back to an integer format. WGSL has the spellings: the same switch
+    already returns `rgba32sint` for `rgba32i` and `rgba32uint` for `rgba32ui`
+    (source/slang/slang-emit-wgsl.cpp:466-469). The `default:` arm at
+    source/slang/slang-emit-wgsl.cpp:477-483 returns the literal `"rgba32float"` for
+    every unsupported format without consulting the format's scalar class, which is what
+    lets a signed/unsigned image become a float image. Choosing the replacement from
+    `getImageFormatInfo(imageFormat)` -- which the arm already fetches, for the
+    diagnostic's name -- would keep the emitted texel type consistent with the
+    declaration, or the case could be diagnosed as an error where no same-class format
+    exists rather than emitting a module that a WGSL consumer must reject.
+  citation_kind: sibling-test
+  citation: tests/diagnostics/image-format-unsupported-by-backend.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/06-emit.md
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "The warning makes this intended, documented behaviour: partly -- the substitution is intended, but the diagnostic promises a format swap, and a float-for-integer swap additionally breaks the type of every load and store against that texture, which no part of the message discloses."
+    - "Tint would accept it because the storage texture is untyped at load: ruled out by the WGSL spec -- textureLoad on texture_storage_2d<rgba32float, _> is defined to return vec4<f32>, and the emitted initializer for that value is declared i32."
+    - "Test artefact of reading .x from a scalar texture: ruled out -- the same collapse happens for the vector integer formats (rg16i, rg8ui) in the 27-format table, and the declaration itself is already float-typed before any load."
+    - "Only affects exotic formats nobody uses: not a correctness argument, and the affected set is 19 of the 27 formats exercised here, including the common narrow integer ones."

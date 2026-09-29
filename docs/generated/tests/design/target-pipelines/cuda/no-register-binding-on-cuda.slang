@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:30:46+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#cuda-specific-runtime-predicates
-//META: doc_section_digest=7a949686b1f99d1ea012c70887b1fc767951f7fb8f2e71588bba83ccf4dffaed
+//META: doc_section_digest=c7ba1e770f2a5ef6e74a934e5479d49fe4dcee7cfb6f669ce553a510a71b86ec
 //META: purpose=CUDA is not isD3DTarget and is non-Khronos so HLSL register(uN) bindings do not appear in CUDA emit; resources are reached through GlobalParams_0.
 //META: intent=functional
 //META: pipeline_stage=emit

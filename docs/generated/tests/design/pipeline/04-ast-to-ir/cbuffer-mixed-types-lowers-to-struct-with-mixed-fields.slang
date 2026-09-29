@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T10:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#module-level-outputs
-//META: doc_section_digest=d2d46e039ebd707b280ca397a6adb57c2b8df7a613cf8bf7da56564fc99b5920
+//META: doc_section_digest=f8561fc2ad6dee3455d62d72f0d7eee4f8a8254c3b4628aad794dd6cd769e81e
 //META: purpose=A cbuffer mixing scalar, vector, and matrix fields lowers to a `ConstantBuffer<...>` payload struct whose `field(...)` rows carry each member's IR type verbatim (Int, Vec, Mat).
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -14,7 +14,7 @@
 // scalar `Int`, `Vec(Float, 3)`, and `Mat(Float, 4, 4, 0)` appear
 // as the three `field(...)` row types in declaration order.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 cbuffer CB {
     int i;
@@ -33,4 +33,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 // CHECK-LABEL: struct %SLANGx5FParameterGroupx5FCB
 // CHECK: field(%i, Int)
 // CHECK: field(%v, Vec(Float, 3 : Int))
-// CHECK: field(%m, Mat(Float, 4 : Int, 4 : Int, 0 : Int))
+// CHECK: field(%m, Mat(Float, 4 : Int, 4 : Int, 0 : Enum(Int)))

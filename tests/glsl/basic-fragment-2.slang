@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -allow-glsl -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/basic-fragment-2.slang -target spirv -stage fragment -entry main
+//TEST:SIMPLE_EX(filecheck=CHECK): -lang glsl tests/glsl/basic-fragment-2.slang -target spirv -stage fragment -entry main -emit-spirv-directly
 #version 450 core
 layout(location = 0) out mediump vec4 o_color;
 layout(location = 0) in highp vec2 v_texCoord;

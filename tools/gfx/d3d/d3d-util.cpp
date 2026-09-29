@@ -423,7 +423,7 @@ D3DUtil::calcResourceFormat(UsageType usage, Int usageFlags, DXGI_FORMAT format)
         }
     }
 
-    assert(!"Not reachable");
+    SLANG_ASSERT_FAILURE("Not reachable");
     return DXGI_FORMAT_UNKNOWN;
 }
 

@@ -28,8 +28,12 @@ public:
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
         SLANG_OVERRIDE;
+
+    // Prefer WGSL's native `loop` spelling for structured unconditional loops.
+    virtual char const* getUnconditionalLoopHeader() SLANG_OVERRIDE { return "loop"; }
 
     // WGSL doesn't support fall-through in switch statements
     virtual bool supportsSwitchFallThrough() SLANG_OVERRIDE { return false; }

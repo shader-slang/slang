@@ -1,14 +1,14 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T14:01:36Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:20:00Z
 target_doc: ir-reference/structure.md
 review_report: ../../reviews/ir-reference/structure.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 1
-  rejected_bogus: 1
+  fixed: 5
+  rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
@@ -17,10 +17,20 @@ actions:
 # Remediation report for ir-reference/structure.md
 
 ## Summary
-Two findings: one rejected-bogus, one fixed. F-001 is bogus — the `generic` callout already says the body ends with `return_val` / `IRReturn`, not `yield`, matching `findGenericReturnVal` and the Lua comment. F-002 mis-cited its example rows (the four it named already carried wrappers) but flagged a real gap: filled every remaining `—` wrapper cell whose opcode has a FIDDLE-generated wrapper, per the "from `struct_name` or implicit" rule. Edits touch only the wrapper column, no watched source, so `source_commit` is unchanged.
+
+All five minor findings were verified against the source at the
+recorded commit and fixed; none was rejected, deferred, or escalated.
+Four fixes are single-cell corrections in the opcode tables and the
+witness-table prose; the fifth merges the audience sentence into the
+opening paragraph as the common contract requires. The nine
+generic/existential rows this page owns were left untouched.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-bogus | Doc line 98 and the `### generic` callout already read "ends with `return_val` / `IRReturn`"; the word "yield" appears only as the value the generic yields, matching `source/slang/slang-ir-insts.lua:809`. `findGenericReturnVal` casts the terminator to `IRReturn` (`source/slang/slang-ir.cpp:9743`). The reviewer's premise that the callout names `yield` as the terminator is false. | — |
-| F-002 | fixed | Wrapper column is mandatory and admits implicit wrappers (`_common.md` line 234: "from `struct_name` or implicit"). Reviewer's four cited rows already had wrappers; the genuinely-empty cells were `call`, `global_generic_param`, `indexedFieldKey`, `thisTypeWitness`, `TypeEqualityWitness`, `SymbolAlias`, all of which have wrappers: `IRCall` (`source/slang/slang-ir-insts.h:1697`), `IRGlobalGenericParam` (`:2266`), `IRIndexedFieldKey` (`source/slang/slang-ir.h:1765`), `IRThisTypeWitness` (`source/slang/slang-ir.h:1730`), `IRTypeEqualityWitness` (`build/source/slang/fiddle/slang-ir-insts.h.fiddle:8307`), `IRSymbolAlias` (`cast<IRSymbolAlias>` at `source/slang/slang-ir-link.cpp:1445`). | Filled wrapper cells `—` -> `IRCall` / `IRGlobalGenericParam` / `IRIndexedFieldKey` / `IRThisTypeWitness` / `IRTypeEqualityWitness` / `IRSymbolAlias` |
+| F-001 | fixed | Confirmed. `source/slang/slang-lower-to-ir.cpp:11927-11938` shows `visitVarDecl` sending only true globals to `lowerGlobalVarDecl` and function-statics to `lowerFunctionStaticVarDecl`, which at `:11825-11834` delegates a `const` to `lowerFunctionStaticConstVarDecl`. | `### Global state`: `global_var` origin now cites `lowerFunctionStaticVarDecl` for mutable function-statics; `globalConstant` origin gained function-`static` `const` via `lowerFunctionStaticConstVarDecl`. |
+| F-002 | fixed | Confirmed. `source/slang/slang-ast-decl.h:575` declares `GlobalGenericParamDecl : public AggTypeDecl`, but line 583 declares `GlobalGenericValueParamDecl : public VarDeclBase`. | `global_generic_param` row: split the shared derivation claim into the two correct base classes. |
+| F-003 | fixed | Confirmed. `docs/generated/design/_meta/prompts/ir-reference-structure.md:38` requires lambda lowering in this cell, and `source/slang/slang-check-expr.cpp:7933-7939` creates the lambda's `FuncDecl` and stores it on the lambda struct. | `func` row: added the synthesized `FuncDecl` that checking stores on a lambda to the AST-origin cell. |
+| F-004 | fixed | Confirmed. `source/slang/slang-lower-to-ir.cpp:12086-12108` counts one entry per `AccessorDecl` of a property or subscript and `continue`s past `InterfaceDefaultImplDecl`, so "one entry per direct interface member" overcounts and undercounts. | `witness_table_entry` / `interface_req_entry` prose: reworded to one entry per requirement-bearing member, with accessors contributing their own entries and default-impl decls skipped. |
+| F-005 | fixed | Confirmed. `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first body paragraph to state both coverage and intended reader; the page split them across two paragraphs. | Introduction: merged the audience sentence into the opening paragraph. |

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#inlining-and-call-graph
-//META: doc_section_digest=d53bcc40d9eaa7a3ac784fc9773eb4780b72aa50e5c0ba67ff2ca45acd271030
+//META: doc_section_digest=0c02024bf756789f5e2a8e8518524bff844c5a9c7658e631aab916c9a49f2d22
 //META: purpose=Stress: a `[ForceInline]` helper called 16 times is inlined at every call site — the callee name disappears from every observable target.
 //META: intent=stress
 //META: pipeline_stage=ir-pass

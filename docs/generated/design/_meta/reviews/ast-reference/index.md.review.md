@@ -1,40 +1,41 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T13:17:20+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:06:33+00:00
 target_doc: ast-reference/index.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: d8e32ce634cb5c690185a7348f23f158bf8feb8f41b3a73c73eb75ceb79f8bd5
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 9b051f09c6305e9dacb68adede05e274c6eca01813cd472a3d3931c5146eb5aa
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: pass
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: pass
   front_matter_validity: pass
 finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 1
+  major: 0
   minor: 0
-  nit: 0
+  nit: 1
 ---
 
 # Review report for ast-reference/index.md
 
 ## Summary
-The index is useful as a navigation page, and its page links and approximate class counts are within the prompt tolerance. The main issue is that the taxonomy diagram claims to mirror `slang-ast-base.h` while including abstract families that are declared in `slang-ast-val.h` instead.
+The document is factually aligned with the recorded source, and its links, front matter, family counts, and hierarchy all check out. The only finding is a small prompt-contract deviation: `## How to navigate` contains seven sentences instead of the required three to four.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ast-reference/index.md` and used the listed prompt, dependency docs, and watched paths at `eb9403ef595a99c2ff6def1d538dbd7a792d9371`.
-- Verified the required intro, `## Family taxonomy`, `## Pages`, `## Cross-cutting topics`, and `## How to navigate` sections.
-- Checked the taxonomy diagram against `source/slang/slang-ast-base.h` and checked the Val-family entries against `source/slang/slang-ast-val.h`.
-- Checked approximate concrete FIDDLE class counts: declarations 60, expressions 94, statements 30, types 119, values 60, modifiers 254.
-- Resolved the relative document links and anchors; the body has no source line-number citations.
+- Read `_common.md`, the per-document prompt, all seven current dependency pages, and every path resolved by `regenerate.py show ast-reference/index.md`; source claims were checked at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Verified all 11 Mermaid hierarchy edges against `source/slang/slang-ast-base.h:133-825`, including the `SourceLoc`, modifier-storage, `Type : Val`, and `DeclRefBase : Val` claims.
+- Counted concrete `FIDDLE` declarations in all six owning headers and confirmed the rounded values `~60`, `~95`, `~30`, `~120`, `~60`, and `~265`.
+- Spot-checked more than 10 further claims, including `SyntaxNode` being the sole direct `SyntaxNodeBase` subclass, `DeclGroup : DeclBase`, deferred `UnparsedStmt` creation, work-graph `__intrinsic_type` declarations, and `[Differentiable]` mapping to `BackwardDifferentiableAttribute`.
+- Resolved all 38 relative links, checked their anchors where present, and confirmed all 12 linked generated peers are manifest entries. The body contains zero line-number citations, so there were none to re-derive.
+- Checked required headings and order, table columns, intro audience statement, Mermaid syntax, file-name and identifier sweeps, the size cap, and all mandatory front-matter fields.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Family taxonomy` | The paragraph says the diagram mirrors the abstract-root hierarchy declared in `slang-ast-base.h`, but the diagram includes `IntVal` and `Witness`, which are not declared in that header. This also violates the index prompt's requirement that the diagram show the roots exactly as declared in `slang-ast-base.h`. | `docs/generated/design/_meta/prompts/ast-reference-index.md:25-32` requires the base-header roots; `source/slang/slang-ast-val.h:143-145` declares `IntVal`; `source/slang/slang-ast-val.h:744-746` declares `Witness`. | Remove `IntVal` and `Witness` from the base-header taxonomy diagram, and keep them in the `values.md` navigation bullet where the non-Type `Val` leaves are already summarized. |
+| F-001 | nit | `## How to navigate`, lines 186-211 | The navigation guidance spans seven sentences, while the per-document prompt requires a three-to-four-sentence section. The content is accurate, but the section is longer than its specified navigation-hub shape. | `docs/generated/design/_meta/prompts/ast-reference-index.md:51-54` requires “3-4 sentence guidance”; the target section contains seven sentences. | Condense the section to three or four sentences while retaining the `base.md` starting point, family-page guidance, abstract-node location, and literal interpretation of the `Grammar` column. |

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/language-reference/generics.md#parameter-binding
-//META: doc_section_digest=5fefa3cf4076961bde4d84e979866a0fe46244475e81339e0cd6922ed4777a7a
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#implicit-parameter-binding-ambiguous-value-argument
+//META: doc_section_digest=d91f482916124f53d789e942e45a31fc7f6d8c8621157c05540b759a5798b3e4
 //META: purpose=When inference yields conflicting values for one generic value parameter (two arrays of different lengths bound to the same `let N`), specialization fails with an error.
 //META: intent=negative
 //META: pipeline_stage=check
@@ -13,7 +13,7 @@
 // example: `len<let N : uint>(int[N], int[N])` receives an int[7] and an int[6],
 // so N cannot be inferred consistently. The compiler rejects the call; CHECK
 // asserts E30442 "cannot deduce generic argument" fires on the call site with
-// the conflicting uint(7)/uint(6) requirements (non-exhaustive skips the
+// the conflicting 7/6 requirements (non-exhaustive skips the
 // trailing "see declaration" note).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
@@ -31,6 +31,6 @@ void computeMain()
     int arr1[7] = {};
     int arr2[6] = {};
     outputBuffer[0] = len(arr1, arr2);
-//CHECK:                 ^ cannot deduce generic argument for 'N': conflicting requirements 'uint(7)' and 'uint(6)'
+//CHECK:                 ^ cannot deduce generic argument for 'N': conflicting requirements '7' and '6'
     //CHECK: E30442
 }

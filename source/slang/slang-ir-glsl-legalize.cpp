@@ -1044,22 +1044,35 @@ void createVarLayoutForLegalizedGlobalParam(
     IRVarLayout* varLayout = varLayoutBuilder.build();
     builder->addLayoutDecoration(globalParam, varLayout);
 
-    // Traverse the entire access chain for the current leaf var and see if
-    // there are interpolation mode decorations along the way.
-    // Make sure we respect the decoration on the inner most node.
-    // So that the decoration on a struct field overrides the outer decoration
-    // on a parameter of the struct type.
+    // Use the innermost interpolation mode, but scan the entire declaration
+    // chain for precise. A field may specify nointerpolation while its enclosing
+    // output parameter specifies precise; both qualifiers apply to the field.
+    bool foundInterpolationMode = false;
     for (; outerParamInfo; outerParamInfo = outerParamInfo->next)
     {
         auto paramInfo = outerParamInfo->outerParam;
         auto decorParent = paramInfo;
         if (auto field = as<IRStructField>(decorParent))
             decorParent = field->getKey();
-        if (auto interpolationModeDecor =
-                decorParent->findDecoration<IRInterpolationModeDecoration>())
+        // A precise output field or parameter remains precise after scalarization.
+        // Keep that qualifier on the resulting output address so the SPIR-V backend
+        // can trace the values stored into it after the original declaration is gone.
+        if (kind == LayoutResourceKind::VaryingOutput &&
+            decorParent->findDecoration<IRPreciseDecoration>() &&
+            !globalParam->findDecoration<IRPreciseDecoration>())
         {
-            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
-            break;
+            builder->addSimpleDecoration<IRPreciseDecoration>(globalParam);
+        }
+        if (!foundInterpolationMode)
+        {
+            if (auto interpolationModeDecor =
+                    decorParent->findDecoration<IRInterpolationModeDecoration>())
+            {
+                builder->addInterpolationModeDecoration(
+                    globalParam,
+                    interpolationModeDecor->getMode());
+                foundInterpolationMode = true;
+            }
         }
     }
 
@@ -5096,7 +5109,11 @@ void legalizeEntryPointsForGLSL(
 
 // Rewrite a single `switch` on a `bool` condition into the equivalent integer switch:
 // cast the condition bool->int (Khronos emitters lower this to an OpSelect) and replace
-// each `IRBoolLit` case value with the matching `IRIntLit` (`true`->1, `false`->0).
+// each case value with the matching `IRIntLit` (`true`->1, `false`->0).
+//
+// A case value on a bool-conditioned switch is a canonical `IRBoolLit`, whether written
+// literally (`case true:`/`case false:`) or produced by a `switch` on an `enum : bool` (whose
+// labels `lowerEnumType` canonicalizes from the enum type to `IRBoolLit`).
 static void legalizeBoolSwitch(IRSwitch* switchInst)
 {
     if (!as<IRBoolType>(switchInst->getCondition()->getDataType()))
@@ -5111,14 +5128,14 @@ static void legalizeBoolSwitch(IRSwitch* switchInst)
 
     for (UInt i = 0; i < switchInst->getCaseCount(); i++)
     {
-        auto boolLit = as<IRBoolLit>(switchInst->getCaseValue(i));
-        SLANG_ASSERT(boolLit);
-        auto intLit = builder.getIntValue(intType, boolLit->getValue() ? 1 : 0);
+        auto caseConstant = as<IRBoolLit>(switchInst->getCaseValue(i));
+        SLANG_RELEASE_ASSERT(caseConstant);
+        auto intLit = builder.getIntValue(intType, caseConstant->value.intVal != 0 ? 1 : 0);
         switchInst->getCaseValueUse(i)->set(intLit);
     }
 }
 
-void legalizeBoolSwitchForKhronos(IRModule* module)
+void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {

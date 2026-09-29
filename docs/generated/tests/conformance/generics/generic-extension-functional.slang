@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/language-reference/generics.md#examples
-//META: doc_section_digest=2843e3e730992c3b4a58e5dcb338c66a5db5be57ab33d9c88e766fe31406de61
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#generic-extension-for-generic-types
+//META: doc_section_digest=034115795153f5efbf5da1b1002c144506804e86277f5c21d084a065283c9b56
 //META: purpose=Two generic extensions on the same struct with different type constraints each contribute their method only for the matching specialization.
 //META: intent=functional
 //META: pipeline_stage=runtime

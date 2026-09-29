@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#thistype-and-assoctypedecl
-//META: doc_section_digest=5f248bb7696458fa65ee7706db2d88769ea1a0b81f789dadf95e485871c7d498
-//META: purpose=A ThisType inside an interface stands for the conforming type; a method whose return type is `This` returns the concrete type when dispatched on a concrete value.
+//META: doc_section_digest=35b2b46dc04e84b08b4aa611ac4530252370da8bdabd15d01fd1ac308064a09d
+//META: purpose=A ThisType stands for the conforming type inside a polymorphic declaration, so a method returning `This` yields the concrete type when dispatched.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies ThisType is the type of `this` inside an interface body:
-// a `This`-returning method dispatched on a concrete type returns a
-// value of that concrete type, so a follow-up concrete method call
-// succeeds. CHECK asserts the cloned value's mark, proving `This`
-// substituted to the conforming type.
+// Verifies that `This` is substituted with the conforming type rather
+// than erased to the interface: the generic stores the result of a
+// This-returning method in a `T` local and then calls a further
+// requirement on it. CHECK asserts the cloned mark, which needs the
+// returned value to have been typed as the concrete conformer.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

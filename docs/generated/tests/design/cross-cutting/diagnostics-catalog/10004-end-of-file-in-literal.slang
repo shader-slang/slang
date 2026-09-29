@@ -1,14 +1,14 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
-//META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=90e08e718ef3c42629a46041937d0ea97ce192cb87a0b3e414306237480cd0b9
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=source/compiler-core/slang-lexer-diagnostic-defs.h
+//META: doc_section_digest=f004998f3bf790529ba3e2db6c6b480908b33b40f429b48e302db06256be33a3
 //META: purpose=Fires diagnostic E10004 (end-of-file-in-literal) from a minimum-reproduction input.
 //META: intent=negative
-//META: pipeline_stage=lex
+//META: pipeline_stage=parse
 //META: catalog_code=10004
-//META: catalog_name=end-of-file-in-literal
+//META: catalog_name=endOfFileInLiteral
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Minimum reproduction for diagnostic E10004.

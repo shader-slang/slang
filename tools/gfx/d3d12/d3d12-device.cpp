@@ -148,7 +148,7 @@ Result DeviceImpl::createBuffer(
     switch (memoryType)
     {
     case MemoryType::ReadBack:
-        assert(!srcData);
+        SLANG_ASSERT(!srcData);
 
         heapProps.Type = D3D12_HEAP_TYPE_READBACK;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -1267,7 +1267,7 @@ Result DeviceImpl::createTextureResource(
                     mipSize.height = int(D3DUtil::calcAligned(mipSize.height, 4));
                 }
 
-                assert(
+                SLANG_ASSERT(
                     footprint.Width == mipSize.width && footprint.Height == mipSize.height &&
                     footprint.Depth == mipSize.depth);
 
@@ -2269,7 +2269,7 @@ Result DeviceImpl::createAccelerationStructure(
     IAccelerationStructure** outAS)
 {
 #if SLANG_GFX_HAS_DXR_SUPPORT
-    assert(desc.buffer != nullptr);
+    SLANG_ASSERT(desc.buffer != nullptr);
     RefPtr<AccelerationStructureImpl> result = new AccelerationStructureImpl();
     result->m_device5 = m_device5;
     result->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);

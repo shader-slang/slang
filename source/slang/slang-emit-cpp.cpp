@@ -3,12 +3,13 @@
 
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-token-reader.h"
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 /*
 ABI
@@ -1301,6 +1302,17 @@ void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* de
     }
 }
 
+void CPPSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // C/C++ (and, via inheritance, CUDA) has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
+    }
+}
+
 const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(Index elemCount)
 {
     SLANG_UNUSED(elemCount);
@@ -1358,18 +1370,16 @@ bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // through the CPU prelude helpers. Matches HLSL/GLSL
             // semantics: returns the prior value as the inst result.
             //
-            // This is the general integer-AtomicAdd lowering for the
-            // CPU target, not coverage-specific: any user
-            // `InterlockedAdd` reaches it. Coverage is one client
-            // and only ever emits the unsigned variants (its
-            // synthesized buffer element type is uint/uint64); the
-            // signed variants are reachable from ordinary user code
-            // that calls `InterlockedAdd` on an `int`/`int64_t`
-            // slot, but the CPU target's existing `InterlockedAdd`
-            // tests (e.g. `tests/hlsl-intrinsic/atomic/atomic-
-            // intrinsics.slang`) disable the `-cpu` line, so the
-            // signed CPU paths here are not currently covered by
-            // a regression test.
+            // Shader coverage is the client this lowering exists for,
+            // and it only emits the unsigned variants (its
+            // synthesized buffer element type is uint/uint64). User
+            // code does not reach it through the atomic APIs meant
+            // for it: `InterlockedAdd` and `Atomic<T>` declare
+            // capabilities that exclude the CPU target, so they are
+            // rejected before emission. `Atomic<T>.add` is the
+            // exception, because the extension that declares it does
+            // not repeat `Atomic<T>`'s `[require]`; that is also the
+            // only way the signed variants are reached.
             //
             // 32-bit and 64-bit integer widths are supported via the
             // matching prelude helper pair
@@ -1425,6 +1435,19 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
     default:
         {
             return false;
+        }
+
+    case kIROp_MakeArray:
+    case kIROp_MakeArrayFromElement:
+        {
+            // A Slang array lowers to `struct FixedArray<T,N> { T m_data[N]; }`, so its initializer
+            // needs two brace levels — the struct and its `m_data` member — whereas the base
+            // emitter emits one and relies on brace-elision, which is ambiguous for nested arrays.
+            // MakeStruct is a genuine struct and stays on the base single-brace path.
+            m_writer->emit("{ ");
+            defaultEmitInstExpr(inst, inOuterPrec);
+            m_writer->emit(" }");
+            return true;
         }
 
     case kIROp_InOutImplicitCast:
