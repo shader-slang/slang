@@ -821,6 +821,72 @@ bool validateStructuredBufferResourceTypes(
     return context.validate(module);
 }
 
+/// Returns true if the data of a shader parameter of type `type` holds a logical pointer: directly,
+/// or through struct fields, array elements, structured-buffer elements, or parameter-group
+/// elements.
+static bool shaderParameterHoldsLogicalPointer(IRType* type, HashSet<IRType*>& visited)
+{
+    if (!visited.add(type))
+        return false;
+
+    if (isLogicalPointerType(type))
+        return true;
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (shaderParameterHoldsLogicalPointer(field->getFieldType(), visited))
+                return true;
+        }
+    }
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
+        return shaderParameterHoldsLogicalPointer(arrayType->getElementType(), visited);
+    else if (auto bufferType = as<IRHLSLStructuredBufferTypeBase>(type))
+        return shaderParameterHoldsLogicalPointer(bufferType->getElementType(), visited);
+    else if (auto groupType = as<IRParameterGroupType>(type))
+        return shaderParameterHoldsLogicalPointer(groupType->getElementType(), visited);
+
+    return false;
+}
+
+/// Returns true if `inst` describes memory that holds a logical pointer and is shared across
+/// invocations or supplied from outside the shader: a shader parameter, a `groupshared` variable,
+/// or the pointee of a physical pointer type.
+static bool isLogicalPointerInSharedMemory(IRInst* inst)
+{
+    if (auto globalParam = as<IRGlobalParam>(inst))
+    {
+        HashSet<IRType*> visited;
+        return shaderParameterHoldsLogicalPointer(globalParam->getDataType(), visited);
+    }
+    if (auto globalVar = as<IRGlobalVar>(inst))
+    {
+        return as<IRGroupSharedRate>(globalVar->getRate()) &&
+               typeContainsLogicalPointer(globalVar->getDataType()->getValueType());
+    }
+    if (auto ptrType = as<IRPtrType>(inst))
+    {
+        return ptrType->getAddressSpace() == AddressSpace::UserPointer &&
+               typeContainsLogicalPointer(ptrType->getValueType());
+    }
+    return false;
+}
+
+void validateLogicalPointerStorage(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (!isLogicalPointerInSharedMemory(globalInst))
+            continue;
+
+        // A type has no source location of its own, so we report it where it is first used.
+        auto location =
+            as<IRType>(globalInst) ? findFirstUseLoc(globalInst) : globalInst->sourceLoc;
+        sink->diagnose(Diagnostics::LogicalPointerInSharedMemory{.location = location});
+    }
+}
+
 void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink)
 {
     validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());

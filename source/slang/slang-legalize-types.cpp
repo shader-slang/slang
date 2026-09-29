@@ -161,6 +161,43 @@ RefPtr<TupleLegalElementWrappingObj> LegalElementWrapping::getTuple() const
 
 //
 
+bool isLogicalPointerType(IRType* type)
+{
+    while (auto arrayType = as<IRArrayTypeBase>(type))
+        type = arrayType->getElementType();
+
+    auto ptrType = as<IRPtrType>(unwrapAttributedType(type));
+    return ptrType && ptrType->getAddressSpace() != AddressSpace::UserPointer;
+}
+
+static bool typeContainsLogicalPointerImpl(IRType* type, HashSet<IRType*>& visited)
+{
+    if (!visited.add(type))
+        return false;
+
+    if (isLogicalPointerType(type))
+        return true;
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (typeContainsLogicalPointerImpl(field->getFieldType(), visited))
+                return true;
+        }
+    }
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
+        return typeContainsLogicalPointerImpl(arrayType->getElementType(), visited);
+
+    return false;
+}
+
+bool typeContainsLogicalPointer(IRType* type)
+{
+    HashSet<IRType*> visited;
+    return typeContainsLogicalPointerImpl(type, visited);
+}
+
 bool isResourceType(IRType* type)
 {
     while (auto arrayType = as<IRArrayTypeBase>(type))

@@ -928,28 +928,51 @@ static LegalVal legalizeAbort(
     return LegalVal::simple(newAbort);
 }
 
-static LegalVal legalizeDebugVar(
+static bool areLegalDebugVarLeavesDebuggable(
+    IRTypeLegalizationContext* context,
+    LegalType type,
+    DebugValueStoreContext& debugContext)
+{
+    switch (type.flavor)
+    {
+    case LegalType::Flavor::none:
+        return true;
+    case LegalType::Flavor::simple:
+        return debugContext.isDebuggableType(
+            tryGetPointedToType(context->builder, type.getSimple()));
+    case LegalType::Flavor::pair:
+        {
+            auto pairType = type.getPair();
+            return areLegalDebugVarLeavesDebuggable(
+                       context,
+                       pairType->ordinaryType,
+                       debugContext) &&
+                   areLegalDebugVarLeavesDebuggable(context, pairType->specialType, debugContext);
+        }
+    case LegalType::Flavor::tuple:
+        for (auto ee : type.getTuple()->elements)
+        {
+            if (!areLegalDebugVarLeavesDebuggable(context, ee.type, debugContext))
+                return false;
+        }
+        return true;
+    default:
+        return false;
+    }
+}
+
+/// Emits one debug variable per leaf of `type`, returning them with the same structure as `type`.
+static LegalVal emitLegalDebugVar(
     IRTypeLegalizationContext* context,
     LegalType type,
     IRDebugVar* originalInst)
 {
-    // For now we just discard any special part and keep the ordinary part.
-
     switch (type.flavor)
     {
     case LegalType::Flavor::simple:
         {
-            auto pointedToType = tryGetPointedToType(context->builder, type.getSimple());
-
-            // Check if the type is debuggable before creating DebugVar
-            DebugValueStoreContext debugContext;
-            if (!debugContext.isDebuggableType(pointedToType))
-            {
-                return LegalVal();
-            }
-
             auto legalVal = context->builder->emitDebugVar(
-                pointedToType,
+                tryGetPointedToType(context->builder, type.getSimple()),
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
@@ -957,28 +980,46 @@ static LegalVal legalizeDebugVar(
             copyNameHintAndDebugDecorations(legalVal, originalInst);
             return LegalVal::simple(legalVal);
         }
-    case LegalType::Flavor::none:
-        return LegalVal();
     case LegalType::Flavor::pair:
         {
             auto pairType = type.getPair();
-            auto ordinaryVal = legalizeDebugVar(context, pairType->ordinaryType, originalInst);
-            return ordinaryVal;
+            return LegalVal::pair(
+                emitLegalDebugVar(context, pairType->ordinaryType, originalInst),
+                emitLegalDebugVar(context, pairType->specialType, originalInst),
+                pairType->pairInfo);
         }
     case LegalType::Flavor::tuple:
         {
-            auto tupleType = type.getTuple();
-            for (auto ee : tupleType->elements)
+            RefPtr<TuplePseudoVal> tupleVal = new TuplePseudoVal();
+            for (auto ee : type.getTuple()->elements)
             {
-                auto innerResult = legalizeDebugVar(context, ee.type, originalInst);
-                if (innerResult.flavor != LegalVal::Flavor::none)
-                    return innerResult;
+                TuplePseudoVal::Element element;
+                element.key = ee.key;
+                element.val = emitLegalDebugVar(context, ee.type, originalInst);
+                tupleVal->elements.add(element);
             }
-            return LegalVal();
+            return LegalVal::tuple(tupleVal);
         }
     default:
         return LegalVal();
     }
+}
+
+static LegalVal legalizeDebugVar(
+    IRTypeLegalizationContext* context,
+    LegalType type,
+    IRDebugVar* originalInst)
+{
+    // The address projections and `DebugValue`s rooted at a debug variable are legalized
+    // against the variable's legal type, so the legalized debug variable must have exactly
+    // that structure. If some leaf cannot be described (such as a resource, or the ordinary
+    // half of a split struct, which keeps `void` placeholders for its special fields), we
+    // drop the whole debug variable rather than emit a partial structure that its uses would
+    // not match.
+    DebugValueStoreContext debugContext;
+    if (!areLegalDebugVarLeavesDebuggable(context, type, debugContext))
+        return LegalVal();
+    return emitLegalDebugVar(context, type, originalInst);
 }
 
 static LegalVal legalizeDebugValue(
@@ -990,7 +1031,8 @@ static LegalVal legalizeDebugValue(
     if (debugVar.flavor == LegalVal::Flavor::none)
         return LegalVal();
 
-    // For now we just discard any special part and keep the ordinary part.
+    // `legalizeDebugVar` gives the debug variable the same structure as the value's legal
+    // type, so we pair up their leaves and emit one `DebugValue` per debuggable leaf.
     switch (debugValue.flavor)
     {
     case LegalType::Flavor::simple:
@@ -1000,25 +1042,24 @@ static LegalVal legalizeDebugValue(
         return LegalVal();
     case LegalType::Flavor::pair:
         {
-            // The var should be legalized as a simple value, because we discard the special part
-            // for debug info insts.
-            //
-            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::simple);
-            auto ordinaryVal = legalizeDebugValue(
-                context,
-                debugVar,
-                debugValue.getPair()->ordinaryVal,
-                originalInst);
-            return ordinaryVal;
+            auto varPair = debugVar.getPair();
+            auto valuePair = debugValue.getPair();
+            legalizeDebugValue(context, varPair->ordinaryVal, valuePair->ordinaryVal, originalInst);
+            legalizeDebugValue(context, varPair->specialVal, valuePair->specialVal, originalInst);
+            return LegalVal();
         }
     case LegalType::Flavor::tuple:
         {
-            auto tupleVal = debugValue.getTuple();
-            for (auto ee : tupleVal->elements)
+            auto varTuple = debugVar.getTuple();
+            auto valueTuple = debugValue.getTuple();
+            SLANG_ASSERT(varTuple->elements.getCount() == valueTuple->elements.getCount());
+            for (Index i = 0; i < valueTuple->elements.getCount(); i++)
             {
-                auto innerResult = legalizeDebugValue(context, debugVar, ee.val, originalInst);
-                if (innerResult.flavor != LegalVal::Flavor::none)
-                    return innerResult;
+                legalizeDebugValue(
+                    context,
+                    varTuple->elements[i].val,
+                    valueTuple->elements[i].val,
+                    originalInst);
             }
             return LegalVal();
         }
@@ -4083,9 +4124,13 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
     bool isSpecialType(IRType* type) override
     {
         // For resource type legalization, the "special" types
-        // we are working with are resource types.
+        // we are working with are resource types and, on SPIR-V,
+        // logical pointers, since neither may be a member of a
+        // composite value there.
         //
-        return isResourceType(type);
+        if (isResourceType(type))
+            return true;
+        return isSPIRV(targetProgram->getTargetReq()->getTarget()) && isLogicalPointerType(type);
     }
 
     bool isSimpleType(IRType*) override { return false; }

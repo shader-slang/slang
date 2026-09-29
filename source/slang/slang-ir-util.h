@@ -206,6 +206,15 @@ IRType* getMatrixElementType(IRType* type);
 bool isResourceType(IRType* type);
 bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 
+// True if `type`, or the element type of an array `type`, is a pointer in a logical address space,
+// that is, any address space other than `AddressSpace::UserPointer`. On SPIR-V, where only
+// `UserPointer` maps to a physical storage class, such a pointer may not be a member of a
+// composite value, nor be stored anywhere but in a function-local or private variable.
+bool isLogicalPointerType(IRType* type);
+
+// True if `type` is a logical pointer type or holds one in a struct field or array element.
+bool typeContainsLogicalPointer(IRType* type);
+
 // True if `type` (after unwrapping attributed types) is a texture or a sampler-state-family type,
 // i.e. one the `spvBindlessTextureNV` descriptor-handle-to-resource conversion can produce. This is
 // also the set of `DescriptorHandle` element types that are represented as `uint64` under that
