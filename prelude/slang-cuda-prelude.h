@@ -6048,32 +6048,36 @@ struct TensorView
         return reinterpret_cast<T*>(data);
     }
 
+    // Compute byte offsets in 64 bits while keeping strides and indices 32-bit. For example,
+    // element 2^30 of a contiguous float tensor is 4 GiB from its base. Widen each stride before
+    // multiplying so that the product does not wrap before it reaches the 64-bit offset.
     template<typename T>
     __device__ T* data_ptr_at(uint32_t index)
     {
-        uint64_t offset = strides[0] * index;
+        uint64_t offset = uint64_t(strides[0]) * index;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
     __device__ T* data_ptr_at(uint2 index)
     {
-        uint64_t offset = strides[0] * index.x + strides[1] * index.y;
+        uint64_t offset = uint64_t(strides[0]) * index.x + uint64_t(strides[1]) * index.y;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
     __device__ T* data_ptr_at(uint3 index)
     {
-        uint64_t offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z;
+        uint64_t offset = uint64_t(strides[0]) * index.x + uint64_t(strides[1]) * index.y +
+                          uint64_t(strides[2]) * index.z;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
     __device__ T* data_ptr_at(uint4 index)
     {
-        uint64_t offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z +
-                          strides[3] * index.w;
+        uint64_t offset = uint64_t(strides[0]) * index.x + uint64_t(strides[1]) * index.y +
+                          uint64_t(strides[2]) * index.z + uint64_t(strides[3]) * index.w;
         return reinterpret_cast<T*>(data + offset);
     }
 
@@ -6083,7 +6087,7 @@ struct TensorView
         uint64_t offset = 0;
         for (unsigned int i = 0; i < N; ++i)
         {
-            offset += strides[i] * index[i];
+            offset += uint64_t(strides[i]) * index[i];
         }
         return reinterpret_cast<T*>(data + offset);
     }
@@ -6091,119 +6095,98 @@ struct TensorView
     template<typename T>
     __device__ T& load(uint32_t x)
     {
-        return *reinterpret_cast<T*>(data + strides[0] * x);
+        return *data_ptr_at<T>(x);
     }
     template<typename T>
     __device__ T& load(uint32_t x, uint32_t y)
     {
-        return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y);
+        return *data_ptr_at<T>(make_uint2(x, y));
     }
     template<typename T>
     __device__ T& load(uint2 index)
     {
-        return *reinterpret_cast<T*>(data + strides[0] * index.x + strides[1] * index.y);
+        return *data_ptr_at<T>(index);
     }
     template<typename T>
     __device__ T& load(uint32_t x, uint32_t y, uint32_t z)
     {
-        return *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z);
+        return *data_ptr_at<T>(make_uint3(x, y, z));
     }
     template<typename T>
     __device__ T& load(uint3 index)
     {
-        return *reinterpret_cast<T*>(
-            data + strides[0] * index.x + strides[1] * index.y + strides[2] * index.z);
+        return *data_ptr_at<T>(index);
     }
     template<typename T>
     __device__ T& load(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
     {
-        return *reinterpret_cast<T*>(
-            data + strides[0] * x + strides[1] * y + strides[2] * z + strides[3] * w);
+        return *data_ptr_at<T>(make_uint4(x, y, z, w));
     }
     template<typename T>
     __device__ T& load(uint4 index)
     {
-        return *reinterpret_cast<T*>(
-            data + strides[0] * index.x + strides[1] * index.y + strides[2] * index.z +
-            strides[3] * index.w);
+        return *data_ptr_at<T>(index);
     }
     template<typename T>
     __device__ T& load(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4)
     {
-        return *reinterpret_cast<T*>(
-            data + strides[0] * i0 + strides[1] * i1 + strides[2] * i2 + strides[3] * i3 +
-            strides[4] * i4);
+        uint indices[] = {i0, i1, i2, i3, i4};
+        return *data_ptr_at<T, 5>(indices);
     }
 
     // Generic version of load
     template<typename T, unsigned int N>
     __device__ T& load(uint index[N])
     {
-        uint64_t offset = 0;
-        for (unsigned int i = 0; i < N; ++i)
-        {
-            offset += strides[i] * index[i];
-        }
-        return *reinterpret_cast<T*>(data + offset);
+        return *data_ptr_at<T, N>(index);
     }
 
     template<typename T>
     __device__ void store(uint32_t x, T val)
     {
-        *reinterpret_cast<T*>(data + strides[0] * x) = val;
+        load<T>(x) = val;
     }
     template<typename T>
     __device__ void store(uint32_t x, uint32_t y, T val)
     {
-        *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y) = val;
+        load<T>(x, y) = val;
     }
     template<typename T>
     __device__ void store(uint2 index, T val)
     {
-        *reinterpret_cast<T*>(data + strides[0] * index.x + strides[1] * index.y) = val;
+        load<T>(index) = val;
     }
     template<typename T>
     __device__ void store(uint32_t x, uint32_t y, uint32_t z, T val)
     {
-        *reinterpret_cast<T*>(data + strides[0] * x + strides[1] * y + strides[2] * z) = val;
+        load<T>(x, y, z) = val;
     }
     template<typename T>
     __device__ void store(uint3 index, T val)
     {
-        *reinterpret_cast<T*>(
-            data + strides[0] * index.x + strides[1] * index.y + strides[2] * index.z) = val;
+        load<T>(index) = val;
     }
     template<typename T>
     __device__ void store(uint32_t x, uint32_t y, uint32_t z, uint32_t w, T val)
     {
-        *reinterpret_cast<T*>(
-            data + strides[0] * x + strides[1] * y + strides[2] * z + strides[3] * w) = val;
+        load<T>(x, y, z, w) = val;
     }
     template<typename T>
     __device__ void store(uint4 index, T val)
     {
-        *reinterpret_cast<T*>(
-            data + strides[0] * index.x + strides[1] * index.y + strides[2] * index.z +
-            strides[3] * index.w) = val;
+        load<T>(index) = val;
     }
     template<typename T>
     __device__ void store(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4, T val)
     {
-        *reinterpret_cast<T*>(
-            data + strides[0] * i0 + strides[1] * i1 + strides[2] * i2 + strides[3] * i3 +
-            strides[4] * i4) = val;
+        load<T>(i0, i1, i2, i3, i4) = val;
     }
 
     // Generic version
     template<typename T, unsigned int N>
     __device__ void store(uint index[N], T val)
     {
-        uint64_t offset = 0;
-        for (unsigned int i = 0; i < N; ++i)
-        {
-            offset += strides[i] * index[i];
-        }
-        *reinterpret_cast<T*>(data + offset) = val;
+        load<T, N>(index) = val;
     }
 };
 
