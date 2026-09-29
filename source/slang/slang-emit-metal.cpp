@@ -151,19 +151,19 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (auto handleType = as<IRDescriptorHandleType>(paramType))
         paramType = handleType->getResourceType();
 
-    // A fixed-size array of textures/samplers binds to consecutive slots from a
-    // base index, so match on the element type to keep the array bound. Only
-    // sized arrays are handled: an unsized array is a bindless/argument-buffer
-    // case that is not a valid direct kernel argument. Arrays of buffers are
-    // likewise not valid direct kernel arguments in MSL (#12291), so the
-    // MetalBuffer case below still tests the whole param type and leaves them
-    // unbound, pending argument-buffer support.
-    IRType* resourceType = paramType;
+    // MSL accepts a fixed-size array of textures or samplers as a direct kernel
+    // argument and binds it to consecutive slots from one base index (MSL 4.1
+    // section 2.12.1), so we test the element type of such an array for the
+    // texture and sampler kinds. We unwrap only one sized array level, because
+    // the element of an MSL resource array must itself be a texture or sampler
+    // and an unsized array cannot be a direct kernel argument. Nested and
+    // unsized arrays are therefore still emitted without an attribute.
+    IRType* textureOrSamplerType = paramType;
     if (auto arrayType = as<IRArrayType>(paramType))
     {
-        resourceType = arrayType->getElementType();
-        if (auto handleType = as<IRDescriptorHandleType>(resourceType))
-            resourceType = handleType->getResourceType();
+        textureOrSamplerType = arrayType->getElementType();
+        if (auto handleType = as<IRDescriptorHandleType>(textureOrSamplerType))
+            textureOrSamplerType = handleType->getResourceType();
     }
 
     for (auto rr : layout->getOffsetAttrs())
@@ -171,7 +171,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(resourceType) || as<IRTextureBufferType>(resourceType))
+            if (as<IRTextureTypeBase>(textureOrSamplerType) ||
+                as<IRTextureBufferType>(textureOrSamplerType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -179,6 +180,9 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
+            // MSL has no direct kernel-argument form for an array of buffers, so
+            // we test the whole parameter type and leave buffer arrays unbound
+            // until they are routed through an argument buffer (#12291).
             if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
                 as<IRByteAddressBufferTypeBase>(paramType) ||
                 as<IRUniformParameterGroupType>(paramType) ||
@@ -190,7 +194,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(resourceType))
+            if (as<IRSamplerStateTypeBase>(textureOrSamplerType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
