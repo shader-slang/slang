@@ -72,6 +72,12 @@ Six claims:
 - `incr` is optional; executed for effects before testing condition on each iteration after first.
 - Variable declared in `init` has scope limited to the for statement.
 
+When regenerating `for-init-scope-functional.slang`, keep both successive
+declarations of `i` and their independent bounds of 3 and 5. WGSL emits
+native `loop` statements; check both loop headers, bounds, and exit
+breaks in order. The source-language scoping claim does not require
+WGSL to retain the source `for` spelling. Keep other target checks.
+
 ### Loop Statements — While Statement
 
 Two claims:
