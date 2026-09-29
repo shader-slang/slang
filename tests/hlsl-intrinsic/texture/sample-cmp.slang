@@ -6,14 +6,14 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -stage fragment -entry fragmentMain -target glsl
 
 // fragmentMain calls every SampleCmpBias form, so one form that still requests
-// GL_EXT_texture_shadow_lod satisfies the shared CHECK_GLSL check below for all of them. The four
-// hlsl.meta.slang wrappers that request the extension for SampleCmpBias on their own (separate-
-// sampler __glsl_shadow_lod_texture_bias, __glsl_shadow_lod_texture_bias_offset and
+// GL_EXT_texture_shadow_lod satisfies the shared CHECK_GLSL check below for all of them. Six
+// hlsl.meta.slang wrappers request the extension for SampleCmpBias on their own. The two combined-
+// sampler sampler2DArrayShadow ones are isolated in
+// tests/glsl-intrinsic/texture-shadow-2d-array-bias-ext.slang; the other four (separate-sampler
+// __glsl_shadow_lod_texture_bias, __glsl_shadow_lod_texture_bias_offset and
 // __glsl_shadow_lod_texture_bias_cube_array_shadow, plus the combined-sampler overload of the last)
-// are therefore each also compiled from their own entry point at the end of this file. Each check
-// pins the 0.375 bias argument, because the no-bias cube-array wrappers request the same
-// extension. The combined sampler2DArrayShadow bias forms are isolated in
-// tests/glsl-intrinsic/texture-shadow-2d-array-bias-ext.slang.
+// are each compiled from their own entry point at the end of this file. Each check pins the 0.375
+// bias argument, because the no-bias cube-array wrappers request the same extension.
 //TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_2DARRAY): -stage fragment -entry extBias2DArray -target glsl -profile glsl_460
 //TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_OFFSET_2DARRAY): -stage fragment -entry extBiasOffset2DArray -target glsl -profile glsl_460
 //TEST:SIMPLE(filecheck=CHECK_EXT_BIAS_CUBEARRAY): -stage fragment -entry extBiasCubeArray -target glsl -profile glsl_460
