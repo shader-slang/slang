@@ -10,9 +10,9 @@
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Verifies that an empty closesthit payload still reaches HLSL as the non-empty
-// `inout` struct DXC requires. The source struct is not padded; a new one-member
-// type replaces it, so CHECK captures the first emitted struct's name, requires
-// one member, and requires `main` to take that struct `inout`.
+// `inout` struct DXC requires. Legalization leaves the source type empty and
+// emits a one-member replacement as the first struct, so its name is captured
+// rather than pinned.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile lib_6_6 -stage closesthit -entry main
 

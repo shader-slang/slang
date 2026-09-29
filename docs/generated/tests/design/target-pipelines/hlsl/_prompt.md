@@ -48,12 +48,15 @@ HLSL-specific on HLSL.
   (HLSL is in the `isD3DTarget` arm). The doc's three ray-payload
   passes, `legalizeEmptyRayPayloadsForHLSL`,
   `legalizeNonStructParameterToStructForHLSL` and
-  `legalizeRayPayloadAccessQualifiersForHLSL`, no longer exist: since
-  #13256 `legalizeRayTracingPayloads`
-  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) does their work.
-  Test the emitted HLSL rather than the pass names; the README's
-  doc-gap rows list what changed, and the empty-payload lesson below
-  gives the new empty-payload shape.
+  `legalizeRayPayloadAccessQualifiersForHLSL`, no longer exist. Since
+  #13256, `legalizeRayTracingPayloads`
+  (`source/slang/slang-ir-ray-tracing-legalize.cpp`) gives an empty
+  receiving payload a separate one-member struct, wraps non-struct
+  arguments of native calls such as `TraceRay`, and fills shader-model
+  6.7 payload access qualifiers. It does not wrap a non-struct DXR
+  entry-point parameter. Test the emitted HLSL rather than the pass
+  names; the README's doc-gap rows list what changed, and the
+  empty-payload lesson below gives the new empty-payload shape.
 - HLSL-specific skips: `lowerCooperativeVectors` (HLSL `break`),
   `lowerAppendConsumeStructuredBuffers` (HLSL has native types).
 - Always-on emit shapes: `[numthreads(...)]`, `register(uN)` /
