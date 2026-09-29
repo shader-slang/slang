@@ -132,6 +132,15 @@ void ReplayStream::setMirrorFile(const char* path)
 {
     closeMirrorFile();
 
+    // `write` seeks the mirror before every write, so we refuse an existing path that is not a
+    // regular file, such as a FIFO or device, which `FileStream` would open for writing.
+    SlangPathType pathType;
+    if (File::exists(path) && !(SLANG_SUCCEEDED(Slang::Path::getPathType(path, &pathType)) &&
+                                pathType == SLANG_PATH_TYPE_FILE))
+    {
+        throw Slang::Exception(String("Mirror file is not a regular file: ") + path);
+    }
+
     m_mirrorFile = new FileStream();
     SlangResult result =
         m_mirrorFile->init(String(path), FileMode::Create, FileAccess::Write, FileShare::ReadWrite);

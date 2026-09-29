@@ -8,4 +8,4 @@ void main() {}
 // DEPFILE: E00004{{.*}}no-such-dir-13294/deps.d
 
 // REFLECTION: result code = -1
-// REFLECTION: E52004
+// REFLECTION: E52004{{.*}}no-such-dir-13294/reflection.json

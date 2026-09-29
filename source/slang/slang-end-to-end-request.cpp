@@ -2048,6 +2048,8 @@ SlangResult EndToEndCompileRequest::compile()
         if (!reflection)
         {
             getSink()->diagnose(Diagnostics::CannotEmitReflectionWithoutTarget{});
+            // API callers read diagnostics from the snapshot taken above, so we refresh it.
+            m_diagnosticOutput = getSink()->outputBuffer.produceString();
             return SLANG_FAIL;
         }
         auto bufferWriter = PrettyWriter();
@@ -2060,6 +2062,7 @@ SlangResult EndToEndCompileRequest::compile()
         else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
         {
             getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = String(reflectionPath)});
+            m_diagnosticOutput = getSink()->outputBuffer.produceString();
             return SLANG_FAIL;
         }
     }

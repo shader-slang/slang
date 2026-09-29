@@ -132,8 +132,8 @@ SlangResult FileStream::_init(
     {
         // We never open a directory as a file. `Open` mode also requires a regular file, because
         // readers size a file by seeking to its end, and opening a FIFO for reading blocks until a
-        // writer appears (`File::writeAllTextIfChanged` reads its target back before writing).
-        // Writing to an existing FIFO or device (e.g. `/dev/null`) is left to the platform.
+        // writer appears (`File::writeAllTextIfChanged` relies on its read-back failing fast).
+        // In `Create` and `Append` modes, an existing FIFO or device is left to the platform.
         SlangPathType pathType;
         const bool isClassified = SLANG_SUCCEEDED(Path::getPathType(fileName, &pathType));
         const bool isDirectory = isClassified && pathType == SLANG_PATH_TYPE_DIRECTORY;
