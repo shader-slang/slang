@@ -6,6 +6,7 @@
 // thread group, so the SPIRV emission must use OpMemoryBarrier
 // (without OpControlBarrier).
 
+//TEST:SIMPLE(filecheck=CHECK_NVVM): -target ptx -emit-cuda-via-nvvm -entry computeMain -stage compute -capability cuda_sm_8_0 -O3 -o -
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
@@ -37,3 +38,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, uint idx : SV_GroupIndex)
 // SPIRV emits OpMemoryBarrier without an accompanying OpControlBarrier.
 // CHECK_SPIRV: OpMemoryBarrier
 // CHECK_SPIRV-NOT: OpControlBarrier
+
+// CHECK_NVVM-NOT: bar.sync
+// CHECK_NVVM: membar.cta
+// CHECK_NVVM-NOT: bar.sync

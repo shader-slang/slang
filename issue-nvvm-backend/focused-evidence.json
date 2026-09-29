@@ -10075,6 +10075,412 @@
         "path": "build/nvvm-target-intrinsics/test-transition.json",
         "sha256": "a34fd7b6798327797d68d9c3b997c051487951ce49e9497bb5e3d904a71f735c"
       }
+    },
+    "nvvm-synchronization": {
+      "status": "accepted",
+      "contract": "Direct named void synchronization through llvm.nvvm.barrier0, llvm.nvvm.membar.gl and llvm.nvvm.membar.cta; seven existing core mappings and CUDA behavior preserved. Three old tags/numbered dispatch operations removed.",
+      "compiler_identity": {
+        "revision": "02d4ef85db4c1a873408636d92dd6d6a4ee8e795",
+        "patch_sha256": "d557c75359e5b312e80f8f9bfbf231d14893e5ec25818bb3dcc02353c5a774de",
+        "compiler_version": "2026.18.3-337-g02d4ef85d",
+        "provider_abi": 44
+      },
+      "complete_provenance": {
+        "path": "build/nvvm-synchronization-intrinsics/candidate-complete-provenance.json",
+        "sha256": "079364e04d39c727d27a6b46482e581dde4f6d832e0fb2f20ce6b02ba00fbb88"
+      },
+      "corpus_execution_provenance": {
+        "path": "build/nvvm-synchronization-intrinsics/checkpoint/provenance.json",
+        "sha256": "e0105348d5c2f4cc45947433663648fda410f5190e360119197cc304f4730513"
+      },
+      "runtime_sha256": {
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "6b4244498fc2556c55df288609ad1a8baec8b0a987b73af6064d82fe07024ec5",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "4673a7284647512efb476be9687611eff2f523e2761ca914f196c78c6c25565a",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "7fc25638f2ace9cf925c17d83efa482b7b341a91fd01ddfad844e9bd031e1e02",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "6d6eb23100e8b18327fce26cd1e4886a1872be6a41d66f9a2834e75db2c72a2d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "e7f65b0699b2d3541ff2f3006425552062e3e7b48e913535332a0a5ee4de3ffa",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "58d5ee2de9b8ff12bcc129332bee33d8e8671b0673160ec21e5fba13aa85e3d7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "58d5ee2de9b8ff12bcc129332bee33d8e8671b0673160ec21e5fba13aa85e3d7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "d2c2f9254c9a6da2a86d720bb387265972887af6ec596b8848101fbc3ff35692",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "a15726456ca573966a961d9a87ec96546908de8678dbc1ad6ea0f2c0840f449d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "58d5ee2de9b8ff12bcc129332bee33d8e8671b0673160ec21e5fba13aa85e3d7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "29c6f1d1c9025e4f8d6bc75e4c4ee058ea800dc41b14e45095cfcd1711353324",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "3714dbb0629b3d1ed47e56c748b12a0fc77c5fe4cd58aa740bcd48b17966805f",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "e081c06a7aea1a48c684dfaa2834ad27e419f6dfc16563d6255aa0aec670f8fe",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7b9c324d73b50b71139f2fd2706029bdc84dccdd7b124716e49786a337cae8f4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "b838cb8db01869db5cb528fd27c433208575032e9dca1b2d701ce092d905a8bf",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "73e9a2f2d593992a1490862a33f62c6062b1c920a138f580c3c298a62c41bc93",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "c1bb9c3d9d52a77685cdb2ee3f2469561ee66a9c31fbef4215fe56bb14483a15",
+        "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+        "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+        "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+      },
+      "source_sha256": {
+        "extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "issue-nvvm-backend/test-nvvm-results.py": "fe45fb97d1d7a28b8e7a28b1ae3a6cef61e8e9d0dbbece3ba5c5fd23901ac044",
+        "issue-nvvm-backend/test-nvvm-surface-results.py": "f9dbc427eecc11b081133f7f885ec9c86eaa46c73906ad43673f7e22b4a1b1b0",
+        "source/compiler-core/slang-nvvm-ir-builder-api.h": "04d32008f5ef558c73487b03be584778364093dd0604dfebd04b11a22ce7ffdf",
+        "source/compiler-core/slang-nvvm-ir-builder.cpp": "6106507e62fd34c21d807469f9a507fb8163041d79f1348626731d184a0c8712",
+        "source/compiler-core/slang-nvvm-ir-builder.h": "4e5c0f14801c9245976fd5d7b616be5facfd77e1e07973c06904d486369a3f16",
+        "source/compiler-core/slang-nvvm-semantic-catalog.h": "a038d80ef52e1779d3c79008d054ead2a9abcbe74e098a7339a7c4a7f46766d5",
+        "source/core/slang-math.h": "14a6ef54d2152724f041ee7e235e7feef34bb74d853214efff70f98ab00a26ce",
+        "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "01d105bc974e093cbb25439f138eb88241297f27a024bb447b6db4e9772e3c9d",
+        "source/slang/hlsl.meta.slang": "318a371a8d7e69cd23f44bb7c34983022388cb363a6f837e7178caf07dc40883",
+        "source/slang/slang-capabilities.capdef": "fd3811a5e00e8f601c61c121f2e6ca193af7c563dc8edfa440810d80cf43243a",
+        "source/slang/slang-diagnostics.lua": "8854ee6c777e219d2e2601ad3347d99fc49541ce882abff9b0c88bc280e43643",
+        "source/slang/slang-emit-nvvm-plan.cpp": "a0acf9aea1d676bf57c6f9cd8d81b454784ee87ddd015e2be046df85f4f5cf1a",
+        "source/slang/slang-emit-nvvm-plan.h": "1e60f7d5595116508ee752383d0377896564dc84e6579ffae11be2edb5a63fef",
+        "source/slang/slang-emit-nvvm-type-lowering.cpp": "44220e32e5de3680d7c9de8f0a0fdd813bcc0c16c393569f30fbc26c6317a6e3",
+        "source/slang/slang-emit-nvvm-type-lowering.h": "3ddee6db29f6478fc40c2f2a773b68fb8d61152f3c0895a1acaa8e7ed244b99d",
+        "source/slang/slang-emit-nvvm.cpp": "2c7dea5a343d1f7c6a61006b0b226caa08d70a8aad23e28d3e292740f51dbf0f",
+        "source/slang/slang-emit.cpp": "91e8170517d2af65d6f146fc29c51f1efb2c8c9676d2686cb721a378db71996c",
+        "source/slang/slang-ir-insts-stable-names.cpp": "2cc2cba677372f96a002e77c80209a0a4bbb1bc09681c55cafc8788ffc9eba52",
+        "source/slang/slang-ir-insts-stable-names.lua": "79988d4930d4ddef9a225b5d3c0bb0378e88775506174b0e533641fac172a9ae",
+        "source/slang/slang-ir-insts.h": "0fe173222e77bdf83c10a306134de3ed0964457d093c24e41033b45508c0ec90",
+        "source/slang/slang-ir-insts.lua": "d8447cc13d09810d015b99e8930deae41c6744380f84df31bb8b1179d270cf83",
+        "source/slang/slang-ir-legalize-varying-params.cpp": "604316b88489155cd650af50c575b6c10e3dd732d084028d3833de2eea0ade1c",
+        "source/slang/slang-ir-legalize-varying-params.h": "486f41fc027de37525d1bf43ba2bea9541456fd0acbfbe550059340f1111b92e",
+        "source/slang/slang-ir-nvvm-surface-legalize.cpp": "9a0c0633b9efc440b1cad217bb3de1f6dd3d6169bc7dc28937f3c2119b735452",
+        "source/slang/slang-ir-nvvm-surface-legalize.h": "8d44137fce5831618e760fae33145e7fe1478db251b6463c8a3675960bcdb421",
+        "source/slang/slang-ir.cpp": "739b788ee3b25eb06e9d23f11f097c07ed9c33dd8699b4dde8c8fb185f32585f",
+        "source/slang/slang-ir.h": "e183ca037369a2ff45184426108462559ca253c98e8df61adcca0dc79ea587ac",
+        "source/slang/slang-lower-to-ir.cpp": "37801b4dfa13721d3cfa80e17f090cce663a1efabe5a1f358c77db4c69c6e98b",
+        "source/slang/slang-nvvm-intrinsic-semantics.h": "b9032a277e52c4926c2c997da63f2334955283594a41666ea5e2cfc8eb9b153c",
+        "source/slang/slang-target-program.cpp": "981ac0f346f530bf2771d0c35de120c1e34775c864e6db92b38c4e3667de154c",
+        "source/slang/slang-target-program.h": "8c099401dd90e7f639d4fff73a4b0e730f918ccb604aa45277a9b1b1b081afa3",
+        "source/slang/slang-target.cpp": "e5e91df76a52c3d25fbbb45f05742c77c51e750e3d6234d878fdf933e4103133",
+        "tests/cuda/nvvm-execution-register-varyings.slang": "7ae06c4ab5d3d5264ab280cb54e05ddc6e03dfa4bc106168a64a1e711036c151",
+        "tests/cuda/nvvm-formatted-surface-1d.slang": "33d99344938e68332ab3383e9aa9e2429f91b0f42319dd59416377e0c887e7db",
+        "tests/cuda/nvvm-formatted-surface-provenance.slang": "0552db2a047458da06b657e13e6134fa5dcd65a988e006f98fd6b1b99e5e67b4",
+        "tests/cuda/nvvm-half-narrow-conversion.slang": "94d4d62c5191ebac109c23bf9c8a13ff8587faea104506a63e75c8093eaf6231",
+        "tests/cuda/nvvm-intrinsic-removed-tag.slang": "58bef803fceff4bb1777328317ca8de7543a4aebb79b916a124e5736af7de7cd",
+        "tests/cuda/nvvm-native-float-surface-unsupported.slang": "87ff9a461478549ce9f05ca5ea8ec841c58bb5d5e28f1de7b65c2b6d7b9eef74",
+        "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "a65c7f557552a5c5751e8d7568ac409955c324d07516557aed78e64d9065b155",
+        "tests/cuda/nvvm-surface-physical-boundaries.slang": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+        "tests/cuda/nvvm-surface-physical-half-load.slang": "336e3472249cb1c8484186cc030425d947fee293d03e1ef453658d79a93eb605",
+        "tests/cuda/nvvm-surface-physical-half-nan.slang": "d85a95b38d14422a72fa85ce4fffe87991e0eacc2c05fcd076756959975c097b",
+        "tests/cuda/nvvm-surface-physical-integers.slang": "f511d4b368d2492a45d38dbdfa8deef58aa141f28dee0294bd011a1aa73f4428",
+        "tests/cuda/nvvm-surface-physical-matrix.slang": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+        "tests/cuda/nvvm-surface-physical-mixed.slang": "17289477e7ef073a3d4274fa9baf1348089e0a3fe96b2d448c950b4a861bbf81",
+        "tests/cuda/nvvm-synchronization-effects.slang": "9100420d9405e71b4a7c6febc4211263e3f56f0f3399a1d7f1dab90f247db3f7",
+        "tests/cuda/nvvm-target-switch-explicit-args.slang": "9e5a98ef37cc14a0dcc6da82be143dc1193c6556fc6a6b7d6e04ce6befe0d086",
+        "tests/cuda/nvvm-varyings-multiple-entries.slang": "426bf32b5116ad9bafcaacc2cc83f7fd1ea342ea89684a2d534a6a2174ca9ded",
+        "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang": "80e6fa88f20d46b794593443b12537d29c9687536bd5f00e9cbe5c39e9b8234d",
+        "tools/slang-unit-test/unit-test-math.cpp": "4795db3844aabf94aa8e83dcc6fe05be2dde4b4712a0814fd3cfe5d870a1ef77",
+        "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "f5d9f97d1ce53dda755b1aec03c436a21a0c61eafc3b4ef3fae5296041ee3e62",
+        "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "39b46044ee48ae14d60ba1dd112d7b9f17dd2cbb07b57259058078157046c469",
+        "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "c6559d802059a47f87617089f18d33ed65cd74930ed995422d469580167f10fe",
+        "tools/slang-unit-test/unit-test-nvvm-routing.cpp": "298b14e6b445d1188c8874a18792be7fa77ce531374076268f778c5d0d3aba15",
+        "tools/slang-unit-test/unit-test-nvvm-support.h": "28d75082349a7787563d140608fa17b77bc19fd7fa13c2089fa8ae1f05ab2c3f"
+      },
+      "focused_gates": {
+        "units": {
+          "record": {
+            "path": "build/nvvm-synchronization-intrinsics/focused-units.json",
+            "sha256": "26695a62f8696f61a823e7d97f12e904b23648b3b2b6a94ea5bbcc6c817567a3"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure",
+              "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations",
+              "slang-unit-test-tool/nvvmSlangNamedSynchronizationUsesVoidReturn",
+              "slang-unit-test-tool/nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation",
+              "slang-unit-test-tool/nvvmSlangSharedMemoryUsesDirectPipeline",
+              "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline",
+              "slang-unit-test-tool/nvvmSlangSharedMemoryRuntimeMatchesNVRTC"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 3.1427860260009766,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-synchronization-intrinsics/focused-units.log",
+            "log_sha256": "703bf18ce6e46139c4e58a66f479980ecad57992b4f940d33dfa1365aa65eaed"
+          },
+          "log": {
+            "path": "build/nvvm-synchronization-intrinsics/focused-units.log",
+            "sha256": "703bf18ce6e46139c4e58a66f479980ecad57992b4f940d33dfa1365aa65eaed"
+          },
+          "counts": {
+            "passed": 8
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangUnsignedSharedArrayIndexUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangSharedMemoryUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedSynchronizationUsesVoidReturn.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangSharedMemoryRuntimeMatchesNVRTC.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation.internal": "passed"
+          }
+        },
+        "source_and_gpu": {
+          "record": {
+            "path": "build/nvvm-synchronization-intrinsics/focused-source-gpu.json",
+            "sha256": "b315a7bc9cee5dae9d734c28d8fd748902493116b63e0dabaaa0335bd51f3083"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "tests/cuda/nvvm-synchronization-effects.slang",
+              "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang",
+              "tests/language-feature/execution-model/groupshared-barrier-functional.slang",
+              "tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 4.815497636795044,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-synchronization-intrinsics/focused-source-gpu.log",
+            "log_sha256": "2b326a73a117428c6ecb1809752fc30c8703f9c0f2a58d0be8cad434fcc9d02e"
+          },
+          "log": {
+            "path": "build/nvvm-synchronization-intrinsics/focused-source-gpu.log",
+            "sha256": "2b326a73a117428c6ecb1809752fc30c8703f9c0f2a58d0be8cad434fcc9d02e"
+          },
+          "counts": {
+            "passed": 17
+          },
+          "outcomes": {
+            "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang": "passed",
+            "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang.1": "passed",
+            "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang.2": "passed",
+            "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang.3": "passed",
+            "tests/language-feature/execution-model/groupshared-barrier-functional.slang (cuda)": "passed",
+            "tests/cuda/nvvm-synchronization-effects.slang (cuda)": "passed",
+            "tests/language-feature/execution-model/groupshared-barrier-functional.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-synchronization-effects.slang.1 (cuda)": "passed",
+            "tests/language-feature/execution-model/groupshared-barrier-functional.slang.2 (vk)": "passed",
+            "tests/language-feature/execution-model/groupshared-barrier-functional.slang.3": "passed",
+            "tests/language-feature/execution-model/groupshared-barrier-functional.slang.4": "passed",
+            "tests/cuda/nvvm-synchronization-effects.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-synchronization-effects.slang.3": "passed",
+            "tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang (cuda)": "passed",
+            "tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang.1 (cuda)": "passed",
+            "tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang.2 (vk)": "passed",
+            "tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang.3": "passed"
+          }
+        }
+      },
+      "focused_inventory": {
+        "path": "build/nvvm-synchronization-intrinsics/focused-inventory.json",
+        "sha256": "85a7e1304467954ddfaaef99187b4a306bfc51a389f77876ea090ff9b33bd4ae"
+      },
+      "vulkan_control_scope": "Explicitly ignored neighbor controls are not claimed as passes; every CUDA and emission cell must pass.",
+      "validation_incidents": [
+        {
+          "id": "named-synchronization-initial-admission",
+          "status": "resolved",
+          "cause": "The prior named-intrinsic provider admitted only zero-argument i32 execution-register reads; the explicit llvm.nvvm.barrier0 void signature failed E52018 before provider module creation.",
+          "correction": "Resolve the three synchronization IDs through the LLVM registry, validate canonical void signatures, emit effectful calls with null value handles and ordinary LLVM void returns. The unchanged reproduction now compiles successfully.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-synchronization-intrinsics/before-named-barrier.json",
+                "sha256": "43b54e46b2862a1e97e7a674336fe51f42da2ff0438b7d5500588ca76078f541"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "build/nvvm-synchronization-intrinsics/before-named-barrier.slang",
+                  "-target",
+                  "ptx",
+                  "-emit-cuda-via-nvvm",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-o",
+                  "build/nvvm-synchronization-intrinsics/before-named-barrier.ptx"
+                ],
+                "return_code": 255,
+                "elapsed_seconds": 0.26451730728149414,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-synchronization-intrinsics/before-named-barrier.log",
+                "log_sha256": "fedac8a81187494bcd1d0df5b79ea4fc92ae5c95e5b1287d35ac5813d6be56eb"
+              },
+              "log": {
+                "path": "build/nvvm-synchronization-intrinsics/before-named-barrier.log",
+                "sha256": "fedac8a81187494bcd1d0df5b79ea4fc92ae5c95e5b1287d35ac5813d6be56eb"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-synchronization-intrinsics/after-named-barrier.json",
+              "sha256": "77051d68654d94b17c4c9181379c8ad933a65eaee72eb58f05f6db729e6072bf"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slangc",
+                "build/nvvm-synchronization-intrinsics/before-named-barrier.slang",
+                "-target",
+                "ptx",
+                "-emit-cuda-via-nvvm",
+                "-entry",
+                "computeMain",
+                "-stage",
+                "compute",
+                "-capability",
+                "cuda_sm_8_0",
+                "-O3",
+                "-o",
+                "build/nvvm-synchronization-intrinsics/after-named-barrier.ptx"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 0.2975955009460449,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-synchronization-intrinsics/after-named-barrier.log",
+              "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "log": {
+              "path": "build/nvvm-synchronization-intrinsics/after-named-barrier.log",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          }
+        }
+      ],
+      "open_findings": [
+        {
+          "id": "transitive-helper-convergence-metadata",
+          "status": "open",
+          "description": "Preexisting provider function declarations propagate NoInline but do not propagate convergence from an intrinsic through its helpers. This migration preserves canonical barrier convergence and conservative Slang memory effects. The tested noinline cross-warp loop passes in all three modes and optimized PTX keeps synchronization outside the warp branch; arbitrary helper control-flow transformations remain unqualified. No miscompile was reproduced by this slice.",
+          "evidence": [
+            {
+              "record": {
+                "path": "build/nvvm-synchronization-intrinsics/inspect-synchronization-ptx.json",
+                "sha256": "565efe37ff5a9a01e02cd91fbe90c80e0087976c16554264257137ab0ee7cf9a"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "tests/cuda/nvvm-synchronization-effects.slang",
+                  "-target",
+                  "ptx",
+                  "-emit-cuda-via-nvvm",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-O3",
+                  "-dump-intermediates",
+                  "-dump-intermediate-prefix",
+                  "build/nvvm-synchronization-intrinsics/sync-o3-",
+                  "-o",
+                  "build/nvvm-synchronization-intrinsics/sync-o3.ptx"
+                ],
+                "return_code": 0,
+                "elapsed_seconds": 0.32115983963012695,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-synchronization-intrinsics/inspect-synchronization-ptx.log",
+                "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              "log": {
+                "path": "build/nvvm-synchronization-intrinsics/inspect-synchronization-ptx.log",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              }
+            },
+            {
+              "record": {
+                "path": "build/nvvm-synchronization-intrinsics/focused-source-gpu.json",
+                "sha256": "b315a7bc9cee5dae9d734c28d8fd748902493116b63e0dabaaa0335bd51f3083"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slang-test",
+                  "-use-test-server",
+                  "-server-count",
+                  "2",
+                  "-disable-retries",
+                  "tests/cuda/nvvm-synchronization-effects.slang",
+                  "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang",
+                  "tests/language-feature/execution-model/groupshared-barrier-functional.slang",
+                  "tests/language-feature/execution-model/groupshared-multi-barrier-functional.slang"
+                ],
+                "return_code": 0,
+                "elapsed_seconds": 4.815497636795044,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-synchronization-intrinsics/focused-source-gpu.log",
+                "log_sha256": "2b326a73a117428c6ecb1809752fc30c8703f9c0f2a58d0be8cad434fcc9d02e"
+              },
+              "log": {
+                "path": "build/nvvm-synchronization-intrinsics/focused-source-gpu.log",
+                "sha256": "2b326a73a117428c6ecb1809752fc30c8703f9c0f2a58d0be8cad434fcc9d02e"
+              }
+            }
+          ],
+          "original_artifacts": [
+            {
+              "path": "build/nvvm-synchronization-intrinsics/review-source.md",
+              "sha256": "a3760c8c0bc33a547fc14a6fccc16b43f9fd20efd065782884b3240c50610813"
+            },
+            {
+              "path": "build/nvvm-synchronization-intrinsics/sync-o3-1.llvm-ir-asm",
+              "sha256": "ac9c59f3e7191ddc2563bdd952d4bf5b663621e41b4929a79f91a2c6be24a73a"
+            },
+            {
+              "path": "build/nvvm-synchronization-intrinsics/sync-o3.ptx",
+              "sha256": "87ce63e3f5b05ce58d48d5d76fc82d85e078d30f80ada50c72dcfe3b3a8f64c5"
+            }
+          ]
+        }
+      ],
+      "source_review": {
+        "path": "build/nvvm-synchronization-intrinsics/review-source.md",
+        "sha256": "a3760c8c0bc33a547fc14a6fccc16b43f9fd20efd065782884b3240c50610813"
+      },
+      "limits": [
+        "Cross-warp shared-memory fixture qualifies noinline synchronization with all lanes reaching every barrier; it does not qualify arbitrary transitive wrapper convergence metadata.",
+        "Historical material-runtime, static, external ABI, numeric sweeps and timing claims retain their original identities."
+      ],
+      "acceptance": {
+        "status": "accepted",
+        "baseline": {
+          "path": "issue-nvvm-backend/accepted-baseline.json",
+          "sha256": "d73f95518423852be4fc8a49b444afb0ae15f174635d7aed09e51e8d56ccb01d"
+        },
+        "final_review": {
+          "path": "build/nvvm-synchronization-intrinsics/review-candidates.json",
+          "sha256": "e2209ed860417924484ccfc26122b1360a31f6da11976095554afba45838a22a"
+        }
+      },
+      "runtime_oracle": {
+        "fixture": "tests/cuda/nvvm-synchronization-effects.slang",
+        "source_sha256": "9100420d9405e71b4a7c6febc4211263e3f56f0f3399a1d7f1dab90f247db3f7",
+        "modes": ["NVRTC O3", "NVVM O0", "NVVM O3"],
+        "blocks": 2,
+        "lanes_per_block": 64,
+        "iterations": 2,
+        "cross_warp_peer_xor": 32,
+        "expected_output": [128, 0, 4544]
+      }
     }
   }
 }

@@ -7980,7 +7980,8 @@ void AllMemoryBarrier()
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm(nvvmDeviceMemoryBarrier) "__threadfence()";
+    case nvvm: __intrinsic_asm "llvm.nvvm.membar.gl";
+    case cuda: __intrinsic_asm "__threadfence()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -8000,7 +8001,8 @@ void AllMemoryBarrierWithGroupSync()
     {
     case hlsl: __intrinsic_asm "AllMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsShared|gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
+    case nvvm: __intrinsic_asm "llvm.nvvm.barrier0";
+    case cuda: __intrinsic_asm "__syncthreads()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -10126,7 +10128,8 @@ void DeviceMemoryBarrier()
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrier";
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm(nvvmDeviceMemoryBarrier) "__threadfence()";
+    case nvvm: __intrinsic_asm "llvm.nvvm.membar.gl";
+    case cuda: __intrinsic_asm "__threadfence()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -10146,7 +10149,8 @@ void DeviceMemoryBarrierWithGroupSync()
     {
     case hlsl: __intrinsic_asm "DeviceMemoryBarrierWithGroupSync";
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeDevice, (gl_StorageSemanticsImage|gl_StorageSemanticsBuffer), gl_SemanticsAcquireRelease)";
-    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
+    case nvvm: __intrinsic_asm "llvm.nvvm.barrier0";
+    case cuda: __intrinsic_asm "__syncthreads()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_device | mem_flags::mem_threadgroup | mem_flags::mem_texture | mem_flags::mem_threadgroup_imageblock)";
     case spirv: spirv_asm
         {
@@ -12127,7 +12131,8 @@ void GroupMemoryBarrier()
     {
     case glsl: __intrinsic_asm "memoryBarrier(gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
     case hlsl: __intrinsic_asm "GroupMemoryBarrier";
-    case cuda: __intrinsic_asm(nvvmWorkgroupMemoryBarrier) "__threadfence_block";
+    case nvvm: __intrinsic_asm "llvm.nvvm.membar.cta";
+    case cuda: __intrinsic_asm "__threadfence_block";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm
@@ -12145,7 +12150,8 @@ void __subgroupBarrier()
     {
     case glsl: __intrinsic_asm "subgroupBarrier";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
-    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
+    case nvvm: __intrinsic_asm "llvm.nvvm.barrier0";
+    case cuda: __intrinsic_asm "__syncthreads()";
     case metal: __intrinsic_asm "simdgroup_barrier(mem_flags::none)";
     case spirv:
         spirv_asm
@@ -12165,7 +12171,8 @@ void GroupMemoryBarrierWithGroupSync()
     {
     case glsl: __intrinsic_asm "controlBarrier(gl_ScopeWorkgroup, gl_ScopeWorkgroup, gl_StorageSemanticsShared, gl_SemanticsAcquireRelease)";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
-    case cuda: __intrinsic_asm(nvvmWorkgroupBarrier) "__syncthreads()";
+    case nvvm: __intrinsic_asm "llvm.nvvm.barrier0";
+    case cuda: __intrinsic_asm "__syncthreads()";
     case metal: __intrinsic_asm "threadgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm

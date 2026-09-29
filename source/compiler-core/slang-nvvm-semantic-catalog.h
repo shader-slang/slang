@@ -684,27 +684,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         2,
         "float32 wave-mask match intrinsic",
     },
-    {
-        SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER,
-        kVoid,
-        {kNoType, kNoType, kNoType},
-        0,
-        "CUDA workgroup barrier",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER,
-        kVoid,
-        {kNoType, kNoType, kNoType},
-        0,
-        "CUDA device memory barrier",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER,
-        kVoid,
-        {kNoType, kNoType, kNoType},
-        0,
-        "CUDA workgroup memory fence",
-    },
 };
 
 inline constexpr size_t getCatalogCount()

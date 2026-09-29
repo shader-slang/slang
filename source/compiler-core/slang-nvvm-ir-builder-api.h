@@ -136,7 +136,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE ((SlangNVVMValueOperation)22u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL ((SlangNVVMValueOperation)23u)
 /* Values 24-27 are retired execution-vector operations. Keep later identities stable. */
-#define SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER ((SlangNVVMValueOperation)28u)
+/* Value 28 is retired; synchronization uses named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_INTEGER_CONVERT ((SlangNVVMValueOperation)29u)
 #define SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT ((SlangNVVMValueOperation)30u)
 #define SLANG_NVVM_VALUE_OP_FLOAT_TO_INTEGER ((SlangNVVMValueOperation)31u)
@@ -145,7 +145,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_SHIFT_RIGHT ((SlangNVVMValueOperation)34u)
 #define SLANG_NVVM_VALUE_OP_FLOAT_CONVERT ((SlangNVVMValueOperation)35u)
 #define SLANG_NVVM_VALUE_OP_SQRT ((SlangNVVMValueOperation)36u)
-#define SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER ((SlangNVVMValueOperation)37u)
+/* Value 37 is retired; synchronization uses named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_BIT_REINTERPRET ((SlangNVVMValueOperation)38u)
 #define SLANG_NVVM_VALUE_OP_SELECT ((SlangNVVMValueOperation)39u)
 #define SLANG_NVVM_VALUE_OP_SIN ((SlangNVVMValueOperation)40u)
@@ -180,7 +180,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_FREXP_FRACTION ((SlangNVVMValueOperation)69u)
 #define SLANG_NVVM_VALUE_OP_FREXP_EXPONENT ((SlangNVVMValueOperation)70u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH ((SlangNVVMValueOperation)71u)
-#define SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER ((SlangNVVMValueOperation)72u)
+/* Value 72 is retired; synchronization uses named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_SINH ((SlangNVVMValueOperation)73u)
 #define SLANG_NVVM_VALUE_OP_COSH ((SlangNVVMValueOperation)74u)
 #define SLANG_NVVM_VALUE_OP_TANH ((SlangNVVMValueOperation)75u)
@@ -515,7 +515,8 @@ extern "C"
     } SlangNVVMBuilderConstructionAPI;
 
     /** An explicit LLVM intrinsic name and its checked Slang signature. Names are length-delimited.
-        The first contract accepts only scalar i32 execution-register reads with no arguments. */
+        Accepts scalar i32 execution-register reads and void synchronization calls with no
+       arguments. Emission returns a null value handle for void calls. */
     typedef struct SlangNVVMNamedIntrinsicDesc
     {
         const char* name;

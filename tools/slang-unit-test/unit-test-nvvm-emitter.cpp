@@ -604,7 +604,7 @@ SLANG_UNIT_TEST(nvvmSlangCUDAExecutionUsesDirectPipeline)
         SLANG_CHECK_ABORT(code != nullptr);
         SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
 
-        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 12);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.barrier0"));
         for (const char* reg : {"tid", "ctaid", "ntid", "nctaid"})
         {
             for (char axis = 'x'; axis <= 'z'; ++axis)
@@ -11690,5 +11690,76 @@ SLANG_UNIT_TEST(nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 1);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames[0] == "llvm.nvvm.read.ptx.sreg.tid.z");
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangNamedSynchronizationUsesVoidReturn)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    globalSession->setSharedLibraryLoader(loader);
+    const char* source = R"(
+        void sync() { __intrinsic_asm "llvm.nvvm.barrier0"; }
+        void deviceFence() { __intrinsic_asm "llvm.nvvm.membar.gl"; }
+        void groupFence() { __intrinsic_asm "llvm.nvvm.membar.cta"; }
+        [CUDAKernel] void computeMain()
+        {
+            sync(); deviceFence(); groupFence();
+            sync(); deviceFence(); groupFence();
+        }
+    )";
+    ComPtr<slang::IBlob> code;
+    ComPtr<slang::IBlob> diagnostics;
+    const auto result = _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics);
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    for (const char* name : {"llvm.nvvm.barrier0", "llvm.nvvm.membar.gl", "llvm.nvvm.membar.cta"})
+    {
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains(name));
+        Index matchingCalls = 0;
+        for (Index callee : gFakeNVVMBuilder.callCalleeFunctionIndices)
+        {
+            const auto intrinsic = gFakeNVVMBuilder.namedIntrinsicFunctionNames.tryGetValue(callee);
+            if (intrinsic && *intrinsic == name)
+                ++matchingCalls;
+        }
+        SLANG_CHECK(matchingCalls == 2);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation)
+{
+    const char* bodies[] = {
+        "void sync() { __intrinsic_asm \"llvm.nvvm.barrier0()\"; }",
+        "void sync() { __intrinsic_asm \"llvm.nvvm.membar.missing\"; }",
+        "void sync() { __intrinsic_asm \"llvm.nvvm.read.ptx.sreg.tid.x\"; }",
+        "void sync() { __intrinsic_asm \"llvm.nvvm.membar.cta\", 1; }",
+        "void sync(uint x) { __intrinsic_asm \"llvm.nvvm.barrier0\"; }",
+        "uint sync() { __intrinsic_asm \"llvm.nvvm.barrier0\"; }",
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(bodies); ++i)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << bodies[i] << "\n[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> output) { "
+               << (i == 5 ? "output[0] = " : "") << "sync(" << (i == 4 ? "7" : "") << "); }";
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(globalSession, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 0);
     }
 }

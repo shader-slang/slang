@@ -46,8 +46,8 @@ The installed compiler can be older than Git HEAD; source revision alone does no
 
 Core execution helpers and varying-parameter legalization use named
 `llvm.nvvm.read.ptx.sreg.*` intrinsics for all twelve thread/block/grid coordinates.
-The initial named-intrinsic boundary admits exactly zero-argument scalar i32 register reads;
-it does not admit arbitrary LLVM assembly or other intrinsic families. Provider signature queries
+The named-intrinsic boundary admits zero-argument scalar i32 register reads and the three void
+barrier/fence operations described below; it does not admit arbitrary LLVM assembly. Provider signature queries
 remain pure and emission consumes the checked plan. CUDA source and NVRTC retain CUDA target
 selection, including when an explicit `nvvm` capability is supplied. Ordinary comma-separated
 `__intrinsic_asm` arguments remain supported. [Target/argument fixture](../../tests/cuda/nvvm-target-switch-explicit-args.slang)
@@ -131,6 +131,17 @@ These details must accompany any widening of a role predicate.
 | Masked Half MIN/MAX                               | Separately qualified raw-half transport and ordered selection; finite exclusive seeds ±65504 | Infinity/NaN/signed-zero behavior follows exact seed and source order. Matrix prefixes remain separate. [Half](../../tests/cuda/nvvm-fp16-masked-minmax.slang)                                                                               |
 | QuadAny/QuadAll                                   | Complete typed helper with matching signatures/requirements; four source-lane reads; GPU     | Complete source quads and matching shuffle sequences required; standalone requirement markers, partial quads and SPIR-V active-only semantics are not admitted. [Quad votes](../../tests/cuda/nvvm-quad-votes.slang)                         |
 | Clock/clock64                                     | Live side-effecting per-SM cycle observations; relational GPU oracle                         | Wrapping counters, not wall time, cross-SM ordering or memory fence. Exact timestamp comparison is invalid. [Clock observations](../../tests/cuda/nvvm-clock-observations.slang)                                                             |
+
+Core synchronization helpers directly name `llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
+`llvm.nvvm.membar.gl` in their NVVM branches. Provider and compiler units cover canonical void
+results, malformed signature rejection before module creation, retained effects and LLVM attributes.
+The [synchronization fixture](../../tests/cuda/nvvm-synchronization-effects.slang) exchanges shared
+values across two warps through non-inlined helpers, with two runtime loop iterations and an
+independent count/error/checksum oracle of 128/0/4544. Its PTX checks retain both fence scopes and the
+barrier. The [memory-only fence fixture](../../tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang)
+requires `membar.cta` without `bar.sync`. This preserves existing barrier scopes, including the
+subgroup and WithGroupSync mappings. It does not qualify arbitrary transitive helper convergence:
+LLVM convergence metadata is retained on the intrinsic but is not propagated to helper declarations.
 
 ## Texture, surface and descriptor contracts
 

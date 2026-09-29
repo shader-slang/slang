@@ -16355,13 +16355,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     moduleScope.module,
                                     namedIntrinsic->desc,
                                     value)));
-                            SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                function,
-                                "named LLVM intrinsic return",
-                                value));
+                            if (namedIntrinsic->desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
+                            {
+                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                    codeGenContext,
+                                    "named LLVM intrinsic void return",
+                                    builder.emitReturnVoid(moduleScope.module)));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    function,
+                                    "named LLVM intrinsic return",
+                                    value));
+                            }
                             break;
                         }
                         NVVMResolvedByteAddressAtomic byteAddressAtomic;

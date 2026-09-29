@@ -45,11 +45,22 @@ uint readThreadX()
 The core module builds `uint3` values from scalar calls in its NVVM branches. Entry-point varying
 legalization constructs the same scalar helper shape for system values and reads it separately in
 each entry block; the backend no longer recognizes CUDA `threadIdx`/`blockIdx` globals. Named calls
-are limited to the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes).
-The provider resolves names through LLVM's intrinsic registry, validates the exact no-argument
-signature and existing dialect admission before module creation, and constructs calls with LLVM's
-intrinsic attributes. This does not admit arbitrary LLVM snippets or other named intrinsics.
+admit the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes) and three
+void synchronization operations: `llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
+`llvm.nvvm.membar.gl`. The provider resolves names through LLVM's intrinsic registry, validates the
+exact no-argument signature and existing dialect admission before module creation, and constructs
+calls with LLVM's intrinsic attributes. Void calls have no result handle; emission adds an ordinary LLVM
+void return for the helper. This does not admit arbitrary LLVM snippets or other named
+intrinsics.
 Ordinary comma-separated `__intrinsic_asm` arguments remain part of the shared language facility.
+
+Synchronization helpers remain effectful in Slang IR. The provider retains `convergent` and
+`nounwind` on the barrier intrinsic, and `nounwind` on the two memory fences; it does not mark them
+pure. The existing subgroup and WithGroupSync mappings still use a workgroup barrier, and the
+migration does not add a separate device fence to WithGroupSync. Generated helper declarations do
+not currently propagate transitive LLVM convergence metadata. Direct intrinsic attributes and
+bounded helper behavior are distinct contracts; arbitrary control-flow transformations across
+nested helpers remain outside that qualification.
 
 | Boundary                               | Owner and responsibility                                                                                                                                                            |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

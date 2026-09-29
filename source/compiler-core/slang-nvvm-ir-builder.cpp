@@ -260,9 +260,15 @@ SlangResult NVVMIRBuilder::emitNamedIntrinsic(
         return SLANG_E_UNINITIALIZED;
     if (!supportsNamedIntrinsic(intrinsic))
         return SLANG_E_NOT_AVAILABLE;
-    return _validateHandleResult(
-        m_valueOperations.emitNamedIntrinsic(module, &intrinsic, &outValue),
-        outValue);
+    const SlangNVVMResult result =
+        m_valueOperations.emitNamedIntrinsic(module, &intrinsic, &outValue);
+    if (intrinsic.resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
+    {
+        if (SLANG_FAILED(result))
+            return result;
+        return !outValue ? SLANG_OK : SLANG_FAIL;
+    }
+    return _validateHandleResult(result, outValue);
 }
 
 bool NVVMIRBuilder::supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const

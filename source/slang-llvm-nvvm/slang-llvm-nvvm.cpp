@@ -2525,6 +2525,15 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat format)
 
 static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID);
 
+// Classifies the synchronization operations admitted by the qualified NVVM dialect. The named
+// query and serializer share this boundary; LLVM owns their signatures and effects.
+static bool _isSynchronizationIntrinsic(llvm::Intrinsic::ID intrinsicID)
+{
+    return intrinsicID == llvm::Intrinsic::nvvm_barrier0 ||
+           intrinsicID == llvm::Intrinsic::nvvm_membar_gl ||
+           intrinsicID == llvm::Intrinsic::nvvm_membar_cta;
+}
+
 static void _addUniqueAttributeSet(
     llvm::SmallVectorImpl<llvm::AttributeSet>& attributeSets,
     llvm::AttributeSet attributeSet)
@@ -2623,12 +2632,13 @@ static SlangResult _writeLegacyNVVMAssembly(
             }
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
-        else if (intrinsicID == llvm::Intrinsic::nvvm_barrier0)
+        else if (_isSynchronizationIntrinsic(intrinsicID))
         {
+            const bool isBarrier = intrinsicID == llvm::Intrinsic::nvvm_barrier0;
             if (!function.isDeclaration() || !function.getReturnType()->isVoidTy() ||
                 function.arg_size() != 0 ||
-                function.getAttributes().getFnAttrs().getNumAttributes() != 2 ||
-                !function.hasFnAttribute(llvm::Attribute::Convergent) ||
+                function.getAttributes().getFnAttrs().getNumAttributes() != (isBarrier ? 2u : 1u) ||
+                function.hasFnAttribute(llvm::Attribute::Convergent) != isBarrier ||
                 !function.hasFnAttribute(llvm::Attribute::NoUnwind))
             {
                 return SLANG_E_NOT_AVAILABLE;
@@ -3340,24 +3350,29 @@ static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
     }
 }
 
-// Resolves explicit names through LLVM's intrinsic registry. The execution-register classifier
-// already owns the NVVM dialect boundary; reuse it instead of inventing a second name catalog.
-// Signature queries use a temporary context and never insert declarations into a module.
+// Resolves explicit names through LLVM's intrinsic registry. The dialect classifiers also own
+// serialization validation; no second name catalog is needed. Signature queries use a temporary
+// context and never insert declarations into a module.
 static llvm::Intrinsic::ID _resolveNamedIntrinsic(const SlangNVVMNamedIntrinsicDesc& intrinsic)
 {
-    if (!intrinsic.name || !intrinsic.nameSize || intrinsic.operandCount ||
-        (intrinsic.resultType.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
-         intrinsic.resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
-        intrinsic.resultType.bitWidth != 32 || intrinsic.resultType.laneCount != 1)
+    if (!intrinsic.name || !intrinsic.nameSize || intrinsic.operandCount)
         return llvm::Intrinsic::not_intrinsic;
     llvm::StringRef name(intrinsic.name, intrinsic.nameSize);
     auto id = llvm::Function::lookupIntrinsicID(name);
     if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::isOverloaded(id) ||
-        llvm::Intrinsic::getName(id) != name || !_isExecutionRegisterIntrinsic(id))
+        llvm::Intrinsic::getName(id) != name ||
+        (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id)))
         return llvm::Intrinsic::not_intrinsic;
     llvm::LLVMContext context;
+    llvm::Type* resultType = nullptr;
+    if (Slang::NVVMSemantics::areSameType(intrinsic.resultType, Slang::NVVMSemantics::kVoid))
+        resultType = llvm::Type::getVoidTy(context);
+    else if (
+        Slang::NVVMSemantics::areSameType(intrinsic.resultType, Slang::NVVMSemantics::kSignedI32) ||
+        Slang::NVVMSemantics::areSameType(intrinsic.resultType, Slang::NVVMSemantics::kUnsignedI32))
+        resultType = llvm::Type::getInt32Ty(context);
     auto type = llvm::Intrinsic::getType(context, id);
-    return type->getNumParams() == 0 && !type->isVarArg() && type->getReturnType()->isIntegerTy(32)
+    return type->getNumParams() == 0 && !type->isVarArg() && type->getReturnType() == resultType
                ? id
                : llvm::Intrinsic::not_intrinsic;
 }
@@ -3387,24 +3402,9 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     if (id == llvm::Intrinsic::not_intrinsic)
         return SLANG_E_NOT_AVAILABLE;
     auto declaration = llvm::Intrinsic::getDeclaration(state->module.get(), id);
-    *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(declaration));
-    return SLANG_OK;
-}
-
-static SlangResult _emitBarrier(
-    SlangNVVMModuleHandle module,
-    llvm::Intrinsic::ID intrinsicID,
-    SlangNVVMValueHandle* outValue)
-{
-    if (outValue)
-        *outValue = nullptr;
-    ModuleState* state = _getModule(module);
-    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !outValue || !insertionBlock)
-        return SLANG_E_INVALID_ARG;
-
-    llvm::Function* barrier = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
-    state->builder.CreateCall(barrier);
+    auto call = state->builder.CreateCall(declaration);
+    if (!call->getType()->isVoidTy())
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
     return SLANG_OK;
 }
 
@@ -3740,12 +3740,6 @@ static SlangResult _emitCatalogOperation(
 
     switch (entry.operation)
     {
-    case SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER:
-        return _emitBarrier(module, llvm::Intrinsic::nvvm_barrier0, outValue);
-    case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
-        return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_gl, outValue);
-    case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
-        return _emitBarrier(module, llvm::Intrinsic::nvvm_membar_cta, outValue);
     case SLANG_NVVM_VALUE_OP_CLOCK:
     case SLANG_NVVM_VALUE_OP_CLOCK64:
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:

@@ -5746,28 +5746,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorConstruct(
     return SLANG_OK;
 }
 
-static SlangResult _fakeNVVMBuilderEmitBarrier(
-    SlangNVVMModuleHandle module,
-    SlangNVVMValueOperation operation,
-    SlangNVVMValueHandle* outValue)
-{
-    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
-        !outValue)
-    {
-        return SLANG_E_INVALID_ARG;
-    }
-    if (operation == SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER)
-        ++gFakeNVVMBuilder.workgroupBarrierCallCount;
-    else if (operation == SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER)
-        ++gFakeNVVMBuilder.deviceMemoryBarrierCallCount;
-    else if (operation == SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER)
-        ++gFakeNVVMBuilder.workgroupMemoryBarrierCallCount;
-    else
-        return SLANG_E_INVALID_ARG;
-    *outValue = nullptr;
-    return SLANG_OK;
-}
-
 static SlangResult _recordFakeNVVMBuilderCatalogScalarOperation(
     SlangNVVMModuleHandle module,
     FakeNVVMBuilderScalarFamily family,
@@ -5845,20 +5823,7 @@ static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
             outValue);
     }
 
-    switch (entry.operation)
-    {
-    case SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER:
-    case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
-    case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
-        return _fakeNVVMBuilderEmitBarrier(module, entry.operation, outValue);
-    default:
-        return _fakeNVVMBuilderEmitIntrinsic(
-            module,
-            operation,
-            operands,
-            entry.operandCount,
-            outValue);
-    }
+    return _fakeNVVMBuilderEmitIntrinsic(module, operation, operands, entry.operandCount, outValue);
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
@@ -6159,13 +6124,19 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
         *outSupported = 0;
     if (!intrinsic || !outSupported)
         return SLANG_E_INVALID_ARG;
-    if (!intrinsic->name || intrinsic->operandCount || intrinsic->resultType.bitWidth != 32 ||
-        intrinsic->resultType.laneCount != 1 ||
-        (intrinsic->resultType.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
-         intrinsic->resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
-        gFakeNVVMBuilder.rejectNamedIntrinsics)
+    if (!intrinsic->name || intrinsic->operandCount || gFakeNVVMBuilder.rejectNamedIntrinsics)
         return SLANG_OK;
     const UnownedStringSlice name(intrinsic->name, intrinsic->nameSize);
+    if (NVVMSemantics::areSameType(intrinsic->resultType, NVVMSemantics::kVoid))
+    {
+        *outSupported = name == toSlice("llvm.nvvm.barrier0") ||
+                        name == toSlice("llvm.nvvm.membar.gl") ||
+                        name == toSlice("llvm.nvvm.membar.cta");
+        return SLANG_OK;
+    }
+    if (!NVVMSemantics::areSameType(intrinsic->resultType, NVVMSemantics::kSignedI32) &&
+        !NVVMSemantics::areSameType(intrinsic->resultType, NVVMSemantics::kUnsignedI32))
+        return SLANG_OK;
     const char* registers[] = {"tid", "ctaid", "ntid", "nctaid"};
     for (const char* reg : registers)
     {
@@ -6191,11 +6162,27 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitNamedIntrinsic(
     SLANG_RETURN_ON_FAIL(_fakeNVVMBuilderIsNamedIntrinsicSupported(intrinsic, &supported));
     if (!supported)
         return SLANG_E_NOT_AVAILABLE;
-    // Reuse the fake's scalar intrinsic result storage. UINT32_MAX marks a named call and does
-    // not pretend that it is one of the old semantic operations.
-    SlangNVVMValueOperationDesc operation = {UINT32_MAX, intrinsic->resultType, nullptr, 0};
-    SLANG_RETURN_ON_FAIL(_fakeNVVMBuilderEmitIntrinsic(module, operation, nullptr, 0, outValue));
+    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
+        !outValue)
+        return SLANG_E_INVALID_ARG;
     const String name(UnownedStringSlice(intrinsic->name, intrinsic->nameSize));
+    if (intrinsic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
+    {
+        if (name == "llvm.nvvm.barrier0")
+            ++gFakeNVVMBuilder.workgroupBarrierCallCount;
+        else if (name == "llvm.nvvm.membar.gl")
+            ++gFakeNVVMBuilder.deviceMemoryBarrierCallCount;
+        else if (name == "llvm.nvvm.membar.cta")
+            ++gFakeNVVMBuilder.workgroupMemoryBarrierCallCount;
+    }
+    else
+    {
+        // Reuse the fake's scalar intrinsic result storage. UINT32_MAX marks a named call and
+        // does not pretend that it is one of the old semantic operations.
+        SlangNVVMValueOperationDesc operation = {UINT32_MAX, intrinsic->resultType, nullptr, 0};
+        SLANG_RETURN_ON_FAIL(
+            _fakeNVVMBuilderEmitIntrinsic(module, operation, nullptr, 0, outValue));
+    }
     gFakeNVVMBuilder.namedIntrinsicNames.add(name);
     const Index functionIndex =
         gFakeNVVMBuilder.blockFunctionIndices[gFakeNVVMBuilder.currentInsertBlockIndex];
