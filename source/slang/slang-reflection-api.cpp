@@ -4699,6 +4699,7 @@ SLANG_API SlangReflectionFunction* spReflectionFunction_specializeWithArgTypes(
     try
     {
         DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+        linkage->installDiagnosticCallback(sink);
         auto resultFunc =
             linkage->specializeWithArgTypes(funcExpr, argTypeList, &sink).as<FunctionDeclBase>();
 
@@ -5579,6 +5580,7 @@ SLANG_API SlangReflectionType* spReflection_specializeType(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    linkage->installDiagnosticCallback(sink);
     try
     {
         auto specializedType = linkage->specializeType(
@@ -5622,6 +5624,7 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    linkage->installDiagnosticCallback(sink);
     try
     {
         List<Expr*> argExprs;

@@ -120,6 +120,7 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     // FrontEndEntryPointRequest.
     //
     DiagnosticSink sink(getLinkage()->getSourceManager(), DiagnosticSink::SourceLocationLexer());
+    getLinkage()->installDiagnosticCallback(sink);
     FrontEndCompileRequest frontEndRequest(getLinkage(), StdWriters::getSingleton(), &sink);
     RefPtr<TranslationUnitRequest> tuRequest = new TranslationUnitRequest(&frontEndRequest);
     tuRequest->module = this;
