@@ -28,10 +28,15 @@ IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
 
 struct LowerCombinedSamplerContext
 {
+    // We replace every use of each type recorded here across the whole module, and IR types are
+    // shared, so only combined texture-sampler types may be recorded.
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
+    // Return the lowered struct info for a combined texture-sampler type, lowering it on first
+    // use, or for a struct type this pass already produced for one. Return `std::nullopt` for
+    // any other type, including a plain texture, which this pass leaves unchanged.
     std::optional<LoweredCombinedSamplerStructInfo> getLoweredTypeInfo(
         IRType* textureTypeOrLoweredType)
     {
@@ -258,12 +263,12 @@ void lowerCombinedTextureSamplers(
                         auto handle = inst->getOperand(0);
                         if (as<IRDescriptorHandleType>(handle->getDataType()))
                         {
-                            // If handle is still a DescriptorHandle, we are on a target where
-                            // native resource handles are already bindless, e.g. metal.
-                            // On these platforms, a handle to a combined texture-sampler is a
-                            // struct containing texture and sampler fields, so we just need to
-                            // insert the extract operations. A handle to any other resource is
-                            // the resource itself, so its cast has no lowered info and is kept.
+                            // If the handle is still a DescriptorHandle, we are on a target where
+                            // native resource handles are already bindless (Metal, CPU). On these
+                            // targets, a handle to a combined texture-sampler is a struct
+                            // containing texture and sampler fields, so we insert the extract
+                            // operations. A handle to any other resource is emitted as that
+                            // resource, and the cast as its operand, so we keep that cast.
                             auto loweredInfo = context.getLoweredTypeInfo(inst->getDataType());
                             if (!loweredInfo)
                                 continue;

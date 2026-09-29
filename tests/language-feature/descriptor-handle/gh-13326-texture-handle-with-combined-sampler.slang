@@ -11,7 +11,7 @@
 // MTL: void computeMain({{.*}} texture2d<float, access::sample> h_1 {{\[\[}}texture(0){{\]\]}}, texture2d<float, access::sample> c_texture_1 {{\[\[}}texture(1){{\]\]}}, sampler c_sampler_1 {{\[\[}}sampler(0){{\]\]}})
 // MTL-NOT: Texture2D_0
 
-// MTLLIB: @computeMain
+// MTLLIB: define void @computeMain
 
 // CPP-NOT: Texture2D_0
 // CPP: struct GlobalParams_0
