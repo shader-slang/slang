@@ -3842,11 +3842,12 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             rematFunc);
     }
 
-    // We fill the legacy `bwd_diff` requirement with a function composed from the entries above,
-    // as the front end does for a declared function (see the `LegacyBackwardDerivativeFunc` case
-    // of the requirement synthesis in `slang-check-decl.cpp`). A call written as
-    // `bwd_diff(fwd_diff(f))(...)` looks up this requirement on the synthesized conformance, so
-    // the entry must be a function of the backward derivative's type.
+    // The legacy `bwd_diff` requirement is what a `bwd_diff(g)(...)` call looks up, so a call
+    // written as `bwd_diff(fwd_diff(f))(...)` reaches this entry. As the front end does for a
+    // declared function, we fill it with `LegacyBackwardDifferentiate(apply_bwd, remat,
+    // BwdCallable.operator())`, the operands `maybeTranslateLegacyBackwardDerivative` expects.
+    // That translator reads the inst's own type as the derivative's function type, so we resolve
+    // the type here.
     {
         DifferentiableTypeConformanceContext diffTypeContext(sharedContext);
         auto bwdDiffFuncType = diffTypeContext.resolveType(

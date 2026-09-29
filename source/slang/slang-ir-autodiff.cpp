@@ -149,6 +149,23 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
     return true;
 }
 
+static bool isBackwardDerivativeRequirementKey(IRInst* key)
+{
+    auto decor = key->findDecoration<IRBuiltinRequirementDecoration>();
+    if (!decor)
+        return false;
+    switch ((BuiltinRequirementKind)decor->getKind())
+    {
+    case BuiltinRequirementKind::BwdApplyFunc:
+    case BuiltinRequirementKind::BwdCallableRematFunc:
+    case BuiltinRequirementKind::BwdCallablePropFunc:
+    case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isBackwardDerivativeValue(IRInst* inst)
 {
     if (!inst)
@@ -157,6 +174,13 @@ bool isBackwardDerivativeValue(IRInst* inst)
     // itself), so a specialized/generic backward-derivative value such as
     // `Specialize(BackwardDifferentiate(g), float)` is still recognized.
     inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
+
+    // A backward derivative can also be a requirement of an `IBackwardDifferentiable` witness
+    // rather than a differentiation op: `bwd_diff(fwd_diff(f))` looks up `bwd_diff` on the
+    // conformance synthesized for `fwd_diff(f)`. We recognize those by the requirement's role.
+    if (auto lookup = as<IRLookupWitnessMethod>(inst))
+        return isBackwardDerivativeRequirementKey(lookup->getRequirementKey());
+
     switch (inst->getOp())
     {
     // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
