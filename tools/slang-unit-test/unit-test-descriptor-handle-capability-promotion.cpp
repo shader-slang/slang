@@ -76,7 +76,7 @@ static ComPtr<slang::IComponentType> _linkEntryPoint(
     return linkedProgram;
 }
 
-static void _checkClosestHitCode(slang::ISession* session)
+static void _checkClosestHitDeclaresAttributesStruct(slang::ISession* session)
 {
     auto program = _linkEntryPoint(session, "closestHit", _getClosestHitSource(), "closestHit");
 
@@ -112,7 +112,7 @@ SLANG_UNIT_TEST(descriptorHandleCapabilityPromotionDoesNotAffectLaterCUDAProgram
     // Baseline: with no DescriptorHandle in the session, the promotion never runs.
     {
         auto session = _createProfileLessCUDASession(globalSession);
-        _checkClosestHitCode(session);
+        _checkClosestHitDeclaresAttributesStruct(session);
     }
 
     // Laying out `gCounter` runs the promotion, which writes the session's shared target caps.
@@ -125,6 +125,6 @@ SLANG_UNIT_TEST(descriptorHandleCapabilityPromotionDoesNotAffectLaterCUDAProgram
             "computeMain");
         ComPtr<slang::IBlob> diagnosticBlob;
         SLANG_CHECK_ABORT(descriptorHandleProgram->getLayout(0, diagnosticBlob.writeRef()));
-        _checkClosestHitCode(session);
+        _checkClosestHitDeclaresAttributesStruct(session);
     }
 }

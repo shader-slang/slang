@@ -9,6 +9,7 @@
 
 // HLSL: "bindlessSpaceIndex": {{[0-9]+}}
 
+// LLVM-NOT: "bindlessSpaceIndex"
 // LLVM: "threadGroupSize"
 // LLVM-NOT: "bindlessSpaceIndex"
 
