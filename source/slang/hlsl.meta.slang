@@ -19355,7 +19355,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 $}
 
 __generic<T:ITexelElement, let format:int>
-extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
+extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format> : $(isReadOnly?"IArray<T>":"IRWArray<T>")
 {
     [__readNone]
     $(requireToSetQuery)
@@ -19375,6 +19375,12 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
             };
         }
     }
+
+    // Satisfies the `IArray<T>`/`IRWArray<T>` element count requirement; the subscript
+    // requirement is met by this extension's own `__subscript`. Delegates to the
+    // single-argument `GetDimensions` above (the texel buffer has no stride out-param,
+    // unlike `StructuredBuffer`).
+    int getCount() { uint dim; this.GetDimensions(dim); return dim; }
 
     $(isReadOnly?"[__readNone] ":"")
     $(requireToSet)
