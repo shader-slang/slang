@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -entry main -stage compute
 
-// A read-only `groupshared` parameter (`const groupshared`, or the equivalent
-// `__constref groupshared`) is a reference its callee cannot write through (shader-slang/slang#10641).
+// A read-only `groupshared` parameter (`const groupshared`) is a reference its callee cannot write
+// through (shader-slang/slang#10641).
 // It can be passed on to another read-only `groupshared` parameter, which is still the same
 // group-shared storage, but not to a read-write one.
 
@@ -24,11 +24,6 @@ uint forwardConst(const groupshared uint a[8])
     return readOnly(a);
 }
 
-uint forwardConstRef(__constref groupshared uint a[8])
-{
-    return readOnly(a);
-}
-
 // --- Rejected: a read-only parameter passed on to a read-write parameter ---
 
 void forwardToReadWrite(const groupshared uint a[8])
@@ -38,16 +33,9 @@ void forwardToReadWrite(const groupshared uint a[8])
 //CHECK:      ^ error E30047
 }
 
-// --- Rejected: writes through either read-only spelling ---
+// --- Rejected: a write through a read-only parameter ---
 
 void writeConst(const groupshared uint a[8])
-{
-    a[0] = 1;
-//CHECK: ^ left of '=' is not an l-value.
-//CHECK: ^ error E30011
-}
-
-void writeConstRef(__constref groupshared uint a[8])
 {
     a[0] = 1;
 //CHECK: ^ left of '=' is not an l-value.
@@ -67,5 +55,5 @@ void atomicConst(const groupshared uint a[8])
 void main(uint tid : SV_DispatchThreadID)
 {
     sh[tid] = tid;
-    sh[tid] = forwardConst(sh) + forwardConstRef(sh);
+    sh[tid] = forwardConst(sh);
 }

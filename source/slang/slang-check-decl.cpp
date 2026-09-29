@@ -14668,14 +14668,14 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
         // Every `groupshared` parameter takes the `ref` passing mode, which passes the argument's
         // own address and, unlike a borrow, has no copy-in fallback: a copy would leave a callee
-        // that reads after a group barrier looking at a stale snapshot. A read-only parameter is a
-        // `const` `ref`, so we rewrite the `__constref` spelling (a `BorrowModifier`) to that form
-        // and both read-only spellings share one representation.
+        // that reads after a group barrier looking at a stale snapshot. `__constref` asks for a
+        // borrow, so it is an error; we drop it after reporting so that the rest of checking sees
+        // a well-formed `ref` parameter.
         if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
         {
+            getSink()->diagnose(
+                Diagnostics::GroupsharedParameterCannotBeConstref{.modifier = borrowModifier});
             removeModifier(paramDecl, borrowModifier);
-            if (!paramDecl->hasModifier<ConstModifier>())
-                addModifier(paramDecl, this->getASTBuilder()->create<ConstModifier>());
         }
         if (!paramDecl->hasModifier<RefModifier>())
             addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());

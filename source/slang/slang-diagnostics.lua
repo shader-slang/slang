@@ -3912,6 +3912,13 @@ err(
     span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage" }
 )
 
+err(
+    "groupshared-parameter-cannot-be-constref",
+    30712,
+    "'__constref' cannot be used with 'groupshared' -- use 'const groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
 --
 -- 308xx: inheritance
 --

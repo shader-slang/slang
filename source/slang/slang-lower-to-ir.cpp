@@ -3679,10 +3679,10 @@ void addCallArgsForParam(
 
 ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
-    // The checker gives every `groupshared` parameter a `RefModifier` and no `BorrowModifier` (in
-    // `SemanticsDeclHeaderVisitor::visitParamDecl`), so it always takes the `ref` branch below. Any
-    // other mode could copy thread-group-shared storage at the call boundary, so we assert in
-    // release builds too.
+    // The checker gives every `groupshared` parameter a `RefModifier` and rejects `__constref` on
+    // it (in `SemanticsDeclHeaderVisitor::visitParamDecl`), so it always takes the `ref` branch
+    // below. Any other mode could copy thread-group-shared storage at the call boundary, so we
+    // assert in release builds too.
     SLANG_RELEASE_ASSERT(
         !paramDecl->hasModifier<HLSLGroupSharedModifier>() ||
         (paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>()));

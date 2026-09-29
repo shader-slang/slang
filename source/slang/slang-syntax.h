@@ -571,8 +571,7 @@ ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 /// Return whether `decl` is a read-only `groupshared` parameter, i.e. `const groupshared T p`.
 ///
 /// Such a parameter takes the `ref` passing mode like a read-write `groupshared` parameter (the
-/// argument's own address is passed, never a copy), but its callee cannot write through it. The
-/// checker rewrites the `__constref groupshared` spelling to this form.
+/// argument's own address is passed, never a copy), but its callee cannot write through it.
 ///
 bool isReadOnlyGroupSharedParam(VarDeclBase* decl);
 
