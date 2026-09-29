@@ -36,4 +36,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL-DAG: {{offsetTexs_[0-9]+}} {{\[\[}}texture(16)]]
 // MTL-DAG: {{offsetSamps_[0-9]+}} {{\[\[}}sampler(12)]]
 
-// LIB: computeMain
+// LIB: define void @computeMain

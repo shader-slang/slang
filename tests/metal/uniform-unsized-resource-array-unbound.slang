@@ -23,4 +23,5 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // `unsizedTexs` is the only texture, so no `[[texture(` may follow the kernel
 // signature.
 // MTL: {{\[\[}}kernel{{\]\]}} void computeMain(
+// MTL-SAME: unsizedTexs_{{[0-9]+}}[]
 // MTL-NOT: {{\[\[}}texture(
