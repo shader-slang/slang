@@ -10,6 +10,7 @@ RWStructuredBuffer<float> floats;
 RWStructuredBuffer<Atomic<float>> atomicFloats;
 RWStructuredBuffer<Atomic<uint>> counters;
 RWByteAddressBuffer bytes;
+RWTexture2D<float> texels;
 
 [Differentiable]
 float lossesAreReported(float x)
@@ -65,6 +66,26 @@ float lossesAreReported(float x)
     InterlockedCompareExchangeFloatBitwise(floats[0], 0.0f, x, previous);
 //CHECK:                                  ^ derivative is lost in atomic operation
 //CHECK:                                  ^ derivative is lost when an atomic operation writes it to non-differentiable memory, use 'no_diff' or 'detach()' to clarify intention.
+    return x * x;
+}
+
+// The texture, pointer, and remaining byte-address entry points are tagged too.
+[Differentiable]
+float resourceAndPointerFormsAreReported(float x)
+{
+    texels.InterlockedAddF32(uint2(0, 0), x);
+//CHECK:                    ^ derivative is lost in atomic operation
+//CHECK:                    ^ derivative is lost when an atomic operation writes it to non-differentiable memory, use 'no_diff' or 'detach()' to clarify intention.
+    float original;
+    bytes.InterlockedExchangeFloat(0, x, original);
+//CHECK:                          ^ derivative is lost in atomic operation
+//CHECK:                          ^ derivative is lost when an atomic operation writes it to non-differentiable memory, use 'no_diff' or 'detach()' to clarify intention.
+    half* halves = nullptr;
+    half halfOriginal;
+    InterlockedAddF16Emulated(halves, half(x), halfOriginal);
+//CHECK:                     ^ derivative is lost in atomic operation
+//CHECK:                     ^ derivative is lost when an atomic operation writes it to non-differentiable memory, use 'no_diff' or 'detach()' to clarify intention.
+    no_diff texels.InterlockedAddF32(uint2(1, 0), x);
     return x * x;
 }
 
