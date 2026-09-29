@@ -4137,10 +4137,6 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSpecialType(IRType* type) override
     {
-        // For resource type legalization, the "special" types
-        // we are working with are resource types and, on some
-        // targets, logical pointers.
-        //
         if (isResourceType(type))
             return true;
 
