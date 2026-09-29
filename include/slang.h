@@ -1031,6 +1031,16 @@ typedef uint32_t SlangSizeT;
     // compiled against an older version of this header.
     namespace slang
     {
+    enum class BitfieldPackingRules
+    {
+        // Uses LSB-first packing; fields may share storage across underlying type sizes.
+        Default = 0,
+        // Uses LSB-first packing; a type-size change starts new storage. Rejects zero-width fields.
+        MSVC = 1,
+        // Uses MSB-first packing and starts new storage on type-size changes. Not recommended.
+        LegacyMSBFirstMSVC = 2,
+    };
+
     enum class CompilerOptionName
     {
         MacroDefine = 0, // stringValue0: macro name;  stringValue1: macro value
@@ -1203,7 +1213,8 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32 = 126,
         DenormalModeFp64 = 127,
 
-        // Bitfield options
+        // Deprecated. When no BitfieldPackingRules value is supplied, true selects MSB-first
+        // packing and starts new storage on underlying type-size changes.
         UseMSVCStyleBitfieldPacking = 128, // bool
 
         ForceCLayout = 129, // bool
@@ -1333,6 +1344,8 @@ typedef uint32_t SlangSizeT;
         // never stored on an option set; it only drives the print-and-continue handler in the
         // command-line parser.
         GetCompilerPath = 159,
+
+        BitfieldPackingRules = 160, // intValue0: slang::BitfieldPackingRules
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
