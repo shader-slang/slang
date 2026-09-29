@@ -180,8 +180,8 @@ Command options are parsed from the parentheses after the test command, separate
 Options may be `name=value` pairs or bare flags.
 
 - `filecheck=PREFIX`: Run FileCheck over the tool's normal output. `SIMPLE`,
-  `REFLECTION`, `INTERPRET`, `COMPILE`, `SPVDB_DEBUGGER`, and several comparison tests
-  support this path through the shared output validator.
+  `REFLECTION`, `INTERPRET`, `SPVDB_DEBUGGER`, and several comparison tests support this
+  path through the shared output validator.
 - `filecheck-buffer=PREFIX`: For compute render tests, run FileCheck over the buffer text
   written by `render-test` instead of comparing `<test>.expected.txt`.
 - `diag=PREFIX`: For diagnostic tests, check source annotations such as `// PREFIX: ...`
@@ -210,7 +210,7 @@ The command name after `//TEST:` selects the runner callback. The most common co
 | `COMPARE_COMPUTE`        | Runs `render-test` and appends implicit `-slang -compute` arguments.                                                                                                                                                  | Validates process output, then compares the rendered buffer with `<test>.expected.txt` or `filecheck-buffer`. |
 | `COMPARE_COMPUTE_EX`     | Runs `render-test` without implicit language/stage arguments. Use this when the directive needs to name the API and stage explicitly, such as `-vk -compute`, `-dx12 -compute`, `-cuda -compute`, or `-cpu -compute`. | Same as `COMPARE_COMPUTE`.                                                                                    |
 | `COMPARE_RENDER_COMPUTE` | Runs `render-test` and appends implicit `-slang -gcompute` arguments.                                                                                                                                                 | Same as `COMPARE_COMPUTE`.                                                                                    |
-| `COMPILE`                | Runs `slangc` with exactly the directive arguments and expects compilation to succeed.                                                                                                                                | Fails on a non-zero compiler result; `filecheck` can be used for compiler output.                             |
+| `COMPILE`                | Runs `slangc` with exactly the directive arguments and expects compilation to succeed.                                                                                                                                | Fails on a non-zero compiler result; `filecheck` is accepted as a command option but ignored by this runner.  |
 | `COMPILE_TARGET`         | Synthesized internally from render tests to make sure an explicit render target also compiles. It is rarely written by hand.                                                                                          | Fails on a non-zero `render-test -compile-only` result.                                                       |
 
 Specialized commands exist for narrower infrastructure tests:
@@ -305,7 +305,6 @@ or resource declaration across several source lines unless you are using the exp
 //TEST_INPUT: type_conformance <derived-type>:<interface-type>=<id>
 //TEST_INPUT: globalSpecializationArg <type-name>
 //TEST_INPUT: entryPointSpecializationArg <type-name>
-//TEST_INPUT: render_targets <count>
 ```
 
 Resource bindings after the colon are comma-separated:
@@ -510,12 +509,6 @@ Use this form only when the single-line `set` expression becomes too hard to rea
 //TEST_INPUT: begin_object(type=Impl):name=params.obj
 //TEST_INPUT: uniform(data=[1]):name=val
 //TEST_INPUT: end
-```
-
-`render_targets N` sets the number of render targets for render tests:
-
-```text
-//TEST_INPUT: render_targets 2
 ```
 
 ### Complete Compute Example
