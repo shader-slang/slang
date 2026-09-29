@@ -2027,12 +2027,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         builder.getIntegerConstant(foreignScope.module, foreignI32Type, 0, foreignIndex)));
 
-    const SlangNVVMValueOperation executionOperations[] = {
-        SLANG_NVVM_VALUE_OP_THREAD_INDEX,
-        SLANG_NVVM_VALUE_OP_BLOCK_INDEX,
-        SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS,
-        SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS,
-    };
+    const char* executionRegisters[] = {"tid", "ctaid", "ntid", "nctaid"};
+    const char* firstName = "llvm.nvvm.read.ptx.sreg.tid.x";
+    SlangNVVMNamedIntrinsicDesc firstIntrinsic =
+        {firstName, strlen(firstName), NVVMSemantics::kUnsignedI32, 0};
     auto getOperation = [](SlangNVVMValueOperation operation)
     {
         for (const NVVMSemantics::CatalogEntry& entry : NVVMSemantics::kCatalog)
@@ -2051,12 +2049,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
 
     SlangNVVMValueHandle rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
-        builder.emitValueOperation(
-            scope.module,
-            getOperation(SLANG_NVVM_VALUE_OP_THREAD_INDEX),
-            nullptr,
-            0,
-            rejectedValue) == SLANG_E_INVALID_ARG);
+        builder.emitNamedIntrinsic(scope.module, firstIntrinsic, rejectedValue) ==
+        SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entryBlock)));
     SLANG_CHECK(
@@ -2087,15 +2081,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
             rejectedValue) == SLANG_E_INVALID_ARG);
     SLANG_CHECK(rejectedValue == nullptr);
 
-    for (SlangNVVMValueOperation executionOperation : executionOperations)
+    for (const char* executionRegister : executionRegisters)
     {
+        SlangNVVMValueHandle components[3] = {};
+        for (uint32_t axis = 0; axis < 3; ++axis)
+        {
+            StringBuilder name;
+            name << "llvm.nvvm.read.ptx.sreg." << executionRegister << "." << char('x' + axis);
+            SlangNVVMNamedIntrinsicDesc intrinsic =
+                {name.getBuffer(), size_t(name.getLength()), NVVMSemantics::kUnsignedI32, 0};
+            SLANG_CHECK_ABORT(builder.supportsNamedIntrinsic(intrinsic));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitNamedIntrinsic(scope.module, intrinsic, components[axis])));
+        }
         SlangNVVMValueHandle vector = nullptr;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueOperation(
-            scope.module,
-            getOperation(executionOperation),
-            nullptr,
-            0,
-            vector)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitVectorConstruct(scope.module, uint3Type, components, 3, vector)));
         SlangNVVMValueHandle axisConstants[4] = {};
         for (uint32_t axis = 0; axis < 4; ++axis)
         {
@@ -2152,18 +2153,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
 
-    for (SlangNVVMValueOperation executionOperation : executionOperations)
-    {
-        rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-        SLANG_CHECK(
-            builder.emitValueOperation(
-                scope.module,
-                getOperation(executionOperation),
-                nullptr,
-                0,
-                rejectedValue) == SLANG_E_INVALID_ARG);
-        SLANG_CHECK(rejectedValue == nullptr);
-    }
+    rejectedValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+    SLANG_CHECK(
+        builder.emitNamedIntrinsic(scope.module, firstIntrinsic, rejectedValue) ==
+        SLANG_E_INVALID_ARG);
+    SLANG_CHECK(rejectedValue == nullptr);
     barrierValue = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
     SLANG_CHECK(
         builder.emitValueOperation(scope.module, barrierOperation, nullptr, 0, barrierValue) ==
@@ -10147,5 +10141,69 @@ SLANG_UNIT_TEST(nvvmIRBuilderFloat8WideningContract)
                 builder.serializeModule(scope.module, format, assembly, diagnostics)));
             SLANG_CHECK(diagnostics.getLength() == 0);
         }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNamedIntrinsicSignaturesArePure)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("named-query"), scope.module)));
+    ComPtr<ISlangBlob> before;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, before)));
+    struct Case
+    {
+        const char* name;
+        SlangNVVMValueTypeDesc result;
+        size_t operandCount;
+        bool supported;
+    };
+    const Case cases[] = {
+        {"llvm.nvvm.read.ptx.sreg.tid.x", NVVMSemantics::kUnsignedI32, 0, true},
+        {"llvm.nvvm.read.ptx.sreg.tid.x", NVVMSemantics::kSignedI32, 0, true},
+        {"llvm.nvvm.read.ptx.sreg.nctaid.z", NVVMSemantics::kUnsignedI32, 0, true},
+        {"llvm.nvvm.read.ptx.sreg.tid.x.extra", NVVMSemantics::kUnsignedI32, 0, false},
+        {"llvm.nvvm.read.ptx.sreg.missing.x", NVVMSemantics::kUnsignedI32, 0, false},
+        {"llvm.nvvm.read.ptx.sreg.tid.x()", NVVMSemantics::kUnsignedI32, 0, false},
+        {"llvm.ctpop.i32", NVVMSemantics::kUnsignedI32, 0, false},
+        {"llvm.nvvm.read.ptx.sreg.tid.x", NVVMSemantics::kFloat32, 0, false},
+        {"llvm.nvvm.read.ptx.sreg.tid.x", NVVMSemantics::kUnsignedI32x3, 0, false},
+        {"llvm.nvvm.read.ptx.sreg.tid.x",
+         {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 64, 1},
+         0,
+         false},
+        {"llvm.nvvm.read.ptx.sreg.tid.x", NVVMSemantics::kUnsignedI32, 1, false},
+    };
+    for (const auto& testCase : cases)
+    {
+        SlangNVVMNamedIntrinsicDesc intrinsic =
+            {testCase.name, strlen(testCase.name), testCase.result, testCase.operandCount};
+        SLANG_CHECK(builder.supportsNamedIntrinsic(intrinsic) == testCase.supported);
+    }
+    const char embeddedNull[] = "llvm.nvvm.read.ptx.sreg.tid.x\0suffix";
+    SlangNVVMNamedIntrinsicDesc malformed =
+        {embeddedNull, sizeof(embeddedNull) - 1, NVVMSemantics::kUnsignedI32, 0};
+    SLANG_CHECK(!builder.supportsNamedIntrinsic(malformed));
+    ComPtr<ISlangBlob> after;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, after)));
+    SLANG_CHECK(_getBlobText(before) == _getBlobText(after));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderRequiresNamedIntrinsicInterface)
+{
+    for (bool query : {false, true})
+    {
+        _resetDirectNVVMFakes();
+        if (query)
+            gFakeNVVMBuilder.valueOperations.isNamedIntrinsicSupported = nullptr;
+        else
+            gFakeNVVMBuilder.valueOperations.emitNamedIntrinsic = nullptr;
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+        NVVMIRBuilder builder;
+        SLANG_CHECK(NVVMIRBuilder::load(String(), loader, builder) == SLANG_E_NO_INTERFACE);
     }
 }

@@ -9323,6 +9323,758 @@
         "issue-nvvm-backend/test-nvvm-corpus-code-capture.py": "ebf37f093bd47e69db431db1b7fa03a0a287eea14d577f10d164412db3f4f502",
         "issue-nvvm-backend/test-nvvm-corpus-code-analysis.py": "8960c215fd75303b361a2a1cdcf5e6e4b51683dd47ecc59f140679e1d0b038f6"
       }
+    },
+    "nvvm-target-selection": {
+      "status": "accepted",
+      "contract": "Explicit NVVM target selection and direct named execution-register intrinsics; CUDA/NVRTC isolation. Remaining semantic-tag families are not migrated.",
+      "compiler_identity": {
+        "revision": "429e7c4436044030945a9c646e966007cbe11027",
+        "patch_sha256": "f6c5548892d687362aabeb908fffda7d60937bca9b2cfc5acf252968a32de6e7",
+        "compiler_version": "2026.18.3-336-g429e7c443",
+        "provider_abi": 44
+      },
+      "complete_provenance": {
+        "path": "build/nvvm-target-intrinsics/candidate-complete-provenance.json",
+        "sha256": "4fecf7495996869e39da82ffe978454fdec50143bd1c9e13774677d7bd19d04a"
+      },
+      "corpus_execution_provenance": {
+        "path": "build/nvvm-target-intrinsics/checkpoint/provenance.json",
+        "sha256": "6b938c777bec8c1259472b663934018746eb3f8c3fd2f627598d68518dd7426b"
+      },
+      "runtime_sha256": {
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "32673ec63c4d04fd4ef23001e608d0f9144139c7ae726e26b89fa96b0bbfb904",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "4673a7284647512efb476be9687611eff2f523e2761ca914f196c78c6c25565a",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "7fc25638f2ace9cf925c17d83efa482b7b341a91fd01ddfad844e9bd031e1e02",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "6d6eb23100e8b18327fce26cd1e4886a1872be6a41d66f9a2834e75db2c72a2d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "e7f65b0699b2d3541ff2f3006425552062e3e7b48e913535332a0a5ee4de3ffa",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "c6914473ad5567889d6e8cc08943d9fa8689e89a386f8003b9c51f4f69fa89de",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "c6914473ad5567889d6e8cc08943d9fa8689e89a386f8003b9c51f4f69fa89de",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "0ac7e850ef439b59c6cdd6e2a17b8538095de7a3d2e6a4b391758b054000e896",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "a5ec210263aac7f2fa5ff23dd8d59e5616e2d7776419ea75ada339f6af091ce3",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "c6914473ad5567889d6e8cc08943d9fa8689e89a386f8003b9c51f4f69fa89de",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "5065ad15aa5770ea9483947db64f6ce5f6022f731dc45c7f59292324a91e3d11",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "7d9c7ddd2d9d3bbe74b24ffdbd56dad61389997d4e41352a95bbba4955602977",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "e4c5db5c602ca249ac9510daddfb74107f44e16bcfd7d91a4c65d137b95130e8",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "cee7b3f65cb82cbfe29b373f2c5a6f319cd37d705e9e7492fc192effa8771c23",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a16b4199d079deb6ba8b07a789e7bcc3f763f336f3c0605939d9514e0471145b",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "40b6b02ecc969745d49440dfa06a4bb3e75c265226c4056d0be8a4dd06d94873",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "f0ff99bec5a3ce0ef61f9dacb04003a34bf261fc9083796c4864b371caa91434",
+        "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+        "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+        "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+      },
+      "source_sha256": {
+        "extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "source/compiler-core/slang-nvvm-ir-builder-api.h": "56baa37dae38b29837f413bd1e63b60be4bba8f33510e96e7cbcbe71af701ffe",
+        "source/compiler-core/slang-nvvm-ir-builder.cpp": "a152833fa3c0023cb4c27cd91436f656eccda2dcaa284b95deae93c6a18dd5e5",
+        "source/compiler-core/slang-nvvm-ir-builder.h": "4e5c0f14801c9245976fd5d7b616be5facfd77e1e07973c06904d486369a3f16",
+        "source/compiler-core/slang-nvvm-semantic-catalog.h": "3d13d923de1883a1add8a1346eab0091c1b724dfa4b8d4ef8a7e781172c5d0fe",
+        "source/core/slang-math.h": "14a6ef54d2152724f041ee7e235e7feef34bb74d853214efff70f98ab00a26ce",
+        "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "2eb0e4b73046e47950db60fa319c6b1b01ef61cfb60911f1b8a6f56221f48a76",
+        "source/slang/hlsl.meta.slang": "457548b1c8323b30108939540cbbe9b89337ea766d00ba3853ff40d0aa7633c8",
+        "source/slang/slang-capabilities.capdef": "fd3811a5e00e8f601c61c121f2e6ca193af7c563dc8edfa440810d80cf43243a",
+        "source/slang/slang-diagnostics.lua": "8854ee6c777e219d2e2601ad3347d99fc49541ce882abff9b0c88bc280e43643",
+        "source/slang/slang-emit-nvvm-plan.cpp": "a0acf9aea1d676bf57c6f9cd8d81b454784ee87ddd015e2be046df85f4f5cf1a",
+        "source/slang/slang-emit-nvvm-plan.h": "1e60f7d5595116508ee752383d0377896564dc84e6579ffae11be2edb5a63fef",
+        "source/slang/slang-emit-nvvm-type-lowering.cpp": "44220e32e5de3680d7c9de8f0a0fdd813bcc0c16c393569f30fbc26c6317a6e3",
+        "source/slang/slang-emit-nvvm-type-lowering.h": "3ddee6db29f6478fc40c2f2a773b68fb8d61152f3c0895a1acaa8e7ed244b99d",
+        "source/slang/slang-emit-nvvm.cpp": "3cbeb7510b8696fb081dcf75f419b8ecf1b9a7b1eea81f7599688d082a088e27",
+        "source/slang/slang-emit.cpp": "91e8170517d2af65d6f146fc29c51f1efb2c8c9676d2686cb721a378db71996c",
+        "source/slang/slang-ir-insts-stable-names.cpp": "2cc2cba677372f96a002e77c80209a0a4bbb1bc09681c55cafc8788ffc9eba52",
+        "source/slang/slang-ir-insts-stable-names.lua": "79988d4930d4ddef9a225b5d3c0bb0378e88775506174b0e533641fac172a9ae",
+        "source/slang/slang-ir-insts.h": "0fe173222e77bdf83c10a306134de3ed0964457d093c24e41033b45508c0ec90",
+        "source/slang/slang-ir-insts.lua": "d8447cc13d09810d015b99e8930deae41c6744380f84df31bb8b1179d270cf83",
+        "source/slang/slang-ir-legalize-varying-params.cpp": "604316b88489155cd650af50c575b6c10e3dd732d084028d3833de2eea0ade1c",
+        "source/slang/slang-ir-legalize-varying-params.h": "486f41fc027de37525d1bf43ba2bea9541456fd0acbfbe550059340f1111b92e",
+        "source/slang/slang-ir-nvvm-surface-legalize.cpp": "9a0c0633b9efc440b1cad217bb3de1f6dd3d6169bc7dc28937f3c2119b735452",
+        "source/slang/slang-ir-nvvm-surface-legalize.h": "8d44137fce5831618e760fae33145e7fe1478db251b6463c8a3675960bcdb421",
+        "source/slang/slang-ir.cpp": "739b788ee3b25eb06e9d23f11f097c07ed9c33dd8699b4dde8c8fb185f32585f",
+        "source/slang/slang-ir.h": "e183ca037369a2ff45184426108462559ca253c98e8df61adcca0dc79ea587ac",
+        "source/slang/slang-lower-to-ir.cpp": "bf8c46af3637a403d63f467e51dcb0a439204925d459f0d8e7a1ff11085f2548",
+        "source/slang/slang-nvvm-intrinsic-semantics.h": "b9032a277e52c4926c2c997da63f2334955283594a41666ea5e2cfc8eb9b153c",
+        "source/slang/slang-target-program.cpp": "981ac0f346f530bf2771d0c35de120c1e34775c864e6db92b38c4e3667de154c",
+        "source/slang/slang-target-program.h": "8c099401dd90e7f639d4fff73a4b0e730f918ccb604aa45277a9b1b1b081afa3",
+        "source/slang/slang-target.cpp": "e5e91df76a52c3d25fbbb45f05742c77c51e750e3d6234d878fdf933e4103133",
+        "tests/cuda/nvvm-execution-register-varyings.slang": "7ae06c4ab5d3d5264ab280cb54e05ddc6e03dfa4bc106168a64a1e711036c151",
+        "tests/cuda/nvvm-formatted-surface-1d.slang": "33d99344938e68332ab3383e9aa9e2429f91b0f42319dd59416377e0c887e7db",
+        "tests/cuda/nvvm-formatted-surface-provenance.slang": "0552db2a047458da06b657e13e6134fa5dcd65a988e006f98fd6b1b99e5e67b4",
+        "tests/cuda/nvvm-half-narrow-conversion.slang": "94d4d62c5191ebac109c23bf9c8a13ff8587faea104506a63e75c8093eaf6231",
+        "tests/cuda/nvvm-intrinsic-removed-tag.slang": "58bef803fceff4bb1777328317ca8de7543a4aebb79b916a124e5736af7de7cd",
+        "tests/cuda/nvvm-native-float-surface-unsupported.slang": "87ff9a461478549ce9f05ca5ea8ec841c58bb5d5e28f1de7b65c2b6d7b9eef74",
+        "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "a65c7f557552a5c5751e8d7568ac409955c324d07516557aed78e64d9065b155",
+        "tests/cuda/nvvm-surface-physical-boundaries.slang": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+        "tests/cuda/nvvm-surface-physical-half-load.slang": "336e3472249cb1c8484186cc030425d947fee293d03e1ef453658d79a93eb605",
+        "tests/cuda/nvvm-surface-physical-half-nan.slang": "d85a95b38d14422a72fa85ce4fffe87991e0eacc2c05fcd076756959975c097b",
+        "tests/cuda/nvvm-surface-physical-integers.slang": "f511d4b368d2492a45d38dbdfa8deef58aa141f28dee0294bd011a1aa73f4428",
+        "tests/cuda/nvvm-surface-physical-matrix.slang": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+        "tests/cuda/nvvm-surface-physical-mixed.slang": "17289477e7ef073a3d4274fa9baf1348089e0a3fe96b2d448c950b4a861bbf81",
+        "tests/cuda/nvvm-target-switch-explicit-args.slang": "9e5a98ef37cc14a0dcc6da82be143dc1193c6556fc6a6b7d6e04ce6befe0d086",
+        "tests/cuda/nvvm-varyings-multiple-entries.slang": "426bf32b5116ad9bafcaacc2cc83f7fd1ea342ea89684a2d534a6a2174ca9ded",
+        "tools/slang-unit-test/unit-test-math.cpp": "4795db3844aabf94aa8e83dcc6fe05be2dde4b4712a0814fd3cfe5d870a1ef77",
+        "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "c8892fb6f2d59dbf3b3d8316780e76bafa86a7ce49d072551a477cd1b3fa4fc5",
+        "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "cb17716b1c6d4a688422fe494c5f757d3f06b8cb6139658a7f13195d1efc0cca",
+        "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "c6559d802059a47f87617089f18d33ed65cd74930ed995422d469580167f10fe",
+        "tools/slang-unit-test/unit-test-nvvm-routing.cpp": "298b14e6b445d1188c8874a18792be7fa77ce531374076268f778c5d0d3aba15",
+        "tools/slang-unit-test/unit-test-nvvm-support.h": "020a5bf0e5fd90a7875a47b84022d7c73b551355547dfa3f72cf7581e5c96100",
+        "issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "issue-nvvm-backend/test-nvvm-results.py": "fe45fb97d1d7a28b8e7a28b1ae3a6cef61e8e9d0dbbece3ba5c5fd23901ac044",
+        "issue-nvvm-backend/test-nvvm-surface-results.py": "f9dbc427eecc11b081133f7f885ec9c86eaa46c73906ad43673f7e22b4a1b1b0"
+      },
+      "focused_gates": {
+        "units": {
+          "record": {
+            "path": "build/nvvm-target-intrinsics/focused-units-final-2.json",
+            "sha256": "4b83ab2073aa3e3582e81e9a9be406d1b54f7b569e6d1b6e7476429fa48e19e2"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure",
+              "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface",
+              "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation",
+              "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder",
+              "slang-unit-test-tool/nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection",
+              "slang-unit-test-tool/nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations",
+              "slang-unit-test-tool/nvvmSlangCUDAExecutionUsesDirectPipeline",
+              "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 3.1204817295074463,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/focused-units-final-2.log",
+            "log_sha256": "64b7fdee951721104d6c4adf4fe09ad407be763fe3e99df2d83ddd362837518e"
+          },
+          "log": {
+            "path": "build/nvvm-target-intrinsics/focused-units-final-2.log",
+            "sha256": "64b7fdee951721104d6c4adf4fe09ad407be763fe3e99df2d83ddd362837518e"
+          },
+          "counts": {
+            "passed": 9
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCUDAExecutionUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC.internal": "passed",
+            "slang-unit-test-tool/nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations.internal": "passed"
+          }
+        },
+        "source_and_gpu": {
+          "record": {
+            "path": "build/nvvm-target-intrinsics/focused-source-gpu-final-2.json",
+            "sha256": "c7c02d4b2d5c5e704df3cd8c2a4252ac65f19c34ec2134fc66a88c6c6ada3168"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "tests/cuda/nvvm-target-switch-explicit-args.slang",
+              "tests/cuda/nvvm-intrinsic-removed-tag.slang",
+              "tests/cuda/nvvm-varyings-multiple-entries.slang",
+              "tests/cuda/nvvm-execution-register-varyings.slang"
+            ],
+            "return_code": 0,
+            "elapsed_seconds": 3.426617383956909,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/focused-source-gpu-final-2.log",
+            "log_sha256": "1a07bf992cc629307944f253a034083c4c6e284c08443bd28c570c970af027bc"
+          },
+          "log": {
+            "path": "build/nvvm-target-intrinsics/focused-source-gpu-final-2.log",
+            "sha256": "1a07bf992cc629307944f253a034083c4c6e284c08443bd28c570c970af027bc"
+          },
+          "counts": {
+            "passed": 8
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-intrinsic-removed-tag.slang": "passed",
+            "tests/cuda/nvvm-target-switch-explicit-args.slang": "passed",
+            "tests/cuda/nvvm-target-switch-explicit-args.slang.1": "passed",
+            "tests/cuda/nvvm-varyings-multiple-entries.slang": "passed",
+            "tests/cuda/nvvm-varyings-multiple-entries.slang.1": "passed",
+            "tests/cuda/nvvm-execution-register-varyings.slang (cuda)": "passed",
+            "tests/cuda/nvvm-execution-register-varyings.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-execution-register-varyings.slang.2 (cuda)": "passed"
+          }
+        }
+      },
+      "validation_incidents": [
+        {
+          "id": "nvvm-target-diagnostic-definition-order",
+          "status": "resolved",
+          "cause": "New Lua diagnostic definition followed the script return.",
+          "correction": "Move declaration before diagnostic processing and return.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/build-compiler-1.json",
+                "sha256": "62d7c268eefee2ab74caa3b39571cd3e729c1e2970886871c25205a57b254750"
+              },
+              "gate": {
+                "command": [
+                  "env",
+                  "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                  "cmake",
+                  "--build",
+                  "--preset",
+                  "releaseWithDebugInfo",
+                  "--parallel",
+                  "4",
+                  "--target",
+                  "slangc",
+                  "slang-nvvm-provider",
+                  "slang-numerics-modules"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 9.78316593170166,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/build-compiler-1.log",
+                "log_sha256": "a2268f483dea79c07e9b4f9c3ce7b6dca7b1e6debf8259bb228bb251fbb4ff1b"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/build-compiler-1.log",
+                "sha256": "a2268f483dea79c07e9b4f9c3ce7b6dca7b1e6debf8259bb228bb251fbb4ff1b"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-target-intrinsics/build-combined-4.json",
+              "sha256": "8b3cac259e69aaf6b4998e4ab6e7255d3dcff9eb71f36c677a41a940cb295e40"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slangc",
+                "slang-test",
+                "slang-unit-test",
+                "test-server",
+                "render-test",
+                "slang-reflection-test",
+                "slang-nvvm-provider",
+                "slang-numerics-modules"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 111.69832229614258,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/build-combined-4.log",
+              "log_sha256": "348c49d16227c5b5f986dbe46f91025302015d88d9007a2282dc642e3fa9915b"
+            },
+            "log": {
+              "path": "build/nvvm-target-intrinsics/build-combined-4.log",
+              "sha256": "348c49d16227c5b5f986dbe46f91025302015d88d9007a2282dc642e3fa9915b"
+            }
+          }
+        },
+        {
+          "id": "nvvm-target-diagnostic-field-order",
+          "status": "resolved",
+          "cause": "Generated diagnostic struct declares semanticName before location; the designated initializer used the opposite order.",
+          "correction": "Match the generated field declaration order.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/build-compiler-2.json",
+                "sha256": "c3784182aebeb775b254b92c661e234baaf0e1a63a07e4c3bb0a6c8b78a0fbdd"
+              },
+              "gate": {
+                "command": [
+                  "env",
+                  "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                  "cmake",
+                  "--build",
+                  "--preset",
+                  "releaseWithDebugInfo",
+                  "--parallel",
+                  "4",
+                  "--target",
+                  "slangc",
+                  "slang-nvvm-provider",
+                  "slang-numerics-modules"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 524.7735035419464,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/build-compiler-2.log",
+                "log_sha256": "b9ebaeab212e02b6cad8360bf18c87ef210f42895096a7b110f32161107739f7"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/build-compiler-2.log",
+                "sha256": "b9ebaeab212e02b6cad8360bf18c87ef210f42895096a7b110f32161107739f7"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-target-intrinsics/build-combined-4.json",
+              "sha256": "8b3cac259e69aaf6b4998e4ab6e7255d3dcff9eb71f36c677a41a940cb295e40"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slangc",
+                "slang-test",
+                "slang-unit-test",
+                "test-server",
+                "render-test",
+                "slang-reflection-test",
+                "slang-nvvm-provider",
+                "slang-numerics-modules"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 111.69832229614258,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/build-combined-4.log",
+              "log_sha256": "348c49d16227c5b5f986dbe46f91025302015d88d9007a2282dc642e3fa9915b"
+            },
+            "log": {
+              "path": "build/nvvm-target-intrinsics/build-combined-4.log",
+              "sha256": "348c49d16227c5b5f986dbe46f91025302015d88d9007a2282dc642e3fa9915b"
+            }
+          }
+        },
+        {
+          "id": "nvvm-target-test-string-delimiters",
+          "status": "resolved",
+          "cause": "Embedded CUDA expression strings terminated two C++ raw literals early.",
+          "correction": "Use explicit slang raw-string delimiters and restore embedded source formatting.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/build-combined-3.json",
+                "sha256": "38e347aa6ff779a3b8f06b9ee589ddfb0f3fb39e5e9aa15fad099f771c295b06"
+              },
+              "gate": {
+                "command": [
+                  "env",
+                  "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                  "cmake",
+                  "--build",
+                  "--preset",
+                  "releaseWithDebugInfo",
+                  "--parallel",
+                  "4",
+                  "--target",
+                  "slangc",
+                  "slang-test",
+                  "slang-unit-test",
+                  "test-server",
+                  "render-test",
+                  "slang-reflection-test",
+                  "slang-nvvm-provider",
+                  "slang-numerics-modules"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 26.45668625831604,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/build-combined-3.log",
+                "log_sha256": "b8ca8d6569124b37d1f416db26a7272c55a964817b309be25983dc5d691b1848"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/build-combined-3.log",
+                "sha256": "b8ca8d6569124b37d1f416db26a7272c55a964817b309be25983dc5d691b1848"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-target-intrinsics/worker-build-tests-5.json",
+              "sha256": "1779a8119c591126622383b40150dbad5f45e43743a99852af13b33bd6ccda04"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slang-unit-test"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 10.774982929229736,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/worker-build-tests-5.log",
+              "log_sha256": "47b63d9195dd9951f8d349680272618564f5e292dc4ba8ba26cc90ddc14b0949"
+            },
+            "log": {
+              "path": "build/nvvm-target-intrinsics/worker-build-tests-5.log",
+              "sha256": "47b63d9195dd9951f8d349680272618564f5e292dc4ba8ba26cc90ddc14b0949"
+            }
+          }
+        },
+        {
+          "id": "nvvm-target-route-fixture-domain",
+          "status": "resolved",
+          "cause": "CUDA source fixture required a portable SM alias without CUDA; isolation fixture reused an already-linked compiled component that aliases its cached output.",
+          "correction": "Require CUDA and SM80 together; use distinct fresh module/entry composites in the same session while retaining mutually exclusive PTX register checks and cached original byte equality. The already-linked alias behavior remains an open separate finding.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/focused-units-1.json",
+                "sha256": "66ae483db9547c3e9e7e85be5b87822e770684da4bb8e5d2e1ca0c9acb18ab12"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slang-test",
+                  "-use-test-server",
+                  "-server-count",
+                  "2",
+                  "-disable-retries",
+                  "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure",
+                  "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface",
+                  "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation",
+                  "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder",
+                  "slang-unit-test-tool/nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection",
+                  "slang-unit-test-tool/nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations",
+                  "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations",
+                  "slang-unit-test-tool/nvvmSlangCUDAExecutionUsesDirectPipeline",
+                  "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 3.012012481689453,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/focused-units-1.log",
+                "log_sha256": "5f66606da853309055061c1a8bde11a7d8daa6febfdba6ce79c776e3056e8e69"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/focused-units-1.log",
+                "sha256": "5f66606da853309055061c1a8bde11a7d8daa6febfdba6ce79c776e3056e8e69"
+              }
+            },
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/worker-route-diagnostic-1.json",
+                "sha256": "db572aeef6d26272a7c5c0518639ce0f455a73ed860198f5d74ec03e079df91a"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slangc",
+                  "build/nvvm-target-intrinsics/route-source-diagnostic.slang",
+                  "-target",
+                  "cuda",
+                  "-entry",
+                  "computeMain",
+                  "-stage",
+                  "compute",
+                  "-emit-cuda-via-nvvm",
+                  "-capability",
+                  "nvvm",
+                  "-capability",
+                  "cuda_sm_8_0",
+                  "-o",
+                  "build/nvvm-target-intrinsics/route-source-diagnostic.cu"
+                ],
+                "return_code": 255,
+                "elapsed_seconds": 0.2714200019836426,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/worker-route-diagnostic-1.log",
+                "log_sha256": "387cf9b556b7f555f7d8df3854f5fd72fe89042136c43a096fd108c4a048fcbb"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/worker-route-diagnostic-1.log",
+                "sha256": "387cf9b556b7f555f7d8df3854f5fd72fe89042136c43a096fd108c4a048fcbb"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-target-intrinsics/worker-focused-units-final.json",
+              "sha256": "3ef3ccbabadabba0a0c97579c9b2b4fb3cc061ddf47ac3ff9ea97812701fe176"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slang-test",
+                "-use-test-server",
+                "-server-count",
+                "2",
+                "-disable-retries",
+                "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure",
+                "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface",
+                "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation",
+                "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder",
+                "slang-unit-test-tool/nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection",
+                "slang-unit-test-tool/nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations",
+                "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations",
+                "slang-unit-test-tool/nvvmSlangCUDAExecutionUsesDirectPipeline",
+                "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 3.167961597442627,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/worker-focused-units-final.log",
+              "log_sha256": "64b7fdee951721104d6c4adf4fe09ad407be763fe3e99df2d83ddd362837518e"
+            },
+            "log": {
+              "path": "build/nvvm-target-intrinsics/worker-focused-units-final.log",
+              "sha256": "64b7fdee951721104d6c4adf4fe09ad407be763fe3e99df2d83ddd362837518e"
+            }
+          }
+        },
+        {
+          "id": "nvvm-target-dimension-fixture-control",
+          "status": "resolved",
+          "cause": "NVRTC control rejects emitted dim3 == uint3 vector equality; both NVVM modes pass.",
+          "correction": "Compare all dimension coordinates as scalars, preserving all twelve register checks, 144 launch count, zero mismatch count and 10296 index sum. CUDA vector-comparison defect remains open separately.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/worker-focused-source-gpu-1.json",
+                "sha256": "d364ac8cf75de7862b27e079b4ff50a871dceded25af06e8076c1db04cc4e54a"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slang-test",
+                  "-use-test-server",
+                  "-server-count",
+                  "2",
+                  "-disable-retries",
+                  "tests/cuda/nvvm-target-switch-explicit-args.slang",
+                  "tests/cuda/nvvm-intrinsic-removed-tag.slang",
+                  "tests/cuda/nvvm-varyings-multiple-entries.slang",
+                  "tests/cuda/nvvm-execution-register-varyings.slang"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 3.224353075027466,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/worker-focused-source-gpu-1.log",
+                "log_sha256": "1decef010183ff842288da130445188365772790397fbf6af8af186742bd7e70"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/worker-focused-source-gpu-1.log",
+                "sha256": "1decef010183ff842288da130445188365772790397fbf6af8af186742bd7e70"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-target-intrinsics/worker-focused-source-gpu-2.json",
+              "sha256": "86e5c237dc4a6c3b6a3d086d75398691d249991599727d254bb07ac738ad5fb5"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slang-test",
+                "-use-test-server",
+                "-server-count",
+                "2",
+                "-disable-retries",
+                "tests/cuda/nvvm-target-switch-explicit-args.slang",
+                "tests/cuda/nvvm-intrinsic-removed-tag.slang",
+                "tests/cuda/nvvm-varyings-multiple-entries.slang",
+                "tests/cuda/nvvm-execution-register-varyings.slang"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 3.43664813041687,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/worker-focused-source-gpu-2.log",
+              "log_sha256": "1a07bf992cc629307944f253a034083c4c6e284c08443bd28c570c970af027bc"
+            },
+            "log": {
+              "path": "build/nvvm-target-intrinsics/worker-focused-source-gpu-2.log",
+              "sha256": "1a07bf992cc629307944f253a034083c4c6e284c08443bd28c570c970af027bc"
+            }
+          }
+        },
+        {
+          "id": "nvvm-target-recording-helper-assertions",
+          "status": "resolved",
+          "cause": "Five older native tests assumed total helper call/extraction counts or first/only internal i32 function; new scalar execution-register helpers invalidate those incidental shapes.",
+          "correction": "Identify semantic callees and arity, inspect exact ABI declaration/call, and assert four group-index operand edges using existing fake records. All310 embedded shader literals remain identical; original plugin/source bytes and explicit test-only identity transition are preserved.",
+          "initial_gates": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/full-units.json",
+                "sha256": "2c6c7d29a0fbe0d59547feb7742cf6d056d27d15b848ed56577a5cef708aa99e"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slang-test",
+                  "-use-test-server",
+                  "-server-count",
+                  "2",
+                  "-disable-retries",
+                  "slang-unit-test-tool/"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 149.705664396286,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/full-units.log",
+                "log_sha256": "355e26768b678b7123137a3fc1b8b4d4036415eeba973f07d6d79cb948df1493"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/full-units.log",
+                "sha256": "355e26768b678b7123137a3fc1b8b4d4036415eeba973f07d6d79cb948df1493"
+              }
+            }
+          ],
+          "resolution_gate": {
+            "record": {
+              "path": "build/nvvm-target-intrinsics/full-units-final.json",
+              "sha256": "e96364325b4acb62c5665bddc8120366c70645c7e892fe2f948ca773353c610b"
+            },
+            "gate": {
+              "command": [
+                "build/RelWithDebInfo/bin/slang-test",
+                "-use-test-server",
+                "-server-count",
+                "2",
+                "-disable-retries",
+                "slang-unit-test-tool/"
+              ],
+              "return_code": 0,
+              "elapsed_seconds": 152.59988641738892,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/full-units-final.log",
+              "log_sha256": "15642cb1b80123f8fac6c4418cacc2dea63d2e8a7bda1146e3e9b2ef5e0a1e56"
+            },
+            "log": {
+              "path": "build/nvvm-target-intrinsics/full-units-final.log",
+              "sha256": "15642cb1b80123f8fac6c4418cacc2dea63d2e8a7bda1146e3e9b2ef5e0a1e56"
+            }
+          }
+        }
+      ],
+      "open_findings": [
+        {
+          "id": "compiled-linked-component-options-alias",
+          "status": "open",
+          "description": "ComponentType::linkWithOptions calls link; fillRequirements can return the same requirement-free input. Loading changed options then leaves cached TargetProgram/code unchanged. This slice qualifies distinct fresh composites sharing one session; already-compiled relinking is not fixed.",
+          "evidence": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/focused-units-1.json",
+                "sha256": "66ae483db9547c3e9e7e85be5b87822e770684da4bb8e5d2e1ca0c9acb18ab12"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slang-test",
+                  "-use-test-server",
+                  "-server-count",
+                  "2",
+                  "-disable-retries",
+                  "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure",
+                  "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface",
+                  "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation",
+                  "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder",
+                  "slang-unit-test-tool/nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection",
+                  "slang-unit-test-tool/nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations",
+                  "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations",
+                  "slang-unit-test-tool/nvvmSlangCUDAExecutionUsesDirectPipeline",
+                  "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 3.012012481689453,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/focused-units-1.log",
+                "log_sha256": "5f66606da853309055061c1a8bde11a7d8daa6febfdba6ce79c776e3056e8e69"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/focused-units-1.log",
+                "sha256": "5f66606da853309055061c1a8bde11a7d8daa6febfdba6ce79c776e3056e8e69"
+              }
+            }
+          ],
+          "original_artifacts": []
+        },
+        {
+          "id": "cuda-dimension-vector-equality",
+          "status": "open",
+          "description": "NVRTC control emits unsupported dim3 == uint3 when cudaBlockDim() or cudaGridDim() is directly compared with uint3. Scalar-coordinate comparison is qualified; CUDA source vector equality remains unfixed.",
+          "evidence": [
+            {
+              "record": {
+                "path": "build/nvvm-target-intrinsics/worker-focused-source-gpu-1.json",
+                "sha256": "d364ac8cf75de7862b27e079b4ff50a871dceded25af06e8076c1db04cc4e54a"
+              },
+              "gate": {
+                "command": [
+                  "build/RelWithDebInfo/bin/slang-test",
+                  "-use-test-server",
+                  "-server-count",
+                  "2",
+                  "-disable-retries",
+                  "tests/cuda/nvvm-target-switch-explicit-args.slang",
+                  "tests/cuda/nvvm-intrinsic-removed-tag.slang",
+                  "tests/cuda/nvvm-varyings-multiple-entries.slang",
+                  "tests/cuda/nvvm-execution-register-varyings.slang"
+                ],
+                "return_code": 1,
+                "elapsed_seconds": 3.224353075027466,
+                "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-target-intrinsics/worker-focused-source-gpu-1.log",
+                "log_sha256": "1decef010183ff842288da130445188365772790397fbf6af8af186742bd7e70"
+              },
+              "log": {
+                "path": "build/nvvm-target-intrinsics/worker-focused-source-gpu-1.log",
+                "sha256": "1decef010183ff842288da130445188365772790397fbf6af8af186742bd7e70"
+              }
+            }
+          ],
+          "original_artifacts": [
+            {
+              "path": "build/nvvm-target-intrinsics/varyings-before-scalar-dimension-comparison.slang",
+              "sha256": "2bee266c805f2a517373de05fbfa9126f8d3e88c57926d83d2225b08fe95d929"
+            }
+          ]
+        }
+      ],
+      "source_review": {
+        "path": "build/nvvm-target-intrinsics/review-source.md",
+        "sha256": "1398ca5a98f0b590814a116d80875c084c3028c650ee2b7952e2b622de477d41"
+      },
+      "limits": [
+        "The varying fixture executes three modes; multiple-entry fixture checks separate entry selections, not whole-program multi-entry compilation.",
+        "Historical material-runtime, static, external ABI, numeric sweeps and timing claims retain their original identities."
+      ],
+      "acceptance": {
+        "status": "accepted",
+        "baseline": {
+          "path": "issue-nvvm-backend/accepted-baseline.json",
+          "sha256": "06bbc96bea2396448e8c13859222687d127292bff2a8eace15d1473645bcc27e"
+        },
+        "final_review": {
+          "path": "build/nvvm-target-intrinsics/review-candidates.json",
+          "sha256": "80baac29138671bf2964312b2c6066a051ee5b41e38850a0ebbe408dcef46d12"
+        }
+      },
+      "reviewed_test_only_transition": {
+        "path": "build/nvvm-target-intrinsics/test-transition.json",
+        "sha256": "a34fd7b6798327797d68d9c3b997c051487951ce49e9497bb5e3d904a71f735c"
+      }
     }
   }
 }

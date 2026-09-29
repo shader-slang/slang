@@ -7,10 +7,12 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-The maintainer authorized one surface-corpus expansion slice on 2026-09-29: native signed/unsigned
-32-bit cases, mixed Float32/Half resources, and recurring physical checkpoint comparison. This slice
-is complete and accepted; stop after its reviewed local commit. A new explicit request is needed
-to resume feature work.
+The maintainer authorized the NVVM target/intrinsic migration sequence on 2026-09-29:
+introduce explicit target selection and direct LLVM/NVVM primitives, migrate tagged operations,
+replace compound CUDA-text recognizers in bounded families, then pursue the recorded wave
+optimization. Preserve existing comma-separated `__intrinsic_asm` arguments; remove only the
+NVVM semantic-tag extension after its users migrate. Continue through reviewed local commits
+until these slices finish or a human decision is needed.
 STATUS records the current evidence and next leads. Earlier independent review
 keeps a transforming local-storage pass deferred because its bounded rewrite cannot retire the
 existing conversion responsibility. Accept and locally commit each bounded task before proceeding;

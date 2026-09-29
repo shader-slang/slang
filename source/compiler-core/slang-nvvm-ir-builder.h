@@ -50,6 +50,15 @@ public:
         return &m_textureOperations;
     }
 
+    /// Checks a named intrinsic without creating provider state.
+    bool supportsNamedIntrinsic(const SlangNVVMNamedIntrinsicDesc& intrinsic) const;
+
+    /// Emits a previously checked named intrinsic with its LLVM declaration attributes.
+    SlangResult emitNamedIntrinsic(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMNamedIntrinsicDesc& intrinsic,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Queries one complete typed operation.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const;
 

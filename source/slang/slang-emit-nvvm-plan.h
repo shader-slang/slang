@@ -300,6 +300,13 @@ private:
     Dictionary<IRInst*, Index> m_elementAddressIndices;
 };
 
+/// Retains the exact source name and signature validated before module creation.
+struct NVVMPlannedNamedIntrinsic
+{
+    IRInst* source = nullptr;
+    SlangNVVMNamedIntrinsicDesc desc = {};
+};
+
 /// Owns stable module decisions produced by preflight and consumed without reclassification.
 struct NVVMEmissionPlan
 {
@@ -310,6 +317,7 @@ struct NVVMEmissionPlan
     List<IRFunc*> functions;
     List<String> functionNames;
     List<NVVMPlannedValueOperation> valueOperations;
+    List<NVVMPlannedNamedIntrinsic> namedIntrinsics;
     List<NVVMPlannedUInt64WordConstruction> uint64WordConstructions;
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
@@ -369,6 +377,7 @@ public:
     const NVVMPlannedLocalStorage* findLocalStorage(IRInst* source) const;
     const NVVMPlannedLoad* findLoad(IRInst* source) const;
     const NVVMPlannedStore* findStore(IRInst* source) const;
+    const NVVMPlannedNamedIntrinsic* findNamedIntrinsic(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
@@ -386,6 +395,7 @@ private:
     Dictionary<IRInst*, Index> m_loads;
     Dictionary<IRInst*, Index> m_stores;
     Dictionary<IRInst*, Index> m_valueOperations;
+    Dictionary<IRInst*, Index> m_namedIntrinsics;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;
     Dictionary<IRInst*, Index> m_floatingRemainderOperations;

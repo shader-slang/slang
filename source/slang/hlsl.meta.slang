@@ -26609,12 +26609,111 @@ uint2 getRealtimeClock()
 
 [__readNone]
 [NonUniformReturn]
+[require(nvvm)]
+uint __nvvmThreadIdxX()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmThreadIdxY()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.y";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmThreadIdxZ()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.z";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmBlockIdxX()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.ctaid.x";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmBlockIdxY()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.ctaid.y";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmBlockIdxZ()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.ctaid.z";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmBlockDimX()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.ntid.x";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmBlockDimY()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.ntid.y";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmBlockDimZ()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.ntid.z";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmGridDimX()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.nctaid.x";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmGridDimY()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.nctaid.y";
+}
+
+[__readNone]
+[NonUniformReturn]
+[require(nvvm)]
+uint __nvvmGridDimZ()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.nctaid.z";
+}
+
+
+
+[__readNone]
+[NonUniformReturn]
 [require(cuda)]
 uint3 cudaThreadIdx()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmThreadIndex) "(threadIdx)";
+    case nvvm: return uint3(__nvvmThreadIdxX(), __nvvmThreadIdxY(), __nvvmThreadIdxZ());
+    case cuda: __intrinsic_asm "(threadIdx)";
     }
 }
 
@@ -26625,7 +26724,8 @@ uint3 cudaBlockIdx()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmBlockIndex) "(blockIdx)";
+    case nvvm: return uint3(__nvvmBlockIdxX(), __nvvmBlockIdxY(), __nvvmBlockIdxZ());
+    case cuda: __intrinsic_asm "(blockIdx)";
     }
 }
 
@@ -26636,7 +26736,8 @@ uint3 cudaBlockDim()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmBlockDimensions) "(blockDim)";
+    case nvvm: return uint3(__nvvmBlockDimX(), __nvvmBlockDimY(), __nvvmBlockDimZ());
+    case cuda: __intrinsic_asm "(blockDim)";
     }
 }
 
@@ -26647,7 +26748,8 @@ uint3 cudaGridDim()
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmGridDimensions) "(gridDim)";
+    case nvvm: return uint3(__nvvmGridDimX(), __nvvmGridDimY(), __nvvmGridDimZ());
+    case cuda: __intrinsic_asm "(gridDim)";
     }
 }
 

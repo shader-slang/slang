@@ -23,6 +23,34 @@ The public target remains `SLANG_PTX`. Target-scoped `-emit-cuda-via-nvrtc` and
 uses an internal NVVM artifact, not the CPU LLVM target. CUDA-family semantics, CUDA C++ preparation
 and NVVM representation must have distinct owners when changing shared pipeline branches.
 
+Direct PTX selects the `nvvm` capability, a refinement of `cuda`. An explicit `case nvvm` therefore
+wins over `case cuda`, while existing CUDA device/SM requirements and unmigrated CUDA helper bodies
+remain available. This is a transitional backend refinement, including inherited `textualTarget`,
+not a pair of mutually exclusive source targets. CUDA source/header and NVRTC PTX select `cuda`;
+requesting the `nvvm` capability alone cannot override that route. When `linkWithOptions` changes
+the PTX backend, the linked `TargetProgram` owns a copy of the target request with that effective
+selector before capability computation. Layout, specialization and emission use that same request;
+the shared session request and its other programs retain their original capabilities.
+
+Execution-register helpers use ordinary intrinsic assembly with an explicit LLVM intrinsic name:
+
+```slang
+[require(nvvm)]
+uint readThreadX()
+{
+    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x";
+}
+```
+
+The core module builds `uint3` values from scalar calls in its NVVM branches. Entry-point varying
+legalization constructs the same scalar helper shape for system values and reads it separately in
+each entry block; the backend no longer recognizes CUDA `threadIdx`/`blockIdx` globals. Named calls
+are limited to the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes).
+The provider resolves names through LLVM's intrinsic registry, validates the exact no-argument
+signature and existing dialect admission before module creation, and constructs calls with LLVM's
+intrinsic attributes. This does not admit arbitrary LLVM snippets or other named intrinsics.
+Ordinary comma-separated `__intrinsic_asm` arguments remain part of the shared language facility.
+
 | Boundary                               | Owner and responsibility                                                                                                                                                            |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                                |
@@ -44,7 +72,7 @@ this does not authorize escaping lane references.
 `SLANG_ENABLE_BOUND_ZERO_INDEX` must become typed compare/select arithmetic because the direct route
 does not preprocess the CUDA prelude. It preserves each access's own resource extent and index type.
 
-Fixed standard-library producers carry typed NVVM intrinsic identities, which legalization consumes
+Remaining fixed standard-library producers carry typed NVVM intrinsic identities, which legalization consumes
 as `IRNVVMIntrinsic`. The catalog does not infer these semantics from arbitrary CUDA source text.
 Surface helpers carry load/store semantic tags and are rewritten per call while static field formats
 and component masks are available. Some richer texture, atomic, scalar-out-parameter and compound-wave helpers still have exact
@@ -267,7 +295,7 @@ execution coverage.
 
 The optional `slang-llvm-nvvm` provider owns an isolated LLVM 14.0.6 typed-pointer construction path.
 It exports a versioned Slang C ABI with opaque handles and one generic operation surface. Current
-provider ABI is 43; compiler and provider must negotiate the exact required interface/capabilities.
+provider ABI is 44; compiler and provider must negotiate the exact required interface/capabilities.
 Raw LLVM objects and symbols must not cross into the CPU LLVM provider or the host compiler.
 Handles belong to their creating live module; destroying it invalidates subordinate handles. ABI
 buffers remain caller-owned, and serialization uses a size-query/write protocol. The host retains

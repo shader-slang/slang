@@ -6473,6 +6473,14 @@ standalone_note(
 )
 
 
+
+err(
+    "unknown-intrinsic-asm-semantic",
+    36121,
+    "unknown intrinsic assembly semantic",
+    span { loc = "location", message = "unknown intrinsic assembly semantic '~semanticName'" }
+)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

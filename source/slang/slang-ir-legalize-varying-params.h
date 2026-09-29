@@ -25,7 +25,10 @@ void legalizeEntryPointVaryingParamsForCPU(
     TargetProgram* target,
     DiagnosticSink* sink);
 
-void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
+void legalizeEntryPointVaryingParamsForCUDA(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool emitNVVMDirectly = false);
 
 void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink);
 

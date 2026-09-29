@@ -48,7 +48,8 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
 
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
 {
-    return api.isOperationSupported && api.emitOperation;
+    return api.isOperationSupported && api.emitOperation && api.isNamedIntrinsicSupported &&
+           api.emitNamedIntrinsic;
 }
 
 static bool _hasRequiredAtomicOperations(const SlangNVVMBuilderAtomicOperationsAPI& api)
@@ -238,6 +239,29 @@ SlangResult NVVMIRBuilder::emitTextureOperation(
 
     return _validateHandleResult(
         m_textureOperations.emitOperation(module, &operation, operands, operandCount, &outValue),
+        outValue);
+}
+
+bool NVVMIRBuilder::supportsNamedIntrinsic(const SlangNVVMNamedIntrinsicDesc& intrinsic) const
+{
+    uint32_t supported = 0;
+    return isInitialized() &&
+           SLANG_SUCCEEDED(m_valueOperations.isNamedIntrinsicSupported(&intrinsic, &supported)) &&
+           supported != 0;
+}
+
+SlangResult NVVMIRBuilder::emitNamedIntrinsic(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMNamedIntrinsicDesc& intrinsic,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsNamedIntrinsic(intrinsic))
+        return SLANG_E_NOT_AVAILABLE;
+    return _validateHandleResult(
+        m_valueOperations.emitNamedIntrinsic(module, &intrinsic, &outValue),
         outValue);
 }
 

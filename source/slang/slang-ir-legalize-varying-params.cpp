@@ -1119,9 +1119,49 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // CUDA provides built-in global parameters `threadIdx`,
     // `blockIdx`, and `blockDim` that we can make use of.
     //
-    IRGlobalParam* threadIdxGlobalParam = nullptr;
-    IRGlobalParam* blockIdxGlobalParam = nullptr;
-    IRGlobalParam* blockDimGlobalParam = nullptr;
+    bool emitNVVMDirectly = false;
+    IRInst* threadIdxValue = nullptr;
+    IRInst* blockIdxValue = nullptr;
+    IRInst* blockDimValue = nullptr;
+    IRFunc* executionRegisterHelpers[3][3] = {};
+
+    // Creates the same scalar intrinsic helpers as the core module. For example, lowering
+    // SV_GroupThreadID needs tid.x/y/z reads; calling these helpers in the entry block gives each
+    // entry point its own SSA values instead of manufacturing CUDA globals for NVVM to recognize.
+    void createNVVMExecutionRegisterHelpers(IRBuilder& builder)
+    {
+        const char* registers[] = {"tid", "ctaid", "ntid"};
+        for (Index group = 0; group < 3; ++group)
+        {
+            for (Index axis = 0; axis < 3; ++axis)
+            {
+                builder.setInsertInto(m_module->getModuleInst());
+                auto function = builder.createFunc();
+                function->setFullType(builder.getFuncType(0, nullptr, builder.getUIntType()));
+                builder.addDecoration(function, kIROp_ReadNoneDecoration);
+                builder.setInsertInto(function);
+                builder.emitBlock();
+                StringBuilder name;
+                name << "llvm.nvvm.read.ptx.sreg." << registers[group] << "." << char('x' + axis);
+                IRInst* operands[] = {builder.getStringValue(name.getUnownedSlice())};
+                builder.emitIntrinsicInst(nullptr, kIROp_GenericAsm, 1, operands);
+                executionRegisterHelpers[group][axis] = function;
+            }
+        }
+    }
+
+    // Reads one complete execution vector at the current entry-point insertion position.
+    IRInst* emitNVVMExecutionRegister(IRBuilder& builder, Index group)
+    {
+        IRInst* components[3];
+        for (Index axis = 0; axis < 3; ++axis)
+            components[axis] = builder.emitCallInst(
+                builder.getUIntType(),
+                executionRegisterHelpers[group][axis],
+                0,
+                nullptr);
+        return builder.emitMakeVector(uint3Type, 3, components);
+    }
 
     // All of our system values will be exposed with the
     // `uint3` type, and we'll cache a pointer to that
@@ -2384,6 +2424,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         //
         auto uintType = builder.getBasicType(BaseType::UInt);
         uint3Type = builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 3));
+        if (emitNVVMDirectly)
+        {
+            createNVVMExecutionRegisterHelpers(builder);
+            return;
+        }
+
 
         // Next we create IR type and variable layouts that
         // we can use to mark the global parameters like
@@ -2407,26 +2453,26 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         // by exactly the desired name (with no attempt to generate
         // a unique name).
 
-        threadIdxGlobalParam = builder.createGlobalParam(uint3Type);
+        threadIdxValue = builder.createGlobalParam(uint3Type);
         builder.addTargetIntrinsicDecoration(
-            threadIdxGlobalParam,
+            threadIdxValue,
             CapabilitySet::makeEmpty(),
             UnownedTerminatedStringSlice("threadIdx"));
-        builder.addLayoutDecoration(threadIdxGlobalParam, varLayout);
+        builder.addLayoutDecoration(threadIdxValue, varLayout);
 
-        blockIdxGlobalParam = builder.createGlobalParam(uint3Type);
+        blockIdxValue = builder.createGlobalParam(uint3Type);
         builder.addTargetIntrinsicDecoration(
-            blockIdxGlobalParam,
+            blockIdxValue,
             CapabilitySet::makeEmpty(),
             UnownedTerminatedStringSlice("blockIdx"));
-        builder.addLayoutDecoration(blockIdxGlobalParam, varLayout);
+        builder.addLayoutDecoration(blockIdxValue, varLayout);
 
-        blockDimGlobalParam = builder.createGlobalParam(uint3Type);
+        blockDimValue = builder.createGlobalParam(uint3Type);
         builder.addTargetIntrinsicDecoration(
-            blockDimGlobalParam,
+            blockDimValue,
             CapabilitySet::makeEmpty(),
             UnownedTerminatedStringSlice("blockDim"));
-        builder.addLayoutDecoration(blockDimGlobalParam, varLayout);
+        builder.addLayoutDecoration(blockDimValue, varLayout);
     }
 
     // While CUDA provides many useful system values
@@ -2443,6 +2489,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     {
         IRBuilder builder(m_module);
         builder.setInsertBefore(m_firstOrdinaryInst);
+
+        if (emitNVVMDirectly)
+        {
+            threadIdxValue = emitNVVMExecutionRegister(builder, 0);
+            blockIdxValue = emitNVVMExecutionRegister(builder, 1);
+            blockDimValue = emitNVVMExecutionRegister(builder, 2);
+        }
 
         // Note that we can use the built-in `blockDim`
         // variable to determine the group extents,
@@ -2461,11 +2514,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         dispatchThreadID = emitCalcDispatchThreadID(
             builder,
             uint3Type,
-            blockIdxGlobalParam,
-            threadIdxGlobalParam,
-            blockDimGlobalParam);
+            blockIdxValue,
+            threadIdxValue,
+            blockDimValue);
 
-        groupThreadIndex = emitCalcGroupIndex(builder, threadIdxGlobalParam, blockDimGlobalParam);
+        groupThreadIndex = emitCalcGroupIndex(builder, threadIdxValue, blockDimValue);
 
         // Note: we don't pay attention to whether the
         // kernel actually makes use of either of these
@@ -2502,9 +2555,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return createLegalizedSystemVaryingValInst(info, blockIdxGlobalParam);
+            return createLegalizedSystemVaryingValInst(info, blockIdxValue);
         case SystemValueSemanticName::GroupThreadID:
-            return createLegalizedSystemVaryingValInst(info, threadIdxGlobalParam);
+            return createLegalizedSystemVaryingValInst(info, threadIdxValue);
         case SystemValueSemanticName::GroupIndex:
             return createLegalizedSystemVaryingValInst(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
@@ -2661,6 +2714,7 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         uintType = builder.getBasicType(BaseType::UInt);
         uint3Type = builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 3));
+
         uint3PtrType = builder.getPtrType(uint3Type);
 
         // As we construct the `ComputeThreadVaryingInput` type and its fields,
@@ -2796,9 +2850,13 @@ void legalizeEntryPointVaryingParamsForCPU(
     context.processModule(module, sink);
 }
 
-void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink)
+void legalizeEntryPointVaryingParamsForCUDA(
+    IRModule* module,
+    DiagnosticSink* sink,
+    bool emitNVVMDirectly)
 {
     CUDAEntryPointVaryingParamLegalizeContext context;
+    context.emitNVVMDirectly = emitNVVMDirectly;
     // Hoist shader-terminating intrinsics (IgnoreHit/AcceptHitAndEndSearch) buried in callees
     // into ray entry points before legalization, so the payload write-back is emitted before the
     // ray terminates (issue #11658).

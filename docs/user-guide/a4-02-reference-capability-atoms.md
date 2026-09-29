@@ -1736,6 +1736,9 @@ Other
 `all`
 > User should not use this capability
 
+`nvvm`
+> Direct NVVM implementation refinement; retains CUDA device/SM capabilities during migration.
+
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
 

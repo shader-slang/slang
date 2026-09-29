@@ -186,8 +186,12 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
-    case CodeGenTarget::PTX:
         atoms.add(CapabilityName::cuda);
+        break;
+    case CodeGenTarget::PTX:
+        atoms.add(
+            optionSet.getEmitCUDAMethod() == SLANG_EMIT_CUDA_VIA_NVVM ? CapabilityName::nvvm
+                                                                      : CapabilityName::cuda);
         break;
 
     case CodeGenTarget::Metal:
@@ -224,6 +228,13 @@ CapabilitySet TargetRequest::getTargetCaps()
             toAdd = CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
             break;
         }
+
+        // Backend selection owns this refinement. An explicit capability must not select LLVM
+        // intrinsic bodies while emitting CUDA source or using NVRTC.
+        if (toAdd.implies(CapabilitySet(CapabilityName::nvvm)) &&
+            !(getTarget() == CodeGenTarget::PTX &&
+              optionSet.getEmitCUDAMethod() == SLANG_EMIT_CUDA_VIA_NVVM))
+            continue;
 
         if (isGLSLTarget)
             targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);

@@ -87,9 +87,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmLog", SLANG_NVVM_VALUE_OP_LOG},
     {"nvvmLog2", SLANG_NVVM_VALUE_OP_LOG2},
     {"nvvmLog10", SLANG_NVVM_VALUE_OP_LOG10},
-    {"nvvmBlockDimensions", SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS},
-    {"nvvmBlockIndex", SLANG_NVVM_VALUE_OP_BLOCK_INDEX},
-    {"nvvmGridDimensions", SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS},
     {"nvvmMax", SLANG_NVVM_VALUE_OP_MAX},
     {"nvvmMin", SLANG_NVVM_VALUE_OP_MIN},
     {"nvvmPow", SLANG_NVVM_VALUE_OP_POW},
@@ -115,7 +112,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmWaveReadLaneFirst", SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST},
     {"nvvmWorkgroupBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER},
     {"nvvmWorkgroupMemoryBarrier", SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER},
-    {"nvvmThreadIndex", SLANG_NVVM_VALUE_OP_THREAD_INDEX},
     {"nvvmTextureSample", kNVVMIntrinsicSemanticTextureSample},
     {"nvvmSurfaceLoad", kNVVMIntrinsicSemanticSurfaceLoad},
     {"nvvmSurfaceStore", kNVVMIntrinsicSemanticSurfaceStore},
@@ -9708,7 +9704,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             NVVMIntrinsicSemantic semantic = 0;
             const bool hasKnownSemantic =
                 _findNVVMIntrinsicAsmSemantic(stmt->semanticToken.getContent(), semantic);
-            SLANG_RELEASE_ASSERT(hasKnownSemantic);
+            if (!hasKnownSemantic)
+            {
+                context->getSink()->diagnose(Diagnostics::UnknownIntrinsicAsmSemantic{
+                    .semanticName = stmt->semanticToken.getContent(),
+                    .location = stmt->semanticToken.loc});
+                return;
+            }
             builder->addDecoration(
                 genericAsm,
                 kIROp_NVVMSemanticDecoration,

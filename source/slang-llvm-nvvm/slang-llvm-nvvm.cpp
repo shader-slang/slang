@@ -3316,81 +3316,78 @@ _isAtomicOperationSupported(const SlangNVVMAtomicOperationDesc* operation, uint3
     return SLANG_OK;
 }
 
-static bool _getExecutionRegisterIntrinsicIDs(
-    SlangNVVMValueOperation operation,
-    llvm::Intrinsic::ID (&outIntrinsicIDs)[3])
+// These are the execution-register reads admitted by the qualified NVVM IR dialect. Both the
+// named-intrinsic query and serialization validator use this classification.
+static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
 {
-    switch (operation)
+    switch (intrinsicID)
     {
-    case SLANG_NVVM_VALUE_OP_THREAD_INDEX:
-        outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_tid_x;
-        outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_tid_y;
-        outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_tid_z;
-        return true;
-    case SLANG_NVVM_VALUE_OP_BLOCK_INDEX:
-        outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_x;
-        outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_y;
-        outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_z;
-        return true;
-    case SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS:
-        outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_x;
-        outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_y;
-        outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_z;
-        return true;
-    case SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS:
-        outIntrinsicIDs[0] = llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_x;
-        outIntrinsicIDs[1] = llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_y;
-        outIntrinsicIDs[2] = llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_z;
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_tid_x:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_tid_y:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_tid_z:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_x:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_y:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_ctaid_z:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_x:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_y:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_ntid_z:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_x:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_y:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_nctaid_z:
         return true;
     default:
         return false;
     }
 }
 
-static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
+// Resolves explicit names through LLVM's intrinsic registry. The execution-register classifier
+// already owns the NVVM dialect boundary; reuse it instead of inventing a second name catalog.
+// Signature queries use a temporary context and never insert declarations into a module.
+static llvm::Intrinsic::ID _resolveNamedIntrinsic(const SlangNVVMNamedIntrinsicDesc& intrinsic)
 {
-    for (SlangNVVMValueOperation operation = SLANG_NVVM_VALUE_OP_THREAD_INDEX;
-         operation <= SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS;
-         ++operation)
-    {
-        llvm::Intrinsic::ID registerIntrinsics[3];
-        if (!_getExecutionRegisterIntrinsicIDs(operation, registerIntrinsics))
-            return false;
-        for (llvm::Intrinsic::ID registerIntrinsic : registerIntrinsics)
-        {
-            if (registerIntrinsic == intrinsicID)
-                return true;
-        }
-    }
-    return false;
+    if (!intrinsic.name || !intrinsic.nameSize || intrinsic.operandCount ||
+        (intrinsic.resultType.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+         intrinsic.resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
+        intrinsic.resultType.bitWidth != 32 || intrinsic.resultType.laneCount != 1)
+        return llvm::Intrinsic::not_intrinsic;
+    llvm::StringRef name(intrinsic.name, intrinsic.nameSize);
+    auto id = llvm::Function::lookupIntrinsicID(name);
+    if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::isOverloaded(id) ||
+        llvm::Intrinsic::getName(id) != name || !_isExecutionRegisterIntrinsic(id))
+        return llvm::Intrinsic::not_intrinsic;
+    llvm::LLVMContext context;
+    auto type = llvm::Intrinsic::getType(context, id);
+    return type->getNumParams() == 0 && !type->isVarArg() && type->getReturnType()->isIntegerTy(32)
+               ? id
+               : llvm::Intrinsic::not_intrinsic;
 }
 
-static SlangResult _emitExecutionRegister(
+static SlangResult SLANG_NVVM_CALL
+_isNamedIntrinsicSupported(const SlangNVVMNamedIntrinsicDesc* intrinsic, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!intrinsic || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = _resolveNamedIntrinsic(*intrinsic) != llvm::Intrinsic::not_intrinsic;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     SlangNVVMModuleHandle module,
-    SlangNVVMValueOperation operation,
+    const SlangNVVMNamedIntrinsicDesc* intrinsic,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
-    ModuleState* state = _getModule(module);
-    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    llvm::Intrinsic::ID registerIntrinsics[3];
-    if (!state || !outValue || !insertionBlock ||
-        !_getExecutionRegisterIntrinsicIDs(operation, registerIntrinsics))
-    {
+    auto state = _getModule(module);
+    if (!intrinsic || !outValue || !_getValidInsertionBlock(state))
         return SLANG_E_INVALID_ARG;
-    }
-
-    llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
-    llvm::Value* result = llvm::UndefValue::get(llvm::FixedVectorType::get(int32Type, 3));
-    for (uint32_t axis = 0; axis < 3; ++axis)
-    {
-        llvm::Function* intrinsic =
-            llvm::Intrinsic::getDeclaration(state->module.get(), registerIntrinsics[axis]);
-        llvm::Value* component = state->builder.CreateCall(intrinsic);
-        result = state->builder.CreateInsertElement(result, component, axis);
-    }
-    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    auto id = _resolveNamedIntrinsic(*intrinsic);
+    if (id == llvm::Intrinsic::not_intrinsic)
+        return SLANG_E_NOT_AVAILABLE;
+    auto declaration = llvm::Intrinsic::getDeclaration(state->module.get(), id);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(declaration));
     return SLANG_OK;
 }
 
@@ -3743,11 +3740,6 @@ static SlangResult _emitCatalogOperation(
 
     switch (entry.operation)
     {
-    case SLANG_NVVM_VALUE_OP_THREAD_INDEX:
-    case SLANG_NVVM_VALUE_OP_BLOCK_INDEX:
-    case SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS:
-    case SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS:
-        return _emitExecutionRegister(module, entry.operation, outValue);
     case SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER:
         return _emitBarrier(module, llvm::Intrinsic::nvvm_barrier0, outValue);
     case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
@@ -5090,6 +5082,8 @@ static void _fillBuilderValueOperationsAPI(SlangNVVMBuilderValueOperationsAPI& a
     api = {};
     api.isOperationSupported = _isOperationSupported;
     api.emitOperation = _emitOperation;
+    api.isNamedIntrinsicSupported = _isNamedIntrinsicSupported;
+    api.emitNamedIntrinsic = _emitNamedIntrinsic;
 }
 
 static void _fillBuilderAtomicOperationsAPI(SlangNVVMBuilderAtomicOperationsAPI& api)

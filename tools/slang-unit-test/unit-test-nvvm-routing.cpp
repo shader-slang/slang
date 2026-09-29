@@ -205,3 +205,79 @@ SLANG_UNIT_TEST(invalidCUDAEmissionMethodIsDiagnosed)
     SLANG_CHECK(code == nullptr);
     SLANG_CHECK(getBlobSlice(diagnostics).indexOf(toSlice("E52015")) != -1);
 }
+
+SLANG_UNIT_TEST(nvvmExplicitCapabilityDoesNotChangeCUDASourceSelection)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    for (SlangEmitCUDAMethod method :
+         {SLANG_EMIT_CUDA_DEFAULT, SLANG_EMIT_CUDA_VIA_NVRTC, SLANG_EMIT_CUDA_VIA_NVVM})
+    {
+        slang::CompilerOptionEntry options[3] = {};
+        options[0] = makeCUDAEmissionMethodOption(method);
+        options[1].name = slang::CompilerOptionName::Capability;
+        options[1].value.kind = slang::CompilerOptionValueKind::Int;
+        options[1].value.intValue0 = int(globalSession->findCapability("nvvm"));
+        options[2] = options[1];
+        options[2].value.intValue0 = int(globalSession->findCapability("cuda_sm_8_0"));
+        slang::TargetDesc target = {};
+        target.format = SLANG_CUDA_SOURCE;
+        target.compilerOptionEntries = options;
+        target.compilerOptionEntryCount = SLANG_COUNT_OF(options);
+        slang::SessionDesc desc = {};
+        desc.targets = &target;
+        desc.targetCount = 1;
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK_ABORT(globalSession->createSession(desc, session.writeRef()) == SLANG_OK);
+        const char* source = R"slang(
+            [require(cuda, cuda_sm_8_0)]
+            uint readRoute()
+            {
+                __target_switch
+                {
+                case nvvm: __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x";
+                case cuda: __intrinsic_asm "__selected_cuda_implementation()";
+                }
+            }
+            [CUDAKernel]
+            void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> p)
+            {
+                p[0] = readRoute();
+            }
+        )slang";
+        ComPtr<slang::IBlob> diagnostics;
+        ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+            "routeSource",
+            "route-source.slang",
+            source,
+            diagnostics.writeRef()));
+        if (!module && diagnostics)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                (const char*)diagnostics->getBufferPointer());
+        SLANG_CHECK_ABORT(module != nullptr);
+        ComPtr<slang::IEntryPoint> entry;
+        SLANG_CHECK_ABORT(
+            module->findAndCheckEntryPoint(
+                "computeMain",
+                SLANG_STAGE_COMPUTE,
+                entry.writeRef(),
+                diagnostics.writeRef()) == SLANG_OK);
+        slang::IComponentType* components[] = {module.get(), entry.get()};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK_ABORT(
+            session->createCompositeComponentType(
+                components,
+                2,
+                program.writeRef(),
+                diagnostics.writeRef()) == SLANG_OK);
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK_ABORT(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+        ComPtr<slang::IBlob> code;
+        SLANG_CHECK_ABORT(
+            linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+        SLANG_CHECK(getBlobSlice(code).indexOf(toSlice("__selected_cuda_implementation()")) >= 0);
+        SLANG_CHECK(getBlobSlice(code).indexOf(toSlice("llvm.nvvm")) < 0);
+    }
+}

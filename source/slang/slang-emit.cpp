@@ -2408,7 +2408,7 @@ Result linkAndOptimizeIR(
     //
     if (emitNVVMDirectly)
     {
-        SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
+        SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink(), true);
     }
     switch (target)
     {

@@ -1818,41 +1818,6 @@ IRStructType* _getNVVMRawBufferAggregateElementType(IRType* type)
                : nullptr;
 }
 
-// Maps a canonical global produced by CUDA varying legalization to its semantic provider operation.
-bool _getNVVMCUDAExecutionGlobalOperation(IRInst* inst, SlangNVVMValueOperation& outOperation)
-{
-    outOperation = 0;
-    auto globalParam = as<IRGlobalParam>(inst);
-    auto targetIntrinsic =
-        globalParam ? globalParam->findDecoration<IRTargetIntrinsicDecoration>() : nullptr;
-    bool isSigned = false;
-    uint32_t elementCount = 0;
-    if (!globalParam || !targetIntrinsic ||
-        !asNVVMSupportedI32VectorType(globalParam->getDataType(), &isSigned, &elementCount) ||
-        isSigned || elementCount != 3)
-        return false;
-
-    const UnownedStringSlice definition = targetIntrinsic->getDefinition();
-    if (definition == toSlice("threadIdx"))
-        outOperation = SLANG_NVVM_VALUE_OP_THREAD_INDEX;
-    else if (definition == toSlice("blockIdx"))
-        outOperation = SLANG_NVVM_VALUE_OP_BLOCK_INDEX;
-    else if (definition == toSlice("blockDim"))
-        outOperation = SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS;
-    else if (definition == toSlice("gridDim"))
-        outOperation = SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS;
-    else
-        return false;
-    return true;
-}
-
-// Builds the complete typed descriptor shared by execution-global preflight and emission.
-SlangNVVMValueOperationDesc _getNVVMCUDAExecutionGlobalOperationDesc(
-    SlangNVVMValueOperation operation)
-{
-    return {operation, NVVMSemantics::kUnsignedI32x3, nullptr, 0};
-}
-
 IRIntLit* _asExecutableInteger32Constant(IRInst* value);
 
 struct NVVMSequentialElement
@@ -3536,6 +3501,29 @@ bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function)
         if (inst != terminator)
             return false;
     }
+    return true;
+}
+
+// Captures the canonical intrinsic helper signature without interpreting its LLVM name. Consider
+// `uint readX() { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }`: AST lowering retains this
+// string as the helper's GenericAsm terminator. The provider resolves that name and checks the
+// exact signature before any LLVM module exists. Ordinary comma arguments remain valid syntax,
+// but this first named-intrinsic contract deliberately has no operands.
+bool _getNVVMNamedIntrinsicDesc(
+    IRGenericAsm* genericAsm,
+    IRFunc* function,
+    SlangNVVMNamedIntrinsicDesc& outDesc)
+{
+    outDesc = {};
+    if (!genericAsm->getAsm().startsWith(toSlice("llvm.")) ||
+        !_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
+        genericAsm->getOperandCount() != 1 ||
+        !_getNVVMSemanticType(function->getResultType(), outDesc.resultType))
+        return false;
+    auto name = genericAsm->getAsm();
+    outDesc.name = name.begin();
+    outDesc.nameSize = size_t(name.getLength());
+    outDesc.operandCount = size_t(function->getParamCount());
     return true;
 }
 
@@ -7231,15 +7219,13 @@ SlangResult _validateAvailableValue(
     const HashSet<IRInst*>& availableValues,
     IRDominatorTree* dominatorTree)
 {
-    // Canonical module-owned storage and CUDA execution globals exist before every function body
+    // Canonical module-owned storage values exist before every function body
     // and therefore do not participate in instruction dominance. All other executable values
     // remain SSA-ordered.
     NVVMConventionalGlobalParams globalParams;
-    SlangNVVMValueOperation executionOperation = 0;
     if (value && consumer && value->getModule() == consumer->getModule() &&
         (getNVVMSupportedSharedGlobal(value) ||
          _getNVVMConventionalGlobalParams(value, globalParams) ||
-         _getNVVMCUDAExecutionGlobalOperation(value, executionOperation) ||
          _isNVVMSupportedModuleConstantValue(value)))
     {
         return SLANG_OK;
@@ -9140,6 +9126,12 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
                     }
+                    SlangNVVMNamedIntrinsicDesc namedIntrinsic;
+                    if (_getNVVMNamedIntrinsicDesc(genericAsm, function, namedIntrinsic))
+                    {
+                        requirements.emissionPlan.namedIntrinsics.add({genericAsm, namedIntrinsic});
+                        break;
+                    }
                     NVVMScalarTruthiness truthiness;
                     NVVMGenericAsmValueOperation valueOperation;
                     NVVMScalarIntrinsicRecipe scalarRecipe;
@@ -10870,21 +10862,6 @@ SlangResult _getLoweredNVVMValue(
                     outValue)));
             return SLANG_OK;
         }
-    }
-
-    SlangNVVMValueOperation executionOperation = 0;
-    if (_getNVVMCUDAExecutionGlobalOperation(irValue, executionOperation))
-    {
-        const SlangNVVMValueOperationDesc operation =
-            _getNVVMCUDAExecutionGlobalOperationDesc(executionOperation);
-        const NVVMSemantics::CatalogEntry* semantic = NVVMSemantics::find(operation);
-        SLANG_RELEASE_ASSERT(semantic);
-        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            codeGenContext,
-            semantic->diagnosticName,
-            builder.emitValueOperation(module, operation, nullptr, 0, outValue)));
-        valueMap[irValue] = outValue;
-        return SLANG_OK;
     }
 
     if (auto intLit = _asExecutableSelectedIntegerConstant(irValue))
@@ -14888,16 +14865,6 @@ SlangResult validateNVVMSupportedIR(
         NVVMConventionalGlobalParams globalParams;
         if (_getNVVMConventionalGlobalParams(globalInst, globalParams))
             continue;
-        SlangNVVMValueOperation executionOperation = 0;
-        if (_getNVVMCUDAExecutionGlobalOperation(globalInst, executionOperation))
-        {
-            const SlangNVVMValueOperationDesc desc =
-                _getNVVMCUDAExecutionGlobalOperationDesc(executionOperation);
-            const NVVMSemantics::CatalogEntry* semantic = NVVMSemantics::find(desc);
-            SLANG_RELEASE_ASSERT(semantic);
-            _requireValueOperation(outRequirements.valueOperations, desc, semantic->diagnosticName);
-            continue;
-        }
         // Hashed string literals are module reflection metadata. Like the C-family emitters, direct
         // NVVM preserves them in the linked module but emits no executable or storage declaration.
         if (_isNVVMSupportedModuleConstantValue(globalInst) ||
@@ -14930,6 +14897,18 @@ SlangResult emitNVVMIRFromLinkedIR(
 
     // Capability queries are pure. Complete this exact typed preflight before module creation so
     // an unsupported overload cannot leave partial provider state behind.
+    for (const auto& planned : requirements.emissionPlan.namedIntrinsics)
+    {
+        const auto& intrinsic = planned.desc;
+        if (!builder.supportsNamedIntrinsic(intrinsic))
+        {
+            String name(UnownedStringSlice(intrinsic.name, intrinsic.nameSize));
+            return _requireBuilderOperation(
+                codeGenContext,
+                name.getBuffer(),
+                SLANG_E_NOT_AVAILABLE);
+        }
+    }
     for (const auto& requirement : requirements.valueOperations)
     {
         if (!builder.supportsValueOperation(requirement.getDesc()))
@@ -16366,6 +16345,25 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_GenericAsm:
                     {
                         auto genericAsm = as<IRGenericAsm>(inst);
+                        if (const auto namedIntrinsic = planIndex.findNamedIntrinsic(inst))
+                        {
+                            SlangNVVMValueHandle value = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "named LLVM intrinsic",
+                                builder.emitNamedIntrinsic(
+                                    moduleScope.module,
+                                    namedIntrinsic->desc,
+                                    value)));
+                            SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                function,
+                                "named LLVM intrinsic return",
+                                value));
+                            break;
+                        }
                         NVVMResolvedByteAddressAtomic byteAddressAtomic;
                         if (_resolveNVVMByteAddressAtomic(genericAsm, function, byteAddressAtomic))
                         {

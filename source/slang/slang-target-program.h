@@ -130,6 +130,7 @@ private:
 
     // The target that code/layout will be generated for
     TargetRequest* m_targetReq;
+    RefPtr<TargetRequest> m_effectiveTargetReq;
 
     // The computed layout, if it has been generated yet
     RefPtr<ProgramLayout> m_layout;

@@ -3985,3 +3985,113 @@ SLANG_UNIT_TEST(nvvmIRBuilderPtxasAcceptsScalarReferenceKernels)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(nvvmArtifact, ptxasPath)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(nvrtcArtifact, ptxasPath)));
 }
+
+// Checks actual backend selection in emitted PTX. The two branches read different physical
+// registers, so successful compilation alone cannot hide selection of the wrong implementation.
+static String _compileAndCheckNamedIntrinsicRoute(slang::IComponentType* program, bool expectNVVM)
+{
+    ComPtr<slang::IBlob> code;
+    ComPtr<slang::IBlob> diagnostics;
+    const auto result = program->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    SLANG_CHECK_ABORT(code != nullptr);
+    const String ptx = _getBlobText(code);
+    SLANG_CHECK((ptx.indexOf("%tid.x") >= 0) == expectNVVM);
+    SLANG_CHECK((ptx.indexOf("%ctaid.z") >= 0) == !expectNVVM);
+    return ptx;
+}
+
+SLANG_UNIT_TEST(nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations)
+{
+    NVVMIRBuilder preflightBuilder;
+    _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    if (SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVVM)) ||
+        SLANG_FAILED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_NVRTC)))
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring named-intrinsic route isolation because libNVVM or NVRTC was not found.");
+        SLANG_IGNORE_TEST;
+    }
+    static const char source[] = R"slang(
+        uint readRoute()
+        {
+            __target_switch
+            {
+            case cuda: __intrinsic_asm "(blockIdx.z)";
+            case nvvm: __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x";
+            }
+        }
+        [CUDAKernel]
+        void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> output)
+        {
+            output[0] = readRoute();
+        }
+    )slang";
+    const int architecture = _getRealNVVMTestArchitecture();
+    StringBuilder capability;
+    capability << "cuda_sm_" << architecture / 10 << "_" << architecture % 10;
+    for (SlangEmitCUDAMethod baseline :
+         {SLANG_EMIT_CUDA_DEFAULT, SLANG_EMIT_CUDA_VIA_NVRTC, SLANG_EMIT_CUDA_VIA_NVVM})
+    {
+        const bool baselineIsNVVM = baseline == SLANG_EMIT_CUDA_VIA_NVVM;
+        ComPtr<slang::ISession> session;
+        ComPtr<slang::IComponentType> baselineProgram;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createSlangPTXLinkedProgram(
+            globalSession,
+            source,
+            baseline,
+            capability.getBuffer(),
+            session,
+            baselineProgram,
+            diagnostics)));
+        const String baselineBefore =
+            _compileAndCheckNamedIntrinsicRoute(baselineProgram, baselineIsNVVM);
+
+        // linkWithOptions may return its input for an already requirement-free component.
+        // Give each option set a fresh composite, as applications do when linking variants,
+        // while sharing the same session, module, entry point and original target request.
+        ComPtr<slang::IModule> module(session->loadModule("directNVVM", diagnostics.writeRef()));
+        SLANG_CHECK_ABORT(module != nullptr);
+        ComPtr<slang::IEntryPoint> entry;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            entry.writeRef(),
+            diagnostics.writeRef())));
+        const SlangEmitCUDAMethod opposite =
+            baselineIsNVVM ? SLANG_EMIT_CUDA_VIA_NVRTC : SLANG_EMIT_CUDA_VIA_NVVM;
+        for (SlangEmitCUDAMethod method : {opposite, baseline})
+        {
+            slang::IComponentType* components[] = {module.get(), entry.get()};
+            ComPtr<slang::IComponentType> variant;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+                components,
+                SLANG_COUNT_OF(components),
+                variant.writeRef(),
+                diagnostics.writeRef())));
+            slang::CompilerOptionEntry option = {};
+            option.name = slang::CompilerOptionName::EmitCUDAMethod;
+            option.value.kind = slang::CompilerOptionValueKind::Int;
+            option.value.intValue0 = method;
+            ComPtr<slang::IComponentType> linkedVariant;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(variant->linkWithOptions(
+                linkedVariant.writeRef(),
+                1,
+                &option,
+                diagnostics.writeRef())));
+            _compileAndCheckNamedIntrinsicRoute(linkedVariant, method == SLANG_EMIT_CUDA_VIA_NVVM);
+            // Check the original cached bytes after both the opposite-route compilation and a
+            // new original-route compilation, so neither variant can contaminate the baseline.
+            SLANG_CHECK(
+                _compileAndCheckNamedIntrinsicRoute(baselineProgram, baselineIsNVVM) ==
+                baselineBefore);
+        }
+    }
+}

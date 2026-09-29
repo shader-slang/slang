@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 43u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 44u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -135,10 +135,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE ((SlangNVVMValueOperation)21u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE ((SlangNVVMValueOperation)22u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL ((SlangNVVMValueOperation)23u)
-#define SLANG_NVVM_VALUE_OP_THREAD_INDEX ((SlangNVVMValueOperation)24u)
-#define SLANG_NVVM_VALUE_OP_BLOCK_INDEX ((SlangNVVMValueOperation)25u)
-#define SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS ((SlangNVVMValueOperation)26u)
-#define SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS ((SlangNVVMValueOperation)27u)
+/* Values 24-27 are retired execution-vector operations. Keep later identities stable. */
 #define SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER ((SlangNVVMValueOperation)28u)
 #define SLANG_NVVM_VALUE_OP_INTEGER_CONVERT ((SlangNVVMValueOperation)29u)
 #define SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT ((SlangNVVMValueOperation)30u)
@@ -517,6 +514,16 @@ extern "C"
             SlangNVVMValueHandle function);
     } SlangNVVMBuilderConstructionAPI;
 
+    /** An explicit LLVM intrinsic name and its checked Slang signature. Names are length-delimited.
+        The first contract accepts only scalar i32 execution-register reads with no arguments. */
+    typedef struct SlangNVVMNamedIntrinsicDesc
+    {
+        const char* name;
+        size_t nameSize;
+        SlangNVVMValueTypeDesc resultType;
+        size_t operandCount;
+    } SlangNVVMNamedIntrinsicDesc;
+
     typedef struct SlangNVVMBuilderValueOperationsAPI
     {
         SlangNVVMResult(SLANG_NVVM_CALL* isOperationSupported)(
@@ -527,6 +534,14 @@ extern "C"
             const SlangNVVMValueOperationDesc* operation,
             const SlangNVVMValueHandle* operands,
             size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+        /** Pure signature query; must not create or mutate a module. */
+        SlangNVVMResult(SLANG_NVVM_CALL* isNamedIntrinsicSupported)(
+            const SlangNVVMNamedIntrinsicDesc* intrinsic,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitNamedIntrinsic)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMNamedIntrinsicDesc* intrinsic,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderValueOperationsAPI;
 

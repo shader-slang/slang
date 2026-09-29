@@ -103,6 +103,9 @@ def cpp : target + textualTarget;
 /// [Target]
 def cuda : target + textualTarget;
 
+/// Direct NVVM implementation refinement; retains CUDA device/SM capabilities during migration.
+def nvvm : cuda;
+
 /// Represents the Metal programming language code generation target.
 /// [Target]
 def metal : target + textualTarget;

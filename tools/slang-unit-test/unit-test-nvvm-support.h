@@ -436,9 +436,6 @@ struct FakeNVVMBuilderAtomicOperationStorage
 struct FakeNVVMBuilderResourceViewTypeStorage
 {
 };
-struct FakeNVVMBuilderExecutionRegisterStorage
-{
-};
 struct FakeNVVMBuilderVectorElementStorage
 {
 };
@@ -477,7 +474,6 @@ enum class FakeNVVMBuilderValueKind
     AggregateElement,
     AggregateConstruct,
     AtomicOperation,
-    ExecutionRegister,
     VectorConstruct,
     VectorElement,
     GlobalStorage,
@@ -776,8 +772,10 @@ struct FakeNVVMBuilderState
         loadResultTypeKinds.clear();
         storePointerValueRefs.clear();
         kernelFunctionIndices.clear();
-        executionRegisterOperations.clear();
-        executionRegisterCallerBlockIndices.clear();
+        namedIntrinsicNames.clear();
+        namedIntrinsicFunctionNames.clear();
+        namedIntrinsicQueryCount = 0;
+        rejectNamedIntrinsics = false;
         vectorConstructResultTypes.clear();
         vectorConstructElementOffsets.clear();
         vectorConstructElementCounts.clear();
@@ -935,7 +933,6 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderAggregateElementStorage aggregateElementStorage[16];
     FakeNVVMBuilderAggregateConstructStorage aggregateConstructStorage[16];
     FakeNVVMBuilderAtomicOperationStorage atomicOperationStorage[16];
-    FakeNVVMBuilderExecutionRegisterStorage executionRegisterStorage[8];
     FakeNVVMBuilderVectorConstructStorage vectorConstructStorage[16];
     FakeNVVMBuilderVectorElementStorage vectorElementStorage[64];
     FakeNVVMBuilderGlobalStorage globalStorage[4];
@@ -1131,8 +1128,10 @@ struct FakeNVVMBuilderState
     List<FakeNVVMBuilderScalarTypeKind> loadResultTypeKinds;
     List<FakeNVVMBuilderValueRef> storePointerValueRefs;
     List<Index> kernelFunctionIndices;
-    List<SlangNVVMValueOperation> executionRegisterOperations;
-    List<Index> executionRegisterCallerBlockIndices;
+    List<String> namedIntrinsicNames;
+    Dictionary<Index, String> namedIntrinsicFunctionNames;
+    int namedIntrinsicQueryCount = 0;
+    bool rejectNamedIntrinsics = false;
     List<SlangNVVMTypeHandle> vectorConstructResultTypes;
     List<Index> vectorConstructElementOffsets;
     List<size_t> vectorConstructElementCounts;
@@ -1970,26 +1969,6 @@ static bool _getFakeNVVMBuilderAtomicOperationIndex(SlangNVVMValueHandle value, 
     return false;
 }
 
-static SlangNVVMValueHandle _getFakeNVVMBuilderExecutionRegister(Index index)
-{
-    SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.executionRegisterStorage));
-    return reinterpret_cast<SlangNVVMValueHandle>(
-        &gFakeNVVMBuilder.executionRegisterStorage[index]);
-}
-
-static bool _getFakeNVVMBuilderExecutionRegisterIndex(SlangNVVMValueHandle value, Index& outIndex)
-{
-    for (Index i = 0; i < gFakeNVVMBuilder.executionRegisterOperations.getCount(); ++i)
-    {
-        if (value == _getFakeNVVMBuilderExecutionRegister(i))
-        {
-            outIndex = i;
-            return true;
-        }
-    }
-    return false;
-}
-
 static SlangNVVMValueHandle _getFakeNVVMBuilderVectorConstruct(Index index)
 {
     SLANG_ASSERT(index >= 0 && index < SLANG_COUNT_OF(gFakeNVVMBuilder.vectorConstructStorage));
@@ -2199,11 +2178,6 @@ static bool _getFakeNVVMBuilderValueRef(SlangNVVMValueHandle value, FakeNVVMBuil
     if (_getFakeNVVMBuilderAtomicOperationIndex(value, valueIndex))
     {
         outRef = {FakeNVVMBuilderValueKind::AtomicOperation, valueIndex};
-        return true;
-    }
-    if (_getFakeNVVMBuilderExecutionRegisterIndex(value, valueIndex))
-    {
-        outRef = {FakeNVVMBuilderValueKind::ExecutionRegister, valueIndex};
         return true;
     }
     if (_getFakeNVVMBuilderVectorConstructIndex(value, valueIndex))
@@ -2474,7 +2448,6 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
     case FakeNVVMBuilderValueKind::ByteOffsetPointer:
     case FakeNVVMBuilderValueKind::SequentialElementPointer:
     case FakeNVVMBuilderValueKind::AggregateConstruct:
-    case FakeNVVMBuilderValueKind::ExecutionRegister:
     case FakeNVVMBuilderValueKind::VectorConstruct:
         return false;
     case FakeNVVMBuilderValueKind::AggregateElement:
@@ -2553,9 +2526,6 @@ static bool _isFakeNVVMBuilderVectorValue(
                parameterType ==
                    _getFakeNVVMBuilderVectorType(expectedElementCount, expectedElementTypeKind);
     }
-    if (valueRef.kind == FakeNVVMBuilderValueKind::ExecutionRegister)
-        return expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer &&
-               expectedElementCount == 3;
     if (valueRef.kind == FakeNVVMBuilderValueKind::Load && valueRef.index >= 0 &&
         valueRef.index < gFakeNVVMBuilder.loadResultTypeKinds.getCount())
     {
@@ -5776,26 +5746,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorConstruct(
     return SLANG_OK;
 }
 
-static SlangResult _fakeNVVMBuilderEmitExecutionOperation(
-    SlangNVVMModuleHandle module,
-    SlangNVVMValueOperation operation,
-    SlangNVVMValueHandle* outValue)
-{
-    if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
-        !outValue ||
-        gFakeNVVMBuilder.executionRegisterOperations.getCount() >=
-            SLANG_COUNT_OF(gFakeNVVMBuilder.executionRegisterStorage))
-    {
-        return SLANG_E_INVALID_ARG;
-    }
-    const Index resultIndex = gFakeNVVMBuilder.executionRegisterOperations.getCount();
-    gFakeNVVMBuilder.executionRegisterOperations.add(operation);
-    gFakeNVVMBuilder.executionRegisterCallerBlockIndices.add(
-        gFakeNVVMBuilder.currentInsertBlockIndex);
-    *outValue = _getFakeNVVMBuilderExecutionRegister(resultIndex);
-    return SLANG_OK;
-}
-
 static SlangResult _fakeNVVMBuilderEmitBarrier(
     SlangNVVMModuleHandle module,
     SlangNVVMValueOperation operation,
@@ -5897,11 +5847,6 @@ static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
 
     switch (entry.operation)
     {
-    case SLANG_NVVM_VALUE_OP_THREAD_INDEX:
-    case SLANG_NVVM_VALUE_OP_BLOCK_INDEX:
-    case SLANG_NVVM_VALUE_OP_BLOCK_DIMENSIONS:
-    case SLANG_NVVM_VALUE_OP_GRID_DIMENSIONS:
-        return _fakeNVVMBuilderEmitExecutionOperation(module, entry.operation, outValue);
     case SLANG_NVVM_VALUE_OP_WORKGROUP_BARRIER:
     case SLANG_NVVM_VALUE_OP_DEVICE_MEMORY_BARRIER:
     case SLANG_NVVM_VALUE_OP_WORKGROUP_MEMORY_BARRIER:
@@ -6203,11 +6148,68 @@ static SlangNVVMBuilderConstructionAPI _makeFakeNVVMBuilderConstructionAPI()
     return api;
 }
 
+// The fake validates the same bounded name/signature surface as the provider. Real-provider
+// tests independently exercise LLVM name resolution and declaration attributes.
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
+    const SlangNVVMNamedIntrinsicDesc* intrinsic,
+    uint32_t* outSupported)
+{
+    ++gFakeNVVMBuilder.namedIntrinsicQueryCount;
+    if (outSupported)
+        *outSupported = 0;
+    if (!intrinsic || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    if (!intrinsic->name || intrinsic->operandCount || intrinsic->resultType.bitWidth != 32 ||
+        intrinsic->resultType.laneCount != 1 ||
+        (intrinsic->resultType.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+         intrinsic->resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
+        gFakeNVVMBuilder.rejectNamedIntrinsics)
+        return SLANG_OK;
+    const UnownedStringSlice name(intrinsic->name, intrinsic->nameSize);
+    const char* registers[] = {"tid", "ctaid", "ntid", "nctaid"};
+    for (const char* reg : registers)
+    {
+        for (char axis = 'x'; axis <= 'z'; ++axis)
+        {
+            StringBuilder expected;
+            expected << "llvm.nvvm.read.ptx.sreg." << reg << "." << axis;
+            if (name == expected.getUnownedSlice())
+                *outSupported = 1;
+        }
+    }
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitNamedIntrinsic(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMNamedIntrinsicDesc* intrinsic,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    uint32_t supported = 0;
+    SLANG_RETURN_ON_FAIL(_fakeNVVMBuilderIsNamedIntrinsicSupported(intrinsic, &supported));
+    if (!supported)
+        return SLANG_E_NOT_AVAILABLE;
+    // Reuse the fake's scalar intrinsic result storage. UINT32_MAX marks a named call and does
+    // not pretend that it is one of the old semantic operations.
+    SlangNVVMValueOperationDesc operation = {UINT32_MAX, intrinsic->resultType, nullptr, 0};
+    SLANG_RETURN_ON_FAIL(_fakeNVVMBuilderEmitIntrinsic(module, operation, nullptr, 0, outValue));
+    const String name(UnownedStringSlice(intrinsic->name, intrinsic->nameSize));
+    gFakeNVVMBuilder.namedIntrinsicNames.add(name);
+    const Index functionIndex =
+        gFakeNVVMBuilder.blockFunctionIndices[gFakeNVVMBuilder.currentInsertBlockIndex];
+    gFakeNVVMBuilder.namedIntrinsicFunctionNames[functionIndex] = name;
+    return SLANG_OK;
+}
+
 static SlangNVVMBuilderValueOperationsAPI _makeFakeNVVMBuilderValueOperationsAPI()
 {
     SlangNVVMBuilderValueOperationsAPI api = {};
     api.isOperationSupported = _fakeNVVMBuilderIsOperationSupported;
     api.emitOperation = _fakeNVVMBuilderEmitOperation;
+    api.isNamedIntrinsicSupported = _fakeNVVMBuilderIsNamedIntrinsicSupported;
+    api.emitNamedIntrinsic = _fakeNVVMBuilderEmitNamedIntrinsic;
     return api;
 }
 

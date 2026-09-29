@@ -18,6 +18,19 @@ TargetProgram::TargetProgram(ComponentType* componentType, TargetRequest* target
     m_entryPointResults.setCount(componentType->getEntryPointCount());
     m_optionSet.overrideWith(m_program->getOptionSet());
     m_optionSet.inheritFrom(targetReq->getOptionSet());
+    // Linking can override the PTX backend after the session target was created. Capabilities
+    // must follow that effective route in layout, specialization, and emission alike. Keep a
+    // private request when the routes differ so cooking its capabilities cannot change another
+    // program that still uses the session's original backend.
+    if (targetReq->getTarget() == CodeGenTarget::PTX &&
+        m_optionSet.getEmitCUDAMethod() != targetReq->getOptionSet().getEmitCUDAMethod())
+    {
+        m_effectiveTargetReq = new TargetRequest(*targetReq);
+        m_effectiveTargetReq->getOptionSet().set(
+            CompilerOptionName::EmitCUDAMethod,
+            m_optionSet.getEmitCUDAMethod());
+        m_targetReq = m_effectiveTargetReq;
+    }
 }
 
 IArtifact* TargetProgram::_createWholeProgramResult(
