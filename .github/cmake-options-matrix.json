@@ -34,6 +34,25 @@
       "macos_only": "true",
       "brew_packages": "lua pkgconf"
     },
+    {
+      "option": "SLANG_USE_SYSTEM_LZ4",
+      "value": "ON",
+      "macos_only": "true",
+      "brew_packages": "lz4 pkgconf"
+    },
+    {
+      "option": "SLANG_USE_SYSTEM_SPIRV_TOOLS",
+      "value": "ON",
+      "macos_only": "true",
+      "brew_packages": "spirv-tools"
+    },
+    {
+      "option": "SLANG_USE_SYSTEM_GLSLANG",
+      "value": "ON",
+      "macos_only": "true",
+      "brew_packages": "glslang spirv-tools",
+      "extra_cmake_flags": "-DSLANG_USE_SYSTEM_SPIRV_TOOLS=ON"
+    },
     { "option": "SLANG_ENABLE_RELEASE_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_SPLIT_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_VALIDATION_IR" },

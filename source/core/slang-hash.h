@@ -136,9 +136,10 @@ auto getHashCode(const TKey& key)
 
 inline HashCode64 getHashCode(const char* buffer, std::size_t len)
 {
-    // The bundled string-view hash passes (buffer, sizeof(char) * len) to wyhash, matching
-    // the former direct call. System hashes may differ; these are in-process lookup hashes,
-    // while persistent cache keys use SHA1.
+    // Use the public string-view hash: system unordered_dense packages need not expose
+    // detail::wyhash::hash. The bundled hash passes (buffer, sizeof(char) * len) to wyhash,
+    // matching the former direct call. System hashes may differ; these are in-process lookup
+    // hashes, while persistent cache keys use SHA1.
     return ankerl::unordered_dense::hash<std::string_view>{}(std::string_view(buffer, len));
 }
 
