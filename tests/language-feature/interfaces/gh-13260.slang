@@ -3,13 +3,7 @@
 // `IHit` has a default *static* method `value(Packed)` whose name collides with the instance
 // requirement `value()`. `Hit` overrides only the instance `value()`; the static `value(Packed)`
 // must inherit the interface default, which reconstructs a `Hit` via `unpack` and calls its
-// instance `value()`. The witness synthesizer previously bound the static requirement's `Packed`
-// parameter as the instance method's implicit `this`, so `Hit`'s witness for `value(Packed)`
-// became a forwarder that called `Hit::value(Hit this)` with a `Packed`: HLSL/CUDA emitted that
-// invalid call, and SPIR-V hit an internal assert in `emitFieldAddress` (looking up a `Hit` field
-// on a `Packed` value). The wrong witness is chosen at conformance-check time, so both a generic
-// static call `T.value(p)` and a dynamic `createDynamicObject<IHit>().value(p)` use it; both are
-// exercised below.
+// instance `value()`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute -conformance Hit:IHit=0
