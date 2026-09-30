@@ -315,10 +315,11 @@ struct PeepholeContext : InstPassBase
     //
     // The result is a vector or, after Metal buffer lowering, a `MetalPackedVectorType`. The lane
     // is unresolved when `laneIndex` is out of range, or when an operand at or before it has a
-    // non-literal width or a scalar or element type other than the result's element type. The
-    // type check matters because a one-operand `makeVector` can act as a conversion, such as the
-    // `float4(packed)` that Metal buffer lowering wraps around a `MetalPackedVectorType` load,
-    // and then its operand is not a lane of the result.
+    // non-literal width or a scalar or element type other than the result's element type, with
+    // attributes such as `unorm` ignored on both sides. The type check matters because a
+    // one-operand `makeVector` can act as a conversion, such as the `float4(packed)` that Metal
+    // buffer lowering wraps around a `MetalPackedVectorType` load, and then its operand is not a
+    // lane of the result.
     static MakeVectorLane findMakeVectorLane(IRInst* makeVector, IRIntegerValue laneIndex)
     {
         SLANG_ASSERT(makeVector->getOp() == kIROp_MakeVector);
@@ -329,21 +330,23 @@ struct PeepholeContext : InstPassBase
             elementType = packedType->getElementType();
         else
             return {};
+        auto elementBaseType = unwrapAttributedType(elementType);
         IRIntegerValue startIndex = 0;
         for (UInt i = 0; i < makeVector->getOperandCount(); i++)
         {
             auto operand = makeVector->getOperand(i);
-            auto operandVectorType = as<IRVectorType>(operand->getDataType());
+            auto operandType = unwrapAttributedType(operand->getDataType());
+            auto operandVectorType = as<IRVectorType>(operandType);
             if (!operandVectorType)
             {
-                if (operand->getDataType() != elementType)
+                if (operandType != elementBaseType)
                     return {};
                 if (laneIndex == startIndex)
                     return {operand, -1};
                 startIndex++;
                 continue;
             }
-            if (operandVectorType->getElementType() != elementType)
+            if (unwrapAttributedType(operandVectorType->getElementType()) != elementBaseType)
                 return {};
             auto operandSize = as<IRIntLit>(operandVectorType->getElementCount());
             if (!operandSize)
