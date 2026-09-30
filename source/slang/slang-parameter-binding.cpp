@@ -2,6 +2,7 @@
 #include "slang-parameter-binding.h"
 
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
@@ -4849,6 +4850,21 @@ ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 
     if (!m_layout)
     {
+        // We reject an unsupported layout rules version here, where both reflection and code
+        // generation first need the layout, so that a reflection-only request cannot report a
+        // layout that differs from the requested rules. The check reads this program's option
+        // set, which inherits the target's.
+        if (isScalarLayoutRoundingUnsupportedForTarget(getOptionSet()))
+        {
+            if (!m_hasReportedUnsupportedLayoutRules)
+            {
+                sink->diagnose(Diagnostics::LayoutRulesVersionUnsupportedForTarget{
+                    .target =
+                        TypeTextUtil::getCompileTargetName(asExternal(m_targetReq->getTarget()))});
+                m_hasReportedUnsupportedLayoutRules = true;
+            }
+            return nullptr;
+        }
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != 0)
             return nullptr;

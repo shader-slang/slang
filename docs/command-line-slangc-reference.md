@@ -241,6 +241,14 @@ It is typically only set from automated builds(such as distros available on gith
 Specifies the language standard that should be used. 
 
 
+<a id="layout-rules-version"></a>
+### -layout-rules-version
+
+**-layout-rules-version &lt;[language-version](#language-version)&gt;**
+
+Specifies the revision of the buffer layout rules, independently of the language standard. Accepts the same version keywords as -std: 202c (or next) selects the 202c rules, while latest currently means 2026 and does not. When unspecified, the current layout rules are used. From 202c on, scalar layout rounds the size of every struct up to a multiple of its alignment, as DXC's scalar layout does, so a field that follows a nested struct can move to a higher offset. This applies to buffers when scalar layout is enabled globally, to buffers declared with ScalarDataLayout, to structs accessed with ByteAddressBuffer Load&lt;T&gt;/Store&lt;T&gt;, and to the data that a user pointer (T*) with the default data layout points at, or that a pointer into a scalar-layout buffer points at. It takes effect when SPIR-V is emitted directly. Generating GLSL, or SPIR-V via GLSL, with 202c or later is an error, and other targets ignore it. sizeof and alignof keep natural layout, so sizeof(T) can be smaller than the stride of T in a rounded buffer. 
+
+
 <a id="warnings-as-errors"></a>
 ### -warnings-as-errors
 

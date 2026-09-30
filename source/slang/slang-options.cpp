@@ -586,6 +586,22 @@ void initCommandOptions(CommandOptions& options)
          "-std",
          "-std <language-version>",
          "Specifies the language standard that should be used."},
+        {OptionKind::LayoutRulesVersion,
+         "-layout-rules-version",
+         "-layout-rules-version <language-version>",
+         "Specifies the revision of the buffer layout rules, independently of the language "
+         "standard. Accepts the same version keywords as -std: 202c (or next) selects the 202c "
+         "rules, while latest currently means 2026 and does not. When unspecified, the current "
+         "layout rules are used. From 202c on, scalar layout rounds the size of every struct up "
+         "to a multiple of its alignment, as DXC's scalar layout does, so a field that follows "
+         "a nested struct can move to a higher offset. This applies to buffers when scalar "
+         "layout is enabled globally, to buffers declared with ScalarDataLayout, to structs "
+         "accessed with ByteAddressBuffer Load<T>/Store<T>, and to the data that a user pointer "
+         "(T*) with the default data layout points at, or that a pointer into a scalar-layout "
+         "buffer points at. It takes effect when SPIR-V is emitted directly. Generating GLSL, or "
+         "SPIR-V via GLSL, with 202c or later is an error, and other targets ignore it. sizeof "
+         "and alignof keep natural layout, so sizeof(T) can be smaller than the stride of T in a "
+         "rounded buffer."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
          "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]",
@@ -1613,6 +1629,7 @@ struct OptionsParser
     SlangResult _parseLoadRepro(const CommandLineArg& arg);
     SlangResult _parseDebugInformation(const CommandLineArg& arg);
     SlangResult _parseProfile(const CommandLineArg& arg);
+    SlangResult _expectLanguageVersion(SlangLanguageVersion& outVersion);
     SlangResult _parseHelp(const CommandLineArg& arg);
     SlangResult _readStdin(List<Byte>& outSource);
 
@@ -2749,6 +2766,23 @@ SlangResult OptionsParser::_parseDebugInformation(const CommandLineArg& arg)
 }
 
 
+// Read the next argument as a language version keyword. `-std` and `-layout-rules-version` both
+// take these keywords, so they share one table and one diagnostic.
+SlangResult OptionsParser::_expectLanguageVersion(SlangLanguageVersion& outVersion)
+{
+    CommandLineArg name;
+    SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+
+    outVersion = TypeTextUtil::findLanguageVersion(name.value.getUnownedSlice());
+    if (outVersion == SLANG_LANGUAGE_VERSION_UNKNOWN)
+    {
+        m_sink->diagnose(
+            Diagnostics::UnknownLanguageVersion{.version = name.value, .location = name.loc});
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
 {
     SLANG_UNUSED(arg);
@@ -3481,22 +3515,16 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::LanguageVersion:
             {
-                CommandLineArg name;
-                SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
-
-                SlangLanguageVersion stdRevision =
-                    TypeTextUtil::findLanguageVersion(name.value.getUnownedSlice());
-                if (stdRevision == SLANG_LANGUAGE_VERSION_UNKNOWN)
-                {
-                    m_sink->diagnose(Diagnostics::UnknownLanguageVersion{
-                        .version = name.value,
-                        .location = name.loc});
-                    return SLANG_FAIL;
-                }
-                else
-                {
-                    linkage->m_optionSet.add(OptionKind::LanguageVersion, stdRevision);
-                }
+                SlangLanguageVersion stdRevision;
+                SLANG_RETURN_ON_FAIL(_expectLanguageVersion(stdRevision));
+                linkage->m_optionSet.add(OptionKind::LanguageVersion, stdRevision);
+                break;
+            }
+        case OptionKind::LayoutRulesVersion:
+            {
+                SlangLanguageVersion layoutRulesVersion;
+                SLANG_RETURN_ON_FAIL(_expectLanguageVersion(layoutRulesVersion));
+                linkage->m_optionSet.add(OptionKind::LayoutRulesVersion, layoutRulesVersion);
                 break;
             }
         case OptionKind::Stage:

@@ -1149,6 +1149,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
 | UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
+| LayoutRulesVersion | Specifies the `-layout-rules-version` option: the revision of the buffer layout rules, independent of `LanguageVersion`. `intValue0` encodes a `SlangLanguageVersion` value. From `SLANG_LANGUAGE_VERSION_202C` on, scalar layout rounds the size of each struct up to a multiple of its alignment, as DXC's `-fvk-use-scalar-layout` does. This covers buffers under global scalar layout, `ScalarDataLayout` buffers, structs accessed with `ByteAddressBuffer` `Load<T>`/`Store<T>`, and the pointees of user pointers (`T*`) that have the default data layout or of pointers into scalar-layout buffers. It takes effect when SPIR-V is emitted directly; generating GLSL (or SPIR-V via GLSL) with it is an error, and other targets ignore it. `sizeof`/`alignof` keep natural layout. |
 
 ### Compiler Option ABI Stability
 

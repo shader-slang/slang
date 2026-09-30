@@ -431,6 +431,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
         break;
     case kIROp_ScalarBufferLayoutType:
+    case kIROp_NaturalBufferLayoutType:
     case kIROp_CBufferLayoutType:
     case kIROp_Std140BufferLayoutType:
     case kIROp_Std430BufferLayoutType:
@@ -683,6 +684,23 @@ struct NaturalLayoutRules : IRTypeLayoutRules
         IRIntegerValue count)
     {
         return IRSizeAndAlignment(element.size * count, element.alignment);
+    }
+};
+
+// Scalar layout under layout rules version 202c and later: natural layout, except that every
+// struct size is rounded up to a multiple of its alignment, as C does (unlike `CLayoutRules`,
+// `bool` keeps its natural 4-byte size). Reflection implements the same rule in
+// `ScalarRoundedLayoutRulesImpl` (slang-type-layout.cpp), which rounds only in `EndStructLayout`.
+// Rounding every composite element here gives the same layout, because under natural layout
+// only a struct can have a size that is not a multiple of its alignment: scalars, vectors and
+// matrices never do, and an array of elements whose sizes are multiples is one too.
+struct ScalarRoundedLayoutRules : NaturalLayoutRules
+{
+    ScalarRoundedLayoutRules() { ruleName = IRTypeLayoutRuleName::ScalarRounded; }
+
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
+    {
+        return IRSizeAndAlignment(elementSize.getStride(), elementSize.alignment);
     }
 };
 
@@ -983,6 +1001,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getNatural()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getScalarRounded()
+{
+    static ScalarRoundedLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getC()
 {
     static CLayoutRules rules;
@@ -1026,6 +1050,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:
         return getLLVM();
+    case IRTypeLayoutRuleName::ScalarRounded:
+        return getScalarRounded();
     default:
         return nullptr;
     }
@@ -1045,6 +1071,7 @@ std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
     case kIROp_Std430BufferLayoutType:
         return IRTypeLayoutRuleName::Std430;
     case kIROp_ScalarBufferLayoutType:
+    case kIROp_NaturalBufferLayoutType:
         return IRTypeLayoutRuleName::Natural;
     case kIROp_CBufferLayoutType:
         return IRTypeLayoutRuleName::C;
@@ -1070,6 +1097,8 @@ IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName)
         return kIROp_Std430BufferLayoutType;
     case IRTypeLayoutRuleName::Natural:
         return kIROp_ScalarBufferLayoutType;
+    case IRTypeLayoutRuleName::ScalarRounded:
+        SLANG_UNEXPECTED("ScalarRounded has no target-independent data-layout op");
     case IRTypeLayoutRuleName::C:
         return kIROp_CBufferLayoutType;
     case IRTypeLayoutRuleName::D3DConstantBuffer:

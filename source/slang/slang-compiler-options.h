@@ -448,6 +448,21 @@ struct CompilerOptionSet
         return (SlangLanguageVersion)getIntOption(CompilerOptionName::LanguageVersion);
     }
 
+    /// Return the layout rules version (`-layout-rules-version`): a language version that names a
+    /// revision of the buffer layout rules, independently of the language version. Each revision
+    /// is a comparison against this value where the layout code selects rules; the first, 202c,
+    /// is `isScalarLayoutRoundingRequested`. An unset option means the default language
+    /// version, as #12714 asks, so raising `SLANG_LANGUAGE_VERSION_DEFAULT` to 202c or later
+    /// would change layout as well.
+    SlangLanguageVersion getLayoutRulesVersion()
+    {
+        if (!hasOption(CompilerOptionName::LayoutRulesVersion))
+        {
+            return SLANG_LANGUAGE_VERSION_DEFAULT;
+        }
+        return (SlangLanguageVersion)getIntOption(CompilerOptionName::LayoutRulesVersion);
+    }
+
     List<String> getDownstreamArgs(String downstreamToolName);
 
     void serialize(SerializedOptionsData* outData);

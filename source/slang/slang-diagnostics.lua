@@ -218,6 +218,12 @@ warning(
 )
 
 err(
+    "layout-rules-version-unsupported-for-target",
+    23,
+    "layout rules version 202c and later cannot be used for target '~target', which is generated through GLSL: glslang does not round scalar-layout struct sizes up to their alignment. Emit SPIR-V directly instead."
+)
+
+err(
     "separate-debug-info-requires-output-path",
     109,
     "`-separate-debug-info` requires an output file path; use `-o <path>` or `-separate-debug-info-output <path>`"

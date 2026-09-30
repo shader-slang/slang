@@ -446,6 +446,8 @@ const char* getLayoutName(IRTypeLayoutRuleName name)
         return "natural";
     case IRTypeLayoutRuleName::C:
         return "c";
+    case IRTypeLayoutRuleName::ScalarRounded:
+        return "scalar_rounded";
     default:
         return "default";
     }
@@ -2397,11 +2399,71 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
-static IRTypeLayoutRuleName getTypeLayoutRuleNameFromOpAlways(
+static IRTypeLayoutRuleName getScalarLayoutRuleName(TargetProgram* target)
+{
+    return isScalarLayoutRoundedUpToAlignment(target->getOptionSet())
+               ? IRTypeLayoutRuleName::ScalarRounded
+               : IRTypeLayoutRuleName::Natural;
+}
+
+// Return the storage layout rule that the data-layout op of a buffer or pointer type selects on
+// `target`, or `defaultLayout` for a default data layout.
+//
+// A data-layout op has two meanings. At the language level, which `sizeof` and `alignof` use
+// (`getTypeLayoutRuleNameFromOp`), `ScalarDataLayout` is natural layout on every target. As the
+// storage layout of a buffer or pointer, which this function decodes, it is the target's scalar
+// rule, which rounds struct sizes on a target that honors layout rules version 202c.
+static IRTypeLayoutRuleName getStorageLayoutRuleNameFromOp(
+    TargetProgram* target,
     IROp layoutTypeOp,
     IRTypeLayoutRuleName defaultLayout)
 {
+    if (layoutTypeOp == kIROp_ScalarBufferLayoutType)
+        return getScalarLayoutRuleName(target);
     return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultLayout).value_or(defaultLayout);
+}
+
+// Return the data-layout op that encodes the storage layout rule `ruleName` on `target`. It is the
+// inverse of `getStorageLayoutRuleNameFromOp`; the round trip is what gives a pointer derived from
+// a buffer the same element stride as the buffer.
+//
+// The target's scalar rule is encoded with the scalar op. Where that rule is `ScalarRounded`,
+// natural layout (e.g. a structured buffer under `-fvk-use-dx-layout`) needs an op of its own,
+// `kIROp_NaturalBufferLayoutType`; everywhere else natural layout is the scalar rule, so the IR is
+// the same as without a layout rules version.
+static IROp getStorageLayoutOpForRule(TargetProgram* target, IRTypeLayoutRuleName ruleName)
+{
+    auto scalarRule = getScalarLayoutRuleName(target);
+    SLANG_ASSERT(ruleName != IRTypeLayoutRuleName::ScalarRounded || ruleName == scalarRule);
+
+    IROp op;
+    if (ruleName == scalarRule)
+        op = kIROp_ScalarBufferLayoutType;
+    else if (ruleName == IRTypeLayoutRuleName::Natural)
+        op = kIROp_NaturalBufferLayoutType;
+    else
+        op = getOpFromTypeLayoutRuleName(ruleName);
+    SLANG_ASSERT(
+        op == kIROp_DefaultBufferLayoutType ||
+        getStorageLayoutRuleNameFromOp(target, op, ruleName) == ruleName);
+    return op;
+}
+
+static IROp getPtrDataLayoutOp(IRPtrTypeBase* ptrType)
+{
+    auto dataLayout = ptrType->getDataLayout();
+    return dataLayout ? dataLayout->getOp() : kIROp_DefaultBufferLayoutType;
+}
+
+// Return whether `type` is a stage input or output pointer. Such a pointer addresses varyings,
+// which have no buffer layout for the scalar rules to change, so it keeps natural layout.
+static bool isStageInterfacePointer(IRType* type)
+{
+    auto ptrType = as<IRPtrTypeBase>(type);
+    if (!ptrType)
+        return false;
+    auto addressSpace = ptrType->getAddressSpace();
+    return addressSpace == AddressSpace::Input || addressSpace == AddressSpace::Output;
 }
 
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
@@ -2442,7 +2504,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
                 layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
             {
-                return getTypeLayoutRuleNameFromOpAlways(
+                return getStorageLayoutRuleNameFromOp(
+                    target,
                     layoutTypeOp,
                     IRTypeLayoutRuleName::Natural);
             }
@@ -2454,7 +2517,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
 
         // If the user specified a scalar buffer layout, then just use that.
         if (target->getOptionSet().shouldUseScalarLayout())
-            return IRTypeLayoutRuleName::Natural;
+            return isStageInterfacePointer(bufferType) ? IRTypeLayoutRuleName::Natural
+                                                       : getScalarLayoutRuleName(target);
     }
 
     if (target->getOptionSet().shouldUseDXLayout())
@@ -2463,8 +2527,21 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         {
             return IRTypeLayoutRuleName::D3DConstantBuffer;
         }
-        else
-            return IRTypeLayoutRuleName::Natural;
+        // Under the DX rules every other buffer, and every pointer with any other data layout
+        // (an explicit std430 or C layout, or the natural layout copied from a structured
+        // buffer), uses natural layout. The two pointer shapes below point at scalar layout
+        // instead: a user pointer with the default data layout, as in the general pointer case
+        // at the end of this function, and a pointer into a `ScalarDataLayout` buffer, which
+        // keeps that buffer's rule.
+        if (auto ptrType = as<IRPtrTypeBase>(bufferType))
+        {
+            auto dataLayoutOp = getPtrDataLayoutOp(ptrType);
+            bool isDefaultUserPointer = dataLayoutOp == kIROp_DefaultBufferLayoutType &&
+                                        ptrType->getAddressSpace() == AddressSpace::UserPointer;
+            if (isDefaultUserPointer || dataLayoutOp == kIROp_ScalarBufferLayoutType)
+                return getScalarLayoutRuleName(target);
+        }
+        return IRTypeLayoutRuleName::Natural;
     }
 
     // The default behavior is to use std140 for constant buffers and std430 for other buffers.
@@ -2480,7 +2557,10 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = structBufferType->getDataLayout()
                                     ? structBufferType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getStorageLayoutRuleNameFromOp(
+                target,
+                layoutTypeOp,
+                IRTypeLayoutRuleName::Std430);
         }
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
@@ -2500,7 +2580,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto defaultTypeOp =
                 isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
 
-            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultTypeOp);
+            return getStorageLayoutRuleNameFromOp(target, layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -2508,15 +2588,22 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = storageBufferType->getDataLayout()
                                     ? storageBufferType->getDataLayout()->getOp()
                                     : kIROp_Std430BufferLayoutType;
-            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getStorageLayoutRuleNameFromOp(
+                target,
+                layoutTypeOp,
+                IRTypeLayoutRuleName::Std430);
         }
     }
     if (auto ptrType = as<IRPtrTypeBase>(bufferType))
     {
-        auto layoutTypeOp = ptrType->getDataLayout() ? ptrType->getDataLayout()->getOp()
-                                                     : kIROp_DefaultBufferLayoutType;
+        auto layoutTypeOp = getPtrDataLayoutOp(ptrType);
 
-        IRTypeLayoutRuleName defaultRule = IRTypeLayoutRuleName::Natural;
+        // A pointer with an explicit data layout, including one copied from the buffer it was
+        // derived from, uses that layout. A user pointer with the default data layout points at
+        // the target's scalar layout, which is also how reflection lays out every pointee.
+        IRTypeLayoutRuleName defaultRule = ptrType->getAddressSpace() == AddressSpace::UserPointer
+                                               ? getScalarLayoutRuleName(target)
+                                               : IRTypeLayoutRuleName::Natural;
         // SPIR-V storage-buffer pointers inherit the same std430 default as
         // GLSLShaderStorageBuffer when no explicit data layout is attached, so stride
         // computations match the ArrayStride decorations emitted later.
@@ -2526,7 +2613,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         if (isCPUTargetViaLLVM(targetReq))
             defaultRule = IRTypeLayoutRuleName::LLVM;
 
-        return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultRule);
+        return getStorageLayoutRuleNameFromOp(target, layoutTypeOp, defaultRule);
     }
     return IRTypeLayoutRuleName::Natural;
 }
@@ -2540,7 +2627,7 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
 IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType)
 {
     TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
-    IROp layoutOp = getOpFromTypeLayoutRuleName(loweringConfig.layoutRuleName);
+    IROp layoutOp = getStorageLayoutOpForRule(target, loweringConfig.layoutRuleName);
     IRType* layoutType =
         as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
     return layoutType;
