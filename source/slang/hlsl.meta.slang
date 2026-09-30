@@ -14877,8 +14877,18 @@ T round(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmRound) "$P_round($0)";
-    case cuda: __intrinsic_asm(nvvmRound) "$P_round($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM round requires half, float, or double.");
+        // Preserve the existing Half evaluation: widen exactly, round in Float32, then narrow once.
+        if (T is half)
+            return __realCast<T>(round(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_roundf", x;
+        else
+            __intrinsic_asm "__nv_round", x;
+    case cpp: __intrinsic_asm "$P_round($0)";
+    case cuda: __intrinsic_asm "$P_round($0)";
     case glsl: __intrinsic_asm "round";
     case hlsl: __intrinsic_asm "round";
     case metal: __intrinsic_asm "round";

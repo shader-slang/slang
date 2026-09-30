@@ -776,6 +776,13 @@ struct FakeNVVMBuilderState
         namedIntrinsicFunctionNames.clear();
         namedIntrinsicQueryCount = 0;
         rejectNamedIntrinsics = false;
+        deviceLibraryLoadCount = 0;
+        deviceLibraryDestroyCount = 0;
+        deviceLibraryQueryCount = 0;
+        rejectDeviceLibraryLoad = false;
+        rejectDeviceLibraryFunctions = false;
+        deviceLibraryBytes = String();
+        replaceDeviceLibraryPath = String();
         vectorConstructResultTypes.clear();
         vectorConstructElementOffsets.clear();
         vectorConstructElementCounts.clear();
@@ -1132,6 +1139,13 @@ struct FakeNVVMBuilderState
     Dictionary<Index, String> namedIntrinsicFunctionNames;
     int namedIntrinsicQueryCount = 0;
     bool rejectNamedIntrinsics = false;
+    int deviceLibraryLoadCount = 0;
+    int deviceLibraryDestroyCount = 0;
+    int deviceLibraryQueryCount = 0;
+    bool rejectDeviceLibraryLoad = false;
+    bool rejectDeviceLibraryFunctions = false;
+    String deviceLibraryBytes;
+    String replaceDeviceLibraryPath;
     List<SlangNVVMTypeHandle> vectorConstructResultTypes;
     List<Index> vectorConstructElementOffsets;
     List<size_t> vectorConstructElementCounts;
@@ -6233,6 +6247,83 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitNamedIntrinsic(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderLoadDeviceLibrary(
+    const void* bytes,
+    size_t size,
+    SlangNVVMDeviceLibraryHandle* outLibrary,
+    SlangNVVMDiagnosticCallback diagnose,
+    void* userData)
+{
+    ++gFakeNVVMBuilder.deviceLibraryLoadCount;
+    *outLibrary = nullptr;
+    gFakeNVVMBuilder.deviceLibraryBytes =
+        String(UnownedStringSlice(static_cast<const char*>(bytes), Index(size)));
+    if (gFakeNVVMBuilder.rejectDeviceLibraryLoad)
+    {
+        if (diagnose)
+            diagnose(
+                userData,
+                "fake corrupt selected bitcode",
+                strlen("fake corrupt selected bitcode"));
+        return SLANG_FAIL;
+    }
+    if (gFakeNVVMBuilder.replaceDeviceLibraryPath.getLength())
+        SLANG_RETURN_ON_FAIL(
+            File::writeAllText(gFakeNVVMBuilder.replaceDeviceLibraryPath, "replaced-after-query"));
+    *outLibrary =
+        reinterpret_cast<SlangNVVMDeviceLibraryHandle>(&gFakeNVVMBuilder.deviceLibraryBytes);
+    return SLANG_OK;
+}
+
+static void SLANG_NVVM_CALL _fakeNVVMBuilderDestroyDeviceLibrary(SlangNVVMDeviceLibraryHandle)
+{
+    ++gFakeNVVMBuilder.deviceLibraryDestroyCount;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSupported(
+    SlangNVVMDeviceLibraryHandle library,
+    const SlangNVVMNamedIntrinsicDesc* function,
+    uint32_t* supported)
+{
+    ++gFakeNVVMBuilder.deviceLibraryQueryCount;
+    *supported = 0;
+    if (!library || !function)
+        return SLANG_E_INVALID_ARG;
+    if (gFakeNVVMBuilder.rejectDeviceLibraryFunctions || function->operandCount != 1 ||
+        !function->operands)
+        return SLANG_OK;
+    const UnownedStringSlice name(function->name, function->nameSize);
+    const auto type =
+        name == toSlice("__nv_roundf") ? NVVMSemantics::kFloat32 : NVVMSemantics::kFloat64;
+    *supported = (name == toSlice("__nv_roundf") || name == toSlice("__nv_round")) &&
+                 NVVMSemantics::areSameType(function->resultType, type) &&
+                 NVVMSemantics::areSameType(function->operands[0].type, type) &&
+                 function->operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitDeviceLibraryFunction(
+    SlangNVVMDeviceLibraryHandle library,
+    SlangNVVMModuleHandle module,
+    const SlangNVVMNamedIntrinsicDesc* function,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    uint32_t supported = 0;
+    SLANG_RETURN_ON_FAIL(
+        _fakeNVVMBuilderIsDeviceLibraryFunctionSupported(library, function, &supported));
+    if (!supported)
+        return SLANG_E_NOT_AVAILABLE;
+    SlangNVVMValueTypeDesc operandType = function->operands[0].type;
+    SlangNVVMValueOperationDesc operation = {UINT32_MAX, function->resultType, &operandType, 1};
+    SLANG_RETURN_ON_FAIL(
+        _fakeNVVMBuilderEmitIntrinsic(module, operation, operands, operandCount, outValue));
+    gFakeNVVMBuilder.namedIntrinsicNames.add(
+        String(UnownedStringSlice(function->name, function->nameSize)));
+    return SLANG_OK;
+}
+
 static SlangNVVMBuilderValueOperationsAPI _makeFakeNVVMBuilderValueOperationsAPI()
 {
     SlangNVVMBuilderValueOperationsAPI api = {};
@@ -6240,6 +6331,10 @@ static SlangNVVMBuilderValueOperationsAPI _makeFakeNVVMBuilderValueOperationsAPI
     api.emitOperation = _fakeNVVMBuilderEmitOperation;
     api.isNamedIntrinsicSupported = _fakeNVVMBuilderIsNamedIntrinsicSupported;
     api.emitNamedIntrinsic = _fakeNVVMBuilderEmitNamedIntrinsic;
+    api.loadDeviceLibrary = _fakeNVVMBuilderLoadDeviceLibrary;
+    api.destroyDeviceLibrary = _fakeNVVMBuilderDestroyDeviceLibrary;
+    api.isDeviceLibraryFunctionSupported = _fakeNVVMBuilderIsDeviceLibraryFunctionSupported;
+    api.emitDeviceLibraryFunction = _fakeNVVMBuilderEmitDeviceLibraryFunction;
     return api;
 }
 
@@ -7296,6 +7391,7 @@ struct CompileSettings
     DownstreamCompileOptions::FloatingPointDenormalMode denormalModeFp64 =
         DownstreamCompileOptions::FloatingPointDenormalMode::Any;
     bool requiresCUDADeviceLibrary = false;
+    INVVMCUDADeviceLibrary* cudaDeviceLibrary = nullptr;
     bool addFakeCompilerArgument = false;
     const char* compilerSpecificArgument = nullptr;
     int architecture = 75;
@@ -7322,6 +7418,7 @@ static SlangResult _compileNVVM(
     options.denormalModeFp32 = settings.denormalModeFp32;
     options.denormalModeFp64 = settings.denormalModeFp64;
     options.requiresCUDADeviceLibrary = settings.requiresCUDADeviceLibrary;
+    options.cudaDeviceLibrary = settings.cudaDeviceLibrary;
     options.sourceArtifacts = makeSlice(sourceArtifacts, SLANG_COUNT_OF(sourceArtifacts));
     options.requiredCapabilityVersions = makeSlice(&capability, 1);
     TerminatedCharSlice selectedArgument(

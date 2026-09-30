@@ -2,6 +2,7 @@
 #include "slang-nvvm-compiler.h"
 
 #include "core/slang-blob.h"
+#include "core/slang-castable.h"
 #include "core/slang-io.h"
 #include "core/slang-shared-library.h"
 #include "core/slang-string-slice-pool.h"
@@ -127,7 +128,49 @@ static void _setPlainFailure(
     diagnostics->requireErrorDiagnostic();
 }
 
-class NVVMDownstreamCompiler : public DownstreamCompilerBase
+// A private token proves provenance without trusting an owner getter implemented by a caller.
+// The token keeps its origin alive, while the compiler never retains tokens or caches their bytes.
+class NVVMCUDADeviceLibrary : public ComBaseObject, public INVVMCUDADeviceLibrary
+{
+public:
+    SLANG_CLASS_GUID(0x2a9f4542, 0x954b, 0x40ad, {0xaf, 0x6c, 0xb8, 0x97, 0x4d, 0x5e, 0x4b, 0xd2});
+    SLANG_COM_BASE_IUNKNOWN_ALL
+
+    NVVMCUDADeviceLibrary(IDownstreamCompiler* owner, ISlangBlob* contents, const String& path)
+        : m_owner(owner), m_contents(contents), m_path(path)
+    {
+    }
+
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE
+    {
+        if (guid == getTypeGuid())
+            return this;
+        return getInterface(guid);
+    }
+    virtual SLANG_NO_THROW ISlangBlob* SLANG_MCALL getContents() SLANG_OVERRIDE
+    {
+        return m_contents;
+    }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE
+    {
+        return m_path.getBuffer();
+    }
+    bool isOwnedBy(IDownstreamCompiler* compiler) const { return m_owner.get() == compiler; }
+
+private:
+    ISlangUnknown* getInterface(const Guid& guid)
+    {
+        if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
+            guid == INVVMCUDADeviceLibrary::getTypeGuid())
+            return static_cast<INVVMCUDADeviceLibrary*>(this);
+        return nullptr;
+    }
+    ComPtr<IDownstreamCompiler> m_owner;
+    ComPtr<ISlangBlob> m_contents;
+    String m_path;
+};
+
+class NVVMDownstreamCompiler : public DownstreamCompilerBase, public INVVMCUDADeviceLibraryProvider
 {
 public:
     typedef DownstreamCompilerBase Super;
@@ -142,6 +185,16 @@ public:
     {
         return getPathFromSymbol((void*)m_nvvmVersion, outPath);
     }
+
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE
+    {
+        if (guid == INVVMCUDADeviceLibraryProvider::getTypeGuid())
+            return static_cast<INVVMCUDADeviceLibraryProvider*>(this);
+        return Super::castAs(guid);
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadCUDADeviceLibrary(
+        INVVMCUDADeviceLibrary** outLibrary,
+        ISlangBlob** outDiagnostics) SLANG_OVERRIDE;
 
     SlangResult init(ISlangSharedLibrary* library, const String& selectedLibraryPath);
 
@@ -270,6 +323,41 @@ SlangResult NVVMDownstreamCompiler::init(
         m_libdevicePath = _getCUDALibdevicePath(m_toolkitRoot);
 
     return SLANG_OK;
+}
+
+SlangResult NVVMDownstreamCompiler::loadCUDADeviceLibrary(
+    INVVMCUDADeviceLibrary** outLibrary,
+    ISlangBlob** outDiagnostics)
+{
+    if (outDiagnostics)
+        *outDiagnostics = nullptr;
+    if (!outLibrary)
+        return SLANG_E_INVALID_ARG;
+    *outLibrary = nullptr;
+    StringBuilder message;
+    SlangResult result = SLANG_E_NOT_FOUND;
+    List<uint8_t> bytes;
+    if (!m_toolkitRoot.getLength() || !m_libdevicePath.getLength())
+    {
+        message << "libNVVM CUDA device library was requested, but the selected libNVVM does "
+                   "not identify a coherent CUDA toolkit root";
+    }
+    else
+    {
+        result = File::readAllBytes(m_libdevicePath, bytes);
+        if (SLANG_SUCCEEDED(result))
+        {
+            ComPtr<ISlangBlob> contents = ListBlob::moveCreate(bytes);
+            ComPtr<INVVMCUDADeviceLibrary> library(
+                new NVVMCUDADeviceLibrary(this, contents, m_libdevicePath));
+            *outLibrary = library.detach();
+            return SLANG_OK;
+        }
+        message << "Unable to read the selected CUDA device library '" << m_libdevicePath << "'";
+    }
+    if (outDiagnostics)
+        *outDiagnostics = StringBlob::moveCreate(message).detach();
+    return result;
 }
 
 SlangResult NVVMDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
@@ -561,27 +649,35 @@ SlangResult NVVMDownstreamCompiler::compile(
         return _returnArtifact(sourceResult, artifact, outArtifact);
     }
 
-    List<unsigned char> libdeviceBytes;
-    if (options.requiresCUDADeviceLibrary)
+    ComPtr<INVVMCUDADeviceLibrary> deviceLibrary(options.cudaDeviceLibrary);
+    if (deviceLibrary)
     {
-        if (!m_toolkitRoot.getLength() || !m_libdevicePath.getLength())
+        auto token = as<NVVMCUDADeviceLibrary>(deviceLibrary.get());
+        if (!options.requiresCUDADeviceLibrary || !token || !token->isOwnedBy(this))
         {
             _setPlainFailure(
                 diagnostics,
-                SLANG_E_NOT_FOUND,
-                toSlice("libNVVM CUDA device library was requested, but the selected libNVVM does "
-                        "not identify a coherent CUDA toolkit root"));
-            return _returnArtifact(SLANG_E_NOT_FOUND, artifact, outArtifact);
+                SLANG_E_INVALID_ARG,
+                toSlice("CUDA device-library snapshot does not belong to this requested compiler"));
+            return _returnArtifact(SLANG_E_INVALID_ARG, artifact, outArtifact);
         }
-
-        const SlangResult libdeviceReadResult = File::readAllBytes(m_libdevicePath, libdeviceBytes);
-        if (SLANG_FAILED(libdeviceReadResult))
+    }
+    else if (options.requiresCUDADeviceLibrary)
+    {
+        // Legacy downstream callers have no snapshot field. They use exactly the same selected
+        // library loader; direct emission always supplies the snapshot it already validated.
+        ComPtr<ISlangBlob> loadDiagnostics;
+        SlangResult result =
+            loadCUDADeviceLibrary(deviceLibrary.writeRef(), loadDiagnostics.writeRef());
+        if (SLANG_FAILED(result))
         {
-            StringBuilder message;
-            message << "Unable to read the selected CUDA device library '" << m_libdevicePath
-                    << "'";
-            _setPlainFailure(diagnostics, libdeviceReadResult, message.getUnownedSlice());
-            return _returnArtifact(libdeviceReadResult, artifact, outArtifact);
+            _setPlainFailure(
+                diagnostics,
+                result,
+                UnownedStringSlice(
+                    static_cast<const char*>(loadDiagnostics->getBufferPointer()),
+                    Index(loadDiagnostics->getBufferSize())));
+            return _returnArtifact(result, artifact, outArtifact);
         }
     }
 
@@ -618,16 +714,17 @@ SlangResult NVVMDownstreamCompiler::compile(
 
     if (options.requiresCUDADeviceLibrary)
     {
-        const char* libdeviceData = reinterpret_cast<const char*>(libdeviceBytes.getBuffer());
+        ISlangBlob* libdevice = deviceLibrary->getContents();
+        const char* libdeviceData = static_cast<const char*>(libdevice->getBufferPointer());
         nvvmResultCode = m_nvvmLazyAddModuleToProgram ? m_nvvmLazyAddModuleToProgram(
                                                             program,
                                                             libdeviceData,
-                                                            size_t(libdeviceBytes.getCount()),
+                                                            libdevice->getBufferSize(),
                                                             "libdevice.10.bc")
                                                       : m_nvvmAddModuleToProgram(
                                                             program,
                                                             libdeviceData,
-                                                            size_t(libdeviceBytes.getCount()),
+                                                            libdevice->getBufferSize(),
                                                             "libdevice.10.bc");
         if (nvvmResultCode != NVVM_SUCCESS)
         {

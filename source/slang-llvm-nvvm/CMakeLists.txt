@@ -35,7 +35,7 @@ if(LLVM_ENABLE_EH)
     message(FATAL_ERROR "slang-llvm-nvvm requires LLVM 14 built without C++ exceptions")
 endif()
 
-llvm_map_components_to_libnames(slang_nvvm_llvm_libraries core bitwriter support)
+llvm_map_components_to_libnames(slang_nvvm_llvm_libraries core bitwriter bitreader support)
 foreach(slang_nvvm_llvm_library IN LISTS slang_nvvm_llvm_libraries)
     if(NOT TARGET ${slang_nvvm_llvm_library})
         message(FATAL_ERROR "LLVM component target ${slang_nvvm_llvm_library} is unavailable")

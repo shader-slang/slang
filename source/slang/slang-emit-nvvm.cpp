@@ -2341,6 +2341,17 @@ bool _getNVVMVectorSwizzledStore(IRInst* inst, NVVMVectorSwizzledStore& outStore
     return true;
 }
 
+struct ScopedNVVMDeviceLibrary
+{
+    const NVVMIRBuilder* builder = nullptr;
+    SlangNVVMDeviceLibraryHandle library = nullptr;
+    ~ScopedNVVMDeviceLibrary()
+    {
+        if (library)
+            builder->destroyDeviceLibrary(library);
+    }
+};
+
 struct ScopedNVVMModule
 {
     const NVVMIRBuilder* builder = nullptr;
@@ -3455,7 +3466,6 @@ static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[]
     {"$P_log2($0)", SLANG_NVVM_VALUE_OP_LOG2, 1},
     {"$P_log10($0)", SLANG_NVVM_VALUE_OP_LOG10, 1},
     {"$P_pow($0, $1)", SLANG_NVVM_VALUE_OP_POW, 2},
-    {"$P_round($0)", SLANG_NVVM_VALUE_OP_ROUND, 1},
     {"$P_rsqrt($0)", SLANG_NVVM_VALUE_OP_RSQRT, 1},
     {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
     {"$P_sin($0)", SLANG_NVVM_VALUE_OP_SIN, 1},
@@ -3511,7 +3521,8 @@ bool _getNVVMNamedIntrinsicDesc(
     NVVMPlannedNamedIntrinsic& outPlan)
 {
     outPlan = {};
-    if (!genericAsm->getAsm().startsWith(toSlice("llvm.")) ||
+    outPlan.isDeviceLibraryFunction = genericAsm->getAsm().startsWith(toSlice("__nv_"));
+    if ((!outPlan.isDeviceLibraryFunction && !genericAsm->getAsm().startsWith(toSlice("llvm."))) ||
         !_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
         !_getNVVMSemanticType(function->getResultType(), outPlan.resultType))
         return false;
@@ -9135,6 +9146,8 @@ SlangResult _validateNVVMFunction(
                     NVVMPlannedNamedIntrinsic namedIntrinsic;
                     if (_getNVVMNamedIntrinsicDesc(genericAsm, function, namedIntrinsic))
                     {
+                        requirements.requiresCUDADeviceLibrary |=
+                            namedIntrinsic.isDeviceLibraryFunction;
                         requirements.emissionPlan.namedIntrinsics.add(_Move(namedIntrinsic));
                         break;
                     }
@@ -14908,17 +14921,43 @@ SlangResult emitNVVMIRFromLinkedIR(
     const LinkedIR& linkedIR,
     const NVVMIRBuilder& builder,
     const NVVMOperationRequirements& requirements,
-    ComPtr<IArtifact>& outArtifact)
+    ComPtr<IArtifact>& outArtifact,
+    ISlangBlob* deviceLibraryContents)
 {
     outArtifact.setNull();
     SLANG_RELEASE_ASSERT(linkedIR.entryPoints.getCount() == 1);
+
+    ScopedNVVMDeviceLibrary libraryScope;
+    libraryScope.builder = &builder;
+    for (const auto& planned : requirements.emissionPlan.namedIntrinsics)
+    {
+        if (!planned.isDeviceLibraryFunction)
+            continue;
+        String diagnostics;
+        SlangResult result =
+            builder.loadDeviceLibrary(deviceLibraryContents, libraryScope.library, diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            if (diagnostics.getLength())
+                codeGenContext->getSink()->diagnoseRaw(
+                    Severity::Error,
+                    diagnostics.getUnownedSlice());
+            return _requireBuilderOperation(
+                codeGenContext,
+                "selected device-library parsing",
+                result);
+        }
+        break;
+    }
 
     // Capability queries are pure. Complete this exact typed preflight before module creation so
     // an unsupported overload cannot leave partial provider state behind.
     for (const auto& planned : requirements.emissionPlan.namedIntrinsics)
     {
         const auto intrinsic = planned.getDesc();
-        if (!builder.supportsNamedIntrinsic(intrinsic))
+        if (!(planned.isDeviceLibraryFunction
+                  ? builder.supportsDeviceLibraryFunction(libraryScope.library, intrinsic)
+                  : builder.supportsNamedIntrinsic(intrinsic)))
         {
             String name(UnownedStringSlice(intrinsic.name, intrinsic.nameSize));
             return _requireBuilderOperation(
@@ -16382,13 +16421,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                             SlangNVVMValueHandle value = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                "named LLVM intrinsic",
-                                builder.emitNamedIntrinsic(
-                                    moduleScope.module,
-                                    namedIntrinsic->getDesc(),
-                                    operands.getBuffer(),
-                                    size_t(operands.getCount()),
-                                    value)));
+                                namedIntrinsic->isDeviceLibraryFunction
+                                    ? "named device-library function"
+                                    : "named LLVM intrinsic",
+                                namedIntrinsic->isDeviceLibraryFunction
+                                    ? builder.emitDeviceLibraryFunction(
+                                          libraryScope.library,
+                                          moduleScope.module,
+                                          namedIntrinsic->getDesc(),
+                                          operands.getBuffer(),
+                                          size_t(operands.getCount()),
+                                          value)
+                                    : builder.emitNamedIntrinsic(
+                                          moduleScope.module,
+                                          namedIntrinsic->getDesc(),
+                                          operands.getBuffer(),
+                                          size_t(operands.getCount()),
+                                          value)));
                             if (namedIntrinsic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
                             {
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(

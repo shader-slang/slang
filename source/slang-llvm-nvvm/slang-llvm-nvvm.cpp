@@ -6,6 +6,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/IR/BasicBlock.h"
@@ -26,7 +27,9 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <cstring>
@@ -66,6 +69,57 @@ struct ModuleState
     std::unique_ptr<llvm::Module> module;
     llvm::IRBuilder<> builder;
 };
+
+// Input-library state is independent of every output ModuleState. Parse once; queries never
+// insert declarations or IR into this module, and no vendor program is involved in its lifetime.
+struct DeviceLibraryState
+{
+    llvm::LLVMContext context;
+    std::unique_ptr<llvm::MemoryBuffer> bytes;
+    std::unique_ptr<llvm::Module> module;
+};
+
+static SlangResult SLANG_NVVM_CALL _loadDeviceLibrary(
+    const void* bytes,
+    size_t byteCount,
+    SlangNVVMDeviceLibraryHandle* outLibrary,
+    SlangNVVMDiagnosticCallback diagnose,
+    void* userData)
+{
+    if (outLibrary)
+        *outLibrary = nullptr;
+    if (!outLibrary || (!bytes && byteCount))
+        return SLANG_E_INVALID_ARG;
+    auto state = std::make_unique<DeviceLibraryState>();
+    state->bytes = llvm::MemoryBuffer::getMemBufferCopy(
+        llvm::StringRef(static_cast<const char*>(bytes), byteCount),
+        "selected-libdevice");
+    auto parsed = llvm::parseBitcodeFile(state->bytes->getMemBufferRef(), state->context);
+    if (!parsed)
+    {
+        const auto message = llvm::toString(parsed.takeError());
+        if (diagnose)
+            diagnose(userData, message.data(), message.size());
+        return SLANG_FAIL;
+    }
+    state->module = std::move(*parsed);
+    std::string diagnostics;
+    llvm::raw_string_ostream stream(diagnostics);
+    if (llvm::verifyModule(*state->module, &stream))
+    {
+        stream.flush();
+        if (diagnose)
+            diagnose(userData, diagnostics.data(), diagnostics.size());
+        return SLANG_FAIL;
+    }
+    *outLibrary = reinterpret_cast<SlangNVVMDeviceLibraryHandle>(state.release());
+    return SLANG_OK;
+}
+
+static void SLANG_NVVM_CALL _destroyDeviceLibrary(SlangNVVMDeviceLibraryHandle library)
+{
+    delete reinterpret_cast<DeviceLibraryState*>(library);
+}
 
 static ModuleState* _getModule(SlangNVVMModuleHandle module)
 {
@@ -3488,6 +3542,124 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     return SLANG_OK;
 }
 
+// This pilot admits scalar Float32/Float64 ABI values. The selected definition, not this
+// classification, determines which complete function signatures are accepted.
+static bool _isAdmittedDeviceLibraryType(const SlangNVVMValueTypeDesc& type)
+{
+    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.laneCount == 1 &&
+           (type.bitWidth == 32 || type.bitWidth == 64);
+}
+
+// The selected definition is the signature authority. The two names bound this pilot's public
+// admission; no parallel name-to-signature mapping exists here. For example, __nv_roundf accepts
+// float(float) only because that is the definition present in the immutable selected bitcode.
+static llvm::FunctionType* _resolveDeviceLibraryFunction(
+    DeviceLibraryState* library,
+    const SlangNVVMNamedIntrinsicDesc& desc)
+{
+    if (!library || !desc.name || (!desc.operands && desc.operandCount))
+        return nullptr;
+    llvm::StringRef name(desc.name, desc.nameSize);
+    if (name != "__nv_roundf" && name != "__nv_round")
+        return nullptr;
+    auto function = library->module->getFunction(name);
+    if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
+        function->getVisibility() != llvm::GlobalValue::DefaultVisibility || function->isVarArg() ||
+        function->getCallingConv() != llvm::CallingConv::C)
+        return nullptr;
+    const auto attributes = function->getAttributes();
+    if (attributes.getRetAttrs().hasAttributes())
+        return nullptr;
+    if (!_isAdmittedDeviceLibraryType(desc.resultType))
+        return nullptr;
+    llvm::SmallVector<llvm::Type*, 3> parameters;
+    for (size_t i = 0; i < desc.operandCount; ++i)
+    {
+        if (!_isAdmittedDeviceLibraryType(desc.operands[i].type) ||
+            desc.operands[i].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
+            attributes.getParamAttrs(unsigned(i)).hasAttributes())
+            return nullptr;
+        parameters.push_back(_getSemanticLLVMType(library->context, desc.operands[i].type));
+    }
+    auto requested = llvm::FunctionType::get(
+        _getSemanticLLVMType(library->context, desc.resultType),
+        parameters,
+        false);
+    return requested == function->getFunctionType() ? requested : nullptr;
+}
+
+static SlangResult SLANG_NVVM_CALL _isDeviceLibraryFunctionSupported(
+    SlangNVVMDeviceLibraryHandle library,
+    const SlangNVVMNamedIntrinsicDesc* function,
+    uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!library || !function || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported =
+        _resolveDeviceLibraryFunction(reinterpret_cast<DeviceLibraryState*>(library), *function) !=
+        nullptr;
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL _emitDeviceLibraryFunction(
+    SlangNVVMDeviceLibraryHandle library,
+    SlangNVVMModuleHandle module,
+    const SlangNVVMNamedIntrinsicDesc* function,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    auto state = _getModule(module);
+    auto block = _getValidInsertionBlock(state);
+    if (!function || !outValue || !block || (!operands && operandCount) ||
+        operandCount != function->operandCount ||
+        !_resolveDeviceLibraryFunction(reinterpret_cast<DeviceLibraryState*>(library), *function))
+        return SLANG_E_INVALID_ARG;
+    llvm::SmallVector<llvm::Value*, 3> values;
+    llvm::SmallVector<llvm::Type*, 3> parameters;
+    for (size_t i = 0; i < operandCount; ++i)
+    {
+        auto type = _getSemanticLLVMType(state->context, function->operands[i].type);
+        auto value = _getValue(operands[i]);
+        if (!_isValueUsableAtInsertionPoint(state, block, value) || value->getType() != type)
+            return SLANG_E_INVALID_ARG;
+        parameters.push_back(type);
+        values.push_back(value);
+    }
+    auto type = llvm::FunctionType::get(
+        _getSemanticLLVMType(state->context, function->resultType),
+        parameters,
+        false);
+    llvm::StringRef name(function->name, function->nameSize);
+    llvm::Function* declaration = nullptr;
+    if (auto existing = state->module->getNamedValue(name))
+    {
+        declaration = llvm::dyn_cast<llvm::Function>(existing);
+        if (!declaration || !declaration->isDeclaration() || !declaration->hasExternalLinkage() ||
+            declaration->getVisibility() != llvm::GlobalValue::DefaultVisibility ||
+            declaration->getFunctionType() != type ||
+            declaration->getCallingConv() != llvm::CallingConv::C ||
+            declaration->getAttributes().getRetAttrs().hasAttributes())
+            return SLANG_E_INVALID_ARG;
+        for (size_t i = 0; i < operandCount; ++i)
+            if (declaration->getAttributes().getParamAttrs(unsigned(i)).hasAttributes())
+                return SLANG_E_INVALID_ARG;
+    }
+    if (!declaration)
+        declaration = llvm::Function::Create(
+            type,
+            llvm::GlobalValue::ExternalLinkage,
+            name,
+            state->module.get());
+    *outValue =
+        reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(declaration, values));
+    return SLANG_OK;
+}
+
 static const char* _getLibdeviceFunctionName(
     SlangNVVMValueOperation operation,
     uint32_t bitWidth,
@@ -3526,8 +3698,6 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_log2f" : "__nv_log2";
         case SLANG_NVVM_VALUE_OP_LOG10:
             return isFloat32 ? "__nv_log10f" : "__nv_log10";
-        case SLANG_NVVM_VALUE_OP_ROUND:
-            return isFloat32 ? "__nv_roundf" : "__nv_round";
         case SLANG_NVVM_VALUE_OP_RSQRT:
             return isFloat32 ? "__nv_rsqrtf" : "__nv_rsqrt";
         case SLANG_NVVM_VALUE_OP_SIN:
@@ -5133,6 +5303,10 @@ static void _fillBuilderValueOperationsAPI(SlangNVVMBuilderValueOperationsAPI& a
     api.emitOperation = _emitOperation;
     api.isNamedIntrinsicSupported = _isNamedIntrinsicSupported;
     api.emitNamedIntrinsic = _emitNamedIntrinsic;
+    api.loadDeviceLibrary = _loadDeviceLibrary;
+    api.destroyDeviceLibrary = _destroyDeviceLibrary;
+    api.isDeviceLibraryFunctionSupported = _isDeviceLibraryFunctionSupported;
+    api.emitDeviceLibraryFunction = _emitDeviceLibraryFunction;
 }
 
 static void _fillBuilderAtomicOperationsAPI(SlangNVVMBuilderAtomicOperationsAPI& api)

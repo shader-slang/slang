@@ -5,7 +5,7 @@
   "archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "59ba006dd3c8a790a0859b7d7163a664344e857bf79b01451a3130e49df04a23"
+    "sha256": "9cb168cbfd6454b39cae65428a78442fbb84b7e9434449d217268f971912751a"
   },
   "features": {
     "inheritance-initialization-constants": {
@@ -12942,6 +12942,1547 @@
         "final_review": {
           "path": "build/nvvm-integer-intrinsics/review/final-candidates-review.json",
           "sha256": "7a5d0a68a3603c10731807b97247da96c66a7c381ea54266d3b8009bdfcb49f5"
+        }
+      }
+    },
+    "nvvm-libdevice-round": {
+      "status": "accepted",
+      "contract": "The selected downstream compiler owns one immutable libdevice snapshot used for both LLVM14 parsed-definition validation and actual libNVVM compilation. ABI46 named device-library calls preflight before output creation and preserve explicit IR operands. Public round uses named calls with canonical Half promotion; operation64/tag/text recognizer retire behind semantic module36. Comma-separated intrinsic arguments remain unchanged.",
+      "compiler_identity": {
+        "revision": "814e6145a1c0dbabdeb53df4575a385003214b6f",
+        "patch_sha256": "e48480a48d52f028e9f47feaba864eb516f3d9a0ff3e94e39727aa4d23d91ed1",
+        "compiler_version": "2026.18.3-340-g814e6145a",
+        "provider_abi": 46
+      },
+      "complete_provenance": {
+        "path": "build/nvvm-libdevice-round/candidate1-complete-provenance.json",
+        "sha256": "1ac0f18281546bd272cf2490315b486cdc875cce7cd0626f7f98fcdd6279612c"
+      },
+      "runtime_sha256": {
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ec7b2c233ff580d1e90087569a434cd2acb33de60bf3e8bb8f56581e6e7a947e",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "91c80ae6e8b75e98f7d3dbdd6090a7e593903a75ca18a6e567247aeafeebe588",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "6d6eb23100e8b18327fce26cd1e4886a1872be6a41d66f9a2834e75db2c72a2d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "e7f65b0699b2d3541ff2f3006425552062e3e7b48e913535332a0a5ee4de3ffa",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "3fb5a4cf3e926d51c1a8fc4b676b39af5f3601be5d597eccc83945c00fc21f99",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "3fb5a4cf3e926d51c1a8fc4b676b39af5f3601be5d597eccc83945c00fc21f99",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "b719ec3d9c1b14c06a4603b734cc02f6979a54e4b89d33c3be53123ab45ee03a",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "2ff0029994e998dcda3071a86421eb8fef20b94997dc5db117db2307178c5ba4",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "3fb5a4cf3e926d51c1a8fc4b676b39af5f3601be5d597eccc83945c00fc21f99",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "1aca151f86b08df244e21fbfc102736fe02f7c4c2b298e883206433685bc378f",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "2225f75d45b54ebf584a6d34354aa307f643efb765a79705246d948bc8c77023",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "3d85c0a3d393f5f104af7b343bf23f4bef05e241da299a8d240f73307fe00930",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "345e12d290b0d2637b06d0726895e05f8c219b5e514cecd8d7bc429176ffd28e",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "2b32a8b0a5e608df765f956acdb8c431d9ae5c5ef28dcf9ed24bb32b3d05a904",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "3bcedcd2caf6c8188b624083b95993a131032757fc8d9aca18c9d12e406ea86c",
+        "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "345cd0b8e93024bfa754171de0a47c0034ddb5f0909e9bf39b3f6d079f184ab0",
+        "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+        "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+        "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+        "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+        "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+      },
+      "source_sha256": {
+        "extras/test-generators/check-nvvm-round-oracles.py": "90ff43f238ac1566163e3b42bf447ee80f96de5e27b3a5f0debdab008285dfe9",
+        "extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+        "issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+        "issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+        "issue-nvvm-backend/test-nvvm-results.py": "fe45fb97d1d7a28b8e7a28b1ae3a6cef61e8e9d0dbbece3ba5c5fd23901ac044",
+        "issue-nvvm-backend/test-nvvm-surface-results.py": "f9dbc427eecc11b081133f7f885ec9c86eaa46c73906ad43673f7e22b4a1b1b0",
+        "source/compiler-core/slang-downstream-compiler.h": "1c80b8ff6db706209e488868a236ab296a9ac69bdb89c27aa45b902ab0eea9b9",
+        "source/compiler-core/slang-nvvm-compiler.cpp": "66ae4d9da5e2f0e091da0c9be42abe8646cbe32cda6386c8dc6e62b03b966ed2",
+        "source/compiler-core/slang-nvvm-compiler.h": "07ef530112df8967a6b35ac0d97fbf2e35f8aac7e339153b2b832f885cc6c70f",
+        "source/compiler-core/slang-nvvm-ir-builder-api.h": "cca013597e712baad893d46e819f455a749d6a3703fd5c05891f46dca80c96d1",
+        "source/compiler-core/slang-nvvm-ir-builder.cpp": "69ac1c1e90400478b5043ca8772c9707102d950a5597059365f625c927b4b721",
+        "source/compiler-core/slang-nvvm-ir-builder.h": "f3fc12f9f413cdd7baadd14ab7783aa4a9d82c005c354598e30fb89af86db873",
+        "source/compiler-core/slang-nvvm-semantic-catalog.h": "3e5b277423d557afe226e1cf9018bf6bc40ea2ed8be20fffe75dae1e9ef9a8dd",
+        "source/core/slang-math.h": "14a6ef54d2152724f041ee7e235e7feef34bb74d853214efff70f98ab00a26ce",
+        "source/slang-llvm-nvvm/CMakeLists.txt": "0fa513a14c47406f51e70e28fc7e8d9e43029f4dbc514464d411c46913dc3040",
+        "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "a98d9b4e8f9363b3d223db08631b5828381f0cdb23a19963851180daba59623f",
+        "source/slang/hlsl.meta.slang": "9f346e3f25dda3856697e47362184995dfae134cb0f66825e2c6c68d3e8624f5",
+        "source/slang/slang-capabilities.capdef": "fd3811a5e00e8f601c61c121f2e6ca193af7c563dc8edfa440810d80cf43243a",
+        "source/slang/slang-code-gen.cpp": "663ac5fdb83df4801e605d0d45d0cbd13568a7c85b96805ef59d586f99082f34",
+        "source/slang/slang-code-gen.h": "8d6c3938bce5adf8e107f870c7111d693b0de5587e72f66622f88f988c3afd1d",
+        "source/slang/slang-diagnostics.lua": "8854ee6c777e219d2e2601ad3347d99fc49541ce882abff9b0c88bc280e43643",
+        "source/slang/slang-emit-nvvm-plan.cpp": "a0acf9aea1d676bf57c6f9cd8d81b454784ee87ddd015e2be046df85f4f5cf1a",
+        "source/slang/slang-emit-nvvm-plan.h": "4805b9b98e00aefa2e52cb6fdbccf647dbdbc7f503ed5dfa38421dddabe1a7d1",
+        "source/slang/slang-emit-nvvm-type-lowering.cpp": "44220e32e5de3680d7c9de8f0a0fdd813bcc0c16c393569f30fbc26c6317a6e3",
+        "source/slang/slang-emit-nvvm-type-lowering.h": "3ddee6db29f6478fc40c2f2a773b68fb8d61152f3c0895a1acaa8e7ed244b99d",
+        "source/slang/slang-emit-nvvm.cpp": "54e93d8fc566eadcecdc15760ffeac64a66ddb0b7de49ef403aae4e6235728d6",
+        "source/slang/slang-emit-nvvm.h": "0310ccb91ffe83993ed3a6a31ad8d0b4e6f03297476ca9691baed41a4646857c",
+        "source/slang/slang-emit.cpp": "7811bc1a679fcd4dad0b20ef53f9a72b7c54064cd3c9dabdeb7d15825fedb134",
+        "source/slang/slang-ir-insts-stable-names.cpp": "2cc2cba677372f96a002e77c80209a0a4bbb1bc09681c55cafc8788ffc9eba52",
+        "source/slang/slang-ir-insts-stable-names.lua": "79988d4930d4ddef9a225b5d3c0bb0378e88775506174b0e533641fac172a9ae",
+        "source/slang/slang-ir-insts.h": "0fe173222e77bdf83c10a306134de3ed0964457d093c24e41033b45508c0ec90",
+        "source/slang/slang-ir-insts.lua": "11929fa69ce3edd0004f7c188cb4ecd32b33fb1312acc5684d871280d0f74430",
+        "source/slang/slang-ir-legalize-varying-params.cpp": "604316b88489155cd650af50c575b6c10e3dd732d084028d3833de2eea0ade1c",
+        "source/slang/slang-ir-legalize-varying-params.h": "486f41fc027de37525d1bf43ba2bea9541456fd0acbfbe550059340f1111b92e",
+        "source/slang/slang-ir-link.cpp": "c6ea65df9dda0f0ece57e461b04924b040e3bb60b008a1984de39687d4a0eaa0",
+        "source/slang/slang-ir-nvvm-surface-legalize.cpp": "9a0c0633b9efc440b1cad217bb3de1f6dd3d6169bc7dc28937f3c2119b735452",
+        "source/slang/slang-ir-nvvm-surface-legalize.h": "8d44137fce5831618e760fae33145e7fe1478db251b6463c8a3675960bcdb421",
+        "source/slang/slang-ir-specialize-target-switch.cpp": "a92cefa907649d069f6a33d4820e323b986d0bc9e267df2306f1d7768aea7f33",
+        "source/slang/slang-ir.cpp": "739b788ee3b25eb06e9d23f11f097c07ed9c33dd8699b4dde8c8fb185f32585f",
+        "source/slang/slang-ir.h": "5a803a69eaef9f37cb9f453890ebc9635325f18b010bc502a4f55b5d96b31abd",
+        "source/slang/slang-lower-to-ir.cpp": "f9b955244482ff9176a95141432b7477268d55abd989f78ef9b396c91ec1d44c",
+        "source/slang/slang-nvvm-intrinsic-semantics.h": "b9032a277e52c4926c2c997da63f2334955283594a41666ea5e2cfc8eb9b153c",
+        "source/slang/slang-target-program.cpp": "981ac0f346f530bf2771d0c35de120c1e34775c864e6db92b38c4e3667de154c",
+        "source/slang/slang-target-program.h": "8c099401dd90e7f639d4fff73a4b0e730f918ccb604aa45277a9b1b1b081afa3",
+        "source/slang/slang-target.cpp": "e5e91df76a52c3d25fbbb45f05742c77c51e750e3d6234d878fdf933e4103133",
+        "tests/cuda/nvvm-conversion-intrinsics.slang": "5f1fa934357b35fd992be457f8fc700c2c63aa37ad06c4327752ecd54e933d7e",
+        "tests/cuda/nvvm-conversion-producers.slang": "26a63cbf669cc446d14b0c02fd45ce284b2f08a3639457b34d4ec9d90fabedec",
+        "tests/cuda/nvvm-execution-register-varyings.slang": "7ae06c4ab5d3d5264ab280cb54e05ddc6e03dfa4bc106168a64a1e711036c151",
+        "tests/cuda/nvvm-formatted-surface-1d.slang": "33d99344938e68332ab3383e9aa9e2429f91b0f42319dd59416377e0c887e7db",
+        "tests/cuda/nvvm-formatted-surface-provenance.slang": "0552db2a047458da06b657e13e6134fa5dcd65a988e006f98fd6b1b99e5e67b4",
+        "tests/cuda/nvvm-half-narrow-conversion.slang": "94d4d62c5191ebac109c23bf9c8a13ff8587faea104506a63e75c8093eaf6231",
+        "tests/cuda/nvvm-integer-count-small.slang": "473f4356e4f27835abd299bac7c40a6a39aeed3279aa9ed89e0cbf773e97eafc",
+        "tests/cuda/nvvm-integer-intrinsics-16.slang": "cd6050715a0fa312e73ee95a49ec4d986d7397854ae0cea50c0aa0db30e681d9",
+        "tests/cuda/nvvm-integer-intrinsics-32.slang": "3b7a2736be26d1c0d0bd3371c284cfb4789bd445a84213c039a617574e6eea96",
+        "tests/cuda/nvvm-integer-intrinsics-64.slang": "639b98caef4eaf3f6a860db540188ca310b6066c202a82de9b07babdb6557003",
+        "tests/cuda/nvvm-integer-intrinsics-8.slang": "8f68cefc18c843ded2664a6087a60aa6ab57f58a4ee21d089301cc9e852b7e40",
+        "tests/cuda/nvvm-integer-producers.slang": "4192c29a13b4a09bb530fa86f2e63254b59fd6883fe322e5a736c96988aca94c",
+        "tests/cuda/nvvm-intrinsic-removed-tag.slang": "58bef803fceff4bb1777328317ca8de7543a4aebb79b916a124e5736af7de7cd",
+        "tests/cuda/nvvm-native-float-surface-unsupported.slang": "87ff9a461478549ce9f05ca5ea8ec841c58bb5d5e28f1de7b65c2b6d7b9eef74",
+        "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "a65c7f557552a5c5751e8d7568ac409955c324d07516557aed78e64d9065b155",
+        "tests/cuda/nvvm-round-32.slang": "ce0eaadce1dc43b2cf31345ed8fe6130ab3cee7ace40968ee48df44570f73881",
+        "tests/cuda/nvvm-round-64.slang": "b37fd71088d194ea308a66e765dda55461b178e53b64eb65893df21967cd28e5",
+        "tests/cuda/nvvm-round-half.slang": "797e49be38410b0c125c32618acfe098d3482dd04d65619ee34e0e5e01067461",
+        "tests/cuda/nvvm-round-removed-tag.slang": "ef689e21fb13e1a5f8067ac2b5ae71dbd5a129b1014ed821d431994d33a2167e",
+        "tests/cuda/nvvm-surface-physical-boundaries.slang": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+        "tests/cuda/nvvm-surface-physical-half-load.slang": "336e3472249cb1c8484186cc030425d947fee293d03e1ef453658d79a93eb605",
+        "tests/cuda/nvvm-surface-physical-half-nan.slang": "d85a95b38d14422a72fa85ce4fffe87991e0eacc2c05fcd076756959975c097b",
+        "tests/cuda/nvvm-surface-physical-integers.slang": "f511d4b368d2492a45d38dbdfa8deef58aa141f28dee0294bd011a1aa73f4428",
+        "tests/cuda/nvvm-surface-physical-matrix.slang": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+        "tests/cuda/nvvm-surface-physical-mixed.slang": "17289477e7ef073a3d4274fa9baf1348089e0a3fe96b2d448c950b4a861bbf81",
+        "tests/cuda/nvvm-synchronization-effects.slang": "9100420d9405e71b4a7c6febc4211263e3f56f0f3399a1d7f1dab90f247db3f7",
+        "tests/cuda/nvvm-target-switch-explicit-args.slang": "9e5a98ef37cc14a0dcc6da82be143dc1193c6556fc6a6b7d6e04ce6befe0d086",
+        "tests/cuda/nvvm-varyings-multiple-entries.slang": "426bf32b5116ad9bafcaacc2cc83f7fd1ea342ea89684a2d534a6a2174ca9ded",
+        "tests/language-feature/capability/target-switch-dead-helper.slang": "f189bfc20a67d751433235b69f3b6da5b17c504a953dd5ad9feb18a2a99b5a99",
+        "tests/language-feature/capability/target-switch-layout-lifetime.slang": "0a2ae41e56ebd0a78be15364c1cd24c1fbf1142b29402604358c9faf3b48ee17",
+        "tests/language-feature/execution-model/group-memory-barrier-no-sync-emission.slang": "80e6fa88f20d46b794593443b12537d29c9687536bd5f00e9cbe5c39e9b8234d",
+        "tools/slang-static-unit-test/unit-test-module-version.cpp": "56908c843ddd745d6f2744a43363f0f3b77b30c7f2faac90f9953b2c760e231f",
+        "tools/slang-unit-test/test-data/nvvm/README.md": "00efd60ee5624125b3696411a50f9541c49416335e0916a51181b67a0942d7f3",
+        "tools/slang-unit-test/test-data/nvvm/generate-library-signatures.py": "bc2b361ee0d414853e27f1413683bc4abb15daa463549dfcadc85cd969cbfb90",
+        "tools/slang-unit-test/test-data/nvvm/library-available-externally.ll": "4c4892cda6a30b03dd6ddab38a5a9eadfa12a170801a61107e7143ae4725c728",
+        "tools/slang-unit-test/test-data/nvvm/library-fastcc.ll": "3feff7caf90a02a09d9a9de12dd3e2fd289ccbade912f5a21162d703599ec5c2",
+        "tools/slang-unit-test/test-data/nvvm/library-hidden.ll": "1546ec66924ccfc84fe9771944bc92ee095fb2204f887f90efc784e89409b1af",
+        "tools/slang-unit-test/test-data/nvvm/library-internal.ll": "3d4a212d88b1a80fd34935c776daaf77af90efd96dac12e11faaa85e2c62bf7e",
+        "tools/slang-unit-test/test-data/nvvm/library-invalid-fastcc-variadic.ll": "571bb593d498dd9ded21e6810ff4db25ff6c687cc2ba20144e8942689c0c2bc0",
+        "tools/slang-unit-test/test-data/nvvm/library-parameter-inreg.ll": "6b572bdbd244a9472bd0f82f887cac1d616d7aa615d3dd45c282a2014b026d7a",
+        "tools/slang-unit-test/test-data/nvvm/library-return-inreg.ll": "83985ebd55d1cd6c66588ce88ad6f5d6403c2c178632224b4a78c6a914a34101",
+        "tools/slang-unit-test/test-data/nvvm/library-variadic.ll": "56a756f67a0fcad9a933504f4ea12da1225f4b74a0fe071355707c725e548695",
+        "tools/slang-unit-test/unit-test-math.cpp": "4795db3844aabf94aa8e83dcc6fe05be2dde4b4712a0814fd3cfe5d870a1ef77",
+        "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "53d36b6fe3a0b342d232efe7646cd3e72f73b4263200433699cd2987476dc579",
+        "tools/slang-unit-test/unit-test-nvvm-compiler.cpp": "812e5a6851da5c13b3f787da68552466eb0b84c9f49c64b0802334888af48c1e",
+        "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "0cf897d132079ab6d57b8544411872552a7cfdbd68c717aeeefb1afe371bee15",
+        "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "c6559d802059a47f87617089f18d33ed65cd74930ed995422d469580167f10fe",
+        "tools/slang-unit-test/unit-test-nvvm-library-signature-fixtures.h": "f4d0eff9d1daf46a092635eb3f560b8f4323815bbdab76971044b23e25321f1a",
+        "tools/slang-unit-test/unit-test-nvvm-routing.cpp": "298b14e6b445d1188c8874a18792be7fa77ce531374076268f778c5d0d3aba15",
+        "tools/slang-unit-test/unit-test-nvvm-support.h": "40c317f134d6860822f20dc368e8ce651e4201699cc3b0574c1f1cda45a34cd8"
+      },
+      "focused_gates": {
+        "units": {
+          "record": {
+            "path": "build/nvvm-libdevice-round/final36-2-units.json",
+            "sha256": "33a06d3bd8f0e74e4b8293e5ed9458a6123161222a988b41fc4e1a831c7584d9"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "slang-unit-test-tool/nvvmCompilerAcceptsLLVMBitcodeArtifact",
+              "slang-unit-test-tool/nvvmCompilerClassifiesVerificationAndCompilationFailures",
+              "slang-unit-test-tool/nvvmCompilerCompilesEmptyKernel",
+              "slang-unit-test-tool/nvvmCompilerCompilesEmptyKernelBitcode",
+              "slang-unit-test-tool/nvvmCompilerCompilesSelfContainedLibdeviceSine",
+              "slang-unit-test-tool/nvvmCompilerCompilesTrivialIR",
+              "slang-unit-test-tool/nvvmCompilerDestroysProgramsOnFailure",
+              "slang-unit-test-tool/nvvmCompilerDeviceLibrarySnapshotDefaultsForOldOptions",
+              "slang-unit-test-tool/nvvmCompilerDeviceLibrarySnapshotOwnsSelectedBytes",
+              "slang-unit-test-tool/nvvmCompilerEnforcesFloatingPointPolicy",
+              "slang-unit-test-tool/nvvmCompilerHandlesLibdeviceModuleAddition",
+              "slang-unit-test-tool/nvvmCompilerLibdeviceSinePtxasAccepts",
+              "slang-unit-test-tool/nvvmCompilerLibdeviceSineRuns",
+              "slang-unit-test-tool/nvvmCompilerNegotiatesCUDADeviceLibraryOption",
+              "slang-unit-test-tool/nvvmCompilerOwnsLibrary",
+              "slang-unit-test-tool/nvvmCompilerPreservesVerifierLogOnCompilationFailure",
+              "slang-unit-test-tool/nvvmCompilerRejectsInvalidInputs",
+              "slang-unit-test-tool/nvvmCompilerRejectsTerminatorOnlyResult",
+              "slang-unit-test-tool/nvvmCompilerRejectsUnavailableRequestedLibdevice",
+              "slang-unit-test-tool/nvvmCompilerRejectsUnterminatedResult",
+              "slang-unit-test-tool/nvvmCompilerUsesErrorStringForEmptyLog",
+              "slang-unit-test-tool/nvvmCompilerUsesSelectedToolkitLibdevice",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsExactLibdeviceUnaryOperations",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsIntegerBitOperations",
+              "slang-unit-test-tool/nvvmIRBuilderBuildsScalarMathOperations",
+              "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryEmitsAndRejectsWithoutMutation",
+              "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryPreservesParseDiagnostics",
+              "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryRejectsUnsupportedABI",
+              "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryUsesSelectedDefinitions",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicSignaturesArePure",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicsPreserveOperandContracts",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicsRejectConflictingSymbols",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicsRejectForeignValuesWithoutMutation",
+              "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure",
+              "slang-unit-test-tool/nvvmIRBuilderNegotiatesExactCurrentABI",
+              "slang-unit-test-tool/nvvmIRBuilderRejectsCurrentABIMismatches",
+              "slang-unit-test-tool/nvvmIRBuilderRejectsRetiredRoundWithoutMutation",
+              "slang-unit-test-tool/nvvmIRBuilderRequiresCompleteCurrentInterfaces",
+              "slang-unit-test-tool/nvvmIRBuilderRequiresDeviceLibraryInterface",
+              "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface",
+              "slang-unit-test-tool/nvvmSlangBuilderDiagnosticsStopBeforeLibNVVM",
+              "slang-unit-test-tool/nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary",
+              "slang-unit-test-tool/nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation",
+              "slang-unit-test-tool/nvvmSlangIntegerBitHelpersRequestTypedOperations",
+              "slang-unit-test-tool/nvvmSlangLegacyRoundAssemblyRejectsBeforeOutputCreation",
+              "slang-unit-test-tool/nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations",
+              "slang-unit-test-tool/nvvmSlangMaskedWaveScalarHelpersUseGenericLoops",
+              "slang-unit-test-tool/nvvmSlangNamedIntegerIntrinsicsPreserveExplicitOperands",
+              "slang-unit-test-tool/nvvmSlangNamedIntegerIntrinsicsRejectBeforeModuleCreation",
+              "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation",
+              "slang-unit-test-tool/nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation",
+              "slang-unit-test-tool/nvvmSlangNamedSynchronizationUsesVoidReturn",
+              "slang-unit-test-tool/nvvmSlangPublicRoundUsesNamedDeviceLibrary",
+              "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes",
+              "slang-unit-test-tool/nvvmSlangScalarMathHelpersRequestTypedOperations",
+              "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder",
+              "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission"
+            ],
+            "started_utc": "2026-09-30T02:56:29.316137+00:00",
+            "completed_utc": "2026-09-30T02:56:44.101615+00:00",
+            "return_code": 0,
+            "elapsed_seconds": 14.785501718521118,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-units.log",
+            "log_sha256": "711f357223417c76c887418c71692da70a9ceb07b4d5dae432d2fbd195dc693b"
+          },
+          "log": {
+            "path": "build/nvvm-libdevice-round/final36-2-units.log",
+            "sha256": "711f357223417c76c887418c71692da70a9ceb07b4d5dae432d2fbd195dc693b"
+          },
+          "counts": {
+            "passed": 58
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderRejectsCurrentABIMismatches.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRequiresCompleteCurrentInterfaces.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsAndValidatesCUDAExecutionOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsIntegerBitOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsExactLibdeviceUnaryOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsScalarMathOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicSignaturesArePure.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicsPreserveOperandContracts.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNegotiatesExactCurrentABI.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicsRejectForeignValuesWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntegerIntrinsicsRejectConflictingSymbols.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRequiresNamedIntrinsicInterface.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryUsesSelectedDefinitions.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryRejectsUnsupportedABI.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryPreservesParseDiagnostics.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryEmitsAndRejectsWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRejectsRetiredRoundWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerOwnsLibrary.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRequiresDeviceLibraryInterface.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerRejectsInvalidInputs.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerNegotiatesCUDADeviceLibraryOption.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerAcceptsLLVMBitcodeArtifact.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerUsesSelectedToolkitLibdevice.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerHandlesLibdeviceModuleAddition.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerRejectsUnavailableRequestedLibdevice.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerCompilesTrivialIR.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerEnforcesFloatingPointPolicy.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerRejectsTerminatorOnlyResult.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerRejectsUnterminatedResult.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerDestroysProgramsOnFailure.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerClassifiesVerificationAndCompilationFailures.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerUsesErrorStringForEmptyLog.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerPreservesVerifierLogOnCompilationFailure.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerCompilesSelfContainedLibdeviceSine.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerLibdeviceSinePtxasAccepts.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerCompilesEmptyKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerCompilesEmptyKernelBitcode.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerDeviceLibrarySnapshotOwnsSelectedBytes.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerDeviceLibrarySnapshotDefaultsForOldOptions.internal": "passed",
+            "slang-unit-test-tool/nvvmCompilerLibdeviceSineRuns.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangBuilderDiagnosticsStopBeforeLibNVVM.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangIntegerBitHelpersRequestTypedOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangScalarMathHelpersRequestTypedOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveScalarHelpersUseGenericLoops.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedIntegerIntrinsicsPreserveExplicitOperands.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedIntegerIntrinsicsRejectBeforeModuleCreation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangTargetSwitchSelectsExplicitIntrinsicInEitherOrder.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedSynchronizationUsesVoidReturn.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangPublicRoundUsesNamedDeviceLibrary.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLegacyRoundAssemblyRejectsBeforeOutputCreation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal": "passed"
+          }
+        },
+        "source_and_gpu": {
+          "record": {
+            "path": "build/nvvm-libdevice-round/final36-2-focused-source.json",
+            "sha256": "2f3674c97a45bc0138444c9ff39166433a955e5e459c4f8d9144dd6d986df1ac"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "tests/cuda/nvvm-round-32.slang",
+              "tests/cuda/nvvm-round-64.slang",
+              "tests/cuda/nvvm-round-half.slang",
+              "tests/cuda/nvvm-round-removed-tag.slang"
+            ],
+            "started_utc": "2026-09-30T02:56:44.144304+00:00",
+            "completed_utc": "2026-09-30T02:56:50.052780+00:00",
+            "return_code": 0,
+            "elapsed_seconds": 5.908502101898193,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-focused-source.log",
+            "log_sha256": "c8f905a25c11dc1cd41ba5ff19d95e21de92e2a400cc769657d07a5ce570c557"
+          },
+          "log": {
+            "path": "build/nvvm-libdevice-round/final36-2-focused-source.log",
+            "sha256": "c8f905a25c11dc1cd41ba5ff19d95e21de92e2a400cc769657d07a5ce570c557"
+          },
+          "counts": {
+            "passed": 10
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-round-32.slang (cuda)": "passed",
+            "tests/cuda/nvvm-round-64.slang (cuda)": "passed",
+            "tests/cuda/nvvm-round-32.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-round-64.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-round-32.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-round-64.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-round-removed-tag.slang": "passed",
+            "tests/cuda/nvvm-round-half.slang (cuda)": "passed",
+            "tests/cuda/nvvm-round-half.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-round-half.slang.2 (cuda)": "passed"
+          }
+        },
+        "capability": {
+          "record": {
+            "path": "build/nvvm-libdevice-round/final36-2-capability.json",
+            "sha256": "138b380dcdca410c8ad49863a62fd128b00c3246b1c98122a0b32bbcb3a225c1"
+          },
+          "gate": {
+            "command": [
+              "build/RelWithDebInfo/bin/slang-test",
+              "-use-test-server",
+              "-server-count",
+              "2",
+              "-disable-retries",
+              "tests/language-feature/capability",
+              "tests/bugs/segfault_on_empty_capability_switch_case.slang"
+            ],
+            "started_utc": "2026-09-30T02:57:03.397391+00:00",
+            "completed_utc": "2026-09-30T02:57:06.827681+00:00",
+            "return_code": 0,
+            "elapsed_seconds": 3.4303154945373535,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-capability.log",
+            "log_sha256": "f97f0dc595377a8da0952a164ec7601a3fc35e538797d55f229cc5bbdd672e9b"
+          },
+          "log": {
+            "path": "build/nvvm-libdevice-round/final36-2-capability.log",
+            "sha256": "f97f0dc595377a8da0952a164ec7601a3fc35e538797d55f229cc5bbdd672e9b"
+          },
+          "counts": {
+            "passed": 106
+          },
+          "outcomes": {
+            "tests/language-feature/capability/address-of.slang": "passed",
+            "tests/bugs/segfault_on_empty_capability_switch_case.slang": "passed",
+            "tests/bugs/segfault_on_empty_capability_switch_case.slang.1": "passed",
+            "tests/bugs/segfault_on_empty_capability_switch_case.slang.2": "passed",
+            "tests/language-feature/capability/address-of.slang.1": "passed",
+            "tests/language-feature/capability/alternative-vendor-capability-warning.slang": "passed",
+            "tests/language-feature/capability/builtin-operator-operand-capability.slang": "passed",
+            "tests/language-feature/capability/alternative-vendor-capability-warning.slang.1": "passed",
+            "tests/language-feature/capability/capability-inheritance-1.slang": "passed",
+            "tests/language-feature/capability/capability-interface-requirement-1.slang": "passed",
+            "tests/language-feature/capability/capability-invalid-compute-in-fragment.slang": "passed",
+            "tests/language-feature/capability/capability-invalid-compute-in-fragment.slang.1": "passed",
+            "tests/language-feature/capability/capability-invalid-fragment-in-compute.slang": "passed",
+            "tests/language-feature/capability/capability-invalid-fragment-in-compute.slang.1": "passed",
+            "tests/language-feature/capability/capability1.slang": "passed",
+            "tests/language-feature/capability/capability1.slang.1": "passed",
+            "tests/language-feature/capability/capability2.slang": "passed",
+            "tests/language-feature/capability/capability2.slang.1": "passed",
+            "tests/language-feature/capability/capability3.slang": "passed",
+            "tests/language-feature/capability/capability3.slang.1": "passed",
+            "tests/language-feature/capability/capability4.slang": "passed",
+            "tests/language-feature/capability/capability4.slang.1": "passed",
+            "tests/language-feature/capability/capability5.slang": "passed",
+            "tests/language-feature/capability/capability5.slang.1": "passed",
+            "tests/language-feature/capability/capability5.slang.2": "passed",
+            "tests/language-feature/capability/capability5.slang.3": "passed",
+            "tests/language-feature/capability/capability5.slang.4": "passed",
+            "tests/language-feature/capability/capability6.slang": "passed",
+            "tests/language-feature/capability/capability6.slang.1": "passed",
+            "tests/language-feature/capability/capability7.slang": "passed",
+            "tests/language-feature/capability/capability7.slang.1": "passed",
+            "tests/language-feature/capability/capability8.slang": "passed",
+            "tests/language-feature/capability/capability8.slang.1": "passed",
+            "tests/language-feature/capability/capabilitySimplification1.slang": "passed",
+            "tests/language-feature/capability/capabilitySimplification1.slang.1": "passed",
+            "tests/language-feature/capability/capabilitySimplification2.slang": "passed",
+            "tests/language-feature/capability/capabilitySimplification2.slang.1": "passed",
+            "tests/language-feature/capability/capabilitySimplification2.slang.2": "passed",
+            "tests/language-feature/capability/capabilitySimplification2.slang.3": "passed",
+            "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang": "passed",
+            "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.1": "passed",
+            "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.2": "passed",
+            "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.3": "passed",
+            "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.4": "passed",
+            "tests/language-feature/capability/cpp-target-graphics-stage.slang": "passed",
+            "tests/language-feature/capability/cpp-target-graphics-stage.slang.1": "passed",
+            "tests/language-feature/capability/cpp-target-graphics-stage.slang.2": "passed",
+            "tests/language-feature/capability/cpp-target-graphics-stage.slang.3": "passed",
+            "tests/language-feature/capability/cpp-target-graphics-stage.slang.4": "passed",
+            "tests/language-feature/capability/cpp-target-graphics-stage.slang.5": "passed",
+            "tests/language-feature/capability/cpp-target-has-cpp-impl-from-default.slang": "passed",
+            "tests/language-feature/capability/cpp-target-has-cpp-impl-from-default2.slang": "passed",
+            "tests/language-feature/capability/cpp-target-missing-cpp-impl.slang": "passed",
+            "tests/language-feature/capability/cpp-target-missing-cpp-impl.slang.1": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-1.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-2.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-2.slang.1": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-3.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-4.slang": "passed",
+            "tests/language-feature/capability/capability-as-string.slang (vk)": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-5.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-6.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-8.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-7.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-9.slang": "passed",
+            "tests/language-feature/capability/explicit-shader-stage-7.slang.1": "passed",
+            "tests/language-feature/capability/no-spurious-capability-for-inverse.slang": "passed",
+            "tests/language-feature/capability/profile-implicitly-upgraded.slang": "passed",
+            "tests/language-feature/capability/profile-implicitly-upgraded.slang.1": "passed",
+            "tests/language-feature/capability/sm-6-0-subgroup-basic-no-warning.slang": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.1": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.2": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.3": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.4": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.5": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.6": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.7": "passed",
+            "tests/language-feature/capability/specializeTargetSwitch.slang.8": "passed",
+            "tests/language-feature/capability/target-switch-dead-helper.slang": "passed",
+            "tests/language-feature/capability/target-switch-dead-helper.slang.1": "passed",
+            "tests/language-feature/capability/target-switch-dead-helper.slang.2": "passed",
+            "tests/language-feature/capability/target-switch-layout-lifetime.slang": "passed",
+            "tests/language-feature/capability/target-switch-layout-lifetime.slang.1": "passed",
+            "tests/language-feature/capability/target-switch-layout-lifetime.slang.2": "passed",
+            "tests/language-feature/capability/target-switch-layout-lifetime.slang.3": "passed",
+            "tests/language-feature/capability/target-switch-layout-lifetime.slang.4": "passed",
+            "tests/language-feature/capability/target-switch-layout-lifetime.slang.5": "passed",
+            "tests/language-feature/capability/target-switch-merge-target-rule-1.slang": "passed",
+            "tests/language-feature/capability/target-switch-merge-target-rule.slang": "passed",
+            "tests/language-feature/capability/intrinsic-texture-ignore-capability.slang": "passed",
+            "tests/language-feature/capability/testing-framework-with-profiles.slang (vk)": "passed",
+            "tests/language-feature/capability/testing-framework-with-profiles.slang.1 (vk)": "passed",
+            "tests/language-feature/capability/testing-framework-with-profiles.slang.2": "passed",
+            "tests/language-feature/capability/testing-framework-with-profiles.slang.3": "passed",
+            "tests/language-feature/capability/intrinsic-texture-ignore-capability.slang.1": "passed",
+            "tests/language-feature/capability/usingInternalCapabilityWarning.slang": "passed",
+            "tests/language-feature/capability/usingInternalCapabilityWarning.slang.1": "passed",
+            "tests/language-feature/capability/var-capability-incompatible.slang": "passed",
+            "tests/language-feature/capability/var-capability-wgsl-2.slang": "passed",
+            "tests/language-feature/capability/testing-framework-with-profiles.slang.4": "passed",
+            "tests/language-feature/capability/var-capability-wgsl.slang": "passed",
+            "tests/language-feature/capability/var-capability-wgsl.slang.1": "passed",
+            "tests/language-feature/capability/testing-framework-with-profiles.slang.5": "passed",
+            "tests/language-feature/capability/var-implicit-capability-wgsl.slang": "passed",
+            "tests/language-feature/capability/var-implicit-capability-wgsl.slang.1": "passed"
+          }
+        },
+        "oracle": {
+          "record": {
+            "path": "build/nvvm-libdevice-round/final36-2-oracle.json",
+            "sha256": "7a70d02f637d071a1ab445436b42b28e8ed4a7f8c3d46a4375e22d99a6a424b2"
+          },
+          "gate": {
+            "command": [
+              "python3",
+              "extras/test-generators/check-nvvm-round-oracles.py",
+              "--check"
+            ],
+            "started_utc": "2026-09-30T02:56:29.235140+00:00",
+            "completed_utc": "2026-09-30T02:56:29.274216+00:00",
+            "return_code": 0,
+            "elapsed_seconds": 0.03909134864807129,
+            "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-oracle.log",
+            "log_sha256": "8e366923ea2d0c8ad8821673b56bc1c5d8478ddd59e12da22b41ba20b2cba733"
+          },
+          "log": {
+            "path": "build/nvvm-libdevice-round/final36-2-oracle.log",
+            "sha256": "8e366923ea2d0c8ad8821673b56bc1c5d8478ddd59e12da22b41ba20b2cba733"
+          }
+        }
+      },
+      "prototype_prerequisite": {
+        "acceptance": {
+          "path": "build/nvvm-libdevice-round/review-prototype5-acceptance.json",
+          "sha256": "3a3f431bb6503eb681ea4d7ab442f8c62b01773cb936e2e2720277a1876e9e31"
+        },
+        "counts": {
+          "units_passed": 52,
+          "new_units": 9,
+          "probe_phases": 26,
+          "probe_compiler_phases": 14,
+          "intended_E41400_negative_phases": 2,
+          "actual_typed_LLVM_calls": 12,
+          "successful_assemblies": 12,
+          "runtime_cells_passed": 9,
+          "probe_artifact_bindings_verified": 76,
+          "baseline_manifest_entries_verified": 27,
+          "source_hashes_verified": 90,
+          "configuration_hashes_verified": 2,
+          "runtime_hashes_verified": 39,
+          "layout_entries_verified": 100,
+          "equal_before_after_identity_groups": 6
+        },
+        "artifacts": {
+          "build/nvvm-libdevice-round/prototype5-source.json": "220f8bf46eeef66ca5b6c70ec1d6be6aaa5597731e2134158c1bbb33f66ee9c1",
+          "build/nvvm-libdevice-round/prototype5-runtime-before.json": "b4897b5d940aae3c0a6b889d58508146a82ecb08d55faecf8830e8cf4c5144e3",
+          "build/nvvm-libdevice-round/prototype5-runtime-after.json": "a996750cbea283ea4ce3633f1963d561f78372cde425c2dd71fd4e8a2fb3fc5e",
+          "build/nvvm-libdevice-round/prototype-inventory.json": "69761936704f2c78893794bf359fe460d2c895a55ffab176d403f1ce38a5f2d9",
+          "build/nvvm-libdevice-round/prototype5-unit-outcomes.json": "00c7e6d1631a0e18e52a2abdb3806929961ad82633d3778a884b28cd454ac6e1",
+          "build/nvvm-libdevice-round/prototype5-probes/results.json": "449c86fb2e99534c0e91d622e773e248023b499cffeaa00d40f3c2783fbc5b85",
+          "build/nvvm-libdevice-round/prototype5-probes/inputs.json": "ae3d3b5f8fc96a74b70c6c0cd423893deaa85a90664136467854a19b43941efa",
+          "build/nvvm-libdevice-round/review-prototype5-source-repair.json": "53226f08c2357e027cf88f4befb6df9a2549b3e827a90447702b122258744122",
+          "build/nvvm-libdevice-round/review-baseline-approval2.json": "9622a427fde0517e25b25da70918dd35faf5fd62c92606a5c791aa56e1da4a66",
+          "build/nvvm-libdevice-round/worker-prototype-audit.md": "ddefe24cc852299e72c31b01d6b5bc1dea73e1485ab6d5c4c3bb8260027f7df6",
+          "build/nvvm-libdevice-round/run-prototype.py": "f4adc8c697a88d354658fc67c9cb136ee121c6f975a819097f752e7b0ad72459",
+          "build/nvvm-libdevice-round/run-gate.py": "bd4f7542126a0bf6a958e24ee39dd30ee19e66a4b6d72362a98e93cf81437954",
+          "build/nvvm-libdevice-round/prototype-probes.py": "51e53c47fc201098ab234f3dd75c8f8a3c11100e88d96785c40f01f0cf2fdd68",
+          "build/nvvm-libdevice-round/prototype5-build.json": "560697cae03ae8a72d00982f2d355653470f13f1799cea89d0e920b765a25eff",
+          "build/nvvm-libdevice-round/prototype5-build.log": "f02668b30a6837ca4e4f71c90863ec95333b7b35c679b54e43fd94e10bb009cf",
+          "build/nvvm-libdevice-round/prototype5-units.json": "3a0b0a315d5170df8cf9386ba80e91466134d31e27f0abfa5386ff15f8bdede8",
+          "build/nvvm-libdevice-round/prototype5-units.log": "d34e945d42d010a95dccf7c96329c23d54aeca4223b17da803a9d4f592cda090",
+          "build/nvvm-libdevice-round/prototype5-probes.json": "cd9d4416ebe3cdb35fc35e6f05c6fff0f2e31683dbc12597389b83a784d0f749",
+          "build/nvvm-libdevice-round/prototype5-probes.log": "0972a92d2501099f1d53bc095a4f3cc666f00dfb13e5c1b25270ca4498bf4b28",
+          "build/nvvm-libdevice-round/prototype5-runtime.json": "93b56f0a40e02acbef4477ad7c1a09a065fcb6b4438c4acbc576308f87060773",
+          "build/nvvm-libdevice-round/prototype5-runtime.log": "206de25b1cf3e84519f8efdf1cc8d29c0ad73165330093d6784a0ab7676411bc",
+          "build/nvvm-libdevice-round/prototype5-validation.json": "b05bafd843f5af07d8abbc1be5c3f45ee66b78c74124e5e7ef1e2346a4313028",
+          "build/nvvm-libdevice-round/prototype5-validation.log": "7c1a9d1bed2cacb8b586af9c352c9ac76762acc61006e44c0f0b59344b36d221"
+        }
+      },
+      "focused_inventory": {
+        "path": "build/nvvm-libdevice-round/final-inventory.json",
+        "sha256": "637624bd67319b35bef0147e8804b5e5a554cd9cc444505f7e8882fc498a8c0c"
+      },
+      "runtime_contracts": [
+        {
+          "fixture": "tests/cuda/nvvm-round-32.slang",
+          "source_sha256": "ce0eaadce1dc43b2cf31345ed8fe6130ab3cee7ace40968ee48df44570f73881",
+          "modes": {
+            "nvrtc-o3": "tests/cuda/nvvm-round-32.slang (cuda)",
+            "nvvm-o0": "tests/cuda/nvvm-round-32.slang.1 (cuda)",
+            "nvvm-o3": "tests/cuda/nvvm-round-32.slang.2 (cuda)"
+          },
+          "oracle": "52 live IEEE lanes with exact host integer/Fraction rounding, scalar/helper/vector2/3/4/matrix checks, signed-zero, NaN class, guards and completion. Half preserves NVRTC ties-even and NVVM ties-away; Float32/64 use ties-away. Literal expectations are unchanged baseline bytes; read-only checker verifies both Half routes."
+        },
+        {
+          "fixture": "tests/cuda/nvvm-round-64.slang",
+          "source_sha256": "b37fd71088d194ea308a66e765dda55461b178e53b64eb65893df21967cd28e5",
+          "modes": {
+            "nvrtc-o3": "tests/cuda/nvvm-round-64.slang (cuda)",
+            "nvvm-o0": "tests/cuda/nvvm-round-64.slang.1 (cuda)",
+            "nvvm-o3": "tests/cuda/nvvm-round-64.slang.2 (cuda)"
+          },
+          "oracle": "52 live IEEE lanes with exact host integer/Fraction rounding, scalar/helper/vector2/3/4/matrix checks, signed-zero, NaN class, guards and completion. Half preserves NVRTC ties-even and NVVM ties-away; Float32/64 use ties-away. Literal expectations are unchanged baseline bytes; read-only checker verifies both Half routes."
+        },
+        {
+          "fixture": "tests/cuda/nvvm-round-half.slang",
+          "source_sha256": "797e49be38410b0c125c32618acfe098d3482dd04d65619ee34e0e5e01067461",
+          "modes": {
+            "nvrtc-o3": "tests/cuda/nvvm-round-half.slang (cuda)",
+            "nvvm-o0": "tests/cuda/nvvm-round-half.slang.1 (cuda)",
+            "nvvm-o3": "tests/cuda/nvvm-round-half.slang.2 (cuda)"
+          },
+          "oracle": "52 live IEEE lanes with exact host integer/Fraction rounding, scalar/helper/vector2/3/4/matrix checks, signed-zero, NaN class, guards and completion. Half preserves NVRTC ties-even and NVVM ties-away; Float32/64 use ties-away. Literal expectations are unchanged baseline bytes; read-only checker verifies both Half routes."
+        }
+      ],
+      "module_version_evidence": {
+        "retirement35": {
+          "gate": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/retirement35-2-modules.json",
+              "sha256": "11a57b2ba37745856b73ffc50d73f495fd4a45c08a498c2e22f2ec4882c4f60d"
+            },
+            "gate": {
+              "command": [
+                "python3",
+                "build/nvvm-libdevice-round/module-controls.py",
+                "retirement35",
+                "--output",
+                "build/nvvm-libdevice-round/retirement35-2-modules"
+              ],
+              "started_utc": "2026-09-30T02:40:45.258682+00:00",
+              "completed_utc": "2026-09-30T02:40:49.603269+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 4.344609498977661,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/retirement35-2-modules.log",
+              "log_sha256": "ce2ae6c8f825593956256b38f5978c19d4c53fa779121cc708605ecfae38dbbc"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/retirement35-2-modules.log",
+              "sha256": "ce2ae6c8f825593956256b38f5978c19d4c53fa779121cc708605ecfae38dbbc"
+            }
+          },
+          "results": {
+            "path": "build/nvvm-libdevice-round/retirement35-2-modules/results.json",
+            "sha256": "8fadc43951cb71e4cf3800750e51a95a5decf3266f787f32bf8420cd24317f69"
+          },
+          "inputs": {
+            "path": "build/nvvm-libdevice-round/retirement35-2-modules/inputs.json",
+            "sha256": "0c53d9eeaa1690f11b985e91c620841476590d9dea1eea142460486ca28e8be4"
+          },
+          "input_bindings": {
+            "phase": "retirement35",
+            "manifest": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/manifest.json",
+              "sha256": "e78b05b9385613a488cfa47b58218cb47fe05ff44977e09f94f6b8679884ae3d"
+            },
+            "frozen_module_binding": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/before-compile3/inputs.json",
+              "sha256": "f898b5f3223d4f97c98457fee7709c8992e426cff033c9e65862af7a8eae0465"
+            },
+            "modules": {
+              "build/nvvm-libdevice-round/before-compile3/public-round35.slang-module": "a2798d28f9b960f25eae34c74be415d08d0e658068f5dc0143389cb65860a356",
+              "build/nvvm-libdevice-round/before-compile3/retained-floor35.slang-module": "3d4f92c46222ce1f14a9722a70b8edb7cdb17cf4050608ccddf66ec3814e54bb",
+              "build/nvvm-libdevice-round/before-compile3/owned-round64-35.slang-module": "eb36d4146346dd8480a9d014a3aab762261d42b2bc440504f600e438828f9470",
+              "build/nvvm-libdevice-round/before-compile3/owned-round32-35.slang-module": "78943304d4bd11a7bff16096d0669eed56b5ffa2265d1f599f6b05a3a4783c12",
+              "build/nvvm-libdevice-round/before-compile3/owned-roundhalf35.slang-module": "784cd0115b1244c75844d5e927d895b5a529083d8df89a3d1ef1661b4559dfcf"
+            }
+          },
+          "cells": 19,
+          "outcomes": {
+            "public-round35-metadata": 0,
+            "public-round35-O0": 0,
+            "public-round35-O0-assembly": 0,
+            "public-round35-O3": 0,
+            "public-round35-O3-assembly": 0,
+            "owned-round32-35-metadata": 0,
+            "owned-round32-35-O0": 255,
+            "owned-round32-35-O3": 255,
+            "owned-round64-35-metadata": 0,
+            "owned-round64-35-O0": 255,
+            "owned-round64-35-O3": 255,
+            "retained-floor35-metadata": 0,
+            "retained-floor35-O0": 0,
+            "retained-floor35-O0-assembly": 0,
+            "retained-floor35-O3": 0,
+            "retained-floor35-O3-assembly": 0,
+            "owned-roundhalf35-metadata": 0,
+            "owned-roundhalf35-O0": 255,
+            "owned-roundhalf35-O3": 255
+          },
+          "source_freeze": {
+            "path": "build/nvvm-libdevice-round/retirement35-2-source.json",
+            "sha256": "c3935234d9bbb34ed51a490231442ebc7f8145716103ea8d95f53703e857d040"
+          },
+          "runtime_identity": {
+            "path": "build/nvvm-libdevice-round/retirement35-2-runtime-before.json",
+            "sha256": "aaf55277d08934e8529ca50bd0437c805307bd7988e0d26d29b6cb3c0e0b320f"
+          },
+          "runtime_identity_after": {
+            "path": "build/nvvm-libdevice-round/retirement35-2-runtime-after.json",
+            "sha256": "b909a0ff2fd0921797422a89d46acea5980b004a3f250a9bb4d3cdfd84e0c11f"
+          },
+          "build": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/retirement35-2-build.json",
+              "sha256": "08ea7855ebc20ddfd4234060dc55718e84808de2608f4ff1566dfc7b7709d903"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "--preset",
+                "releaseWithDebugInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slangc",
+                "slang-test",
+                "slang-unit-test",
+                "test-server",
+                "render-test",
+                "slang-reflection-test",
+                "slang-nvvm-provider",
+                "slang-numerics-modules"
+              ],
+              "started_utc": "2026-09-30T02:37:27.381924+00:00",
+              "completed_utc": "2026-09-30T02:38:56.528200+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 89.14630460739136,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/retirement35-2-build.log",
+              "log_sha256": "f054375eb4228b44be27e8747c28a4c316fd09d8d92a8629acbb1362356e7253"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/retirement35-2-build.log",
+              "sha256": "f054375eb4228b44be27e8747c28a4c316fd09d8d92a8629acbb1362356e7253"
+            }
+          },
+          "compiler_version": "2026.18.3-340-g814e6145a",
+          "runtime_sha256": {
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ec7b2c233ff580d1e90087569a434cd2acb33de60bf3e8bb8f56581e6e7a947e",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slang-test.dwarf": "91c80ae6e8b75e98f7d3dbdd6090a7e593903a75ca18a6e567247aeafeebe588",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "6d6eb23100e8b18327fce26cd1e4886a1872be6a41d66f9a2834e75db2c72a2d",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libplatform.so": "e7f65b0699b2d3541ff2f3006425552062e3e7b48e913535332a0a5ee4de3ffa",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so": "8fe565a93ae5a11e84793d440c28fafaca8b10ae7e421d270e6a45efc181c49c",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "8fe565a93ae5a11e84793d440c28fafaca8b10ae7e421d270e6a45efc181c49c",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "dd9b02482d20d6ad5fbeb36fdbda668dab6c92410659c848bc8289da5457bbbe",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "1123e712de48573442cc3d6ac810916718c0bfc4c5bb06436d8b7afd1669e09b",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang.so": "8fe565a93ae5a11e84793d440c28fafaca8b10ae7e421d270e6a45efc181c49c",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-core-module.bin": "33e98094d680b6b38dc87a80439c8830c1e47acb7afe7d35d5b339cd06933ee5",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "47c841875d304950f25c1d1c3eb8824cb8e5ec4ec8ed583eb1463de83d015f79",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "588dad94936ddfd4859c9f73944b25b4fbac7d0de7568fa5d1c3653940714e76",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "9e29736478d82decd0bfb4beeb8f23d006313252752957492e702b147e256ba7",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "c47d2b7bd6d3f3372e452361be20f261745fbf7d5389c8e02798ecace30ac346",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "2cd0e6c8f3bdde0a8ef368d17af0a6dacff8e08d5be389f4b47702eb6d8008f3",
+            "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "da62d7914c37b937ea9df52c1f22172db92aa26c706eb959c825f790db7ff6ed",
+            "/home/skallweit/codex/agent-sandbox/slang/extras/validate-nvvm-surfaces.py": "8969a20010daa853d172ed546c9ea190cf04e60d5c151444af32c34fdcf14e40",
+            "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-results.py": "77c97bb9b7803b3ebbd216bebb1ea00932982ad73d9647b3544408946da7dbfe",
+            "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/nvvm-surface-results.py": "c584f34e89b3cffdaa57dee229cc2e4f537b35f058565edf69a9540d0c77678b",
+            "/home/skallweit/codex/agent-sandbox/slang/issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+            "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+            "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+            "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+            "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+          }
+        },
+        "rejection35": {
+          "gate": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/final36-2-modules.json",
+              "sha256": "2ff8344dc2daab3131d91bd5cd09172622946970f0015e790b6bd98fbbae575f"
+            },
+            "gate": {
+              "command": [
+                "python3",
+                "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/module-controls.py",
+                "reject35",
+                "--output",
+                "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-modules"
+              ],
+              "started_utc": "2026-09-30T02:56:50.091814+00:00",
+              "completed_utc": "2026-09-30T02:56:53.963805+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 3.872013568878174,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-modules.log",
+              "log_sha256": "159d878955d328c5fd660405b9a488a97e2a2e56ca21f36a2681387322fd1254"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/final36-2-modules.log",
+              "sha256": "159d878955d328c5fd660405b9a488a97e2a2e56ca21f36a2681387322fd1254"
+            }
+          },
+          "results": {
+            "path": "build/nvvm-libdevice-round/final36-2-modules/results.json",
+            "sha256": "948b4b1b661635c7040071ee5148abae16b936c8763057a06056c28e77ae11f5"
+          },
+          "inputs": {
+            "path": "build/nvvm-libdevice-round/final36-2-modules/inputs.json",
+            "sha256": "7b1978035750edf0c562bc4aad417351814884696265eea3a1e33fe08a6bee97"
+          },
+          "input_bindings": {
+            "phase": "reject35",
+            "manifest": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/manifest.json",
+              "sha256": "e78b05b9385613a488cfa47b58218cb47fe05ff44977e09f94f6b8679884ae3d"
+            },
+            "frozen_module_binding": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/before-compile3/inputs.json",
+              "sha256": "f898b5f3223d4f97c98457fee7709c8992e426cff033c9e65862af7a8eae0465"
+            },
+            "modules": {
+              "build/nvvm-libdevice-round/before-compile3/public-round35.slang-module": "a2798d28f9b960f25eae34c74be415d08d0e658068f5dc0143389cb65860a356",
+              "build/nvvm-libdevice-round/before-compile3/retained-floor35.slang-module": "3d4f92c46222ce1f14a9722a70b8edb7cdb17cf4050608ccddf66ec3814e54bb",
+              "build/nvvm-libdevice-round/before-compile3/owned-round64-35.slang-module": "eb36d4146346dd8480a9d014a3aab762261d42b2bc440504f600e438828f9470",
+              "build/nvvm-libdevice-round/before-compile3/owned-round32-35.slang-module": "78943304d4bd11a7bff16096d0669eed56b5ffa2265d1f599f6b05a3a4783c12",
+              "build/nvvm-libdevice-round/before-compile3/owned-roundhalf35.slang-module": "784cd0115b1244c75844d5e927d895b5a529083d8df89a3d1ef1661b4559dfcf"
+            }
+          },
+          "cells": 15,
+          "outcomes": {
+            "public-round35-metadata": 0,
+            "public-round35-O0": 1,
+            "public-round35-O3": 1,
+            "owned-round32-35-metadata": 0,
+            "owned-round32-35-O0": 1,
+            "owned-round32-35-O3": 1,
+            "owned-round64-35-metadata": 0,
+            "owned-round64-35-O0": 1,
+            "owned-round64-35-O3": 1,
+            "retained-floor35-metadata": 0,
+            "retained-floor35-O0": 1,
+            "retained-floor35-O3": 1,
+            "owned-roundhalf35-metadata": 0,
+            "owned-roundhalf35-O0": 1,
+            "owned-roundhalf35-O3": 1
+          },
+          "runtime_identity": {
+            "path": "build/nvvm-libdevice-round/final36-2-runtime-before.json",
+            "sha256": "ac5e66aa94f754a0cd2343895c895544cfa5c6bee641ea6e1925b60145c57e9e"
+          }
+        },
+        "successors36": {
+          "gate": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/final36-2-successors.json",
+              "sha256": "0a835eb97a0cb7f52c35683039d5d75ac5c02201e3451cb150f67f1fbc8e5140"
+            },
+            "gate": {
+              "command": [
+                "python3",
+                "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/module-successors.py",
+                "--output",
+                "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors"
+              ],
+              "started_utc": "2026-09-30T02:56:58.845619+00:00",
+              "completed_utc": "2026-09-30T02:57:03.359419+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 4.513819217681885,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors.log",
+              "log_sha256": "6e7119600a2c21f56ce33de6531ef5b7f2b99bfa100e4f25784fe2a97c01ff93"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/final36-2-successors.log",
+              "sha256": "6e7119600a2c21f56ce33de6531ef5b7f2b99bfa100e4f25784fe2a97c01ff93"
+            }
+          },
+          "results": {
+            "path": "build/nvvm-libdevice-round/final36-2-successors/results.json",
+            "sha256": "348541c9148de146221bd81961ad66de72430e93b5d6b07b52db46cb76e274ef"
+          },
+          "inputs": {
+            "path": "build/nvvm-libdevice-round/final36-2-successors/inputs.json",
+            "sha256": "cd678a3784c735990f2ec9d5ffe21fa7e506d38a49477261a63ae60104095417"
+          },
+          "input_bindings": {
+            "manifest": {
+              "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/manifest.json",
+              "sha256": "e78b05b9385613a488cfa47b58218cb47fe05ff44977e09f94f6b8679884ae3d"
+            },
+            "successor_sources": [
+              {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/public-round36.slang",
+                "sha256": "79aa6f2648a3ab158a4c624d3f880d9b468c51234cf67baeee4a6e323f0d938c"
+              },
+              {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/public-round36-caller.slang",
+                "sha256": "a04799dcccfbbb6afc3c7947e37b4435916eee6129e95a0ab161b303f1eeaac5"
+              },
+              {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/owned-named-round36.slang",
+                "sha256": "9cd089a0c8cb078a5c1d5105fd265a7649ec88550d27b8497f18880470b0a0b2"
+              },
+              {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/owned-named-round36-caller.slang",
+                "sha256": "85b531d77f8dc0dc05b15fe5f3301e074caf4448c437f4ab2d5b9fdace24af03"
+              },
+              {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/retained-floor36.slang",
+                "sha256": "7cdd0c823991812832cacfcaeceee538b911690f1785b16bd47d2e89363d79bc"
+              },
+              {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/retained-floor36-caller.slang",
+                "sha256": "ff5f89d8d93cb2d1d8aaec41b048cb295416c83c941d0a6466669a6800699bbe"
+              }
+            ],
+            "modules": {
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/public-round36.slang-module": "f49be56fd0afc74fe8ca7e626979e40a5fa62ea793d5d9302c931c5575b37645",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/retained-floor36.slang-module": "0e9089347dd47233e7e6d8f20da94d1fa643d45efaa1c2f232d5e7498b0a1313",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-successors/owned-named-round36.slang-module": "c1f28052c2ea41f8a64af763658a41485a450965d8b60e0ae6b70112a98f3863"
+            }
+          },
+          "cells": 21,
+          "outcomes": {
+            "public-round36-serialize": 0,
+            "public-round36-metadata": 0,
+            "public-round36-O0": 0,
+            "public-round36-O0-assembly": 0,
+            "public-round36-O3": 0,
+            "public-round36-O3-assembly": 0,
+            "owned-named-round36-serialize": 0,
+            "owned-named-round36-metadata": 0,
+            "owned-named-round36-O0": 0,
+            "owned-named-round36-O0-assembly": 0,
+            "owned-named-round36-O3": 0,
+            "owned-named-round36-O3-assembly": 0,
+            "retained-floor36-serialize": 0,
+            "retained-floor36-metadata": 0,
+            "retained-floor36-O0": 0,
+            "retained-floor36-O0-assembly": 0,
+            "retained-floor36-O3": 0,
+            "retained-floor36-O3-assembly": 0,
+            "owned-round32-35-retired-source": 255,
+            "owned-round64-35-retired-source": 255,
+            "owned-roundhalf35-retired-source": 255
+          },
+          "runtime_identity": {
+            "path": "build/nvvm-libdevice-round/final36-2-runtime-before.json",
+            "sha256": "ac5e66aa94f754a0cd2343895c895544cfa5c6bee641ea6e1925b60145c57e9e"
+          }
+        },
+        "named_library_replay": {
+          "gate": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/final36-2-probes.json",
+              "sha256": "ccec85301058784dfe16a66ef913b3c8f1bc72f8e52269d3b3b4c541b8fa9585"
+            },
+            "gate": {
+              "command": [
+                "python3",
+                "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/prototype-probes.py",
+                "--output",
+                "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes"
+              ],
+              "started_utc": "2026-09-30T02:56:54.002357+00:00",
+              "completed_utc": "2026-09-30T02:56:58.807743+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 4.805406093597412,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes.log",
+              "log_sha256": "0972a92d2501099f1d53bc095a4f3cc666f00dfb13e5c1b25270ca4498bf4b28"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/final36-2-probes.log",
+              "sha256": "0972a92d2501099f1d53bc095a4f3cc666f00dfb13e5c1b25270ca4498bf4b28"
+            }
+          },
+          "results": {
+            "path": "build/nvvm-libdevice-round/final36-2-probes/results.json",
+            "sha256": "95f080f24a55e73bccf6ab319e72f68b9ab038c429abe8af56c3b03d7c24857e"
+          },
+          "inputs": {
+            "path": "build/nvvm-libdevice-round/final36-2-probes/inputs.json",
+            "sha256": "ae3d3b5f8fc96a74b70c6c0cd423893deaa85a90664136467854a19b43941efa"
+          },
+          "outcomes": {
+            "raw-direct-32-O0": 0,
+            "raw-direct-32-O0-assembly": 0,
+            "raw-direct-32-O3": 0,
+            "raw-direct-32-O3-assembly": 0,
+            "raw-direct-64-O0": 0,
+            "raw-direct-64-O0-assembly": 0,
+            "raw-direct-64-O3": 0,
+            "raw-direct-64-O3-assembly": 0,
+            "generic-prototype-float-O0": 0,
+            "generic-prototype-float-O0-assembly": 0,
+            "generic-prototype-float-O3": 0,
+            "generic-prototype-float-O3-assembly": 0,
+            "generic-prototype-double-O0": 0,
+            "generic-prototype-double-O0-assembly": 0,
+            "generic-prototype-double-O3": 0,
+            "generic-prototype-double-O3-assembly": 0,
+            "generic-prototype-half-O0": 255,
+            "generic-prototype-half-O3": 255,
+            "generic-prototype-unused-half-O0": 0,
+            "generic-prototype-unused-half-O0-assembly": 0,
+            "generic-prototype-unused-half-O3": 0,
+            "generic-prototype-unused-half-O3-assembly": 0,
+            "public-half-O0": 0,
+            "public-half-O0-assembly": 0,
+            "public-half-O3": 0,
+            "public-half-O3-assembly": 0
+          },
+          "artifacts": [
+            {
+              "phase": "raw-direct-32-O0",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/raw-direct-32.slang",
+                "sha256": "915cdc217039f1198633f8371a4198d50b78bc4dd31bba5913a0b113d1efa809"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-32-O0-1.llvm-ir-asm",
+                "sha256": "585772215fffad97e8362ac4fb3e3279e866095c0994d3971d4cee417e676866"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-32-O0.ptx",
+                "sha256": "2bca2956b91516362d42fef771d9649e6958ebe6e7ec09c9557abaf1601b596d"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-32-O0.cubin",
+                "sha256": "3c8a5277d9e66e09411f4814345853494f9e12029c6c2022caba84c5d12795b1"
+              }
+            },
+            {
+              "phase": "raw-direct-32-O3",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/raw-direct-32.slang",
+                "sha256": "915cdc217039f1198633f8371a4198d50b78bc4dd31bba5913a0b113d1efa809"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-32-O3-1.llvm-ir-asm",
+                "sha256": "585772215fffad97e8362ac4fb3e3279e866095c0994d3971d4cee417e676866"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-32-O3.ptx",
+                "sha256": "a7d149861642fc9d2f2318970b98e9589cab2f1a83c8a6c85091479fb9780b90"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-32-O3.cubin",
+                "sha256": "a53bcd6a8a000fbc6de5d4192c0e5f2a13c98db2c6fa7bd32a4d47cde2301bec"
+              }
+            },
+            {
+              "phase": "raw-direct-64-O0",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/raw-direct-64.slang",
+                "sha256": "2b69db9af1f54ddf6544614668b3e9408568f79f3d0e45a2ea5093e1b66a3a7d"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-64-O0-1.llvm-ir-asm",
+                "sha256": "10c25c169b404b39052bd15af82b5d8be87b0d0174956eecd7be5dea5c186d9f"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-64-O0.ptx",
+                "sha256": "e2679f3981c40109ab93a209d207006f94681492691746f96f473362ee5cb949"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-64-O0.cubin",
+                "sha256": "97d2c97da576ffd45d26d34fa2881148ba400742399279784a892c036c24cefc"
+              }
+            },
+            {
+              "phase": "raw-direct-64-O3",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/raw-direct-64.slang",
+                "sha256": "2b69db9af1f54ddf6544614668b3e9408568f79f3d0e45a2ea5093e1b66a3a7d"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-64-O3-1.llvm-ir-asm",
+                "sha256": "10c25c169b404b39052bd15af82b5d8be87b0d0174956eecd7be5dea5c186d9f"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-64-O3.ptx",
+                "sha256": "016b7fa79f14c075d202b4b6133890263279388a7345d9f023e858be2daf84c9"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/raw-direct-64-O3.cubin",
+                "sha256": "bb09626e0855de92f74a1aad0a3e5a895c6b90eed1aed6a1c662b46468a8edd0"
+              }
+            },
+            {
+              "phase": "generic-prototype-float-O0",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/generic-prototype-float.slang",
+                "sha256": "68b9fcee8bce1b22f4b4be28fe11680c846bdf69b0cc97786c5f12f2dfe83c7c"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-float-O0-1.llvm-ir-asm",
+                "sha256": "29f13c524c8f58914d9b9e59c43b678c2f5e7ecf5809284aa8b7bafc881dea4b"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-float-O0.ptx",
+                "sha256": "0a6a083451866ad64d524ba5c2d6b3260c9204ea468f346a9c159dbb5f5068f5"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-float-O0.cubin",
+                "sha256": "5d232c70a1b74d78b9ce3596c222f19caaedb736e6eefd6e646349cad57eeb3c"
+              }
+            },
+            {
+              "phase": "generic-prototype-float-O3",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/generic-prototype-float.slang",
+                "sha256": "68b9fcee8bce1b22f4b4be28fe11680c846bdf69b0cc97786c5f12f2dfe83c7c"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-float-O3-1.llvm-ir-asm",
+                "sha256": "29f13c524c8f58914d9b9e59c43b678c2f5e7ecf5809284aa8b7bafc881dea4b"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-float-O3.ptx",
+                "sha256": "a7d149861642fc9d2f2318970b98e9589cab2f1a83c8a6c85091479fb9780b90"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-float-O3.cubin",
+                "sha256": "a53bcd6a8a000fbc6de5d4192c0e5f2a13c98db2c6fa7bd32a4d47cde2301bec"
+              }
+            },
+            {
+              "phase": "generic-prototype-double-O0",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/generic-prototype-double.slang",
+                "sha256": "d7803e405946414218fccd0edd459e119e68f61e31f3a7f2040fba74967fd604"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-double-O0-1.llvm-ir-asm",
+                "sha256": "ba3281989e3edcbc3129688a3f86461bd8defb7f3e6fedaad1ba11f2ed6e90c7"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-double-O0.ptx",
+                "sha256": "11f734aa01493c4697d409afab278a9fecc5ef44c03d27963097b93d4ecb49c0"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-double-O0.cubin",
+                "sha256": "d612cc52e283b18afe411bf9c86f9e7628e3b6f12aad288cff57b0a541c692af"
+              }
+            },
+            {
+              "phase": "generic-prototype-double-O3",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/generic-prototype-double.slang",
+                "sha256": "d7803e405946414218fccd0edd459e119e68f61e31f3a7f2040fba74967fd604"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-double-O3-1.llvm-ir-asm",
+                "sha256": "ba3281989e3edcbc3129688a3f86461bd8defb7f3e6fedaad1ba11f2ed6e90c7"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-double-O3.ptx",
+                "sha256": "016b7fa79f14c075d202b4b6133890263279388a7345d9f023e858be2daf84c9"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-double-O3.cubin",
+                "sha256": "bb09626e0855de92f74a1aad0a3e5a895c6b90eed1aed6a1c662b46468a8edd0"
+              }
+            },
+            {
+              "phase": "generic-prototype-unused-half-O0",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/generic-prototype-unused-half.slang",
+                "sha256": "917197bc1bb39cc4d839ab443e5740bd9f50d41132c9e658f3fba08c76ee4c98"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-unused-half-O0-1.llvm-ir-asm",
+                "sha256": "5d1ee82e8e51c26892e80bf399a37400c119940fc8aa6dea4c2a8a0c0e474387"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-unused-half-O0.ptx",
+                "sha256": "45a1b1ec3e876b3c14535d7f1352293a2ec6105a3f941e0473687e5025623d57"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-unused-half-O0.cubin",
+                "sha256": "04e463503f29686736b7b0359d2301de7e68d5bd2b99523c0329325290c7aac6"
+              }
+            },
+            {
+              "phase": "generic-prototype-unused-half-O3",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/generic-prototype-unused-half.slang",
+                "sha256": "917197bc1bb39cc4d839ab443e5740bd9f50d41132c9e658f3fba08c76ee4c98"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-unused-half-O3-1.llvm-ir-asm",
+                "sha256": "5d1ee82e8e51c26892e80bf399a37400c119940fc8aa6dea4c2a8a0c0e474387"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-unused-half-O3.ptx",
+                "sha256": "a7d149861642fc9d2f2318970b98e9589cab2f1a83c8a6c85091479fb9780b90"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/generic-prototype-unused-half-O3.cubin",
+                "sha256": "a53bcd6a8a000fbc6de5d4192c0e5f2a13c98db2c6fa7bd32a4d47cde2301bec"
+              }
+            },
+            {
+              "phase": "public-half-O0",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/public-half.slang",
+                "sha256": "46f40a10dfe6cfd78efe14d03987b3fb6a59b634847079850b80f063e20ccfe7"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/public-half-O0-1.llvm-ir-asm",
+                "sha256": "b4a391ba37028f89797c9db796014ee41abe8b6b31d2309b6605d83d0bbf072e"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/public-half-O0.ptx",
+                "sha256": "87f0ed036eba36df8711048e38eebb35ad480985bbdac741662cd18b3be474cf"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/public-half-O0.cubin",
+                "sha256": "e242c3415e9bed8ada381d5b7b0788e64b7ca2c3f9a0985e47542a5f3007fd78"
+              }
+            },
+            {
+              "phase": "public-half-O3",
+              "source": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/baseline-inputs3/public-half.slang",
+                "sha256": "46f40a10dfe6cfd78efe14d03987b3fb6a59b634847079850b80f063e20ccfe7"
+              },
+              "llvm_ir": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/public-half-O3-1.llvm-ir-asm",
+                "sha256": "b4a391ba37028f89797c9db796014ee41abe8b6b31d2309b6605d83d0bbf072e"
+              },
+              "ptx": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/public-half-O3.ptx",
+                "sha256": "a675978d917793315669801256e8016d5ad41e783d4b2a6fb57df3505bba4fc7"
+              },
+              "assembly": {
+                "path": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-probes/public-half-O3.cubin",
+                "sha256": "397ee4db30466bc0ba736af777fc969dee6628a0a4af9a0f9afec7a51e0f49d8"
+              }
+            }
+          ],
+          "runtime_identity": {
+            "path": "build/nvvm-libdevice-round/final36-2-runtime-before.json",
+            "sha256": "ac5e66aa94f754a0cd2343895c895544cfa5c6bee641ea6e1925b60145c57e9e"
+          }
+        },
+        "static": {
+          "configure": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/final36-2-static-configure.json",
+              "sha256": "b1a32f0eb6e6afd517820b5ea1d39805628819d49c216700a7050b7606a1e4bf"
+            },
+            "gate": {
+              "command": [
+                "cmake",
+                "-S",
+                ".",
+                "-B",
+                "build/nvvm-local-record-arrays/static-unit-build",
+                "-U",
+                "SLANG_VERSION_FULL",
+                "-U",
+                "SLANG_VERSION_NUMERIC",
+                "-DSLANG_EMBED_CORE_MODULE=OFF"
+              ],
+              "started_utc": "2026-09-30T02:57:21.021418+00:00",
+              "completed_utc": "2026-09-30T02:57:23.464567+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 2.443173408508301,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-static-configure.log",
+              "log_sha256": "7d8b810ebc7fa4989ce4823f989ef2b81517e86370ac396408b172a10a1d98ba"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/final36-2-static-configure.log",
+              "sha256": "7d8b810ebc7fa4989ce4823f989ef2b81517e86370ac396408b172a10a1d98ba"
+            }
+          },
+          "build": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/final36-2-static-build.json",
+              "sha256": "1cc67765aa35275367155c107a7bee38daa8b714d3bc42f206a2c61d4c5a383f"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "CMAKE_BUILD_PARALLEL_LEVEL=1",
+                "cmake",
+                "--build",
+                "build/nvvm-local-record-arrays/static-unit-build",
+                "--config",
+                "RelWithDebInfo",
+                "--parallel",
+                "4",
+                "--target",
+                "slang-static-unit-test"
+              ],
+              "started_utc": "2026-09-30T02:57:23.506345+00:00",
+              "completed_utc": "2026-09-30T03:07:16.040360+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 592.5340440273285,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-static-build.log",
+              "log_sha256": "a72247829de392e577c82d4153c950a2e30b193e3073624b8db492272423be59"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/final36-2-static-build.log",
+              "sha256": "a72247829de392e577c82d4153c950a2e30b193e3073624b8db492272423be59"
+            }
+          },
+          "tests": {
+            "record": {
+              "path": "build/nvvm-libdevice-round/final36-2-static.json",
+              "sha256": "69e34491915f40beff39c3e265670367295e70af87458e9bdfb37eface481a67"
+            },
+            "gate": {
+              "command": [
+                "env",
+                "LD_LIBRARY_PATH=/home/skallweit/codex/agent-sandbox/slang/build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/lib:/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin:/usr/local/cuda-12.9/nvvm/lib64:/usr/local/cuda-12.9/lib64",
+                "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test",
+                "serializedModuleVersion"
+              ],
+              "started_utc": "2026-09-30T03:07:23.138972+00:00",
+              "completed_utc": "2026-09-30T03:07:23.386173+00:00",
+              "return_code": 0,
+              "elapsed_seconds": 0.24723124504089355,
+              "log": "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-libdevice-round/final36-2-static.log",
+              "log_sha256": "7e68428345a1e93507bcb37b612b4941549094d6e74fa0cb3d7deb6c5ad0225d"
+            },
+            "log": {
+              "path": "build/nvvm-libdevice-round/final36-2-static.log",
+              "sha256": "7e68428345a1e93507bcb37b612b4941549094d6e74fa0cb3d7deb6c5ad0225d"
+            }
+          },
+          "artifact_sha256": {
+            "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "dd94f5e8d942aafa75a42d5bd4c394e8604c8bdccee8b43e484d75cc7104c970",
+            "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-core-module.bin": "0be9e320221e74b26e19e2ca0d92a23f364ec8fcfc59c156880ab591befc26b8",
+            "build/nvvm-local-record-arrays/static-unit-build/CMakeCache.txt": "f24c79d5a2dbdcb033ab49f7d774035322d3066e6d4135dce80a436be5e0d8fe",
+            "build/nvvm-local-record-arrays/static-unit-build/build.ninja": "62a85e3408db37ddb3e53011d6435d9930e734a1b8cf37abc52ea7440939098f",
+            "build/nvvm-local-record-arrays/static-unit-build/build-RelWithDebInfo.ninja": "800be7ddcd7560e6ac2b1ed9927c6b41c5be6974e29bcf3ed780e82aa9e9f93d",
+            "build/nvvm-local-record-arrays/static-unit-build/CMakeFiles/impl-RelWithDebInfo.ninja": "3a700ee280a0ce085989f8abd5c328cf39a10f3579c5b7026eec14a0813170f2"
+          },
+          "identities": [
+            "serializedModuleVersionValidation",
+            "serializedModuleVersionLibraryReference",
+            "serializedModuleVersionImportFallback"
+          ],
+          "separate_from_native": true,
+          "identity_before": {
+            "path": "build/nvvm-libdevice-round/final36-2-static-identity.json",
+            "sha256": "a6d69b855d8ef92ba66e526712ec64bf374c3b5bd2f4c6240b44fb720ec893bb"
+          },
+          "identity_after": {
+            "path": "build/nvvm-libdevice-round/final36-2-static-identity-after.json",
+            "sha256": "a6d69b855d8ef92ba66e526712ec64bf374c3b5bd2f4c6240b44fb720ec893bb"
+          }
+        }
+      },
+      "validation_incidents": [
+        {
+          "id": "libdevice-round-baseline-entry-abi",
+          "status": "resolved",
+          "gate_names": [
+            "before-compile",
+            "before-compile2",
+            "before-compile3",
+            "before-half-ir",
+            "before-runtime-half",
+            "before-runtime-round"
+          ],
+          "problem": "Initial direct probes used unsupported Ptr<double>/Ptr<half> entry shapes. Subsequent expectation incorrectly treated public Half round as unsupported based on the scalar catalog alone.",
+          "resolution": "Use canonical uint-word entry ABI. Trace proved public Half used shared Float32 promotion. Frozen third input set preserves successful Half behavior and CUDA ties-even versus NVVM ties-away; all54 compile/control phases and9 runtime cells pass. Earlier attempts retained.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/before-compile.json",
+              "sha256": "451914b4d8b3f2785bbd95f5a468dcff4dc1332dbce988b452923fb56cff75b2"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/before-compile2.json",
+              "sha256": "2062c306373b187f247d138d3a504ea44e0de09e037bfe2f8e60c6156e3a2497"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/before-compile3.json",
+              "sha256": "6246744b99e9a2db5acdf49958c5da734024d9b53437e8944e260374488fe209"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/before-half-ir.json",
+              "sha256": "9786da8048dc7e44247d33a452b9a875aa406915538ba18472cf52426ffb3107"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/before-runtime-half.json",
+              "sha256": "654b56035c7c52305b398ef17caabff9c1f24ced3f31d9b0730f230b7598fc3b"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/before-runtime-round.json",
+              "sha256": "a8963e46abfc44237e81120df99cfd732495b443ec855439133911a29ffc471d"
+            }
+          ]
+        },
+        {
+          "id": "libdevice-round-reader-tool-enum",
+          "status": "resolved",
+          "gate_names": ["reader-build", "reader-build2", "reader-real"],
+          "problem": "Isolated LLVM reader initializer mixed enum and unsigned values, preventing C++ type deduction.",
+          "resolution": "Corrected isolated fixture reader type; actual selected bitcode parse/verify and definition inspection passed. No compiler source workaround.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/reader-build.json",
+              "sha256": "82f2131b418ddc7feace566e6449679d98232dc92051bcb81db6f76ca1b69695"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/reader-build2.json",
+              "sha256": "6ced34bb56469257ce661c1283d144b098a25a43d5715f7d8ee8e4ed32497c47"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/reader-real.json",
+              "sha256": "a3cab08d78be5860d595894d412e485ae7f41db099ef1ecf175d360c18f4980c"
+            }
+          ]
+        },
+        {
+          "id": "libdevice-round-explicit-comptr-construction",
+          "status": "resolved",
+          "gate_names": [
+            "prototype1-build",
+            "prototype2-build",
+            "prototype5-build"
+          ],
+          "problem": "Two newly introduced ComPtr initializations incorrectly invoked an explicit constructor by copy initialization. First tail-only log inspection missed the second site.",
+          "resolution": "Both changed to direct construction; all new initializations audited. Original two failed build logs preserved.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/prototype1-build.json",
+              "sha256": "29142b9b05bd996290dc7d6e4218ca30def64207c4cff4c0f4d5f6deffa59d7b"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/prototype2-build.json",
+              "sha256": "02538d0f82b6bc73c9cde22a5433df7c21b1d7589fef572395d014c3855efd66"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/prototype5-build.json",
+              "sha256": "560697cae03ae8a72d00982f2d355653470f13f1799cea89d0e920b765a25eff"
+            }
+          ]
+        },
+        {
+          "id": "libdevice-round-test-helper-arguments",
+          "status": "resolved",
+          "gate_names": [
+            "prototype3-build",
+            "prototype4-build",
+            "prototype5-build"
+          ],
+          "problem": "New test calls omitted constant bit width and used SLANG_CHECK in unbraced if/else; initial textual repair missed a formatter-split width64 call.",
+          "resolution": "Added explicit32/64 widths and braces, then repaired exact width64 substring with an occurrence assertion. Successful fifth build and52focused units qualified the repairs.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/prototype3-build.json",
+              "sha256": "d7cd7e92693c55903e9950317ff2a8e81ffa565619980a0573cb618b6bb03148"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/prototype4-build.json",
+              "sha256": "337d43cbc1aa3b4e451b518e2d03e9fd168a0d71b86a4c17e46620debcf69f4a"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/prototype5-build.json",
+              "sha256": "560697cae03ae8a72d00982f2d355653470f13f1799cea89d0e920b765a25eff"
+            }
+          ]
+        },
+        {
+          "id": "libdevice-round-generic-half-constructor",
+          "status": "resolved",
+          "gate_names": ["retirement35-1-build"],
+          "problem": "Core bootstrap E30080: generic T to float constructor conversion is ambiguous despite Half branch; C++ compiler artifacts linked but core generation failed.",
+          "resolution": "Existing __realCast on both promotion legs emits canonical FloatCast. retirement35-2 build passes,58focusedunits,10sourcecells,19modulephases,26namedprobes pass under stable identity.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-1-build.json",
+              "sha256": "62137fdcf107b55180087aa7a893f5389870dad959e983086ba10a3d51edce9f"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-2-build.json",
+              "sha256": "08ea7855ebc20ddfd4234060dc55718e84808de2608f4ff1566dfc7b7709d903"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-2-units.json",
+              "sha256": "c711ffd067dc69239c04ca741901f32e75983fd978e5d1539983a7e19a7da49f"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-2-focused-source.json",
+              "sha256": "bf433a50b751b0b1be967bc0c351b5f035d2e2da09fd78022c4d38254d7128fe"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-2-modules.json",
+              "sha256": "11a57b2ba37745856b73ffc50d73f495fd4a45c08a498c2e22f2ec4882c4f60d"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-2-probes.json",
+              "sha256": "dcec4eecbd980c6f7016b52c85d13c4d7037513838758f012502b5ce1aac6bed"
+            }
+          ]
+        },
+        {
+          "id": "libdevice-round-harness-source-name-collision",
+          "status": "resolved",
+          "gate_names": ["retirement35-2-validation"],
+          "problem": "Outer runner passed58units and oracle gate, then refused to overwrite the saved source-freeze JSON when creating a source-test gate with the same name. No source tests ran in that attempt.",
+          "resolution": "Preserved original harness and failed outer attempt. New orchestration2 uses focused-source; remaining10source/19module/26probe gates passed separately without repeating units. Runtime/source/config/layout hashes match before and after.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/retirement35-2-validation.json",
+              "sha256": "d9d4e6816fe728ab39c3eb379309728a9acf4aa07cd21f524dfa250f58187397"
+            }
+          ]
+        },
+        {
+          "id": "libdevice-round-final-comment-interruption",
+          "status": "resolved",
+          "gate_names": ["final36-1-build"],
+          "problem": "Lead intentionally interrupted final36-1 build with SIGINT after84.96s to correct the stale module-boundary explanatory comment before qualification.",
+          "resolution": "Corrected the version36 boundary comment before a fresh source freeze. final36-2 build, focused validation, isolated static units and full checkpoint passed with unchanged source, configuration, runtime and layout identities. The interrupted attempt executed no shader.",
+          "evidence": [
+            {
+              "path": "build/nvvm-libdevice-round/final36-1-build.json",
+              "sha256": "4e4d473962c0d379e18746a9a0befaa22f4cdd9e927165591864c57f8adab11f"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/final36-2-build.json",
+              "sha256": "4b5073fc12e16a5b3464cf28b1148137f3b70ea0d74e7f6df4126820822a0d54"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/final36-2-focused-validation.json",
+              "sha256": "2a5080d6368cf46b2fefcaee1838977b8cafc49ea9f44153ab689b3fafc4d272"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/final36-2-checkpoint.json",
+              "sha256": "359f30572e3c4f77e99eedd9f9a8d615e511ba9ada2ba2d94a6b79fef6810696"
+            },
+            {
+              "path": "build/nvvm-libdevice-round/final36-2-runtime-after.json",
+              "sha256": "048d1c7399075713ddeca100fa21114e754ee856b922b0bcbb0a14d905982b2d"
+            }
+          ]
+        }
+      ],
+      "source_review": {
+        "path": "build/nvvm-libdevice-round/review-final36-2-execution.json",
+        "sha256": "0a1c8b3de158fe57b12fc5fb0d30c0a6ecb1e2c6b59525cb21e46dd42b6856f2"
+      },
+      "limits": [
+        "Only __nv_roundf and __nv_round names and scalar Float32/64 ABI descriptors are admitted in this pilot. Other scalar math and compound recognizers await separate migration.",
+        "Module36 rejects older binaries before decoding. Recompile modules; no compatibility remapping.",
+        "The snapshot protects query-to-compilation byte identity; the existing earlier timestamp-based cache key is not an atomic filesystem snapshot.",
+        "No performance, arbitrary ABI/vector library calls, packed surface, provenance expansion or prior focused feature requalification is claimed."
+      ],
+      "acceptance": {
+        "status": "accepted",
+        "final_review": {
+          "path": "build/nvvm-libdevice-round/review-candidate1-promotion.json",
+          "sha256": "3787084fe313cc7d390430f62dcf36895a3a1758b2785f24e681e30cb263f397"
         }
       }
     }

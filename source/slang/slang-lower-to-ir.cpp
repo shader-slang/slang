@@ -85,7 +85,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmMax", SLANG_NVVM_VALUE_OP_MAX},
     {"nvvmMin", SLANG_NVVM_VALUE_OP_MIN},
     {"nvvmPow", SLANG_NVVM_VALUE_OP_POW},
-    {"nvvmRound", SLANG_NVVM_VALUE_OP_ROUND},
     {"nvvmRsqrt", SLANG_NVVM_VALUE_OP_RSQRT},
     {"nvvmSign", SLANG_NVVM_VALUE_OP_SIGN},
     {"nvvmSin", SLANG_NVVM_VALUE_OP_SIN},

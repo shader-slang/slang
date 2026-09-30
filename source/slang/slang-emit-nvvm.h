@@ -19,6 +19,7 @@ SlangResult emitNVVMIRFromLinkedIR(
     const LinkedIR& linkedIR,
     const NVVMIRBuilder& builder,
     const NVVMOperationRequirements& requirements,
-    ComPtr<IArtifact>& outArtifact);
+    ComPtr<IArtifact>& outArtifact,
+    ISlangBlob* deviceLibraryContents = nullptr);
 
 } // namespace Slang

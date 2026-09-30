@@ -190,6 +190,25 @@ Use the reviewed current `NVVM_BASELINE` identified by STATUS before quality mea
 retain `runtime_input_sha256`,
 `provenance.artifact_sha256`, and per-corpus `fresh_cell_outcomes` for the next refresh.
 
+### Round signature and numerical contracts
+
+Run the read-only oracle check before the focused shader tests:
+
+```bash
+python3 extras/test-generators/check-nvvm-round-oracles.py --check
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-round-
+```
+
+The prefix includes three numerical fixtures and the removed semantic-tag source control. Each
+numerical fixture has NVRTC O3, NVVM O0 and NVVM O3 directives. Require all declared identities and
+no skips; preserve the compiler/provider, source and expected-buffer hashes. Float32/64 use exact
+ties-away expectations, while Half checks both ties-away and ties-even arrays unconditionally with
+backend-specific FileCheck masks. Signed zeros/infinities compare bits and NaNs compare class.
+Scalar, noinline helper, vector2/3/4 and matrix2x2 outputs retain guards and per-lane completion.
+The checker uses only integer IEEE decoding and Fraction arithmetic; shader or vendor output must
+not regenerate expected values. These focused contracts do not change frozen corpus membership.
+
 ## Report environment
 
 Execution and comparison use the Python standard library. Shareable SVG/PNG charts use Matplotlib:

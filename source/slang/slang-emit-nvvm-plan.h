@@ -303,6 +303,7 @@ private:
 /// Retains the exact source name and signature validated before module creation.
 struct NVVMPlannedNamedIntrinsic
 {
+    bool isDeviceLibraryFunction = false;
     IRInst* source = nullptr;
     String name;
     SlangNVVMValueTypeDesc resultType = {};

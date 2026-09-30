@@ -5,6 +5,7 @@
 #include "compiler-core/slang-artifact-impl.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-name.h"
+#include "compiler-core/slang-nvvm-compiler.h"
 #include "compiler-core/slang-slice-allocator.h"
 #include "core/slang-castable.h"
 #include "core/slang-performance-profiler.h"
@@ -3851,9 +3852,48 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
         return SLANG_FAILED(loadResult) ? loadResult : SLANG_E_NO_INTERFACE;
     }
 
+    // Pin the selected compiler and a per-compilation snapshot before output-module creation.
+    // Replacing libdevice on disk later cannot change the bytes validated and supplied to libNVVM.
+    ComPtr<IDownstreamCompiler> compiler;
+    ComPtr<INVVMCUDADeviceLibrary> deviceLibrary;
+    if (requirements.requiresCUDADeviceLibrary)
+    {
+        compiler = getSession()->getOrLoadDownstreamCompiler(PassThroughMode::NVVM, getSink());
+        if (!compiler)
+        {
+            getSink()->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = "NVVM"});
+            return SLANG_FAIL;
+        }
+        auto provider = as<INVVMCUDADeviceLibraryProvider>(compiler.get());
+        if (!provider)
+        {
+            getSink()->diagnoseRaw(
+                Severity::Error,
+                "Selected NVVM compiler cannot provide its CUDA device library");
+            return SLANG_E_NO_INTERFACE;
+        }
+        ComPtr<ISlangBlob> diagnostics;
+        SlangResult result =
+            provider->loadCUDADeviceLibrary(deviceLibrary.writeRef(), diagnostics.writeRef());
+        if (SLANG_FAILED(result))
+        {
+            if (diagnostics)
+                getSink()->diagnoseRaw(
+                    Severity::Error,
+                    UnownedStringSlice(
+                        static_cast<const char*>(diagnostics->getBufferPointer()),
+                        Index(diagnostics->getBufferSize())));
+            return result;
+        }
+    }
     ComPtr<IArtifact> sourceArtifact;
-    SLANG_RETURN_ON_FAIL(
-        emitNVVMIRFromLinkedIR(this, linkedIR, *builder, requirements, sourceArtifact));
+    SLANG_RETURN_ON_FAIL(emitNVVMIRFromLinkedIR(
+        this,
+        linkedIR,
+        *builder,
+        requirements,
+        sourceArtifact,
+        deviceLibrary ? deviceLibrary->getContents() : nullptr));
     maybeDumpIntermediate(sourceArtifact);
 
     return emitWithDownstreamForEntryPoints(
@@ -3861,7 +3901,9 @@ SlangResult CodeGenContext::emitNVVMForEntryPoints(ComPtr<IArtifact>& outArtifac
         PassThroughMode::NVVM,
         sourceArtifact,
         SourceLanguage::LLVM,
-        requirements.requiresCUDADeviceLibrary);
+        requirements.requiresCUDADeviceLibrary,
+        compiler,
+        deviceLibrary);
 }
 
 SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)

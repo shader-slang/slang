@@ -57,11 +57,21 @@ Ordinary comma-separated `__intrinsic_asm` operands are canonical checked IR val
 `__intrinsic_asm "llvm.ctlz", value, false;` carries both operands explicitly; helper parameters
 never supply implicit arguments. The owned emission plan retains those IR values and their type
 and constant-kind descriptors. Each provider call borrows a freshly constructed descriptor view,
-so moving the plan cannot leave pointers into its former storage. ABI45 transports the descriptors
+so moving the plan cannot leave pointers into its former storage. ABI46 transports the descriptors
 and actual value handles. LLVM's signature matcher supplies overload types and its `ImmArg`
 attributes require constant operands during the pure support query. Emission separately checks
 actual types, constant promises, provenance and dominance before creating a declaration or call.
 Conflicting intrinsic symbols reject before mutation.
+
+Named libdevice calls reuse these explicit operands. This pilot admits `__nv_roundf` and
+`__nv_round`; their complete signatures come from definitions in the selected immutable library,
+with scalar Float32/Float64 ABI values admitted. There is no parallel name-to-signature table.
+Core `round` selects these names in its NVVM branch. Half preserves its existing evaluation through
+`__realCast<T>(round(__realCast<float>(x)))`: widen exactly, round in Float32 and narrow once.
+The existing vector and matrix mappings call the scalar body. NVVM retains ties away from zero;
+CUDA Half retains its `hrint` ties-to-even behavior. Numeric operation64 is reserved, and the round
+semantic tag, lowering-name entry and CUDA-text recognizer are removed. Shared promotion recipes
+remain for other math, but their catalog validation no longer admits the retired operation.
 
 The integer primitive boundary admits signed/unsigned scalar widths 8, 16, 32 and 64. Core
 `countbits` converts the same-width population count to uint; its existing pre-switch conversion
@@ -137,12 +147,12 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 35. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 36. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations. Existing guards reject these before decoding AST or IR;
+or retired numeric NVVM operations, including round's operation64. Existing guards reject these before decoding AST or IR;
 metadata inspection and speculative import fallback to source remain available. Source modules
 that explicitly used retired semantic tags need named intrinsic bodies. Container format 2 and
-provider ABI45 are separate contracts. See the
+provider ABI46 are separate contracts. See the
 [module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
 
 ## Preflight is a contract, not a trial emission
@@ -348,13 +358,24 @@ execution coverage.
 
 The optional `slang-llvm-nvvm` provider owns an isolated LLVM 14.0.6 typed-pointer construction path.
 It exports a versioned Slang C ABI with opaque handles and one generic operation surface. Current
-provider ABI is 44; compiler and provider must negotiate the exact required interface/capabilities.
+provider ABI is 46; compiler and provider must negotiate the exact required interface/capabilities.
 Raw LLVM objects and symbols must not cross into the CPU LLVM provider or the host compiler.
-Handles belong to their creating live module; destroying it invalidates subordinate handles. ABI
-buffers remain caller-owned, and serialization uses a size-query/write protocol. The host retains
+Output handles belong to their creating live module; destroying it invalidates subordinate handles.
+ABI46 also exposes a separate input-library handle owning its byte copy, LLVM context and eagerly
+parsed, verified module. Definition queries create neither output IR nor a vendor program. Loading
+reports parse/verification failures through an optional synchronous callback; callback text and
+userData are never retained, and the host copies the diagnostic immediately. A failed load leaves
+no handle. Unsupported signatures return support=false without a parse diagnostic. Serialization
+uses a size-query/write protocol with caller-owned buffers. The host retains
 the provider library, validates returned handles and copies output into its own blob.
 The separate LLVM build is statically linked with hidden/excluded LLVM symbols, avoiding a competing
-process-visible dynamic `libLLVM` dependency.
+process-visible dynamic `libLLVM` dependency. BitReader supplies the input-library parser.
+
+Selected definitions must have external linkage, default visibility, C calling convention, a fixed
+parameter list and no return/parameter attributes. The requested function type must exactly match
+the selected definition. Emission separately checks actual operand types, ownership and dominance,
+and rejects incompatible output symbols before inserting a declaration or call. Library function
+attributes are not copied to the output declaration; named LLVM calls retain their registry policy.
 
 NVVM uses 64-bit `nvptx64-nvidia-cuda`, the specified NVVM DataLayout, explicit `nvvmir.version` and
 kernel annotations. A calling convention alone does not mark a kernel. A valid LLVM module may still
@@ -378,6 +399,21 @@ logical loader discovery and deterministic filesystem candidates retain actual l
 A rootless loaded compiler may compile without libdevice, but requested libdevice requires a proven
 coherent root. There is no fallback to another toolkit's file. The selected library and coherent
 libdevice identities belong in provenance and cache decisions.
+
+When linked requirements need libdevice, the direct route retains the selected compiler and obtains
+a per-compilation snapshot through its optional `INVVMCUDADeviceLibraryProvider` extension. The
+snapshot owns immutable bytes, path and a strong reference to its origin; the compiler retains no
+snapshot cache. A private token identity proves that origin. Live named-library plans parse this
+snapshot once and query every requested definition before output-module creation. Dead helpers do
+not request it; LLVM-only calls preserve their existing support-query ordering without libdevice.
+
+The same compiler and token reach downstream compilation through a dedicated appended options field.
+Token provenance is checked before `nvvmProgram` creation, then eager/lazy library addition consumes
+the snapshot bytes without reopening the path. Old-size options default the field to null; legacy
+callers use the same selected-path loader when a library is required. Generic artifact libraries
+keep their existing contract. Queries and vendor compilation therefore consume identical bytes even
+if the file changes afterward. The earlier timestamp-based cache hash is unchanged and is not an
+atomic snapshot of the filesystem.
 
 The direct route passes an explicit virtual architecture and optimization 0 or 3. Floating policy
 and Float32 denormal policy are independent:

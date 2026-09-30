@@ -263,7 +263,9 @@ protected:
         PassThroughMode compilerOverride = PassThroughMode::None,
         IArtifact* sourceArtifactOverride = nullptr,
         SourceLanguage sourceLanguageOverride = SourceLanguage::Unknown,
-        bool requiresCUDADeviceLibrary = false);
+        bool requiresCUDADeviceLibrary = false,
+        IDownstreamCompiler* selectedCompiler = nullptr,
+        INVVMCUDADeviceLibrary* cudaDeviceLibrary = nullptr);
 
     /// Emits PTX through the direct NVVM route.
     ///

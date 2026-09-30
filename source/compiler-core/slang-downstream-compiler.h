@@ -150,6 +150,8 @@ In particular
 * New fields must take into account alignment/padding such that they do not share bytes in previous
 version sizes
 */
+class INVVMCUDADeviceLibrary;
+
 struct DownstreamCompileOptions
 {
     typedef DownstreamCompileOptions ThisType;
@@ -303,6 +305,10 @@ struct DownstreamCompileOptions
     /// Pointer-sized storage keeps this versioned extension outside the prior struct's tail
     /// padding; zero means false and any nonzero value means true.
     uintptr_t requiresCUDADeviceLibrary = 0;
+
+    /// Borrows the selected immutable library through synchronous compile. The producing compiler
+    /// must match this compile's compiler; older option versions default to no supplied snapshot.
+    INVVMCUDADeviceLibrary* cudaDeviceLibrary = nullptr;
 };
 static_assert(std::is_trivially_copyable_v<DownstreamCompileOptions>);
 

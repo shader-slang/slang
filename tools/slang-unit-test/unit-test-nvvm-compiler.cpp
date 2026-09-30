@@ -524,6 +524,14 @@ SLANG_UNIT_TEST(nvvmCompilerHandlesLibdeviceModuleAddition)
             NVVMDownstreamCompilerUtil::locateCompilers(toolkit.path, loader, set)));
         IDownstreamCompiler* compiler = _findNVVMCompiler(set);
         SLANG_CHECK_ABORT(compiler != nullptr);
+        ComPtr<INVVMCUDADeviceLibrary> snapshot;
+        auto provider = as<INVVMCUDADeviceLibraryProvider>(compiler);
+        SLANG_CHECK_ABORT(provider);
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(provider->loadCUDADeviceLibrary(snapshot.writeRef(), nullptr)));
+        settings.cudaDeviceLibrary = snapshot;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(File::writeAllText(libdevicePath, "replaced-after-snapshot")));
         ComPtr<IArtifact> outputArtifact;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
@@ -1183,4 +1191,133 @@ SLANG_UNIT_TEST(nvvmPtxasAcceptsEmptyKernel)
     SLANG_CHECK_ABORT(outputArtifact != nullptr);
     SLANG_CHECK(_ptxContainsEntry(outputArtifact, toSlice("testEmpty")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_assemblePTX(outputArtifact, ptxasPath)));
+}
+
+// This deliberately implements only the public snapshot interface. Matching bytes/path cannot
+// substitute for a token created by the selected compiler's private implementation.
+class ForeignNVVMDeviceLibrary : public ComBaseObject, public INVVMCUDADeviceLibrary
+{
+public:
+    SLANG_COM_BASE_IUNKNOWN_ALL
+    explicit ForeignNVVMDeviceLibrary(INVVMCUDADeviceLibrary* source)
+        : m_source(source)
+    {
+    }
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE
+    {
+        return getInterface(guid);
+    }
+    virtual SLANG_NO_THROW ISlangBlob* SLANG_MCALL getContents() SLANG_OVERRIDE
+    {
+        return m_source->getContents();
+    }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getPath() SLANG_OVERRIDE
+    {
+        return m_source->getPath();
+    }
+
+private:
+    ISlangUnknown* getInterface(const Guid& guid)
+    {
+        return guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
+                       guid == INVVMCUDADeviceLibrary::getTypeGuid()
+                   ? static_cast<INVVMCUDADeviceLibrary*>(this)
+                   : nullptr;
+    }
+    ComPtr<INVVMCUDADeviceLibrary> m_source;
+};
+
+SLANG_UNIT_TEST(nvvmCompilerDeviceLibrarySnapshotOwnsSelectedBytes)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    TempDirectory toolkit;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_createTempDirectory(toolkit)));
+    const uint8_t first[] = {0x42, 0x43, 0xc0, 0xde, 0, 1};
+    const uint8_t second[] = {0x42, 0x43, 0xc0, 0xde, 0, 2};
+    String candidate, path;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _createFakeNVVMToolkit(toolkit.path, first, sizeof(first), candidate, path)));
+    gFakeNVVM.reset();
+    ComPtr<ISlangSharedLibraryLoader> loader(new RecordingFakeNVVMLoader);
+    RefPtr<DownstreamCompilerSet> set = new DownstreamCompilerSet;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(NVVMDownstreamCompilerUtil::locateCompilers(toolkit.path, loader, set)));
+    auto compiler = _findNVVMCompiler(set);
+    auto provider = as<INVVMCUDADeviceLibraryProvider>(compiler);
+    SLANG_CHECK_ABORT(provider);
+    ComPtr<INVVMCUDADeviceLibrary> snapshot;
+    ComPtr<ISlangBlob> diagnostics;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        provider->loadCUDADeviceLibrary(snapshot.writeRef(), diagnostics.writeRef())));
+    SLANG_CHECK(!diagnostics);
+    SLANG_CHECK(String(snapshot->getPath()) == path);
+    SLANG_CHECK(snapshot->getContents()->getBufferSize() == sizeof(first));
+    SLANG_CHECK(::memcmp(snapshot->getContents()->getBufferPointer(), first, sizeof(first)) == 0);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllBytes(path, second, sizeof(second))));
+
+    CompileSettings settings;
+    settings.requiresCUDADeviceLibrary = true;
+    settings.cudaDeviceLibrary = snapshot;
+    ComPtr<IArtifact> input = _createNVVMIRArtifact(), output;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileNVVM(compiler, input, settings, output.writeRef())));
+    SLANG_CHECK(gFakeNVVM.addedLibraryModule.getLength() == sizeof(first));
+    SLANG_CHECK(::memcmp(gFakeNVVM.addedLibraryModule.getBuffer(), first, sizeof(first)) == 0);
+
+    ComPtr<INVVMCUDADeviceLibrary> fresh;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider->loadCUDADeviceLibrary(fresh.writeRef(), nullptr)));
+    SLANG_CHECK(::memcmp(fresh->getContents()->getBufferPointer(), second, sizeof(second)) == 0);
+    settings.cudaDeviceLibrary = nullptr;
+    gFakeNVVM.resetCalls();
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileNVVM(compiler, input, settings, output.writeRef())));
+    SLANG_CHECK(::memcmp(gFakeNVVM.addedLibraryModule.getBuffer(), second, sizeof(second)) == 0);
+
+    // A supplied token must not silently enable an unrequested dependency.
+    settings.cudaDeviceLibrary = snapshot;
+    settings.requiresCUDADeviceLibrary = false;
+    gFakeNVVM.resetCalls();
+    SLANG_CHECK(SLANG_FAILED(_compileNVVM(compiler, input, settings, output.writeRef())));
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+
+    // A fresh compiler instance at the same path still has a different owner identity.
+    RefPtr<DownstreamCompilerSet> otherSet = new DownstreamCompilerSet;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        NVVMDownstreamCompilerUtil::locateCompilers(toolkit.path, loader, otherSet)));
+    settings.requiresCUDADeviceLibrary = true;
+    gFakeNVVM.resetCalls();
+    SLANG_CHECK(SLANG_FAILED(
+        _compileNVVM(_findNVVMCompiler(otherSet), input, settings, output.writeRef())));
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    ComPtr<INVVMCUDADeviceLibrary> foreign(new ForeignNVVMDeviceLibrary(snapshot));
+    settings.cudaDeviceLibrary = foreign;
+    SLANG_CHECK(SLANG_FAILED(_compileNVVM(compiler, input, settings, output.writeRef())));
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    foreign.setNull();
+    otherSet = nullptr;
+    fresh.setNull();
+    set = nullptr;
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 1);
+    // Snapshot ownership keeps the selected compiler/library alive after its registry is released.
+    settings.cudaDeviceLibrary = snapshot;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileNVVM(compiler, input, settings, output.writeRef())));
+    snapshot.setNull();
+    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(nvvmCompilerDeviceLibrarySnapshotDefaultsForOldOptions)
+{
+    DownstreamCompileOptions options;
+    const size_t previousSize = offsetof(DownstreamCompileOptions, cudaDeviceLibrary);
+    SLANG_CHECK(
+        previousSize ==
+        offsetof(DownstreamCompileOptions, requiresCUDADeviceLibrary) + sizeof(uintptr_t));
+    options.version.size = uint32_t(previousSize);
+    options.requiresCUDADeviceLibrary = true;
+    options.cudaDeviceLibrary = reinterpret_cast<INVVMCUDADeviceLibrary*>(uintptr_t(1));
+    auto compatible = getCompatibleVersion(&options);
+    SLANG_CHECK(compatible.requiresCUDADeviceLibrary);
+    SLANG_CHECK(compatible.cudaDeviceLibrary == nullptr);
+    SLANG_CHECK(compatible.version.size == sizeof(options));
 }

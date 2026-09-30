@@ -48,7 +48,7 @@ Core execution helpers and varying-parameter legalization use named
 `llvm.nvvm.read.ptx.sreg.*` intrinsics for all twelve thread/block/grid coordinates.
 The named-intrinsic boundary admits zero-argument scalar i32 register reads, the three void
 barrier/fence operations described below, and scalar integer `llvm.ctpop`, `llvm.bitreverse`,
-`llvm.ctlz` and `llvm.cttz`. It does not admit arbitrary LLVM assembly. ABI 45 carries explicit
+`llvm.ctlz` and `llvm.cttz`. It does not admit arbitrary LLVM assembly. ABI 46 carries explicit
 ordinary `__intrinsic_asm` operands; pure provider queries validate LLVM registry signatures and
 immediate-constant requirements before module creation. Actual emission separately validates value
 handles and rejects conflicting symbols without mutation. CUDA source and NVRTC retain CUDA target
@@ -74,9 +74,22 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 35 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 36 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
+
+Public `round` uses named `__nv_roundf`/`__nv_round` calls validated against actual definitions in
+an immutable snapshot of the selected libdevice. The same bytes reach libNVVM. Half uses canonical
+FloatCast widening/narrowing around Float32 round, preserving NVVM ties-away and CUDA Half ties-even.
+Numeric operation64 and the old tag/text recognizers are retired. Other scalar math and compound
+recognizers remain outside this migration. Scalar library ABI admission does not admit vector calls.
+The [Float32](../../tests/cuda/nvvm-round-32.slang), [Float64](../../tests/cuda/nvvm-round-64.slang)
+and [Half](../../tests/cuda/nvvm-round-half.slang) contracts cover live scalar/noinline helper,
+vector2/3/4 and matrix2x2 results with independent integer/rational oracles, signed-zero checks,
+NaN classification, guards and completion. Half compares both tie policies unconditionally.
+The [oracle checker](../../extras/test-generators/check-nvvm-round-oracles.py) recomputes frozen
+expectations without a compiler; the [removed-tag control](../../tests/cuda/nvvm-round-removed-tag.slang)
+checks the source boundary. Current acceptance and compiler identity remain owned by STATUS.
 
 Core bit reinterpretation and Half-value conversions use canonical NVVM `BitCast`/`FloatCast`
 instructions. The [conversion API fixture](../../tests/cuda/nvvm-conversion-intrinsics.slang) checks

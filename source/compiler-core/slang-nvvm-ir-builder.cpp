@@ -49,7 +49,8 @@ static bool _hasRequiredConstruction(const SlangNVVMBuilderConstructionAPI& api)
 static bool _hasRequiredValueOperations(const SlangNVVMBuilderValueOperationsAPI& api)
 {
     return api.isOperationSupported && api.emitOperation && api.isNamedIntrinsicSupported &&
-           api.emitNamedIntrinsic;
+           api.emitNamedIntrinsic && api.loadDeviceLibrary && api.destroyDeviceLibrary &&
+           api.isDeviceLibraryFunctionSupported && api.emitDeviceLibraryFunction;
 }
 
 static bool _hasRequiredAtomicOperations(const SlangNVVMBuilderAtomicOperationsAPI& api)
@@ -162,6 +163,75 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
     outBuilder.m_textureOperations = textureOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
+}
+
+// The provider borrows both the callback context and diagnostic text only during loading.
+static void SLANG_NVVM_CALL
+_copyDeviceLibraryDiagnostic(void* context, const char* text, size_t size)
+{
+    *static_cast<String*>(context) = String(UnownedStringSlice(text, Index(size)));
+}
+
+SlangResult NVVMIRBuilder::loadDeviceLibrary(
+    ISlangBlob* contents,
+    SlangNVVMDeviceLibraryHandle& outLibrary,
+    String& outDiagnostics) const
+{
+    outLibrary = nullptr;
+    outDiagnostics = String();
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!contents)
+        return SLANG_E_INVALID_ARG;
+    return _validateHandleResult(
+        m_valueOperations.loadDeviceLibrary(
+            contents->getBufferPointer(),
+            contents->getBufferSize(),
+            &outLibrary,
+            _copyDeviceLibraryDiagnostic,
+            &outDiagnostics),
+        outLibrary);
+}
+
+void NVVMIRBuilder::destroyDeviceLibrary(SlangNVVMDeviceLibraryHandle library) const
+{
+    if (library)
+        m_valueOperations.destroyDeviceLibrary(library);
+}
+
+bool NVVMIRBuilder::supportsDeviceLibraryFunction(
+    SlangNVVMDeviceLibraryHandle library,
+    const SlangNVVMNamedIntrinsicDesc& function) const
+{
+    uint32_t supported = 0;
+    return isInitialized() && library &&
+           SLANG_SUCCEEDED(m_valueOperations
+                               .isDeviceLibraryFunctionSupported(library, &function, &supported)) &&
+           supported != 0;
+}
+
+SlangResult NVVMIRBuilder::emitDeviceLibraryFunction(
+    SlangNVVMDeviceLibraryHandle library,
+    SlangNVVMModuleHandle module,
+    const SlangNVVMNamedIntrinsicDesc& function,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsDeviceLibraryFunction(library, function))
+        return SLANG_E_NOT_AVAILABLE;
+    return _validateHandleResult(
+        m_valueOperations.emitDeviceLibraryFunction(
+            library,
+            module,
+            &function,
+            operands,
+            operandCount,
+            &outValue),
+        outValue);
 }
 
 bool NVVMIRBuilder::supportsSurfaceOperation(const SlangNVVMSurfaceOperationDesc& operation) const

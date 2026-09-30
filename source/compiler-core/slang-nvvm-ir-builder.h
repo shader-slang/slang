@@ -61,6 +61,24 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
+    /// Copies selected library bytes into a separate provider input context and retains
+    /// diagnostics.
+    SlangResult loadDeviceLibrary(
+        ISlangBlob* contents,
+        SlangNVVMDeviceLibraryHandle& outLibrary,
+        String& outDiagnostics) const;
+    void destroyDeviceLibrary(SlangNVVMDeviceLibraryHandle library) const;
+    bool supportsDeviceLibraryFunction(
+        SlangNVVMDeviceLibraryHandle library,
+        const SlangNVVMNamedIntrinsicDesc& function) const;
+    SlangResult emitDeviceLibraryFunction(
+        SlangNVVMDeviceLibraryHandle library,
+        SlangNVVMModuleHandle module,
+        const SlangNVVMNamedIntrinsicDesc& function,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Queries one complete typed operation.
     bool supportsValueOperation(const SlangNVVMValueOperationDesc& operation) const;
 

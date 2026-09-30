@@ -362,7 +362,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
     PassThroughMode compilerOverride,
     IArtifact* sourceArtifactOverride,
     SourceLanguage sourceLanguageOverride,
-    bool requiresCUDADeviceLibrary)
+    bool requiresCUDADeviceLibrary,
+    IDownstreamCompiler* selectedCompiler,
+    INVVMCUDADeviceLibrary* cudaDeviceLibrary)
 {
     outArtifact.setNull();
 
@@ -422,7 +424,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
     SLANG_ASSERT(compilerType != PassThroughMode::None);
 
     // Get the required downstream compiler
-    IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(compilerType, sink);
+    SLANG_RELEASE_ASSERT(
+        !selectedCompiler || selectedCompiler->getDesc().type == SlangPassThrough(compilerType));
+    IDownstreamCompiler* compiler = selectedCompiler
+                                        ? selectedCompiler
+                                        : session->getOrLoadDownstreamCompiler(compilerType, sink);
     if (!compiler)
     {
         auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
@@ -436,6 +442,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(
     typedef DownstreamCompileOptions CompileOptions;
     CompileOptions options;
     options.requiresCUDADeviceLibrary = requiresCUDADeviceLibrary;
+    options.cudaDeviceLibrary = cudaDeviceLibrary;
 
     List<DownstreamCompileOptions::CapabilityVersion> requiredCapabilityVersions;
     List<String> compilerSpecificArguments;

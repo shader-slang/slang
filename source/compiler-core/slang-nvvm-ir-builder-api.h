@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 45u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 46u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -33,6 +33,14 @@ extern "C"
 #endif
 
     typedef struct SlangNVVMModule* SlangNVVMModuleHandle;
+    typedef struct SlangNVVMDeviceLibrary* SlangNVVMDeviceLibraryHandle;
+
+    /** Reports parse/load diagnostics synchronously. Neither callback nor userData is retained;
+        text is borrowed only for this invocation. A null callback discards diagnostics. */
+    typedef void(SLANG_NVVM_CALL* SlangNVVMDiagnosticCallback)(
+        void* userData,
+        const char* text,
+        size_t textSize);
     typedef struct SlangNVVMType* SlangNVVMTypeHandle;
     typedef struct SlangNVVMValue* SlangNVVMValueHandle;
     typedef struct SlangNVVMBlock* SlangNVVMBlockHandle;
@@ -171,7 +179,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_LOG2 ((SlangNVVMValueOperation)61u)
 #define SLANG_NVVM_VALUE_OP_LOG10 ((SlangNVVMValueOperation)62u)
 #define SLANG_NVVM_VALUE_OP_POW ((SlangNVVMValueOperation)63u)
-#define SLANG_NVVM_VALUE_OP_ROUND ((SlangNVVMValueOperation)64u)
+/* Value 64 is retired; round uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_RSQRT ((SlangNVVMValueOperation)65u)
 #define SLANG_NVVM_VALUE_OP_TAN ((SlangNVVMValueOperation)66u)
 #define SLANG_NVVM_VALUE_OP_IS_NAN ((SlangNVVMValueOperation)67u)
@@ -525,8 +533,9 @@ extern "C"
         SlangNVVMNamedIntrinsicOperandKind kind;
     } SlangNVVMNamedIntrinsicOperandDesc;
 
-    /** An exact LLVM registry base name and its checked Slang signature. All pointers are borrowed
-        for the synchronous call. Emission returns a null value handle for void calls. */
+    /** An exact LLVM registry or admitted device-library name and its checked Slang signature. All
+       pointers are borrowed for the synchronous call. Emission returns a null value handle for void
+       calls. */
     typedef struct SlangNVVMNamedIntrinsicDesc
     {
         const char* name;
@@ -554,6 +563,27 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* emitNamedIntrinsic)(
             SlangNVVMModuleHandle module,
             const SlangNVVMNamedIntrinsicDesc* intrinsic,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+        /** Copies and eagerly parses immutable library bytes in a separate input context. Failure
+            leaves outLibrary null and may report a diagnostic; no output module is created. */
+        SlangNVVMResult(SLANG_NVVM_CALL* loadDeviceLibrary)(
+            const void* bytes,
+            size_t byteCount,
+            SlangNVVMDeviceLibraryHandle* outLibrary,
+            SlangNVVMDiagnosticCallback diagnose,
+            void* userData);
+        void(SLANG_NVVM_CALL* destroyDeviceLibrary)(SlangNVVMDeviceLibraryHandle library);
+        /** An unsupported signature returns success with outSupported zero, without diagnostics. */
+        SlangNVVMResult(SLANG_NVVM_CALL* isDeviceLibraryFunctionSupported)(
+            SlangNVVMDeviceLibraryHandle library,
+            const SlangNVVMNamedIntrinsicDesc* function,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitDeviceLibraryFunction)(
+            SlangNVVMDeviceLibraryHandle library,
+            SlangNVVMModuleHandle module,
+            const SlangNVVMNamedIntrinsicDesc* function,
             const SlangNVVMValueHandle* operands,
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
