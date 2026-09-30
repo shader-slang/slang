@@ -93,9 +93,7 @@ struct ConditionalTypeLoweringContext
             // parameter concrete. One here is an upstream bug; `Conditional` has no
             // non-literal-flag representation on any backend, so emit a located diagnostic to fail
             // cleanly here.
-            sink->diagnose(Diagnostics::Unexpected{
-                .message = "Conditional<T,hasValue> reached code generation with a non-literal "
-                           "hasValue flag",
+            sink->diagnose(Diagnostics::ConditionalHasValueNotConstant{
                 .location = useLoc.isValid() ? useLoc : condType->sourceLoc});
             return nullptr;
         }
@@ -198,11 +196,6 @@ struct ConditionalTypeLoweringContext
         switch (inst->getOp())
         {
         case kIROp_ConditionalType:
-            // Eagerly lower and cache every conditional type, including those with no make/get
-            // consumer to trigger on-demand lowering: the terminal replacement loop in
-            // processModule rewrites each cached type wherever it still appears (field / parameter
-            // / return positions), so a type reached only through those positions must be cached
-            // here.
             tryLowerConditionalType(as<IRConditionalType>(inst), inst->sourceLoc);
             break;
         case kIROp_MakeConditionalValue:
