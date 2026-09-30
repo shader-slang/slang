@@ -656,8 +656,12 @@ public:
 
     /// Construct an AST deserialization context.
     ///
-    /// The `linkage`, `astBuilder`, and `sink` arguments must
-    /// all remain valid for as long as this context will be used.
+    /// The `linkage` and `astBuilder` arguments must remain valid
+    /// for as long as this context will be used. The `sink` may be
+    /// null, and is expected to remain valid for as long, but it is
+    /// the sink of the loading request, so on-demand reads that
+    /// happen after that request has returned do not satisfy this
+    /// (see the TODO on `_sink`).
     ///
     /// The context will retain the `sourceLocReader` and the
     /// `blobHoldingSerializedData`. It is assumed that the
@@ -716,8 +720,8 @@ private:
 
     /// The sink of the request that loaded the module, or null when the core module is read.
     ///
-    /// TODO: On-demand reads that happen after that request has returned still use this sink,
-    /// which may no longer be valid by then.
+    /// TODO(#13351): On-demand reads that happen after that request has returned still use this
+    /// sink, which may no longer be valid by then.
     ///
     DiagnosticSink* _sink = nullptr;
     RefPtr<SerialSourceLocReader> _sourceLocReader = nullptr;
@@ -729,8 +733,8 @@ private:
     // The actual cache for the mapping from fossilized declaration pointers
     // to their revitalized `Decl*`s is maintained by the `Fossil::ReadContext`.
     //
-    // TODO: An abort during an on-demand read, after the module has been
-    // loaded, leaves this context partially read while the module stays registered.
+    // TODO(#13351): An abort during an on-demand read, after the module has
+    // been loaded, leaves this context partially read while the module stays registered.
     //
 
     Fossil::ReadContext _readContext;
