@@ -3487,12 +3487,12 @@ bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
 
     // Look annotations up on the resolved inner function rather than on the
     // unresolved callee. A generic's derivative annotations live on its
-    // `IRSpecialize`, and two kinds found there would make calls carry that
-    // should not, regressing the false-positive fixes from #11286: built-in
-    // derivatives that are pure but not marked `[__readNone]` (e.g.
-    // `__d_reflect`), and the synthesized `BackwardDifferentiatePropagate` of a
-    // generic `[__readNone][Differentiable]` function, which `isReadNoneCallee`
-    // does not treat as read-none.
+    // `IRSpecialize`, and two kinds found there would make pure calls carry,
+    // regressing the false-positive fixes from #11286: built-in derivatives
+    // that are pure but not marked `[__readNone]` (e.g. `__d_reflect`), and the
+    // synthesized `BackwardDifferentiatePropagate` of a generic
+    // `[__readNone][Differentiable]` function, which `isReadNoneCallee`
+    // conservatively does not treat as read-none.
     //
     // The trade-off is that the derivatives of a generic primary are never
     // checked: a generic `[__readNone]` primary whose user-supplied
