@@ -4,6 +4,8 @@
 #include "core/slang-blob.h"
 #include "core/slang-performance-profiler.h"
 
+#include <exception>
+
 namespace Slang
 {
 namespace Fossil
@@ -1153,7 +1155,7 @@ SerialReader::SerialReader(
 {
     // We track the number of active `SerialReader`s that
     // are working with the same `ReadContext`, and will
-    // make use of this count in the destructor below.
+    // make use of this count in `flush()` below.
     //
     context._readerCount++;
 
@@ -1175,6 +1177,27 @@ SerialReader::SerialReader(
 
 SerialReader::~SerialReader()
 {
+    // Deferred actions are run by `flush()` rather than here, because an
+    // action can throw (for example, when a serialized module refers to a
+    // declaration that can no longer be resolved), and an exception must
+    // not escape a destructor. The outermost reader can only have pending
+    // actions here if an exception is unwinding through it (anything else
+    // means a caller did not call `flush()`, which the assertion catches),
+    // and we drop them. The objects those actions would have filled in stay
+    // cached in the `ReadContext` only partially read, so whoever catches
+    // the exception must abandon the data being read.
+    //
+    if (_context._readerCount == 1)
+    {
+        SLANG_RELEASE_ASSERT(
+            _context._deferredActions.getCount() == 0 || std::uncaught_exceptions() != 0);
+        _context._deferredActions.clear();
+    }
+    _context._readerCount--;
+}
+
+void SerialReader::flush()
+{
     // If an application is designed to perform something
     // like on-demand deserialization, it may create
     // additional `SerialReader`s attached to the same
@@ -1183,8 +1206,8 @@ SerialReader::~SerialReader()
     // `SerialReader` further up the stack.
     //
     // If we were to track the deferred actions that get
-    // enqueued on a per-`SerialReader` basis, and then
-    // flush them when the given `SerialReader` is destructed,
+    // enqueued on a per-`SerialReader` basis, and have each
+    // `SerialReader` run only its own actions when flushed,
     // it could potentially lead to very deep call stacks.
     //
     // Instead, we track a single list of deferred actions
@@ -1192,32 +1215,20 @@ SerialReader::~SerialReader()
     // figure out when to actually flush that list.
     //
     // What is implemented here is a "last one out shuts the door"
-    // policy. When a `SerialReader` is being destroyed, before
-    // it decrements the count on the shared `ReadContext`, it
-    // checks to see if it is the last remaining `SerialReader`,
-    // in which case it takes responsibility for flushing the deferred
-    // actions that were enqueued by *all* of the readers.
+    // policy. Every `SerialReader` is flushed before it is destroyed,
+    // but only the outermost one on a `ReadContext` actually runs the
+    // deferred actions that were enqueued by *all* of the readers.
     //
-    // Note that the ordering here is critical: we check whether
-    // we are the last reader and, if so, perform the `_flush()`
-    // operation all *before* decrementing the counter. If we
-    // were to decrement the count before invoking `_flush()`
-    // then any nested `SerialReader`s that get created by the
-    // deferred actions would (incorrectly) believe themselves
-    // to be the "last one out" and try to perform their own
-    // `flush()`, which could quickly lead to unbounded
-    // recursion.
+    // Note that this reader is still counted while it flushes. Any
+    // nested `SerialReader`s that get created by the deferred actions
+    // therefore see a count above one, and leave their own actions to
+    // the loop in this reader's `_flush()` rather than starting one
+    // of their own, which could quickly lead to unbounded recursion.
     //
     if (_context._readerCount == 1)
     {
         _flush();
     }
-    _context._readerCount--;
-}
-
-void SerialReader::flush()
-{
-    _flush();
 }
 
 void SerialReader::beginVariant(Scope& scope)

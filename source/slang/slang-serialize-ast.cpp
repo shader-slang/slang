@@ -1517,7 +1517,13 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
             _sink->diagnose(Diagnostics::ImportFailed{
                 .path = moduleName ? moduleName->text : String(),
                 .location = _requestingSourceLoc});
-        return nullptr;
+
+        // Every declaration that the module being read imports from the missing
+        // one would be unresolvable, so we stop loading rather than return null `Decl*`s.
+        StringBuilder message;
+        message << "failed to import module '" << (moduleName ? moduleName->text : String())
+                << "' required by a serialized module";
+        SLANG_ABORT_COMPILATION(message.produceString().begin());
     }
     return module->getModuleDecl();
 }
@@ -1551,22 +1557,26 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
     serialize(serializer, importedFromModuleDecl);
     serialize(serializer, mangledName);
 
-    if (!importedFromModuleDecl)
-        return nullptr;
-
+    SLANG_RELEASE_ASSERT(importedFromModuleDecl && importedFromModuleDecl->module);
     auto importedFromModule = importedFromModuleDecl->module;
-    if (!importedFromModule)
-    {
-        return nullptr;
-    }
 
     auto importedDecl =
         importedFromModule->findExportedDeclByMangledName(mangledName.getUnownedSlice());
     if (!importedDecl)
     {
-        _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
-            .declName = mangledName,
-            .moduleName = importedFromModule->getName()});
+        if (_sink)
+            _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
+                .declName = mangledName,
+                .moduleName = importedFromModule->getName(),
+                .location = _requestingSourceLoc});
+
+        // A null declaration would reach consumers that cannot represent one, such as
+        // the `Decl*`-keyed requirement dictionary of a `WitnessTable`, so we stop
+        // loading instead.
+        StringBuilder message;
+        message << "cannot resolve imported declaration '" << mangledName << "' from module '"
+                << importedFromModule->getName() << "'";
+        SLANG_ABORT_COMPILATION(message.produceString().begin());
     }
     return importedDecl;
 }
@@ -2104,6 +2114,7 @@ Decl* ASTSerialReadContext::readFossilizedDecl(Fossilized<Decl>* fossilizedDecl)
 
     Decl* decl = nullptr;
     serialize(serializer, decl);
+    reader.flush();
     return decl;
 }
 

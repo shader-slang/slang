@@ -645,6 +645,12 @@ public:
     ///
     Fossil::AnyValPtr readValPtr();
 
+    /// Run the actions deferred by the readers sharing this reader's `ReadContext`.
+    ///
+    /// Every reader must be flushed before it is destroyed. Only the outermost
+    /// reader on a context runs the actions, and it does so here rather than in
+    /// its destructor so that an exception thrown by an action reaches the caller.
+    ///
     void flush();
 
 private:
