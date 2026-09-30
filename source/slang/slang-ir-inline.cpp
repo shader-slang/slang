@@ -972,6 +972,19 @@ bool performMandatoryEarlyInlining(IRModule* module, HashSet<IRInst*>* modifiedF
     return pass.considerAllCallSites();
 }
 
+// Return whether a call to `callee` may keep its `groupshared` parameters, which are `Workgroup`
+// pointers, across the call boundary instead of being inlined away. Direct SPIR-V allows such a
+// pointer parameter under the `VariablePointers` capability, so we keep the boundary for a
+// `[noinline]` callee when the target already enables `SPV_KHR_variable_pointers`. We never enable
+// the extension only to keep a boundary.
+static bool canKeepGroupSharedParamsAcrossCall(TargetProgram* targetProgram, IRFunc* callee)
+{
+    return targetProgram->shouldEmitSPIRVDirectly() &&
+           callee->findDecoration<IRNoInlineDecoration>() &&
+           targetProgram->getTargetReq()->getTargetCaps().implies(
+               CapabilityAtom::SPV_KHR_variable_pointers);
+}
+
 namespace
 { // anonymous
 
@@ -1061,13 +1074,18 @@ struct TypeInliningPass : InliningPassBase
             return true;
         }
 
-        const auto count = Count(callee->getParamCount());
-        for (Index i = 0; i < count; ++i)
+        bool keepGroupSharedParams = canKeepGroupSharedParamsAcrossCall(targetProgram, callee);
+        Index i = 0;
+        for (auto param : callee->getParams())
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
+            bool isKeptGroupSharedParam =
+                keepGroupSharedParams && as<IRGroupSharedRate>(param->getRate());
+            if (!isKeptGroupSharedParam &&
+                doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
             {
                 return true;
             }
+            ++i;
         }
 
         return false;
@@ -1241,8 +1259,15 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     // away.
     bool m_groupSharedByRefOnly = false;
 
-    GLSLResourceReturnFunctionInliningPass(IRModule* module, bool groupSharedByRefOnly)
-        : Super(module), m_groupSharedByRefOnly(groupSharedByRefOnly)
+    TargetProgram* m_targetProgram = nullptr;
+
+    GLSLResourceReturnFunctionInliningPass(
+        IRModule* module,
+        TargetProgram* targetProgram,
+        bool groupSharedByRefOnly)
+        : Super(module)
+        , m_groupSharedByRefOnly(groupSharedByRefOnly)
+        , m_targetProgram(targetProgram)
     {
     }
 
@@ -1252,6 +1277,8 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
         {
             return true;
         }
+        bool keepGroupSharedParams =
+            canKeepGroupSharedParamsAcrossCall(m_targetProgram, info.callee);
         for (auto param : info.callee->getParams())
         {
             if (!m_groupSharedByRefOnly && isIllegalGLSLParameterType(param->getDataType()))
@@ -1264,9 +1291,15 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
             // `groupshared`-ness lives on the parameter's rate (`IRGroupSharedRate`), not on its
             // value type, so the value-type checks above never catch it. Inline the callee so the
             // parameter disappears and the accesses fall directly on the `Workgroup` global,
-            // mirroring how resource parameters are handled here.
+            // mirroring how resource parameters are handled here. Direct SPIR-V with
+            // `VariablePointers` already enabled is the exception, as
+            // `canKeepGroupSharedParamsAcrossCall` describes.
             if (as<IRGroupSharedRate>(param->getRate()))
+            {
+                if (keepGroupSharedParams)
+                    continue;
                 return true;
+            }
             if (m_groupSharedByRefOnly)
                 continue;
             auto outType = as<IROutParamTypeBase>(param->getDataType());
@@ -1285,7 +1318,7 @@ void performGLSLResourceReturnFunctionInlining(
     TargetProgram* targetProgram,
     bool groupSharedByRefOnly)
 {
-    GLSLResourceReturnFunctionInliningPass pass(module, groupSharedByRefOnly);
+    GLSLResourceReturnFunctionInliningPass pass(module, targetProgram, groupSharedByRefOnly);
     bool changed = true;
 
     while (changed)
