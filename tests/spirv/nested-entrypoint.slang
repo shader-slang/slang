@@ -1,6 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-use-entrypoint-name
+//TEST:SIMPLE(filecheck=CUDA): -target cuda
 
 // CHECK: OpEntryPoint
+
+// The ordinary-function copy of `innerMain` that `outerMain` calls must keep its `id` parameter;
+// CUDA drops system-value parameters only from entry-point signatures.
+// CUDA: innerMain_{{[0-9]+}}(int{{[^)]*}}id{{[^)]*}}){{$}}
 
 RWStructuredBuffer<int> output;
 

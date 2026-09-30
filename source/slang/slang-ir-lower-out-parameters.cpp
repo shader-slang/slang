@@ -395,9 +395,7 @@ static void transferFunctionDecorations(
 // (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
 // IREntryPointParamDecoration recording the entry-point function it came from. Once the wrapper
 // replaces the entry point those tags must follow it: introduceExplicitGlobalContext binds a
-// global uniform to an entry point only when this decoration names that entry point, and a tag
-// left on `oldFunc` would also count as a use that keeps `oldFunc` alive (see
-// handleOriginalFunction).
+// global uniform to an entry point only when this decoration names that entry point.
 static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
 {
     traverseUses(
@@ -409,31 +407,16 @@ static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
         });
 }
 
-// An original that other users keep alive must no longer look like an entry point to later passes.
-static void handleOriginalFunction(IRFunc* func, IRCall* callResult)
+// Inline the original entry point `func` into the wrapper through `call`, then delete `func`.
+// `call` must be the only remaining use of `func`: fixEntryPointCallsites has already moved every
+// other call to a separate ordinary-function copy, and retargetEntryPointParamDecorations has moved
+// the hoisted uniforms' tags to the wrapper.
+static void inlineOriginalFunction(IRFunc* func, IRCall* call)
 {
-    if (!func->hasMoreThanOneUse())
-    {
-        inlineCall(callResult);
-        func->removeAndDeallocate();
-        return;
-    }
-
-    List<IRDecoration*> decorationsToRemove;
-    for (auto decor : func->getDecorations())
-    {
-        if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor) ||
-            as<IRLayoutDecoration>(decor))
-        {
-            decorationsToRemove.add(decor);
-        }
-    }
-
-    for (auto decor : decorationsToRemove)
-    {
-        decor->removeFromParent();
-    }
-    removeParamLayoutDecorations(func);
+    SLANG_RELEASE_ASSERT(
+        func->firstUse && func->firstUse->getUser() == call && !func->hasMoreThanOneUse());
+    inlineCall(call);
+    func->removeAndDeallocate();
 }
 
 // Main function that orchestrates the transformation
@@ -509,9 +492,7 @@ IRFunc* lowerOutParameters(
     builder.emitReturn(returnValue);
 
     retargetEntryPointParamDecorations(func, newFunc);
-
-    // Handle cleanup of original function
-    handleOriginalFunction(func, callResult);
+    inlineOriginalFunction(func, callResult);
 
     return newFunc;
 }

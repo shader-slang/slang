@@ -6,6 +6,19 @@
 
 namespace Slang
 {
+// Remove the layout decorations the entry point's parameters carry. Emitters read them as
+// stage-interface information, which is wrong for an ordinary function: Metal prints a varying
+// input as `[[stage_in]]`, and CUDA leaves a system-value parameter out of the signature while
+// callers still pass it.
+static void removeParamLayoutDecorations(IRFunc* func)
+{
+    for (auto param : func->getParams())
+    {
+        while (auto layoutDecoration = param->findDecoration<IRLayoutDecoration>())
+            layoutDecoration->removeAndDeallocate();
+    }
+}
+
 // If the entrypoint is called by some other function, we need to clone the
 // entrypoint and replace the callsites to call the cloned entrypoint instead.
 // This is because we will be modifying the signature of the entrypoint during

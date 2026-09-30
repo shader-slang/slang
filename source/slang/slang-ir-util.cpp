@@ -1567,15 +1567,6 @@ void removeLinkageDecorations(IRInst* inst)
         decoration->removeAndDeallocate();
 }
 
-void removeParamLayoutDecorations(IRFunc* func)
-{
-    for (auto param : func->getParams())
-    {
-        while (auto layoutDecoration = param->findDecoration<IRLayoutDecoration>())
-            layoutDecoration->removeAndDeallocate();
-    }
-}
-
 void setInsertBeforeOrdinaryInst(IRBuilder* builder, IRInst* inst)
 {
     if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(inst))
