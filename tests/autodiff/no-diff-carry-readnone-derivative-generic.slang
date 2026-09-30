@@ -18,10 +18,10 @@
 // CHECK-NOT: derivative is lost
 // CHECK: void main(
 
-RWStructuredBuffer<float> out_buf;
+RWStructuredBuffer<float> outBuf;
 
 [Differentiable]
-public void caller_builtin(no_diff float3 x, no_diff out float result)
+public void callerBuiltin(no_diff float3 x, no_diff out float result)
 {
     result = dot(x, x);
 }
@@ -31,6 +31,6 @@ public void caller_builtin(no_diff float3 x, no_diff out float result)
 void main()
 {
     float r;
-    caller_builtin(float3(1.0, 2.0, 3.0), r);
-    out_buf[0] = r;
+    callerBuiltin(float3(1.0, 2.0, 3.0), r);
+    outBuf[0] = r;
 }

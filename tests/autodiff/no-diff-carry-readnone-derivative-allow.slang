@@ -13,20 +13,20 @@
 // CHECK: error[E41031]
 // CHECK: derivative is lost
 
-RWStructuredBuffer<float> debug_buf;
-RWStructuredBuffer<float> out_buf;
+RWStructuredBuffer<float> debugBuf;
+RWStructuredBuffer<float> outBuf;
 
 // Backward derivative writes to a buffer and uses
 // [PreferRecompute(SideEffectBehavior.Allow)] to silence the side-effect
 // warning — so it is NOT side-effect free.
 [PreferRecompute(SideEffectBehavior.Allow)]
-void baz_bwd(inout DifferentialPair<float> v, float dOut)
+void bazBwd(inout DifferentialPair<float> v, float dOut)
 {
-    debug_buf[0] = v.p;
+    debugBuf[0] = v.p;
     v = diffPair(v.p, dOut * 2.0 * v.p);
 }
 
-[BackwardDerivative(baz_bwd)]
+[BackwardDerivative(bazBwd)]
 [__readNone]
 float baz(float x)
 {
@@ -34,7 +34,7 @@ float baz(float x)
 }
 
 [Differentiable]
-public void caller_allow(no_diff float x, no_diff out float result)
+public void callerAllow(no_diff float x, no_diff out float result)
 {
     result = baz(x);
 }
@@ -44,6 +44,6 @@ public void caller_allow(no_diff float x, no_diff out float result)
 void main()
 {
     float r;
-    caller_allow(2.0, r);
-    out_buf[0] = r;
+    callerAllow(2.0, r);
+    outBuf[0] = r;
 }

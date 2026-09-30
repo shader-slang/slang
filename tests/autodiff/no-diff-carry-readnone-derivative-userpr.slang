@@ -17,19 +17,19 @@
 // CHECK: error[E41031]
 // CHECK: derivative is lost
 
-RWStructuredBuffer<float> debug_buf;
-RWStructuredBuffer<float> out_buf;
+RWStructuredBuffer<float> debugBuf;
+RWStructuredBuffer<float> outBuf;
 
 // User-authored backward derivative with side effects, marked with the
 // default `[PreferRecompute]` (Warn) — NOT side-effect free.
 [PreferRecompute]
-void qux_bwd(inout DifferentialPair<float> v, float dOut)
+void quxBwd(inout DifferentialPair<float> v, float dOut)
 {
-    debug_buf[0] = v.p;
+    debugBuf[0] = v.p;
     v = diffPair(v.p, dOut * 2.0 * v.p);
 }
 
-[BackwardDerivative(qux_bwd)]
+[BackwardDerivative(quxBwd)]
 [__readNone]
 float qux(float x)
 {
@@ -37,7 +37,7 @@ float qux(float x)
 }
 
 [Differentiable]
-public void caller_userpr(no_diff float x, no_diff out float result)
+public void callerUserPr(no_diff float x, no_diff out float result)
 {
     result = qux(x);
 }
@@ -47,6 +47,6 @@ public void caller_userpr(no_diff float x, no_diff out float result)
 void main()
 {
     float r;
-    caller_userpr(2.0, r);
-    out_buf[0] = r;
+    callerUserPr(2.0, r);
+    outBuf[0] = r;
 }

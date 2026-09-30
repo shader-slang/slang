@@ -15,20 +15,20 @@
 // CHECK: derivative is lost
 
 RWStructuredBuffer<float> debugBuf;
-RWStructuredBuffer<float> out_buf;
+RWStructuredBuffer<float> outBuf;
 
 // A user-authored backward derivative with side effects, carrying BOTH
 // [PreferRecompute] and __target_intrinsic. Neither is a purity contract, so
 // the call must still be treated as carrying a derivative.
 [PreferRecompute]
 __target_intrinsic(hlsl, "debugBuf[0] = ($0).p")
-void quux_bwd(inout DifferentialPair<float> v, float dOut)
+void quuxBwd(inout DifferentialPair<float> v, float dOut)
 {
     debugBuf[0] = v.p;
     v = diffPair(v.p, dOut * 2.0 * v.p);
 }
 
-[BackwardDerivative(quux_bwd)]
+[BackwardDerivative(quuxBwd)]
 [__readNone]
 float quux(float x)
 {
@@ -36,7 +36,7 @@ float quux(float x)
 }
 
 [Differentiable]
-public void caller_intrinsic(no_diff float x, no_diff out float result)
+public void callerIntrinsic(no_diff float x, no_diff out float result)
 {
     result = quux(x);
 }
@@ -46,6 +46,6 @@ public void caller_intrinsic(no_diff float x, no_diff out float result)
 void main()
 {
     float r;
-    caller_intrinsic(2.0, r);
-    out_buf[0] = r;
+    callerIntrinsic(2.0, r);
+    outBuf[0] = r;
 }
