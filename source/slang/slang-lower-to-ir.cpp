@@ -10164,7 +10164,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
     StmtLoweringVisitor visitor;
     visitor.context = context;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         maybeEmitDebugLine(context, &visitor, stmt, stmt->loc);
 
@@ -10179,6 +10179,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
 
         visitor.dispatch(stmt);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -10190,6 +10191,7 @@ void lowerStmt(IRGenContext* context, Stmt* stmt)
         context->getSink()->noteInternalErrorLoc(stmt->loc);
         throw;
     }
+#endif
 }
 
 /// Create and return a mutable temporary initialized with `val`
@@ -15061,6 +15063,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_NonDynamicUniformReturnDecoration);
         }
 
+        // Explicitly add a geometry input primitive topology decoration to handle the case where
+        // the input struct is empty.
+        if (auto firstBlock = irFunc->getFirstBlock();
+            firstBlock && !irFunc->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+        {
+            for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
+            {
+                if (auto geomDecor = pp->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+                {
+                    getBuilder()->addDecoration(irFunc, geomDecor->getOp());
+                    break;
+                }
+            }
+        }
+
         verifyComputeDerivativeGroupModifiers(
             getSink(),
             decl->loc,
@@ -15222,10 +15239,11 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
     DeclLoweringVisitor visitor;
     visitor.context = context;
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         return visitor.dispatch(decl);
     }
+#if SLANG_HAS_EXCEPTIONS
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
     catch (const AbortCompilationException&)
@@ -15237,6 +15255,7 @@ LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
         context->getSink()->noteInternalErrorLoc(decl->loc);
         throw;
     }
+#endif
 }
 
 // We will probably want to put the

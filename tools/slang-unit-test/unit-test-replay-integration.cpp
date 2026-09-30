@@ -1,3 +1,4 @@
+#if SLANG_ENABLE_RECORD_REPLAY
 // unit-test-replay-integration.cpp
 // Integration tests: API calls, directory management
 
@@ -706,3 +707,4 @@ SLANG_UNIT_TEST(replayContextGetDownstreamCompilerPathPlayback)
 
     ctx().disable();
 }
+#endif // SLANG_ENABLE_RECORD_REPLAY

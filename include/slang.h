@@ -1031,6 +1031,16 @@ typedef uint32_t SlangSizeT;
     // compiled against an older version of this header.
     namespace slang
     {
+    enum class BitfieldPackingRules
+    {
+        // Uses LSB-first packing; fields may share storage across underlying type sizes.
+        Default = 0,
+        // Uses LSB-first packing; a type-size change starts new storage. Rejects zero-width fields.
+        MSVC = 1,
+        // Uses MSB-first packing and starts new storage on type-size changes. Not recommended.
+        LegacyMSBFirstMSVC = 2,
+    };
+
     enum class CompilerOptionName
     {
         MacroDefine = 0, // stringValue0: macro name;  stringValue1: macro value
@@ -1203,7 +1213,8 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32 = 126,
         DenormalModeFp64 = 127,
 
-        // Bitfield options
+        // Deprecated. When no BitfieldPackingRules value is supplied, true selects MSB-first
+        // packing and starts new storage on underlying type-size changes.
         UseMSVCStyleBitfieldPacking = 128, // bool
 
         ForceCLayout = 129, // bool
@@ -1334,8 +1345,10 @@ typedef uint32_t SlangSizeT;
         // command-line parser.
         GetCompilerPath = 159,
 
+        BitfieldPackingRules = 160, // intValue0: slang::BitfieldPackingRules
+
         LayoutRulesVersion =
-            160, // intValue0: SlangLanguageVersion naming the revision of the buffer layout rules,
+            161, // intValue0: SlangLanguageVersion naming the revision of the buffer layout rules,
                  //   independently of `LanguageVersion`. When unset, the current layout rules
                  //   are used. `SLANG_LANGUAGE_VERSION_202C` and later round the size of each
                  //   struct up to a multiple of its alignment under scalar layout, as DXC's
@@ -6088,12 +6101,16 @@ SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
    Switches to playback mode on success.
    @param folderPath Path to the replay folder.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
 
 /* Load the most recent replay from the replay directory.
    Switches to playback mode on success.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
 

@@ -384,6 +384,21 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-msvc-style-bitfield-packing",
+    134,
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC "
+        .. "on little-endian platforms. Use `-bitfield-packing-rules legacy-msb-first-msvc` "
+        .. "for the same packing behavior, or `-bitfield-packing-rules msvc` for MSVC bitfield "
+        .. "packing"
+)
+
+err(
+    "conflicting-bitfield-packing-rules-options",
+    135,
+    "`-msvc-style-bitfield-packing` cannot be combined with `-bitfield-packing-rules`"
+)
+
 err(
     "unknown-source-language",
     19,
@@ -4116,6 +4131,13 @@ err(
     31301,
     "bit-field type must be integral",
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
+)
+
+err(
+    "zero-width-bit-field-unsupported-in-msvc-packing",
+    31302,
+    "zero-width bit fields are not supported by `-bitfield-packing-rules msvc`",
+    span { loc = "location", message = "this zero-width bit field has no defined MSVC packing behavior in Slang" }
 )
 
 --
