@@ -111,6 +111,29 @@ interface IComparable
     bool lessThanOrEquals(This other);
 }
 
+//@hidden:
+// The builtin scalar, vector and matrix conformances override `__min`/`__max` with calls to
+// their concrete `min`/`max` overloads. Those calls are resolved against the concrete shape when
+// the conformance is checked, so a generic `min`/`max` specialized on, say, `float3` reaches the
+// element-wise vector overload instead of a scalar-only target intrinsic.
+interface __IMinMax : IComparable
+{
+    This __min(This other)
+    {
+        if (this.lessThan(other))
+            return this;
+        return other;
+    }
+
+    This __max(This other)
+    {
+        if (this.lessThan(other))
+            return other;
+        return this;
+    }
+}
+//@public:
+
 /// Represents types that has a defined range of values.
 /// Implemented by all builtin integer and floating point types.
 interface IRangedValue
@@ -248,7 +271,7 @@ interface ILogical : IComparable
 /// }
 /// ```
 ///
-interface IInteger : IArithmetic, ILogical
+interface IInteger : IArithmetic, ILogical, __IMinMax
 {
     /// Converts the value of the current instance to an `int`.
     /// @return The converted `int` value.
@@ -301,7 +324,7 @@ interface IInteger : IArithmetic, ILogical
 /// }
 /// ```
 ///
-interface IFloat : IArithmetic, IDifferentiable
+interface IFloat : IArithmetic, IDifferentiable, __IMinMax
 {
     /// Initializes a value of the conforming type form a `float`.
     [Differentiable]
@@ -1306,6 +1329,8 @@ $}
         __intrinsic_op($(kIROp_IntCast)) int64_t toInt64();
         __intrinsic_op($(kIROp_IntCast)) uint toUInt();
         __intrinsic_op($(kIROp_IntCast)) uint64_t toUInt64();
+        [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+        [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 ${
         break;
 
@@ -1341,6 +1366,8 @@ $}
          __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
          __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
          [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+         [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
@@ -2385,6 +2412,8 @@ extension vector<T,N> : IInteger
     [__unsafeForceInlineEarly] int64_t toInt64() { return __intCast<int64_t>(this[0]); }
     [__unsafeForceInlineEarly] uint toUInt() { return __intCast<uint>(this[0]); }
     [__unsafeForceInlineEarly] uint64_t toUInt64() { return __intCast<uint64_t>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
@@ -2425,6 +2454,8 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
     [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    [__unsafeForceInlineEarly] override This __min(This other) { return min(this, other); }
+    [__unsafeForceInlineEarly] override This __max(This other) { return max(this, other); }
 
     [Differentiable]
     __intrinsic_op(0)
@@ -2493,6 +2524,27 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+
+    // A whole-matrix `min(this, other)` would need a layout conversion to reach the concrete
+    // matrix overload, which then ranks below the generic `min<T : __IMinMax>` that dispatches
+    // back here. Each row is a `vector<T, M>`, so the per-row calls bind the concrete overloads.
+    [__unsafeForceInlineEarly]
+    override This __min(This other)
+    {
+        This result;
+        for (int i = 0; i < N; ++i)
+            result[i] = min(this[i], other[i]);
+        return result;
+    }
+
+    [__unsafeForceInlineEarly]
+    override This __max(This other)
+    {
+        This result;
+        for (int i = 0; i < N; ++i)
+            result[i] = max(this[i], other[i]);
+        return result;
+    }
 
     [Differentiable]
     __intrinsic_op(0)

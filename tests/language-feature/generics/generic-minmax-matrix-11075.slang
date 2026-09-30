@@ -1,23 +1,46 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -entry test -stage compute
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 
-// A generic `min`/`max` on a matrix must fail as a clean language error, not a compiler abort.
-// Regression test for shader-slang/slang#11075.
+// Regression test for shader-slang/slang#11075: a generic `min`/`max` constrained by `IFloat` and
+// specialized on a matrix reaches the concrete per-row vector overloads (it used to abort the
+// cpp/cuda emitter), without recursing back into the generic overload.
 
+T genMin<T : IFloat>(T a, T b)
+{
+    return min(a, b);
+}
 T genMax<T : IFloat>(T a, T b)
 {
     return max(a, b);
 }
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-[shader("compute")]
 [numthreads(1, 1, 1)]
-void test()
+void computeMain()
 {
-    float3x3 a = float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9);
-    float3x3 b = float3x3(9, 8, 7, 6, 5, 4, 3, 2, 1);
-    float3x3 r = genMax(a, b);
-    outputBuffer[0] = r[0][0];
-    //CHECK: E55216
-    //CHECK: does not support operand type
+    float2x2 a2 = float2x2(1, 6, 3, 8), b2 = float2x2(5, 2, 7, 4);
+    float2x2 mn2 = genMin(a2, b2);
+
+    float3x3 a3 = float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    float3x3 b3 = float3x3(9, 8, 7, 6, 5, 4, 3, 2, 1);
+    float3x3 mx3 = genMax(a3, b3);
+
+    int i = 0;
+    outputBuffer[i++] = mn2[0][0]; // CHECK: 1.0
+    outputBuffer[i++] = mn2[0][1]; // CHECK: 2.0
+    outputBuffer[i++] = mn2[1][0]; // CHECK: 3.0
+    outputBuffer[i++] = mn2[1][1]; // CHECK: 4.0
+
+    outputBuffer[i++] = mx3[0][0]; // CHECK: 9.0
+    outputBuffer[i++] = mx3[0][1]; // CHECK: 8.0
+    outputBuffer[i++] = mx3[0][2]; // CHECK: 7.0
+    outputBuffer[i++] = mx3[1][0]; // CHECK: 6.0
+    outputBuffer[i++] = mx3[1][1]; // CHECK: 5.0
+    outputBuffer[i++] = mx3[1][2]; // CHECK: 6.0
+    outputBuffer[i++] = mx3[2][0]; // CHECK: 7.0
+    outputBuffer[i++] = mx3[2][1]; // CHECK: 8.0
+    outputBuffer[i++] = mx3[2][2]; // CHECK: 9.0
 }

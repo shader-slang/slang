@@ -13409,6 +13409,18 @@ T max(T x, T y)
     return __max_impl(x, y);
 }
 
+//@hidden:
+__generic<T : __IMinMax>
+[__readNone]
+[ForceInline]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T max(T x, T y)
+{
+    return x.__max(y);
+}
+//@public:
+
 /// Maximum.
 /// @param x The first value.
 /// @param y The second value.
@@ -13418,7 +13430,7 @@ T max(T x, T y)
 /// @category math
 __generic<T : IComparable>
 [__readNone]
-[OverloadRank(-10)]
+[OverloadRank(-11)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
@@ -13796,6 +13808,18 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
     }
 }
 
+//@hidden:
+__generic<T : __IMinMax>
+[__readNone]
+[ForceInline]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T min(T x, T y)
+{
+    return x.__min(y);
+}
+//@public:
+
 /// Minimum.
 /// @param x The first value.
 /// @param y The second value.
@@ -13805,7 +13829,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @category math
 __generic<T : IComparable>
 [__readNone]
-[OverloadRank(-10)]
+[OverloadRank(-11)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {

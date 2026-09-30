@@ -5,9 +5,10 @@
 
 // Regression test for shader-slang/slang#11075.
 //
-// A generic `min`/`max` (constrained by `IFloat`/`IComparable`) specialized on
-// a vector must produce the same componentwise result on every backend. The
-// shared CHECK buffer across cpu/cuda/vk/mtl is the cross-target parity gate.
+// A generic `min`/`max` constrained by `IFloat` or `IInteger` and specialized on a builtin
+// vector must reach the concrete element-wise vector overload (it used to abort the cpp/cuda
+// emitter) and produce the same componentwise result on every backend. The shared CHECK
+// buffer across cpu/cuda/vk/mtl is the cross-target parity gate.
 
 T genMin<T : IFloat>(T a, T b)
 {
@@ -18,11 +19,11 @@ T genMax<T : IFloat>(T a, T b)
     return max(a, b);
 }
 
-T genMinC<T : IComparable>(T a, T b)
+T genMinI<T : IInteger>(T a, T b)
 {
     return min(a, b);
 }
-T genMaxC<T : IComparable>(T a, T b)
+T genMaxI<T : IInteger>(T a, T b)
 {
     return max(a, b);
 }
@@ -42,20 +43,17 @@ void computeMain()
     float4 mn4 = genMin(a4, b4);
     float4 mx4 = genMax(a4, b4);
 
-    // Exercise additional element prefixes so a defect in one of these prelude rows
-    // (wrong CUDA base name / accessor / missing helper) fails here, not only in the field:
-    // U32 (unsigned prefix) and U64 (uint64 prefix), through both paths. F64 (double) is not a
-    // Metal type, so its prefix row is covered by generic-minmax-double-vector-11075.slang, which
-    // omits `-mtl`.
+    // `double` is not a Metal type, so double vectors are covered by
+    // generic-minmax-double-vector-11075.slang, which omits `-mtl`.
     int3 ai = int3(9, 2, 5), bi = int3(3, 8, 5);
-    int3 mniC = genMinC(ai, bi);
-    int3 mxiC = genMaxC(ai, bi);
+    int3 mniC = genMinI(ai, bi);
+    int3 mxiC = genMaxI(ai, bi);
 
     uint4 au = uint4(9, 2, 5, 1), bu = uint4(3, 8, 5, 7);
-    uint4 mxu = genMaxC(au, bu);
+    uint4 mxu = genMaxI(au, bu);
 
     uint64_t2 al = uint64_t2(9, 2), bl = uint64_t2(3, 8);
-    uint64_t2 mnl = genMinC(al, bl);
+    uint64_t2 mnl = genMinI(al, bl);
 
     int i = 0;
     outputBuffer[i++] = mn2.x; // CHECK: 1.0
