@@ -1147,7 +1147,8 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
+| UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
 
 ### Compiler Option ABI Stability
 

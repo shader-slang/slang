@@ -45,16 +45,53 @@ timers as `[*] <phase> <count> <ms>`. The runner captures **all** of them per ru
   Attribution therefore uses **leaf** timers (a jump in `generateOutput` is just
   its child `linkAndOptimizeIR`, whose jump is its child `specializeModule`…).
 
-- **Robustness:** each data point is `1 warmup + 5 timed` runs; the **median** is
-  saved and used for cross-version comparison (reflects the typical run, and is
-  steadier than the min when a build's run-to-run spread shifts). All of
-  `median`/`min`/`mean`/`stdev` are kept in `results.json`; the reporting tools
-  take `--metric` to switch (default `median`).
+- **Robustness:** prepare inputs and dependencies once, then run one warmup
+  pass and five timed passes over all selected workload/size pairs. For A, B,
+  and C, the timed order is `ABC ABC ABC ABC ABC`, rather than `AAAAA BBBBB CCCCC`.
+  This spreads each workload's samples across the suite so a short host
+  disturbance is less likely to affect most of its five samples. The **median**
+  remains the default comparison metric. Raw samples and
+  `median`/`min`/`mean`/`stdev` remain in `results.json`; reporting tools accept
+  `--metric` to switch. `--warmup` and `--samples` set the number of complete
+  passes; generation and module precompilation are not repeated between passes.
+  Interleaving does not remove disturbances lasting the whole suite.
+- **Sampling provenance:** each record identifies `sampling_strategy` as
+  `interleaved` (the CLI) or `consecutive` (the isolated `run_spec` API).
+  The nightly trend gate compares only matching known strategies, in addition
+  to matching runner, size, and timer schema. Older records without the marker
+  remain available for historical reporting but cannot seed the new gate's
+  baseline. Judgement resumes after enough comparable points accumulate; a
+  skipped comparison is reported explicitly rather than treated as a pass.
 - **Memory:** peak RSS per compile is captured when the platform query
   succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
   `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
   memory charts is that, not a bug) — see the Memory footprint section
   below.
+- **Comparison coverage:** the candidate archive records how many metrics had
+  a usable baseline. If none were judged, the CI summary and Slack report
+  “Insufficient comparable history” instead of a clean performance verdict.
+  This is informational, not a performance alarm; normal comparisons resume
+  as compatible history accumulates.
+- **Nightly alert confirmation:** a warning (5%) or regression (10%) first
+  triggers one additional batch for the affected workloads on the same runner
+  and compiler. The rerun uses the original sizes, sample count (default five),
+  and warmup count. Only the same counter crossing the original, frozen
+  baseline in both batches can alert. Two error-level crossings are required
+  for a red alarm; an error followed by a warning confirms only a warning.
+  Clean runs do no extra measurements. A failed or incomplete rerun is an
+  evaluation failure, not recovery. Original graph points stay unchanged;
+  `daily/<label>/confirmation.json` preserves the baseline, candidate rows and
+  rerun's raw samples, and both batches are also uploaded as a CI artifact.
+  `confirm.py measure` runs before publication, while `confirm.py report`
+  emits the final verdict on the notification host. Direct `trend.py` calls
+  remain useful for inspecting unconfirmed historical changes.
+- **Matrix workload size:** all five `backend_matrix_*` targets default to
+  512, with 256 retained in the size sweep. A local same-binary Windows study
+  with interleaved sampling found lower HLSL/GLSL total-time variation and
+  fewer Metal simplification spikes at 512. The larger inputs cost more time
+  and did not improve every counter; confirmation is still required. Keep the
+  family sizes equal for cross-target comparisons. Size provenance excludes
+  the old 256-size measurements from the new alert baseline.
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one
@@ -74,12 +111,12 @@ Workloads run per release. Synthetic ones are generated deterministically by
 
 ### Suspected-regression features (deepest workloads)
 
-| Test                      | What it generates                                                                                                                                    | Targets (compiler stage)                                                                                                                                                      | Primary timer                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| **autodiff**              | `N` `[Differentiable]` functions in bounded-depth groups, differentiated forward + reverse, plus a differentiable generic                            | the **autodiff IR transform**                                                                                                                                                 | `linkAndOptimizeIR`                                 |
-| **dynamic_dispatch**      | one interface with `N` implementations, dispatched through a runtime-typed existential (defeats static specialization → real witness-table dispatch) | **dynamic-dispatch lowering / specialization**                                                                                                                                | `specializeModule`                                  |
-| **existential_aggregate** | an interface-typed **field** inside a struct (`Scene { IMat m; }`) + `N` impls selected via a switch                                                 | boxing the existential in an aggregate forces **existential-layout legalization** + a witness-per-case specialization blowup (uncovered by the bare-local `dynamic_dispatch`) | `legalizeExistentialTypeLayout`, `specializeModule` |
-| **diagnostics_clean**     | `N` functions with distinct compile-time constants, no errors                                                                                        | **semantic checking** at scale — same shape as the old error workload but compiling cleanly, so `SemanticChecking` reflects pure checking cost without diagnostic emission    | `SemanticChecking`                                  |
+| Test                      | What it generates                                                                                                                                    | Targets (compiler stage)                                                                                                                                                                                                                                                                         | Primary timer                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| **autodiff**              | `N` `[Differentiable]` functions in bounded-depth groups, differentiated forward + reverse, plus a differentiable generic                            | the **autodiff IR transform**                                                                                                                                                                                                                                                                    | `linkAndOptimizeIR`                                                      |
+| **dynamic_dispatch**      | one interface with `N` implementations, dispatched through a runtime-typed existential (defeats static specialization → real witness-table dispatch) | **dynamic-dispatch lowering / specialization**                                                                                                                                                                                                                                                   | `specializeModule`                                                       |
+| **existential_aggregate** | an interface-typed **field** inside a struct (`Scene { IMat m; }`) + `N` impls selected via a switch                                                 | boxing the existential in an aggregate forces **existential-layout legalization** + a witness-per-case specialization blowup (uncovered by the bare-local `dynamic_dispatch`)                                                                                                                    | `linkAndOptimizeIR`, `specializeModule`, `legalizeExistentialTypeLayout` |
+| **diagnostics**           | `N` functions each containing one type error, so the compile emits `N` diagnostics                                                                   | **diagnostic production** — source-location resolution, line/caret rendering, message formatting and sink throughput. Compilation stops after the front end, so nothing downstream dilutes it and `SemanticChecking` is ~86% of `compileInner`. Replaces `diagnostics_clean`, which emitted none | `SemanticChecking`                                                       |
 
 ### Core compiler-stage tests
 
@@ -87,8 +124,6 @@ Workloads run per release. Synthetic ones are generated deterministically by
 | --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | **parse**                                     | `N` trivial functions, long expressions                                     | **lexing/parsing**                                                                                                                                                                                                                                                                                                                          | `parseTranslationUnit`                   |
 | **sema_generics**                             | `N` generic functions × 3 type instantiations                               | **semantic checking / generic instantiation**                                                                                                                                                                                                                                                                                               | `SemanticChecking`                       |
-| **generic_nesting**                           | one generic `Pair` self-nested `N` levels deep (typealias chain)            | **substitution / inheritance-witness cost vs generic nesting DEPTH** (known exponential, ~3-4x per level; sweep it)                                                                                                                                                                                                                         | `SemanticChecking`                       |
-| **generic_nesting_eval**                      | the nesting chain + a witness method called recursively through it          | **overload resolution + witness lookup at every nesting level** (steeper than generic_nesting)                                                                                                                                                                                                                                              | `SemanticChecking`                       |
 | **interface_depth**                           | a linear interface inheritance chain `N` deep, conformance at the bottom    | **calcInheritanceInfo vs interface-hierarchy depth** (~N^3.4 measured)                                                                                                                                                                                                                                                                      | `SemanticChecking`                       |
 | **specialization**                            | a generic `Box<T:IVal>` over `N` distinct types                             | **generic specialization**                                                                                                                                                                                                                                                                                                                  | `specializeModule`                       |
 | **inlining**                                  | `N` `[ForceInline]` functions (bounded-depth groups)                        | **inliner + SSA simplify**                                                                                                                                                                                                                                                                                                                  | `simplifyIR`                             |
@@ -96,7 +131,13 @@ Workloads run per release. Synthetic ones are generated deterministically by
 | **emit_metal** / **emit_wgsl**                | the same shader as `codegen_spirv`, emitted to **textual** Metal / WGSL     | the **source-emission backend** (`emitEntryPointsSourceFromIR`) that `-emit-spirv-directly` skips entirely. This family measures the EMITTER, not target legalization: its shared source is construct-free, so the target-specific passes all run and find nothing (six targets within 1.18x). Legalization is the `backend_*` family's job | `emitEntryPointsSourceFromIR`            |
 | **emit_hlsl** / **emit_glsl** / **emit_cuda** | the same shader, emitted to textual HLSL / GLSL / CUDA                      | the remaining **source-emission backends** (D3D source path, GLSL legalization, the C++-family emitter)                                                                                                                                                                                                                                     | `emitEntryPointsSourceFromIR`            |
 | **codegen_dxil** / **codegen_ptx**            | the same shader, compiled through the **downstream** compiler (dxc / nvrtc) | the full pipeline **including the downstream toolchain**; win32-only, and a missing toolchain is a HARD failure (`downstream_required`) so a host without dxc/nvrtc cannot silently report OK. Excluded from release sweeps: release packages do not bundle the downstream compilers, so their history lives in the daily series            | `compileInner` (+ downstream wall clock) |
-| **module_link**                               | `N` modules precompiled to `.slang-module`, then linked                     | **module read + IR link**                                                                                                                                                                                                                                                                                                                   | `linkIR`                                 |
+| **module_link**                               | `N` modules precompiled to `.slang-module`, then linked                     | **module read + IR link**                                                                                                                                                                                                                                                                                                                   | `linkIR`, `frontEndExecute`              |
+
+> **Removed 2026-09:** `generic_nesting` and `generic_nesting_eval`. At 2.9 ms
+> and 4.2 ms they sat below the trend check's 2 ms absolute gate, so they would
+> have needed a +69%/+48% regression to report anything and never fired in 73
+> nights; and the exponential they were built for is gone (`SemanticChecking`
+> measures 0.45 ms at nesting depth 16 and 0.90 ms at depth 64).
 
 ### Type-checking tests
 
@@ -124,9 +165,9 @@ isolate the shared machinery and scaling behavior directly.
 | Test            | What it generates                                        | Targets                                            | Primary timer                                           |
 | --------------- | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
 | **minimal**     | a near-empty shader                                      | the **per-compile floor**: core-module load + link | `linkIR`, `readSerializedModuleIR`, `loadBuiltinModule` |
-| **ir_builder**  | one giant straight-line function (`N` trivial int ops)   | **IR construction / dedup / SSA simplify**         | `generateIR`, `simplifyIR`                              |
+| **ir_builder**  | one giant straight-line function (`N` trivial int ops)   | **IR construction / dedup / SSA simplify**         | `generateIR`, `simplifyIR`, `generateOutput`            |
 | **serialize**   | a large module of `N` public functions → `.slang-module` | **IR/AST serialization (write)**                   | `writeSerializedModuleAST/IR`                           |
-| **conformance** | `N` structs conforming to a shared interface             | **conformance checking / witness synthesis**       | `SemanticChecking`                                      |
+| **conformance** | `N` structs conforming to a shared interface             | **conformance checking / witness synthesis**       | `frontEndExecute`, `SemanticChecking`                   |
 | **loop_unroll** | a `[ForceUnroll]` loop of `N` iterations                 | **loop unrolling + simplify**                      | `unrollLoopsInModule`                                   |
 
 `minimal` is the **regression canary**: cheap enough to run on every PR, and the

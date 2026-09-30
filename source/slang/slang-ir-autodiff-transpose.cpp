@@ -1594,7 +1594,6 @@ struct DiffTransposePass
         auto revPtr = fwdLoad->getPtr();
 
         auto primalType = tryGetPrimalTypeFromDiffInst(fwdLoad);
-        auto loadType = fwdLoad->getDataType();
 
         List<RevGradient> gradients(RevGradient(revPtr, revValue, nullptr));
 
@@ -1614,21 +1613,9 @@ struct DiffTransposePass
         // Get the _total_ value.
         auto aggregateGradient = emitAggregateValue(builder, primalType, gradients);
 
-        if (as<IRDifferentialPairType>(loadType))
-        {
-            auto primalPairVal = builder->emitLoad(revPtr);
-            auto primalVal = builder->emitDifferentialPairGetPrimal(primalPairVal);
-
-            auto pairVal =
-                builder->emitMakeDifferentialPair(loadType, primalVal, aggregateGradient);
-
-            builder->emitStore(revPtr, pairVal);
-        }
-        else
-        {
-            // Store this back into the pointer.
-            builder->emitStore(revPtr, aggregateGradient);
-        }
+        // Unzipping has already separated primal and differential storage. The aggregate is
+        // the complete gradient, including both fields when the differentiated value is a pair.
+        builder->emitStore(revPtr, aggregateGradient);
 
         return TranspositionResult(List<RevGradient>());
     }
@@ -1644,12 +1631,8 @@ struct DiffTransposePass
         IRInst* emptyVal = diffTypeContext.emitDZeroOfDiffInstType(builder, primalType);
         builder->emitStore(fwdStore->getPtr(), emptyVal);
 
-        if (auto diffPairType = as<IRDifferentialPairType>(revVal->getDataType()))
-        {
-            revVal = builder->emitDifferentialPairGetDifferential(
-                (IRType*)diffTypeContext.getDiffTypeFromPairType(builder, diffPairType),
-                revVal);
-        }
+        // Preserve the complete gradient from differential storage. For a pair-valued store,
+        // both fields are gradients; extracting only the differential field loses one of them.
         return TranspositionResult(List<RevGradient>(
             RevGradient(RevGradient::Flavor::Simple, fwdStore->getVal(), revVal, fwdStore)));
     }
