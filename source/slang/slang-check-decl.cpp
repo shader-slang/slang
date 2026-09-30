@@ -5434,6 +5434,15 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             if (getParamPassingMode(requiredParam.getDecl()) !=
                 getParamPassingMode(satisfyingParam.getDecl()))
                 return false;
+            // `__ref`, `groupshared` and `const groupshared` all pass by `ref`, but `groupshared`
+            // also promises the callee group-shared storage and `const` promises no writes, so a
+            // direct match needs the same qualifiers. A synthesized witness can still forward
+            // between them where the call type-checks.
+            if (requiredParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() !=
+                    satisfyingParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() ||
+                isReadOnlyGroupSharedParam(requiredParam.getDecl()) !=
+                    isReadOnlyGroupSharedParam(satisfyingParam.getDecl()))
+                return false;
             auto requiredParamType = getType(m_astBuilder, requiredParam);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
