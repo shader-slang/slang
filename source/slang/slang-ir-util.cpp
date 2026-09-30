@@ -3495,15 +3495,14 @@ bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
 
     // Only these kinds associate a derivative *callee*. The others associate a
     // type or witness table, or a remat callee that only rebuilds a context and
-    // never runs the user's derivative body. A kind wrongly left out here
-    // suppresses an E41031 without failing any test, so we force the decision
-    // to be re-made whenever the enum changes.
+    // never runs the user's derivative body. A new kind left out here would
+    // silently suppress E41031, so we force the decision to be re-made
+    // whenever the enum changes.
     static_assert(
         int(AnnotationKind::CountOf) == 16,
         "AnnotationKind changed: does the new kind associate a derivative "
         "callee that can have side effects? If so, add it here.");
     static const AnnotationKind kDerivativeKinds[] = {
-        // The user's `[ForwardDerivative]` function.
         AnnotationKind::ForwardDerivative,
         // For a legacy `[BackwardDerivative]` this is
         // `BackwardPrimalFromLegacyBwdDiffFunc(primary, bwd)`, which

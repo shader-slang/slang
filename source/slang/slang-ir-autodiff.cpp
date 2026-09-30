@@ -1056,10 +1056,10 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
                     continue;
 
                 auto preferRecomputeDecor = func->findDecoration<IRPreferRecomputeDecoration>();
-                auto sideEffectBehavior =
-                    as<IRIntLit>(preferRecomputeDecor->getOperand(0))->getValue();
+                auto sideEffectBehavior = as<IRIntLit>(preferRecomputeDecor->getOperand(0));
+                SLANG_RELEASE_ASSERT(sideEffectBehavior);
 
-                if (sideEffectBehavior == (IRIntegerValue)SideEffectBehavior::Allow)
+                if (sideEffectBehavior->getValue() == (IRIntegerValue)SideEffectBehavior::Allow)
                     continue;
 
                 // Find function name. (don't diagnose on nameless functions)
