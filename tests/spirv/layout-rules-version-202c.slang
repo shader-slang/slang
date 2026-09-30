@@ -7,8 +7,8 @@
 // `S` becomes 16 bytes, which moves `U.w` to offset 16 and makes `U` 24 bytes.
 //
 // `Q` adds a `float3` after `w`, which separates rounded scalar layout from std430: `Q.v` is at 16
-// (unrounded scalar), 20 (rounded scalar), or 32 (std430). Pointer pointees always use scalar layout,
-// so `Q*` checks that pointers follow the layout rules version too.
+// (unrounded scalar), 20 (rounded scalar), or 32 (std430). The pointee of a default user pointer uses
+// scalar layout, so `Q*` checks that pointers follow the layout rules version too.
 //
 // `latest` names 2026, so it keeps the old rules; `next` names 202c.
 
