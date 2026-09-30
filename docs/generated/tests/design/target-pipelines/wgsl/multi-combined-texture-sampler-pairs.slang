@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=03a91c30e9eaf1766fcdfbae6c7316ecb8108a2f9e0a27218a3bbcea152c7a7f
+//META: doc_section_digest=d55555774e3671195c911b5700b7f3b76e600649eaa66a65a238dcf8a1620c86
 //META: purpose=Two Sampler2D globals each split into their own <name>_texture_* / <name>_sampler_* pair with distinct bindings
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

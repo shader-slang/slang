@@ -929,6 +929,10 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         sb << "This";
     }
+    else if (as<HLSLUnsignedTypeExpr>(expr))
+    {
+        sb << "unsigned int";
+    }
     else if (const auto andTypeExpr = as<AndTypeExpr>(expr))
     {
         if (andTypeExpr->left.type)

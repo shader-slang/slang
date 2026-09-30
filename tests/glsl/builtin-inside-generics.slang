@@ -1,8 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -entry main -stage compute -target spirv -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry main -stage compute -target glsl -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -entry main -stage compute -target hlsl -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_METAL): -entry main -stage compute -target metal -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_WGSL): -entry main -stage compute -target wgsl -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -entry main -stage compute -target spirv
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry main -stage compute -target glsl
+//TEST:SIMPLE(filecheck=CHECK_HLSL): -entry main -stage compute -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_METAL): -entry main -stage compute -target metal
+//TEST:SIMPLE(filecheck=CHECK_WGSL): -entry main -stage compute -target wgsl
+
+import glsl;
 
 RWStructuredBuffer<uint> outputBuffer;
 

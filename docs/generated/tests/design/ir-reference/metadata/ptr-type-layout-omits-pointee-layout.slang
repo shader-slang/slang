@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#layout-family
-//META: doc_section_digest=c1ef039f2fd0378a7cac58b8bb8282b937d992edac625ada2b1761464ceb475b
+//META: doc_section_digest=15a52cc34c412d5b3dbd8695f6596a698ed0285315d9405cb40493ae94d82357
 //META: purpose=A pointer-typed field lowers to a ptrTypeLayout that stores only attributes, deliberately not a pointee layout.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

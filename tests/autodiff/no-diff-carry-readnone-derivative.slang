@@ -1,61 +1,62 @@
-// Regression test for shader-slang/slang#11374. Follow-up to #11286.
+// Positive test for https://github.com/shader-slang/slang/issues/11374.
 //
-// PR #11286 narrowed the carry-set decision for [Differentiable] calls so a
-// [__readNone] callee whose arguments don't carry a derivative is treated as
-// not carrying. That tightening must also consider the side-effect status of
-// any associated derivative variants: a primary [__readNone] callee can have
-// a user-defined [ForwardDerivative] / [BackwardDerivative] variant that
-// writes to memory, and that variant is what runs after the autodiff
-// transform. If the gate skips the call based only on the primary's
-// readNone-ness, the missing-no_diff diagnostic that #11374 expects to
-// fire here is silently suppressed. (#11285 pulled the opposite way — it
-// reported E41031 firing where no derivative flowed in — so the companion
-// -clean.slang case must keep compiling clean.)
+// PR #11286 added a `[__readNone]` gate to the Call-rule carry-set
+// tightening: a differentiable call only enters `carryNonTrivialDiffSet`
+// when one of its differentiable-input arguments does. That gate inspects
+// only the *primary* callee.
 //
-// This file exercises a custom backward-derivative variant with side
-// effects. With the fix in slang-ir-check-differentiability.cpp, the gate
-// requires every associated derivative variant to be readNone before
-// treating the call as elidable, so E41031 fires correctly.
+// A `[__readNone]` primary whose user-supplied `[BackwardDerivative]` (or
+// `[ForwardDerivative]`) is NOT `[__readNone]` can still produce observable
+// derivative state through differentiation — the user-supplied derivative
+// is free to read or write captured buffers. The carry-set analysis must
+// reject the optimization in that case so that storing the call result
+// into a `no_diff` slot is diagnosed.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 
 // CHECK: error[E41031]
 // CHECK: derivative is lost
 
+public struct Sample
+{
+    public float val;
+}
+
 RWStructuredBuffer<float> debug_buf;
-RWStructuredBuffer<float> out_buf;
 
-// Backward-mode derivative writes to a buffer — NOT readNone — even though
-// the primary `foo` is [__readNone].
-void foo_bwd(inout DifferentialPair<float> v, float dOut)
+// User-supplied backward-derivative with an observable side effect. Not
+// `[__readNone]`: the side effect makes the call's derivative state
+// dependent on captured buffer state, not only on its arguments.
+void foo_bwd(inout DifferentialPair<float> dpx, float.Differential dy)
 {
-    debug_buf[0] = v.p;
-    v = diffPair(v.p, dOut * 2.0 * v.p);
+    debug_buf[0] = dpx.p;
+    dpx = diffPair(dpx.p, 2 * dpx.p * dy);
 }
 
-[BackwardDerivative(foo_bwd)]
 [__readNone]
-float foo(float x)
+[BackwardDerivative(foo_bwd)]
+float foo(float x) { return x * x; }
+
+[Differentiable]
+public void compute(no_diff float v, no_diff out Sample sample)
 {
-    return x * x;
+    sample = {};
+    // Without #11374's fix the Call-rule tightening fires (primary is
+    // readNone, the single arg is `no_diff` so it doesn't carry), and the
+    // call is wrongly classified as not carrying. After the fix, the
+    // associated `foo_bwd` is non-readNone so the gate falls back to
+    // "differentiable call always carries", which makes this store a real
+    // E41031.
+    sample.val = foo(v);
 }
 
-// `x` is `no_diff` — does NOT carry a derivative. With #11286 alone the
-// gate sees `foo` is readNone and `x` doesn't carry, treats `foo(x)` as
-// not carrying, and the store into the no_diff `result` slot is silently
-// accepted. With #11374 the gate also notices `foo_bwd` is non-readNone,
-// falls back to "carries", and the store fires E41031.
-[Differentiable]
-public void caller(no_diff float x, no_diff out float result)
-{
-    result = foo(x);
-}
+RWStructuredBuffer<float> out_buf;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main()
 {
-    float r;
-    caller(2.0, r);
-    out_buf[0] = r;
+    Sample s;
+    compute(1.0, s);
+    out_buf[0] = s.val;
 }

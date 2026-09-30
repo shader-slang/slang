@@ -27,6 +27,7 @@
     },
     { "option": "SLANG_ENABLE_EXAMPLES" },
     { "option": "SLANG_ENABLE_REPLAYER" },
+    { "option": "SLANG_ENABLE_RECORD_REPLAY" },
     { "option": "SLANG_ENABLE_RELEASE_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_SPLIT_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_VALIDATION_IR" },
@@ -60,6 +61,11 @@
     },
     {
       "option": "SLANG_ENABLE_ASAN",
+      "skip_linux_aarch64": "true"
+    },
+    {
+      "option": "SLANG_ENABLE_TSAN",
+      "linux_only": "true",
       "skip_linux_aarch64": "true"
     },
     {
