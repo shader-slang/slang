@@ -9587,6 +9587,15 @@ internal uint __emulatedCountbits64(uint64_t value)
     return counted_bits_uint2.x + counted_bits_uint2.y;
 }
 
+// Preserve LLVM's same-width population-count result; the public API converts it to uint.
+internal T __nvvmCountBits<T : __BuiltinIntegerType>(T value)
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "llvm.ctpop", value;
+    }
+}
+
 /// Population count.
 /// Counts the number of set bits in the binary representation of a value.
 /// @param value The value to count bits in.
@@ -9629,9 +9638,11 @@ uint countbits(T value)
         }
     case metal:
         __intrinsic_asm "($TR)popcount($0)";
+    case nvvm:
+        return __intCast<uint>(__nvvmCountBits(value));
     case cuda:
     case cpp:
-        __intrinsic_asm(nvvmCountBits) "$P_countbits($0)";
+        __intrinsic_asm "$P_countbits($0)";
     case spirv:
         if(T is int64_t || T  is uint64_t)
         {
@@ -11186,18 +11197,23 @@ internal T __metal_ctz<T : __BuiltinIntegerType>(T value)
     }
 }
 
+// NVVM uses a false immediate so zero returns the bit width. CPU LLVM callers retain their
+// existing nonzero guard and true immediate; the two target bodies make that contract explicit.
 internal T __llvm_ctlz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
+    case nvvm: __intrinsic_asm "llvm.ctlz", value, false;
     case llvm: __intrinsic_asm "%result = call $TR @llvm.ctlz($0, i1 1)";
     }
 }
 
+// Match the target-specific zero contract of __llvm_ctlz for trailing-zero counts.
 internal T __llvm_cttz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
+    case nvvm: __intrinsic_asm "llvm.cttz", value, false;
     case llvm: __intrinsic_asm "%result = call $TR @llvm.cttz($0, i1 1)";
     }
 }
@@ -11234,8 +11250,15 @@ uint firstbithigh<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFirstBitHigh) "$P_firstbithigh($0)";
-    case cuda: __intrinsic_asm(nvvmFirstBitHigh) "$P_firstbithigh($0)";
+    case nvvm:
+        {
+            if (__isSignedInt<T>() && value < T(0))
+                value = ~value;
+            // A zero input counts every bit, so subtraction also yields the uint(-1) sentinel.
+            return sizeof(T)*8u - 1u - __intCast<uint>(__llvm_ctlz(value));
+        }
+    case cpp: __intrinsic_asm "$P_firstbithigh($0)";
+    case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl:
         __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
@@ -11345,8 +11368,9 @@ uint firstbitlow<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFirstBitLow) "$P_firstbitlow($0)";
-    case cuda: __intrinsic_asm(nvvmFirstBitLow) "$P_firstbitlow($0)";
+    case nvvm: return value == T(0) ? uint(-1) : __intCast<uint>(__llvm_cttz(value));
+    case cpp: __intrinsic_asm "$P_firstbitlow($0)";
+    case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl:
         if (T is int64_t || T is uint64_t)
             __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
@@ -14738,9 +14762,10 @@ T reversebits<T : __BuiltinIntegerType>(T value)
             __intrinsic_asm "pack64(bitfieldReverse(unpack32($0)).yx)";
         else
             __intrinsic_asm "bitfieldReverse";
+    case nvvm: __intrinsic_asm "llvm.bitreverse", value;
     case cuda:
     case cpp:
-        __intrinsic_asm(nvvmReverseBits) "$P_reversebits($0)";
+        __intrinsic_asm "$P_reversebits($0)";
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:

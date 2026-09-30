@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SLANG_NVVM_BUILDER_ABI_REVISION 44u
+#define SLANG_NVVM_BUILDER_ABI_REVISION 45u
 #define SLANG_NVVM_BUILDER_GET_API_NAME "slang_getNVVMBuilderAPI"
 
 #if defined(_MSC_VER)
@@ -154,8 +154,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_MIN ((SlangNVVMValueOperation)43u)
 #define SLANG_NVVM_VALUE_OP_MAX ((SlangNVVMValueOperation)44u)
 #define SLANG_NVVM_VALUE_OP_COUNT_BITS ((SlangNVVMValueOperation)45u)
-#define SLANG_NVVM_VALUE_OP_REVERSE_BITS ((SlangNVVMValueOperation)46u)
-#define SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH ((SlangNVVMValueOperation)47u)
+/* Values 46-47 are retired; public integer-bit operations use named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW ((SlangNVVMValueOperation)48u)
 #define SLANG_NVVM_VALUE_OP_ABS ((SlangNVVMValueOperation)49u)
 #define SLANG_NVVM_VALUE_OP_ACOS ((SlangNVVMValueOperation)50u)
@@ -514,14 +513,26 @@ extern "C"
             SlangNVVMValueHandle function);
     } SlangNVVMBuilderConstructionAPI;
 
-    /** An explicit LLVM intrinsic name and its checked Slang signature. Names are length-delimited.
-        Accepts scalar i32 execution-register reads and void synchronization calls with no
-       arguments. Emission returns a null value handle for void calls. */
+    typedef uint32_t SlangNVVMNamedIntrinsicOperandKind;
+#define SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ((SlangNVVMNamedIntrinsicOperandKind)0u)
+#define SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT ((SlangNVVMNamedIntrinsicOperandKind)1u)
+
+    /** A checked operand type and its guaranteed constant classification. INTEGER_CONSTANT
+        promises an integer or Boolean literal; emission independently verifies the value handle. */
+    typedef struct SlangNVVMNamedIntrinsicOperandDesc
+    {
+        SlangNVVMValueTypeDesc type;
+        SlangNVVMNamedIntrinsicOperandKind kind;
+    } SlangNVVMNamedIntrinsicOperandDesc;
+
+    /** An exact LLVM registry base name and its checked Slang signature. All pointers are borrowed
+        for the synchronous call. Emission returns a null value handle for void calls. */
     typedef struct SlangNVVMNamedIntrinsicDesc
     {
         const char* name;
         size_t nameSize;
         SlangNVVMValueTypeDesc resultType;
+        const SlangNVVMNamedIntrinsicOperandDesc* operands;
         size_t operandCount;
     } SlangNVVMNamedIntrinsicDesc;
 
@@ -543,6 +554,8 @@ extern "C"
         SlangNVVMResult(SLANG_NVVM_CALL* emitNamedIntrinsic)(
             SlangNVVMModuleHandle module,
             const SlangNVVMNamedIntrinsicDesc* intrinsic,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderValueOperationsAPI;
 

@@ -2257,10 +2257,10 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    // Version 34 adds the NVVM target and changes serialized capability identities. Modules
-    // from earlier versions must be recompiled before their AST or IR can be decoded safely.
-    const static UInt k_minSupportedModuleVersion = 34;
-    const static UInt k_maxSupportedModuleVersion = 34;
+    // Version 35 retires the serialized NVVM reverse-bits and first-bit-high semantic IDs.
+    // Older modules must be recompiled to use the core module's named LLVM intrinsic bodies.
+    const static UInt k_minSupportedModuleVersion = 35;
+    const static UInt k_maxSupportedModuleVersion = 35;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

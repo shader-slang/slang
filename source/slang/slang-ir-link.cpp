@@ -2431,8 +2431,23 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     }
 
+    // The linked layout is owned by LinkedIR outside the IR use graph. Root it while target
+    // specialization prunes dead globals, keeping the host pointer valid for later passes such
+    // as collectGlobalUniformParameters.
+    // Remove this temporary reference afterward: retaining all layout keys through later DCE
+    // would keep unused shader parameters alive even without the preserve-params option.
+    IRLayoutDecoration* globalScopeLayoutRoot = nullptr;
+    if (irGlobalScopeVarLayout)
+    {
+        globalScopeLayoutRoot = context->builder->addLayoutDecoration(
+            state->irModule->getModuleInst(),
+            irGlobalScopeVarLayout);
+    }
+
     // Specialize target_switch branches to use the best branch for the target.
     specializeTargetSwitch(targetReq, state->irModule, codeGenContext->getSink());
+    if (globalScopeLayoutRoot)
+        globalScopeLayoutRoot->removeAndDeallocate();
 
     // Diagnose on unresolved symbols if we are compiling into a target that does
     // not allow incomplete symbols.

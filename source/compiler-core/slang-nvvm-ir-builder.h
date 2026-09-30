@@ -57,6 +57,8 @@ public:
     SlangResult emitNamedIntrinsic(
         SlangNVVMModuleHandle module,
         const SlangNVVMNamedIntrinsicDesc& intrinsic,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
     /// Queries one complete typed operation.

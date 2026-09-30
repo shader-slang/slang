@@ -80,10 +80,12 @@ Two types of versions are tracked:
 
 ### Current Prototype Boundary
 
-The NVVM target changes the numeric identities stored for capabilities, including target-switch
-aliases. This prototype writes semantic module version 34 and accepts only version 34. Recompile
-older user modules and built-ins for every backend; metadata inspection remains available without
-loading their AST or IR. Serialization format 2 is unchanged.
+The prototype writes semantic module version 35 and accepts only version 35. Earlier versions
+contain incompatible numeric capability identities or retired NVVM reverse-bits/first-bit-high
+semantic operations. Recompile older user modules and built-ins for every backend. Public integer
+APIs then use the current core bodies; modules that explicitly named retired semantic tags must
+migrate those source bodies. Metadata inspection remains available without loading AST or IR,
+and speculative binary imports can fall back to available source. Serialization format 2 is unchanged.
 
 Stable instruction names do not stabilize capability identities. Until capabilities have a stable
 serialized representation, any further renumbering requires another semantic version boundary

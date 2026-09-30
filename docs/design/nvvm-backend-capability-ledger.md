@@ -46,12 +46,37 @@ The installed compiler can be older than Git HEAD; source revision alone does no
 
 Core execution helpers and varying-parameter legalization use named
 `llvm.nvvm.read.ptx.sreg.*` intrinsics for all twelve thread/block/grid coordinates.
-The named-intrinsic boundary admits zero-argument scalar i32 register reads and the three void
-barrier/fence operations described below; it does not admit arbitrary LLVM assembly. Provider signature queries
-remain pure and emission consumes the checked plan. CUDA source and NVRTC retain CUDA target
-selection, including when an explicit `nvvm` capability is supplied. Ordinary comma-separated
-`__intrinsic_asm` arguments remain supported. [Target/argument fixture](../../tests/cuda/nvvm-target-switch-explicit-args.slang)
-and [varying composition](../../tests/cuda/nvvm-execution-register-varyings.slang) define the new contracts.
+The named-intrinsic boundary admits zero-argument scalar i32 register reads, the three void
+barrier/fence operations described below, and scalar integer `llvm.ctpop`, `llvm.bitreverse`,
+`llvm.ctlz` and `llvm.cttz`. It does not admit arbitrary LLVM assembly. ABI 45 carries explicit
+ordinary `__intrinsic_asm` operands; pure provider queries validate LLVM registry signatures and
+immediate-constant requirements before module creation. Actual emission separately validates value
+handles and rejects conflicting symbols without mutation. CUDA source and NVRTC retain CUDA target
+selection, including when an explicit `nvvm` capability is supplied.
+[Target/argument fixture](../../tests/cuda/nvvm-target-switch-explicit-args.slang) and
+[varying composition](../../tests/cuda/nvvm-execution-register-varyings.slang) retain their contracts.
+
+Core integer count, reverse, high-bit and low-bit APIs use named scalar primitives plus ordinary
+Slang width/sign/zero handling. Live independent bit-loop oracles cover signed/unsigned scalar operations and
+vectors of lengths 2/3/4 at widths [8](../../tests/cuda/nvvm-integer-intrinsics-8.slang),
+[16](../../tests/cuda/nvvm-integer-intrinsics-16.slang),
+[32](../../tests/cuda/nvvm-integer-intrinsics-32.slang) and
+[64](../../tests/cuda/nvvm-integer-intrinsics-64.slang), with literals, completion and guard checks.
+All widths pass NVVM O0/O3; widths 32/64 also pass NVRTC O3. NVRTC 8/16 scan/reverse prelude helpers
+remain missing, and their original compile failures remain recorded. The separate
+[small-count fixture](../../tests/cuda/nvvm-integer-count-small.slang) passes all three modes.
+Public signed 8-bit population count preserves uint32 sign extension (32 for -1, 25 for -128); direct
+i8 population count independently checks the same-width results (8 and 1). The
+[producer check](../../tests/cuda/nvvm-integer-producers.slang) requires four named intrinsics and
+explicit false scan flags. Scalar registry admission does not imply vector LLVM intrinsic support.
+
+The [target-switch helper test](../../tests/language-feature/capability/target-switch-dead-helper.slang)
+checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
+unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
+cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
+unused resources. Semantic module version 35 rejects older modules before AST/IR decoding; metadata inspection
+and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
+shim. Compound wave users still own count45/low48 until their separate migration.
 
 Core bit reinterpretation and Half-value conversions use canonical NVVM `BitCast`/`FloatCast`
 instructions. The [conversion API fixture](../../tests/cuda/nvvm-conversion-intrinsics.slang) checks

@@ -45,14 +45,39 @@ uint readThreadX()
 The core module builds `uint3` values from scalar calls in its NVVM branches. Entry-point varying
 legalization constructs the same scalar helper shape for system values and reads it separately in
 each entry block; the backend no longer recognizes CUDA `threadIdx`/`blockIdx` globals. Named calls
-admit the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes) and three
-void synchronization operations: `llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
-`llvm.nvvm.membar.gl`. The provider resolves names through LLVM's intrinsic registry, validates the
-exact no-argument signature and existing dialect admission before module creation, and constructs
-calls with LLVM's intrinsic attributes. Void calls have no result handle; emission adds an ordinary LLVM
-void return for the helper. This does not admit arbitrary LLVM snippets or other named
-intrinsics.
-Ordinary comma-separated `__intrinsic_asm` arguments remain part of the shared language facility.
+admit the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes), three
+void synchronization operations (`llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
+`llvm.nvvm.membar.gl`), and four scalar integer intrinsics (`llvm.ctpop`, `llvm.bitreverse`,
+`llvm.ctlz` and `llvm.cttz`). The provider resolves exact base names through LLVM's registry and
+validates the complete signature and dialect admission before module creation. Calls retain LLVM's
+intrinsic attributes. Void calls have no result handle; emission adds an ordinary LLVM void return
+for the helper. This does not admit arbitrary LLVM snippets or arbitrary registry intrinsics.
+
+Ordinary comma-separated `__intrinsic_asm` operands are canonical checked IR values. For example,
+`__intrinsic_asm "llvm.ctlz", value, false;` carries both operands explicitly; helper parameters
+never supply implicit arguments. The owned emission plan retains those IR values and their type
+and constant-kind descriptors. Each provider call borrows a freshly constructed descriptor view,
+so moving the plan cannot leave pointers into its former storage. ABI45 transports the descriptors
+and actual value handles. LLVM's signature matcher supplies overload types and its `ImmArg`
+attributes require constant operands during the pure support query. Emission separately checks
+actual types, constant promises, provenance and dominance before creating a declaration or call.
+Conflicting intrinsic symbols reject before mutation.
+
+The integer primitive boundary admits signed/unsigned scalar widths 8, 16, 32 and 64. Core
+`countbits` converts the same-width population count to uint; its existing pre-switch conversion
+of 8-bit inputs to uint32 remains, including sign extension for negative int8 values. `reversebits`
+returns the same-width primitive result. `firstbithigh` complements negative signed values, then
+subtracts the leading-zero count from width minus one. Both scan primitives receive literal false,
+so zero has a defined width result; the public APIs preserve the uint(-1) sentinel. Existing vector
+mappings call the scalar bodies. Numeric semantic IDs46/47 are retired; COUNT_BITS45 and
+FIRST_BIT_LOW48 remain for compound wave recipes that have not migrated.
+
+Target-switch specialization selects available branches across the linked module before diagnosing
+compatible but unavailable cases. A helper referenced only by an unselected NVVM arm is valid IR
+and must become unreachable before its switch is checked for CUDA. The pass keeps unresolved
+switches in their existing IR form, uses ordinary dead-code elimination, then diagnoses survivors.
+The linker temporarily roots its externally held global layout during this pruning and removes
+that reference afterward, preserving later removal of unused resource parameters.
 
 Core `asfloat`, `asint` and `asuint` NVVM bodies use canonical `BitCast` instructions. Half-value
 `f16tof32` and `f32tof16_` bodies use canonical `FloatCast`, including vectors. The existing typed
@@ -112,10 +137,12 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The NVVM target changes serialized capability identities. The prototype writes and accepts only
-semantic module version 34; older user modules and built-ins must be recompiled for every backend.
-Existing version guards reject incompatible layouts before decoding AST or IR. Container format 2
-and provider ABI44 are separate contracts and remain unchanged. See the
+The prototype writes and accepts only semantic module version 35. Older user modules and built-ins
+must be recompiled for every backend: earlier versions contain incompatible capability identities
+or retired numeric NVVM operations. Existing guards reject these before decoding AST or IR;
+metadata inspection and speculative import fallback to source remain available. Source modules
+that explicitly used retired semantic tags need named intrinsic bodies. Container format 2 and
+provider ABI45 are separate contracts. See the
 [module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
 
 ## Preflight is a contract, not a trial emission

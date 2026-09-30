@@ -304,7 +304,22 @@ private:
 struct NVVMPlannedNamedIntrinsic
 {
     IRInst* source = nullptr;
-    SlangNVVMNamedIntrinsicDesc desc = {};
+    String name;
+    SlangNVVMValueTypeDesc resultType = {};
+    List<SlangNVVMNamedIntrinsicOperandDesc> operands;
+    List<IRInst*> operandValues;
+
+    // Construct the borrowed view at use time because moving a plan can move its owned storage.
+    SlangNVVMNamedIntrinsicDesc getDesc() const
+    {
+        SLANG_ASSERT(operands.getCount() == operandValues.getCount());
+        return {
+            name.getBuffer(),
+            size_t(name.getLength()),
+            resultType,
+            operands.getBuffer(),
+            size_t(operands.getCount())};
+    }
 };
 
 /// Owns stable module decisions produced by preflight and consumed without reclassification.

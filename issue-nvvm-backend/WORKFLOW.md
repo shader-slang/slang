@@ -15,9 +15,10 @@ NVVM semantic-tag extension after its users migrate. Continue through reviewed l
 until these slices finish or a human decision is needed. The maintainer subsequently authorized
 a prototype module-version break: reject earlier capability layouts before deserialization and
 require old modules to be recompiled; stable historical capability decoding is outside this slice.
-The maintainer subsequently requested stopping after the canonical conversion/module-version34 slice
-on 2026-09-29. That stop request supersedes continuation authority; finish its reviewed local commit,
-then resume the development loop only on a new explicit request.
+The maintainer requested stopping after the canonical conversion/module-version34 slice on
+2026-09-29; that slice was accepted and locally committed. The maintainer then explicitly resumed
+the migration on 2026-09-29. Continue with bounded integer-bit work and the remaining authorized
+slices, accepting and locally committing each before proceeding.
 STATUS records the current evidence and next leads. Earlier independent review
 keeps a transforming local-storage pass deferred because its bounded rewrite cannot retire the
 existing conversion responsibility. Accept and locally commit each bounded task before proceeding;

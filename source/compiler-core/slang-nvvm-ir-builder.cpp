@@ -253,6 +253,8 @@ bool NVVMIRBuilder::supportsNamedIntrinsic(const SlangNVVMNamedIntrinsicDesc& in
 SlangResult NVVMIRBuilder::emitNamedIntrinsic(
     SlangNVVMModuleHandle module,
     const SlangNVVMNamedIntrinsicDesc& intrinsic,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
     SlangNVVMValueHandle& outValue) const
 {
     outValue = nullptr;
@@ -261,7 +263,7 @@ SlangResult NVVMIRBuilder::emitNamedIntrinsic(
     if (!supportsNamedIntrinsic(intrinsic))
         return SLANG_E_NOT_AVAILABLE;
     const SlangNVVMResult result =
-        m_valueOperations.emitNamedIntrinsic(module, &intrinsic, &outValue);
+        m_valueOperations.emitNamedIntrinsic(module, &intrinsic, operands, operandCount, &outValue);
     if (intrinsic.resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
     {
         if (SLANG_FAILED(result))

@@ -6122,11 +6122,38 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
     ++gFakeNVVMBuilder.namedIntrinsicQueryCount;
     if (outSupported)
         *outSupported = 0;
-    if (!intrinsic || !outSupported)
+    if (!intrinsic || !outSupported || (!intrinsic->operands && intrinsic->operandCount))
         return SLANG_E_INVALID_ARG;
-    if (!intrinsic->name || intrinsic->operandCount || gFakeNVVMBuilder.rejectNamedIntrinsics)
+    if (!intrinsic->name || gFakeNVVMBuilder.rejectNamedIntrinsics)
         return SLANG_OK;
     const UnownedStringSlice name(intrinsic->name, intrinsic->nameSize);
+    const bool isScan = name == toSlice("llvm.ctlz") || name == toSlice("llvm.cttz");
+    if (isScan || name == toSlice("llvm.ctpop") || name == toSlice("llvm.bitreverse"))
+    {
+        const auto& result = intrinsic->resultType;
+        if ((result.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+             result.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
+            result.laneCount != 1 ||
+            (result.bitWidth != 8 && result.bitWidth != 16 && result.bitWidth != 32 &&
+             result.bitWidth != 64) ||
+            intrinsic->operandCount != (isScan ? 2u : 1u))
+            return SLANG_OK;
+        const auto& value = intrinsic->operands[0];
+        if ((value.type.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+             value.type.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
+            value.type.laneCount != 1 || value.type.bitWidth != result.bitWidth ||
+            (value.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+             value.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT))
+            return SLANG_OK;
+        if (isScan &&
+            (!NVVMSemantics::areSameType(intrinsic->operands[1].type, NVVMSemantics::kBool) ||
+             intrinsic->operands[1].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT))
+            return SLANG_OK;
+        *outSupported = 1;
+        return SLANG_OK;
+    }
+    if (intrinsic->operandCount)
+        return SLANG_OK;
     if (NVVMSemantics::areSameType(intrinsic->resultType, NVVMSemantics::kVoid))
     {
         *outSupported = name == toSlice("llvm.nvvm.barrier0") ||
@@ -6154,6 +6181,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitNamedIntrinsic(
     SlangNVVMModuleHandle module,
     const SlangNVVMNamedIntrinsicDesc* intrinsic,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
@@ -6165,6 +6194,19 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitNamedIntrinsic(
     if (module != _getFakeNVVMBuilderModule() || gFakeNVVMBuilder.currentInsertBlockIndex < 0 ||
         !outValue)
         return SLANG_E_INVALID_ARG;
+    if ((!operands && operandCount) || operandCount != intrinsic->operandCount)
+        return SLANG_E_INVALID_ARG;
+    SlangNVVMValueTypeDesc operandTypes[2] = {};
+    SLANG_ASSERT(operandCount <= SLANG_COUNT_OF(operandTypes));
+    for (size_t i = 0; i < operandCount; ++i)
+    {
+        FakeNVVMBuilderValueRef value;
+        if (!_getFakeNVVMBuilderValueRef(operands[i], value) ||
+            (intrinsic->operands[i].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT &&
+             value.kind != FakeNVVMBuilderValueKind::IntegerConstant))
+            return SLANG_E_INVALID_ARG;
+        operandTypes[i] = intrinsic->operands[i].type;
+    }
     const String name(UnownedStringSlice(intrinsic->name, intrinsic->nameSize));
     if (intrinsic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
     {
@@ -6179,9 +6221,10 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitNamedIntrinsic(
     {
         // Reuse the fake's scalar intrinsic result storage. UINT32_MAX marks a named call and
         // does not pretend that it is one of the old semantic operations.
-        SlangNVVMValueOperationDesc operation = {UINT32_MAX, intrinsic->resultType, nullptr, 0};
+        SlangNVVMValueOperationDesc operation =
+            {UINT32_MAX, intrinsic->resultType, operandTypes, operandCount};
         SLANG_RETURN_ON_FAIL(
-            _fakeNVVMBuilderEmitIntrinsic(module, operation, nullptr, 0, outValue));
+            _fakeNVVMBuilderEmitIntrinsic(module, operation, operands, operandCount, outValue));
     }
     gFakeNVVMBuilder.namedIntrinsicNames.add(name);
     const Index functionIndex =

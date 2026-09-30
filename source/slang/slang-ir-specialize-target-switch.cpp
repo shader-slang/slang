@@ -9,17 +9,20 @@
 
 namespace Slang
 {
-void specializeTargetSwitch(
+// Select available branches first. Switches needing an incompatible-profile diagnostic remain
+// in their original IR form until module-wide DCE determines whether the program reaches them.
+static void specializeTargetSwitchInCode(
     TargetRequest* target,
     IRGlobalValueWithCode* code,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    bool diagnoseUnavailableTargets)
 {
     if (auto gen = as<IRGeneric>(code))
     {
         auto retVal = findGenericReturnVal(gen);
         if (auto innerCode = as<IRGlobalValueWithCode>(retVal))
         {
-            specializeTargetSwitch(target, innerCode, sink);
+            specializeTargetSwitchInCode(target, innerCode, sink, diagnoseUnavailableTargets);
             return;
         }
     }
@@ -64,6 +67,9 @@ void specializeTargetSwitch(
                         failedImplies = true;
                 }
             }
+            if (!targetBlock && failedImplies && !diagnoseUnavailableTargets)
+                continue;
+
             IRBuilder builder(targetSwitch);
             builder.setInsertBefore(targetSwitch);
             if (targetBlock)
@@ -103,7 +109,21 @@ void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticS
     {
         if (auto code = as<IRGlobalValueWithCode>(globalInst))
         {
-            specializeTargetSwitch(target, code, sink);
+            specializeTargetSwitchInCode(target, code, sink, false);
+        }
+    }
+
+    // Consider a helper called only from `case nvvm` in another function's target switch.
+    // Linking clones both functions before selecting the caller's CUDA branch. Diagnosing the
+    // helper at that point would reject a function that the selected program never calls.
+    // Prune discarded blocks and their dependencies before diagnosing the remaining switches.
+    // Keeping each failed IRTargetSwitch intact also avoids retaining pointers across DCE.
+    eliminateDeadCode(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto code = as<IRGlobalValueWithCode>(globalInst))
+        {
+            specializeTargetSwitchInCode(target, code, sink, true);
         }
     }
 }

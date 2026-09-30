@@ -3437,10 +3437,6 @@ struct NVVMGenericAsmOperationSpelling
 static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[] = {
     {"$P_min($0, $1)", SLANG_NVVM_VALUE_OP_MIN, 2},
     {"$P_max($0, $1)", SLANG_NVVM_VALUE_OP_MAX, 2},
-    {"$P_countbits($0)", SLANG_NVVM_VALUE_OP_COUNT_BITS, 1},
-    {"$P_reversebits($0)", SLANG_NVVM_VALUE_OP_REVERSE_BITS, 1},
-    {"$P_firstbithigh($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH, 1},
-    {"$P_firstbitlow($0)", SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW, 1},
     {"$P_abs($0)", SLANG_NVVM_VALUE_OP_ABS, 1},
     {"$P_acos($0)", SLANG_NVVM_VALUE_OP_ACOS, 1},
     {"$P_asin($0)", SLANG_NVVM_VALUE_OP_ASIN, 1},
@@ -3504,26 +3500,36 @@ bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function)
     return true;
 }
 
-// Captures the canonical intrinsic helper signature without interpreting its LLVM name. Consider
-// `uint readX() { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }`: AST lowering retains this
-// string as the helper's GenericAsm terminator. The provider resolves that name and checks the
-// exact signature before any LLVM module exists. Ordinary comma arguments remain valid syntax,
-// but this first named-intrinsic contract deliberately has no operands.
+// Captures the checked signature and explicit operands without interpreting the LLVM name.
+// Consider `uint scan(uint x) { __intrinsic_asm "llvm.ctlz", x, false; }`: lowering stores
+// the parameter and Boolean literal as GenericAsm operands. Preserve those values directly;
+// helper parameters are not an implicit forwarding convention. The provider validates LLVM's
+// signature and immediate-argument constraints before an output module exists.
 bool _getNVVMNamedIntrinsicDesc(
     IRGenericAsm* genericAsm,
     IRFunc* function,
-    SlangNVVMNamedIntrinsicDesc& outDesc)
+    NVVMPlannedNamedIntrinsic& outPlan)
 {
-    outDesc = {};
+    outPlan = {};
     if (!genericAsm->getAsm().startsWith(toSlice("llvm.")) ||
         !_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
-        genericAsm->getOperandCount() != 1 ||
-        !_getNVVMSemanticType(function->getResultType(), outDesc.resultType))
+        !_getNVVMSemanticType(function->getResultType(), outPlan.resultType))
         return false;
-    auto name = genericAsm->getAsm();
-    outDesc.name = name.begin();
-    outDesc.nameSize = size_t(name.getLength());
-    outDesc.operandCount = size_t(function->getParamCount());
+    outPlan.source = genericAsm;
+    outPlan.name = genericAsm->getAsm();
+    for (UInt i = 1; i < genericAsm->getOperandCount(); ++i)
+    {
+        IRInst* value = genericAsm->getOperand(i);
+        SlangNVVMNamedIntrinsicOperandDesc operand = {};
+        if (!value || !_getNVVMSemanticType(value->getDataType(), operand.type))
+            return false;
+        operand.kind =
+            _asExecutableSelectedIntegerConstant(value) || _asExecutableBoolConstant(value)
+                ? SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT
+                : SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+        outPlan.operands.add(operand);
+        outPlan.operandValues.add(value);
+    }
     return true;
 }
 
@@ -9126,10 +9132,10 @@ SlangResult _validateNVVMFunction(
                     {
                         return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
                     }
-                    SlangNVVMNamedIntrinsicDesc namedIntrinsic;
+                    NVVMPlannedNamedIntrinsic namedIntrinsic;
                     if (_getNVVMNamedIntrinsicDesc(genericAsm, function, namedIntrinsic))
                     {
-                        requirements.emissionPlan.namedIntrinsics.add({genericAsm, namedIntrinsic});
+                        requirements.emissionPlan.namedIntrinsics.add(_Move(namedIntrinsic));
                         break;
                     }
                     NVVMScalarTruthiness truthiness;
@@ -9978,8 +9984,20 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
-            case kIROp_NVVMIntrinsic:
             case kIROp_GenericAsm:
+                // Every explicit operand is a checked executable value, including constants.
+                // Untagged legacy helpers have only their string operand, so this loop is empty.
+                for (UInt i = 1; i < inst->getOperandCount(); ++i)
+                {
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        inst->getOperand(i),
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                }
+                [[fallthrough]];
+            case kIROp_NVVMIntrinsic:
                 SLANG_ASSERT(inst == terminator);
                 hasHelperReturn = true;
                 break;
@@ -14899,7 +14917,7 @@ SlangResult emitNVVMIRFromLinkedIR(
     // an unsupported overload cannot leave partial provider state behind.
     for (const auto& planned : requirements.emissionPlan.namedIntrinsics)
     {
-        const auto& intrinsic = planned.desc;
+        const auto intrinsic = planned.getDesc();
         if (!builder.supportsNamedIntrinsic(intrinsic))
         {
             String name(UnownedStringSlice(intrinsic.name, intrinsic.nameSize));
@@ -16347,15 +16365,31 @@ SlangResult emitNVVMIRFromLinkedIR(
                         auto genericAsm = as<IRGenericAsm>(inst);
                         if (const auto namedIntrinsic = planIndex.findNamedIntrinsic(inst))
                         {
+                            List<SlangNVVMValueHandle> operands;
+                            for (IRInst* operand : namedIntrinsic->operandValues)
+                            {
+                                SlangNVVMValueHandle lowered = nullptr;
+                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                    codeGenContext,
+                                    builder,
+                                    moduleScope.module,
+                                    operand,
+                                    valueMap,
+                                    typeContext,
+                                    lowered));
+                                operands.add(lowered);
+                            }
                             SlangNVVMValueHandle value = nullptr;
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
                                 "named LLVM intrinsic",
                                 builder.emitNamedIntrinsic(
                                     moduleScope.module,
-                                    namedIntrinsic->desc,
+                                    namedIntrinsic->getDesc(),
+                                    operands.getBuffer(),
+                                    size_t(operands.getCount()),
                                     value)));
-                            if (namedIntrinsic->desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
+                            if (namedIntrinsic->resultType.kind == SLANG_NVVM_VALUE_TYPE_VOID)
                             {
                                 SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                     codeGenContext,

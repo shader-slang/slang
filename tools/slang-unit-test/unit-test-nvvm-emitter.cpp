@@ -8419,7 +8419,6 @@ SLANG_UNIT_TEST(nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations)
 
 SLANG_UNIT_TEST(nvvmSlangIntegerBitHelpersRequestTypedOperations)
 {
-#if SLANG_WINDOWS_FAMILY
     _resetDirectNVVMFakes();
     {
         ComPtr<slang::IGlobalSession> globalSession;
@@ -8444,52 +8443,38 @@ SLANG_UNIT_TEST(nvvmSlangIntegerBitHelpersRequestTypedOperations)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        uint32_t operationCounts[4] = {};
+        // The public formulas use ordinary arithmetic around four explicitly named primitives.
+        for (const char* name : {"llvm.ctpop", "llvm.bitreverse", "llvm.ctlz", "llvm.cttz"})
+        {
+            SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains(name));
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 4);
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
-            if (operation.key.operation < SLANG_NVVM_VALUE_OP_COUNT_BITS ||
-                operation.key.operation > SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW)
+            SLANG_CHECK(operation.key.operation < 45 || operation.key.operation > 48);
+        }
+        Index scans = 0;
+        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+        {
+            SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[i] == UINT32_MAX);
+            SLANG_CHECK(gFakeNVVMBuilder.intrinsicResultTypes[i].bitWidth == 32);
+            SLANG_CHECK(gFakeNVVMBuilder.intrinsicResultTypes[i].laneCount == 1);
+            const Index count = gFakeNVVMBuilder.intrinsicArgumentCounts[i];
+            SLANG_CHECK(count == 1 || count == 2);
+            if (count == 2)
             {
-                continue;
-            }
-            SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::Unary);
-            SLANG_CHECK(operation.operandCount == 1);
-            SLANG_CHECK(operation.resultType.laneCount == 1);
-            SLANG_CHECK(operation.operandTypes[0].laneCount == 1);
-            SLANG_CHECK(operation.operandTypes[0].bitWidth == 32);
-            const uint32_t operationIndex =
-                operation.key.operation - SLANG_NVVM_VALUE_OP_COUNT_BITS;
-            ++operationCounts[operationIndex];
-            if (operation.key.operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS)
-            {
-                SLANG_CHECK(
-                    NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]));
-            }
-            else
-            {
-                SLANG_CHECK(
-                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI32));
-            }
-            if (operation.key.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS ||
-                operation.key.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH)
-            {
-                SLANG_CHECK(operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER);
-            }
-            else
-            {
-                SLANG_CHECK(
-                    operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+                ++scans;
+                const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+                const auto flag = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset + 1];
+                SLANG_CHECK_ABORT(flag.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+                SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[flag.index] == 0);
             }
         }
-        for (uint32_t count : operationCounts)
-            SLANG_CHECK(count == 1);
+        SLANG_CHECK(scans == 2);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-#else
-    SLANG_IGNORE_TEST;
-#endif
 }
 
 SLANG_UNIT_TEST(nvvmSlangIntegerTruthinessAndBitfieldsUseTypedRecipes)
@@ -11712,7 +11697,7 @@ SLANG_UNIT_TEST(nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation)
         "uint read() { __intrinsic_asm \"llvm.nvvm.read.ptx.sreg.tid.x()\"; }",
         "float read() { __intrinsic_asm \"llvm.nvvm.read.ptx.sreg.tid.x\"; }",
         "uint read() { __intrinsic_asm \"llvm.nvvm.read.ptx.sreg.tid.x\", 1; }",
-        "uint read(uint x) { __intrinsic_asm \"llvm.nvvm.read.ptx.sreg.tid.x\"; }",
+        "uint read(uint x) { __intrinsic_asm \"llvm.ctpop\"; }",
     };
     for (Index i = 0; i < SLANG_COUNT_OF(bodies); ++i)
     {
@@ -11733,6 +11718,130 @@ SLANG_UNIT_TEST(nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation)
         SLANG_CHECK(code == nullptr);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangNamedIntegerIntrinsicsPreserveExplicitOperands)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    globalSession->setSharedLibraryLoader(loader);
+    const char* source = R"(
+        uint pop(uint x) { __intrinsic_asm "llvm.ctpop", x; }
+        uint reverse(uint x) { __intrinsic_asm "llvm.bitreverse", x; }
+        uint high(uint x) { __intrinsic_asm "llvm.ctlz", x, false; }
+        uint low(uint x) { __intrinsic_asm "llvm.cttz", x, false; }
+        uint readUnused(uint ignored) { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }
+        void syncUnused(uint ignored) { __intrinsic_asm "llvm.nvvm.barrier0"; }
+        [CUDAKernel] void computeMain(
+            uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
+        {
+            uint value = words[0];
+            words[1] = pop(value);
+            words[2] = reverse(value);
+            words[3] = high(value);
+            words[4] = low(value);
+            words[5] = readUnused(value);
+            syncUnused(value);
+        }
+    )";
+    ComPtr<slang::IBlob> code;
+    ComPtr<slang::IBlob> diagnostics;
+    const auto result = _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics);
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(code != nullptr);
+    SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 6);
+    Index unusedParameterHelpers = 0;
+    for (const auto& namedFunction : gFakeNVVMBuilder.namedIntrinsicFunctionNames)
+    {
+        if (namedFunction.second == "llvm.nvvm.read.ptx.sreg.tid.x" ||
+            namedFunction.second == "llvm.nvvm.barrier0")
+        {
+            const Index type = gFakeNVVMBuilder.functionTypeIndices[namedFunction.first];
+            SLANG_CHECK(gFakeNVVMBuilder.functionTypeParameterCounts[type] == 1);
+            ++unusedParameterHelpers;
+        }
+    }
+    SLANG_CHECK(unusedParameterHelpers == 2);
+    Index scanCount = 0;
+    for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+    {
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[i] == UINT32_MAX);
+        const Index function =
+            gFakeNVVMBuilder.blockFunctionIndices[gFakeNVVMBuilder.intrinsicCallerBlockIndices[i]];
+        const String& name = gFakeNVVMBuilder.namedIntrinsicFunctionNames[function];
+        const Index count = gFakeNVVMBuilder.intrinsicArgumentCounts[i];
+        if (name == "llvm.nvvm.read.ptx.sreg.tid.x")
+        {
+            SLANG_CHECK(count == 0);
+            continue;
+        }
+        const bool isScan = name == "llvm.ctlz" || name == "llvm.cttz";
+        SLANG_CHECK(count == (isScan ? 2 : 1));
+        const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+        const auto& first = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
+        SLANG_CHECK(first.kind == FakeNVVMBuilderValueKind::Parameter);
+        SLANG_CHECK(first.functionIndex == function);
+        if (isScan)
+        {
+            ++scanCount;
+            const auto& flag = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset + 1];
+            SLANG_CHECK_ABORT(flag.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[flag.index] == 0);
+        }
+    }
+    SLANG_CHECK(scanCount == 2);
+    SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangNamedIntegerIntrinsicsRejectBeforeModuleCreation)
+{
+    const char* bodies[] = {
+        "uint bits(uint x, bool b) { __intrinsic_asm \"llvm.ctlz\", x, b; }",
+        "uint bits(uint x, bool b) { __intrinsic_asm \"llvm.ctpop\", x, false; }",
+        "uint bits(uint x, bool b) { __intrinsic_asm \"llvm.ctpop\", uint; }",
+        "uint bits(uint x, bool b) { __intrinsic_asm \"llvm.ctlz\", x; }",
+        "uint bits(uint x, bool b) { __intrinsic_asm \"llvm.ctpop.i32\", x; }",
+    };
+    const char* names[] = {
+        "llvm.ctlz",
+        "llvm.ctpop",
+        "GenericAsm assembly=llvm.ctpop",
+        "llvm.ctlz",
+        "llvm.ctpop.i32"};
+    for (Index i = 0; i < SLANG_COUNT_OF(bodies); ++i)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << bodies[i] << R"(
+            [CUDAKernel] void computeMain(
+                uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
+            { words[1] = bits(words[0], words[0] != 0); }
+        )";
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(globalSession, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(code == nullptr);
+        const String diagnosticText = _getBlobText(diagnostics);
+        const char* expectedCode = i == 2 ? "E52017" : "E52018";
+        if (!diagnosticText.contains(expectedCode) || !diagnosticText.contains(names[i]))
+            getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
+        SLANG_CHECK(diagnosticText.contains(expectedCode));
+        SLANG_CHECK(diagnosticText.contains(names[i]));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 0);
     }
 }
@@ -11817,7 +11926,7 @@ SLANG_UNIT_TEST(nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation)
         "void sync() { __intrinsic_asm \"llvm.nvvm.membar.missing\"; }",
         "void sync() { __intrinsic_asm \"llvm.nvvm.read.ptx.sreg.tid.x\"; }",
         "void sync() { __intrinsic_asm \"llvm.nvvm.membar.cta\", 1; }",
-        "void sync(uint x) { __intrinsic_asm \"llvm.nvvm.barrier0\"; }",
+        "void sync(uint x) { __intrinsic_asm \"llvm.nvvm.barrier0\", x; }",
         "uint sync() { __intrinsic_asm \"llvm.nvvm.barrier0\"; }",
     };
     for (Index i = 0; i < SLANG_COUNT_OF(bodies); ++i)

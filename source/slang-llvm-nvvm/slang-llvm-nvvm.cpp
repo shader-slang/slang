@@ -2525,6 +2525,13 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat format)
 
 static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID);
 
+// Shares admission of the qualified scalar integer intrinsics with serialization validation.
+static bool _isIntegerBitIntrinsic(llvm::Intrinsic::ID intrinsicID)
+{
+    return intrinsicID == llvm::Intrinsic::ctpop || intrinsicID == llvm::Intrinsic::bitreverse ||
+           intrinsicID == llvm::Intrinsic::ctlz || intrinsicID == llvm::Intrinsic::cttz;
+}
+
 // Classifies the synchronization operations admitted by the qualified NVVM dialect. The named
 // query and serializer share this boundary; LLVM owns their signatures and effects.
 static bool _isSynchronizationIntrinsic(llvm::Intrinsic::ID intrinsicID)
@@ -2717,9 +2724,7 @@ static SlangResult _writeLegacyNVVMAssembly(
                     return SLANG_E_NOT_AVAILABLE;
             }
         }
-        else if (
-            intrinsicID == llvm::Intrinsic::ctpop || intrinsicID == llvm::Intrinsic::bitreverse ||
-            intrinsicID == llvm::Intrinsic::ctlz || intrinsicID == llvm::Intrinsic::cttz)
+        else if (_isIntegerBitIntrinsic(intrinsicID))
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             llvm::IntegerType* integerType =
@@ -3350,31 +3355,77 @@ static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
     }
 }
 
-// Resolves explicit names through LLVM's intrinsic registry. The dialect classifiers also own
-// serialization validation; no second name catalog is needed. Signature queries use a temporary
-// context and never insert declarations into a module.
-static llvm::Intrinsic::ID _resolveNamedIntrinsic(const SlangNVVMNamedIntrinsicDesc& intrinsic)
+static llvm::Type* _getSemanticLLVMType(
+    llvm::LLVMContext& context,
+    const SlangNVVMValueTypeDesc& type);
+
+// Resolves a borrowed signature through LLVM's registry without creating any module state.
+// Consider `llvm.ctlz` with (i32, i1): IIT matching derives the i32 overload and LLVM's ImmArg
+// attribute requires the second operand's constant guarantee. The same path handles other
+// admitted intrinsics, so neither signature constraints nor immediate positions are duplicated.
+static llvm::Intrinsic::ID _resolveNamedIntrinsic(
+    llvm::LLVMContext& context,
+    const SlangNVVMNamedIntrinsicDesc& intrinsic,
+    llvm::FunctionType*& outType,
+    llvm::SmallVectorImpl<llvm::Type*>& outOverloadTypes)
 {
-    if (!intrinsic.name || !intrinsic.nameSize || intrinsic.operandCount)
+    outType = nullptr;
+    outOverloadTypes.clear();
+    if (!intrinsic.name || !intrinsic.nameSize || (!intrinsic.operands && intrinsic.operandCount))
         return llvm::Intrinsic::not_intrinsic;
     llvm::StringRef name(intrinsic.name, intrinsic.nameSize);
     auto id = llvm::Function::lookupIntrinsicID(name);
-    if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::isOverloaded(id) ||
-        llvm::Intrinsic::getName(id) != name ||
-        (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id)))
+    if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::getBaseName(id) != name ||
+        (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id) &&
+         !_isIntegerBitIntrinsic(id)))
         return llvm::Intrinsic::not_intrinsic;
-    llvm::LLVMContext context;
-    llvm::Type* resultType = nullptr;
-    if (Slang::NVVMSemantics::areSameType(intrinsic.resultType, Slang::NVVMSemantics::kVoid))
-        resultType = llvm::Type::getVoidTy(context);
-    else if (
-        Slang::NVVMSemantics::areSameType(intrinsic.resultType, Slang::NVVMSemantics::kSignedI32) ||
-        Slang::NVVMSemantics::areSameType(intrinsic.resultType, Slang::NVVMSemantics::kUnsignedI32))
-        resultType = llvm::Type::getInt32Ty(context);
-    auto type = llvm::Intrinsic::getType(context, id);
-    return type->getNumParams() == 0 && !type->isVarArg() && type->getReturnType() == resultType
-               ? id
-               : llvm::Intrinsic::not_intrinsic;
+
+    const auto& result = intrinsic.resultType;
+    const bool isIntegerResult = (result.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                                  result.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                                 result.laneCount == 1;
+    if ((_isIntegerBitIntrinsic(id) && !isIntegerResult) ||
+        (_isExecutionRegisterIntrinsic(id) && (!isIntegerResult || result.bitWidth != 32)) ||
+        (_isSynchronizationIntrinsic(id) &&
+         !Slang::NVVMSemantics::areSameType(result, Slang::NVVMSemantics::kVoid)))
+        return llvm::Intrinsic::not_intrinsic;
+    llvm::Type* resultType = _getSemanticLLVMType(context, result);
+    if (!resultType)
+        return llvm::Intrinsic::not_intrinsic;
+
+    llvm::SmallVector<llvm::Type*, 2> parameterTypes;
+    for (size_t i = 0; i < intrinsic.operandCount; ++i)
+    {
+        const auto& operand = intrinsic.operands[i];
+        if ((operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+             operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT) ||
+            operand.type.laneCount != 1 ||
+            (operand.type.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
+             operand.type.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER &&
+             operand.type.kind != SLANG_NVVM_VALUE_TYPE_BOOL))
+            return llvm::Intrinsic::not_intrinsic;
+        llvm::Type* type = _getSemanticLLVMType(context, operand.type);
+        if (!type)
+            return llvm::Intrinsic::not_intrinsic;
+        parameterTypes.push_back(type);
+    }
+    auto type = llvm::FunctionType::get(resultType, parameterTypes, false);
+    llvm::SmallVector<llvm::Intrinsic::IITDescriptor, 8> descriptors;
+    llvm::Intrinsic::getIntrinsicInfoTableEntries(id, descriptors);
+    llvm::ArrayRef<llvm::Intrinsic::IITDescriptor> remaining = descriptors;
+    if (llvm::Intrinsic::matchIntrinsicSignature(type, remaining, outOverloadTypes) !=
+            llvm::Intrinsic::MatchIntrinsicTypes_Match ||
+        llvm::Intrinsic::matchIntrinsicVarArg(false, remaining))
+        return llvm::Intrinsic::not_intrinsic;
+    const auto attributes = llvm::Intrinsic::getAttributes(context, id);
+    for (size_t i = 0; i < intrinsic.operandCount; ++i)
+    {
+        if (attributes.hasParamAttr(unsigned(i), llvm::Attribute::ImmArg) &&
+            intrinsic.operands[i].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT)
+            return llvm::Intrinsic::not_intrinsic;
+    }
+    outType = type;
+    return id;
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -3382,27 +3433,56 @@ _isNamedIntrinsicSupported(const SlangNVVMNamedIntrinsicDesc* intrinsic, uint32_
 {
     if (outSupported)
         *outSupported = 0;
-    if (!intrinsic || !outSupported)
+    if (!intrinsic || !outSupported || (!intrinsic->operands && intrinsic->operandCount))
         return SLANG_E_INVALID_ARG;
-    *outSupported = _resolveNamedIntrinsic(*intrinsic) != llvm::Intrinsic::not_intrinsic;
+    llvm::LLVMContext context;
+    llvm::FunctionType* type = nullptr;
+    llvm::SmallVector<llvm::Type*, 1> overloadTypes;
+    *outSupported = _resolveNamedIntrinsic(context, *intrinsic, type, overloadTypes) !=
+                    llvm::Intrinsic::not_intrinsic;
     return SLANG_OK;
 }
 
 static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     SlangNVVMModuleHandle module,
     const SlangNVVMNamedIntrinsicDesc* intrinsic,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
     SlangNVVMValueHandle* outValue)
 {
     if (outValue)
         *outValue = nullptr;
     auto state = _getModule(module);
-    if (!intrinsic || !outValue || !_getValidInsertionBlock(state))
+    auto block = _getValidInsertionBlock(state);
+    if (!intrinsic || !outValue || !block || (!intrinsic->operands && intrinsic->operandCount) ||
+        (!operands && operandCount) || operandCount != intrinsic->operandCount)
         return SLANG_E_INVALID_ARG;
-    auto id = _resolveNamedIntrinsic(*intrinsic);
+    llvm::FunctionType* type = nullptr;
+    llvm::SmallVector<llvm::Type*, 1> overloadTypes;
+    auto id = _resolveNamedIntrinsic(state->context, *intrinsic, type, overloadTypes);
     if (id == llvm::Intrinsic::not_intrinsic)
         return SLANG_E_NOT_AVAILABLE;
-    auto declaration = llvm::Intrinsic::getDeclaration(state->module.get(), id);
-    auto call = state->builder.CreateCall(declaration);
+    llvm::SmallVector<llvm::Value*, 2> values;
+    for (size_t i = 0; i < operandCount; ++i)
+    {
+        auto value = _getValue(operands[i]);
+        if (!_isValueUsableAtInsertionPoint(state, block, value) ||
+            value->getType() != type->getParamType(unsigned(i)) ||
+            (intrinsic->operands[i].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT &&
+             !llvm::isa<llvm::ConstantInt>(value)))
+            return SLANG_E_INVALID_ARG;
+        values.push_back(value);
+    }
+    const auto name = llvm::Intrinsic::getNameNoUnnamedTypes(id, overloadTypes);
+    if (auto existing = state->module->getNamedValue(name))
+    {
+        auto function = llvm::dyn_cast<llvm::Function>(existing);
+        if (!function || !function->isDeclaration() || function->getFunctionType() != type ||
+            function->getIntrinsicID() != id)
+            return SLANG_E_INVALID_ARG;
+    }
+    auto declaration = llvm::Intrinsic::getDeclaration(state->module.get(), id, overloadTypes);
+    auto call = state->builder.CreateCall(declaration, values);
     if (!call->getType()->isVoidTy())
         *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
     return SLANG_OK;
@@ -3900,41 +3980,44 @@ static llvm::Value* _emitBFloat16Dot(
     return sum;
 }
 
-static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc& type)
+static llvm::Type* _getSemanticLLVMType(
+    llvm::LLVMContext& context,
+    const SlangNVVMValueTypeDesc& type)
 {
-    if (!state)
-        return nullptr;
-
     llvm::Type* scalarType = nullptr;
     switch (type.kind)
     {
+    case SLANG_NVVM_VALUE_TYPE_VOID:
+        return Slang::NVVMSemantics::areSameType(type, Slang::NVVMSemantics::kVoid)
+                   ? llvm::Type::getVoidTy(context)
+                   : nullptr;
     case SLANG_NVVM_VALUE_TYPE_BOOL:
         if (type.bitWidth == 1)
-            scalarType = llvm::Type::getInt1Ty(state->context);
+            scalarType = llvm::Type::getInt1Ty(context);
         break;
     case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER:
     case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER:
         if (type.bitWidth == 8 || type.bitWidth == 16 || type.bitWidth == 32 || type.bitWidth == 64)
         {
-            scalarType = llvm::IntegerType::get(state->context, type.bitWidth);
+            scalarType = llvm::IntegerType::get(context, type.bitWidth);
         }
         break;
     case SLANG_NVVM_VALUE_TYPE_FLOAT_E4M3:
     case SLANG_NVVM_VALUE_TYPE_FLOAT_E5M2:
         if (type.bitWidth == 8 && type.laneCount == 1)
-            scalarType = llvm::Type::getInt8Ty(state->context);
+            scalarType = llvm::Type::getInt8Ty(context);
         break;
     case SLANG_NVVM_VALUE_TYPE_BFLOAT16:
         if (type.bitWidth == 16)
-            scalarType = llvm::Type::getInt16Ty(state->context);
+            scalarType = llvm::Type::getInt16Ty(context);
         break;
     case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
         if (type.bitWidth == 16)
-            scalarType = llvm::Type::getHalfTy(state->context);
+            scalarType = llvm::Type::getHalfTy(context);
         else if (type.bitWidth == 32)
-            scalarType = llvm::Type::getFloatTy(state->context);
+            scalarType = llvm::Type::getFloatTy(context);
         else if (type.bitWidth == 64)
-            scalarType = llvm::Type::getDoubleTy(state->context);
+            scalarType = llvm::Type::getDoubleTy(context);
         break;
     default:
         break;
@@ -3953,6 +4036,11 @@ static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValue
         return llvm::FixedVectorType::get(scalarType, type.laneCount);
     }
     return nullptr;
+}
+
+static llvm::Type* _getSemanticLLVMType(ModuleState* state, const SlangNVVMValueTypeDesc& type)
+{
+    return state ? _getSemanticLLVMType(state->context, type) : nullptr;
 }
 
 // Materializes the physical vector operand required by LLVM for one validated scalar broadcast.
@@ -4073,12 +4161,6 @@ static SlangResult _emitValueOperationFamily(
             case SLANG_NVVM_VALUE_OP_COUNT_BITS:
                 intrinsicID = llvm::Intrinsic::ctpop;
                 break;
-            case SLANG_NVVM_VALUE_OP_REVERSE_BITS:
-                intrinsicID = llvm::Intrinsic::bitreverse;
-                break;
-            case SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH:
-                intrinsicID = llvm::Intrinsic::ctlz;
-                break;
             case SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW:
                 intrinsicID = llvm::Intrinsic::cttz;
                 break;
@@ -4086,37 +4168,18 @@ static SlangResult _emitValueOperationFamily(
                 return SLANG_E_INVALID_ARG;
             }
 
-            llvm::Value* intrinsicOperand = llvmOperands[0];
-            if (operation.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH &&
-                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER)
-            {
-                llvm::Value* isNegative = state->builder.CreateICmpSLT(
-                    intrinsicOperand,
-                    llvm::ConstantInt::get(operandType, 0));
-                intrinsicOperand = state->builder.CreateSelect(
-                    isNegative,
-                    state->builder.CreateNot(intrinsicOperand),
-                    intrinsicOperand);
-            }
-
             llvm::Function* intrinsic =
                 llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID, {operandType});
             llvm::Value* intrinsicResult = nullptr;
-            if (intrinsicID == llvm::Intrinsic::ctlz || intrinsicID == llvm::Intrinsic::cttz)
+            if (intrinsicID == llvm::Intrinsic::cttz)
             {
                 intrinsicResult = state->builder.CreateCall(
                     intrinsic,
-                    {intrinsicOperand, llvm::ConstantInt::getFalse(state->context)});
+                    {llvmOperands[0], llvm::ConstantInt::getFalse(state->context)});
             }
             else
             {
-                intrinsicResult = state->builder.CreateCall(intrinsic, {intrinsicOperand});
-            }
-
-            if (operation.operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS)
-            {
-                result = intrinsicResult;
-                break;
+                intrinsicResult = state->builder.CreateCall(intrinsic, {llvmOperands[0]});
             }
 
             llvm::Value* count = state->builder.CreateZExtOrTrunc(intrinsicResult, int32Type);
@@ -4125,14 +4188,6 @@ static SlangResult _emitValueOperationFamily(
                 result = count;
                 break;
             }
-            if (operation.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH)
-            {
-                result = state->builder.CreateSub(
-                    llvm::ConstantInt::get(int32Type, operandType->getBitWidth() - 1),
-                    count);
-                break;
-            }
-
             llvm::Value* isZero = state->builder.CreateICmpEQ(
                 llvmOperands[0],
                 llvm::ConstantInt::get(operandType, 0));

@@ -821,14 +821,12 @@ inline bool resolveValueOperationFamily(
 
     const bool isIntegerBitOperand =
         desc.operandCount == 1 && isSelectedScalarInteger(desc.operandTypes[0]);
-    const bool isSameTypeBitResult =
-        isIntegerBitOperand && areSameType(desc.resultType, desc.operandTypes[0]);
     const bool isUnsignedI32BitResult =
         isIntegerBitOperand && areSameType(desc.resultType, kUnsignedI32);
-    if ((isSameTypeBitResult && desc.operation == SLANG_NVVM_VALUE_OP_REVERSE_BITS) ||
-        (isUnsignedI32BitResult && (desc.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS ||
-                                    desc.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_HIGH ||
-                                    desc.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW)))
+    // Compound wave recipes still use population count and first-lane selection. Public bit
+    // APIs now compose named LLVM primitives in the core module.
+    if (isUnsignedI32BitResult && (desc.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS ||
+                                   desc.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW))
     {
         outResolution = {ValueOperationFamily::IntegerBit, "scalar integer bit operation"};
         return true;
