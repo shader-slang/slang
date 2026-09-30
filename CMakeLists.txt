@@ -664,6 +664,15 @@ endif()
 
 if(${SLANG_USE_SYSTEM_GLSLANG})
     find_package(glslang REQUIRED)
+    if(
+        NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+        AND (TARGET SPIRV-Tools-opt OR TARGET SPIRV-Tools-link)
+    )
+        message(
+            FATAL_ERROR
+            "The installed glslang package imports SPIRV-Tools targets; set SLANG_USE_SYSTEM_SPIRV_TOOLS=ON to avoid conflicting with bundled targets"
+        )
+    endif()
     if(NOT TARGET glslang)
         add_library(glslang ALIAS glslang::glslang)
     endif()

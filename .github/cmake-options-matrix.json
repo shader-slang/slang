@@ -41,6 +41,12 @@
       "brew_packages": "lz4 pkgconf"
     },
     {
+      "option": "SLANG_USE_SYSTEM_UNORDERED_DENSE",
+      "value": "ON",
+      "macos_only": "true",
+      "brew_packages": "unordered_dense"
+    },
+    {
       "option": "SLANG_USE_SYSTEM_SPIRV_TOOLS",
       "value": "ON",
       "macos_only": "true",
