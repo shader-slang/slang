@@ -2257,11 +2257,11 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    // Version 40 retires the serialized NVVM rsqrt semantic ID. Earlier versions also permit
+    // Version 41 retires the serialized NVVM exp semantic ID. Earlier versions also permit
     // retired integer-bit and math IDs. Recompile older modules to use the core module's
     // named intrinsic calls and ordinary composition.
-    const static UInt k_minSupportedModuleVersion = 40;
-    const static UInt k_maxSupportedModuleVersion = 40;
+    const static UInt k_minSupportedModuleVersion = 41;
+    const static UInt k_maxSupportedModuleVersion = 41;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

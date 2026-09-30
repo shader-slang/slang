@@ -58,15 +58,15 @@ Ordinary comma-separated `__intrinsic_asm` operands are canonical checked IR val
 `__intrinsic_asm "llvm.ctlz", value, false;` carries both operands explicitly; helper parameters
 never supply implicit arguments. The owned emission plan retains those IR values and their type
 and constant-kind descriptors. Each provider call borrows a freshly constructed descriptor view,
-so moving the plan cannot leave pointers into its former storage. ABI46 transports the descriptors
+so moving the plan cannot leave pointers into its former storage. ABI 46 transports the descriptors
 and actual value handles. LLVM's signature matcher supplies overload types and its `ImmArg`
 attributes require constant operands during the pure support query. Emission separately checks
 actual types, constant promises, provenance and dominance before creating a declaration or call.
 Conflicting intrinsic symbols reject before mutation.
 
 Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
-names for `round`, `ceil`, `floor`, `trunc` and `rsqrt` (`__nv_roundf`/`__nv_round`, and the
-corresponding pairs for the other four). Complete signatures come from definitions in the selected immutable
+names for `round`, `ceil`, `floor`, `trunc`, `rsqrt` and `exp` (`__nv_roundf`/`__nv_round`, and the
+corresponding pairs for the other five). Complete signatures come from definitions in the selected immutable
 library; there is no parallel name-to-signature table. Core scalar bodies select these names in
 NVVM branches. Half preserves its existing evaluation through canonical casts, for example
 `__realCast<T>(floor(__realCast<float>(x)))`: widen exactly, evaluate in Float32 and narrow once.
@@ -96,12 +96,35 @@ tag and CUDA-text recognizer are retired. The selected immutable definition owns
 reciprocal division, `llvm.sqrt` and approximate PTX do not replace the selected operation.
 
 Numerical qualification uses an explicit union around the same-width RN-even reference: a radius
-of N times its larger adjacent spacing, or N encoding steps (Float32 N=2, Float64 N=1). This is a
+of N times its larger adjacent spacing, or N encoding steps (Float32 N = 2, Float64 N = 1). This is a
 bounded empirical test convention, not a vendor-defined ULP metric or universal guarantee. NVVM
 Half uses the exact RN16 image of that Float32 set; CUDA Half uses the exact Float32 PTX
 relative-error set with epsilon 2^-22.9 before narrowing. The selected Half corpus's sets agree,
 but the policies remain distinct. Signed zeros return signed infinities; positive infinity returns
 positive zero; negative nonzero inputs and NaNs require NaN classification.
+
+Public `exp` selects `__nv_expf` or `__nv_exp` in the NVVM core body. Half uses canonical
+`__realCast<T>(exp(__realCast<float>(x)))`; vectors and matrices map to this scalar body. Numeric
+operation 55, its semantic tag and CUDA-text recognizer are retired. The actual selected definition
+owns the signature through the existing library boundary.
+
+Default-mode exp qualification uses a test-defined union around the same-width RN-even reference:
+N times the larger adjacent spacing or N nonnegative encoding steps (Float32 N = 2, Float64 N = 1).
+The library table is empirical and non-guaranteed. Zero uses minsubnormal spacing; maximum finite
+uses the conceptual next finite binade for upper spacing; infinity uses only encoding neighbors,
+ordered immediately after maximum finite. No arithmetic subtracts infinity. Exact special-input
+rules override this approximate union: either zero returns one, negative infinity returns positive
+zero, positive infinity returns positive infinity, and NaNs require only NaN classification.
+
+NVVM Half applies one RN16 narrowing to the selected Float32 library admission set. CUDA Half
+instead widens, multiplies by encoded Float32 `0x3fb8aa3b` with FMA RN and negative-zero addend,
+applies `ex2.approx.ftz.f32`, narrows, then executes all four Half FMA correction stages. The
+original-input matches/corrections are `0x1f79/0x9400`, `0x25cf/0x9400`, `0xc13b/0x0400`
+and `0xc1ef/0x0200`.
+Both input and result FTZ and every discrete correction image are retained in the oracle. The
+PTX 2-ULP interpretation is separately test-defined; it is not the empirical expf table. Frozen
+baseline scalar outputs at Half inputs `0x1f79` and `0x25cf` differ between targets intentionally.
+Per-mode raw byte preservation, including unpromised NaN payloads, is a separate requirement.
 
 Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
 matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
@@ -187,12 +210,12 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 40. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 41. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including rsqrt in version 39. Existing guards reject these
+or retired numeric NVVM operations, including exp in version 40. Existing guards reject these
 before decoding AST or IR; metadata inspection and speculative import fallback to source remain
 available. Source modules that explicitly used retired semantic tags need current core calls or
-supported explicit intrinsic bodies. Container format 2 and provider ABI46 are separate contracts.
+supported explicit intrinsic bodies. Container format 2 and provider ABI 46 are separate contracts.
 See the [module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
 
 ## Preflight is a contract, not a trial emission
@@ -401,7 +424,7 @@ It exports a versioned Slang C ABI with opaque handles and one generic operation
 provider ABI is 46; compiler and provider must negotiate the exact required interface/capabilities.
 Raw LLVM objects and symbols must not cross into the CPU LLVM provider or the host compiler.
 Output handles belong to their creating live module; destroying it invalidates subordinate handles.
-ABI46 also exposes a separate input-library handle owning its byte copy, LLVM context and eagerly
+ABI 46 also exposes a separate input-library handle owning its byte copy, LLVM context and eagerly
 parsed, verified module. Definition queries create neither output IR nor a vendor program. Loading
 reports parse/verification failures through an optional synchronous callback; callback text and
 userData are never retained, and the host copies the diagnostic immediately. A failed load leaves

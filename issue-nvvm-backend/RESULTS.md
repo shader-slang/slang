@@ -284,7 +284,7 @@ completion, zero shape-error masks, exact guards/length and host-checked paired 
 Half/Float32 high words must be zero.
 
 The library policy is the union of a radius N times the exact same-width RN-even reference's
-larger adjacent spacing and an N-encoding-step neighborhood (Float32 N=2, Float64 N=1). This
+larger adjacent spacing and an N-encoding-step neighborhood (Float32 N = 2, Float64 N = 1). This
 explicit empirical test convention is neither a vendor-defined ULP metric nor a guaranteed bound.
 NVVM Half uses the exact discrete RN16 image of the Float32 union. CUDA Half uses the exact PTX
 relative-error set with epsilon 2^-22.9: integer tenth-power brackets must give matching inner/outer
@@ -298,6 +298,43 @@ requires review if its raw bits change. Keep earlier math fixtures and frozen co
 unchanged. Exact version 39 module controls separately qualify retirement and reader40 rejection;
 the three static module units cover historical versions31–38 and a dynamic future version, and do
 not substitute for those exact version39 controls.
+
+### Exponential numerical contracts
+
+```bash
+python3 extras/test-generators/check-nvvm-exp-oracles.py --self-test --check
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-exp-
+```
+
+Require nine numerical cells and one removed-tag diagnostic, with no skips. Half/Float32/Float64
+fixtures contain 80 / 62 / 62 unique IEEE inputs and 15 scalar/noinline/vector2/3/4/matrix2x2
+observations per lane. Half output has 323 uint words: leading guard, target policy marker,
+80 records of `errors, low, high, 55000 + lane`, and trailing guard. Float32/64 use 250 words
+and 62 records without a policy marker. Half markers `55040` (NVVM) and `1209` (CUDA) are policy IDs,
+not module versions. Require six shape-error bits clear, every completion, exact lengths/guards,
+host-checked scalar admission and zero high words for Half/Float32.
+
+Library admission is the explicit test-defined spacing/encoding union, N = 2 for Float32 or
+N = 1 for Float64, centered on independently certified same-width RN-even references. Zero uses minsubnormal spacing;
+maximum finite uses the conceptual next binade for adjacent spacing; infinity admits only itself
+and N finite predecessors by ordered encoding steps. Special inputs have exact classification rules.
+These endpoint extensions are not a vendor-defined ULP metric or a universal accuracy guarantee.
+The library table is empirical and non-guaranteed; PTX ex2 has its separate source contract.
+
+NVVM Half narrows the admitted Float32 expf set once. CUDA Half preserves the exact encoded-FMA
+constant `0x3fb8aa3b`, ex2 input/output FTZ, narrowing and four Half correction FMAs, including
+inactive stages. The checker preserves every discrete image. Half baseline scalar results at
+`0x1f79` and `0x25cf` intentionally differ between targets; compare each mode to its own immutable
+baseline rather than requiring cross-target identity. Preserve all nine complete buffers byte for
+byte before/after migration, including NaN payloads that admission only checks by classification.
+
+The standalone checker reconstructs all 204 inputs/references, both Half policies and exact fixture
+contracts without an ignored manifest. It runs 38 synthetic midpoint/endpoint/FTZ/constant/correction
+controls; optional `--proposal PATH --negative-controls` audits preparation certificates and 16
+mutations. Independent generator proofs and checker proofs use different integer algorithms.
+Keep all earlier five oracle suites and 15 fixtures unchanged, including six rsqrt negative controls;
+exp adds the sixth suite and three fixtures without changing frozen corpus membership.
 
 ## Report environment
 

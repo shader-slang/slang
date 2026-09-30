@@ -170,7 +170,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_ATAN ((SlangNVVMValueOperation)52u)
 #define SLANG_NVVM_VALUE_OP_ATAN2 ((SlangNVVMValueOperation)53u)
 /* Value 54 is retired; ceil uses named selected-libdevice functions. */
-#define SLANG_NVVM_VALUE_OP_EXP ((SlangNVVMValueOperation)55u)
+/* Value 55 is retired; exp uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_EXP2 ((SlangNVVMValueOperation)56u)
 /* Value 57 is retired; floor uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_FMOD ((SlangNVVMValueOperation)58u)

@@ -10801,8 +10801,18 @@ T exp(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmExp) "$P_exp($0)";
-    case cuda: __intrinsic_asm(nvvmExp) "$P_exp($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM exp requires half, float, or double.");
+        // Preserve the selected Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(exp(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_expf", x;
+        else
+            __intrinsic_asm "__nv_exp", x;
+    case cpp: __intrinsic_asm "$P_exp($0)";
+    case cuda: __intrinsic_asm "$P_exp($0)";
     case glsl: __intrinsic_asm "exp";
     case hlsl: __intrinsic_asm "exp";
     case metal: __intrinsic_asm "exp";

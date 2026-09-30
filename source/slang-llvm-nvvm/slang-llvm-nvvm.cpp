@@ -3560,7 +3560,7 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
     if (name != "__nv_roundf" && name != "__nv_round" && name != "__nv_ceilf" &&
         name != "__nv_ceil" && name != "__nv_floorf" && name != "__nv_floor" &&
         name != "__nv_truncf" && name != "__nv_trunc" && name != "__nv_rsqrtf" &&
-        name != "__nv_rsqrt")
+        name != "__nv_rsqrt" && name != "__nv_expf" && name != "__nv_exp")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3683,8 +3683,6 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_atanf" : "__nv_atan";
         case SLANG_NVVM_VALUE_OP_COS:
             return isFloat32 ? "__nv_cosf" : "__nv_cos";
-        case SLANG_NVVM_VALUE_OP_EXP:
-            return isFloat32 ? "__nv_expf" : "__nv_exp";
         case SLANG_NVVM_VALUE_OP_EXP2:
             return isFloat32 ? "__nv_exp2f" : "__nv_exp2";
         case SLANG_NVVM_VALUE_OP_LOG:

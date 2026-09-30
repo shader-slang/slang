@@ -11962,6 +11962,8 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation)
         {"__nv_roundf", false},
         {"__nv_rsqrtf", false},
         {"__nv_rsqrt", true},
+        {"__nv_expf", false},
+        {"__nv_exp", true},
     };
     for (const auto& testCase : cases)
         for (int variant = 0; variant < 6; ++variant)
@@ -12040,6 +12042,8 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary)
         float unused(float value) { __intrinsic_asm "__nv_roundf", value; }
         float unusedRsqrtFloat(float value) { __intrinsic_asm "__nv_rsqrtf", value; }
         double unusedRsqrtDouble(double value) { __intrinsic_asm "__nv_rsqrt", value; }
+        float unusedExpFloat(float value) { __intrinsic_asm "__nv_expf", value; }
+        double unusedExpDouble(double value) { __intrinsic_asm "__nv_exp", value; }
         uint readX() { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }
         [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
         { words[0] = readX(); }
@@ -12638,7 +12642,15 @@ SLANG_UNIT_TEST(nvvmSlangPublicFracUsesNamedFloorAndSubtract)
 #endif
 }
 
-SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
+// Checks scalar and aggregate calls against the same selected-library contract.
+// Consider exp(halfValue): the core module widens once, calls the Float32 body owning the
+// named intrinsic, then narrows once. The value-edge checks below preserve that sequence for
+// each public function without duplicating the live scalar/vector/matrix test construction.
+static void _checkNVVMPublicUnaryDeviceLibrary(
+    const char* publicName,
+    const char* floatName,
+    const char* doubleName,
+    SlangNVVMValueOperation retiredOperation)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
     const char* types[] = {"half", "float", "double"};
@@ -12656,8 +12668,8 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
             const char* type = types[variant];
             StringBuilder source;
-            source << "[noinline] " << type << " rsqrtHelper(" << type
-                   << " x) { return rsqrt(x); } "
+            source << "[noinline] " << type << " " << publicName << "Helper(" << type
+                   << " x) { return " << publicName << "(x); } "
                    << "[CUDAKernel] void computeMain("
                    << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { ";
             for (Index i = 0; i < 4; ++i)
@@ -12670,16 +12682,17 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
                 else
                     source << "asdouble(words[" << 2 * i << "], words[" << 2 * i + 1 << "]); ";
             }
-            source << type << " scalar = rsqrt(x0); " << type << " helper = rsqrtHelper(x1); ";
+            source << type << " scalar = " << publicName << "(x0); " << type
+                   << " helper = " << publicName << "Helper(x1); ";
             for (Index size = 2; size <= 4; ++size)
             {
-                source << "vector<" << type << ", " << size << "> v" << size << " = rsqrt(vector<"
-                       << type << ", " << size << ">(";
+                source << "vector<" << type << ", " << size << "> v" << size << " = " << publicName
+                       << "(vector<" << type << ", " << size << ">(";
                 for (Index i = 0; i < size; ++i)
                     source << (i ? ", " : "") << "x" << i;
                 source << ")); ";
             }
-            source << "matrix<" << type << ", 2, 2> m = rsqrt(matrix<" << type
+            source << "matrix<" << type << ", 2, 2> m = " << publicName << "(matrix<" << type
                    << ", 2, 2>(x0, x1, x2, x3)); ";
             const char* values[] = {
                 "scalar",
@@ -12718,7 +12731,8 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
                 SLANG_CHECK(SLANG_FAILED(result));
                 SLANG_CHECK(!code);
                 SLANG_CHECK(_getBlobText(diagnostics).contains("E52018"));
-                SLANG_CHECK(_getBlobText(diagnostics).contains("__nv_rsqrt"));
+                SLANG_CHECK(
+                    _getBlobText(diagnostics).contains(variant == 2 ? doubleName : floatName));
                 SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
                 SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
                 continue;
@@ -12752,8 +12766,10 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
             SLANG_CHECK(wordStores == (variant == 2 ? 30 : 15));
             SLANG_CHECK_ABORT(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 1);
             for (const auto& name : gFakeNVVMBuilder.namedIntrinsicNames)
-                SLANG_CHECK(name == (variant == 2 ? "__nv_rsqrt" : "__nv_rsqrtf"));
-            SLANG_CHECK(_countFakeNVVMNoInlineHelperCalls("rsqrtHelper", 1) == 1);
+                SLANG_CHECK(name == (variant == 2 ? doubleName : floatName));
+            SLANG_CHECK(
+                _countFakeNVVMNoInlineHelperCalls((String(publicName) + "Helper").getBuffer(), 1) ==
+                1);
             SLANG_CHECK_ABORT(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
             for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
             {
@@ -12774,7 +12790,7 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
             for (Index i = 0; i < gFakeNVVMBuilder.scalarOperations.getCount(); ++i)
             {
                 const auto& operation = gFakeNVVMBuilder.scalarOperations[i];
-                SLANG_CHECK(operation.key.operation != 65);
+                SLANG_CHECK(operation.key.operation != retiredOperation);
                 if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
                     continue;
                 SLANG_CHECK_ABORT(operation.operandCount == 1);
@@ -12794,9 +12810,9 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
             if (variant == 0)
             {
                 SLANG_CHECK_ABORT(widen >= 0 && narrow >= 0);
-                // Consider rsqrt(halfValue), including a lane of the vectors and matrix above.
+                // Consider exp(halfValue) or rsqrt(halfValue), including an aggregate lane.
                 // Its scalar Half body widens the argument, calls the Float32 body that owns
-                // __nv_rsqrtf, then narrows that call's result. Check these direct value edges;
+                // the named intrinsic, then narrows that call's result. Check these direct edges;
                 // merely finding unrelated conversions would not establish Half evaluation.
                 const auto& narrowing = gFakeNVVMBuilder.scalarOperations[narrow];
                 const auto call = narrowing.operands[0];
@@ -12827,6 +12843,16 @@ SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
 #else
     SLANG_IGNORE_TEST;
 #endif
+}
+
+SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
+{
+    _checkNVVMPublicUnaryDeviceLibrary("rsqrt", "__nv_rsqrtf", "__nv_rsqrt", 65);
+}
+
+SLANG_UNIT_TEST(nvvmSlangPublicExpUsesNamedDeviceLibrary)
+{
+    _checkNVVMPublicUnaryDeviceLibrary("exp", "__nv_expf", "__nv_exp", 55);
 }
 
 SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
@@ -12863,6 +12889,47 @@ SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
         SLANG_CHECK(!code);
         SLANG_CHECK(text.contains("E52017"));
         SLANG_CHECK(text.contains("$P_rsqrt($0)"));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacyExpAssemblyRejectsBeforeOutputCreation)
+{
+    // Fresh tagged source is diagnosed as an unknown tag before NVVM planning. Immutable old
+    // modules separately prove retirement of numeric 55; this unit owns legacy untagged text.
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "words[1] = uint(bit_cast<uint16_t>(oldExp(bit_cast<half>(uint16_t(words[0])))));",
+        "words[1] = asuint(oldExp(asfloat(words[0])));",
+        "uint low, high; asuint(oldExp(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << types[variant] << " oldExp(" << types[variant] << " x) { "
+               << "__intrinsic_asm \"$P_exp($0)\"; } "
+               << "[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << bodies[variant] << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017") || !text.contains("$P_exp($0)"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(!code);
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains("$P_exp($0)"));
         SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);

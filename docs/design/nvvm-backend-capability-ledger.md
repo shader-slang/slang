@@ -74,7 +74,7 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 40 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 41 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
@@ -129,7 +129,7 @@ tests verify direct Half widen/call/narrow edges and live scalar/vector/matrix o
 The [Half](../../tests/cuda/nvvm-rsqrt-half.slang), [Float32](../../tests/cuda/nvvm-rsqrt-32.slang)
 and [Float64](../../tests/cuda/nvvm-rsqrt-64.slang) fixtures contain 64 unique IEEE inputs and 15
 observations per lane. Exact rational references define a test union of reference-spacing radius
-and encoding-step neighborhoods (Float32 N=2, Float64 N=1), with empirical, non-guaranteed library
+and encoding-step neighborhoods (Float32 N = 2, Float64 N = 1), with empirical, non-guaranteed library
 scope. Separate NVVM and CUDA Half policies use the exact narrowed images of the library union
 and the PTX epsilon 2^-22.9 set, respectively. These policies agree on the selected Half inputs;
 a shared selector drives both the admission table and visible policy marker.
@@ -139,6 +139,32 @@ recomputes tables without a compiler or ignored manifest and exercises six negat
 controls. The [removed-tag test](../../tests/cuda/nvvm-rsqrt-removed-tag.slang) checks the frontend
 boundary. Preserve all nine pre-migration buffers byte-for-byte, including raw NaNs; payloads remain
 unpromised by numerical admission. Current acceptance and exact compiler identity are owned by STATUS.
+
+Public `exp` selects named `__nv_expf`/`__nv_exp` through the same selected-definition boundary.
+Half preserves Float32 library evaluation before one narrowing. Numeric 55, its tag and text route
+are retired; real-provider tests retain both serializers and reject reserved operation 55 without mutation.
+Emitter tests preserve preflight-before-output and direct Half widen/call/narrow edges.
+The [Half](../../tests/cuda/nvvm-exp-half.slang), [Float32](../../tests/cuda/nvvm-exp-32.slang)
+and [Float64](../../tests/cuda/nvvm-exp-64.slang) fixtures contain 80 / 62 / 62 unique inputs and 15
+scalar/noinline/vector2/3/4/matrix2x2 observations per lane. Six shape-error bits, raw scalar pairs,
+completion and guards occupy 323 / 250 / 250 words. Half markers `55040` (NVVM) and `1209` (CUDA) identify
+policies, not the current module version; the same target selector chooses marker and admission.
+
+The default library union uses reference-spacing radius or encoding-step distance, N = 2 for Float32
+and N = 1 for Float64, as an empirical non-guaranteed test convention. Zero uses minsubnormal spacing;
+maxfinite uses the conceptual next binade; infinity uses only ordered encoding neighbors. Exact
+special-input classifications override the union. NVVM Half is its exact Float32-to-Half image;
+CUDA Half retains encoded-FMA, ex2 input/output FTZ, Half narrowing and four correction FMAs.
+All four correction inputs distinguish candidate sets; baseline outputs at `0x1f79` / `0x25cf` differ
+intentionally. These bounded policies imply neither universal accuracy nor target equivalence.
+
+The [standalone checker](../../extras/test-generators/check-nvvm-exp-oracles.py) independently
+reconstructs the corpus, references, sets, stage images and fixture contracts using integers,
+without compiler execution or ignored manifests. Its 38 synthetic controls cover midpoint parity,
+endpoint rules, FTZ, constants and corrections. An optional ignored proposal audit checks generator
+proof fields and rejects 16 mutations. The [removed-tag test](../../tests/cuda/nvvm-exp-removed-tag.slang)
+checks the frontend boundary. Preserve all nine raw baseline buffers, including NaNs. Current
+acceptance and exact compiler identity remain owned by STATUS.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

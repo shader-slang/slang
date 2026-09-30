@@ -1,84 +1,80 @@
 # NVVM current status
 
-The rsqrt core migration and full checkpoint are accepted. Explicit selected
-`__nv_rsqrtf`/`__nv_rsqrt` calls preserve the existing scalar library operations. Half widens to
-Float32 before one narrowing. Numeric operation 65, its tag and CUDA-text recognizer are retired.
-The semantic module boundary is 40; provider ABI 46 and container format 2 are unchanged.
-The maintainer's resumed migration authorization continues through reviewed local commits.
-Skip Slack; no push or system changes. Plans, reports and raw artifacts stay ignored.
-Current accepted raw evidence: `build/nvvm-rsqrt/`.
+The exp core migration and full checkpoint are accepted. The core selects `__nv_expf` or
+`__nv_exp` explicitly for NVVM; Half preserves exact widening, selected Float32 evaluation and one
+narrowing. Numeric operation 55, its semantic tag and CUDA-text recognizer are retired. The module
+range is `min = max = 41`; provider ABI 46 and container format 2 remain unchanged.
+
+**Stopped after this exp slice, as requested.** Exp2 remains unselected and requires a new explicit
+request before investigation or implementation. No Slack, push or system changes. Plans, reports
+and raw artifacts remain ignored. Current accepted raw evidence: `build/nvvm-exp/`.
 
 Start with the [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
-[HISTORY](HISTORY.md) explains Git recovery of superseded documentation and evidence.
+[HISTORY](HISTORY.md) explains Git recovery. The [accepted baseline](accepted-baseline.json),
+[identity](accepted-identity.json) and [focused evidence](focused-evidence.json) remain authoritative.
 
 ## Accepted state
 
-[Accepted baseline](accepted-baseline.json), [identity](accepted-identity.json) and
-[focused evidence](focused-evidence.json) record the current accepted state.
-All prior inputs, exact outcomes and failure histories are preserved.
+| Evidence                                          | Accepted result                                                                                                                                           |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cases / sources / mode cells                      | 580 / 576 / 1,740; all 1,356 frozen and 384 discovery outcomes unchanged                                                                                  |
+| Main outcomes                                     | 1,704 correct; 36 unresolved; 21 resolved histories retained                                                                                              |
+| Native units                                      | 1,173 identities: 1,161 pass, 12 skip; all 1,169 prior statuses unchanged plus four new passes                                                            |
+| Semantic regressions                              | 1,248 identities: 1,170 pass, 78 skip; unchanged                                                                                                          |
+| Physical surfaces                                 | 249 cells: 214 pass, 24 compile failures, 11 retained NVRTC mismatches; exact preservation                                                                |
+| Focused coverage                                  | 79 units, 54 GPU cells, eight tag diagnostics, 106 capability tests                                                                                       |
+| Oracles                                           | Six suites / 18 fixtures; 38 exp synthetic controls and six retained rsqrt negative controls                                                              |
+| Exp numerical preservation                        | Nine buffers, with 323 / 250 / 250 words by width, unchanged per mode at versions 40 and 41                                                               |
+| Runtime / toolkit / material                      | 4 / 18 / 6 pass; material remains compile/assembly coverage only                                                                                          |
+| Runner contracts                                  | 119 pass, one inherited skip; 83 surface CPU contracts pass                                                                                               |
+| Module boundary                                   | 64 baseline phases at version 40; 46 retirement phases; 30 old-version metadata/rejection phases; 32 fresh version 41 phases; three isolated static units |
+| Focused features                                  | 25 total; all 24 prior objects retain their original evidence identities                                                                                  |
+| Last full / targeted / implementations since full | exp / exp / 0                                                                                                                                             |
+| Validation stability                              | 122 source, two configuration, 39 runtime and 100 layout entries; unchanged across final before/after captures                                            |
 
-| Evidence                                          | Accepted result                                                                                                                                                   |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cases / sources / mode cells                      | 580 / 576 / 1,740; frozen 1,356 + discovery 384 unchanged                                                                                                         |
-| Main outcomes                                     | 1,704 correct; 36 unresolved; 21 resolved histories retained                                                                                                      |
-| Native units                                      | 1,169 identities: 1,157 pass, 12 skip; all 1,165 prior statuses unchanged plus four new passes                                                                    |
-| Semantic regressions                              | 1,248 identities: 1,170 pass, 78 skip; unchanged                                                                                                                  |
-| Physical surfaces                                 | 249 cells: 214 pass, 24 compile failures, 11 retained NVRTC mismatches; exact outcomes unchanged                                                                  |
-| Focused coverage                                  | 75 units, 45 GPU cells, 7 tag diagnostics, 106 capability tests, 15 oracle fixtures and 6 negative oracle controls pass                                           |
-| Rsqrt numerical controls                          | All nine output buffers byte-identical to baseline at module versions 39 and 40                                                                                   |
-| Runtime / toolkit / material                      | 4 / 18 / 6 pass; material is compile/assembly coverage                                                                                                            |
-| Runner contracts                                  | 119 pass, 1 inherited skip; 83 surface oracle/ABI CPU contracts pass                                                                                              |
-| Module boundary                                   | min=max40, container 2; 46 version 39 retirement phases, 30 old-module metadata/rejection phases, 32 version 40 successor phases and 3 isolated static units pass |
-| Focused features                                  | 24 total; all 23 earlier objects retain exact original identities and evidence                                                                                    |
-| Last full / targeted / implementations since full | rsqrt / rsqrt / 0                                                                                                                                                 |
-| Validation stability                              | 117 source, 2 configuration, 39 runtime hashes and 100 layout entries unchanged across four final validation captures                                             |
+The exp corpus has 80 Half, 62 Float32 and 62 Float64 inputs, with 15 live observations per lane.
+Output lengths are 323 / 250 / 250 words. Half policy IDs `55040` and `1209` identify contracts,
+not module versions. Library admission uses an empirical, non-guaranteed, test-defined union of
+reference-spacing and encoding-step bounds. Endpoint rules cover zero, maximum finite and infinity;
+exact special-input rules override approximate admission.
 
-Rational/integer oracles cover 64 unique IEEE inputs per width and 15 live observations per lane.
-Float32/64 acceptance uses an explicitly test-defined union of reference-spacing and encoding-step
-bounds, not a universal vendor error metric. NVVM Half retains the selected Float32 library result
-before narrowing; CUDA Half retains its distinct PTX approximation envelope. All selected Half
-admission sets agree, without implying universal equivalence. Raw scalar buffers, completion and
-guards remain checked; NaN payloads are not promised but observed changes require review.
+NVVM Half narrows the selected Float32 `expf` result once. CUDA Half preserves its initial FMA,
+`ex2` input/output FTZ, narrowing and four Half correction FMAs. All four correction inputs distinguish
+the candidate sets; baseline scalar results at inputs `0x1f79` and `0x25cf` intentionally differ
+between targets. Require each mode's raw bytes to remain unchanged, including unpromised NaN payloads.
 
-The original final harness rejected a relative-versus-absolute boundary-review reference before any
-module workload. Its failed gates and original contracts remain preserved. The reviewed continuation
-corrected the record producer and reused successful focused results with their original identities.
-Four source/configuration/runtime/layout captures prove that the continuation used the same built
-bytes. No compiler or oracle change was needed. Earlier preparation corrections and prior failure
-histories also remain in the evidence.
+Retirement at version 40 and final version 41 validation passed. All nine output buffers remain
+byte-identical to each mode's baseline. Source, configuration, runtime and layout captures match.
+Original preparation corrections and prior failure histories remain preserved in the evidence.
 
-Named libdevice admission covers round/ceil/floor/trunc/rsqrt at Float32/64; selected definitions own
-signatures and the same immutable bytes reach libNVVM. Frac composes floor with ordinary subtraction.
-Earlier features retain their original tested identities and policies. The protected user material
-update remains unchanged.
+Named-library admission covers `round`, `ceil`, `floor`, `trunc`, `rsqrt` and `exp`; selected
+definitions own signatures. `frac` remains named `floor` plus ordinary subtraction. The protected
+user material update remains unchanged.
 
 ## Tested identity
 
-Source revision `b43ebe8cf8e82583d8d99c8f146ac6854d31c7e5` plus compiler patch
-`062129763ad0026dcb5217e69996b87caba73c1c6b27747fff3daabaf3d4ea1b`.
-Compiler version `2026.18.3-344-gb43ebe8cf`; loaded compiler SHA256
-`db128742e2ad4a8fba4c145d87c23bcf032bfe75e7124ab26df0f77c4b5f1d6f`;
-provider ABI 46 SHA256 `fe8442ae252639fe90641768c592b50ede017030745e1a1ca72bd6a5d60d7447`.
-These are final40-1 source/runtime-before identities reused by final40-2, not a later commit label.
-Qualification remains native Ubuntu 24.04, L4 SM89, driver 580.126.09, CUDA 12.9.2/NVRTC 12.9.86,
-LLVM 14 and target SM80 in `build/RelWithDebInfo`. Static executable/configuration has its own
-capture and is not added to native counts. After explicit core-cache preparation, scored
-before/after captures preserve exact identity;
-historical versions 31–38 and a dynamic future version are covered, while immutable module probes
-cover exact version 39. Performance measurements were not refreshed.
+Source revision `6ab51dcb36307a7922bcfc280a87055823041bdc` plus compiler patch
+`b5996feb9b9636bfc7956d5131935b80c07b4180aa424a353adb61ef64bce897`.
+Compiler version `2026.18.3-345-g6ab51dcb3`; loaded compiler SHA256
+`dc1e492ac310dfb6b3d90fa43beb8398491f93bf50ad6d562ed435a359f5124b`;
+provider ABI 46 SHA256 `ae85ecb92635f26d41246cbd8951f41b7ffa7aec7044802404b4acf636cab887`.
+These identify the final `final41-2` validation bytes, not a later commit label. Earlier focused
+features retain their original tested identities. Qualification remains native Ubuntu 24.04,
+L4 SM89, driver 580.126.09, CUDA 12.9.2 / NVRTC 12.9.86, LLVM 14 and target SM80.
+
+The isolated static executable and configuration have separate captures and remain outside native
+unit counts. Their historical tests cover versions 31–38 and a dynamic future version; immutable
+module probes cover exact version 40. Performance and material-runtime evidence are not refreshed.
 
 ## Boundaries and next action
 
-- Investigate exp (numeric operation 55) as the next bounded candidate. Reviewed preparatory notes
-  identify distinct CUDA Half corrections and NVVM selected-Float32 behavior; independently review
-  and freeze numerical policy and fixtures before implementation. Other math, compound and wave
-  recognizers remain separate work.
-- Module version 40 requires older user modules and separately supplied built-ins to be recompiled
-  for every backend. Metadata inspection and source fallback remain available. Other math/compound/
-  wave recognizers remain; retire the semantic-tag extension only after its final consumers migrate,
-  preserving ordinary comma-separated intrinsic-asm operands. The earlier timestamp-based cache
-  hash is not atomic with external libdevice replacement.
+- Work is stopped after the completed exp slice. Do not investigate, prepare or implement another
+  slice without a new explicit request.
+- Module version 41 requires older modules and separately supplied built-ins to be recompiled for
+  every backend. Metadata inspection and source fallback remain available. The semantic-tag extension
+  remains until its final consumers migrate; ordinary comma-separated intrinsic arguments remain.
+  Timestamp-based snapshot caching is still non-atomic with external libdevice replacement.
 - Preserve all 36 main gaps and prior focused NVRTC narrow-bit/nested-array failures and timeouts.
   Packed/normalized surface domains, general aliases, resource provenance, dynamic components and
   three-channel transfers remain outside current physical legalization. Checked address/memory

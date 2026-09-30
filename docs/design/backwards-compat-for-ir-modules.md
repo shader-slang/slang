@@ -80,13 +80,13 @@ Two types of versions are tracked:
 
 ### Current Prototype Boundary
 
-The prototype writes semantic module version 40 and accepts only version 40. Earlier versions
+The prototype writes semantic module version 41 and accepts only version 41. Earlier versions
 contain incompatible numeric capability identities or retired NVVM integer-bit and math operations;
-version 39 still admitted rsqrt ID 65. Recompile older user modules and built-ins for every backend.
+version 40 still admitted exp ID 55. Recompile older user modules and built-ins for every backend.
 Public APIs then use the current core bodies; modules that explicitly named retired semantic tags
 must migrate those source bodies to current core calls or supported explicit intrinsic operations.
 Metadata inspection remains available without loading AST or IR, and speculative binary imports
-can fall back to available source. Serialization format 2 and provider ABI46 are unchanged.
+can fall back to available source. Serialization format 2 and provider ABI 46 are unchanged.
 
 Stable instruction names do not stabilize capability identities. Until capabilities have a stable
 serialized representation, any further renumbering requires another semantic version boundary
