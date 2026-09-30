@@ -129,7 +129,8 @@ private:
 
     // Whether `getOrCreateLayout` has already reported that the target cannot honor the requested
     // layout rules version. The layout is never created in that case, so we remember the report
-    // to give it once per target program rather than once per request for the layout.
+    // to give it once per target program rather than once per request for the layout. A later
+    // request that passes a different sink therefore fails without a diagnostic of its own.
     bool m_hasReportedUnsupportedLayoutRules = false;
 
     CompilerOptionSet m_optionSet;

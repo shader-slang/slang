@@ -9,6 +9,8 @@
 // `Q` adds a `float3` after `w`, which separates rounded scalar layout from std430: `Q.v` is at 16
 // (unrounded scalar), 20 (rounded scalar), or 32 (std430). Pointer pointees always use scalar layout,
 // so `Q*` checks that pointers follow the layout rules version too.
+//
+// `latest` names 2026, so it keeps the old rules; `next` names 202c.
 
 //TEST:REFLECTION(filecheck=REFL_OLD):-target spirv -stage compute -entry computeMain -fvk-use-scalar-layout
 //TEST:REFLECTION(filecheck=REFL_OLD):-target spirv -stage compute -entry computeMain -fvk-use-scalar-layout -layout-rules-version 2026
@@ -16,6 +18,8 @@
 //TEST:SIMPLE(filecheck=SPV_OLD):-target spirv-asm -emit-spirv-directly -stage compute -entry computeMain -fvk-use-scalar-layout
 //TEST:SIMPLE(filecheck=SPV_OLD):-target spirv-asm -emit-spirv-directly -stage compute -entry computeMain -fvk-use-scalar-layout -layout-rules-version 2026
 //TEST:SIMPLE(filecheck=SPV_NEW):-target spirv-asm -emit-spirv-directly -stage compute -entry computeMain -fvk-use-scalar-layout -layout-rules-version 202c
+//TEST:SIMPLE(filecheck=SPV_OLD):-target spirv-asm -emit-spirv-directly -stage compute -entry computeMain -fvk-use-scalar-layout -layout-rules-version latest
+//TEST:SIMPLE(filecheck=SPV_NEW):-target spirv-asm -emit-spirv-directly -stage compute -entry computeMain -fvk-use-scalar-layout -layout-rules-version next
 
 struct S
 {

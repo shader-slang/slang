@@ -2455,6 +2455,17 @@ static IROp getPtrDataLayoutOp(IRPtrTypeBase* ptrType)
     return dataLayout ? dataLayout->getOp() : kIROp_DefaultBufferLayoutType;
 }
 
+// Return whether `type` is a stage input or output pointer. Such a pointer addresses varyings,
+// which have no buffer layout for the scalar rules to change, so it keeps natural layout.
+static bool isStageInterfacePointer(IRType* type)
+{
+    auto ptrType = as<IRPtrTypeBase>(type);
+    if (!ptrType)
+        return false;
+    auto addressSpace = ptrType->getAddressSpace();
+    return addressSpace == AddressSpace::Input || addressSpace == AddressSpace::Output;
+}
+
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
 {
     if (bufferType->getOp() == kIROp_ParameterBlockType && isMetalTarget(target->getTargetReq()))
@@ -2506,7 +2517,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
 
         // If the user specified a scalar buffer layout, then just use that.
         if (target->getOptionSet().shouldUseScalarLayout())
-            return getScalarLayoutRuleName(target);
+            return isStageInterfacePointer(bufferType) ? IRTypeLayoutRuleName::Natural
+                                                       : getScalarLayoutRuleName(target);
     }
 
     if (target->getOptionSet().shouldUseDXLayout())
@@ -2589,7 +2601,9 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         // A pointer with an explicit data layout, including one copied from the buffer it was
         // derived from, uses that layout. A user pointer with the default data layout points at
         // the target's scalar layout, which is also how reflection lays out every pointee.
-        IRTypeLayoutRuleName defaultRule = getScalarLayoutRuleName(target);
+        IRTypeLayoutRuleName defaultRule = ptrType->getAddressSpace() == AddressSpace::UserPointer
+                                               ? getScalarLayoutRuleName(target)
+                                               : IRTypeLayoutRuleName::Natural;
         // SPIR-V storage-buffer pointers inherit the same std430 default as
         // GLSLShaderStorageBuffer when no explicit data layout is attached, so stride
         // computations match the ArrayStride decorations emitted later.
