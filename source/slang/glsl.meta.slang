@@ -223,7 +223,9 @@ public in int2 gl_FragSizeEXT : SV_FragSize;
 public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 
-// Override operator* behavior to compute algebric product of matrices and vectors.
+// GLSL's `*` and `*=` on matrices and vectors compute the algebraic product. Each overload
+// below forwards to `mul` with its operands swapped, so its target set mirrors that of the
+// `mul` overload it calls; whether `double` can be emitted on a target is not modelled here (#10232).
 
 [ForceInline]
 [OverloadRank(15)]
