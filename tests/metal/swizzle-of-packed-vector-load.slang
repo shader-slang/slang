@@ -1,7 +1,7 @@
 // Metal buffer lowering loads a `float4` element as a `packed_float4` and converts it back
-// with a one-operand vector constructor. That operand is not a lane of the `float4`, so
-// the swizzle-of-constructor and element-of-constructor peepholes must leave the conversion in
-// place.
+// with a one-operand vector constructor, `float4(packed)`. The constructor peepholes resolve
+// lanes only through scalar or `vector<T,N>` operands, so they conservatively leave that
+// conversion in place instead of folding a swizzle or index into the packed value.
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry computeMain -stage compute
 

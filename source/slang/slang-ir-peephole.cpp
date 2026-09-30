@@ -297,40 +297,49 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
-    // A lane is one position in a `makeVector` result: the position that a swizzle or
-    // `getElement` index selects. `MakeVectorLane` names the operand that supplies a lane and,
-    // when that operand is a vector, the element of the operand that holds it; `elementIndex` is
-    // -1 for a scalar operand. A null `operand` means the lane could not be resolved.
-    struct MakeVectorLane
+    // Where one lane of a `makeVector` result comes from. A lane is a position in the result, the
+    // position that a swizzle or `getElement` index selects. The source is the operand that
+    // supplies the lane and, when that operand is a vector, `indexInOperand`, the element of the
+    // operand that holds it (-1 for a scalar operand). A default-constructed source is
+    // unresolved.
+    struct MakeVectorLaneSource
     {
         IRInst* operand = nullptr;
-        IRIntegerValue elementIndex = -1;
+        IRIntegerValue indexInOperand = -1;
 
-        bool isVectorElement() const { return elementIndex >= 0; }
+        bool isResolved() const { return operand != nullptr; }
+        bool isInVectorOperand() const { return indexInOperand >= 0; }
     };
 
-    // Find the operand of `makeVector` that supplies lane `laneIndex` of its result, where a
-    // scalar operand supplies one lane and a vector operand supplies one lane per element. For
-    // example, lane 2 of `uint4(a, b)` is element 0 of `b`.
+    // Find where lane `laneIndex` of `makeVector`'s result comes from. A scalar operand supplies
+    // one lane and a vector operand one lane per element, so lane 2 of `uint4(a, b)` is element 0
+    // of `b`.
     //
-    // The result is a vector or, after Metal buffer lowering, a `MetalPackedVectorType`. The lane
-    // is unresolved when `laneIndex` is out of range, or when an operand at or before it has a
-    // non-literal width or a scalar or element type other than the result's element type, with
-    // attributes such as `unorm` ignored on both sides. The type check matters because a
-    // one-operand `makeVector` can act as a conversion, such as the `float4(packed)` that Metal
-    // buffer lowering wraps around a `MetalPackedVectorType` load, and then its operand is not a
-    // lane of the result.
-    static MakeVectorLane findMakeVectorLane(IRInst* makeVector, IRIntegerValue laneIndex)
+    // An operand supplies lanes only if it is a scalar of the result's element type, or an
+    // `IRVectorType` with that element type and a literal element count, ignoring type
+    // attributes such as `unorm` on both sides. Any other operand leaves its own lanes and every
+    // later lane unresolved, as does an out-of-range `laneIndex`. That rule conservatively skips
+    // the `makeVector(float4, packed)` that Metal buffer lowering uses to convert a packed load:
+    // the packed operand's elements do line up with the result's lanes, but we don't look
+    // through a `MetalPackedVectorType`, so that conversion is never folded away.
+    //
+    // The `makeVector` itself has a vector type, or a `MetalPackedVectorType` for the opposite
+    // conversion, `makeVector(packed, v)`, which Metal buffer lowering emits before a store.
+    // Resolving lanes of the latter keeps the `getElement` fold's earlier behaviour for it; any
+    // other result type is left unresolved.
+    static MakeVectorLaneSource findMakeVectorLaneSource(
+        IRInst* makeVector,
+        IRIntegerValue laneIndex)
     {
         SLANG_ASSERT(makeVector->getOp() == kIROp_MakeVector);
-        IRType* elementType = nullptr;
-        if (auto vectorType = as<IRVectorType>(makeVector->getDataType()))
-            elementType = vectorType->getElementType();
-        else if (auto packedType = as<IRMetalPackedVectorType>(makeVector->getDataType()))
-            elementType = packedType->getElementType();
+        auto makeVectorType = unwrapAttributedType(makeVector->getDataType());
+        IRInst* elementType = nullptr;
+        if (auto vectorType = as<IRVectorType>(makeVectorType))
+            elementType = unwrapAttributedType(vectorType->getElementType());
+        else if (auto packedType = as<IRMetalPackedVectorType>(makeVectorType))
+            elementType = unwrapAttributedType(packedType->getElementType());
         else
             return {};
-        auto elementBaseType = unwrapAttributedType(elementType);
         IRIntegerValue startIndex = 0;
         for (UInt i = 0; i < makeVector->getOperandCount(); i++)
         {
@@ -339,14 +348,14 @@ struct PeepholeContext : InstPassBase
             auto operandVectorType = as<IRVectorType>(operandType);
             if (!operandVectorType)
             {
-                if (operandType != elementBaseType)
+                if (operandType != elementType)
                     return {};
                 if (laneIndex == startIndex)
                     return {operand, -1};
                 startIndex++;
                 continue;
             }
-            if (unwrapAttributedType(operandVectorType->getElementType()) != elementBaseType)
+            if (unwrapAttributedType(operandVectorType->getElementType()) != elementType)
                 return {};
             auto operandSize = as<IRIntLit>(operandVectorType->getElementCount());
             if (!operandSize)
@@ -358,23 +367,23 @@ struct PeepholeContext : InstPassBase
         return {};
     }
 
-    static IRInst* emitMakeVectorLaneValue(IRBuilder& builder, MakeVectorLane lane)
+    // `source` must be resolved.
+    static IRInst* getMakeVectorLaneValue(IRBuilder& builder, MakeVectorLaneSource source)
     {
-        if (!lane.isVectorElement())
-            return lane.operand;
-        return builder.emitElementExtract(lane.operand, lane.elementIndex);
+        SLANG_ASSERT(source.isResolved());
+        if (!source.isInVectorOperand())
+            return source.operand;
+        return builder.emitElementExtract(source.operand, source.indexInOperand);
     }
 
-    // Return the vector operand that supplies every one of `lanes`, or nullptr if they come from
-    // more than one operand or any of them comes from a scalar operand.
-    static IRInst* findSoleVectorOperand(const ShortList<MakeVectorLane, 4>& lanes)
+    static IRInst* findSoleVectorOperand(const ShortList<MakeVectorLaneSource, 4>& sources)
     {
         IRInst* soleOperand = nullptr;
-        for (auto lane : lanes)
+        for (auto source : sources)
         {
-            if (!lane.isVectorElement() || (soleOperand && lane.operand != soleOperand))
+            if (!source.isInVectorOperand() || (soleOperand && source.operand != soleOperand))
                 return nullptr;
-            soleOperand = lane.operand;
+            soleOperand = source.operand;
         }
         return soleOperand;
     }
@@ -391,16 +400,16 @@ struct PeepholeContext : InstPassBase
     // the IR is left unchanged.
     IRInst* tryFoldSwizzleOfMakeVector(IRSwizzle* swizzle)
     {
-        ShortList<MakeVectorLane, 4> lanes;
+        ShortList<MakeVectorLaneSource, 4> sources;
         for (UInt i = 0; i < swizzle->getElementCount(); i++)
         {
             auto index = as<IRIntLit>(swizzle->getElementIndex(i));
             if (!index)
                 return nullptr;
-            auto lane = findMakeVectorLane(swizzle->getBase(), index->getValue());
-            if (!lane.operand)
+            auto source = findMakeVectorLaneSource(swizzle->getBase(), index->getValue());
+            if (!source.isResolved())
                 return nullptr;
-            lanes.add(lane);
+            sources.add(source);
         }
 
         IRBuilder builder(module);
@@ -410,24 +419,24 @@ struct PeepholeContext : InstPassBase
         auto resultType = swizzle->getDataType();
         if (!as<IRVectorType>(resultType))
         {
-            SLANG_ASSERT(lanes.getCount() == 1);
-            return emitMakeVectorLaneValue(builder, lanes[0]);
+            SLANG_RELEASE_ASSERT(sources.getCount() == 1);
+            return getMakeVectorLaneValue(builder, sources[0]);
         }
 
         // When every lane comes from one vector operand, we read that operand directly, whole or
         // through a swizzle of it. Rebuilding it lane by lane would leave `uint2(v.x, v.y)` in
         // place of `v`, and nothing folds that back.
-        if (auto soleOperand = findSoleVectorOperand(lanes))
+        if (auto soleOperand = findSoleVectorOperand(sources))
         {
             bool isIdentity = soleOperand->getDataType() == resultType;
-            for (Index i = 0; isIdentity && i < lanes.getCount(); i++)
-                isIdentity = lanes[i].elementIndex == i;
+            for (Index i = 0; isIdentity && i < sources.getCount(); i++)
+                isIdentity = sources[i].indexInOperand == i;
             if (isIdentity)
                 return soleOperand;
 
             ShortList<IRInst*, 4> indices;
-            for (auto lane : lanes)
-                indices.add(builder.getIntValue(builder.getIntType(), lane.elementIndex));
+            for (auto source : sources)
+                indices.add(builder.getIntValue(builder.getIntType(), source.indexInOperand));
             return builder.emitSwizzle(
                 resultType,
                 soleOperand,
@@ -436,8 +445,8 @@ struct PeepholeContext : InstPassBase
         }
 
         ShortList<IRInst*, 4> vals;
-        for (auto lane : lanes)
-            vals.add(emitMakeVectorLaneValue(builder, lane));
+        for (auto source : sources)
+            vals.add(getMakeVectorLaneValue(builder, source));
         return builder.emitMakeVector(
             resultType,
             (UInt)vals.getCount(),
@@ -1053,13 +1062,13 @@ struct PeepholeContext : InstPassBase
                 auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
                 if (!index)
                     break;
-                auto lane = findMakeVectorLane(inst->getOperand(0), index->getValue());
-                if (!lane.operand)
+                auto source = findMakeVectorLaneSource(inst->getOperand(0), index->getValue());
+                if (!source.isResolved())
                     break;
                 IRBuilder builder(module);
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
-                inst->replaceUsesWith(emitMakeVectorLaneValue(builder, lane));
+                inst->replaceUsesWith(getMakeVectorLaneValue(builder, source));
                 maybeRemoveOldInst(inst);
                 changed = true;
             }
