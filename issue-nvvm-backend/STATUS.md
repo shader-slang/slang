@@ -1,10 +1,10 @@
 # NVVM current status
 
-The core bit/classification migration is accepted after core math. Seven bit transport/conversion
-spellings and three classification families now use core casts, masks and assignments. Nine backend
-recipe kinds and numeric IS_NAN 67 are retired. The preceding math batch moved thirteen public
-operations to named libdevice calls and composed sincos/mad in core. Module 43, provider ABI 46 and
-container format 2 remain unchanged.
+The combined values/clock/atomic migration has **qualified local acceptance with one inherited
+failure**. Core abs/min/max/sign, two named clocks, nine atomic reduction families and two ByteAddress
+helpers replace their CUDA-text/tag paths. Four numeric IDs and thirteen semantic tags are retired;
+wave MIN43/MAX44 remain. Unsigned abs, integer sign, shared integer reductions and integer64 reduction
+increment/decrement gain canonical paths. Module 43, provider ABI 46 and container 2 remain unchanged.
 
 **Continue under the accelerated workflow authorized on 2026-09-30.** Use eight build jobs,
 larger related intrinsic batches, focused compile/PTX checks and no routine module-version bumps.
@@ -15,33 +15,36 @@ removal of CUDA-string recognizers. No push, Slack or system changes. Preserve t
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-core-bits/`; plans and reports remain uncommitted.
+`build/nvvm-core-values/`; plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
 | Evidence | Result |
 | --- | --- |
-| Build | Eight-job incremental build passed in 317 seconds |
-| Focused units | 6 pass, including retired numeric/text rejection before output mutation |
-| Shader smoke | 11 CUDA cases and 1 PTX file check pass across four small fixtures |
-| Material PTX | One representative material compiled and assembled through NVVM O3 |
-| Test time | About 20 seconds for units and shader smoke combined |
-| Last full / targeted / implementations since full | log-family / core-bits / 2 |
-| Historical evidence | Full baseline/identity unchanged; all 28 earlier feature objects preserved |
+| Build | Eight-job production build passed in 301 seconds; test builds took 23 and 19 seconds |
+| Focused units | 13 pass: ten initial results reused, three corrected/new checks passed |
+| CUDA smoke | 22 pass, 1 inherited downstream failure; 18 non-CUDA cases excluded |
+| Failure | Signed16 abs(INT_MIN) at O3; exact active test remains failing |
+| Diagnostic | Correct i16 LLVM; equivalent old select control also fails; SASS lacks signed16 normalization after IABS |
+| Last full / targeted / implementations since full | log-family / core-values-and-atomics / 3 |
+| Historical evidence | Full baseline/identity unchanged; all 29 earlier feature objects preserved |
 
-This batch had no validation failures. Exact bit transport, double word/alias order, packed Half
-conversion edges and all-width IEEE classification have focused execution coverage. No full corpus,
-static-version, old-module or new numerical-oracle campaign ran. The prior math batch's resolved
-failures remain recorded with their original identities.
+This is not an all-pass checkpoint or publication/CI readiness. The failure returns correct low16
+bits but compares/widens the value as +32768 rather than -32768 at O3; O0 passes. General narrow-integer
+lowering remains separate from producer migration. Do not disable the test, change its expectation,
+or add a special-case abs workaround to claim success. Two stale unit expectations were corrected:
+integer/Half abs needs no fabsf call, and local atomic destinations now diagnose earlier with E41403.
+Ignored diagnostic NVRTC controls also failed narrow-select C++ overload resolution and are not passes.
+No full campaign ran; no full suite rerun follows from these focused results.
 
 ## Current tested identity
 
-Revision `2bf556480e04b1451d328a8104f82cbbc93a543a` plus compiler patch
-`5f3e4d820dafee3ba55c2c95c26b464a38f0c8eed08cf0d138484a74f97c6f70`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `690caf01988714cccd4113e78aebe714ff39fc438b6707bdb465c4907e9ddff5`.
-Provider SHA-256: `0c137803f2ffd728339e9a6d563820ebc78416e53a37fe32ca6d9a6f74dc187b`.
-The later commit does not relabel these binaries. Current source/runtime hashes and exact focused
-outcomes live in `focused-evidence.json` under `features.nvvm-core-bits`.
+Revision `4d18503346028be698054c1800ad3a0e142d6019` plus compiler patch
+`3106b1dac662315749de32c2f4e09ccaba94b165ab3d0ca831d290b28586cabd`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `2c6b63e007000d5afedeb3b4e77e245e9bbb759cd1fbb43986577731c68a74ea`.
+Provider SHA-256: `1b542e29de5338b29ade9fe4f5402933fab2bb4475a0f69d43d74fc16abbcad0`.
+The later commit does not relabel these binaries. Current source/runtime hashes, exact outcomes and
+failure history live in `focused-evidence.json` under `features.nvvm-core-values-and-atomics`.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -58,11 +61,11 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 
 ## Next action
 
-Move abs/min/max/sign and clocks together using named calls and core expressions. Preserve Half
-absolute-value bits, floating min/max selection, sign behavior and side-effecting clock observations.
-Then migrate atomic producers and wave compositions through existing canonical operations. Keep
-pointer-result frexp/modf and resource producer identity separate where their representation needs
-explicit design. Continue larger batches without routine module-version bumps.
+Migrate wave producer identities and straightforward compositions through named NVVM calls and
+existing canonical operations. Preserve convergence, explicit masks and reduction/scan combination
+order; validate the affected contracts with a compact existing runtime selection. Keep pointer-result
+frexp/modf, resource producer representation and general narrow-integer normalization as separate
+bounded design work. Continue larger batches without routine module-version bumps.
 
 ## Retained boundaries
 

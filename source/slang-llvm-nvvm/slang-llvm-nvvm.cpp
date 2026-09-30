@@ -1935,26 +1935,6 @@ static SlangResult _emitIntrinsic(
         operation.operandTypes[1].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
     switch (operation.operation)
     {
-    case SLANG_NVVM_VALUE_OP_CLOCK:
-    case SLANG_NVVM_VALUE_OP_CLOCK64:
-        {
-            if (argumentCount != 0)
-                return SLANG_E_INVALID_ARG;
-            // Preserve every observation of the changing per-SM counter. Consider two clock64()
-            // reads around clock(): libNVVM 12.9 commons LLVM clock intrinsics even at O0, and
-            // hoists loop reads at O3. Side-effecting PTX retains these observations without
-            // promising a memory fence, synchronized lanes, or cross-SM time.
-            const bool is64Bit = operation.operation == SLANG_NVVM_VALUE_OP_CLOCK64;
-            llvm::Type* resultType = is64Bit ? llvm::Type::getInt64Ty(state->context) : int32Type;
-            llvm::FunctionType* functionType = llvm::FunctionType::get(resultType, false);
-            llvm::InlineAsm* assembly = llvm::InlineAsm::get(
-                functionType,
-                is64Bit ? "mov.u64 $0, %clock64;" : "mov.u32 $0, %clock;",
-                is64Bit ? "=l" : "=r",
-                true);
-            *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(assembly));
-            return SLANG_OK;
-        }
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
         {
             if (argumentCount != 0)
@@ -3397,6 +3377,13 @@ static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID)
     }
 }
 
+// Clock reads are changing observations, unlike the invariant execution-register reads above.
+static bool _isClockIntrinsic(llvm::Intrinsic::ID id)
+{
+    return id == llvm::Intrinsic::nvvm_read_ptx_sreg_clock ||
+           id == llvm::Intrinsic::nvvm_read_ptx_sreg_clock64;
+}
+
 static llvm::Type* _getSemanticLLVMType(
     llvm::LLVMContext& context,
     const SlangNVVMValueTypeDesc& type);
@@ -3427,7 +3414,7 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
     auto id = llvm::Function::lookupIntrinsicID(name);
     if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::getBaseName(id) != name ||
         (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id) &&
-         !_isIntegerBitIntrinsic(id) && id != llvm::Intrinsic::sqrt))
+         !_isIntegerBitIntrinsic(id) && !_isClockIntrinsic(id) && id != llvm::Intrinsic::sqrt))
         return llvm::Intrinsic::not_intrinsic;
 
     const bool isSqrt = id == llvm::Intrinsic::sqrt;
@@ -3436,7 +3423,7 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
                                   result.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
                                  result.laneCount == 1;
     if ((isSqrt && !_isScalarFloat32Or64Type(result)) ||
-        (_isIntegerBitIntrinsic(id) && !isIntegerResult) ||
+        ((_isIntegerBitIntrinsic(id) || _isClockIntrinsic(id)) && !isIntegerResult) ||
         (_isExecutionRegisterIntrinsic(id) && (!isIntegerResult || result.bitWidth != 32)) ||
         (_isSynchronizationIntrinsic(id) &&
          !Slang::NVVMSemantics::areSameType(result, Slang::NVVMSemantics::kVoid)))
@@ -3502,6 +3489,21 @@ _isNamedIntrinsicSupported(const SlangNVVMNamedIntrinsicDesc* intrinsic, uint32_
     return SLANG_OK;
 }
 
+// Preserve distinct per-SM observations after the named signature has passed LLVM registry checks.
+// libNVVM 12.9 commons plain LLVM clock reads at O0 and hoists loop reads at O3. This
+// side-effecting PTX preserves observations without promising a memory fence, synchronized lanes or
+// cross-SM time.
+static llvm::Value* _emitClockObservation(ModuleState* state, llvm::FunctionType* type)
+{
+    const bool is64Bit = type->getReturnType()->isIntegerTy(64);
+    auto assembly = llvm::InlineAsm::get(
+        type,
+        is64Bit ? "mov.u64 $0, %clock64;" : "mov.u32 $0, %clock;",
+        is64Bit ? "=l" : "=r",
+        true);
+    return state->builder.CreateCall(assembly);
+}
+
 static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     SlangNVVMModuleHandle module,
     const SlangNVVMNamedIntrinsicDesc* intrinsic,
@@ -3540,6 +3542,11 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
             function->getIntrinsicID() != id)
             return SLANG_E_INVALID_ARG;
     }
+    if (_isClockIntrinsic(id))
+    {
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(_emitClockObservation(state, type));
+        return SLANG_OK;
+    }
     auto declaration = llvm::Intrinsic::getDeclaration(state->module.get(), id, overloadTypes);
     auto call = state->builder.CreateCall(declaration, values);
     if (!call->getType()->isVoidTy())
@@ -3571,7 +3578,9 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
         name != "__nv_pow" && name != "__nv_tanf" && name != "__nv_tan" && name != "__nv_sinhf" &&
         name != "__nv_sinh" && name != "__nv_coshf" && name != "__nv_cosh" &&
         name != "__nv_tanhf" && name != "__nv_tanh" && name != "__nv_fmaf" && name != "__nv_fma" &&
-        name != "__nv_fmodf" && name != "__nv_fmod")
+        name != "__nv_fmodf" && name != "__nv_fmod" && name != "__nv_fabsf" &&
+        name != "__nv_fabs" && name != "__nv_fminf" && name != "__nv_fmin" &&
+        name != "__nv_fmaxf" && name != "__nv_fmax")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3680,16 +3689,6 @@ static const char* _getLibdeviceFunctionName(
     const bool isFloat64 = bitWidth == 64;
     if (!isFloat32 && !isFloat64)
         return nullptr;
-    if (operandCount == 1)
-    {
-        switch (operation)
-        {
-        case SLANG_NVVM_VALUE_OP_ABS:
-            return isFloat32 ? "__nv_fabsf" : "__nv_fabs";
-        default:
-            return nullptr;
-        }
-    }
     if (operandCount == 2)
     {
         switch (operation)
@@ -3957,8 +3956,6 @@ static SlangResult _emitCatalogOperation(
 
     switch (entry.operation)
     {
-    case SLANG_NVVM_VALUE_OP_CLOCK:
-    case SLANG_NVVM_VALUE_OP_CLOCK64:
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
@@ -4267,22 +4264,9 @@ static SlangResult _emitValueOperationFamily(
     switch (family)
     {
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerUnary:
-        if (operation.operation == SLANG_NVVM_VALUE_OP_ABS)
-        {
-            llvm::Value* isNegative = state->builder.CreateICmpSLT(
-                llvmOperands[0],
-                llvm::ConstantInt::get(resultType, 0));
-            result = state->builder.CreateSelect(
-                isNegative,
-                state->builder.CreateNeg(llvmOperands[0]),
-                llvmOperands[0]);
-        }
-        else
-        {
-            result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT
-                         ? state->builder.CreateNot(llvmOperands[0])
-                         : state->builder.CreateNeg(llvmOperands[0]);
-        }
+        result = operation.operation == SLANG_NVVM_VALUE_OP_BIT_NOT
+                     ? state->builder.CreateNot(llvmOperands[0])
+                     : state->builder.CreateNeg(llvmOperands[0]);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerBit:
         {
@@ -4392,27 +4376,10 @@ static SlangResult _emitValueOperationFamily(
         }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatUnary:
-        if (operation.operation == SLANG_NVVM_VALUE_OP_NEGATE)
-        {
-            // LLVM 14 prints `fneg`, which libNVVM's LLVM 7 reader cannot parse. Use the equivalent
-            // typed subtraction directly so scalar/vector Half and Float negation need no fragile
-            // text-level type reconstruction in the NVVM IR 2.0 serializer.
-            result = state->builder.CreateFSub(
-                llvm::ConstantFP::getNegativeZero(resultType),
-                llvmOperands[0]);
-        }
-        else if (
-            operation.operation == SLANG_NVVM_VALUE_OP_ABS && operation.resultType.bitWidth == 16)
-        {
-            llvm::Type* int16Type = llvm::Type::getInt16Ty(state->context);
-            llvm::Value* bits = state->builder.CreateBitCast(llvmOperands[0], int16Type);
-            bits = state->builder.CreateAnd(bits, llvm::ConstantInt::get(int16Type, 0x7fff));
-            result = state->builder.CreateBitCast(bits, resultType);
-        }
-        else
-        {
-            return _emitLibdeviceOperation(module, operation, operands, outValue);
-        }
+        // LLVM 14 prints fneg, which libNVVM's LLVM 7 reader cannot parse.
+        result = state->builder.CreateFSub(
+            llvm::ConstantFP::getNegativeZero(resultType),
+            llvmOperands[0]);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatBinary:
         switch (operation.operation)
@@ -4438,16 +4405,6 @@ static SlangResult _emitValueOperationFamily(
             return _emitLibdeviceOperation(module, operation, operands, outValue);
         default:
             return SLANG_E_INVALID_ARG;
-        }
-        break;
-    case Slang::NVVMSemantics::ValueOperationFamily::FloatSign:
-        {
-            llvm::Value* zero = llvm::ConstantFP::get(llvmOperands[0]->getType(), 0.0);
-            llvm::Value* positive = state->builder.CreateFCmpOGT(llvmOperands[0], zero);
-            llvm::Value* negative = state->builder.CreateFCmpOLT(llvmOperands[0], zero);
-            result = state->builder.CreateSub(
-                state->builder.CreateZExt(positive, resultType),
-                state->builder.CreateZExt(negative, resultType));
         }
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerCompare:

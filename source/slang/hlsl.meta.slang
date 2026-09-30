@@ -5918,7 +5918,8 @@ void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceAdd) "__slang_atomic_reduce_add($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+    case nvvm:
     default: __atomic_add(val, value, order);
     }
 }
@@ -5958,7 +5959,8 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceSubtract) "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+    case nvvm:
     default: __atomic_sub(val, value, order);
     }
 }
@@ -5974,7 +5976,8 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceMin) "__slang_atomic_reduce_min($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+    case nvvm:
     default: __atomic_min(val, value, order);
     }
 }
@@ -5990,7 +5993,8 @@ void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceMax) "__slang_atomic_reduce_max($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+    case nvvm:
     default: __atomic_max(val, value, order);
     }
 }
@@ -6006,7 +6010,8 @@ void __atomic_reduce_and<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceBitAnd) "__slang_atomic_reduce_and($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+    case nvvm:
     default: __atomic_and(val, value, order);
     }
 }
@@ -6022,7 +6027,8 @@ void __atomic_reduce_or<T>(__ref T val, T value, MemoryOrder order = MemoryOrder
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceBitOr) "__slang_atomic_reduce_or($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+    case nvvm:
     default: __atomic_or(val, value, order);
     }
 }
@@ -6038,7 +6044,8 @@ void __atomic_reduce_xor<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceBitXor) "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+    case nvvm:
     default: __atomic_xor(val, value, order);
     }
 }
@@ -6053,7 +6060,11 @@ void __atomic_reduce_inc<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceIncrement) "__slang_atomic_reduce_inc($0, (int)$1)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
+    case nvvm:
+        static_assert(__isInt<T>(), "NVVM atomic increment/decrement requires an integer type.");
+        __atomic_increment(val, order);
+        return;
     default: __atomic_increment(val);
     }
 }
@@ -6068,7 +6079,11 @@ void __atomic_reduce_dec<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm(nvvmAtomicReduceDecrement) "__slang_atomic_reduce_dec($0, (int)$1)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
+    case nvvm:
+        static_assert(__isInt<T>(), "NVVM atomic increment/decrement requires an integer type.");
+        __atomic_decrement(val, order);
+        return;
     default: __atomic_decrement(val);
     }
 }
@@ -6719,6 +6734,7 @@ $}
         {
         case hlsl: __intrinsic_asm "($3 = NvInterlockedAddFp32($0, $1, $2))";
         case cuda: __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))";
+        case nvvm:
         default:
             {
                 let buf = __getEquivalentStructuredBuffer<float>(this);
@@ -6914,6 +6930,7 @@ $}
         case cuda: __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))";
         case hlsl:
             __intrinsic_asm ".InterlockedCompareExchange64";
+        case nvvm:
         default:
             let buf = __getEquivalentStructuredBuffer<uint64_t>(this);
             outOriginalValue = __atomic_compare_exchange(buf[byteAddress / 8], compareValue, value);
@@ -7600,11 +7617,13 @@ T abs(T x)
 {
     __target_switch
     {
+    case nvvm:
+        return x < T(0) ? -x : x;
     case hlsl: __intrinsic_asm "abs";
     case glsl: __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
-    case cuda: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
-    case cpp: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
+    case cuda: __intrinsic_asm "$P_abs($0)";
+    case cpp: __intrinsic_asm "$P_abs($0)";
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 SAbs $x
     };
@@ -7656,11 +7675,20 @@ T abs(T x)
 {
     __target_switch
     {
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM abs requires half, float, or double.");
+        if (T is half)
+            return __realCast<T>(asfloat16(asuint16(__realCast<half>(x)) & uint16_t(0x7fffu)));
+        else if (T is float)
+            __intrinsic_asm "__nv_fabsf", x;
+        else
+            __intrinsic_asm "__nv_fabs", x;
     case hlsl: __intrinsic_asm "abs";
     case metal: __intrinsic_asm "abs";
     case glsl: __intrinsic_asm "abs";
-    case cuda: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
-    case cpp: __intrinsic_asm(nvvmAbs) "$P_abs($0)";
+    case cuda: __intrinsic_asm "$P_abs($0)";
+    case cpp: __intrinsic_asm "$P_abs($0)";
     case spirv: return spirv_asm {
         result:$$T = OpExtInst glsl450 FAbs $x;
     };
@@ -13287,12 +13315,21 @@ T __max_impl(T x, T y)
 {
     __target_switch
     {
+    case nvvm:
+        if (T is half)
+            return __builtin_cast<T>(max(__builtin_cast<float>(x), __builtin_cast<float>(y)));
+        else if (T is float)
+            __intrinsic_asm "__nv_fmaxf", x, y;
+        else if (T is double)
+            __intrinsic_asm "__nv_fmax", x, y;
+        else
+            return x > y ? x : y;
     case hlsl: __intrinsic_asm "max";
     case glsl: __intrinsic_asm "max";
     case metal: __intrinsic_asm "max";
     case wgsl: __intrinsic_asm "max";
-    case cuda: __intrinsic_asm(nvvmMax) "$P_max($0, $1)";
-    case cpp: __intrinsic_asm(nvvmMax) "$P_max($0, $1)";
+    case cuda: __intrinsic_asm "$P_max($0, $1)";
+    case cpp: __intrinsic_asm "$P_max($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm { result:$$T = OpExtInst glsl450 FMax $x $y };
@@ -13571,12 +13608,21 @@ T __min_impl(T x, T y)
 {
     __target_switch
     {
+    case nvvm:
+        if (T is half)
+            return __builtin_cast<T>(min(__builtin_cast<float>(x), __builtin_cast<float>(y)));
+        else if (T is float)
+            __intrinsic_asm "__nv_fminf", x, y;
+        else if (T is double)
+            __intrinsic_asm "__nv_fmin", x, y;
+        else
+            return x < y ? x : y;
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
     case wgsl: __intrinsic_asm "min";
-    case cuda: __intrinsic_asm(nvvmMin) "$P_min($0, $1)";
-    case cpp: __intrinsic_asm(nvvmMin) "$P_min($0, $1)";
+    case cuda: __intrinsic_asm "$P_min($0, $1)";
+    case cpp: __intrinsic_asm "$P_min($0, $1)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm { result:$$T = OpExtInst glsl450 FMin $x $y };
@@ -15304,12 +15350,17 @@ int sign(T x)
 {
     __target_switch
     {
+    case nvvm:
+        if (T is half)
+            return sign(__builtin_cast<float>(x));
+        else
+            return int(x > T(0)) - int(x < T(0));
     case hlsl: __intrinsic_asm "sign";
     case metal: __intrinsic_asm "int(sign($0))";
     case glsl: __intrinsic_asm "int(sign($0))";
     case cuda:
     case cpp:
-        __intrinsic_asm(nvvmSign) "$P_sign($0)";
+        __intrinsic_asm "$P_sign($0)";
     case spirv:
         if (__isFloat<T>())
             return spirv_asm
@@ -26875,6 +26926,8 @@ uint getRealtimeClockLow()
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.read.ptx.sreg.clock";
     case hlsl:
         __intrinsic_asm "NvGetSpecial( NV_SPECIALOP_GLOBAL_TIMER_LO)";
     case glsl:
@@ -26894,6 +26947,8 @@ int64_t __cudaCppGetRealtimeClock()
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.read.ptx.sreg.clock64";
     case cpp: __intrinsic_asm "std::chrono::high_resolution_clock::now().time_since_epoch().count()";
     case cuda: __intrinsic_asm "clock64";
     }

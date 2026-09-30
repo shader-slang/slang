@@ -7745,7 +7745,7 @@ SLANG_UNIT_TEST(nvvmSlangCommonSharedAtomicAlgebraUsesOneTypedInterface)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-SLANG_UNIT_TEST(nvvmSlangAtomicReductionsUseGlobalHelperReferences)
+SLANG_UNIT_TEST(nvvmSlangAtomicReductionsUseCanonicalOperations)
 {
     _resetDirectNVVMFakes();
     {
@@ -7797,13 +7797,13 @@ SLANG_UNIT_TEST(nvvmSlangAtomicReductionsUseGlobalHelperReferences)
         SLANG_CHECK(sawFloat32Add);
         SLANG_CHECK(sawFloat64Add);
         SLANG_CHECK(sawHalf2Add);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerAddressSpaceCastCallCount == 8);
+        SLANG_CHECK(gFakeNVVMBuilder.emitPointerAddressSpaceCastCallCount == 0);
         for (const FakeNVVMBuilderValueRef& pointer :
              gFakeNVVMBuilder.atomicOperationPointerValueRefs)
         {
-            SLANG_CHECK(pointer.kind == FakeNVVMBuilderValueKind::PointerAddressSpaceCast);
+            SLANG_CHECK(pointer.kind == FakeNVVMBuilderValueKind::PointerOffset);
         }
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -8297,54 +8297,18 @@ SLANG_UNIT_TEST(nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        uint32_t integerMinimumCount = 0;
-        uint32_t integerMaximumCount = 0;
-        uint32_t float32MinimumCount = 0;
-        uint32_t float32MaximumCount = 0;
-        uint32_t float64MinimumCount = 0;
-        uint32_t float64MaximumCount = 0;
+        for (const char* name : {"__nv_fminf", "__nv_fmaxf", "__nv_fmin", "__nv_fmax"})
+            SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains(name));
+        bool sawIntegerCompare = false;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
-            if (operation.key.operation != SLANG_NVVM_VALUE_OP_MIN &&
-                operation.key.operation != SLANG_NVVM_VALUE_OP_MAX)
-            {
-                continue;
-            }
-            SLANG_CHECK(operation.operandCount == 2);
-            SLANG_CHECK(
-                NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]));
-            SLANG_CHECK(
-                NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[1]));
-            if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
-            {
-                SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::FloatingBinary);
-                uint32_t* count = nullptr;
-                if (operation.resultType.bitWidth == 32)
-                    count = operation.key.operation == SLANG_NVVM_VALUE_OP_MIN
-                                ? &float32MinimumCount
-                                : &float32MaximumCount;
-                else if (operation.resultType.bitWidth == 64)
-                    count = operation.key.operation == SLANG_NVVM_VALUE_OP_MIN
-                                ? &float64MinimumCount
-                                : &float64MaximumCount;
-                SLANG_CHECK_ABORT(count != nullptr);
-                ++*count;
-            }
-            else
-            {
-                SLANG_CHECK(operation.key.family == FakeNVVMBuilderScalarFamily::Binary);
-                if (operation.key.operation == SLANG_NVVM_VALUE_OP_MIN)
-                    ++integerMinimumCount;
-                else
-                    ++integerMaximumCount;
-            }
+            SLANG_CHECK(operation.key.operation != SLANG_NVVM_VALUE_OP_MIN);
+            SLANG_CHECK(operation.key.operation != SLANG_NVVM_VALUE_OP_MAX);
+            sawIntegerCompare |=
+                operation.key.family == FakeNVVMBuilderScalarFamily::Compare &&
+                NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kSignedI32);
         }
-        SLANG_CHECK(integerMinimumCount == 1);
-        SLANG_CHECK(integerMaximumCount == 1);
-        SLANG_CHECK(float32MinimumCount == 1);
-        SLANG_CHECK(float32MaximumCount == 1);
-        SLANG_CHECK(float64MinimumCount == 1);
-        SLANG_CHECK(float64MaximumCount == 1);
+        SLANG_CHECK(sawIntegerCompare);
         SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
@@ -8641,13 +8605,14 @@ SLANG_UNIT_TEST(nvvmSlangScalarMathHelpersRequestTypedOperations)
             if (operation.key.operation < SLANG_NVVM_VALUE_OPERATION_COUNT)
                 ++operationCounts[operation.key.operation];
         }
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_ABS] == 2);
+        SLANG_CHECK(operationCounts[49] == 0);
+        SLANG_CHECK(!gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fabsf"));
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_tan"));
         SLANG_CHECK(operationCounts[66] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_pow"));
         SLANG_CHECK(operationCounts[63] == 0);
         SLANG_CHECK(operationCounts[67] == 0);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SIGN] == 1);
+        SLANG_CHECK(operationCounts[68] == 0);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
@@ -8740,9 +8705,11 @@ SLANG_UNIT_TEST(nvvmSlangScalarIntrinsicHelpersUseTypedRecipes)
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FREXP_EXPONENT] == 3);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MODF_FRACTION] == 1);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MODF_INTEGRAL] == 1);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MIN] >= 1);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MAX] >= 1);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SIGN] >= 1);
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MIN] == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fminf"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmaxf"));
+        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MAX] == 0);
+        SLANG_CHECK(operationCounts[68] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_sinhf"));
         SLANG_CHECK(operationCounts[73] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_coshf"));
@@ -10584,7 +10551,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedSurfaceSignatureSource, "'GenericAsm assembly="},
         {kDirectNVVMLogicalNotSource, "'entry-point parameter'"},
         {kDirectNVVMAcquireGlobalI32AtomicAddSource, "'atomicAdd'"},
-        {kDirectNVVMUnsupportedLocalAtomicReductionSource, "'atomic reduction global reference'"},
         {kDirectNVVMPointerEqualSource, "'cmpEQ'"},
         {kDirectNVVMPointerNotEqualSource, "'cmpNE'"},
         {kDirectNVVMPointerGreaterThanSource, "'cmpGT'"},
@@ -13305,4 +13271,135 @@ SLANG_UNIT_TEST(nvvmSlangCoreBitsLegacyTextRejectsBeforeOutput)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
+}
+
+SLANG_UNIT_TEST(nvvmSlangCoreValuesLegacyRoutesRejectBeforeOutput)
+{
+    struct LegacyCase
+    {
+        const char* declaration;
+        const char* use;
+    };
+    const LegacyCase cases[] = {
+        {R"slang(float old(float x) { __intrinsic_asm "$P_abs($0)"; })slang",
+         "words[1]=asuint(old(asfloat(words[0])));"},
+        {R"slang(int old(float x) { __intrinsic_asm "$P_sign($0)"; })slang",
+         "words[1]=uint(old(asfloat(words[0])));"},
+        {R"slang(float old(float x,float y) { __intrinsic_asm "$P_min($0, $1)"; })slang",
+         "words[1]=asuint(old(asfloat(words[0]),asfloat(words[1])));"},
+        {R"slang(float old(float x,float y) { __intrinsic_asm "$P_max($0, $1)"; })slang",
+         "words[1]=asuint(old(asfloat(words[0]),asfloat(words[1])));"},
+        {R"slang(uint old() { __intrinsic_asm "clock"; })slang", "words[0]=old();"},
+        {R"slang(int64_t old() { __intrinsic_asm "clock64"; })slang", "words[0]=uint(old());"},
+        {R"slang(float old(float x) { __intrinsic_asm(nvvmAbs) "$P_abs($0)"; })slang",
+         "words[1]=asuint(old(asfloat(words[0])));"},
+        {R"slang(int old(float x) { __intrinsic_asm(nvvmSign) "$P_sign($0)"; })slang",
+         "words[1]=uint(old(asfloat(words[0])));"},
+        {R"slang(float old(float x,float y) { __intrinsic_asm(nvvmMin) "$P_min($0, $1)"; })slang",
+         "words[1]=asuint(old(asfloat(words[0]),asfloat(words[1])));"},
+        {R"slang(float old(float x,float y) { __intrinsic_asm(nvvmMax) "$P_max($0, $1)"; })slang",
+         "words[1]=asuint(old(asfloat(words[0]),asfloat(words[1])));"},
+    };
+    List<String> sources;
+    sources.add(R"slang(
+        void old(RWByteAddressBuffer b, uint offset, float value, out float previous)
+        { __intrinsic_asm "(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))"; }
+        RWByteAddressBuffer buffer;
+        [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
+        { float previous; old(buffer, words[0], asfloat(words[1]), previous); words[2]=asuint(previous); }
+    )slang");
+    sources.add(R"slang(
+        void old(RWByteAddressBuffer b, uint offset, uint64_t expected, uint64_t desired, out uint64_t previous)
+        { __intrinsic_asm "(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))"; }
+        RWByteAddressBuffer buffer;
+        [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
+        { uint64_t previous; old(buffer, words[0], uint64_t(words[1]), uint64_t(words[2]), previous); words[3]=uint(previous); }
+    )slang");
+    for (const auto& testCase : cases)
+    {
+        StringBuilder source;
+        source << testCase.declaration << " [CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << testCase.use << " }";
+        sources.add(source.produceString());
+    }
+    for (const char* operation :
+         {"Add", "Subtract", "Min", "Max", "BitAnd", "BitOr", "BitXor", "Increment", "Decrement"})
+    {
+        StringBuilder source;
+        source << "void old(inout uint x, uint y) { __intrinsic_asm(nvvmAtomicReduce" << operation
+               << ") \"legacy atomic reduction\"; } [CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+                  "old(words[0], words[1]); }";
+        sources.add(source.produceString());
+    }
+    for (const auto& source : sources)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangAtomicReductionProducersRejectInvalidInputs)
+{
+    for (const char* call :
+         {"__atomic_reduce_inc(*words, MemoryOrder::Acquire);",
+          "__atomic_reduce_dec(*words, MemoryOrder::Acquire);",
+          "__atomic_reduce_inc(*words);",
+          "__atomic_reduce_dec(*words);"})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        const bool nonRelaxed = String(call).contains("Acquire");
+        StringBuilder source;
+        source << "[CUDAKernel] void computeMain(uniform Ptr<" << (nonRelaxed ? "uint" : "float")
+               << ", Access::ReadWrite, AddressSpace::Device> words) { " << call << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(!code);
+        const String text = _getBlobText(diagnostics);
+        SLANG_CHECK(text.contains(
+            nonRelaxed ? (String(call).contains("inc") ? "atomicInc" : "atomicDec")
+                       : "requires an integer type"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangLocalAtomicReductionRejectsAtProducer)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    session->setSharedLibraryLoader(loader);
+    ComPtr<slang::IBlob> code, diagnostics;
+    SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+        session,
+        kDirectNVVMUnsupportedLocalAtomicReductionSource,
+        code,
+        diagnostics)));
+    SLANG_CHECK(!code);
+    SLANG_CHECK(_getBlobText(diagnostics).contains("E41403"));
+    SLANG_CHECK(_getBlobText(diagnostics).contains("invalid atomic destination"));
+    SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
+    SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
 }

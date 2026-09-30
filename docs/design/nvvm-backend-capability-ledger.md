@@ -48,7 +48,8 @@ Core execution helpers and varying-parameter legalization use named
 `llvm.nvvm.read.ptx.sreg.*` intrinsics for all twelve thread/block/grid coordinates.
 The named-intrinsic boundary admits zero-argument scalar i32 register reads, the three void
 barrier/fence operations described below, and scalar integer `llvm.ctpop`, `llvm.bitreverse`,
-`llvm.ctlz` and `llvm.cttz`, and scalar Float32/Float64 `llvm.sqrt`. It does not admit arbitrary LLVM
+`llvm.ctlz` and `llvm.cttz`, scalar Float32/Float64 `llvm.sqrt`, and zero-operand
+`llvm.nvvm.read.ptx.sreg.clock`/`clock64` signatures. It does not admit arbitrary LLVM
 assembly. ABI 46 carries explicit ordinary `__intrinsic_asm` operands; pure provider queries validate LLVM registry signatures and
 immediate-constant requirements before module creation. Actual emission separately validates value
 handles and rejects conflicting symbols without mutation. CUDA source and NVRTC retain CUDA target
@@ -226,6 +227,28 @@ bits, zero-extension after packing, asymmetric double word order, aliased out st
 floating widths' zero/subnormal/finite/infinity/NaN classifications. NaN numerical conversions check
 classification only; raw bit transport checks exact bits. Existing Half value/narrowing and vector
 classification fixtures cover the shared operations. Current focused acceptance remains in STATUS.
+
+Public abs/min/max/sign now use core bit operations, comparisons and selected fabs/fmin/fmax
+library calls. Half abs preserves raw NaN payloads, signed abs emits wrapping INT_MIN semantics, and sign
+maps NaNs and both zeros to zero. Unsigned abs and signed integer sign are new support. The compact
+[core values fixture](../../tests/cuda/nvvm-core-values.slang) checks runtime-loaded integer edges,
+Half quiet/signaling NaN abs, zero and NaN sign, shared integer reductions and shared/global 64-bit
+inc/dec wrap under NVVM O0/O3. Its O0 cell passes; its active O3 cell fails the signed16 INT_MIN
+abs comparison on CUDA 12.9. Correct i16 LLVM and an old-style select control both lower to an
+`abs.s16` result whose subsequent wide machine comparison lacks signed16 normalization. The exact
+expected result and failure remain active; this migration is accepted with that known downstream
+limitation, not qualified as fully passing or CI-ready. Named provider units cover all six library
+signatures; raw IDs 49/68
+and 80/81 and retired source routes reject. Numeric MIN/MAX remains for canonical wave consumers.
+
+Both public atomic reduction APIs now produce canonical Atomic IR. Their existing Relaxed-only
+memory-order and pointer admission is unchanged; HLSL inc/dec explicitly forwards order and rejects
+floating inputs. Shared integer reductions and 64-bit inc/dec are newly exposed through that same
+contract. The existing integer/float/Half reduction fixtures and Float32 ByteAddress add/UInt64 CAS
+fixtures cover existing behavior. ByteAddress typed views require naturally aligned offsets.
+Named clock signatures retain side-effecting PTX and the existing
+[clock observations fixture](../../tests/cuda/nvvm-clock-observations.slang); they do not become
+readnone LLVM calls. Current focused results and compiler identity remain owned by STATUS.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

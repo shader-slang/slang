@@ -3446,14 +3446,8 @@ struct NVVMGenericAsmOperationSpelling
 // directly supported signature and a compiler-owned legalization recipe select from this table;
 // neither path parses placeholders or reconstructs the source intrinsic name.
 static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[] = {
-    {"$P_min($0, $1)", SLANG_NVVM_VALUE_OP_MIN, 2},
-    {"$P_max($0, $1)", SLANG_NVVM_VALUE_OP_MAX, 2},
-    {"$P_abs($0)", SLANG_NVVM_VALUE_OP_ABS, 1},
-    {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
     {"__ballot_sync($0, $1)", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT, 2},
     {"_slang_vector_dot", SLANG_NVVM_VALUE_OP_BFLOAT16_DOT, 2},
-    {"clock", SLANG_NVVM_VALUE_OP_CLOCK, 0},
-    {"clock64", SLANG_NVVM_VALUE_OP_CLOCK64, 0},
 };
 
 const NVVMGenericAsmOperationSpelling* _findNVVMGenericAsmOperationSpelling(
@@ -3636,7 +3630,6 @@ void _setNVVMValueRecipeStep(
 enum class NVVMScalarIntrinsicRecipeKind
 {
     None,
-    PromotedHalfValue,
     Frexp,
     FrexpHalf,
     ModfHalf,
@@ -3708,85 +3701,6 @@ bool _appendNVVMScalarIntrinsicUnaryStep(
         diagnosticName);
 }
 
-// Resolves the promoted-Half recipe from producer-owned semantic identity. The ordinary CUDA
-// spelling is intentionally unavailable after NVVM legalization; the complete helper signature
-// still proves whether the operation needs Float32 promotion.
-bool _resolveNVVMTaggedScalarIntrinsicRecipe(
-    IRNVVMIntrinsic* intrinsic,
-    IRFunc* function,
-    NVVMScalarIntrinsicRecipe& outRecipe)
-{
-    outRecipe = {};
-    if (!_isCanonicalNVVMIntrinsicValueHelper(intrinsic, function) ||
-        intrinsic->getOperandCount() != 1 || function->getParamCount() == 0 ||
-        function->getParamCount() > SLANG_COUNT_OF(outRecipe.parameters) ||
-        !_getNVVMSemanticType(function->getResultType(), outRecipe.resultType))
-    {
-        return false;
-    }
-    auto semantic = as<IRIntLit>(intrinsic->getOperand(0));
-    if (!semantic || semantic->getValue() < 0 ||
-        semantic->getValue() >= SLANG_NVVM_VALUE_OPERATION_COUNT)
-        return false;
-    const auto operation = SlangNVVMValueOperation(semantic->getValue());
-
-    IRParam* parameter = function->getFirstParam();
-    for (uint32_t i = 0; i < function->getParamCount(); ++i)
-    {
-        if (!parameter ||
-            !_getNVVMSemanticType(parameter->getDataType(), outRecipe.parameterTypes[i]) ||
-            !NVVMSemantics::areSameType(outRecipe.parameterTypes[i], NVVMSemantics::kFloat16))
-        {
-            return false;
-        }
-        outRecipe.parameters[i] = parameter;
-        parameter = parameter->getNextParam();
-    }
-    SLANG_ASSERT(!parameter);
-    outRecipe.parameterCount = uint32_t(function->getParamCount());
-
-    const bool returnsHalf =
-        NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kFloat16);
-    const bool returnsSign =
-        operation == SLANG_NVVM_VALUE_OP_SIGN &&
-        NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kSignedI32);
-    if (!returnsHalf && !returnsSign)
-        return false;
-
-    outRecipe.kind = NVVMScalarIntrinsicRecipeKind::PromotedHalfValue;
-    outRecipe.diagnosticName = "promoted Float16 scalar math operation";
-    if (!_appendNVVMScalarIntrinsicUnaryStep(
-            outRecipe,
-            SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
-            NVVMSemantics::kFloat32,
-            NVVMSemantics::kFloat16,
-            outRecipe.diagnosticName))
-    {
-        return false;
-    }
-    SlangNVVMValueTypeDesc promotedOperandTypes[3] = {};
-    for (uint32_t i = 0; i < outRecipe.parameterCount; ++i)
-        promotedOperandTypes[i] = NVVMSemantics::kFloat32;
-    const SlangNVVMValueTypeDesc promotedResultType =
-        returnsHalf ? NVVMSemantics::kFloat32 : NVVMSemantics::kSignedI32;
-    if (!_appendNVVMScalarIntrinsicRecipeStep(
-            outRecipe,
-            operation,
-            promotedResultType,
-            promotedOperandTypes,
-            outRecipe.parameterCount,
-            outRecipe.diagnosticName))
-    {
-        return false;
-    }
-    return !returnsHalf || _appendNVVMScalarIntrinsicUnaryStep(
-                               outRecipe,
-                               SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
-                               NVVMSemantics::kFloat16,
-                               NVVMSemantics::kFloat32,
-                               outRecipe.diagnosticName);
-}
-
 // Recognizes the remaining finalized scalar intrinsic helpers selected by the CUDA prelude. Each
 // row checks the complete linked signature, including exact out-parameter roles, before attaching
 // a typed recipe. Assembly is a bounded semantic key here, not text passed to or parsed by LLVM.
@@ -3821,63 +3735,6 @@ bool _resolveNVVMScalarIntrinsicRecipe(
     }
     SLANG_ASSERT(!parameter);
     outRecipe.parameterCount = uint32_t(function->getParamCount());
-
-    // CUDA's scalar Half math helpers have the same final intrinsic-assembly spellings as their
-    // Float32 overloads. Every Half input is represented exactly by Float32, so evaluate the
-    // already-supported Float32 semantic and narrow its floating result once. The complete helper
-    // signature above proves this is a homogeneous scalar Half overload; mixed or out-parameter
-    // shapes continue to the explicit recipes below.
-    if (const auto spelling = _findNVVMGenericAsmOperationSpelling(genericAsm->getAsm()))
-    {
-        const bool returnsHalf =
-            NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kFloat16);
-        const bool returnsSign =
-            spelling->operation == SLANG_NVVM_VALUE_OP_SIGN &&
-            NVVMSemantics::areSameType(outRecipe.resultType, NVVMSemantics::kSignedI32);
-        bool hasHomogeneousHalfInputs =
-            outRecipe.parameterCount == spelling->operandCount && outRecipe.parameterCount >= 1;
-        for (uint32_t i = 0; i < outRecipe.parameterCount; ++i)
-        {
-            hasHomogeneousHalfInputs =
-                hasHomogeneousHalfInputs && !outRecipe.parameterIsOut[i] &&
-                NVVMSemantics::areSameType(outRecipe.parameterTypes[i], NVVMSemantics::kFloat16);
-        }
-        if (hasHomogeneousHalfInputs && (returnsHalf || returnsSign))
-        {
-            outRecipe.kind = NVVMScalarIntrinsicRecipeKind::PromotedHalfValue;
-            outRecipe.diagnosticName = "promoted Float16 scalar math operation";
-            if (!_appendNVVMScalarIntrinsicUnaryStep(
-                    outRecipe,
-                    SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
-                    NVVMSemantics::kFloat32,
-                    NVVMSemantics::kFloat16,
-                    outRecipe.diagnosticName))
-            {
-                return false;
-            }
-            SlangNVVMValueTypeDesc promotedOperandTypes[3] = {};
-            for (uint32_t i = 0; i < outRecipe.parameterCount; ++i)
-                promotedOperandTypes[i] = NVVMSemantics::kFloat32;
-            const SlangNVVMValueTypeDesc promotedResultType =
-                returnsHalf ? NVVMSemantics::kFloat32 : NVVMSemantics::kSignedI32;
-            if (!_appendNVVMScalarIntrinsicRecipeStep(
-                    outRecipe,
-                    spelling->operation,
-                    promotedResultType,
-                    promotedOperandTypes,
-                    outRecipe.parameterCount,
-                    outRecipe.diagnosticName))
-            {
-                return false;
-            }
-            return !returnsHalf || _appendNVVMScalarIntrinsicUnaryStep(
-                                       outRecipe,
-                                       SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
-                                       NVVMSemantics::kFloat16,
-                                       NVVMSemantics::kFloat32,
-                                       outRecipe.diagnosticName);
-        }
-    }
 
     struct RecipeSignature
     {
@@ -5586,300 +5443,6 @@ bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
     return true;
 }
 
-struct NVVMResolvedAtomicReduction
-{
-    SlangNVVMAtomicOperationDesc desc = {};
-    IRParam* pointerParameter = nullptr;
-    IRParam* valueParameter = nullptr;
-    IRParam* orderParameter = nullptr;
-    IRType* valueIRType = nullptr;
-    NVVMValueRecipeStep valueNegation;
-    int64_t implicitValue = 0;
-    const char* diagnosticName = nullptr;
-    bool hasImplicitValue = false;
-    bool negatesValue = false;
-};
-
-struct NVVMResolvedByteAddressAtomic
-{
-    SlangNVVMAtomicOperationDesc desc = {};
-    IRParam* bufferParameter = nullptr;
-    IRParam* offsetParameter = nullptr;
-    IRParam* valueParameters[2] = {};
-    uint32_t valueCount = 0;
-    IRParam* resultPointerParameter = nullptr;
-    IRType* valueIRType = nullptr;
-    const char* diagnosticName = nullptr;
-};
-
-// Resolves the complete CUDA-prelude helper retained for byte-address Float32 add and UInt64 CAS.
-// These functions are canonical GenericAsm producers rather than core atomic instructions. Match
-// the entire body, assembly, and typed signature so emission never parses `_getPtrAt<T>` text or
-// infers a source method from a name.
-bool _resolveNVVMByteAddressAtomic(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMResolvedByteAddressAtomic& outAtomic)
-{
-    outAtomic = {};
-    IRBlock* block = function ? function->getFirstBlock() : nullptr;
-    if (!genericAsm || !block || block->getNextBlock() || genericAsm->getParent() != block ||
-        genericAsm->getOperandCount() != 1 || !as<IRVoidType>(function->getResultType()))
-    {
-        return false;
-    }
-    for (auto inst : block->getOrdinaryInsts())
-    {
-        if (inst != genericAsm)
-            return false;
-    }
-
-    const UnownedStringSlice assembly = genericAsm->getAsm();
-    const bool isFloatAdd =
-        assembly == UnownedStringSlice("(*$3 = atomicAdd($0._getPtrAt<float>($1), $2))");
-    const bool isUInt64CAS =
-        assembly == UnownedStringSlice("(*$4 = atomicCAS($0._getPtrAt<uint64_t>($1), $2, $3))");
-    if ((!isFloatAdd && !isUInt64CAS) || function->getParamCount() != (isFloatAdd ? 4u : 5u))
-    {
-        return false;
-    }
-
-    IRParam* bufferParameter = function->getFirstParam();
-    IRParam* offsetParameter = bufferParameter ? bufferParameter->getNextParam() : nullptr;
-    IRParam* firstValueParameter = offsetParameter ? offsetParameter->getNextParam() : nullptr;
-    IRParam* secondValueParameter =
-        isUInt64CAS && firstValueParameter ? firstValueParameter->getNextParam() : nullptr;
-    IRParam* resultPointerParameter =
-        isUInt64CAS ? (secondValueParameter ? secondValueParameter->getNextParam() : nullptr)
-                    : (firstValueParameter ? firstValueParameter->getNextParam() : nullptr);
-    NVVMRawBufferType bufferType;
-    IRType* valueType = firstValueParameter ? firstValueParameter->getDataType() : nullptr;
-    IRType* resultValueType = nullptr;
-    auto resultPointerType = resultPointerParameter ? asNVVMSupportedLocalNumericPointerType(
-                                                          resultPointerParameter->getDataType(),
-                                                          &resultValueType)
-                                                    : nullptr;
-    if (!bufferParameter || !offsetParameter || !firstValueParameter || !resultPointerParameter ||
-        resultPointerParameter->getNextParam() ||
-        !getNVVMSupportedRawBufferType(bufferParameter->getDataType(), bufferType) ||
-        bufferType.kind != NVVMRawBufferKind::ByteAddress ||
-        bufferType.access != NVVMBufferAccess::ReadWrite ||
-        !isNVVMUnsignedI32Type(offsetParameter->getDataType()) ||
-        (isFloatAdd && !isNVVMFloat32Type(valueType)) ||
-        (isUInt64CAS && (!secondValueParameter ||
-                         (!isNVVMSupportedIntegerScalarType(valueType) ||
-                          !isTypeEqual(secondValueParameter->getDataType(), valueType)))) ||
-        !resultPointerType || resultPointerType->getOp() != kIROp_OutParamType ||
-        !isTypeEqual(resultValueType, valueType))
-    {
-        return false;
-    }
-
-    uint32_t integerBitWidth = 0;
-    bool integerIsSigned = false;
-    if (isUInt64CAS &&
-        (!isNVVMSupportedIntegerScalarType(valueType, &integerBitWidth, &integerIsSigned) ||
-         integerBitWidth != 64 || integerIsSigned))
-    {
-        return false;
-    }
-
-    SlangNVVMValueTypeDesc semanticType = {};
-    if (!_getNVVMSemanticType(valueType, semanticType))
-        return false;
-    outAtomic.desc = {
-        isFloatAdd ? SLANG_NVVM_ATOMIC_OP_ADD : SLANG_NVVM_ATOMIC_OP_COMPARE_EXCHANGE,
-        semanticType,
-        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-        SLANG_NVVM_MEMORY_ORDER_RELAXED,
-        SLANG_NVVM_MEMORY_ORDER_RELAXED,
-    };
-    if (!NVVMSemantics::isSupported(outAtomic.desc))
-        return false;
-
-    outAtomic.bufferParameter = bufferParameter;
-    outAtomic.offsetParameter = offsetParameter;
-    outAtomic.valueParameters[0] = firstValueParameter;
-    outAtomic.valueParameters[1] = secondValueParameter;
-    outAtomic.valueCount = isFloatAdd ? 1u : 2u;
-    outAtomic.resultPointerParameter = resultPointerParameter;
-    outAtomic.valueIRType = valueType;
-    outAtomic.diagnosticName =
-        isFloatAdd ? "raw-buffer Float32 atomic add" : "raw-buffer UInt64 compare-exchange";
-    return true;
-}
-
-struct NVVMAtomicReductionSemantic
-{
-    NVVMIntrinsicSemantic semantic;
-    SlangNVVMAtomicOperation operation;
-    bool negatesValue;
-    bool hasImplicitValue;
-    int64_t implicitValue;
-    const char* diagnosticName;
-};
-
-static const NVVMAtomicReductionSemantic kNVVMAtomicReductionSemantics[] = {
-    {kNVVMIntrinsicSemanticAtomicReduceAdd,
-     SLANG_NVVM_ATOMIC_OP_ADD,
-     false,
-     false,
-     0,
-     "relaxed atomic reduction add"},
-    {kNVVMIntrinsicSemanticAtomicReduceSubtract,
-     SLANG_NVVM_ATOMIC_OP_ADD,
-     true,
-     false,
-     0,
-     "relaxed atomic reduction subtract"},
-    {kNVVMIntrinsicSemanticAtomicReduceMin,
-     SLANG_NVVM_ATOMIC_OP_MIN,
-     false,
-     false,
-     0,
-     "relaxed atomic reduction minimum"},
-    {kNVVMIntrinsicSemanticAtomicReduceMax,
-     SLANG_NVVM_ATOMIC_OP_MAX,
-     false,
-     false,
-     0,
-     "relaxed atomic reduction maximum"},
-    {kNVVMIntrinsicSemanticAtomicReduceBitAnd,
-     SLANG_NVVM_ATOMIC_OP_BIT_AND,
-     false,
-     false,
-     0,
-     "relaxed atomic reduction bitwise-and"},
-    {kNVVMIntrinsicSemanticAtomicReduceBitOr,
-     SLANG_NVVM_ATOMIC_OP_BIT_OR,
-     false,
-     false,
-     0,
-     "relaxed atomic reduction bitwise-or"},
-    {kNVVMIntrinsicSemanticAtomicReduceBitXor,
-     SLANG_NVVM_ATOMIC_OP_BIT_XOR,
-     false,
-     false,
-     0,
-     "relaxed atomic reduction bitwise-xor"},
-    {kNVVMIntrinsicSemanticAtomicReduceIncrement,
-     SLANG_NVVM_ATOMIC_OP_ADD,
-     false,
-     true,
-     1,
-     "relaxed atomic reduction increment"},
-    {kNVVMIntrinsicSemanticAtomicReduceDecrement,
-     SLANG_NVVM_ATOMIC_OP_ADD,
-     false,
-     true,
-     -1,
-     "relaxed atomic reduction decrement"},
-};
-
-// Resolves one producer-tagged atomic-reduction helper from its semantic identity and exact typed
-// signature. The helper reference is semantic; `Atomic<T>` and `T` references both point at
-// physical `T`.
-bool _resolveNVVMTaggedAtomicReduction(
-    IRNVVMIntrinsic* intrinsic,
-    IRFunc* function,
-    NVVMResolvedAtomicReduction& outReduction)
-{
-    outReduction = {};
-    if (!_isCanonicalNVVMIntrinsicValueHelper(intrinsic, function) ||
-        intrinsic->getOperandCount() != 1 || !as<IRVoidType>(function->getResultType()))
-    {
-        return false;
-    }
-
-    auto semanticValue = as<IRIntLit>(intrinsic->getOperand(0));
-    if (!semanticValue || semanticValue->getValue() < 0)
-        return false;
-    const NVVMAtomicReductionSemantic* signature = nullptr;
-    for (const auto& candidate : kNVVMAtomicReductionSemantics)
-    {
-        if (NVVMIntrinsicSemantic(semanticValue->getValue()) == candidate.semantic)
-        {
-            signature = &candidate;
-            break;
-        }
-    }
-    if (!signature)
-        return false;
-
-    const UInt expectedParameterCount = signature->hasImplicitValue ? 2 : 3;
-    if (function->getParamCount() != expectedParameterCount)
-        return false;
-    IRParam* pointerParameter = function->getFirstParam();
-    IRType* referenceValueType = nullptr;
-    auto referenceType = pointerParameter ? asNVVMSupportedHelperReferencePointerType(
-                                                pointerParameter->getDataType(),
-                                                &referenceValueType)
-                                          : nullptr;
-    if (!referenceType || referenceType->getOp() != kIROp_RefParamType)
-        return false;
-
-    IRType* physicalValueType = nullptr;
-    if (!asNVVMSupportedAtomicType(referenceValueType, &physicalValueType))
-        physicalValueType = referenceValueType;
-    SlangNVVMValueTypeDesc valueType = {};
-    if (!_getNVVMSemanticType(physicalValueType, valueType))
-        return false;
-
-    IRParam* valueParameter =
-        signature->hasImplicitValue ? nullptr : pointerParameter->getNextParam();
-    IRParam* orderParameter = signature->hasImplicitValue ? pointerParameter->getNextParam()
-                                                          : valueParameter->getNextParam();
-    if ((!signature->hasImplicitValue &&
-         (!valueParameter || !isTypeEqual(valueParameter->getDataType(), physicalValueType))) ||
-        !orderParameter || !isNVVMSignedI32Type(orderParameter->getDataType()) ||
-        orderParameter->getNextParam())
-    {
-        return false;
-    }
-
-    if (signature->hasImplicitValue &&
-        (!(valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
-           valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) ||
-         valueType.bitWidth != 32 || valueType.laneCount != 1))
-    {
-        return false;
-    }
-
-    outReduction.desc = {
-        signature->operation,
-        valueType,
-        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-        SLANG_NVVM_MEMORY_ORDER_RELAXED,
-    };
-    if (!NVVMSemantics::isSupported(outReduction.desc))
-        return false;
-
-    if (signature->negatesValue)
-    {
-        const SlangNVVMValueTypeDesc operandTypes[] = {valueType};
-        if (!_setNVVMSupportedValueRecipeStep(
-                outReduction.valueNegation,
-                SLANG_NVVM_VALUE_OP_NEGATE,
-                valueType,
-                operandTypes,
-                SLANG_COUNT_OF(operandTypes),
-                "atomic reduction value negation"))
-        {
-            return false;
-        }
-    }
-
-    outReduction.pointerParameter = pointerParameter;
-    outReduction.valueParameter = valueParameter;
-    outReduction.orderParameter = orderParameter;
-    outReduction.valueIRType = physicalValueType;
-    outReduction.implicitValue = signature->implicitValue;
-    outReduction.diagnosticName = signature->diagnosticName;
-    outReduction.hasImplicitValue = signature->hasImplicitValue;
-    outReduction.negatesValue = signature->negatesValue;
-    return true;
-}
-
 struct NVVMResolvedAtomicPointer
 {
     IRPtrTypeBase* type = nullptr;
@@ -6312,22 +5875,6 @@ IRType* _getNVVMStructuredBufferStoragePointerValueType(IRInst* pointer, IRInst*
                : nullptr;
 }
 
-void _requireNVVMAtomicReductionOperations(
-    NVVMOperationRequirements& requirements,
-    const NVVMResolvedAtomicReduction& reduction)
-{
-    _requireAtomicOperation(
-        requirements.atomicOperations,
-        reduction.desc,
-        reduction.diagnosticName);
-    if (reduction.negatesValue)
-    {
-        _requireValueOperation(
-            requirements.valueOperations,
-            reduction.valueNegation.getDesc(),
-            reduction.valueNegation.diagnosticName);
-    }
-}
 
 // Records both directions of the bit-preserving Half helper ABI boundary. A Half parameter uses
 // the physical-to-canonical direction at helper entry and the canonical-to-physical direction at
@@ -8745,18 +8292,12 @@ SlangResult _validateNVVMFunction(
                 {
                     auto intrinsic = as<IRNVVMIntrinsic>(inst);
                     NVVMGenericAsmValueOperation valueOperation;
-                    NVVMScalarIntrinsicRecipe scalarRecipe;
-                    NVVMResolvedAtomicReduction atomicReduction;
                     NVVMResolvedTextureOperation textureOperation;
                     if (isEntryPoint || intrinsic != terminator)
                     {
                         return _diagnoseUnsupportedIR(codeGenContext, toSlice("nvvmIntrinsic"));
                     }
-                    if (_resolveNVVMTaggedAtomicReduction(intrinsic, function, atomicReduction))
-                    {
-                        _requireNVVMAtomicReductionOperations(requirements, atomicReduction);
-                    }
-                    else if (_resolveNVVMTaggedTextureSample(intrinsic, function, textureOperation))
+                    if (_resolveNVVMTaggedTextureSample(intrinsic, function, textureOperation))
                     {
                         _requireTextureOperations(
                             requirements.textureOperations,
@@ -8772,17 +8313,6 @@ SlangResult _validateNVVMFunction(
                             valueOperation.diagnosticName);
                         requirements.requiresCUDADeviceLibrary |=
                             valueOperation.requiresCUDADeviceLibrary;
-                    }
-                    else if (_resolveNVVMTaggedScalarIntrinsicRecipe(
-                                 intrinsic,
-                                 function,
-                                 scalarRecipe))
-                    {
-                        _requireNVVMScalarIntrinsicRecipeOperations(
-                            requirements.valueOperations,
-                            scalarRecipe);
-                        requirements.requiresCUDADeviceLibrary |=
-                            scalarRecipe.requiresCUDADeviceLibrary;
                     }
                     else
                     {
@@ -8812,7 +8342,6 @@ SlangResult _validateNVVMFunction(
                     NVVMGenericAsmCompoundOperation compoundOperation;
                     NVVMMaskedWaveScalarOperation maskedWaveOperation;
                     NVVMAggregateWaveOperation aggregateWaveOperation;
-                    NVVMResolvedByteAddressAtomic byteAddressAtomic;
                     NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMScalarTruthiness(genericAsm, function, truthiness))
                     {
@@ -8820,14 +8349,6 @@ SlangResult _validateNVVMFunction(
                             requirements.valueOperations,
                             truthiness.getOperationDesc(),
                             truthiness.diagnosticName);
-                        break;
-                    }
-                    if (_resolveNVVMByteAddressAtomic(genericAsm, function, byteAddressAtomic))
-                    {
-                        _requireAtomicOperation(
-                            requirements.atomicOperations,
-                            byteAddressAtomic.desc,
-                            byteAddressAtomic.diagnosticName);
                         break;
                     }
                     if (_resolveNVVMGenericAsmValueOperation(genericAsm, function, valueOperation))
@@ -9497,27 +9018,6 @@ SlangResult _validateNVVMFunction(
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             toSlice("direct scalar call"));
-                    }
-                    auto calleeBlock = callee->getFirstBlock();
-                    auto calleeIntrinsic =
-                        calleeBlock ? as<IRNVVMIntrinsic>(calleeBlock->getTerminator()) : nullptr;
-                    NVVMResolvedAtomicReduction atomicReduction;
-                    if (_resolveNVVMTaggedAtomicReduction(calleeIntrinsic, callee, atomicReduction))
-                    {
-                        if (!_isNVVMGlobalHelperReferenceArgument(call->getArg(0)))
-                        {
-                            return _diagnoseUnsupportedIR(
-                                codeGenContext,
-                                toSlice("atomic reduction global reference"));
-                        }
-                        const UInt orderArgumentIndex = call->getArgCount() - 1;
-                        auto order = _asExecutableI32Constant(call->getArg(orderArgumentIndex));
-                        if (!order || order->getValue() != kIRMemoryOrder_Relaxed)
-                        {
-                            return _diagnoseUnsupportedIR(
-                                codeGenContext,
-                                toSlice("atomic reduction memory order"));
-                        }
                     }
                     for (UInt argumentIndex = 0; argumentIndex < call->getArgCount();
                          ++argumentIndex)
@@ -11610,181 +11110,6 @@ SlangResult _emitNVVMResourceBitCast(
             outValue));
 }
 
-SlangResult _emitNVVMAtomicReduction(
-    CodeGenContext* codeGenContext,
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    const NVVMResolvedAtomicReduction& reduction,
-    NVVMValueMap& valueMap,
-    NVVMTypeLoweringContext& typeContext)
-{
-    SlangNVVMValueHandle pointer = nullptr;
-    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-        codeGenContext,
-        builder,
-        module,
-        reduction.pointerParameter,
-        valueMap,
-        typeContext,
-        pointer));
-
-    // The CUDA prelude reduction spelling is a global-memory operation. Every call was proven to
-    // supply a canonical global producer, so recover that physical address space after the generic
-    // helper ABI boundary before emitting the atomic operation.
-    SlangNVVMTypeHandle valueType = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        typeContext.lowerType(reduction.valueIRType, NVVMTypeUse::Value, valueType));
-    SlangNVVMTypeHandle globalPointerType = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "atomic reduction global pointer type",
-        builder.getPointerType(
-            module,
-            valueType,
-            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-            globalPointerType)));
-    SlangNVVMValueHandle globalPointer = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "atomic reduction generic-to-global reference conversion",
-        builder.emitPointerAddressSpaceCast(module, globalPointerType, pointer, globalPointer)));
-    pointer = globalPointer;
-
-    SlangNVVMValueHandle value = nullptr;
-    if (reduction.hasImplicitValue)
-    {
-        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-            codeGenContext,
-            "atomic reduction implicit value",
-            builder.getIntegerConstant(module, valueType, reduction.implicitValue, value)));
-    }
-    else
-    {
-        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-            codeGenContext,
-            builder,
-            module,
-            reduction.valueParameter,
-            valueMap,
-            typeContext,
-            value));
-    }
-
-    if (reduction.negatesValue)
-    {
-        SlangNVVMValueHandle negatedValue = nullptr;
-        SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-            codeGenContext,
-            builder,
-            module,
-            reduction.valueNegation,
-            &value,
-            1,
-            negatedValue));
-        value = negatedValue;
-    }
-
-    SlangNVVMValueHandle originalValue = nullptr;
-    const SlangNVVMValueHandle atomicOperands[] = {pointer, value};
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        reduction.diagnosticName,
-        builder.emitAtomicOperation(
-            module,
-            reduction.desc,
-            atomicOperands,
-            SLANG_COUNT_OF(atomicOperands),
-            originalValue)));
-    return _requireBuilderOperation(
-        codeGenContext,
-        "atomic reduction void return",
-        builder.emitReturnVoid(module));
-}
-
-SlangResult _emitNVVMByteAddressAtomic(
-    CodeGenContext* codeGenContext,
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    const NVVMResolvedByteAddressAtomic& operation,
-    NVVMValueMap& valueMap,
-    NVVMTypeLoweringContext& typeContext)
-{
-    SlangNVVMValueHandle buffer = nullptr;
-    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-        codeGenContext,
-        builder,
-        module,
-        operation.bufferParameter,
-        valueMap,
-        typeContext,
-        buffer));
-    SlangNVVMValueHandle dataPointer = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "raw-buffer atomic data pointer",
-        builder.emitAggregateElementExtract(module, buffer, 0, dataPointer)));
-
-    SlangNVVMValueHandle byteOffset = nullptr;
-    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-        codeGenContext,
-        builder,
-        module,
-        operation.offsetParameter,
-        valueMap,
-        typeContext,
-        byteOffset));
-    SlangNVVMTypeHandle valueType = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        typeContext.lowerType(operation.valueIRType, NVVMTypeUse::Value, valueType));
-    SlangNVVMValueHandle typedPointer = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "raw-buffer atomic byte offset",
-        builder.emitByteOffsetPointer(module, dataPointer, byteOffset, valueType, typedPointer)));
-
-    SlangNVVMValueHandle atomicOperands[3] = {typedPointer, nullptr, nullptr};
-    for (uint32_t i = 0; i < operation.valueCount; ++i)
-    {
-        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-            codeGenContext,
-            builder,
-            module,
-            operation.valueParameters[i],
-            valueMap,
-            typeContext,
-            atomicOperands[i + 1]));
-    }
-    SlangNVVMValueHandle originalValue = nullptr;
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        operation.diagnosticName,
-        builder.emitAtomicOperation(
-            module,
-            operation.desc,
-            atomicOperands,
-            operation.valueCount + 1,
-            originalValue)));
-
-    SlangNVVMValueHandle resultPointer = nullptr;
-    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-        codeGenContext,
-        builder,
-        module,
-        operation.resultPointerParameter,
-        valueMap,
-        typeContext,
-        resultPointer));
-    const uint32_t alignment = getNVVMNumericValueAlignment(operation.valueIRType);
-    SLANG_RELEASE_ASSERT(alignment);
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "raw-buffer atomic result store",
-        builder.emitStore(module, originalValue, resultPointer, alignment)));
-    return _requireBuilderOperation(
-        codeGenContext,
-        "raw-buffer atomic void return",
-        builder.emitReturnVoid(module));
-}
 
 // Materializes one already-typed scalar value across the exact integer scalar/vector shape owned
 // by the canonical instruction. Signedness does not change the physical provider type.
@@ -12272,48 +11597,6 @@ SlangResult _emitNVVMScalarIntrinsicRecipe(
     SlangNVVMValueHandle result = nullptr;
     switch (recipe.kind)
     {
-    case NVVMScalarIntrinsicRecipeKind::PromotedHalfValue:
-        {
-            SLANG_RELEASE_ASSERT(recipe.parameterCount >= 1 && recipe.parameterCount <= 3);
-            SlangNVVMValueHandle promotedParameters[3] = {};
-            for (uint32_t i = 0; i < recipe.parameterCount; ++i)
-            {
-                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-                    codeGenContext,
-                    builder,
-                    module,
-                    recipe.steps[0],
-                    &parameters[i],
-                    1,
-                    promotedParameters[i]));
-            }
-            SlangNVVMValueHandle promotedResult = nullptr;
-            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-                codeGenContext,
-                builder,
-                module,
-                recipe.steps[1],
-                promotedParameters,
-                recipe.parameterCount,
-                promotedResult));
-            if (recipe.stepCount == 2)
-            {
-                result = promotedResult;
-            }
-            else
-            {
-                SLANG_RELEASE_ASSERT(recipe.stepCount == 3);
-                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-                    codeGenContext,
-                    builder,
-                    module,
-                    recipe.steps[2],
-                    &promotedResult,
-                    1,
-                    result));
-            }
-        }
-        break;
     case NVVMScalarIntrinsicRecipeKind::Frexp:
         {
             SlangNVVMValueHandle exponent = nullptr;
@@ -15591,18 +14874,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_NVVMIntrinsic:
                     {
                         auto intrinsic = as<IRNVVMIntrinsic>(inst);
-                        NVVMResolvedAtomicReduction atomicReduction;
-                        if (_resolveNVVMTaggedAtomicReduction(intrinsic, function, atomicReduction))
-                        {
-                            SLANG_RETURN_ON_FAIL(_emitNVVMAtomicReduction(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                atomicReduction,
-                                valueMap,
-                                typeContext));
-                            break;
-                        }
                         if (auto textureRequirement = _findTextureOperationRequirement(
                                 requirements.textureOperations,
                                 function))
@@ -15693,20 +14964,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             break;
                         }
 
-                        NVVMScalarIntrinsicRecipe scalarRecipe;
-                        const bool hasScalarRecipe = _resolveNVVMTaggedScalarIntrinsicRecipe(
-                            intrinsic,
-                            function,
-                            scalarRecipe);
-                        SLANG_RELEASE_ASSERT(hasScalarRecipe);
-                        SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicRecipe(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            function,
-                            scalarRecipe,
-                            valueMap,
-                            typeContext));
+                        SLANG_UNEXPECTED("Unplanned NVVM semantic intrinsic");
                     }
                     break;
 
@@ -15766,18 +15024,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                                     "named LLVM intrinsic return",
                                     value));
                             }
-                            break;
-                        }
-                        NVVMResolvedByteAddressAtomic byteAddressAtomic;
-                        if (_resolveNVVMByteAddressAtomic(genericAsm, function, byteAddressAtomic))
-                        {
-                            SLANG_RETURN_ON_FAIL(_emitNVVMByteAddressAtomic(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                byteAddressAtomic,
-                                valueMap,
-                                typeContext));
                             break;
                         }
                         NVVMScalarTruthiness truthiness;

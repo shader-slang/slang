@@ -4180,7 +4180,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceAdd) "__slang_atomic_reduce_add($0, $1, (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+        case nvvm:
         default: add(value, order);
         }
     }
@@ -4194,7 +4195,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceSubtract) "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+        case nvvm:
         default: sub(value, order);
         }
     }
@@ -4208,7 +4210,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceMax) "__slang_atomic_reduce_max($0, $1, (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+        case nvvm:
         default: max(value, order);
         }
     }
@@ -4222,7 +4225,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceMin) "__slang_atomic_reduce_min($0, $1, (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+        case nvvm:
         default: min(value, order);
         }
     }
@@ -4268,7 +4272,8 @@ extension<T : IBitAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceBitAnd) "__slang_atomic_reduce_and($0, $1, (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+        case nvvm:
         default: and(value, order);
         }
     }
@@ -4282,7 +4287,8 @@ extension<T : IBitAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceBitOr) "__slang_atomic_reduce_or($0, $1, (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+        case nvvm:
         default: or(value, order);
         }
     }
@@ -4296,7 +4302,8 @@ extension<T : IBitAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceBitXor) "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+        case nvvm:
         default: xor(value, order);
         }
     }
@@ -4310,7 +4317,8 @@ extension<T : IBitAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceIncrement) "__slang_atomic_reduce_inc($0, (int)$1)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
+        case nvvm:
         default: increment(order);
         }
     }
@@ -4324,7 +4332,8 @@ extension<T : IBitAtomicable> Atomic<T>
     {
         __target_switch
         {
-        case cuda: __intrinsic_asm(nvvmAtomicReduceDecrement) "__slang_atomic_reduce_dec($0, (int)$1)";
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
+        case nvvm:
         default: decrement(order);
         }
     }

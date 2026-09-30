@@ -17,7 +17,6 @@ enum class ValueOperationFamily : uint32_t
     IntegerCompare,
     FloatUnary,
     FloatBinary,
-    FloatSign,
     FloatCompare,
     BooleanUnary,
     BooleanBinary,
@@ -524,20 +523,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         "Float64 wave read-lane-at intrinsic",
     },
     {
-        SLANG_NVVM_VALUE_OP_CLOCK,
-        kUnsignedI32,
-        {kNoType, kNoType, kNoType},
-        0,
-        "CUDA clock counter read",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_CLOCK64,
-        kSignedI64,
-        {kNoType, kNoType, kNoType},
-        0,
-        "CUDA clock64 counter read",
-    },
-    {
         SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},
@@ -758,11 +743,8 @@ inline bool resolveValueOperationFamily(
                                      isSelectedIntegerValue(desc.resultType) &&
                                      areSameType(desc.resultType, desc.operandTypes[0]);
     const bool isUnaryInteger = isUnaryIntegerValue && isSelectedScalarInteger(desc.resultType);
-    const bool isSignedUnaryInteger =
-        isUnaryInteger && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
     if ((isUnaryIntegerValue && desc.operation == SLANG_NVVM_VALUE_OP_BIT_NOT) ||
-        (isUnaryInteger && desc.operation == SLANG_NVVM_VALUE_OP_NEGATE) ||
-        (isSignedUnaryInteger && desc.operation == SLANG_NVVM_VALUE_OP_ABS))
+        (isUnaryInteger && desc.operation == SLANG_NVVM_VALUE_OP_NEGATE))
     {
         outResolution = {
             ValueOperationFamily::IntegerUnary,
@@ -865,35 +847,6 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::FloatUnary,
             "parameterized floating-point unary operation"};
-        return true;
-    }
-
-    const bool isScalarFloat16Abs = isUnaryFloat && desc.resultType.bitWidth == 16 &&
-                                    desc.resultType.laneCount == 1 &&
-                                    desc.operation == SLANG_NVVM_VALUE_OP_ABS;
-    const bool isScalarFloat32Or64Unary =
-        isUnaryFloat && (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
-        desc.resultType.laneCount == 1;
-    const bool isScalarMathUnary = desc.operation == SLANG_NVVM_VALUE_OP_ABS;
-    if (isScalarFloat16Abs || (isScalarFloat32Or64Unary && isScalarMathUnary))
-    {
-        outResolution = {
-            ValueOperationFamily::FloatUnary,
-            "scalar floating-point math operation",
-            desc.resultType.bitWidth != 16,
-        };
-        return true;
-    }
-
-    const bool isScalarFloat32Or64Operand =
-        desc.operandCount == 1 &&
-        desc.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-        (desc.operandTypes[0].bitWidth == 32 || desc.operandTypes[0].bitWidth == 64) &&
-        desc.operandTypes[0].laneCount == 1;
-    if (isScalarFloat32Or64Operand && desc.operation == SLANG_NVVM_VALUE_OP_SIGN &&
-        areSameType(desc.resultType, kSignedI32))
-    {
-        outResolution = {ValueOperationFamily::FloatSign, "scalar floating-point sign"};
         return true;
     }
 

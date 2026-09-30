@@ -65,10 +65,6 @@ struct NVVMIntrinsicAsmSemanticName
 // These names are compiler-internal source-module vocabulary. They identify an operation rather
 // than a CUDA spelling, so target specialization may retain semantic intent independently of text.
 static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
-    {"nvvmAbs", SLANG_NVVM_VALUE_OP_ABS},
-    {"nvvmMax", SLANG_NVVM_VALUE_OP_MAX},
-    {"nvvmMin", SLANG_NVVM_VALUE_OP_MIN},
-    {"nvvmSign", SLANG_NVVM_VALUE_OP_SIGN},
     {"nvvmWaveMaskAllEqual", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL},
     {"nvvmWaveMaskAllTrue", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE},
     {"nvvmWaveMaskAnyTrue", SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE},
@@ -81,15 +77,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmTextureSample", kNVVMIntrinsicSemanticTextureSample},
     {"nvvmSurfaceLoad", kNVVMIntrinsicSemanticSurfaceLoad},
     {"nvvmSurfaceStore", kNVVMIntrinsicSemanticSurfaceStore},
-    {"nvvmAtomicReduceAdd", kNVVMIntrinsicSemanticAtomicReduceAdd},
-    {"nvvmAtomicReduceSubtract", kNVVMIntrinsicSemanticAtomicReduceSubtract},
-    {"nvvmAtomicReduceMin", kNVVMIntrinsicSemanticAtomicReduceMin},
-    {"nvvmAtomicReduceMax", kNVVMIntrinsicSemanticAtomicReduceMax},
-    {"nvvmAtomicReduceBitAnd", kNVVMIntrinsicSemanticAtomicReduceBitAnd},
-    {"nvvmAtomicReduceBitOr", kNVVMIntrinsicSemanticAtomicReduceBitOr},
-    {"nvvmAtomicReduceBitXor", kNVVMIntrinsicSemanticAtomicReduceBitXor},
-    {"nvvmAtomicReduceIncrement", kNVVMIntrinsicSemanticAtomicReduceIncrement},
-    {"nvvmAtomicReduceDecrement", kNVVMIntrinsicSemanticAtomicReduceDecrement},
 };
 
 bool _findNVVMIntrinsicAsmSemantic(

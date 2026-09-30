@@ -74889,6 +74889,240 @@
         "Material smoke compiles and assembles NVVM only; prior NVRTC material evidence retains its original identity.",
         "Module 43 / ABI 46 unchanged; stale prototype modules may need recompilation."
       ]
+    },
+    "nvvm-core-values-and-atomics": {
+      "status": "accepted-with-known-failure",
+      "scope": "Core abs/min/max/sign select six named libdevice functions or canonical expressions. Named clocks retain side-effecting observations. Nine atomic reduction families and two ByteAddress helpers use canonical atomic operations. Four numeric IDs and thirteen semantic tags are retired; wave MIN43/MAX44 remain.",
+      "new_support": [
+        "Unsigned abs and integer sign via core expressions.",
+        "Shared integer reductions and signed/unsigned64 increment/decrement reductions through existing validated Atomic operations."
+      ],
+      "compiler_identity": {
+        "revision": "4d18503346028be698054c1800ad3a0e142d6019",
+        "compiler_patch_sha256": "3106b1dac662315749de32c2f4e09ccaba94b165ab3d0ca831d290b28586cabd",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "85d25118153db92de5010394d32e6d15d6e809d3150d037a2211ccc21adb66e4",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "d54e1d2054dbe0fa77e260ca25965417bfdfb1e664e4fe746bc9f0d83d17dcd8",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "1c32f62d16c2594bec4a274c59d69be635026fe061feab7202f9473e6c74310d",
+          "source/slang/core.meta.slang": "3b69e3f2d7525009c52805cacba81d6eb1e7e59bf46804bbe1e1c95abef46e14",
+          "source/slang/hlsl.meta.slang": "e3a8ddb707c53dbe19717f03180e64da8fc093d702a433121c0ae7913c30d912",
+          "source/slang/slang-emit-nvvm.cpp": "2bfbd5cb0187b0dc7e20c9fa9ccccf0d5e88113732fd33fb2dbf74530e1e1a2b",
+          "source/slang/slang-lower-to-ir.cpp": "ce0663219f4a6a145959cb619dae84043a686ec7ae1959c2a149d1a8feae0da8",
+          "source/slang/slang-nvvm-intrinsic-semantics.h": "836a270fb0344b67cc2c1c90d7ec1631578b62f34a05d2665b3e716c03ec1ce4",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "83046ed27555c77c5db7f2d2bb46a0428e810ca3ac0239ea7a8f22be643e7195",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "64f77d2be3e17e5749b26150f4ba39aea819b7c636bcb9710789181ecc1eef6a",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "5a880a2581313fc003cdeaeacd84a418d44120e7e026e0afa0f6f2df31839117",
+          "tests/cuda/nvvm-core-values.slang": "6a988bae1178f0f21e6263762244f7d6c0f2c04c92146de4934a0ac3c9f11dae"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "2c6b63e007000d5afedeb3b4e77e245e9bbb759cd1fbb43986577731c68a74ea",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "5f309edece141fb42fc4c8ab7d1078a4cc32437c906b22d4869e01910645fd77",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "1b542e29de5338b29ade9fe4f5402933fab2bb4475a0f69d43d74fc16abbcad0",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b"
+        }
+      },
+      "validation": {
+        "units": {
+          "passed": 13,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderBuildsClock64.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsClock.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsScalarMathOperations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderCoreValuesUseNamedFunctions.internal",
+            "slang-unit-test-tool/nvvmIRBuilderCoreValuesRejectRetiredOperations.internal",
+            "slang-unit-test-tool/nvvmSlangAtomicReductionsUseCanonicalOperations.internal",
+            "slang-unit-test-tool/nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangCoreValuesLegacyRoutesRejectBeforeOutput.internal",
+            "slang-unit-test-tool/nvvmSlangAtomicReductionProducersRejectInvalidInputs.internal",
+            "slang-unit-test-tool/nvvmSlangScalarMathHelpersRequestTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangLocalAtomicReductionRejectsAtProducer.internal",
+            "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-core-values/units.json",
+              "sha256": "10a508c90c6d7f208ac903162ba02919f1b6c64b4c7ef874f9959fc9b956bbbf"
+            },
+            {
+              "path": "build/nvvm-core-values/units-retry.json",
+              "sha256": "125e3db28344518f0f9035bc9387c3c1860716e8236460dbe221ea528af4218c"
+            }
+          ],
+          "reuse": "Ten initial passes reused; only two corrected and one new unit rerun after test-only rebuild.",
+          "initial_unit_module_sha256": "a7010cf8f2bd825b6c245757a3a057bece754ed4f374561672c5e04574f83120"
+        },
+        "cuda_smoke": {
+          "passed": 22,
+          "failed": 1,
+          "passed_outcomes": [
+            "tests/cuda/nvvm-core-values.slang (cuda)",
+            "tests/cuda/nvvm-clock-observations.slang (cuda)",
+            "tests/cuda/nvvm-clock-observations.slang.1 (cuda)",
+            "tests/cuda/nvvm-clock-observations.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-float.slang (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-float.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-half-cuda.slang (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-float.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-half-cuda.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-intrinsics.slang (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-half-cuda.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-intrinsics.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-methods.slang (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-intrinsics.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-methods.slang.1 (cuda)",
+            "tests/slang-extension/atomic-float-byte-address-buffer.slang.5 (cuda)",
+            "tests/hlsl-intrinsic/atomic/atomic-reduce-methods.slang.2 (cuda)",
+            "tests/slang-extension/atomic-float-byte-address-buffer.slang.6 (cuda)",
+            "tests/slang-extension/cas-int64-byte-address-buffer.slang.5 (cuda)",
+            "tests/slang-extension/atomic-float-byte-address-buffer.slang.7 (cuda)",
+            "tests/slang-extension/cas-int64-byte-address-buffer.slang.6 (cuda)",
+            "tests/slang-extension/cas-int64-byte-address-buffer.slang.7 (cuda)"
+          ],
+          "failed_outcomes": ["tests/cuda/nvvm-core-values.slang.1 (cuda)"],
+          "excluded_non_cuda_subtests": 18,
+          "record": {
+            "path": "build/nvvm-core-values/smoke.json",
+            "sha256": "9f95afdf43f709bbb0d841599dc75dfb28ed9c33b9cb5a587b3176c53e19e12e"
+          },
+          "policy": "The failing O3 test remains active with its exact expected result."
+        },
+        "builds": [
+          {
+            "path": "build/nvvm-core-values/build-production.json",
+            "sha256": "9a88fa4b2ac9602b38dcf195769d73ecdd6d8e46efc23883d06a08cb8fbad0c7"
+          },
+          {
+            "path": "build/nvvm-core-values/build-tests.json",
+            "sha256": "fb9196f4ea718dc7e7238e0cd1db47ce2f8427b8392cd9d2362b51d8079f9dcc"
+          },
+          {
+            "path": "build/nvvm-core-values/build-test-fix.json",
+            "sha256": "d28b2be1b9d69e82bc91a95cfac39453d1cd5c811599806a65f6dc05c57447cf"
+          }
+        ],
+        "ptx_diagnostic_commands": [
+          {
+            "path": "build/nvvm-core-values/edge-o3-compile.json",
+            "sha256": "e64a8c9c858cf910a8d8c668a895ae4b7438a56bd116e12c7f47b0386828ad0d"
+          },
+          {
+            "path": "build/nvvm-core-values/edge-o3-ir.json",
+            "sha256": "ed21fe49ae7e8d942a192ee93bf31c639f19ecf17e2bc3ac48673d3eecabb76e"
+          },
+          {
+            "path": "build/nvvm-core-values/edge-o0-ir.json",
+            "sha256": "8ff6ff55eb8f15429d0bcbd1419ff807d9a8b39c53e7065a2602d28006ae98a1"
+          },
+          {
+            "path": "build/nvvm-core-values/edge-o3-assembly.json",
+            "sha256": "0ff9d5b98e5f37f11306c835855a7ad738c64cb6ff1718d1c1847e478f588492"
+          }
+        ]
+      },
+      "validation_incidents": [
+        {
+          "id": "stale-unit-expectations",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-values/units.json",
+            "sha256": "10a508c90c6d7f208ac903162ba02919f1b6c64b4c7ef874f9959fc9b956bbbf"
+          },
+          "resolution": {
+            "path": "build/nvvm-core-values/units-retry.json",
+            "sha256": "125e3db28344518f0f9035bc9387c3c1860716e8236460dbe221ea528af4218c"
+          },
+          "cause": "Fixture uses integer and Half abs, which correctly emit no fabsf call; local atomic is rejected earlier by canonical frontend E41403.",
+          "fix": "Assert absent fabsf and move local case into exact E41403/no-output unit; keep generic E52017 table strict. Only three affected/new units rerun."
+        },
+        {
+          "id": "signed16-int-min-o3-normalization",
+          "status": "unresolved-inherited-downstream",
+          "failed_outcome": "tests/cuda/nvvm-core-values.slang.1 (cuda)",
+          "input": "abs(int16_t(-32768)), wrapping result expected -32768; error bit32 in compact fixture.",
+          "failure": {
+            "path": "build/nvvm-core-values/smoke.json",
+            "sha256": "9f95afdf43f709bbb0d841599dc75dfb28ed9c33b9cb5a587b3176c53e19e12e"
+          },
+          "actual_output": {
+            "path": "build/nvvm-core-values/smoke-nvvm-core-values.slang.1.actual.txt",
+            "sha256": "0512230f97161d3f5f9e67c1679e3ae5785c83a6c83b697b55a9415b0ae57cd7"
+          },
+          "observed": "O0 passes. O3 raw uint16 bits are32768, but signed comparison fails and int32 widening yields+32768. The equivalent prior-style direct-select control fails identically.",
+          "cause_evidence": "LLVM uses exact i16 compare, unflagged negate, and phi/select. O3 PTX uses abs.s16; SASS IABS produces+32768 and compares it directly with-32768 without signed16 normalization.",
+          "scope": "No malformed core representation or new arithmetic algorithm. General narrow-integer lowering is separate; no per-abs workaround, disabled test, tolerance change or pass relabeling.",
+          "ptx_spec": "https://docs.nvidia.com/cuda/parallel-thread-execution/#machine-specific-semantics-of-16-bit-code",
+          "evidence": [
+            {
+              "path": "build/nvvm-core-values/edge-o3-ir-1.llvm-ir-asm",
+              "sha256": "eece36b6c30f0b349798f7afc44a716976665ee95f6227dea8670d123a4e6041"
+            },
+            {
+              "path": "build/nvvm-core-values/edge-o0-ir-1.llvm-ir-asm",
+              "sha256": "eece36b6c30f0b349798f7afc44a716976665ee95f6227dea8670d123a4e6041"
+            },
+            {
+              "path": "build/nvvm-core-values/edge-o3.ptx",
+              "sha256": "0b982b138daa283aee1d673640f4e2771c110e0236baa21c4d8a2354769af5a8"
+            },
+            {
+              "path": "build/nvvm-core-values/edge-o3.sass",
+              "sha256": "9fbe356a92cc74d6f32cd4209e6e8267379402d6eb24737ecf9aa78c657c277b"
+            },
+            {
+              "path": "build/nvvm-core-values/narrow-abs-smoke.json",
+              "sha256": "6f8424314fb3cfbbb59b1f3da204e6833ab08159af180291439e7c292af9937e"
+            },
+            {
+              "path": "build/nvvm-core-values/narrow-abs.slang.2.actual.txt",
+              "sha256": "55e9f51540f88b06203506cf9633e09bf37cd21faeefd43ee815462d0ce55168"
+            },
+            {
+              "path": "build/nvvm-core-values/narrow-abs-cast-smoke.json",
+              "sha256": "6124291dcdd553d32253cdf57f5c23149a8edf5833b4d4340a1b10f3babbada8"
+            }
+          ]
+        },
+        {
+          "id": "diagnostic-nvrtc-narrow-select",
+          "status": "unresolved-diagnostic-limitation",
+          "cause": "Both ignored diagnostic controls fail NVRTC compilation because CUDA emits unary-negated int16 as int in _slang_select(bool,int,short). Explicit same-width cast is eliminated; neither NVRTC control is claimed successful.",
+          "records": [
+            {
+              "path": "build/nvvm-core-values/narrow-abs-smoke.json",
+              "sha256": "6f8424314fb3cfbbb59b1f3da204e6833ab08159af180291439e7c292af9937e"
+            },
+            {
+              "path": "build/nvvm-core-values/narrow-abs-cast-smoke.json",
+              "sha256": "6124291dcdd553d32253cdf57f5c23149a8edf5833b4d4340a1b10f3babbada8"
+            }
+          ]
+        },
+        {
+          "id": "disassembler-location",
+          "status": "resolved",
+          "cause": "Toolkit path lacked cuobjdump; reused previously qualified portable cuobjdump12.9.82 and nvdisasm12.9.88 under ignored build/nvvm-results, with subprocess PATH only."
+        }
+      ],
+      "last_full_baseline": {
+        "path": "issue-nvvm-backend/accepted-baseline.json",
+        "sha256": "f6df540235ea04c97f6b1a49d546ffd716763123b5a57988d40dbde6a71d087b"
+      },
+      "limits": [
+        "Qualified local migration acceptance, not an all-pass checkpoint or publication/CI readiness.",
+        "Signed16 absolute-value INT_MIN normalization remains incorrect at O3 on the tested toolchain; LLVM wrapping intent is preserved.",
+        "No full/native/corpus/material/version or new numerical-oracle campaign; historical claims retain their identities.",
+        "Module43/ABI46 unchanged; stale prototype modules may need recompilation."
+      ]
     }
   }
 }

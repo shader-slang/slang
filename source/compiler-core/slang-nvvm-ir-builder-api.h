@@ -164,7 +164,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_COUNT_BITS ((SlangNVVMValueOperation)45u)
 /* Values 46-47 are retired; public integer-bit operations use named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW ((SlangNVVMValueOperation)48u)
-#define SLANG_NVVM_VALUE_OP_ABS ((SlangNVVMValueOperation)49u)
+// 49 is reserved (retired abs operation).
 /* Value 50 is retired; core math uses named calls and ordinary composition. */
 /* Value 51 is retired; core math uses named calls and ordinary composition. */
 /* Value 52 is retired; core math uses named calls and ordinary composition. */
@@ -183,7 +183,7 @@ extern "C"
 /* Value 65 is retired; rsqrt uses named selected-libdevice functions. */
 /* Value 66 is retired; core math uses named calls and ordinary composition. */
 // 67 is reserved (retired scalar NaN classification).
-#define SLANG_NVVM_VALUE_OP_SIGN ((SlangNVVMValueOperation)68u)
+// 68 is reserved (retired sign operation).
 #define SLANG_NVVM_VALUE_OP_FREXP_FRACTION ((SlangNVVMValueOperation)69u)
 #define SLANG_NVVM_VALUE_OP_FREXP_EXPONENT ((SlangNVVMValueOperation)70u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH ((SlangNVVMValueOperation)71u)
@@ -197,8 +197,8 @@ extern "C"
 /** Snapshots currently executing lanes without synchronization; not a logical convergence mask. */
 #define SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK ((SlangNVVMValueOperation)79u)
 /** Reads the per-multiprocessor cycle counter; each observation remains live. */
-#define SLANG_NVVM_VALUE_OP_CLOCK ((SlangNVVMValueOperation)80u)
-#define SLANG_NVVM_VALUE_OP_CLOCK64 ((SlangNVVMValueOperation)81u)
+// 80 is reserved (retired clock operation).
+// 81 is reserved (retired clock64 operation).
 /** BF16 dot: positive-zero accumulator, separately rounded products/sums in lane order. */
 #define SLANG_NVVM_VALUE_OP_BFLOAT16_DOT ((SlangNVVMValueOperation)82u)
 #define SLANG_NVVM_VALUE_OPERATION_COUNT 83u

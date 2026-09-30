@@ -5903,8 +5903,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
     }
     if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerUnary ||
         resolution.family == NVVMSemantics::ValueOperationFamily::IntegerBit ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::FloatSign)
+        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
             {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
@@ -6164,6 +6163,17 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
                         name == toSlice("llvm.nvvm.membar.cta");
         return SLANG_OK;
     }
+    if (name == toSlice("llvm.nvvm.read.ptx.sreg.clock") ||
+        name == toSlice("llvm.nvvm.read.ptx.sreg.clock64"))
+    {
+        const auto& type = intrinsic->resultType;
+        *outSupported =
+            type.laneCount == 1 &&
+            (type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+             type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+            type.bitWidth == (name == toSlice("llvm.nvvm.read.ptx.sreg.clock") ? 32u : 64u);
+        return SLANG_OK;
+    }
     if (!NVVMSemantics::areSameType(intrinsic->resultType, NVVMSemantics::kSignedI32) &&
         !NVVMSemantics::areSameType(intrinsic->resultType, NVVMSemantics::kUnsignedI32))
         return SLANG_OK;
@@ -6296,6 +6306,12 @@ static const NVVMCoreMathTestCase kNVVMCoreMathTestCases[] = {
     {"fmod", "__nv_fmodf", "__nv_fmod", 58, 2},
 };
 
+static const NVVMCoreMathTestCase kNVVMCoreValueTestCases[] = {
+    {"abs", "__nv_fabsf", "__nv_fabs", 49, 1},
+    {"min", "__nv_fminf", "__nv_fmin", 43, 2},
+    {"max", "__nv_fmaxf", "__nv_fmax", 44, 2},
+};
+
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSupported(
     SlangNVVMDeviceLibraryHandle library,
     const SlangNVVMNamedIntrinsicDesc* function,
@@ -6320,6 +6336,17 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSuppor
                      name == toSlice("__nv_log2") || name == toSlice("__nv_log10");
     uint32_t operandCount = 1;
     for (const auto& testCase : kNVVMCoreMathTestCases)
+    {
+        if (name == UnownedStringSlice(testCase.floatName) ||
+            name == UnownedStringSlice(testCase.doubleName))
+        {
+            isFloat32 = name == UnownedStringSlice(testCase.floatName);
+            isFloat64 = !isFloat32;
+            operandCount = testCase.operandCount;
+            break;
+        }
+    }
+    for (const auto& testCase : kNVVMCoreValueTestCases)
     {
         if (name == UnownedStringSlice(testCase.floatName) ||
             name == UnownedStringSlice(testCase.doubleName))
@@ -12213,29 +12240,17 @@ bool nanHalf(half value)
 
 half minimumHalf(half left, half right)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_min($0, $1)";
-    default: return min(left, right);
-    }
+    return min(left, right);
 }
 
 half maximumHalf(half left, half right)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_max($0, $1)";
-    default: return max(left, right);
-    }
+    return max(left, right);
 }
 
 int signHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_sign($0)";
-    default: return value < half(0) ? -1 : value > half(0) ? 1 : 0;
-    }
+    return sign(value);
 }
 
 half hyperbolicSineHalf(half value)

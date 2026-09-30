@@ -48,10 +48,11 @@ each entry block; the backend no longer recognizes CUDA `threadIdx`/`blockIdx` g
 admit the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes), three
 void synchronization operations (`llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
 `llvm.nvvm.membar.gl`), and four scalar integer intrinsics (`llvm.ctpop`, `llvm.bitreverse`,
-`llvm.ctlz` and `llvm.cttz`), and scalar Float32/Float64 `llvm.sqrt`. The provider resolves exact
+`llvm.ctlz` and `llvm.cttz`), scalar Float32/Float64 `llvm.sqrt`, and the zero-operand
+`llvm.nvvm.read.ptx.sreg.clock`/`clock64` observations. The provider resolves exact
 base names through LLVM's registry and validates the complete signature and dialect admission before
-module creation. Calls retain LLVM's
-intrinsic attributes. Void calls have no result handle; emission adds an ordinary LLVM void return
+module creation. Ordinary calls retain LLVM's intrinsic attributes; validated clocks use the
+side-effecting PTX implementation described below. Void calls have no result handle; emission adds an ordinary LLVM void return
 for the helper. This does not admit arbitrary LLVM snippets or arbitrary registry intrinsics.
 
 Ordinary comma-separated `__intrinsic_asm` operands are canonical checked IR values. For example,
@@ -66,7 +67,8 @@ Conflicting intrinsic symbols reject before mutation.
 
 Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
 names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp`, `exp2`, `log`, `log2`, `log10`,
-`sin`, `cos`, `acos`, `asin`, `atan`, `atan2`, `pow`, `tan`, `sinh`, `cosh`, `tanh`, `fma` and `fmod`
+`sin`, `cos`, `acos`, `asin`, `atan`, `atan2`, `pow`, `tan`, `sinh`, `cosh`, `tanh`, `fma`, `fmod`,
+`fabs`, `fmin` and `fmax`
 (`__nv_roundf`/`__nv_round`, and the corresponding pairs for the other operations).
 Complete signatures come from definitions in the selected immutable
 library; there is no parallel name-to-signature table. Core scalar bodies select these names in
@@ -88,6 +90,32 @@ lowering, which has a real backend consumer independent of the public `fmod` bod
 43 and provider ABI 46 remain unchanged; direct retired-ID rejection does not depend on a version gate.
 
 Half bit transport, packed Half conversion and double word conversion also belong to the core.
+Core scalar `abs`, `min`, `max` and `sign` now own their compositions. Integer abs uses an
+ordinary comparison and wrapping negate, including INT_MIN in the emitted LLVM semantics;
+unsigned abs is identity. CUDA 12.9 O3 has an observed signed16 INT_MIN normalization failure: the
+correct i16 result is compared as a wider positive value after PTX `abs.s16`. The active core-values
+O3 test retains its exact expected wrapping result and fails; O0 passes. An equivalent old-style
+select control fails identically. This downstream narrow-integer limitation is not repaired by
+this producer migration. Half abs
+clears bit 15 directly, preserving NaN payload bits. Float32/64 abs and min/max use the selected
+libdevice definitions; Half min/max widens both inputs and narrows the selected Float32 result
+once. Floating min/max is not replaced by a ternary comparison. Integer min/max uses ordinary
+comparison/selection. Sign subtracts the two ordered comparisons, so NaN and either zero return
+zero; signed integer sign is also supported. Numeric IDs 49/68 and their scalar tags/text are
+retired. MIN 43/MAX 44 remain for canonical masked-wave consumers.
+
+The nine atomic reduction families in both `Atomic<T>` methods and HLSL helpers select existing
+canonical Atomic IR operations. Their discarded result does not need a tagged CUDA helper body.
+Both inc/dec APIs forward the requested memory order; the unconstrained HLSL producers assert an
+integer type before constructing integer increments. Canonical admission retains Relaxed ordering,
+global/shared signed and unsigned 32/64-bit integers, and the existing global floating ADD forms.
+Shared integer reductions and 64-bit inc/dec are newly exposed; inc/dec wraps through ordinary
+addition, without CUDA bounded atomicInc semantics. Private pointers and unsupported orders still
+reject before emission. Float32 ByteAddress add and UInt64 compare-exchange reuse existing typed
+structured views at naturally aligned offsets, retaining low-address calculation, expected/desired
+operand order and the old-result store. Nine old reduction tags and two ByteAddress text recipes
+are removed; reserved semantic holes keep the surviving surface operation identities stable.
+
 NVVM `asfloat16`/`asuint16` use ordinary bit casts; `f16tof32` truncates to unsigned low 16 bits,
 decodes Half and widens, while `f32tof16` narrows once, reinterprets as uint16 and zero-extends.
 `asdouble(low, high)` combines unsigned words before a bit cast. Double `asuint` uses a uint64
@@ -251,7 +279,7 @@ does not preprocess the CUDA prelude. It preserves each access's own resource ex
 Remaining fixed standard-library producers carry typed NVVM intrinsic identities, which legalization consumes
 as `IRNVVMIntrinsic`. The catalog does not infer these semantics from arbitrary CUDA source text.
 Surface helpers carry load/store semantic tags and are rewritten per call while static field formats
-and component masks are available. Some richer texture, atomic, scalar-out-parameter and compound-wave helpers still have exact
+and component masks are available. Some richer texture, scalar-out-parameter and compound-wave helpers still have exact
 whole-body/signature recognizers. `RequirePrelude`, arbitrary GenericAsm and standalone execution
 requirements are not general no-ops; their meaning must be owned before they can be removed.
 
@@ -566,7 +594,9 @@ root/wrapped/multidimensional integer arrays and 39 serialized shape/alignment c
 65,536-element O3 experiments hit the same 120-second/4-GiB bound with and without the annotation;
 there is no scalability or speed claim. NVRTC's optimized integer-array copy defect remains open.
 
-**Clocks and masks.** Clock reads use side-effecting inline PTX because the tested intrinsic path
+**Clocks and masks.** Core clock helpers use named registry-validated integer32/64 signatures.
+The provider emits the shared side-effecting inline PTX implementation before creating an ordinary
+LLVM declaration or call; numeric IDs 80/81 and CUDA clock text recipes are retired. The tested plain intrinsic path
 merged/hoisted live observations. They are per-SM wrapping cycle counters, not a global wall clock or
 memory fence. Hardware `activemask` is distinct from logical participation synthesis. CUDA quad
 helpers preserve complete-source-quad/matching-shuffle semantics; partial quads have no defined oracle.

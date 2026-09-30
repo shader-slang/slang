@@ -4027,20 +4027,24 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsClock)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
-    const SlangNVVMValueOperationDesc operation = {
-        SLANG_NVVM_VALUE_OP_CLOCK,
+    const SlangNVVMNamedIntrinsicDesc operation = {
+        "llvm.nvvm.read.ptx.sreg.clock",
+        sizeof("llvm.nvvm.read.ptx.sreg.clock") - 1,
         NVVMSemantics::kUnsignedI32,
         nullptr,
         0,
     };
-    SLANG_CHECK_ABORT(builder.supportsValueOperation(operation));
-    SlangNVVMValueOperationDesc unsupported = operation;
-    unsupported.resultType = NVVMSemantics::kSignedI32;
-    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+    SLANG_CHECK_ABORT(builder.supportsNamedIntrinsic(operation));
+    SlangNVVMNamedIntrinsicDesc unsupported = operation;
+    unsupported.resultType = NVVMSemantics::kSignedI64;
+    SLANG_CHECK(!builder.supportsNamedIntrinsic(unsupported));
     unsupported = operation;
-    unsupported.operandTypes = &NVVMSemantics::kUnsignedI32;
+    const SlangNVVMNamedIntrinsicOperandDesc operand = {
+        NVVMSemantics::kUnsignedI32,
+        SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+    unsupported.operands = &operand;
     unsupported.operandCount = 1;
-    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+    SLANG_CHECK(!builder.supportsNamedIntrinsic(unsupported));
 
     ScopedNVVMBuilderModule scope;
     scope.builder = &builder;
@@ -4064,19 +4068,24 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsClock)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
     SlangNVVMValueHandle invalid = nullptr;
     SLANG_CHECK(
-        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+        SLANG_FAILED(builder.emitNamedIntrinsic(scope.module, unsupported, nullptr, 0, invalid)));
     SLANG_CHECK(invalid == nullptr);
     unsupported = operation;
-    unsupported.resultType = NVVMSemantics::kSignedI32;
+    unsupported.resultType = NVVMSemantics::kSignedI64;
     SLANG_CHECK(
-        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+        SLANG_FAILED(builder.emitNamedIntrinsic(scope.module, unsupported, nullptr, 0, invalid)));
+    SLANG_CHECK(invalid == nullptr);
+    const SlangNVVMValueOperationDesc retired = {80, operation.resultType, nullptr, 0};
+    SLANG_CHECK(!builder.supportsValueOperation(retired));
+    SLANG_CHECK(
+        SLANG_FAILED(builder.emitValueOperation(scope.module, retired, nullptr, 0, invalid)));
     SLANG_CHECK(invalid == nullptr);
     SlangNVVMValueHandle first = nullptr;
     SlangNVVMValueHandle second = nullptr;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, first)));
+        SLANG_SUCCEEDED(builder.emitNamedIntrinsic(scope.module, operation, nullptr, 0, first)));
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, second)));
+        SLANG_SUCCEEDED(builder.emitNamedIntrinsic(scope.module, operation, nullptr, 0, second)));
     SLANG_CHECK(first != second);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, second)));
 
@@ -4103,20 +4112,24 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsClock64)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
-    const SlangNVVMValueOperationDesc operation = {
-        SLANG_NVVM_VALUE_OP_CLOCK64,
+    const SlangNVVMNamedIntrinsicDesc operation = {
+        "llvm.nvvm.read.ptx.sreg.clock64",
+        sizeof("llvm.nvvm.read.ptx.sreg.clock64") - 1,
         NVVMSemantics::kSignedI64,
         nullptr,
         0,
     };
-    SLANG_CHECK_ABORT(builder.supportsValueOperation(operation));
-    SlangNVVMValueOperationDesc unsupported = operation;
-    unsupported.resultType = NVVMSemantics::kUnsignedI64;
-    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+    SLANG_CHECK_ABORT(builder.supportsNamedIntrinsic(operation));
+    SlangNVVMNamedIntrinsicDesc unsupported = operation;
+    unsupported.resultType = NVVMSemantics::kUnsignedI32;
+    SLANG_CHECK(!builder.supportsNamedIntrinsic(unsupported));
     unsupported = operation;
-    unsupported.operandTypes = &NVVMSemantics::kUnsignedI32;
+    const SlangNVVMNamedIntrinsicOperandDesc operand = {
+        NVVMSemantics::kUnsignedI32,
+        SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+    unsupported.operands = &operand;
     unsupported.operandCount = 1;
-    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+    SLANG_CHECK(!builder.supportsNamedIntrinsic(unsupported));
 
     ScopedNVVMBuilderModule scope;
     scope.builder = &builder;
@@ -4140,19 +4153,24 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsClock64)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
     SlangNVVMValueHandle invalid = nullptr;
     SLANG_CHECK(
-        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+        SLANG_FAILED(builder.emitNamedIntrinsic(scope.module, unsupported, nullptr, 0, invalid)));
     SLANG_CHECK(invalid == nullptr);
     unsupported = operation;
-    unsupported.resultType = NVVMSemantics::kUnsignedI64;
+    unsupported.resultType = NVVMSemantics::kUnsignedI32;
     SLANG_CHECK(
-        SLANG_FAILED(builder.emitValueOperation(scope.module, unsupported, nullptr, 0, invalid)));
+        SLANG_FAILED(builder.emitNamedIntrinsic(scope.module, unsupported, nullptr, 0, invalid)));
+    SLANG_CHECK(invalid == nullptr);
+    const SlangNVVMValueOperationDesc retired = {81, operation.resultType, nullptr, 0};
+    SLANG_CHECK(!builder.supportsValueOperation(retired));
+    SLANG_CHECK(
+        SLANG_FAILED(builder.emitValueOperation(scope.module, retired, nullptr, 0, invalid)));
     SLANG_CHECK(invalid == nullptr);
     SlangNVVMValueHandle first = nullptr;
     SlangNVVMValueHandle second = nullptr;
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, first)));
+        SLANG_SUCCEEDED(builder.emitNamedIntrinsic(scope.module, operation, nullptr, 0, first)));
     SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, operation, nullptr, 0, second)));
+        SLANG_SUCCEEDED(builder.emitNamedIntrinsic(scope.module, operation, nullptr, 0, second)));
     SLANG_CHECK(first != second);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, second)));
 
@@ -8825,51 +8843,22 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
 
-    const SlangNVVMValueTypeDesc signedOperands[] = {NVVMSemantics::kSignedI32};
     const SlangNVVMValueTypeDesc halfOperands[] = {NVVMSemantics::kFloat16};
     const SlangNVVMValueTypeDesc float32Operands[] = {NVVMSemantics::kFloat32};
     const SlangNVVMValueTypeDesc float64Operands[] = {
         NVVMSemantics::kFloat64,
         NVVMSemantics::kFloat64,
     };
-    const SlangNVVMValueOperation unaryMathOperations[] = {
-        SLANG_NVVM_VALUE_OP_ABS,
-    };
     const SlangNVVMValueOperation binaryMathOperations[] = {
         SLANG_NVVM_VALUE_OP_FMOD,
     };
 
-    SlangNVVMValueOperationDesc operation = {
-        SLANG_NVVM_VALUE_OP_ABS,
-        NVVMSemantics::kSignedI32,
-        signedOperands,
-        1,
-    };
-    SLANG_CHECK(builder.supportsValueOperation(operation));
-    operation = {
-        SLANG_NVVM_VALUE_OP_ABS,
-        NVVMSemantics::kFloat16,
-        halfOperands,
-        1,
-    };
-    SLANG_CHECK(builder.supportsValueOperation(operation));
-    for (auto mathOperation : unaryMathOperations)
-    {
-        operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 1};
-        SLANG_CHECK(builder.supportsValueOperation(operation));
-    }
+    SlangNVVMValueOperationDesc operation = {};
     for (auto mathOperation : binaryMathOperations)
     {
         operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 2};
         SLANG_CHECK(builder.supportsValueOperation(operation));
     }
-    operation = {
-        SLANG_NVVM_VALUE_OP_SIGN,
-        NVVMSemantics::kSignedI32,
-        float64Operands,
-        1,
-    };
-    SLANG_CHECK(builder.supportsValueOperation(operation));
     operation = {
         SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
         NVVMSemantics::kFloat32,
@@ -8903,7 +8892,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
     };
     SLANG_CHECK(!builder.supportsValueOperation(operation));
     operation = {
-        SLANG_NVVM_VALUE_OP_ABS,
+        SlangNVVMValueOperation(49),
         NVVMSemantics::kUnsignedI32,
         &NVVMSemantics::kUnsignedI32,
         1,
@@ -8958,36 +8947,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
 
     SlangNVVMValueHandle result = nullptr;
-    operation = {
-        SLANG_NVVM_VALUE_OP_ABS,
-        NVVMSemantics::kSignedI32,
-        signedOperands,
-        1,
-    };
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitValueOperation(module.module, operation, &values[0], 1, result)));
-    operation = {
-        SLANG_NVVM_VALUE_OP_ABS,
-        NVVMSemantics::kFloat16,
-        halfOperands,
-        1,
-    };
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitValueOperation(module.module, operation, &values[1], 1, result)));
-    operation = {
-        SLANG_NVVM_VALUE_OP_ABS,
-        NVVMSemantics::kFloat32,
-        float32Operands,
-        1,
-    };
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitValueOperation(module.module, operation, &values[2], 1, result)));
-    for (auto mathOperation : unaryMathOperations)
-    {
-        operation = {mathOperation, NVVMSemantics::kFloat64, float64Operands, 1};
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
-    }
     for (const char* name : {"__nv_floor", "__nv_rsqrt"})
     {
         auto mathBytes = _makeNVVMDeviceLibraryFixture(builder, 64, true, name);
@@ -9025,14 +8984,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             builder.emitValueOperation(module.module, operation, binaryOperands, 2, result)));
     }
-    operation = {
-        SLANG_NVVM_VALUE_OP_SIGN,
-        NVVMSemantics::kSignedI32,
-        float64Operands,
-        1,
-    };
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
     operation = {
         SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
         NVVMSemantics::kFloat32,
@@ -9077,16 +9028,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
         const String text = _getBlobText(assembly);
-        SLANG_CHECK(text.indexOf("declare float @__nv_fabsf(float)") >= 0);
         SLANG_CHECK(text.indexOf("declare float @__nv_frexpf(float, i32*)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @__nv_frexp(double, i32*)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @llvm.sqrt.f64(double)") >= 0);
         SLANG_CHECK(text.indexOf("call double @__nv_floor(double") >= 0);
         SLANG_CHECK(text.indexOf("call double @__nv_rsqrt(double") >= 0);
         SLANG_CHECK(text.indexOf("declare double @__nv_rsqrt(double)") >= 0);
-        SLANG_CHECK(text.indexOf("fcmp ogt double") >= 0);
-        SLANG_CHECK(text.indexOf("fcmp olt double") >= 0);
-        SLANG_CHECK(text.indexOf("and i16") >= 0);
         SLANG_CHECK(text.indexOf("load i32, i32*") >= 0);
     }
 }
@@ -12170,7 +12117,8 @@ static void _checkNVVMReservedMathOperation(
     UnitTestContext* unitTestContext,
     SlangNVVMValueOperation operation,
     uint32_t operandCount = 1,
-    bool booleanResult = false)
+    bool booleanResult = false,
+    bool signedResult = false)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -12221,7 +12169,9 @@ static void _checkNVVMReservedMathOperation(
                         testedType,
                         testedType};
                     const SlangNVVMValueHandle operands[] = {value, value, value};
-                    auto resultType = booleanResult ? NVVMSemantics::kBool : testedType;
+                    auto resultType = signedResult    ? NVVMSemantics::kSignedI32
+                                      : booleanResult ? NVVMSemantics::kBool
+                                                      : testedType;
                     resultType.laneCount = lanes;
                     const SlangNVVMValueOperationDesc desc =
                         {operation, resultType, operandTypes, operandCount};
@@ -12285,4 +12235,31 @@ SLANG_UNIT_TEST(nvvmIRBuilderRetiredCoreMathRejectsWithoutMutation)
 SLANG_UNIT_TEST(nvvmIRBuilderRetiredNaNRejectsWithoutMutation)
 {
     _checkNVVMReservedMathOperation(unitTestContext, SlangNVVMValueOperation(67), 1, true);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderCoreValuesUseNamedFunctions)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const auto& testCase : kNVVMCoreValueTestCases)
+    {
+        _checkNVVMDeviceLibraryTypedCall(
+            builder,
+            testCase.floatName,
+            32,
+            "core-value-float",
+            testCase.operandCount);
+        _checkNVVMDeviceLibraryTypedCall(
+            builder,
+            testCase.doubleName,
+            64,
+            "core-value-double",
+            testCase.operandCount);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderCoreValuesRejectRetiredOperations)
+{
+    _checkNVVMReservedMathOperation(unitTestContext, 49);
+    _checkNVVMReservedMathOperation(unitTestContext, 68, 1, false, true);
 }
