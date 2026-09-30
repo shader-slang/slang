@@ -3,8 +3,9 @@
 
 // CHECK: OpEntryPoint
 
-// The ordinary-function copy of `innerMain` that `outerMain` calls must keep its `id` parameter;
-// CUDA drops system-value parameters only from entry-point signatures.
+// The ordinary-function copy of `innerMain` that `outerMain` calls must keep its `id` parameter.
+// The CUDA emitter leaves any parameter with a system-value layout out of a signature, so the copy
+// must not inherit the entry point's parameter layouts.
 // CUDA: innerMain_{{[0-9]+}}(int{{[^)]*}}id{{[^)]*}}){{$}}
 // CUDA: innerMain_{{[0-9]+}}(&{{[^)]+}});
 

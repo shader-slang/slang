@@ -414,7 +414,8 @@ static void inlineOriginalFunction(IRFunc* func, IRCall* call)
 {
     SLANG_RELEASE_ASSERT(
         func->firstUse && func->firstUse->getUser() == call && !func->hasMoreThanOneUse());
-    inlineCall(call);
+    bool inlined = inlineCall(call);
+    SLANG_RELEASE_ASSERT(inlined);
     func->removeAndDeallocate();
 }
 

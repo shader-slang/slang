@@ -22,7 +22,8 @@ struct VOut
 };
 
 // The wrapper built by lowerOutParameters for a struct return must absorb the original function.
-// The entry-point `uniform` is essential: its hoisted parameter used to keep the original alive.
+// The entry-point `uniform` is essential: its hoisted parameter's IREntryPointParamDecoration is
+// a non-call use of the original, which is the path this case exercises.
 //VS-NOT: stage_in
 //VS: {{\[\[}}vertex{{\]\]}}{{.*}} vsMain({{.*}}{{\[\[}}stage_in{{\]\]}}
 //VS-NOT: stage_in
@@ -35,7 +36,8 @@ VOut vsMain(float3 p : POSITION, uniform float4x4 m)
     return o;
 }
 
-// The same wrapper, built here for an `out` parameter; the `uniform` is again essential.
+// The same wrapper, built here for an `out` parameter; the `uniform` is essential for the same
+// reason.
 //FS-NOT: stage_in
 //FS: {{\[\[}}fragment{{\]\]}}{{.*}} fsMain({{.*}}{{\[\[}}stage_in{{\]\]}}
 //FS-NOT: stage_in
@@ -45,10 +47,11 @@ void fsMain(float4 c : COLOR, uniform float4 tint, out float4 color : SV_Target)
     color = c * tint;
 }
 
-// A vertex shader that calls another vertex shader: fixEntryPointCallsites compiles the callee
-// as an ordinary function too. The `vsB_0` check matches that copy's one-line signature, which
-// must contain no `[` at all and end at its `)`, so a call site (ending in `;`) cannot match. The
-// two `[[vertex]]` checks match the vsA and vsB entry points, in either order.
+// A vertex shader that calls another vertex shader: fixEntryPointCallsites clones the callee into
+// an ordinary-function copy. The `vsB_0` check matches that copy's one-line signature, which must
+// contain no `[` at all and end at its `)`, so a call site (ending in `;`) cannot match. The copy
+// is emitted before its caller, so it precedes both entry points; the two `[[vertex]]` checks
+// match the vsA and vsB entry points, in either order.
 //EP-NOT: stage_in
 //EP: {{^[^[]*}} vsB_0({{[^[]*}}){{$}}
 //EP-NOT: stage_in

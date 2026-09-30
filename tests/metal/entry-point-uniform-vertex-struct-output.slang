@@ -7,12 +7,11 @@
 // was silently dropped (it read uninitialized memory). The wrapper is produced for BOTH triggers
 // of that pass -- a struct return AND `out` parameters -- so both are covered here.
 //
-// Each Metal vertex check pins not just that a buffer argument exists, but that the entry point
-// reads the uniform through that argument (`entryPointParams...->cfg`). With the #11606 bug the
-// argument is missing and the uniform is read through a context that nothing initializes, so the
-// check fails against that compiler rather than merely matching an incidental `buffer(`
-// elsewhere. The concrete buffer index is Slang's own default layout (entry-point params take the
-// first buffer slot), so the signature check matches `buffer(` without pinning a slot number.
+// Each Metal vertex check pins that the `[[vertex]]` signature has a buffer argument and that the
+// entry point body then reads `cfg` from `entryPointParams`. With the #11606 bug the signature has
+// no buffer argument, so the check fails against that compiler. The concrete buffer index is
+// Slang's own default layout (entry-point params take the first buffer slot), so the signature
+// check matches `buffer(` without pinning a slot number.
 
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry vsMain
 //TEST:SIMPLE(filecheck=METALOUT): -target metal -stage vertex -entry vsOut

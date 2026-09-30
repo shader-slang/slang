@@ -6,10 +6,10 @@
 
 namespace Slang
 {
-// Remove the layout decorations the entry point's parameters carry. Emitters read them as
-// stage-interface information, which is wrong for an ordinary function: Metal prints a varying
-// input as `[[stage_in]]`, and CUDA leaves a system-value parameter out of the signature while
-// callers still pass it.
+// Remove the layout decorations from the parameters of `func`, an ordinary-function copy of an
+// entry point. Emitters read them as stage-interface information, which is wrong for an ordinary
+// function: Metal prints a varying input as `[[stage_in]]`, and CUDA leaves a system-value
+// parameter out of the signature while callers still pass it.
 static void removeParamLayoutDecorations(IRFunc* func)
 {
     for (auto param : func->getParams())
