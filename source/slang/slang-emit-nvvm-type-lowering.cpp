@@ -2473,11 +2473,8 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
     SLANG_UNEXPECTED("unknown NVVM type use");
 }
 
-NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
+NVVMTypeInfo classifyNVVMType(IRType* type)
 {
-    if (const auto cachedInfo = m_typeInfoMap.tryGetValue(type))
-        return *cachedInfo;
-
     NVVMTypeInfo info;
     info.canonicalType = type;
     info.isVoid = as<IRVoidType>(type) != nullptr;
@@ -2548,6 +2545,15 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
     info.isStructuredBufferStorage = isNVVMSupportedStructuredBufferStorageType(type);
     info.isParameterGroupElementStorage = isNVVMSupportedParameterGroupElementStorageType(type);
 
+    return info;
+}
+
+NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
+{
+    if (const auto cachedInfo = m_typeInfoMap.tryGetValue(type))
+        return *cachedInfo;
+
+    const auto info = classifyNVVMType(type);
     m_typeInfoMap[type] = info;
     return info;
 }

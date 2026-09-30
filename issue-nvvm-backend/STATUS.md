@@ -6,7 +6,7 @@ recognizer is replaced by a typed query that preserves the exact field key befor
 Explicit LLVM/libdevice names and genuine primitive PTX remain intentional backend interfaces.
 Module43, ABI46 and container2 are unchanged. The signed16 O3 failure is corrected by provider-side
 normalization at exact-width integer consumers. The consolidated integration checkpoint is accepted;
-operation-dispatch cleanup is accepted. Shared type-role admission is next.
+operation-dispatch and shared type-role admission cleanup are accepted. Structured-buffer planning is next.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -20,25 +20,25 @@ Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_upda
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-dispatch/`; integration evidence remains under `build/nvvm-integration/run-1/`.
+`build/nvvm-type-admission/`; dispatch evidence remains under `build/nvvm-dispatch/`, and integration evidence remains under `build/nvvm-integration/run-1/`.
 Plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
-| Evidence                                          | Result                                                                                           |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Build                                             | Eight-job compiler/provider build 31 seconds; test tools 21 seconds                              |
-| Focused units                                     | 63 pass: generic numeric/Half/BF16, exact waves and preflight/no-mutation contracts              |
-| PTX smoke                                         | Representative core-math-composition O3 output byte-identical before/after                       |
-| Deletion                                          | 33 duplicate numeric catalog rows, 3 unreachable Float32 helpers, repeated fake dispatch removed |
-| Retained                                          | 5 exact canonical wave rows, typed operand/ownership checks and signed16 normalization           |
-| Last full / targeted / implementations since full | log-family / operation-dispatch cleanup / 10                                                     |
-| Historical evidence                               | Full baseline/identity and all 37 earlier feature objects retained                               |
+| Evidence                                          | Result                                                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Build                                             | Eight-job compiler build 31 seconds; unchanged provider and test tools reused                       |
+| Focused units                                     | 12 pass in 8 seconds: helper roles, Half ABI, resources, negative preflight and module-local caches |
+| Ownership                                         | One provider-independent canonical type classifier feeds helper preflight and lowering              |
+| Retained                                          | Role-specific supports policy, supports-before-cache order, provenance/export/layout checks         |
+| Last full / targeted / implementations since full | log-family / shared type-role admission / 11                                                        |
+| Historical evidence                               | Full baseline/identity and all 38 earlier feature objects retained                                  |
 
-Numeric operations now have one family owner across compiler, real provider and fake provider.
-The fake uses one typed recorder with consistent counters. Two capability diagnostic labels now
-name their actual generic family. No fresh runtime/numerical campaign or full integration rerun
-was needed for this deletion-only cleanup.
+The existing classifier was extracted unchanged; no representation or admission policy changed.
+An initial test command lacked plugin prefixes and failed before tests started; its corrected
+selection passed all twelve tests. No new runtime or full integration campaign was needed.
+The preceding dispatch cleanup passed 63 units with byte-identical representative PTX and removed
+33 duplicate catalog rows, three unreachable Float32 helpers and repeated fake dispatch.
 
 The bounded integration checkpoint is accepted in `features.nvvm-post-migration-integration`.
 Five native failures were outdated migration assertions: early-folded size/alignment constants,
@@ -62,11 +62,11 @@ covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `c617d1c444dbc33cbb251cf3d56984570b661a13` plus compiler/provider patch
-`d9efca36f295ce2f1bc9aa0d03dc26332fadb4186c9fc4a39179066536300463`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `035434cfe5e828f28023ee17a36ca5a3c930ec06fcbe3aa9279b76f435f06da8`.
+Revision `caf98bcfd132e714c9d13ca9058d3df252b26d8a` plus compiler patch
+`146a8d5795aec990458a2f4000747f4fe10b8337730917a3d633a3f0cb04a99c`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `3c92fd16d059703dc71a07b34d2cfa09459b443ad08b502438173664ddf494ee`.
 Provider SHA-256: `4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72`.
-Source/runtime/test/configuration hashes are in `features.nvvm-operation-dispatch-cleanup`.
+Source/runtime/test/configuration hashes are in `features.nvvm-shared-type-admission`.
 Later commits do not relabel these binaries. Earlier integration and failure evidence retain their
 actual identities, including the explicit signed16 resolution.
 
@@ -86,7 +86,7 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 ## Next action
 
 The agreed migration and residual-text audit are finished. The maintainer authorized this sequence
-on 2026-09-30. Steps 1–3 are complete; step 4 is next:
+on 2026-09-30. Steps 1–4 are complete; step 5 is next:
 
 1. Fix the known signed16 O3 normalization failure at its responsible layer, retaining its failure
    history and avoiding an abs-specific workaround.

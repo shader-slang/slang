@@ -4928,47 +4928,15 @@ UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 }
 
 // Returns whether a type is an accepted canonical value in a helper result.
-bool _isSupportedNVVMHelperResultType(IRInst* type)
+bool _isSupportedNVVMHelperResultType(IRType* type)
 {
-    IRType* localValueType = nullptr;
-    if (asNVVMSupportedLocalHelperValuePointerType(type, &localValueType) &&
-        asNVVMSupportedSubstandardRecordType(localValueType) &&
-        !asNVVMSupportedLocalBFloat16RecordType(localValueType))
-        return false;
-    NVVMRawBufferType rawBufferType;
-    NVVMReadOnlyTextureType sampledTextureType;
-    return as<IRVoidType>(type) || isNVVMFloat8Type(type) || isNVVMBFloat16Type(type) ||
-           asNVVMBFloat16VectorType(type) || isNVVMSupportedHelperValueType(type) ||
-           asNVVMSupportedSubstandardRecordType(type) || asNVVMSupportedResourceStructType(type) ||
-           asNVVMSupportedLocalCopyableValuePointerType(type) ||
-           asNVVMSupportedLocalHelperValuePointerType(type) ||
-           asNVVMSupportedDeviceHelperValuePointerType(type) ||
-           getNVVMSupportedRawBufferType(type, rawBufferType) ||
-           getNVVMSupportedReadOnlyTextureType(type, sampledTextureType);
+    return classifyNVVMType(type).supports(NVVMTypeUse::HelperResult);
 }
 
 // Returns whether one exact canonical type can cross a selected helper parameter boundary.
-bool _isSupportedNVVMHelperParameterType(IRInst* type)
+bool _isSupportedNVVMHelperParameterType(IRType* type)
 {
-    NVVMRawBufferType rawBufferType;
-    NVVMSurfaceType surfaceType;
-    NVVMReadOnlyTextureType sampledTextureType;
-    return isNVVMFloat8Type(type) || isNVVMBFloat16Type(type) || asNVVMBFloat16VectorType(type) ||
-           isNVVMSupportedHelperValueType(type) || asNVVMSupportedSubstandardRecordType(type) ||
-           asNVVMSupportedLocalSubstandardRecordArrayType(type) ||
-           asNVVMSupportedResourceStructType(type) ||
-           asNVVMSupportedLocalResourceStructPointerType(type) ||
-           asNVVMSupportedLocalCopyableValuePointerType(type) ||
-           asNVVMSupportedLocalHelperValuePointerType(type) ||
-           asNVVMSupportedHelperReferencePointerType(type) ||
-           asNVVMSupportedPhysicalStorageReferencePointerType(type) ||
-           asNVVMSupportedLocalPhysicalStoragePointerType(type) ||
-           asNVVMSupportedSharedHelperPointerType(type) ||
-           asNVVMSupportedDeviceHelperValuePointerType(type) ||
-           getNVVMSupportedRawBufferType(type, rawBufferType) ||
-           getNVVMSupportedSurfaceType(type, surfaceType) ||
-           getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
-           asNVVMSupportedSamplerValueType(type);
+    return classifyNVVMType(type).supports(NVVMTypeUse::HelperParameter);
 }
 
 // Returns the exact group-shared pointer values whose source type is allowed to omit address-space

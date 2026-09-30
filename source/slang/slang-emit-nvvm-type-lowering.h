@@ -484,6 +484,10 @@ struct NVVMTypeInfo
     bool supports(NVVMTypeUse use) const;
 };
 
+/// Classifies a canonical linked-IR type without creating provider handles. Helper preflight and
+/// cached type lowering select their representation roles from the same record.
+NVVMTypeInfo classifyNVVMType(IRType* type);
+
 /// Maps canonical linked-IR types to module-owned provider handles and caches each representation.
 class NVVMTypeLoweringContext
 {

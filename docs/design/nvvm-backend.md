@@ -316,6 +316,12 @@ the same ownership and records each admitted family attempt once before physical
 its counters do not depend on numeric width or catalog membership. Complete descriptor preflight
 still precedes provider module creation.
 
+Helper signature preflight and type lowering share `classifyNVVMType`, a provider-independent
+classification of canonical IR types. `NVVMTypeInfo::supports` owns the parameter/result/storage
+role distinctions, including substandard record and reference exceptions. Type lowering caches
+that record but checks the requested role before reusing a physical representation. Actual argument
+provenance, export restrictions and CUDA/LLVM layout compatibility remain separate checks.
+
 | Boundary                               | Owner and responsibility                                                                                                                                                      |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                          |

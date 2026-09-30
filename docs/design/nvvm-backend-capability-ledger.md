@@ -7,6 +7,10 @@ inventories and outcomes. Source test links below identify durable contracts; th
 records which compiler and inputs were actually tested. Deeper historical evidence is available through the
 [archive guide](../../issue-nvvm-backend/HISTORY.md).
 
+Helper parameter/result admission and provider lowering use the same `NVVMTypeInfo` role policy.
+Argument provenance, exported ABI restrictions and physical layout compatibility remain separate
+requirements; sharing type classification does not broaden any qualified role.
+
 ## Reading the evidence
 
 - **GPU** means an independently expected output was qualified on the recorded platform. It does not

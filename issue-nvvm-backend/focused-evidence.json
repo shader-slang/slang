@@ -77231,6 +77231,79 @@
         "Float8Widen fake emission remains rejected; genuinely exact wave admissions and Half helper ABI remain distinct.",
         "37 earlier feature objects/full baseline/identity retained; signed16 correction remains intact."
       ]
+    },
+    "nvvm-shared-type-admission": {
+      "status": "accepted-focused",
+      "scope": "Provider-independent canonical type classification shared by helper preflight and cached lowering. Existing supports(role), representations, ABI, provenance, export and layout rules remain unchanged.",
+      "identity": {
+        "revision": "caf98bcfd132e714c9d13ca9058d3df252b26d8a",
+        "compiler_patch_sha256": "146a8d5795aec990458a2f4000747f4fe10b8337730917a3d633a3f0cb04a99c",
+        "files": {
+          "source/slang/slang-emit-nvvm.cpp": "08dc6ad929ec776b3db7124e0e23bfce5975bfd02cf4c5c22134332b19645ce9",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "3a422a9c7877c6f251459273508ce2c1a16f13049c57cb21a31f6c6659f6e982",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "cffcfe4830043ea55c19928cde017a4ae00286ea631389a9273172645a8debe3"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "3c92fd16d059703dc71a07b34d2cfa09459b443ad08b502438173664ddf494ee",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "560541b0ae3fcae8a6eba3a43ed316ee5a03623b3a507481d9ae0e21e5256e12",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "record": {
+          "path": "build/nvvm-type-admission/tested-identity.json",
+          "sha256": "48a11fbb40d51f9edaece1ce3fc79739c25876f2a2d0f63a6ab85b12899227f3"
+        }
+      },
+      "build": {
+        "path": "build/nvvm-type-admission/build.json",
+        "sha256": "e422a0ed1cbb8d63aac6dfe6c7edb973a0a3fddb7c8a12fc4af3498faca5c113",
+        "return_code": 0,
+        "elapsed_seconds": 30.952882051467896
+      },
+      "units": {
+        "passed": 12,
+        "record": {
+          "path": "build/nvvm-type-admission/units-corrected.json",
+          "sha256": "3aaef01551b51efcb21eaa62f5cdbe32d9be5f033d507766095d4782a50bd7ff",
+          "return_code": 0,
+          "elapsed_seconds": 7.8469319343566895
+        },
+        "outcomes": {
+          "slang-unit-test-tool/nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangHalfVectorsCrossAllFourHelperBoundaries.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangResourceStructsCrossLocalAndHelperBoundaries.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRecursiveCopyableValuesCrossHelperBoundaries.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangTypeCacheIsModuleLocal.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangResourceViewsCrossHelperResultsByValue.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangFiniteGroupsharedValuesCrossHelperPointers.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsUseInternalValues.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangNestedSubstandardRecordsRejectOtherRoles.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangFloat8UnsupportedRolesStopBeforeEmission.internal": "passed"
+        }
+      },
+      "validation_incidents": [
+        {
+          "status": "resolved-command-error",
+          "attempt": {
+            "path": "build/nvvm-type-admission/units.json",
+            "sha256": "ff8f457d0ac9d64581755361a2defd9981918e35dd7e2a5ec876ef5507ef26b4",
+            "return_code": 1,
+            "elapsed_seconds": 0.30039262771606445
+          },
+          "cause": "Unit selectors omitted slang-unit-test-tool/ prefix; tool launcher rejected first selector before executing tests.",
+          "resolution": "Corrected all selector prefixes and ran the exact twelve tests successfully."
+        }
+      ],
+      "limitations": [
+        "No type representation or admission changes; static cache-order coverage retains historical identity. Upcoming address-planning change will rerun direct static units.",
+        "No new GPU/full integration/numerical campaign; provider and test plugin reused unchanged. All earlier feature records and full baseline/identity preserved."
+      ]
     }
   }
 }
