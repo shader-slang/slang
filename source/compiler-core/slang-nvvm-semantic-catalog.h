@@ -38,7 +38,7 @@ struct ValueOperationFamilyResolution
     bool requiresCUDADeviceLibrary = false;
 };
 
-/// Describes one established semantic overload from canonical Slang values to the provider ABI.
+/// Describes one exact hardware-wave overload outside the generic value-operation families.
 struct CatalogEntry
 {
     SlangNVVMValueOperation operation;
@@ -46,7 +46,6 @@ struct CatalogEntry
     SlangNVVMValueTypeDesc operandTypes[3];
     uint32_t operandCount;
     const char* diagnosticName;
-    bool requiresCUDADeviceLibrary = false;
 };
 
 inline constexpr SlangNVVMValueTypeDesc kNoType = {};
@@ -125,240 +124,9 @@ inline constexpr SlangNVVMValueTypeDesc kSignedI32x2 = {
     2,
 };
 
-// This is the only table that maps an established typed semantic to its provider operation.
+// Hardware wave operations have exact signatures; numeric operations use the family resolver.
 // Producer and target spellings are deliberately absent from the typed provider contract.
 inline constexpr CatalogEntry kCatalog[] = {
-    {
-        SLANG_NVVM_VALUE_OP_ADD,
-        kSignedI32,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 addition",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_SUBTRACT,
-        kSignedI32,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 subtraction",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_MULTIPLY,
-        kSignedI32,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 multiplication",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_AND,
-        kSignedI32,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 bitwise AND",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_OR,
-        kSignedI32,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 bitwise OR",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_XOR,
-        kSignedI32,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 bitwise XOR",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_NOT,
-        kSignedI32,
-        {kSignedI32, kNoType, kNoType},
-        1,
-        "signed i32 bitwise NOT",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_NEGATE,
-        kSignedI32,
-        {kSignedI32, kNoType, kNoType},
-        1,
-        "signed i32 arithmetic negation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_EQUAL,
-        kBool,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 equality comparison",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_NOT_EQUAL,
-        kBool,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 inequality comparison",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_LESS_THAN,
-        kBool,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 less-than comparison",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_GREATER_THAN,
-        kBool,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 greater-than comparison",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_LESS_EQUAL,
-        kBool,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 less-than-or-equal comparison",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
-        kBool,
-        {kSignedI32, kSignedI32, kNoType},
-        2,
-        "signed i32 greater-than-or-equal comparison",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_ADD,
-        kFloat32,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 addition",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_SUBTRACT,
-        kFloat32,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 subtraction",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_MULTIPLY,
-        kFloat32,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 multiplication",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_DIVIDE,
-        kFloat32,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 division",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_NEGATE,
-        kFloat32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 negation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_EQUAL,
-        kBool,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 ordered equality",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_NOT_EQUAL,
-        kBool,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 unordered inequality",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_LESS_THAN,
-        kBool,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 ordered less-than",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_GREATER_THAN,
-        kBool,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 ordered greater-than",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_LESS_EQUAL,
-        kBool,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 ordered less-than-or-equal",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_GREATER_EQUAL,
-        kBool,
-        {kFloat32, kFloat32, kNoType},
-        2,
-        "float32 ordered greater-than-or-equal",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
-        kFloat16,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "floating-point width conversion",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_FLOAT_CONVERT,
-        kFloat32,
-        {kFloat16, kNoType, kNoType},
-        1,
-        "floating-point width conversion",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-        kSignedI32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-        kSignedI32,
-        {kUnsignedI32, kNoType, kNoType},
-        1,
-        "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-        kUnsignedI32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-        kUnsignedI32,
-        {kSignedI32, kNoType, kNoType},
-        1,
-        "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-        kFloat32,
-        {kSignedI32, kNoType, kNoType},
-        1,
-        "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_BIT_REINTERPRET,
-        kFloat32,
-        {kUnsignedI32, kNoType, kNoType},
-        1,
-        "32-bit value reinterpretation",
-    },
     {
         SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
         kUnsignedI32,
@@ -395,11 +163,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         "float32 wave-mask match intrinsic",
     },
 };
-
-inline constexpr size_t getCatalogCount()
-{
-    return sizeof(kCatalog) / sizeof(kCatalog[0]);
-}
 
 inline bool areSameType(const SlangNVVMValueTypeDesc& left, const SlangNVVMValueTypeDesc& right)
 {

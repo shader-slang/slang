@@ -77061,6 +77061,176 @@
         "All36 earlier feature objects and full baseline/identity retained, including historical failures superseded by explicit resolution records.",
         "CUDA C++ PTX is comparison evidence; differing implementation structures are accepted only with explicit semantic contracts. WaveMaskMatch differing-value mask semantics remain separately qualified."
       ]
+    },
+    "nvvm-operation-dispatch-cleanup": {
+      "status": "accepted-focused",
+      "scope": "Delete33 shadowed numeric exact-catalog rows and3 unreachable Float32 emission helpers. Numeric operations resolve through generic families in compiler/real/fake providers; retain5 exact canonical-wave rows. One fake recorder preserves typed operands, ownership checks, BF16 ternary and consistent family counters. No provider ABI/operation IDs or numeric behavior change.",
+      "compiler_identity": {
+        "revision": "c617d1c444dbc33cbb251cf3d56984570b661a13",
+        "compiler_patch_sha256": "d9efca36f295ce2f1bc9aa0d03dc26332fadb4186c9fc4a39179066536300463",
+        "files": {
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "e46a3cb376dd50c8be2efb0b8d1f1b55ab14e531beb861782f2e091ceb8a410f",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "8e458ecf3d6846ff83a2cefd9dd38a01d35987db9bb02075deedbb75508460ec",
+          "source/slang/slang-emit-nvvm.cpp": "2e00929d829b74b399f7801b56f3937b3cde785b62bf93a813cc4a7a27f5455c",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "5a5e82e91b56cea9b489ab00963d7d5349fa63161e04667aa051a957465d30c5",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "f9ebf24fb5e1780fef7a1ede4e91cd94ec65b72ca6cd5954a5fd2f4bbd871e96",
+          "tests/cuda/nvvm-core-math-composition.slang": "65bc13217ff3bf93cf10b77ec6842ce3a65edb70b05f26bc7268d35a2cfb97cf"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "035434cfe5e828f28023ee17a36ca5a3c930ec06fcbe3aa9279b76f435f06da8",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "560541b0ae3fcae8a6eba3a43ed316ee5a03623b3a507481d9ae0e21e5256e12",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "container_version": 2,
+        "tested_identity": {
+          "path": "build/nvvm-dispatch/tested-identity.json",
+          "sha256": "1e3a50042a75d9b7754b8b69f58cf9219dd7df21621ee291d341bfedd2c718a9"
+        }
+      },
+      "validation": {
+        "builds": [
+          {
+            "path": "build/nvvm-dispatch/build-production.json",
+            "sha256": "282a50b529aaaf4dbe1920b7fe51e5accacc2e9135803441dbe1abfcffb2034a",
+            "return_code": 0,
+            "elapsed_seconds": 30.508134841918945
+          },
+          {
+            "path": "build/nvvm-dispatch/build-tests.json",
+            "sha256": "ddd791f75e25d76ccfd6052f58a80e04e5706bf64dbb8a7ff9b2eef8dce1a7b6",
+            "return_code": 0,
+            "elapsed_seconds": 21.075857877731323
+          }
+        ],
+        "units": {
+          "passed": 63,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderRejectsUnknownOperationsWithoutMutation.internal",
+            "slang-unit-test-tool/nvvmIRBuilderRejectsInvalidFloat32Operations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32SubtractKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32MultiplyKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32DivideKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32NegateKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32EqualKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32NotEqualKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32GreaterThanKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32LessEqualKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32GreaterEqualKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32LessThanKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32ConstantKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32PhiKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32FunctionKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveActiveMaskKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskMatchIntKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskMatchUIntKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskMatchFloatKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32CopyKernel.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsFloat32AddKernel.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32AddUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32SubtractUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangRoutesGenericScalarFamilies.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32MultiplyUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32DivideUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32NegateUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32EqualUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32NotEqualUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32GreaterThanUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32LessEqualUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32GreaterEqualUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32LessThanUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32ConstantUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32FunctionsUseDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32PhiUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat64ValueFamilyUsesGenericTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangWaveActiveMaskUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangWaveMaskMatchUsesTypedIntrinsic.internal",
+            "slang-unit-test-tool/nvvmSlangScalarShiftDivideRemainderUseTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangFloat16ValuesUseGenericTypedPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32CopyUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangSelectedScalarTruthinessUsesTypedInequality.internal",
+            "slang-unit-test-tool/nvvmSlangHardwareAndLogicalWaveMasksStayDistinct.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32AddRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangPreflightsExactValueOperationCapabilities.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32SubtractRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32MultiplyRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32DivideRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32NegateRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32EqualRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32NotEqualRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32GreaterThanRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32LessEqualRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32GreaterEqualRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32LessThanRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32ConstantRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32PhiRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32FunctionRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmSlangFloat32CopyRuntimeMatchesNVRTC.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBFloat16FmaContract.internal",
+            "slang-unit-test-tool/nvvmSlangBFloat16CoreDotComposition.internal"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-dispatch/units.json",
+              "sha256": "f2127986a9beb2937126401cae48d565a3d3d2393ceb797e3c9adb5579f02dae",
+              "return_code": 0,
+              "elapsed_seconds": 8.661333322525024
+            },
+            {
+              "path": "build/nvvm-dispatch/bf16-units.json",
+              "sha256": "a755b555a026fb15ec92abad4140b65783e9fbb268d802fae7ef047c7960655e",
+              "return_code": 0,
+              "elapsed_seconds": 1.7635297775268555
+            }
+          ],
+          "contracts": "Generic numeric/Half/BF16 families, real provider LLVM, exact capability rejection/no mutation and canonical waves; no assertion weakened."
+        },
+        "ptx_smoke": {
+          "records": [
+            {
+              "path": "build/nvvm-dispatch/before-ptx.json",
+              "sha256": "33cdb92438a89d28ce79f764d5ac0a0c0aa4cdb6983552f6f74545eff3c50d3f",
+              "return_code": 0,
+              "elapsed_seconds": 0.43502116203308105
+            },
+            {
+              "path": "build/nvvm-dispatch/after-ptx.json",
+              "sha256": "803f78445d83192839d763be000d58225792b8d865e7de6c2603ffa66b20396c",
+              "return_code": 0,
+              "elapsed_seconds": 0.43763136863708496
+            }
+          ],
+          "artifacts": [
+            {
+              "path": "build/nvvm-dispatch/before.ptx",
+              "sha256": "1244289f6681861fcbf93e0da856f7cb5daa57b66cda7ec2876047c16ee8e2b1"
+            },
+            {
+              "path": "build/nvvm-dispatch/after.ptx",
+              "sha256": "1244289f6681861fcbf93e0da856f7cb5daa57b66cda7ec2876047c16ee8e2b1"
+            }
+          ],
+          "comparison": "Representative core-math-composition O3 PTX byte-identical before/after; code-generation preservation only, no fresh GPU/numerical claim."
+        },
+        "ownership_audit": {
+          "path": "build/nvvm-dispatch/ownership-audit.json",
+          "sha256": "51560f59797e9cf74ac0cf5566a0e2864a49079b4aae3dc8bae9644c06cfbd37"
+        }
+      },
+      "validation_incidents": [],
+      "limitations": [
+        "No repeated full integration/native/runtime/numerical/material campaign. Prior accepted integration retains its tested identity.",
+        "Float8Widen fake emission remains rejected; genuinely exact wave admissions and Half helper ABI remain distinct.",
+        "37 earlier feature objects/full baseline/identity retained; signed16 correction remains intact."
+      ]
     }
   }
 }

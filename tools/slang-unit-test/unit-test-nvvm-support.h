@@ -5791,7 +5791,9 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitVectorConstruct(
     return SLANG_OK;
 }
 
-static SlangResult _recordFakeNVVMBuilderCatalogScalarOperation(
+// Records every admitted family dispatch attempt before the shared physical operand checks.
+// Accounting must not depend on whether a particular width once had an exact catalog row.
+static SlangResult _recordFakeNVVMBuilderValueOperation(
     SlangNVVMModuleHandle module,
     FakeNVVMBuilderScalarFamily family,
     const SlangNVVMValueOperationDesc& operation,
@@ -5810,67 +5812,6 @@ static SlangResult _recordFakeNVVMBuilderCatalogScalarOperation(
         operation.operandTypes);
 }
 
-static SlangResult _fakeNVVMBuilderEmitCatalogOperation(
-    SlangNVVMModuleHandle module,
-    const NVVMSemantics::CatalogEntry& entry,
-    const SlangNVVMValueHandle* operands,
-    SlangNVVMValueHandle* outValue)
-{
-    const SlangNVVMValueOperationDesc operation = NVVMSemantics::getOperationDesc(entry);
-    if (entry.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(entry.operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(entry.operation)},
-            operands,
-            entry.operandCount,
-            outValue,
-            &operation.resultType,
-            operation.operandTypes);
-    }
-    if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
-    {
-        const FakeNVVMBuilderScalarFamily family =
-            entry.operandCount == 1 ? FakeNVVMBuilderScalarFamily::FloatingUnary
-            : entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL
-                ? FakeNVVMBuilderScalarFamily::FloatingCompare
-                : FakeNVVMBuilderScalarFamily::FloatingBinary;
-        return _recordFakeNVVMBuilderCatalogScalarOperation(
-            module,
-            family,
-            operation,
-            operands,
-            outValue);
-    }
-
-    if (entry.operation >= SLANG_NVVM_VALUE_OP_EQUAL &&
-        entry.operation <= SLANG_NVVM_VALUE_OP_GREATER_EQUAL)
-    {
-        return _recordFakeNVVMBuilderCatalogScalarOperation(
-            module,
-            FakeNVVMBuilderScalarFamily::Compare,
-            operation,
-            operands,
-            outValue);
-    }
-    if (entry.operation <= SLANG_NVVM_VALUE_OP_NEGATE)
-    {
-        const FakeNVVMBuilderScalarFamily family = entry.operandCount == 1
-                                                       ? FakeNVVMBuilderScalarFamily::Unary
-                                                       : FakeNVVMBuilderScalarFamily::Binary;
-        return _recordFakeNVVMBuilderCatalogScalarOperation(
-            module,
-            family,
-            operation,
-            operands,
-            outValue);
-    }
-
-    return _fakeNVVMBuilderEmitIntrinsic(module, operation, operands, entry.operandCount, outValue);
-}
-
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMValueOperationDesc* operation,
@@ -5886,202 +5827,59 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
         return SLANG_E_INVALID_ARG;
     }
 
-    if (operation->operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET)
-    {
-        NVVMSemantics::ValueOperationFamilyResolution resolution;
-        if (!NVVMSemantics::resolveValueOperationFamily(*operation, resolution) ||
-            resolution.family != NVVMSemantics::ValueOperationFamily::BitReinterpret)
-        {
-            return SLANG_E_INVALID_ARG;
-        }
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-
-    const NVVMSemantics::CatalogEntry* entry = NVVMSemantics::find(*operation);
-    if (entry)
-        return _fakeNVVMBuilderEmitCatalogOperation(module, *entry, operands, outValue);
-
     NVVMSemantics::ValueOperationFamilyResolution resolution;
     if (!NVVMSemantics::resolveValueOperationFamily(*operation, resolution))
+    {
+        const auto entry = NVVMSemantics::find(*operation);
+        return entry ? _fakeNVVMBuilderEmitIntrinsic(
+                           module,
+                           *operation,
+                           operands,
+                           operandCount,
+                           outValue)
+                     : SLANG_E_INVALID_ARG;
+    }
+
+    FakeNVVMBuilderScalarFamily family;
+    switch (resolution.family)
+    {
+    case NVVMSemantics::ValueOperationFamily::IntegerBinary:
+    case NVVMSemantics::ValueOperationFamily::BooleanBinary:
+        family = FakeNVVMBuilderScalarFamily::Binary;
+        break;
+    case NVVMSemantics::ValueOperationFamily::IntegerUnary:
+    case NVVMSemantics::ValueOperationFamily::BooleanUnary:
+    case NVVMSemantics::ValueOperationFamily::IntegerConvert:
+    case NVVMSemantics::ValueOperationFamily::FloatToInteger:
+    case NVVMSemantics::ValueOperationFamily::BitReinterpret:
+        family = FakeNVVMBuilderScalarFamily::Unary;
+        break;
+    case NVVMSemantics::ValueOperationFamily::IntegerCompare:
+    case NVVMSemantics::ValueOperationFamily::BooleanCompare:
+        family = FakeNVVMBuilderScalarFamily::Compare;
+        break;
+    case NVVMSemantics::ValueOperationFamily::FloatUnary:
+    case NVVMSemantics::ValueOperationFamily::IntegerToFloat:
+    case NVVMSemantics::ValueOperationFamily::FloatConvert:
+    case NVVMSemantics::ValueOperationFamily::BFloat16Convert:
+        family = FakeNVVMBuilderScalarFamily::FloatingUnary;
+        break;
+    case NVVMSemantics::ValueOperationFamily::FloatBinary:
+        family = FakeNVVMBuilderScalarFamily::FloatingBinary;
+        break;
+    case NVVMSemantics::ValueOperationFamily::FloatCompare:
+        family = FakeNVVMBuilderScalarFamily::FloatingCompare;
+        break;
+    case NVVMSemantics::ValueOperationFamily::BFloat16Fma:
+        family = FakeNVVMBuilderScalarFamily::FloatingTernary;
+        break;
+    case NVVMSemantics::ValueOperationFamily::Select:
+        family = FakeNVVMBuilderScalarFamily::Select;
+        break;
+    default:
         return SLANG_E_INVALID_ARG;
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerBinary ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanBinary)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Binary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Binary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
     }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerUnary ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatUnary)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerCompare)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatCompare)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::BooleanCompare)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Compare, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatBinary)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingBinary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingBinary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerConvert)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerToFloat)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatToInteger)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Unary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatConvert ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::BFloat16Convert)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::BFloat16Fma)
-    {
-        return _recordFakeNVVMBuilderCatalogScalarOperation(
-            module,
-            FakeNVVMBuilderScalarFamily::FloatingTernary,
-            *operation,
-            operands,
-            outValue);
-    }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::Select)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::Select, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::Select, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
-    return SLANG_E_INVALID_ARG;
+    return _recordFakeNVVMBuilderValueOperation(module, family, *operation, operands, outValue);
 }
 
 static SlangNVVMBuilderFoundationAPI _makeFakeNVVMBuilderFoundationAPI()

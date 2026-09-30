@@ -6,7 +6,7 @@ recognizer is replaced by a typed query that preserves the exact field key befor
 Explicit LLVM/libdevice names and genuine primitive PTX remain intentional backend interfaces.
 Module43, ABI46 and container2 are unchanged. The signed16 O3 failure is corrected by provider-side
 normalization at exact-width integer consumers. The consolidated integration checkpoint is accepted;
-operation-dispatch cleanup is next.
+operation-dispatch cleanup is accepted. Shared type-role admission is next.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -20,21 +20,25 @@ Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_upda
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-signed16/` and `build/nvvm-integration/run-1/`; plans and reports remain uncommitted.
+`build/nvvm-dispatch/`; integration evidence remains under `build/nvvm-integration/run-1/`.
+Plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
-| Evidence                                          | Result                                                                             |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Native units                                      | 1,172 pass, 12 inherited skips; only five stale assertions rerun after correction  |
-| Shared semantics                                  | 1,171 pass, 78 inherited skips; one expected new diagnostic test                   |
-| Capability                                        | 106 pass                                                                           |
-| Runtime                                           | 40 fresh migration cells plus 4 reused signed16 O0/O3 cells; native GPU4 also pass |
-| Toolkit / surfaces                                | 18 compile/assembly cells and 4 physical surface cells pass                        |
-| Exact inventory                                   | 29 added / 34 retired native tests explained from Git; unchanged retained statuses |
-| Build                                             | Test-only rebuild in 20 seconds; production binaries unchanged                     |
-| Last full / targeted / implementations since full | log-family / post-migration integration / 9                                        |
-| Historical evidence                               | Full baseline/identity and all 36 earlier feature objects retained                 |
+| Evidence                                          | Result                                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Build                                             | Eight-job compiler/provider build 31 seconds; test tools 21 seconds                              |
+| Focused units                                     | 63 pass: generic numeric/Half/BF16, exact waves and preflight/no-mutation contracts              |
+| PTX smoke                                         | Representative core-math-composition O3 output byte-identical before/after                       |
+| Deletion                                          | 33 duplicate numeric catalog rows, 3 unreachable Float32 helpers, repeated fake dispatch removed |
+| Retained                                          | 5 exact canonical wave rows, typed operand/ownership checks and signed16 normalization           |
+| Last full / targeted / implementations since full | log-family / operation-dispatch cleanup / 10                                                     |
+| Historical evidence                               | Full baseline/identity and all 37 earlier feature objects retained                               |
+
+Numeric operations now have one family owner across compiler, real provider and fake provider.
+The fake uses one typed recorder with consistent counters. Two capability diagnostic labels now
+name their actual generic family. No fresh runtime/numerical campaign or full integration rerun
+was needed for this deletion-only cleanup.
 
 The bounded integration checkpoint is accepted in `features.nvvm-post-migration-integration`.
 Five native failures were outdated migration assertions: early-folded size/alignment constants,
@@ -58,14 +62,13 @@ covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `de493da9e0951bfcd3ecba6848ae0f433f741c0e` plus the provider patch recorded in
-`features.nvvm-integer16-normalization`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `1378468640c4b444809566aade1257d2cb77682faf1d0a120c19439e96ddc528`.
-Provider SHA-256: `ce0c6bf613372977c4f985b8d6853fe36aa24f8e83181392091859555e66589c`.
-The later commit does not relabel these binaries. Source/runtime hashes and exact outcomes live in
-`focused-evidence.json` under `features.nvvm-integer16-normalization`; earlier identities and failure histories remain
-in their original feature objects. The integration test-only patch and updated unit-plugin identity
-are recorded separately in `features.nvvm-post-migration-integration`.
+Revision `c617d1c444dbc33cbb251cf3d56984570b661a13` plus compiler/provider patch
+`d9efca36f295ce2f1bc9aa0d03dc26332fadb4186c9fc4a39179066536300463`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `035434cfe5e828f28023ee17a36ca5a3c930ec06fcbe3aa9279b76f435f06da8`.
+Provider SHA-256: `4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72`.
+Source/runtime/test/configuration hashes are in `features.nvvm-operation-dispatch-cleanup`.
+Later commits do not relabel these binaries. Earlier integration and failure evidence retain their
+actual identities, including the explicit signed16 resolution.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -83,7 +86,7 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 ## Next action
 
 The agreed migration and residual-text audit are finished. The maintainer authorized this sequence
-on 2026-09-30. Steps 1 and 2 are complete; step 3 is next:
+on 2026-09-30. Steps 1–3 are complete; step 4 is next:
 
 1. Fix the known signed16 O3 normalization failure at its responsible layer, retaining its failure
    history and avoiding an abs-specific workaround.

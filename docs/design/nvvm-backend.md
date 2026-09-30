@@ -308,6 +308,14 @@ not currently propagate transitive LLVM convergence metadata. Direct intrinsic a
 bounded helper behavior are distinct contracts; arbitrary control-flow transformations across
 nested helpers remain outside that qualification.
 
+Numeric operation descriptors have one owner: `resolveValueOperationFamily` supplies their typed
+admission and diagnostic category to the compiler and provider. The exact catalog contains only
+five hardware-wave signatures: active mask, ballot, and three mask-match payload types. There are
+no duplicate exact arithmetic, conversion or reinterpretation rows. Fake-provider dispatch follows
+the same ownership and records each admitted family attempt once before physical operand checks;
+its counters do not depend on numeric width or catalog membership. Complete descriptor preflight
+still precedes provider module creation.
+
 | Boundary                               | Owner and responsibility                                                                                                                                                      |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                          |

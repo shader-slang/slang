@@ -4085,7 +4085,7 @@ bool _resolveNVVMFloatingRemainderOperation(
     return true;
 }
 
-// Resolves canonical Slang value operations to either a fixed exact row or one bounded family.
+// Resolves numeric operations through their family and hardware-wave operations by exact signature.
 bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOperation)
 {
     outOperation = {};
@@ -4112,15 +4112,15 @@ bool _resolveNVVMValueOperation(IRInst* inst, NVVMResolvedValueOperation& outOpe
         inst->getOperandCount() ? outOperation.operandTypes : nullptr,
         inst->getOperandCount(),
     };
-    outOperation.staticEntry = NVVMSemantics::find(outOperation.desc);
-    if (outOperation.staticEntry)
+    if (NVVMSemantics::resolveValueOperationFamily(outOperation.desc, outOperation.family))
     {
-        outOperation.diagnosticName = outOperation.staticEntry->diagnosticName;
+        outOperation.diagnosticName = outOperation.family.diagnosticName;
         return true;
     }
-    if (!NVVMSemantics::resolveValueOperationFamily(outOperation.desc, outOperation.family))
+    outOperation.staticEntry = NVVMSemantics::find(outOperation.desc);
+    if (!outOperation.staticEntry)
         return false;
-    outOperation.diagnosticName = outOperation.family.diagnosticName;
+    outOperation.diagnosticName = outOperation.staticEntry->diagnosticName;
     return true;
 }
 

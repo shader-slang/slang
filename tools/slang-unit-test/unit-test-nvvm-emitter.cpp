@@ -7564,7 +7564,7 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
                 signedI32Operands,
                 2,
             },
-            "signed i32 multiplication",
+            "parameterized integer binary operation",
         },
         {
             kDirectNVVMFloat32AddSource,
@@ -7574,7 +7574,7 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
                 float32Operands,
                 2,
             },
-            "float32 addition",
+            "parameterized floating-point binary operation",
         },
         {
             kDirectNVVMFloat16ValueSource,
