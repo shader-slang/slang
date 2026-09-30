@@ -132,6 +132,15 @@ per-target divergence happens. The default for this bundle is:
 
 Do not use any GPU-only directive.
 
+### Loop emission maintenance
+
+When regenerating `ast-to-ir-lowers-loop.slang`, retain the dynamic trip
+count and every target directive. Check WGSL's native `loop` header and
+its following exit `break`; other source targets retain `for(;;)`.
+Describe these as target-specific representations of the same lowered
+control flow, not one universal emitted spelling. Preserve the SPIR-V
+structured-loop checks and reflect this distinction in the README.
+
 ## Quality checklist (in addition to `_common.md`'s)
 
 - [ ] Every test's `doc_ref` resolves to an anchor in

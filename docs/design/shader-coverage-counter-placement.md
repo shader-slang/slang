@@ -592,6 +592,15 @@ attribution fields in `CoverageEntryInfo` or `.coverage-manifest.json`,
 not by assuming that counter slot `K` means the same source location
 in two different compiles.
 
+Automatic differentiation runs after the coverage pass, so the forward
+and backward derivatives generated from a differentiable function carry
+that function's counter increments as non-differentiable side effects.
+They follow autodiff's rule for side effects: how many times a side
+effect runs inside a derivative is not guaranteed. A backward derivative
+can skip primal code whose results it does not need, counters included.
+Counts gathered while derivatives run therefore do not measure how often
+the differentiable function's source executed.
+
 ## Future Region Coverage
 
 Line coverage already shares one counter across the source entries of

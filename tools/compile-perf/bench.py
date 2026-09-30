@@ -6,6 +6,9 @@ timers emitted by -report-detailed-perf-benchmark (per-binary fallback to
 the base -report-perf-benchmark via resolve_perf_flag, for a slangc that
 predates the detailed flag), and writes per-run JSON: a summary
 (median/min/max/mean/stdev/n) AND the raw samples per timer; merge-on-write.
+Inputs and dependencies are prepared once, then fixed-order passes visit every
+selected workload/size once before repeating any of them. Warmup passes precede
+timed passes, whose samples are aggregated separately for each workload/size.
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
 slangc.
@@ -594,9 +597,8 @@ def _reap_posix(proc, wait4=None):
     back into the signature.
 
     Raises RuntimeError if the child cannot be reaped, rather than returning a
-    number it cannot stand behind. main() catches that per workload (its
-    try/except around run_spec is the isolation contract), so the workload is
-    recorded with ok=False and the sweep continues to the next one — the run
+    number it cannot stand behind. WorkloadRun.measure catches that per workload,
+    so the workload is recorded with ok=False and the other workloads continue — the run
     still ends non-zero through the ok-count. The translation lives HERE
     rather than in the caller so the stub-driven self-check can reach it
     without spawning a process — see the ECHILD case at the bottom of this
@@ -613,7 +615,7 @@ def _reap_posix(proc, wait4=None):
         # ChildProcessError and substitutes returncode = 0, so a compile that
         # FAILED would be recorded as a clean run with no memory number.
         # Raising is what keeps a fabricated success out of results.json;
-        # main() then books this workload as failed and moves on.
+        # WorkloadRun.measure retains the failure for result() to report.
         raise RuntimeError(
             "os.wait4 could not reap the compile child (ECHILD): the "
             "environment reaped it first, which happens when SIGCHLD is set "
@@ -635,8 +637,8 @@ def run_once(cmd):
 
     Raises RuntimeError on POSIX if the child cannot be reaped (see
     _reap_posix): the exit code is unrecoverable there, so it propagates
-    instead of returning a tuple whose rc would be a guess. main()'s
-    per-workload try/except turns that into one failed workload."""
+    instead of returning a tuple whose rc would be a guess. WorkloadRun.measure
+    catches it and records this workload as failed."""
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -653,7 +655,7 @@ def run_once(cmd):
     else:
         # No try/except: _reap_posix already translates ECHILD into a
         # RuntimeError explaining why no trustworthy rc exists, and letting it
-        # reach main()'s per-workload handler is the point.
+        # reach WorkloadRun.measure's per-workload handler is the point.
         rss = _reap_posix(proc)
     wall = (time.perf_counter() - t0) * 1000.0
     text = out.decode("utf-8", "replace")
@@ -700,7 +702,7 @@ def classify_sample(rc, text, expected_diags, benign):
                    the workload declares it emits, but didn't this sample.
       is_crash  -- whether `rc` indicates the process crashed rather than
                    exited normally. `rc > 1 or rc < 0` is the crash signature
-                   (see run_spec's comment for the platform-specific values),
+                   (see WorkloadRun.add_sample for the platform-specific values),
                    EXCEPT when every expected diagnostic is present, no
                    unexpected error was seen, AND rc is one of
                    _EXIT_NEGATIVE_ONE -- slangc's intentional, non-portable
@@ -730,8 +732,8 @@ def classify_sample(rc, text, expected_diags, benign):
     return ok, missing, False
 
 
-# Import-time self-check for classify_sample, the pure core of run_spec's
-# sample-classification logic -- otherwise untested, and the PR that added
+# Import-time self-check for classify_sample, the pure core of WorkloadRun's
+# sample-classification logic. The PR that added
 # it exists specifically to stop this class of subtle logic rotting silently
 # (see report_suite_health's self-check above for the same rationale applied
 # to the other new logic in this file).
@@ -758,88 +760,111 @@ assert classify_sample(0xC0000005, "error[E30019]: type mismatch in expression",
     "count as a crash even when the expected diagnostic text is fully present"
 
 
-def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
-             prepared=False):
-    src_dir = os.path.join(src_root, corpus.dir_name(spec, size))
-    out_dir = os.path.join(out_root, corpus.dir_name(spec, size))
-    # Where the sources come from is corpus.py's problem, not this function's:
-    # generated here, or already prepared by an earlier step / another machine
-    # (bench.py --corpus). Either way what follows measures a directory.
-    if prepared:
-        files = corpus.prepared_files(src_dir)
-        # An empty prepared directory is legitimate for an api workload — the
-        # driver takes --dir and reads it itself, and session-create needs no
-        # sources at all — but every other mode picks an entry point out of
-        # this list, so empty there means the corpus was prepared incompletely
-        # or --corpus points a level too high. Named here rather than left to
-        # build_commands, whose IndexError would say nothing about which
-        # directory to go and look at.
-        if not files and spec.mode != "api":
-            raise FileNotFoundError(
-                f"no .slang files in prepared corpus {src_dir}")
-    else:
-        files = corpus.materialize(spec, size, src_dir)
-    os.makedirs(out_dir, exist_ok=True)
+class WorkloadRun:
+    """Keep setup and accumulated samples for one workload/size until all passes finish.
 
-    # An api workload without a driver+libslang must fail loudly (not silently
-    # skip): a missing host compiler or unrecognized package layout would
-    # otherwise drop the workload from the series with no visible signal.
-    if spec.mode == "api" and api is None:
-        return {
-            "workload": spec.name, "bucket": spec.bucket, "size": size,
-            "mode": spec.mode, "ok": False, "setup_ok": False,
-            "got_timers": False, "samples": samples, "warmup": warmup,
-            "wall_ms": None, "rss_kb": None, "memory": None, "timers": {},
-            "primary_timers": spec.primary_timers, "cmd": "",
-            "error": "api-driver or libslang unavailable (see stderr)",
-            "crash_codes": None,
-        }
+    Preparation happens once. Each invocation runs one fresh compiler process;
+    warmup invocations are excluded, while timed invocations supply samples for
+    validation. A Python exception stops only this workload, and remains a failed
+    result even if earlier samples succeeded.
+    """
 
-    cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api,
-                          perf_flag=resolve_perf_flag(slangc))
-    # A failed setup step (e.g. a module that didn't precompile in link mode) must
-    # fail the workload — otherwise the timed compile runs against missing inputs.
-    setup_ok = True
-    for c in cmds["setup"]:
+    def __init__(self, spec, size, samples, warmup, sampling_strategy):
+        self.spec = spec
+        self.size = size
+        self.samples = samples
+        self.warmup = warmup
+        self.sampling_strategy = sampling_strategy
+        self.timed = []
+        self.setup_ok = False
+        self.failure = None
+        self.benign = _BENIGN
+        self.expected_diags = []
+        self.last_text = ""
+        self.per_timer = {}
+        self.per_mem = {}
+        self.walls = []
+        self.rsses = []
+        self.sample_ok = []
+        self.crash_codes = []
+        self.missing_diags = set()
+
+    def prepare(self, slangc, src_root, out_root, api, prepared):
+        """Generate or read inputs and execute untimed setup exactly once."""
+        spec, size = self.spec, self.size
+        src_dir = os.path.join(src_root, corpus.dir_name(spec, size))
+        out_dir = os.path.join(out_root, corpus.dir_name(spec, size))
+        # Where the sources come from is corpus.py's problem, not this function's:
+        # generated here, or already prepared by an earlier step / another machine
+        # (bench.py --corpus). Either way what follows measures a directory.
+        if prepared:
+            files = corpus.prepared_files(src_dir)
+            # An empty prepared directory is legitimate for an api workload — the
+            # driver takes --dir and reads it itself, and session-create needs no
+            # sources at all — but every other mode picks an entry point out of
+            # this list, so empty there means the corpus was prepared incompletely
+            # or --corpus points a level too high. Named here rather than left to
+            # build_commands, whose IndexError would say nothing about which
+            # directory to go and look at.
+            if not files and spec.mode != "api":
+                raise FileNotFoundError(
+                    f"no .slang files in prepared corpus {src_dir}")
+        else:
+            files = corpus.materialize(spec, size, src_dir)
+        os.makedirs(out_dir, exist_ok=True)
+
+        # An api workload without a driver+libslang must fail loudly (not silently
+        # skip): a missing host compiler or unrecognized package layout would
+        # otherwise drop the workload from the series with no visible signal.
+        if spec.mode == "api" and api is None:
+            raise RuntimeError("api-driver or libslang unavailable (see stderr)")
+
+        cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api,
+                              perf_flag=resolve_perf_flag(slangc))
+        # A failed setup step (e.g. a module that didn't precompile in link mode) must
+        # fail the workload — otherwise the timed compile runs against missing inputs.
+        setup_ok = True
+        for c in cmds["setup"]:
+            try:
+                rc = subprocess.run(c, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, timeout=600).returncode
+            except subprocess.TimeoutExpired:
+                rc = 1
+            if rc != 0:
+                setup_ok = False
+
+        benign = (_BENIGN_DOWNSTREAM_REQUIRED
+                  if getattr(spec, "downstream_required", False) else _BENIGN)
+        # A workload that is SUPPOSED to emit diagnostics (see
+        # WorkloadSpec.expected_diagnostics) declares their codes, which both stops
+        # them failing the run and — below — makes their disappearance fail it.
+        expected_diags = list(getattr(spec, "expected_diagnostics", []) or [])
+        benign = tuple(benign) + tuple(expected_diags)
+
+        self.timed = cmds["timed"]
+        self.setup_ok = setup_ok
+        self.expected_diags = expected_diags
+        self.benign = benign
+
+    def measure(self, is_warmup=False):
+        """Run one compiler process, excluding warmups from timing and exit-code checks.
+
+        An exception during either a warmup or timed invocation fails this
+        workload and stops its later invocations. A warmup's returned crash
+        code is ignored; timed invocations still determine sample validity.
+        """
+        if self.failure is not None:
+            return
         try:
-            rc = subprocess.run(c, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, timeout=600).returncode
-        except subprocess.TimeoutExpired:
-            rc = 1
-        if rc != 0:
-            setup_ok = False
+            rc, wall, text, rss = run_once(self.timed)
+            if not is_warmup:
+                self.add_sample(rc, wall, text, rss)
+        except Exception as exc:  # Keep other workloads running after an execution failure.
+            self.failure = str(exc) or type(exc).__name__
 
-    benign = (_BENIGN_DOWNSTREAM_REQUIRED
-              if getattr(spec, "downstream_required", False) else _BENIGN)
-    # A workload that is SUPPOSED to emit diagnostics (see
-    # WorkloadSpec.expected_diagnostics) declares their codes, which both stops
-    # them failing the run and — below — makes their disappearance fail it.
-    expected_diags = list(getattr(spec, "expected_diagnostics", []) or [])
-    benign = tuple(benign) + tuple(expected_diags)
-
-    timed = cmds["timed"]
-    for _ in range(warmup):
-        run_once(timed)
-
-    per_timer = {}
-    per_mem = {}
-    walls = []
-    rsses = []
-    last_text = ""
-    # Validate EVERY sample: a workload that fails on 2 of 5 runs but succeeds
-    # on 3 would look valid if only the last sample were checked. When ALL samples
-    # crash, sample_ok is empty (all([]) is True) AND got_timers is False — both
-    # independently make ok=False; crash_codes also fires as a third guard.
-    sample_ok = []
-    crash_codes = []
-    # Union over samples, not just the last one: the expected diagnostics have
-    # to be present in EVERY timed sample. Checking only the final text would
-    # let a run where the workload compiled clean four times and errored once
-    # report ok, which is the exact rot this guard exists to catch.
-    missing_diags = set()
-    for _ in range(samples):
-        rc, wall, text, rss = run_once(timed)
-        last_text = text
+    def add_sample(self, rc, wall, text, rss):
+        """Validate and accumulate one timed sample, retaining failures across passes."""
+        self.last_text = text
         # rc == 0: success. rc == 1: portable slangc compile-error exit,
         # caught by real_error() inside classify_sample. rc > 1 or rc < 0: a
         # crash, excluded from timing stats since a crashed sample's wall
@@ -855,88 +880,141 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         # large positive NTSTATUS value. See classify_sample's docstring for
         # the expected-exit-vs-crash distinction this feeds into.
         sample_is_ok, sample_missing, is_crash = classify_sample(
-            rc, text, expected_diags, benign)
-        missing_diags.update(sample_missing)
+            rc, text, self.expected_diags, self.benign)
+        self.missing_diags.update(sample_missing)
         if is_crash:
-            crash_codes.append(rc)
-            sample_ok.append(False)
-            continue
-        walls.append(wall)
+            self.crash_codes.append(rc)
+            self.sample_ok.append(False)
+            return
+        self.walls.append(wall)
         if rss is not None:
-            rsses.append(rss)
-        sample_ok.append(sample_is_ok)
+            self.rsses.append(rss)
+        self.sample_ok.append(sample_is_ok)
         for name, ms in parse_timers(text).items():
-            per_timer.setdefault(name, []).append(ms)
+            self.per_timer.setdefault(name, []).append(ms)
         for name, kb in parse_mem(text).items():
-            per_mem.setdefault(name, []).append(kb)
+            self.per_mem.setdefault(name, []).append(kb)
 
-    err = real_error(last_text, benign)
+    def result(self):
+        """Summarize this workload without discarding earlier failures or raw samples."""
+        spec, size = self.spec, self.size
+        samples, warmup, timed = self.samples, self.warmup, self.timed
+        err = self.failure or real_error(self.last_text, self.benign)
 
-    # The other half of the expected_diagnostics contract. Tolerating a code
-    # without requiring it is how `diagnostics_clean` rotted: it was built to
-    # measure diagnostic production, quietly stopped emitting any, and went on
-    # reporting a healthy green number that measured something else entirely.
-    # A workload that declares it emits E30019 and stops doing so is broken,
-    # not passing.
-    if missing_diags:
-        # Takes priority over whatever else the compile said. If the declared
-        # diagnostic is gone, every other symptom (a stray error, no timers,
-        # a non-zero exit) is downstream of that, and reporting one of those
-        # instead sends the reader looking in the wrong place.
-        err = ("expected diagnostics absent: " + ", ".join(sorted(missing_diags)) +
-               " - the workload no longer exercises what it claims to")
+        # The other half of the expected_diagnostics contract. Tolerating a code
+        # without requiring it is how `diagnostics_clean` rotted: it was built to
+        # measure diagnostic production, quietly stopped emitting any, and went on
+        # reporting a healthy green number that measured something else entirely.
+        # A workload that declares it emits E30019 and stops doing so is broken,
+        # not passing.
+        if self.missing_diags:
+            # Takes priority over whatever else the compile said. If the declared
+            # diagnostic is gone, every other symptom (a stray error, no timers,
+            # a non-zero exit) is downstream of that, and reporting one of those
+            # instead sends the reader looking in the wrong place.
+            err = ("expected diagnostics absent: " + ", ".join(sorted(self.missing_diags)) +
+                   " - the workload no longer exercises what it claims to")
 
-    # Every declared primary timer should be a counter the compiler actually
-    # emits. `serialize` declared `writeSerializedModuleIR` for months while
-    # that function had no SLANG_PROFILE, so its headline could not respond to
-    # the regression it existed to catch. Reported rather than fatal: a release
-    # sweep measures old binaries that legitimately predate a newer timer.
-    # compileInner is exempt: it is the base -report-perf-benchmark wall-clock
-    # total, not a SLANG_PROFILE-gated pass timer, so its absence is not this
-    # check's failure mode -- it is already caught by got_timers/ok below.
-    missing_primary_timers = [t for t in spec.primary_timers
-                              if t != "compileInner" and t not in per_timer]
+        # Every declared primary timer should be a counter the compiler actually
+        # emits. `serialize` declared `writeSerializedModuleIR` for months while
+        # that function had no SLANG_PROFILE, so its headline could not respond to
+        # the regression it existed to catch. Reported rather than fatal: a release
+        # sweep measures old binaries that legitimately predate a newer timer.
+        # compileInner is exempt: it is the base -report-perf-benchmark wall-clock
+        # total, not a SLANG_PROFILE-gated pass timer, so its absence is not this
+        # check's failure mode -- it is already caught by got_timers/ok below.
+        missing_primary_timers = [t for t in spec.primary_timers
+                                  if t != "compileInner" and t not in self.per_timer]
 
-    got_timers = bool(per_timer)
-    # A run that produced no timers and no recognizable diagnostic would report
-    # a bare "no timers" with the actual output lost — surface the first output
-    # line (e.g. a loader failure or crash banner) so remote CI runs are
-    # debuggable from results.json alone.
-    if err is None and not got_timers:
-        err = next((ln.strip()[:200] for ln in last_text.splitlines() if ln.strip()), None)
-    ok = (setup_ok and got_timers and all(sample_ok) and not crash_codes
-          and not missing_diags)
+        got_timers = bool(self.per_timer)
+        # A run that produced no timers and no recognizable diagnostic would report
+        # a bare "no timers" with the actual output lost — surface the first output
+        # line (e.g. a loader failure or crash banner) so remote CI runs are
+        # debuggable from results.json alone.
+        if err is None and not got_timers:
+            err = next((ln.strip()[:200] for ln in self.last_text.splitlines() if ln.strip()), None)
+        ok = (self.failure is None and self.setup_ok and got_timers and all(self.sample_ok)
+              and not self.crash_codes and not self.missing_diags)
 
-    return {
-        "workload": spec.name,
-        "bucket": spec.bucket,
-        "size": size,
-        "mode": spec.mode,
-        "ok": ok,
-        "setup_ok": setup_ok,
-        "got_timers": got_timers,
-        "missing_primary_timers": missing_primary_timers,
-        "samples": samples,
-        "warmup": warmup,
-        "wall_ms": stats(walls),
-        "rss_kb": stats(rsses) if rsses else None,
-        "memory": ({k: stats(v) for k, v in sorted(per_mem.items())}
-                   if per_mem else None),
-        "timers": {k: stats(v) for k, v in sorted(per_timer.items())},
-        "primary_timers": spec.primary_timers,
-        "cmd": " ".join(timed),
-        "error": err,
-        "crash_codes": crash_codes or None,
-        # Which timer set this run's compiler-phase buckets can be trusted at:
-        # "detailed" means -report-detailed-perf-benchmark's ~67 per-pass
-        # timers were requested (resolve_perf_flag probes per binary), so the
-        # buckets.py detail-only names (deferBufferLoad, simplifyNonSSAIR,
-        # lowerCombinedTextureSamplers, legalizeMatrixTypes) are real
-        # measurements when present and genuine zeros when absent. "coarse"
-        # means those four are structurally unmeasured, not zero, so
-        # daily_movers must not read a schema transition as a bucket move.
-        "timer_schema": _schema_of(timed),
-    }
+        return {
+            "workload": spec.name,
+            "bucket": spec.bucket,
+            "size": size,
+            "mode": spec.mode,
+            "ok": ok,
+            "setup_ok": self.setup_ok,
+            "got_timers": got_timers,
+            "missing_primary_timers": missing_primary_timers,
+            "samples": samples,
+            "warmup": warmup,
+            "wall_ms": stats(self.walls),
+            "rss_kb": stats(self.rsses) if self.rsses else None,
+            "memory": ({k: stats(v) for k, v in sorted(self.per_mem.items())}
+                       if self.per_mem else None),
+            "timers": {k: stats(v) for k, v in sorted(self.per_timer.items())},
+            "primary_timers": spec.primary_timers,
+            "cmd": " ".join(timed),
+            "error": err,
+            "crash_codes": self.crash_codes or None,
+            # Which timer set this run's compiler-phase buckets can be trusted at:
+            # "detailed" means -report-detailed-perf-benchmark's ~67 per-pass
+            # timers were requested (resolve_perf_flag probes per binary), so the
+            # buckets.py detail-only names (deferBufferLoad, simplifyNonSSAIR,
+            # lowerCombinedTextureSamplers, legalizeMatrixTypes) are real
+            # measurements when present and genuine zeros when absent. "coarse"
+            # means those four are structurally unmeasured, not zero, so
+            # daily_movers must not read a schema transition as a bucket move.
+            "timer_schema": _schema_of(timed),
+            "sampling_strategy": self.sampling_strategy,
+        }
+
+
+def run_workloads(slangc, cases, samples, warmup, src_root, out_root, api=None,
+                  prepared=False, interleave=True, verbose=False):
+    """Prepare workload/size cases once, then collect samples in fixed-order passes.
+
+    For cases A, B, C and five samples, the default order is ABC ABC ABC ABC ABC.
+    All warmup passes precede timed passes. Keeping the compiler invocations
+    apart makes a short disturbance less likely to occupy most of a workload's
+    median-of-five window. It does not eliminate effects lasting the whole run.
+
+    Setting interleave=False supports isolated run_spec callers and controlled
+    comparisons of sampling order. Both schedules retain the same result shape.
+    """
+    if samples < 1 or warmup < 0:
+        raise ValueError("samples must be positive and warmup must be non-negative")
+    strategy = "interleaved" if interleave else "consecutive"
+    runs = [WorkloadRun(spec, size, samples, warmup, strategy) for spec, size in cases]
+    for run in runs:
+        try:
+            run.prepare(slangc, src_root, out_root, api, prepared)
+        except Exception as exc:  # A missing corpus or setup failure costs only this case.
+            run.failure = str(exc) or type(exc).__name__
+
+    # One group containing all cases repeats the full suite on each pass.
+    # One group per case finishes all its passes before starting the next case.
+    groups = [runs] if interleave else [[run] for run in runs]
+    for group in groups:
+        for warmup_index in range(warmup):
+            if verbose:
+                print(f"[warmup {warmup_index + 1}/{warmup}] {len(group)} workload/size case(s)",
+                      flush=True)
+            for run in group:
+                run.measure(is_warmup=True)
+        for sample_index in range(samples):
+            if verbose:
+                print(f"[sample {sample_index + 1}/{samples}] {len(group)} workload/size case(s)",
+                      flush=True)
+            for run in group:
+                run.measure()
+    return [run.result() for run in runs]
+
+
+def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
+             prepared=False):
+    """Measure one isolated workload, retaining the consecutive-sampling API."""
+    return run_workloads(slangc, [(spec, size)], samples, warmup, src_root, out_root,
+                         api=api, prepared=prepared, interleave=False)[0]
 
 
 # A workload's own cost has to clear the per-compile floor by enough that a
@@ -1071,6 +1149,8 @@ def main():
                          "reports don't change shape before the history is "
                          "resynced with them (see DESIGN.md 'API-path workloads').")
     args = ap.parse_args()
+    if args.samples < 1 or args.warmup < 0:
+        ap.error("--samples must be positive and --warmup must be non-negative")
 
     # --slangc and --label are checked HERE rather than declared required=True,
     # and validated only after the --prepare return below. Preparing a corpus
@@ -1198,37 +1278,20 @@ def main():
             sys.stderr.write("compile-perf: api workloads will FAIL "
                              f"(libslang={libslang}, driver={driver})\n")
 
-    records = []
-    for spec in specs:
-        sizes = spec.sweep_sizes if (args.sweep and spec.sweep_sizes) else [spec.default_size]
-        for size in sizes:
-            print(f"[run] {spec.name:18s} n={size:<5d} ", end="", flush=True)
-            # ANY generator/run failure (missing corpus, a generator bug, a
-            # bad manifest field) must cost ONE workload, not the whole run's
-            # results: everything measured before it would be lost, since
-            # results.json is written at the end. Record the failure and keep
-            # going; bench still exits non-zero at the end via the ok-count.
-            try:
-                rec = run_spec(slangc, spec, size, args.samples, args.warmup,
-                               src_root, out_root, api=api,
-                               prepared=bool(args.corpus))
-            except Exception as e:  # noqa: BLE001 — isolation is the contract
-                rec = {
-                    "workload": spec.name, "bucket": spec.bucket, "size": size,
-                    "mode": spec.mode, "ok": False, "setup_ok": False,
-                    "got_timers": False, "samples": args.samples,
-                    "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
-                    "memory": None, "timers": {}, "primary_timers": spec.primary_timers,
-                    "cmd": "", "error": str(e), "crash_codes": None,
-                }
-            rec["label"] = args.label
-            rec["slangc"] = slangc
-            records.append(rec)
-            ci = rec["timers"].get("compileInner")
-            tag = "OK " if rec["ok"] else "FAIL"
-            ms = f'{ci["median"]:.2f}ms' if ci else "no-compileInner"
-            extra = "" if rec["ok"] else f"  <- {rec['error'] or 'no timers'}"
-            print(f"{tag} compileInner={ms}{extra}")
+    cases = [(spec, size) for spec in specs
+             for size in (spec.sweep_sizes if args.sweep and spec.sweep_sizes
+                          else [spec.default_size])]
+    records = run_workloads(slangc, cases, args.samples, args.warmup,
+                            src_root, out_root, api=api, prepared=bool(args.corpus), verbose=True)
+    for rec in records:
+        rec["label"] = args.label
+        rec["slangc"] = slangc
+        ci = rec["timers"].get("compileInner")
+        tag = "OK " if rec["ok"] else "FAIL"
+        ms = f'{ci["median"]:.2f}ms' if ci else "no-compileInner"
+        extra = "" if rec["ok"] else f"  <- {rec['error'] or 'no timers'}"
+        print(f"[run] {rec['workload']:18s} n={rec['size']:<5d} "
+              f"{tag} compileInner={ms}{extra}")
 
     # JSON (full detail). Merge with any existing file so a partial run
     # (e.g. --only mdl_dxr) augments rather than clobbers prior workloads.

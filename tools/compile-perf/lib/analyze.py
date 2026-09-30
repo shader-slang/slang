@@ -46,6 +46,12 @@ SCHEMA_MARKER = "__timer_schema__"
 # COMPARISON across the change that is invalid.
 SIZE_MARKER = "__size__"
 
+# Consecutive and interleaved samples have different cache/host-state exposure.
+# Keep this per workload because --only can merge a new run into older results.
+# Missing or unrecognized strategies remain unknown, never a matching baseline.
+SAMPLING_MARKER = "__sampling_strategy__"
+SAMPLING_VALUES = {"consecutive": 0.0, "interleaved": 1.0}
+
 
 def schema_value(schema):
     """The SCHEMA_MARKER encoding of a record's `timer_schema`, or None when the
@@ -55,7 +61,7 @@ def schema_value(schema):
 
 def point_metrics(results_json_path):
     """{ 'workload|counter': median } for the canonical run of each workload,
-    plus the SCHEMA_MARKER / SIZE_MARKER provenance entries.
+    plus timer-schema, workload-size, and sampling-strategy provenance entries.
 
     canonical_runs() collapses any swept (multi-size) data to default_size so
     history and daily points compare like-with-like. The median (not min) is the
@@ -78,6 +84,9 @@ def point_metrics(results_json_path):
         size = r.get("size")
         if size is not None:
             out[f"{r['workload']}|{SIZE_MARKER}"] = float(size)
+        sampling = SAMPLING_VALUES.get(r.get("sampling_strategy"))
+        if sampling is not None:
+            out[f"{r['workload']}|{SAMPLING_MARKER}"] = sampling
     return out
 
 
