@@ -13,7 +13,7 @@
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 // CHECK-LABEL: %wholeOperand = OpFunction
@@ -140,6 +140,52 @@ uint2 middleWindow(uint s, uint3 v)
     return uint4(s, v).yz;
 }
 
+// `__vectorReshape<1>` narrows with a one-element swizzle typed `vector<uint,1>`. The fold keeps
+// that vector type, and SPIR-V legalization then turns the one-element vector into a scalar.
+// CHECK-LABEL: %oneLaneFromScalar = OpFunction
+// CHECK-NEXT: %[[S:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK-NEXT: OpFunctionParameter %v2uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: OpReturnValue %[[S]]
+vector<uint, 1> oneLaneFromScalar(uint s, uint2 b)
+{
+    return __vectorReshape<1>(uint3(s, b));
+}
+
+// CHECK-LABEL: %oneLaneFromVector = OpFunction
+// CHECK-NEXT: %[[A:[A-Za-z0-9_]+]] = OpFunctionParameter %v2uint
+// CHECK-NEXT: OpFunctionParameter %uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: %[[R:[0-9]+]] = OpCompositeExtract %uint %[[A]] 0
+// CHECK-NEXT: OpReturnValue %[[R]]
+vector<uint, 1> oneLaneFromVector(uint2 a, uint s)
+{
+    return __vectorReshape<1>(uint3(a, s));
+}
+
+// CHECK-LABEL: %oneLaneAllScalar = OpFunction
+// CHECK-NEXT: %[[X:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK-NEXT: OpFunctionParameter %uint
+// CHECK-NEXT: OpFunctionParameter %uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: OpReturnValue %[[X]]
+vector<uint, 1> oneLaneAllScalar(uint x, uint y, uint z)
+{
+    return __vectorReshape<1>(uint3(x, y, z));
+}
+
+// The `getElement` fold shares the lane lookup with the swizzle fold.
+// CHECK-LABEL: %elementOfMixed = OpFunction
+// CHECK-NEXT: %[[A:[A-Za-z0-9_]+]] = OpFunctionParameter %v2uint
+// CHECK-NEXT: OpFunctionParameter %uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: %[[R:[0-9]+]] = OpCompositeExtract %uint %[[A]] 1
+// CHECK-NEXT: OpReturnValue %[[R]]
+uint elementOfMixed(uint2 a, uint s)
+{
+    return uint3(a, s)[1];
+}
+
 void store(uint index, uint2 value)
 {
     outputBuffer[index] = value.x;
@@ -189,4 +235,12 @@ void computeMain()
     // BUF-NEXT: 1
     // BUF-NEXT: 2
     store(19, middleWindow(s, v));
+    // BUF-NEXT: 5
+    outputBuffer[21] = oneLaneFromScalar(s, b).x;
+    // BUF-NEXT: 1
+    outputBuffer[22] = oneLaneFromVector(a, s).x;
+    // BUF-NEXT: 1
+    outputBuffer[23] = oneLaneAllScalar(v.x, v.y, v.z).x;
+    // BUF-NEXT: 2
+    outputBuffer[24] = elementOfMixed(a, s);
 }
