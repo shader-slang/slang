@@ -4231,327 +4231,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveActiveMaskKernel)
     }
 }
 
-// Checks the shared signless-i32 implementation and exact LLVM 14/LLVM 7 declaration forms for
-// one independently negotiated Slang read-first semantic.
-static void _checkNVVMIRBuilderBuildsWaveReadLaneFirstKernel(
-    UnitTestContext* unitTestContext,
-    SlangNVVMValueOperation operation,
-    const UnownedStringSlice& moduleName,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& helperName,
-    bool usesFloatValue)
-{
-    NVVMIRBuilder builder;
-    _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK_ABORT(builder.isInitialized());
-
-    ScopedNVVMBuilderModule scope;
-    scope.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(moduleName, scope.module)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWaveReadLaneFirstKernel(
-        builder,
-        scope.module,
-        kernelName,
-        helperName,
-        operation,
-        usesFloatValue)));
-
-    const SlangNVVMSerializationFormat formats[] = {
-        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
-        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
-    };
-    for (SlangNVVMSerializationFormat format : formats)
-    {
-        ComPtr<ISlangBlob> assembly;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
-        SLANG_CHECK_ABORT(assembly != nullptr);
-        const UnownedStringSlice text(
-            static_cast<const char*>(assembly->getBufferPointer()),
-            assembly->getBufferSize());
-        StringBuilder helperDefinition;
-        helperDefinition << (usesFloatValue ? "define float @" : "define i32 @") << helperName
-                         << "(i32";
-        SLANG_CHECK(text.indexOf(helperDefinition.getUnownedSlice()) >= 0);
-        SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.cttz.i32")) == 1);
-        const UnownedStringSlice shuffleCall =
-            usesFloatValue ? toSlice("call float @llvm.nvvm.shfl.sync.idx.f32")
-                           : toSlice("call i32 @llvm.nvvm.shfl.sync.idx.i32");
-        SLANG_CHECK(_countOccurrences(text, shuffleCall) == 1);
-        SLANG_CHECK(text.indexOf(toSlice("i1 true")) >= 0);
-        SLANG_CHECK(text.indexOf(toSlice("i32 31")) >= 0);
-        SLANG_CHECK(
-            _countOccurrences(
-                text,
-                usesFloatValue ? toSlice("store float") : toSlice("store i32")) == 1);
-        const UnownedStringSlice llvm14Declaration = toSlice("@llvm.cttz.i32(i32, i1 immarg)");
-        const UnownedStringSlice legacyDeclaration = toSlice("@llvm.cttz.i32(i32, i1)");
-        const UnownedStringSlice llvm14Attributes =
-            toSlice(" = { nofree nosync nounwind readnone speculatable willreturn }");
-        const UnownedStringSlice legacyAttributes = toSlice(" = { nounwind readnone }");
-        if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
-        {
-            SLANG_CHECK(_countOccurrences(text, llvm14Declaration) == 1);
-            SLANG_CHECK(_countOccurrences(text, legacyDeclaration) == 0);
-            SLANG_CHECK(_countOccurrences(text, llvm14Attributes) == 1);
-            SLANG_CHECK(_countOccurrences(text, legacyAttributes) == 0);
-        }
-        else
-        {
-            SLANG_CHECK(_countOccurrences(text, llvm14Declaration) == 0);
-            SLANG_CHECK(_countOccurrences(text, legacyDeclaration) == 1);
-            SLANG_CHECK(_countOccurrences(text, llvm14Attributes) == 0);
-            SLANG_CHECK(_countOccurrences(text, legacyAttributes) == 1);
-        }
-    }
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveReadLaneFirstUIntKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveReadLaneFirstKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
-        toSlice("wave-read-lane-first-uint-module"),
-        toSlice("waveReadLaneFirstUInt"),
-        toSlice("readWaveLaneFirstUInt"),
-        false);
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveReadLaneFirstIntKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveReadLaneFirstKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
-        toSlice("wave-read-lane-first-int-module"),
-        toSlice("waveReadLaneFirstInt"),
-        toSlice("readWaveLaneFirstInt"),
-        false);
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveReadLaneFirstFloatKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveReadLaneFirstKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
-        toSlice("wave-read-lane-first-float-module"),
-        toSlice("waveReadLaneFirstFloat"),
-        toSlice("readWaveLaneFirstFloat"),
-        true);
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskIsFirstLaneKernel)
-{
-    NVVMIRBuilder builder;
-    _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK_ABORT(builder.isInitialized());
-    SLANG_CHECK_ABORT(builder.isInitialized());
-
-    ScopedNVVMBuilderModule scope;
-    scope.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("wave-mask-is-first-lane-module"), scope.module)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWaveIsFirstLaneKernel(
-        builder,
-        scope.module,
-        toSlice("waveIsFirstLane"),
-        toSlice("waveMaskIsFirstLane"))));
-
-    const SlangNVVMSerializationFormat formats[] = {
-        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
-        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
-    };
-    for (SlangNVVMSerializationFormat format : formats)
-    {
-        ComPtr<ISlangBlob> assembly;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
-        SLANG_CHECK_ABORT(assembly != nullptr);
-        const UnownedStringSlice text(
-            static_cast<const char*>(assembly->getBufferPointer()),
-            assembly->getBufferSize());
-        SLANG_CHECK(text.indexOf(toSlice("define i1 @waveMaskIsFirstLane(i32")) >= 0);
-        SLANG_CHECK(_countOccurrences(text, toSlice("sub i32 0,")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("and i32")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("shl i32 1,")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("icmp eq i32")) == 1);
-        SLANG_CHECK(
-            _countOccurrences(text, toSlice("call i32 @llvm.nvvm.read.ptx.sreg.laneid()")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("ret i1")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("call i1 @waveMaskIsFirstLane")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.nvvm.vote.ballot.sync")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
-    }
-}
-
-static void _checkNVVMIRBuilderBuildsWaveMaskVoteKernel(
-    UnitTestContext* unitTestContext,
-    SlangNVVMValueOperation operation,
-    const UnownedStringSlice& moduleName,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& helperName,
-    const UnownedStringSlice& intrinsicName)
-{
-    NVVMIRBuilder builder;
-    _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK_ABORT(builder.isInitialized());
-    SLANG_CHECK_ABORT(builder.isInitialized());
-
-    ScopedNVVMBuilderModule scope;
-    scope.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(moduleName, scope.module)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWavePredicateIntrinsicKernel(
-        builder,
-        scope.module,
-        kernelName,
-        helperName,
-        operation,
-        WavePredicateValueKind::Boolean)));
-
-    const SlangNVVMSerializationFormat formats[] = {
-        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
-        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
-    };
-    for (SlangNVVMSerializationFormat format : formats)
-    {
-        ComPtr<ISlangBlob> assembly;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
-        SLANG_CHECK_ABORT(assembly != nullptr);
-        const UnownedStringSlice text(
-            static_cast<const char*>(assembly->getBufferPointer()),
-            assembly->getBufferSize());
-        StringBuilder helperDefinition;
-        helperDefinition << "define i1 @" << helperName << "(i32";
-        StringBuilder intrinsicCall;
-        intrinsicCall << "call i1 @" << intrinsicName << "(i32";
-        StringBuilder helperCall;
-        helperCall << "call i1 @" << helperName;
-        StringBuilder intrinsicDeclaration;
-        intrinsicDeclaration << "declare i1 @" << intrinsicName << "(i32, i1)";
-        SLANG_CHECK(text.indexOf(helperDefinition.getUnownedSlice()) >= 0);
-        SLANG_CHECK(text.indexOf(toSlice(", i1")) >= 0);
-        SLANG_CHECK(_countOccurrences(text, intrinsicCall.getUnownedSlice()) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("ret i1")) == 1);
-        SLANG_CHECK(_countOccurrences(text, helperCall.getUnownedSlice()) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.nvvm.vote.ballot.sync")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
-        SLANG_CHECK(_countOccurrences(text, intrinsicDeclaration.getUnownedSlice()) == 1);
-    }
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAnyTrueKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveMaskVoteKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE,
-        toSlice("wave-mask-any-true-module"),
-        toSlice("waveActiveAnyTrue"),
-        toSlice("waveMaskAnyTrue"),
-        toSlice("llvm.nvvm.vote.any.sync"));
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllTrueKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveMaskVoteKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE,
-        toSlice("wave-mask-all-true-module"),
-        toSlice("waveActiveAllTrue"),
-        toSlice("waveMaskAllTrue"),
-        toSlice("llvm.nvvm.vote.all.sync"));
-}
-
-static void _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
-    UnitTestContext* unitTestContext,
-    SlangNVVMValueOperation operation,
-    const UnownedStringSlice& moduleName,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& helperName,
-    WavePredicateValueKind valueKind)
-{
-    NVVMIRBuilder builder;
-    _requireRealNVVMBuilder(unitTestContext, builder);
-    SLANG_CHECK_ABORT(builder.isInitialized());
-    SLANG_CHECK_ABORT(builder.isInitialized());
-
-    ScopedNVVMBuilderModule scope;
-    scope.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(moduleName, scope.module)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_populateWavePredicateIntrinsicKernel(
-        builder,
-        scope.module,
-        kernelName,
-        helperName,
-        operation,
-        valueKind)));
-
-    const SlangNVVMSerializationFormat formats[] = {
-        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
-        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
-    };
-    for (SlangNVVMSerializationFormat format : formats)
-    {
-        ComPtr<ISlangBlob> assembly;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
-        SLANG_CHECK_ABORT(assembly != nullptr);
-        const UnownedStringSlice text(
-            static_cast<const char*>(assembly->getBufferPointer()),
-            assembly->getBufferSize());
-        StringBuilder helperDefinition;
-        helperDefinition << "define i1 @" << helperName << "(i32";
-        StringBuilder helperCall;
-        helperCall << "call i1 @" << helperName;
-        SLANG_CHECK(text.indexOf(helperDefinition.getUnownedSlice()) >= 0);
-        SLANG_CHECK(
-            _countOccurrences(
-                text,
-                toSlice("call { i32, i1 } @llvm.nvvm.match.all.sync.i32p(i32")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("extractvalue { i32, i1 }")) == 1);
-        SLANG_CHECK(
-            _countOccurrences(text, toSlice("bitcast float")) ==
-            (valueKind == WavePredicateValueKind::Float ? 1 : 0));
-        SLANG_CHECK(_countOccurrences(text, toSlice(", 1")) >= 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("ret i1")) == 1);
-        SLANG_CHECK(_countOccurrences(text, helperCall.getUnownedSlice()) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("call i32 @llvm.nvvm.vote.ballot.sync")) == 1);
-        SLANG_CHECK(_countOccurrences(text, toSlice("store i32")) == 1);
-        SLANG_CHECK(
-            _countOccurrences(
-                text,
-                toSlice("declare { i32, i1 } @llvm.nvvm.match.all.sync.i32p(i32, i32)")) == 1);
-    }
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
-        toSlice("wave-mask-all-equal-int-module"),
-        toSlice("waveActiveAllEqualInt"),
-        toSlice("waveMaskAllEqualInt"),
-        WavePredicateValueKind::Integer);
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualUIntKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
-        toSlice("wave-mask-all-equal-uint-module"),
-        toSlice("waveActiveAllEqualUInt"),
-        toSlice("waveMaskAllEqualUInt"),
-        WavePredicateValueKind::UnsignedInteger);
-}
-
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsWaveMaskAllEqualFloatKernel)
-{
-    _checkNVVMIRBuilderBuildsWaveMaskAllEqualKernel(
-        unitTestContext,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
-        toSlice("wave-mask-all-equal-float-module"),
-        toSlice("waveActiveAllEqualFloat"),
-        toSlice("waveMaskAllEqualFloat"),
-        WavePredicateValueKind::Float);
-}
-
 static void _checkNVVMIRBuilderBuildsWaveMaskMatchKernel(
     UnitTestContext* unitTestContext,
     const UnownedStringSlice& moduleName,
@@ -12262,4 +11941,188 @@ SLANG_UNIT_TEST(nvvmIRBuilderCoreValuesRejectRetiredOperations)
 {
     _checkNVVMReservedMathOperation(unitTestContext, 49);
     _checkNVVMReservedMathOperation(unitTestContext, 68, 1, false, true);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderCoreWavesUseNamedSignatures)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const auto& testCase : kNVVMWaveNamedTestCases)
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("named-wave"), scope.module)));
+        SlangNVVMTypeHandle integerType = nullptr, boolType = nullptr, floatType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, integerType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 1, boolType)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 32, floatType)));
+        SlangNVVMNamedIntrinsicOperandDesc operands[4] = {};
+        SlangNVVMTypeHandle types[4] = {};
+        for (uint32_t i = 0; i < testCase.operandCount; ++i)
+        {
+            operands[i] = {testCase.operands[i], SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+            types[i] = testCase.operands[i].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ? floatType
+                       : testCase.operands[i].kind == SLANG_NVVM_VALUE_TYPE_BOOL         ? boolType
+                                                                                 : integerType;
+        }
+        const SlangNVVMTypeHandle resultType =
+            testCase.result.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ? floatType
+            : testCase.result.kind == SLANG_NVVM_VALUE_TYPE_BOOL         ? boolType
+                                                                         : integerType;
+        SlangNVVMNamedIntrinsicDesc desc = {
+            testCase.name,
+            strlen(testCase.name),
+            testCase.result,
+            operands,
+            testCase.operandCount};
+        SLANG_CHECK_ABORT(builder.supportsNamedIntrinsic(desc));
+        SlangNVVMTypeHandle functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+            scope.module,
+            resultType,
+            types,
+            testCase.operandCount,
+            functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("apply"),
+            function)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        SlangNVVMValueHandle values[4] = {};
+        for (uint32_t i = 0; i < testCase.operandCount; ++i)
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionParameter(scope.module, function, i, values[i])));
+        auto invalid = desc;
+        invalid.resultType = NVVMSemantics::kFloat64;
+        SLANG_CHECK(!builder.supportsNamedIntrinsic(invalid));
+        SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+        SLANG_CHECK(SLANG_FAILED(builder.emitNamedIntrinsic(
+            scope.module,
+            invalid,
+            values,
+            testCase.operandCount,
+            rejected)));
+        SLANG_CHECK(rejected == nullptr);
+        invalid = desc;
+        invalid.operandCount = testCase.operandCount ? testCase.operandCount - 1 : 1;
+        SLANG_CHECK(!builder.supportsNamedIntrinsic(invalid));
+        if (testCase.operandCount)
+        {
+            auto saved = operands[0];
+            operands[0].type = NVVMSemantics::kFloat64;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+            operands[0] = saved;
+        }
+        if (testCase.result.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+        {
+            operands[1].kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+            operands[1].kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+        }
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitNamedIntrinsic(scope.module, desc, values, testCase.operandCount, result)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, result)));
+        for (const auto format :
+             {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+              SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+        {
+            ComPtr<ISlangBlob> assembly;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
+            StringBuilder symbol;
+            symbol << "@" << testCase.name << "(";
+            const String text = _getBlobText(assembly);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), symbol.getUnownedSlice()) == 2);
+            if (testCase.operandCount)
+                SLANG_CHECK(text.contains("convergent inaccessiblememonly nounwind"));
+            SLANG_CHECK(!text.contains("double"));
+        }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderCoreWavesRejectRetiredOperations)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    String control;
+    for (bool injectFailures : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("retired-wave"), scope.module)));
+        SlangNVVMTypeHandle integerType = nullptr, boolType = nullptr, functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, integerType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 1, boolType)));
+        const SlangNVVMTypeHandle types[] = {integerType, integerType, boolType};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, integerType, types, 3, functionType)));
+        SlangNVVMValueHandle function = nullptr, values[3] = {};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("identity"),
+            function)));
+        for (uint32_t i = 0; i < 3; ++i)
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionParameter(scope.module, function, i, values[i])));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        if (injectFailures)
+            for (uint32_t operation : {16u, 19u, 20u, 21u, 22u, 23u})
+            {
+                const bool vote = operation == 21 || operation == 22;
+                const SlangNVVMValueTypeDesc operands[] = {
+                    NVVMSemantics::kUnsignedI32,
+                    vote ? NVVMSemantics::kBool : NVVMSemantics::kUnsignedI32};
+                const SlangNVVMValueHandle arguments[] = {values[0], values[vote ? 2 : 1]};
+                const SlangNVVMValueOperationDesc desc = {
+                    operation,
+                    operation == 16 || operation == 19 ? NVVMSemantics::kUnsignedI32
+                                                       : NVVMSemantics::kBool,
+                    operands,
+                    operation == 16   ? 0u
+                    : operation == 20 ? 1u
+                                      : 2u};
+                SLANG_CHECK(!builder.supportsValueOperation(desc));
+                SlangNVVMValueHandle rejected =
+                    reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                SLANG_CHECK(
+                    builder.getValueOperationsAPI()->emitOperation(
+                        scope.module,
+                        &desc,
+                        arguments,
+                        desc.operandCount,
+                        &rejected) == SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+            }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, values[0])));
+        ComPtr<ISlangBlob> assembly;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            assembly)));
+        if (injectFailures)
+        {
+            SLANG_CHECK(_getBlobText(assembly) == control);
+        }
+        else
+        {
+            control = _getBlobText(assembly);
+        }
+    }
 }

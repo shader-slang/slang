@@ -231,6 +231,30 @@ so zero has a defined width result; the public APIs preserve the uint(-1) sentin
 mappings call the scalar bodies. Numeric semantic IDs46/47 are retired; COUNT_BITS45 and
 FIRST_BIT_LOW48 remain for compound wave recipes that have not migrated.
 
+Public lane indices/counts, indexed shuffles, ballot/votes and raw-bit matching use eight named
+NVVM registry intrinsics. Registry matching owns the complete signature and attributes; indexed
+shuffle passes mask, payload, lane and clamp 31 explicitly. Core bit casts and word decomposition
+transport Boolean, integer 8/16/32/64, Half, Float32 and Float64 values without numerical conversion.
+Vector/matrix helpers call those scalar bodies. Read-first, first-lane and ballot counts use ordinary
+core composition. Numeric IDs 16/19/20/21/22/23 and all nine old wave tags are retired, along with
+compound shuffle/all-equal/count and aggregate-shuffle text recognizers.
+
+All-equal compares the intersection of raw-word match masks with `WaveMaskBallot(mask, true)`.
+This counts non-exited participants even when the supplied mask still names exited lanes. Each
+word/component collective executes before its results are combined; Boolean short-circuiting
+cannot skip a collective. Identical NaN payloads compare equal and positive/negative zero remain
+distinct. This composition exposes narrow and 64-bit matching/equality without an aggregate-return
+provider ABI. CUDA's existing `_waveMatchScalar` uses match-all, whereas NVVM matching uses match-any;
+differing-value `WaveMaskMatch` results across those targets remain an inherited distinction.
+
+Hardware and logical masks have distinct IR identities. `WaveGetConvergedMask` is effectful stable
+IR opcode 909, lowered through existing numeric operation 79 to convergent, side-effecting PTX
+`activemask`. It is not eligible for CSE or hoisting. `WaveGetActiveMask` retains its logical
+active-mask synthesis. Implicit matrix lane transport captures one hardware mask, ballots its
+participants and reuses that ballot for all components. Numeric 15/17/18/71/79 remain for genuine
+canonical, masked-scan, quad or rotation consumers. Ordered masked reductions/scans and their
+floating NaN/signed-zero behavior are unchanged.
+
 Target-switch specialization selects available branches across the linked module before diagnosing
 compatible but unavailable cases. A helper referenced only by an unselected NVVM arm is valid IR
 and must become unreachable before its switch is checked for CUDA. The pass keeps unresolved

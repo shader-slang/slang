@@ -552,7 +552,7 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneIndexUsesDirectPipeline)
 
         SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[0] == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicNames[0] == "llvm.nvvm.read.ptx.sreg.laneid");
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicCallerBlockIndices[0] == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 1);
@@ -2427,8 +2427,8 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneCountUsesDirectPipeline)
 
         SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[0] == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[1] == SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT);
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicNames[0] == "llvm.nvvm.read.ptx.sreg.laneid");
+        SLANG_CHECK(gFakeNVVMBuilder.intrinsicNames[1] == "llvm.nvvm.read.ptx.sreg.warpsize");
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicCallerBlockIndices[0] == 1);
         SLANG_CHECK(gFakeNVVMBuilder.intrinsicCallerBlockIndices[1] == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 2);
@@ -2460,238 +2460,6 @@ SLANG_UNIT_TEST(nvvmSlangWaveLaneCountUsesDirectPipeline)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtUIntUsesDirectPipeline)
-{
-    _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveReadLaneAtUIntSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 2);
-        Index shuffleIntrinsicIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
-            {
-                shuffleIntrinsicIndex = i;
-            }
-        }
-        SLANG_CHECK_ABORT(shuffleIntrinsicIndex >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[shuffleIntrinsicIndex] == 3);
-        const Index shuffleArgumentOffset =
-            gFakeNVVMBuilder.intrinsicArgumentOffsets[shuffleIntrinsicIndex];
-        const Index shuffleBlockIndex =
-            gFakeNVVMBuilder.intrinsicCallerBlockIndices[shuffleIntrinsicIndex];
-        const Index shuffleFunctionIndex = gFakeNVVMBuilder.blockFunctionIndices[shuffleBlockIndex];
-        for (Index i = 0; i < 3; ++i)
-        {
-            const FakeNVVMBuilderValueRef& argument =
-                gFakeNVVMBuilder.intrinsicArgumentValueRefs[shuffleArgumentOffset + i];
-            SLANG_CHECK(argument.kind == FakeNVVMBuilderValueKind::Parameter);
-            SLANG_CHECK(argument.functionIndex == shuffleFunctionIndex);
-            SLANG_CHECK(argument.index == i);
-        }
-
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
-        Index shuffleCallIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.callArgumentCounts.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.callArgumentCounts[i] == 3)
-                shuffleCallIndex = i;
-        }
-        SLANG_CHECK_ABORT(shuffleCallIndex >= 0);
-        const Index callArgumentOffset = gFakeNVVMBuilder.callArgumentOffsets[shuffleCallIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 0].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 1].kind ==
-            FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 2].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.pointerOffsetElementValueRefs[0].kind ==
-            FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtIntUsesDirectPipeline)
-{
-    _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveReadLaneAtIntSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 2);
-        Index shuffleIntrinsicIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
-            {
-                shuffleIntrinsicIndex = i;
-            }
-        }
-        SLANG_CHECK_ABORT(shuffleIntrinsicIndex >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[shuffleIntrinsicIndex] == 3);
-        const Index shuffleArgumentOffset =
-            gFakeNVVMBuilder.intrinsicArgumentOffsets[shuffleIntrinsicIndex];
-        const Index shuffleBlockIndex =
-            gFakeNVVMBuilder.intrinsicCallerBlockIndices[shuffleIntrinsicIndex];
-        const Index shuffleFunctionIndex = gFakeNVVMBuilder.blockFunctionIndices[shuffleBlockIndex];
-        for (Index i = 0; i < 3; ++i)
-        {
-            const FakeNVVMBuilderValueRef& argument =
-                gFakeNVVMBuilder.intrinsicArgumentValueRefs[shuffleArgumentOffset + i];
-            SLANG_CHECK(argument.kind == FakeNVVMBuilderValueKind::Parameter);
-            SLANG_CHECK(argument.functionIndex == shuffleFunctionIndex);
-            SLANG_CHECK(argument.index == i);
-        }
-
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
-        Index shuffleCallIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.callArgumentCounts.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.callArgumentCounts[i] == 3)
-                shuffleCallIndex = i;
-        }
-        SLANG_CHECK_ABORT(shuffleCallIndex >= 0);
-        const Index callArgumentOffset = gFakeNVVMBuilder.callArgumentOffsets[shuffleCallIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 0].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 1].kind ==
-            FakeNVVMBuilderValueKind::Load);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 2].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveReadLaneAtFloatUsesDirectPipeline)
-{
-    _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveReadLaneAtFloatSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 2);
-        Index shuffleIntrinsicIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
-            {
-                shuffleIntrinsicIndex = i;
-            }
-        }
-        SLANG_CHECK_ABORT(shuffleIntrinsicIndex >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[shuffleIntrinsicIndex] == 3);
-        const Index shuffleArgumentOffset =
-            gFakeNVVMBuilder.intrinsicArgumentOffsets[shuffleIntrinsicIndex];
-        const Index shuffleBlockIndex =
-            gFakeNVVMBuilder.intrinsicCallerBlockIndices[shuffleIntrinsicIndex];
-        const Index shuffleFunctionIndex = gFakeNVVMBuilder.blockFunctionIndices[shuffleBlockIndex];
-        for (Index i = 0; i < 3; ++i)
-        {
-            const FakeNVVMBuilderValueRef& argument =
-                gFakeNVVMBuilder.intrinsicArgumentValueRefs[shuffleArgumentOffset + i];
-            SLANG_CHECK(argument.kind == FakeNVVMBuilderValueKind::Parameter);
-            SLANG_CHECK(argument.functionIndex == shuffleFunctionIndex);
-            SLANG_CHECK(argument.index == i);
-        }
-
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
-        Index shuffleCallIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.callArgumentCounts.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.callArgumentCounts[i] == 3)
-                shuffleCallIndex = i;
-        }
-        SLANG_CHECK_ABORT(shuffleCallIndex >= 0);
-        const Index callArgumentOffset = gFakeNVVMBuilder.callArgumentOffsets[shuffleCallIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 0].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 1].kind ==
-            FakeNVVMBuilderValueKind::Load);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[callArgumentOffset + 2].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
 
 SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskUsesDirectPipeline)
 {
@@ -2764,380 +2532,7 @@ SLANG_UNIT_TEST(nvvmSlangWaveActiveMaskUsesDirectPipeline)
 }
 
 // Compiles one public scalar wave-read fixture and checks its canonical mask-to-operation topology.
-static void _checkPublicWaveReadDirectPipeline(
-    const char* source,
-    SlangNVVMValueOperation waveOperation,
-    Index waveArgumentCount,
-    FakeNVVMBuilderValueKind entryValueKind,
-    Index expectedPointerOffsetCount,
-    Index expectedLoadCount)
-{
-    _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
 
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 5);
-        SLANG_CHECK(gFakeNVVMBuilder.createBlockCallCount == 5);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 3);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations.getCount() == 3);
-        Index ballotIntrinsicIndex = -1;
-        Index waveIntrinsicIndex = -1;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
-                ballotIntrinsicIndex = i;
-            else if (gFakeNVVMBuilder.intrinsicOperations[i] == waveOperation)
-                waveIntrinsicIndex = i;
-        }
-        SLANG_CHECK_ABORT(ballotIntrinsicIndex >= 0);
-        SLANG_CHECK_ABORT(waveIntrinsicIndex >= 0);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[ballotIntrinsicIndex] == 2);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.intrinsicArgumentCounts[waveIntrinsicIndex] == waveArgumentCount);
-
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
-        Index publicCallIndex = -1;
-        Index activeMaskCallIndex = -1;
-        Index maskedWaveCallIndex = -1;
-        for (Index callIndex = 0; callIndex < gFakeNVVMBuilder.callArgumentCounts.getCount();
-             ++callIndex)
-        {
-            const Index argumentCount = gFakeNVVMBuilder.callArgumentCounts[callIndex];
-            const Index argumentOffset = gFakeNVVMBuilder.callArgumentOffsets[callIndex];
-            if (argumentCount == 1)
-            {
-                activeMaskCallIndex = callIndex;
-            }
-            else if (argumentCount == waveArgumentCount)
-            {
-                const FakeNVVMBuilderValueRef& lastArgument =
-                    gFakeNVVMBuilder.callArgumentValueRefs[argumentOffset + waveArgumentCount - 1];
-                if (lastArgument.kind == FakeNVVMBuilderValueKind::Intrinsic)
-                    publicCallIndex = callIndex;
-                else
-                    maskedWaveCallIndex = callIndex;
-            }
-        }
-        SLANG_CHECK_ABORT(publicCallIndex >= 0);
-        SLANG_CHECK_ABORT(activeMaskCallIndex >= 0);
-        SLANG_CHECK_ABORT(maskedWaveCallIndex >= 0);
-
-        const Index publicArgumentOffset = gFakeNVVMBuilder.callArgumentOffsets[publicCallIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 0].kind ==
-            entryValueKind);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + waveArgumentCount - 1]
-                .kind == FakeNVVMBuilderValueKind::Intrinsic);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + waveArgumentCount - 1]
-                .index == ballotIntrinsicIndex);
-        if (waveArgumentCount == 3)
-        {
-            SLANG_CHECK(
-                gFakeNVVMBuilder.callArgumentValueRefs[publicArgumentOffset + 1].kind ==
-                FakeNVVMBuilderValueKind::Parameter);
-        }
-
-        const Index activeMaskArgumentOffset =
-            gFakeNVVMBuilder.callArgumentOffsets[activeMaskCallIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[activeMaskArgumentOffset].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        const Index maskedWaveArgumentOffset =
-            gFakeNVVMBuilder.callArgumentOffsets[maskedWaveCallIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 0].kind ==
-            FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 0].index ==
-            activeMaskCallIndex);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 1].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        if (waveArgumentCount == 3)
-        {
-            SLANG_CHECK(
-                gFakeNVVMBuilder.callArgumentValueRefs[maskedWaveArgumentOffset + 2].kind ==
-                FakeNVVMBuilderValueKind::Parameter);
-        }
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == expectedPointerOffsetCount);
-        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == expectedLoadCount);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::Call);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].index == publicCallIndex);
-        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtUIntUsesDirectPipeline)
-{
-    _checkPublicWaveReadDirectPipeline(
-        kDirectNVVMUnmaskedWaveReadLaneAtUIntSource,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        3,
-        FakeNVVMBuilderValueKind::Call,
-        1,
-        0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtIntUsesDirectPipeline)
-{
-    _checkPublicWaveReadDirectPipeline(
-        kDirectNVVMUnmaskedWaveReadLaneAtIntSource,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        3,
-        FakeNVVMBuilderValueKind::Load,
-        2,
-        1);
-}
-
-SLANG_UNIT_TEST(nvvmSlangUnmaskedWaveReadLaneAtFloatUsesDirectPipeline)
-{
-    _checkPublicWaveReadDirectPipeline(
-        kDirectNVVMUnmaskedWaveReadLaneAtFloatSource,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        3,
-        FakeNVVMBuilderValueKind::Load,
-        2,
-        1);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstUIntUsesDirectPipeline)
-{
-    _checkPublicWaveReadDirectPipeline(
-        kDirectNVVMWaveReadLaneFirstUIntSource,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
-        2,
-        FakeNVVMBuilderValueKind::Call,
-        1,
-        0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstIntUsesDirectPipeline)
-{
-    _checkPublicWaveReadDirectPipeline(
-        kDirectNVVMWaveReadLaneFirstIntSource,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
-        2,
-        FakeNVVMBuilderValueKind::Load,
-        2,
-        1);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveReadLaneFirstFloatUsesDirectPipeline)
-{
-    _checkPublicWaveReadDirectPipeline(
-        kDirectNVVMWaveReadLaneFirstFloatSource,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST,
-        2,
-        FakeNVVMBuilderValueKind::Load,
-        2,
-        1);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveIsFirstLaneUsesDirectPipeline)
-{
-    _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kDirectNVVMWaveIsFirstLaneSource,
-            code,
-            diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 5);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 4);
-        Index isFirstIntrinsicIndex = -1;
-        Index ballotCount = 0;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] ==
-                SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE)
-            {
-                isFirstIntrinsicIndex = i;
-            }
-            else if (
-                gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
-            {
-                ++ballotCount;
-            }
-        }
-        SLANG_CHECK_ABORT(isFirstIntrinsicIndex >= 0);
-        SLANG_CHECK(ballotCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[isFirstIntrinsicIndex] == 1);
-        const Index argumentOffset =
-            gFakeNVVMBuilder.intrinsicArgumentOffsets[isFirstIntrinsicIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.intrinsicArgumentValueRefs[argumentOffset].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
-        Index booleanCallCount = 0;
-        for (SlangNVVMTypeHandle resultType : gFakeNVVMBuilder.callResultTypes)
-        {
-            if (resultType == _getFakeNVVMBuilderBooleanType())
-                ++booleanCallCount;
-        }
-        SLANG_CHECK(booleanCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitConditionalBranchCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPhiCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.scalarPhiTypes[0] == _getFakeNVVMBuilderIntegerType());
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::ScalarPhi);
-        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-static void _checkPublicWavePredicateDirectPipeline(
-    const char* source,
-    SlangNVVMValueOperation operation,
-    Index expectedBooleanParameterCount,
-    Index expectedFloatParameterCount = 0)
-{
-    _resetDirectNVVMFakes();
-    {
-        ComPtr<slang::IGlobalSession> globalSession;
-        SLANG_CHECK_ABORT(
-            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        globalSession->setSharedLibraryLoader(loader);
-
-        ComPtr<slang::IBlob> code;
-        ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(_compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
-        SLANG_CHECK_ABORT(code != nullptr);
-        SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
-
-        SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 5);
-        SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 4);
-        Index predicateIntrinsicIndex = -1;
-        Index ballotCount = 0;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] == operation)
-            {
-                predicateIntrinsicIndex = i;
-            }
-            else if (
-                gFakeNVVMBuilder.intrinsicOperations[i] == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
-            {
-                ++ballotCount;
-            }
-        }
-        SLANG_CHECK_ABORT(predicateIntrinsicIndex >= 0);
-        SLANG_CHECK(ballotCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[predicateIntrinsicIndex] == 2);
-        const Index argumentOffset =
-            gFakeNVVMBuilder.intrinsicArgumentOffsets[predicateIntrinsicIndex];
-        SLANG_CHECK(
-            gFakeNVVMBuilder.intrinsicArgumentValueRefs[argumentOffset].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(
-            gFakeNVVMBuilder.intrinsicArgumentValueRefs[argumentOffset + 1].kind ==
-            FakeNVVMBuilderValueKind::Parameter);
-        Index booleanParameterCount = 0;
-        Index floatParameterCount = 0;
-        for (FakeNVVMBuilderParameterTypeKind parameterKind :
-             gFakeNVVMBuilder.functionParameterTypeKinds)
-        {
-            if (parameterKind == FakeNVVMBuilderParameterTypeKind::Boolean)
-                ++booleanParameterCount;
-            else if (parameterKind == FakeNVVMBuilderParameterTypeKind::Float)
-                ++floatParameterCount;
-        }
-        SLANG_CHECK(booleanParameterCount == expectedBooleanParameterCount);
-        SLANG_CHECK(floatParameterCount == expectedFloatParameterCount);
-        SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 4);
-        Index booleanCallCount = 0;
-        for (SlangNVVMTypeHandle resultType : gFakeNVVMBuilder.callResultTypes)
-        {
-            if (resultType == _getFakeNVVMBuilderBooleanType())
-                ++booleanCallCount;
-        }
-        SLANG_CHECK(booleanCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitConditionalBranchCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitPhiCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.scalarPhiTypes[0] == _getFakeNVVMBuilderIntegerType());
-        SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[0].kind == FakeNVVMBuilderValueKind::ScalarPhi);
-        SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
-    }
-    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
-    SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveActiveAnyTrueUsesDirectPipeline)
-{
-    _checkPublicWavePredicateDirectPipeline(
-        kDirectNVVMWaveActiveAnyTrueSource,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE,
-        2);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveActiveAllTrueUsesDirectPipeline)
-{
-    _checkPublicWavePredicateDirectPipeline(
-        kDirectNVVMWaveActiveAllTrueSource,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE,
-        2);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualIntUsesDirectPipeline)
-{
-    _checkPublicWavePredicateDirectPipeline(
-        kDirectNVVMWaveActiveAllEqualIntSource,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
-        0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualUIntUsesDirectPipeline)
-{
-    _checkPublicWavePredicateDirectPipeline(
-        kDirectNVVMWaveActiveAllEqualUIntSource,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
-        0);
-}
-
-SLANG_UNIT_TEST(nvvmSlangWaveActiveAllEqualFloatUsesDirectPipeline)
-{
-    _checkPublicWavePredicateDirectPipeline(
-        kDirectNVVMWaveActiveAllEqualFloatSource,
-        SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL,
-        0,
-        2);
-}
 
 SLANG_UNIT_TEST(nvvmSlangWaveMaskMatchUsesTypedIntrinsic)
 {
@@ -8163,14 +7558,15 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
             "floating-point width conversion",
         },
         {
-            kDirectNVVMWaveLaneIndexSource,
+            "[CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, "
+            "AddressSpace::Device> destination) { *destination = WaveGetConvergedMask(); }",
             {
-                SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
+                SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
                 NVVMSemantics::kUnsignedI32,
                 nullptr,
                 0,
             },
-            "wave lane index intrinsic",
+            "hardware wave active mask",
         },
         {
             kDirectNVVMMixedNumericSource,
@@ -8758,39 +8154,17 @@ SLANG_UNIT_TEST(nvvmSlangCompoundWaveHelpersUseScalarRecipes)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        uint32_t readLaneAtCount = 0;
-        uint32_t allEqualCount = 0;
-        uint32_t ballotCount = 0;
-        for (SlangNVVMValueOperation operation : gFakeNVVMBuilder.intrinsicOperations)
-        {
-            if (operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
-                ++readLaneAtCount;
-            else if (operation == SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL)
-                ++allEqualCount;
-            else if (operation == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
-                ++ballotCount;
-        }
-        SLANG_CHECK(readLaneAtCount == 2);
-        SLANG_CHECK(allEqualCount == 2);
-        SLANG_CHECK(ballotCount == 1);
-
-        uint32_t populationCount = 0;
-        uint32_t booleanConjunctionCount = 0;
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.shfl.sync.idx.f32"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.match.any.sync.i32"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.vote.ballot.sync"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.ctpop"));
+        bool intersectsComponentMasks = false;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
-        {
-            if (operation.key.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS)
-                ++populationCount;
-            else if (
+            intersectsComponentMasks |=
                 operation.key.operation == SLANG_NVVM_VALUE_OP_BIT_AND &&
-                operation.key.family == FakeNVVMBuilderScalarFamily::Binary)
-            {
-                ++booleanConjunctionCount;
-            }
-        }
-        SLANG_CHECK(populationCount == 1);
-        SLANG_CHECK(booleanConjunctionCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementExtractCallCount >= 6);
-        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 3);
+                NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI32);
+        SLANG_CHECK(intersectsComponentMasks);
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementExtractCallCount >= 4);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -8837,7 +8211,9 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarHelpersUseGenericLoops)
                 ++laneIndexCount;
         }
         SLANG_CHECK(readLaneAtCount == 2);
-        SLANG_CHECK(laneIndexCount == 2);
+        SLANG_CHECK(laneIndexCount == 1);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.read.ptx.sreg.laneid"));
 
         uint32_t firstBitLowCount = 0;
         uint32_t negateCount = 0;
@@ -9060,24 +8436,11 @@ SLANG_UNIT_TEST(nvvmSlangAggregateWaveHelpersUseRecursiveScalarRecipes)
             laneIndexCount += operation == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX;
             activeMaskCount += operation == SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK;
         }
-        SLANG_CHECK(readLaneAtCount == 16);
-        SLANG_CHECK(laneIndexCount >= 2);
+        SLANG_CHECK(readLaneAtCount == 8);
+        SLANG_CHECK(laneIndexCount >= 1);
         SLANG_CHECK(activeMaskCount == 3);
-        uint32_t ballotCount = 0;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] != SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
-                continue;
-            ++ballotCount;
-            const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
-            const auto mask = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
-            SLANG_CHECK_ABORT(mask.kind == FakeNVVMBuilderValueKind::Intrinsic);
-            SLANG_CHECK(
-                gFakeNVVMBuilder.intrinsicOperations[mask.index] ==
-                SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK);
-        }
-        SLANG_CHECK(ballotCount == 1);
-
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.shfl.sync.idx.i32"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.vote.ballot.sync"));
         uint32_t floatMinimumCount = 0;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
@@ -9140,51 +8503,41 @@ SLANG_UNIT_TEST(nvvmSlangFloat64ImplicitAggregateShuffleUsesTypedMaskChain)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        uint32_t readLaneAtCount = 0;
-        uint32_t laneIndexCount = 0;
         uint32_t activeMaskCount = 0;
-        for (SlangNVVMValueOperation operation : gFakeNVVMBuilder.intrinsicOperations)
-        {
-            readLaneAtCount += operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT;
-            laneIndexCount += operation == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX;
+        for (auto operation : gFakeNVVMBuilder.intrinsicOperations)
             activeMaskCount += operation == SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK;
-        }
-        SLANG_CHECK(readLaneAtCount == 4);
-        SLANG_CHECK(laneIndexCount == 1);
         SLANG_CHECK(activeMaskCount == 1);
-        uint32_t ballotCount = 0;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.shfl.sync.idx.i32"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.vote.ballot.sync"));
+        Index ballotFunction = -1;
+        for (Index i = 0; i < gFakeNVVMBuilder.functionNames.getCount(); ++i)
+            if (gFakeNVVMBuilder.namedIntrinsicFunctionNames[i] == "llvm.nvvm.vote.ballot.sync")
+                ballotFunction = i;
+        SLANG_CHECK_ABORT(ballotFunction >= 0);
+        bool capturedMaskFeedsBallot = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount(); ++i)
         {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] != SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT)
+            if (gFakeNVVMBuilder.callCalleeFunctionIndices[i] != ballotFunction)
                 continue;
-            ++ballotCount;
-            const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
-            const auto mask = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
-            SLANG_CHECK_ABORT(mask.kind == FakeNVVMBuilderValueKind::Intrinsic);
-            SLANG_CHECK(
-                gFakeNVVMBuilder.intrinsicOperations[mask.index] ==
-                SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK);
+            const auto mask =
+                gFakeNVVMBuilder.callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[i]];
+            capturedMaskFeedsBallot |= mask.kind == FakeNVVMBuilderValueKind::Intrinsic &&
+                                       gFakeNVVMBuilder.intrinsicOperations[mask.index] ==
+                                           SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK;
         }
-        SLANG_CHECK(ballotCount == 1);
-
-        uint32_t float64ShuffleCount = 0;
-        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+        SLANG_CHECK(capturedMaskFeedsBallot);
+        bool ballotFeedsTransport = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount(); ++i)
         {
-            if (gFakeNVVMBuilder.intrinsicOperations[i] != SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT ||
-                !NVVMSemantics::areSameType(
-                    gFakeNVVMBuilder.intrinsicResultTypes[i],
-                    NVVMSemantics::kFloat64))
+            if (!gFakeNVVMBuilder.callArgumentCounts[i])
                 continue;
-            ++float64ShuffleCount;
-            const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
-            const auto mask = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
-            SLANG_CHECK_ABORT(mask.kind == FakeNVVMBuilderValueKind::Intrinsic);
-            SLANG_CHECK(
-                gFakeNVVMBuilder.intrinsicOperations[mask.index] ==
-                SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT);
+            const auto mask =
+                gFakeNVVMBuilder.callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[i]];
+            ballotFeedsTransport |=
+                mask.kind == FakeNVVMBuilderValueKind::Call &&
+                gFakeNVVMBuilder.callCalleeFunctionIndices[mask.index] == ballotFunction;
         }
-        SLANG_CHECK(float64ShuffleCount == 4);
-
+        SLANG_CHECK(ballotFeedsTransport);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 1);
     }
@@ -9265,8 +8618,7 @@ SLANG_UNIT_TEST(nvvmSlangBFloat16LocalVectorsUseQualifiedStorage)
         _resetDirectNVVMFakes();
         {
             StringBuilder source;
-            source << "typealias V = vector<BFloat16," << width << ">;"
-                   << R"SLANG(
+            source << "typealias V = vector<BFloat16," << width << ">;" << R"SLANG(
                 [noinline] V replace(inout V x, V y) { let old = x; x = y; return old; }
                 [noinline] void initialize(out V x, V y) { x = y; }
                 RWStructuredBuffer<uint> outputBuffer;
@@ -9341,8 +8693,7 @@ SLANG_UNIT_TEST(nvvmSlangBFloat16LocalRecordsUseQualifiedFields)
         _resetDirectNVVMFakes();
         {
             StringBuilder source;
-            source << "typealias V = vector<BFloat16," << width << ">;"
-                   << R"SLANG(
+            source << "typealias V = vector<BFloat16," << width << ">;" << R"SLANG(
                 struct Record { uint16_t prefix; V value; uint16_t suffix; }
                 [noinline] void initialize(out Record x, V y)
                 { x.prefix = uint16_t(17); x.value = y; x.suffix = uint16_t(19); }
@@ -9414,8 +8765,7 @@ SLANG_UNIT_TEST(nvvmSlangSubstandardRecordsUseInternalValues)
         StringBuilder source;
         source << "typealias F = " << type
                << "; typealias Bits = " << (String(type) == "BFloat16" ? "uint16_t" : "uint8_t")
-               << ";"
-               << R"SLANG(
+               << ";" << R"SLANG(
             struct Payload { F value; }
             [noinline] Payload copy(Payload x) { return x; }
             RWStructuredBuffer<uint> outputBuffer;
@@ -9570,8 +8920,7 @@ SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsUseInternalValues)
         {
             StringBuilder source;
             source << "typealias F = " << format << "; typealias Bits = "
-                   << (String(format) == "BFloat16" ? "uint16_t" : "uint8_t") << ";"
-                   << R"SLANG(
+                   << (String(format) == "BFloat16" ? "uint16_t" : "uint8_t") << ";" << R"SLANG(
                 struct Payload { F value; }
                 struct Outer { Payload value; }
                 [noinline] Outer copy(Outer x) { return x; }
@@ -9948,8 +9297,7 @@ SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsRejectOtherRoles)
         _resetDirectNVVMFakes();
         {
             StringBuilder source;
-            source << "struct Payload { vector<BFloat16," << width << "> value; }"
-                   << R"SLANG(
+            source << "struct Payload { vector<BFloat16," << width << "> value; }" << R"SLANG(
                 struct Outer { Payload inner; }
                 [noinline] void initialize(out Outer x, BFloat16 v) { x.inner.value = v; }
                 RWStructuredBuffer<uint> outputBuffer;
@@ -12098,8 +11446,7 @@ SLANG_UNIT_TEST(nvvmSlangLegacyRoundAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldRound(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_round($0)\"; } "
-               << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_round($0)\"; } " << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -12143,8 +11490,7 @@ SLANG_UNIT_TEST(nvvmSlangPublicDirectedRoundingUsesNamedDeviceLibrary)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
             StringBuilder source;
             source << types[variant] << " selected(" << types[variant] << " x) { return "
-                   << operationName << "(x); } "
-                   << "[CUDAKernel] void computeMain("
+                   << operationName << "(x); } " << "[CUDAKernel] void computeMain("
                    << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                    << bodies[variant] << " }";
             ComPtr<slang::IBlob> code, diagnostics;
@@ -12403,8 +11749,7 @@ SLANG_UNIT_TEST(nvvmSlangLegacySqrtAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldSqrt(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_sqrt($0)\"; } "
-               << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_sqrt($0)\"; } " << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -12444,8 +11789,7 @@ SLANG_UNIT_TEST(nvvmSlangLegacyFracAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldFrac(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_frac($0)\"; } "
-               << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_frac($0)\"; } " << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -12628,8 +11972,7 @@ static void _checkNVVMPublicUnaryDeviceLibrary(
             const char* type = types[variant];
             StringBuilder source;
             source << "[noinline] " << type << " " << publicName << "Helper(" << type
-                   << " x) { return " << publicName << "(x); } "
-                   << "[CUDAKernel] void computeMain("
+                   << " x) { return " << publicName << "(x); } " << "[CUDAKernel] void computeMain("
                    << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { ";
             for (Index i = 0; i < 4; ++i)
             {
@@ -12855,8 +12198,7 @@ SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldRsqrt(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_rsqrt($0)\"; } "
-               << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_rsqrt($0)\"; } " << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -12896,8 +12238,7 @@ SLANG_UNIT_TEST(nvvmSlangLegacyExpAssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldExp(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_exp($0)\"; } "
-               << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_exp($0)\"; } " << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -12937,8 +12278,7 @@ SLANG_UNIT_TEST(nvvmSlangLegacyExp2AssemblyRejectsBeforeOutputCreation)
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
         source << types[variant] << " oldExp2(" << types[variant] << " x) { "
-               << "__intrinsic_asm \"$P_exp2($0)\"; } "
-               << "[CUDAKernel] void computeMain("
+               << "__intrinsic_asm \"$P_exp2($0)\"; } " << "[CUDAKernel] void computeMain("
                << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
                << bodies[variant] << " }";
         ComPtr<slang::IBlob> code, diagnostics;
@@ -13402,4 +12742,175 @@ SLANG_UNIT_TEST(nvvmSlangLocalAtomicReductionRejectsAtProducer)
     SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+}
+
+// Public wave APIs now expose named primitives and ordinary composition instead of numeric recipes.
+SLANG_UNIT_TEST(nvvmSlangCoreWaveProducersUseNamedCalls)
+{
+    struct SourceCase
+    {
+        const char* source;
+        const char* primitive;
+    };
+    const SourceCase cases[] = {
+        {kDirectNVVMWaveReadLaneAtUIntSource, "llvm.nvvm.shfl.sync.idx.i32"},
+        {kDirectNVVMWaveReadLaneAtIntSource, "llvm.nvvm.shfl.sync.idx.i32"},
+        {kDirectNVVMWaveReadLaneAtFloatSource, "llvm.nvvm.shfl.sync.idx.f32"},
+        {kDirectNVVMUnmaskedWaveReadLaneAtUIntSource, "llvm.nvvm.shfl.sync.idx.i32"},
+        {kDirectNVVMUnmaskedWaveReadLaneAtIntSource, "llvm.nvvm.shfl.sync.idx.i32"},
+        {kDirectNVVMUnmaskedWaveReadLaneAtFloatSource, "llvm.nvvm.shfl.sync.idx.f32"},
+        {kDirectNVVMWaveReadLaneFirstUIntSource, "llvm.nvvm.shfl.sync.idx.i32"},
+        {kDirectNVVMWaveReadLaneFirstIntSource, "llvm.nvvm.shfl.sync.idx.i32"},
+        {kDirectNVVMWaveReadLaneFirstFloatSource, "llvm.nvvm.shfl.sync.idx.f32"},
+        {kDirectNVVMWaveIsFirstLaneSource, "llvm.nvvm.read.ptx.sreg.laneid"},
+        {kDirectNVVMWaveActiveAnyTrueSource, "llvm.nvvm.vote.any.sync"},
+        {kDirectNVVMWaveActiveAllTrueSource, "llvm.nvvm.vote.all.sync"},
+        {kDirectNVVMWaveActiveAllEqualIntSource, "llvm.nvvm.match.any.sync.i32"},
+        {kDirectNVVMWaveActiveAllEqualUIntSource, "llvm.nvvm.match.any.sync.i32"},
+        {kDirectNVVMWaveActiveAllEqualFloatSource, "llvm.nvvm.match.any.sync.i32"},
+    };
+    for (const auto& testCase : cases)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result =
+            _compileSlangWithDirectNVVM(session, testCase.source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK(code);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains(testCase.primitive));
+        for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+        {
+            const auto operation = gFakeNVVMBuilder.intrinsicOperations[i];
+            SLANG_CHECK(operation != 16 && (operation < 19 || operation > 23));
+            if (gFakeNVVMBuilder.intrinsicNames[i] != "llvm.nvvm.shfl.sync.idx.i32" &&
+                gFakeNVVMBuilder.intrinsicNames[i] != "llvm.nvvm.shfl.sync.idx.f32")
+                continue;
+            SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[i] == 4);
+            const auto offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+            for (Index operand = 0; operand < 3; ++operand)
+            {
+                const auto ref = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset + operand];
+                SLANG_CHECK(ref.kind == FakeNVVMBuilderValueKind::Parameter);
+                SLANG_CHECK(ref.index == operand);
+            }
+            const auto clamp = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset + 3];
+            SLANG_CHECK_ABORT(clamp.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[clamp.index] == 31);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+    }
+}
+
+// The hardware snapshot stays an effectful canonical instruction, distinct from logical synthesis.
+SLANG_UNIT_TEST(nvvmSlangHardwareAndLogicalWaveMasksStayDistinct)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    session->setSharedLibraryLoader(loader);
+    ComPtr<slang::IBlob> code, diagnostics;
+    const char* source = R"slang(
+        [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
+        {
+            words[0] = __WaveGetConvergedMask();
+            words[1] = __WaveGetConvergedMask();
+            words[2] = WaveGetActiveMask();
+        }
+    )slang";
+    const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    uint32_t hardware = 0, logical = 0;
+    for (auto operation : gFakeNVVMBuilder.intrinsicOperations)
+    {
+        hardware += operation == SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK;
+        logical += operation == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT;
+    }
+    SLANG_CHECK(hardware == 2);
+    SLANG_CHECK(logical >= 1);
+    SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 3);
+}
+
+SLANG_UNIT_TEST(nvvmSlangCoreWaveLegacyRoutesRejectBeforeOutput)
+{
+    struct LegacyCase
+    {
+        const char* declaration;
+        const char* use;
+        const char* diagnostic = "E52017";
+    };
+    const LegacyCase cases[] = {
+        {R"slang(uint old() { __intrinsic_asm "__activemask()"; })slang", "old()"},
+        {R"slang(uint4 old() { __intrinsic_asm "make_uint4(__activemask(), 0, 0, 0)"; })slang",
+         "old().x"},
+        {R"slang(uint old() { __intrinsic_asm(nvvmWaveLaneIndex) "_getLaneId()"; })slang",
+         "old()",
+         "E36121"},
+        {R"slang(uint old() { __intrinsic_asm(nvvmWaveLaneCount) "(warpSize)"; })slang",
+         "old()",
+         "E36121"},
+        {R"slang(uint old(uint m,uint v,int l) { __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)"; })slang",
+         "old(words[0],words[1],int(words[2]))",
+         "E36121"},
+        {R"slang(uint old(uint m,uint v) { __intrinsic_asm(nvvmWaveReadLaneFirst) "_waveReadFirst($0, $1)"; })slang",
+         "old(words[0],words[1])",
+         "E36121"},
+        {R"slang(bool old(uint m) { __intrinsic_asm(nvvmWaveMaskIsFirstLane) "(($0 & -$0) == (WarpMask(1) << _getLaneId()))"; })slang",
+         "uint(old(words[0]))",
+         "E36121"},
+        {R"slang(bool old(uint m,bool v) { __intrinsic_asm(nvvmWaveMaskAnyTrue) "(__any_sync($0, $1) != 0)"; })slang",
+         "uint(old(words[0],words[1]!=0))",
+         "E36121"},
+        {R"slang(bool old(uint m,bool v) { __intrinsic_asm(nvvmWaveMaskAllTrue) "(__all_sync($0, $1) != 0)"; })slang",
+         "uint(old(words[0],words[1]!=0))",
+         "E36121"},
+        {R"slang(bool old(uint m,uint v) { __intrinsic_asm(nvvmWaveMaskAllEqual) "_waveAllEqual($0, $1)"; })slang",
+         "uint(old(words[0],words[1]))",
+         "E36121"},
+        {R"slang(uint old(uint m,bool v) { __intrinsic_asm(nvvmWaveMaskBallot) "__ballot_sync($0, $1)"; })slang",
+         "old(words[0],words[1]!=0)",
+         "E36121"},
+        {R"slang(uint old(uint m,bool v) { __intrinsic_asm "__ballot_sync($0, $1)"; })slang",
+         "old(words[0],words[1]!=0)"},
+        {R"slang(uint old(uint m,bool v) { __intrinsic_asm "__popc(__ballot_sync($0, $1))"; })slang",
+         "old(words[0],words[1]!=0)"},
+        {R"slang(uint2 old(uint m,uint2 v,int l) { __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)"; })slang",
+         "old(words[0],uint2(words[1],words[2]),int(words[3])).x"},
+        {R"slang(bool old(uint m,uint2 v) { __intrinsic_asm "_waveAllEqualMultiple($0, $1)"; })slang",
+         "uint(old(words[0],uint2(words[1],words[2])))"},
+    };
+    for (const auto& testCase : cases)
+    {
+        StringBuilder source;
+        source << testCase.declaration << " [CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { words[4]="
+               << testCase.use << "; }";
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(_getBlobText(diagnostics).contains(testCase.diagnostic));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
 }

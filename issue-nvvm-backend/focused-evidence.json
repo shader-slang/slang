@@ -75123,6 +75123,207 @@
         "No full/native/corpus/material/version or new numerical-oracle campaign; historical claims retain their identities.",
         "Module43/ABI46 unchanged; stale prototype modules may need recompilation."
       ]
+    },
+    "nvvm-core-waves": {
+      "status": "accepted-focused",
+      "scope": "Eight named LLVM/NVVM wave primitives and core raw-payload/aggregate composition replace nine tags and six numeric IDs. Stable effectful IR909 preserves hardware mask observations separately from logical active-mask synthesis. Ordered reductions/scans, quad and rotation retain their current algorithms.",
+      "compiler_identity": {
+        "revision": "44c7461777b6bba99fb86580f5c6f84f2047abfa",
+        "compiler_patch_sha256": "bdd8324aec1f79521c30e3314d11d2404e5262079805c66da7eb3bde54540b8c",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "35f4ef4eda43e0c8c7e5f16a694740dc059ce885640cc79a8641bf172aaeeb1e",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "78090b66d19a5989295143346e3b32264b561d5424cacfab2addf898098e5e96",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "c1ca91038f2b4f516bf40a40e517e1c8680b04c57247123ef81710d1454cd233",
+          "source/slang/hlsl.meta.slang": "a09674c3693072d1f740d47f4fe5147c4765678cc4f00925a7adf60b9e3174bc",
+          "source/slang/slang-emit-nvvm.cpp": "8914be3c23b21a7563c0d343f340e646557500dc56e4f76d18ffbac14edaab91",
+          "source/slang/slang-ir-insts-stable-names.cpp": "39d6d2541994db521063c630cec15290226521893aa469053a7152e3840a8a08",
+          "source/slang/slang-ir-insts-stable-names.lua": "14c1946fa2a647252e9f1473f6ddaa857351074f153807af6bbacdde641abb8f",
+          "source/slang/slang-ir-insts.lua": "ac3caba795993b176ac199b1361020b856a7b5a2956ae16ec2b2425dcc668087",
+          "source/slang/slang-lower-to-ir.cpp": "b63d4a21f783ce00f1e97cacc1cdb72a6d4b6b1f1f6c63de272a2844ecc91387",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "b6f073f1dbdcd971f6cc84c0403fa597a510e47b0ce41185f5a67027e30e103e",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "98c5a207a05d30867e2afd6551ec0be0d348663b8c64026eb1cf30e251e92882",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "04206be96797051a70e7f4a7235fda7486b7e48feaadfe81602b0e8b9ff216da",
+          "tests/cuda/nvvm-core-waves.slang": "e4127d1af1132f189cc28deaebc1508dc809dc64f27067f0c6794a96dd54e4b9"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "17128411d8d8a0ecfbc9bd78bea81a1cf4b0d69f924cbcf5dd4048444bfebebf",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "890acdf1e5948d632daeb67ca841a9d1496571945690f94804da25d354d410f2",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "dcdd63edf1bbfabc675ca08a289587c6ceb7637f2a71c305d4c6a0fe4d7cb1cb",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b"
+        }
+      },
+      "validation": {
+        "units": {
+          "passed": 13,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderBuildsHardwareActiveMask.internal",
+            "slang-unit-test-tool/nvvmIRBuilderCoreWavesUseNamedSignatures.internal",
+            "slang-unit-test-tool/nvvmIRBuilderCoreWavesRejectRetiredOperations.internal",
+            "slang-unit-test-tool/nvvmSlangWaveLaneIndexUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangWaveLaneCountUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangCompoundWaveHelpersUseScalarRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangAggregateWaveHelpersUseRecursiveScalarRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangFloat64ImplicitAggregateShuffleUsesTypedMaskChain.internal",
+            "slang-unit-test-tool/nvvmSlangHardwareAndLogicalWaveMasksStayDistinct.internal",
+            "slang-unit-test-tool/nvvmSlangCoreWaveProducersUseNamedCalls.internal",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveScalarHelpersUseGenericLoops.internal",
+            "slang-unit-test-tool/nvvmSlangPreflightsExactValueOperationCapabilities.internal",
+            "slang-unit-test-tool/nvvmSlangCoreWaveLegacyRoutesRejectBeforeOutput.internal"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-core-waves/units.json",
+              "sha256": "3fc7b52b5a753d7aa9bffd0b56c7d93fcc23c76cef0233e4038d9a76dd98044a",
+              "return_code": 1,
+              "elapsed_seconds": 5.826353073120117
+            },
+            {
+              "path": "build/nvvm-core-waves/units-retry.json",
+              "sha256": "f8840f24dee95e3ebefdcd4610fe09fecce38363b3734c72ddc3338e51965fd0",
+              "return_code": 0,
+              "elapsed_seconds": 4.5809831619262695
+            }
+          ],
+          "reuse": "Ten initial passes reused; only three corrected assertion tests rerun.",
+          "initial_unit_module_sha256": "cc5be3983a7ef1789c7547b29887372ea73a124174e07f2606b2b26c49d1735c"
+        },
+        "cuda_smoke": {
+          "passed": 18,
+          "failed": 0,
+          "passed_outcomes": [
+            "tests/cuda/nvvm-fp64-wave-aggregate.slang (cuda)",
+            "tests/cuda/nvvm-wave-shuffle-widths.slang (cuda)",
+            "tests/cuda/nvvm-fp64-wave-aggregate.slang.1 (cuda)",
+            "tests/cuda/nvvm-wave-shuffle-widths.slang.1 (cuda)",
+            "tests/cuda/nvvm-fp64-wave-aggregate.slang.2 (cuda)",
+            "tests/cuda/nvvm-wave-shuffle-widths.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/wave-mask/wave-equality.slang.4 (cuda)",
+            "tests/hlsl-intrinsic/wave-mask/wave-get-converged.slang.4 (cuda)",
+            "tests/hlsl-intrinsic/wave-mask/wave-equality.slang.5 (cuda)",
+            "tests/hlsl-intrinsic/wave-mask/wave-get-converged.slang.5 (cuda)",
+            "tests/hlsl-intrinsic/wave-mask/wave-equality.slang.6 (cuda)",
+            "tests/hlsl-intrinsic/wave-mask/wave-get-converged.slang.6 (cuda)",
+            "tests/hlsl-intrinsic/wave-prefix-count-bits-cuda.slang (cuda)",
+            "tests/hlsl-intrinsic/wave-prefix-count-bits-cuda.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/wave-prefix-count-bits-cuda.slang.2 (cuda)",
+            "tests/cuda/nvvm-core-waves.slang (cuda)",
+            "tests/cuda/nvvm-core-waves.slang.1 (cuda)",
+            "tests/cuda/nvvm-core-waves.slang.2 (cuda)"
+          ],
+          "excluded_non_cuda_subtests": 8,
+          "records": [
+            {
+              "path": "build/nvvm-core-waves/existing-smoke.json",
+              "sha256": "f49fd9dcbbf093758d602d8d715fac102bc60a94dd65da425f05bcaca07e2a1c",
+              "return_code": 0,
+              "elapsed_seconds": 7.504618883132935
+            },
+            {
+              "path": "build/nvvm-core-waves/edge-smoke.json",
+              "sha256": "89fa8b405461f624d6fdc7595f8a454ad56a4f79021c115c791f2fcab0f49964",
+              "return_code": 0,
+              "elapsed_seconds": 3.4672133922576904
+            }
+          ],
+          "runtime_sha256": {
+            "build/RelWithDebInfo/lib/libslang-compiler.so": "17128411d8d8a0ecfbc9bd78bea81a1cf4b0d69f924cbcf5dd4048444bfebebf",
+            "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "5f309edece141fb42fc4c8ab7d1078a4cc32437c906b22d4869e01910645fd77",
+            "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+            "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "dcdd63edf1bbfabc675ca08a289587c6ceb7637f2a71c305d4c6a0fe4d7cb1cb",
+            "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+            "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+            "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+          },
+          "edge_runtime_sha256": {
+            "build/RelWithDebInfo/lib/libslang-compiler.so": "17128411d8d8a0ecfbc9bd78bea81a1cf4b0d69f924cbcf5dd4048444bfebebf",
+            "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "cc5be3983a7ef1789c7547b29887372ea73a124174e07f2606b2b26c49d1735c",
+            "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+            "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "dcdd63edf1bbfabc675ca08a289587c6ceb7637f2a71c305d4c6a0fe4d7cb1cb",
+            "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+            "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+            "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+          },
+          "reuse": "Production, provider and render module unchanged through test-only corrections; no GPU rerun."
+        },
+        "builds": [
+          {
+            "path": "build/nvvm-core-waves/build-production.json",
+            "sha256": "7af44234152a5579af3e3f14af0da70247dd5953e6ba593f3fff81b27fecf053",
+            "return_code": 0,
+            "elapsed_seconds": 315.55181884765625
+          },
+          {
+            "path": "build/nvvm-core-waves/build-tests.json",
+            "sha256": "d593f61777a5f8090eca0a3df2b46f1f97df36eee16d05bdd3a4f6a8bb410a5b",
+            "return_code": 1,
+            "elapsed_seconds": 22.320555210113525
+          },
+          {
+            "path": "build/nvvm-core-waves/build-test-fix.json",
+            "sha256": "2d0eb361326e4b1a7c5f1525ad6e7babc304301e5d32e1018aeb79ad46d0d769",
+            "return_code": 0,
+            "elapsed_seconds": 19.928932666778564
+          },
+          {
+            "path": "build/nvvm-core-waves/build-test-retry.json",
+            "sha256": "936ba593b210b4c5f12ced37bfd697a89984448252096db073a08d08a69a0fe0",
+            "return_code": 0,
+            "elapsed_seconds": 18.842319011688232
+          }
+        ]
+      },
+      "validation_incidents": [
+        {
+          "id": "unit-macro-braces",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-waves/build-tests.json",
+            "sha256": "d593f61777a5f8090eca0a3df2b46f1f97df36eee16d05bdd3a4f6a8bb410a5b",
+            "return_code": 1,
+            "elapsed_seconds": 22.320555210113525
+          },
+          "resolution": {
+            "path": "build/nvvm-core-waves/build-test-fix.json",
+            "sha256": "2d0eb361326e4b1a7c5f1525ad6e7babc304301e5d32e1018aeb79ad46d0d769",
+            "return_code": 0,
+            "elapsed_seconds": 19.928932666778564
+          },
+          "cause": "SLANG_CHECK macro needs braces before else in retired-ID exact-serialization test. Test-only braces fixed; production unchanged."
+        },
+        {
+          "id": "stale-wave-unit-expectations",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-waves/units.json",
+            "sha256": "3fc7b52b5a753d7aa9bffd0b56c7d93fcc23c76cef0233e4038d9a76dd98044a",
+            "return_code": 1,
+            "elapsed_seconds": 5.826353073120117
+          },
+          "resolution": {
+            "path": "build/nvvm-core-waves/units-retry.json",
+            "sha256": "f8840f24dee95e3ebefdcd4610fe09fecce38363b3734c72ddc3338e51965fd0",
+            "return_code": 0,
+            "elapsed_seconds": 4.5809831619262695
+          },
+          "cause": "Public laneid now named while prefix retains one numeric15; canonical hardware-mask diagnostic name differs from deleted recipe; retired tags diagnose in lowering before untagged NVVM text rejection.",
+          "fix": "Check numeric15 plus named laneid; exact catalog name and exact per-row diagnostic; preserve zero-output assertions."
+        }
+      ],
+      "limitations": [
+        "No full campaign, independent numerical oracle or separate PTX assembly campaign. Real-provider units cover both serializers; compact runtime covers JIT and affected semantics.",
+        "Existing signed16 abs INT_MIN O3 downstream normalization failure remains active and unchanged in nvvm-core-values-and-atomics; this is not an all-pass repository checkpoint.",
+        "CUDA WaveMaskMatch historically uses match-all while NVVM uses match-any. Shared fixture covers AllEqual and does not claim differing-value Match masks agree.",
+        "Module43/providerABI46/container2 unchanged; stale same-version prototype modules may require recompilation."
+      ]
     }
   }
 }

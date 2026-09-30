@@ -65,15 +65,6 @@ struct NVVMIntrinsicAsmSemanticName
 // These names are compiler-internal source-module vocabulary. They identify an operation rather
 // than a CUDA spelling, so target specialization may retain semantic intent independently of text.
 static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
-    {"nvvmWaveMaskAllEqual", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL},
-    {"nvvmWaveMaskAllTrue", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE},
-    {"nvvmWaveMaskAnyTrue", SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE},
-    {"nvvmWaveMaskBallot", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT},
-    {"nvvmWaveMaskIsFirstLane", SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE},
-    {"nvvmWaveLaneCount", SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT},
-    {"nvvmWaveLaneIndex", SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX},
-    {"nvvmWaveReadLaneAt", SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT},
-    {"nvvmWaveReadLaneFirst", SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST},
     {"nvvmTextureSample", kNVVMIntrinsicSemanticTextureSample},
     {"nvvmSurfaceLoad", kNVVMIntrinsicSemanticSurfaceLoad},
     {"nvvmSurfaceStore", kNVVMIntrinsicSemanticSurfaceStore},

@@ -1926,9 +1926,6 @@ static SlangResult _emitIntrinsic(
     llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
     llvm::Type* expectedArgumentTypes[] = {int32Type, int32Type, int32Type};
     bool appendsShuffleClamp = false;
-    bool derivesFirstActiveLane = false;
-    bool derivesFirstLanePredicate = false;
-    bool extractsMatchAllPredicate = false;
     bool bitcastsMatchFloatValue = false;
     const bool hasFloatingValue =
         operation.operandCount > 1 &&
@@ -1954,9 +1951,6 @@ static SlangResult _emitIntrinsic(
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
         intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_laneid;
         break;
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
-        intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_warpsize;
-        break;
     case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT:
         intrinsicID = hasFloatingValue ? llvm::Intrinsic::nvvm_shfl_sync_idx_f32
                                        : llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
@@ -1969,36 +1963,6 @@ static SlangResult _emitIntrinsic(
         intrinsicID = llvm::Intrinsic::nvvm_vote_ballot_sync;
         expectedArgumentCount = 2;
         expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST:
-        intrinsicID = hasFloatingValue ? llvm::Intrinsic::nvvm_shfl_sync_idx_f32
-                                       : llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
-        expectedArgumentCount = 2;
-        if (hasFloatingValue)
-            expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
-        derivesFirstActiveLane = true;
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE:
-        expectedArgumentCount = 1;
-        derivesFirstLanePredicate = true;
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE:
-        intrinsicID = llvm::Intrinsic::nvvm_vote_any_sync;
-        expectedArgumentCount = 2;
-        expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE:
-        intrinsicID = llvm::Intrinsic::nvvm_vote_all_sync;
-        expectedArgumentCount = 2;
-        expectedArgumentTypes[1] = llvm::Type::getInt1Ty(state->context);
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL:
-        intrinsicID = llvm::Intrinsic::nvvm_match_all_sync_i32p;
-        expectedArgumentCount = 2;
-        if (hasFloatingValue)
-            expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
-        extractsMatchAllPredicate = true;
-        bitcastsMatchFloatValue = hasFloatingValue;
         break;
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH:
         intrinsicID = llvm::Intrinsic::nvvm_match_any_sync_i32;
@@ -2027,41 +1991,14 @@ static SlangResult _emitIntrinsic(
     }
     if (bitcastsMatchFloatValue)
         llvmArguments[1] = state->builder.CreateBitCast(llvmArguments[1], int32Type);
-    if (derivesFirstLanePredicate)
-    {
-        llvm::Function* laneIDIntrinsic = llvm::Intrinsic::getDeclaration(
-            state->module.get(),
-            llvm::Intrinsic::nvvm_read_ptx_sreg_laneid);
-        llvm::Value* laneID = state->builder.CreateCall(laneIDIntrinsic);
-        llvm::Value* firstMaskBit =
-            state->builder.CreateAnd(llvmArguments[0], state->builder.CreateNeg(llvmArguments[0]));
-        llvm::Value* laneBit =
-            state->builder.CreateShl(llvm::ConstantInt::get(int32Type, 1), laneID);
-        llvm::Value* predicate = state->builder.CreateICmpEQ(firstMaskBit, laneBit);
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(predicate);
-        return SLANG_OK;
-    }
-    if (derivesFirstActiveLane)
-    {
-        llvm::Function* countTrailingZeros = llvm::Intrinsic::getDeclaration(
-            state->module.get(),
-            llvm::Intrinsic::cttz,
-            {int32Type});
-        llvm::Value* firstActiveLane = state->builder.CreateCall(
-            countTrailingZeros,
-            {llvmArguments[0], llvm::ConstantInt::getTrue(state->context)});
-        llvmArguments.push_back(firstActiveLane);
-        llvmArguments.push_back(llvm::ConstantInt::get(int32Type, 31));
-    }
-    else if (appendsShuffleClamp)
+    if (appendsShuffleClamp)
     {
         llvmArguments.push_back(llvm::ConstantInt::get(int32Type, 31));
     }
 
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
     llvm::CallInst* call = state->builder.CreateCall(intrinsic, llvmArguments);
-    llvm::Value* result = extractsMatchAllPredicate ? state->builder.CreateExtractValue(call, {1})
-                                                    : static_cast<llvm::Value*>(call);
+    llvm::Value* result = call;
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
@@ -2724,15 +2661,11 @@ static SlangResult _writeLegacyNVVMAssembly(
                 return SLANG_E_NOT_AVAILABLE;
             }
         }
-        else if (intrinsicID == llvm::Intrinsic::nvvm_match_all_sync_i32p)
+        else if (intrinsicID == llvm::Intrinsic::nvvm_match_any_sync_i32)
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
-            llvm::StructType* resultType =
-                llvm::dyn_cast<llvm::StructType>(function.getReturnType());
-            if (!function.isDeclaration() || !resultType || resultType->getNumElements() != 2 ||
-                resultType->getElementType(0) != int32Type ||
-                resultType->getElementType(1) != llvm::Type::getInt1Ty(state->context) ||
+            if (!function.isDeclaration() || function.getReturnType() != int32Type ||
                 function.arg_size() != 2 || functionAttributes.getNumAttributes() != 3 ||
                 !function.hasFnAttribute(llvm::Attribute::Convergent) ||
                 !function.hasFnAttribute(llvm::Attribute::InaccessibleMemOnly) ||
@@ -3384,6 +3317,25 @@ static bool _isClockIntrinsic(llvm::Intrinsic::ID id)
            id == llvm::Intrinsic::nvvm_read_ptx_sreg_clock64;
 }
 
+// The registry owns signatures and convergence attributes for these scalar wave primitives.
+static bool _isWaveIntrinsic(llvm::Intrinsic::ID id)
+{
+    switch (id)
+    {
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_laneid:
+    case llvm::Intrinsic::nvvm_read_ptx_sreg_warpsize:
+    case llvm::Intrinsic::nvvm_shfl_sync_idx_i32:
+    case llvm::Intrinsic::nvvm_shfl_sync_idx_f32:
+    case llvm::Intrinsic::nvvm_vote_ballot_sync:
+    case llvm::Intrinsic::nvvm_vote_any_sync:
+    case llvm::Intrinsic::nvvm_vote_all_sync:
+    case llvm::Intrinsic::nvvm_match_any_sync_i32:
+        return true;
+    default:
+        return false;
+    }
+}
+
 static llvm::Type* _getSemanticLLVMType(
     llvm::LLVMContext& context,
     const SlangNVVMValueTypeDesc& type);
@@ -3414,7 +3366,8 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
     auto id = llvm::Function::lookupIntrinsicID(name);
     if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::getBaseName(id) != name ||
         (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id) &&
-         !_isIntegerBitIntrinsic(id) && !_isClockIntrinsic(id) && id != llvm::Intrinsic::sqrt))
+         !_isIntegerBitIntrinsic(id) && !_isClockIntrinsic(id) && !_isWaveIntrinsic(id) &&
+         id != llvm::Intrinsic::sqrt))
         return llvm::Intrinsic::not_intrinsic;
 
     const bool isSqrt = id == llvm::Intrinsic::sqrt;
@@ -3442,14 +3395,20 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
                 !_isScalarFloat32Or64Type(operand.type))
                 return llvm::Intrinsic::not_intrinsic;
         }
-        else if (
-            (operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
-             operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT) ||
-            operand.type.laneCount != 1 ||
-            (operand.type.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
-             operand.type.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER &&
-             operand.type.kind != SLANG_NVVM_VALUE_TYPE_BOOL))
-            return llvm::Intrinsic::not_intrinsic;
+        else
+        {
+            const bool isFloatingValue = operand.kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+                                         _isScalarFloat32Or64Type(operand.type);
+            const bool isIntegerValueOrConstant =
+                (operand.kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
+                 operand.kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT) &&
+                operand.type.laneCount == 1 &&
+                (operand.type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+                 operand.type.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+                 operand.type.kind == SLANG_NVVM_VALUE_TYPE_BOOL);
+            if (!isFloatingValue && !isIntegerValueOrConstant)
+                return llvm::Intrinsic::not_intrinsic;
+        }
         llvm::Type* type = _getSemanticLLVMType(context, operand.type);
         if (!type)
             return llvm::Intrinsic::not_intrinsic;
@@ -3958,13 +3917,7 @@ static SlangResult _emitCatalogOperation(
     {
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
     case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT:
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST:
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE:
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE:
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE:
-    case SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH:
         return _emitIntrinsic(module, operation, operands, entry.operandCount, outValue);
     default:

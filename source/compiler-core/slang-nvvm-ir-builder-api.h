@@ -135,14 +135,14 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_LESS_EQUAL ((SlangNVVMValueOperation)13u)
 #define SLANG_NVVM_VALUE_OP_GREATER_EQUAL ((SlangNVVMValueOperation)14u)
 #define SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX ((SlangNVVMValueOperation)15u)
-#define SLANG_NVVM_VALUE_OP_WAVE_LANE_COUNT ((SlangNVVMValueOperation)16u)
+// Value operation 16 is reserved after moving its public wave composition to core.
 #define SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT ((SlangNVVMValueOperation)17u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT ((SlangNVVMValueOperation)18u)
-#define SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_FIRST ((SlangNVVMValueOperation)19u)
-#define SLANG_NVVM_VALUE_OP_WAVE_MASK_IS_FIRST_LANE ((SlangNVVMValueOperation)20u)
-#define SLANG_NVVM_VALUE_OP_WAVE_MASK_ANY_TRUE ((SlangNVVMValueOperation)21u)
-#define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_TRUE ((SlangNVVMValueOperation)22u)
-#define SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL ((SlangNVVMValueOperation)23u)
+// Value operation 19 is reserved after moving its public wave composition to core.
+// Value operation 20 is reserved after moving its public wave composition to core.
+// Value operation 21 is reserved after moving its public wave composition to core.
+// Value operation 22 is reserved after moving its public wave composition to core.
+// Value operation 23 is reserved after moving its public wave composition to core.
 /* Values 24-27 are retired execution-vector operations. Keep later identities stable. */
 /* Value 28 is retired; synchronization uses named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_INTEGER_CONVERT ((SlangNVVMValueOperation)29u)

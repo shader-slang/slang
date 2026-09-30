@@ -16168,6 +16168,10 @@ matrix<T, N, M> trunc(matrix<T, N, M> x)
 //@hidden:
 typedef uint WaveMask;
 
+// This operation reads executing hardware lanes and must not use logical active-mask synthesis.
+__intrinsic_op($(kIROp_WaveGetConvergedMask))
+WaveMask __WaveGetConvergedMask();
+
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
@@ -16175,6 +16179,8 @@ WaveMask WaveGetConvergedMask()
 {
     __target_switch
     {
+    case nvvm:
+        return __WaveGetConvergedMask();
     case glsl:
         __intrinsic_asm "subgroupBallot(true).x";
     case hlsl:
@@ -16201,6 +16207,8 @@ WaveMask WaveGetActiveMask()
 {
     __target_switch
     {
+    case nvvm:
+        return __WaveGetActiveMask();
     case glsl:
         __intrinsic_asm "subgroupBallot(true).x";
     case hlsl:
@@ -16226,10 +16234,12 @@ bool WaveMaskIsFirstLane(WaveMask mask)
 {
     __target_switch
     {
+    case nvvm:
+        return (mask & (uint(0) - mask)) == (uint(1) << WaveGetLaneIndex());
     case glsl:
         __intrinsic_asm "subgroupElect()";
     case cuda:
-        __intrinsic_asm(nvvmWaveMaskIsFirstLane) "(($0 & -$0) == (WarpMask(1) << _getLaneId()))";
+        __intrinsic_asm "(($0 & -$0) == (WarpMask(1) << _getLaneId()))";
     case hlsl:
         __intrinsic_asm "WaveIsFirstLane()";
     case spirv:
@@ -16248,10 +16258,12 @@ bool WaveMaskAllTrue(WaveMask mask, bool condition)
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.vote.all.sync", mask, condition;
     case glsl:
         __intrinsic_asm "subgroupAll($1)";
     case cuda:
-        __intrinsic_asm(nvvmWaveMaskAllTrue) "(__all_sync($0, $1) != 0)";
+        __intrinsic_asm "(__all_sync($0, $1) != 0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllTrue($1)";
     case spirv:
@@ -16270,10 +16282,12 @@ bool WaveMaskAnyTrue(WaveMask mask, bool condition)
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.vote.any.sync", mask, condition;
     case glsl:
         __intrinsic_asm "subgroupAny($1)";
     case cuda:
-        __intrinsic_asm(nvvmWaveMaskAnyTrue) "(__any_sync($0, $1) != 0)";
+        __intrinsic_asm "(__any_sync($0, $1) != 0)";
     case hlsl:
         __intrinsic_asm "WaveActiveAnyTrue($1)";
     case spirv:
@@ -16292,10 +16306,12 @@ WaveMask WaveMaskBallot(WaveMask mask, bool condition)
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.vote.ballot.sync", mask, condition;
     case glsl:
         __intrinsic_asm "subgroupBallot($1).x";
     case cuda:
-        __intrinsic_asm(nvvmWaveMaskBallot) "__ballot_sync($0, $1)";
+        __intrinsic_asm "__ballot_sync($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBallot($1)";
     case spirv:
@@ -16312,6 +16328,8 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 {
     __target_switch
     {
+    case nvvm:
+        return countbits(WaveMaskBallot(mask, value));
     case cuda:
         __intrinsic_asm  "__popc(__ballot_sync($0, $1))";
     case hlsl:
@@ -16441,8 +16459,10 @@ T WaveMaskBroadcastLaneAt(WaveMask mask, T value, constexpr int lane)
 {
     __target_switch
     {
+    case nvvm:
+        return WaveMaskReadLaneAt(mask, value, lane);
     case glsl: __intrinsic_asm "subgroupBroadcast($1, $2)";
-    case cuda: __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+    case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
         let ulane = uint(lane);
@@ -16461,6 +16481,11 @@ vector<T,N> WaveMaskBroadcastLaneAt(WaveMask mask, vector<T,N> value, constexpr 
 {
     __target_switch
     {
+    case nvvm:
+        vector<T,N> result;
+        [ForceUnroll] for (int i = 0; i < N; ++i)
+            result[i] = WaveMaskReadLaneAt(mask, value[i], lane);
+        return result;
     case glsl: __intrinsic_asm "subgroupBroadcast($1, $2)";
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
@@ -16478,6 +16503,11 @@ matrix<T,N,M> WaveMaskBroadcastLaneAt(WaveMask mask, matrix<T,N,M> value, conste
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T,N,M> result;
+        [ForceUnroll] for (int i = 0; i < N; ++i)
+            result[i] = WaveMaskReadLaneAt(mask, value[i], lane);
+        return result;
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     }
@@ -16493,8 +16523,28 @@ T WaveMaskReadLaneAt(WaveMask mask, T value, int lane)
 {
     __target_switch
     {
+    case nvvm:
+        static_assert(T is bool || __isInt<T>() || T is half || T is float || T is double,
+            "NVVM wave transport requires a Boolean, integer, Half, Float32 or Float64 payload.");
+        if (T is float)
+            __intrinsic_asm "llvm.nvvm.shfl.sync.idx.f32", mask, value, lane, 31;
+        else if (T is int || T is uint)
+            __intrinsic_asm "llvm.nvvm.shfl.sync.idx.i32", mask, value, lane, 31;
+        else if (T is bool)
+            return __builtin_cast<T>(WaveMaskReadLaneAt(mask, __builtin_cast<uint>(value), lane) != 0);
+        else if (sizeof(T) == 1)
+            return bit_cast<T>(uint8_t(WaveMaskReadLaneAt(mask, uint(bit_cast<uint8_t>(value)), lane)));
+        else if (sizeof(T) == 2)
+            return bit_cast<T>(uint16_t(WaveMaskReadLaneAt(mask, uint(bit_cast<uint16_t>(value)), lane)));
+        else
+        {
+            uint64_t bits = bit_cast<uint64_t>(value);
+            uint low = WaveMaskReadLaneAt(mask, uint(bits), lane);
+            uint high = WaveMaskReadLaneAt(mask, uint(bits >> 32), lane);
+            return bit_cast<T>(uint64_t(low) | (uint64_t(high) << 32));
+        }
     case glsl: __intrinsic_asm "subgroupShuffle($1, $2)";
-    case cuda: __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+    case cuda: __intrinsic_asm "__shfl_sync($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     case spirv:
         let ulane = uint(lane);
@@ -16512,6 +16562,11 @@ vector<T,N> WaveMaskReadLaneAt(WaveMask mask, vector<T,N> value, int lane)
 {
     __target_switch
     {
+    case nvvm:
+        vector<T,N> result;
+        [ForceUnroll] for (int i = 0; i < N; ++i)
+            result[i] = WaveMaskReadLaneAt(mask, value[i], lane);
+        return result;
     case glsl: __intrinsic_asm "subgroupShuffle($1, $2)";
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
@@ -16529,6 +16584,11 @@ matrix<T,N,M> WaveMaskReadLaneAt(WaveMask mask, matrix<T,N,M> value, int lane)
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T,N,M> result;
+        [ForceUnroll] for (int i = 0; i < N; ++i)
+            result[i] = WaveMaskReadLaneAt(mask, value[i], lane);
+        return result;
     case cuda: __intrinsic_asm "_waveShuffleMultiple($0, $1, $2)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt($1, $2)";
     }
@@ -16564,6 +16624,7 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
     __target_switch
     {
     case glsl: __intrinsic_asm "subgroupBallotExclusiveBitCount(subgroupBallot($1))";
+    case nvvm:
     case cuda:
         // CUDA lane indices are 0..31, so this mask excludes the current lane without
         // shifting by the word width. Keep the caller's mask on the synchronized ballot.
@@ -16882,13 +16943,19 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
 {
     __target_switch
     {
+    case nvvm:
+        // Exited lanes can remain named in mask. Compare the matching lanes to the actual
+        // participants, and execute both collectives before testing their results.
+        uint matching = WaveMaskMatch(mask, value);
+        uint participating = WaveMaskBallot(mask, true);
+        return matching == participating;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
     case cuda:
-        __intrinsic_asm(nvvmWaveMaskAllEqual) "_waveAllEqual($0, $1)";
+        __intrinsic_asm "_waveAllEqual($0, $1)";
     case spirv:
         return spirv_asm
         {
@@ -16906,6 +16973,12 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
 {
     __target_switch
     {
+    case nvvm:
+        // Exited lanes can remain named in mask. Compare the matching lanes to the actual
+        // participants, and execute both collectives before testing their results.
+        uint matching = WaveMaskMatch(mask, value);
+        uint participating = WaveMaskBallot(mask, true);
+        return matching == participating;
     case glsl:
         if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
@@ -16928,6 +17001,12 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value)
 {
     __target_switch
     {
+    case nvvm:
+        // Exited lanes can remain named in mask. Compare the matching lanes to the actual
+        // participants, and execute both collectives before testing their results.
+        uint matching = WaveMaskMatch(mask, value);
+        uint participating = WaveMaskBallot(mask, true);
+        return matching == participating;
     case cuda: __intrinsic_asm "_waveAllEqualMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveAllEqual($1)";
     }
@@ -17042,8 +17121,10 @@ T WaveMaskReadLaneFirst(WaveMask mask, T expr)
 {
     __target_switch
     {
+    case nvvm:
+        return WaveMaskReadLaneAt(mask, expr, int(firstbitlow(mask)));
     case glsl: __intrinsic_asm "subgroupBroadcastFirst($1)";
-    case cuda: __intrinsic_asm(nvvmWaveReadLaneFirst) "_waveReadFirst($0, $1)";
+    case cuda: __intrinsic_asm "_waveReadFirst($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst($1)";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformBallot; OpGroupNonUniformBroadcastFirst $$T result Subgroup $expr};
@@ -17057,6 +17138,8 @@ vector<T,N> WaveMaskReadLaneFirst(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
+    case nvvm:
+        return WaveMaskReadLaneAt(mask, expr, int(firstbitlow(mask)));
     case glsl: __intrinsic_asm "subgroupBroadcastFirst($1)";
     case cuda: __intrinsic_asm "_waveReadFirstMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst($1)";
@@ -17071,6 +17154,8 @@ matrix<T,N,M> WaveMaskReadLaneFirst(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
+    case nvvm:
+        return WaveMaskReadLaneAt(mask, expr, int(firstbitlow(mask)));
     case cuda: __intrinsic_asm "_waveReadFirstMultiple($0, $1)";
     }
 }
@@ -17088,6 +17173,26 @@ WaveMask WaveMaskMatch(WaveMask mask, T value)
 {
     __target_switch
     {
+    case nvvm:
+        static_assert(T is bool || __isInt<T>() || T is half || T is float || T is double,
+            "NVVM wave matching requires a Boolean, integer, Half, Float32 or Float64 payload.");
+        if (T is uint)
+            __intrinsic_asm "llvm.nvvm.match.any.sync.i32", mask, value;
+        else if (T is bool)
+            return WaveMaskMatch(mask, __builtin_cast<uint>(value));
+        else if (sizeof(T) == 1)
+            return WaveMaskMatch(mask, uint(bit_cast<uint8_t>(value)));
+        else if (sizeof(T) == 2)
+            return WaveMaskMatch(mask, uint(bit_cast<uint16_t>(value)));
+        else if (sizeof(T) == 4)
+            return WaveMaskMatch(mask, bit_cast<uint>(value));
+        else
+        {
+            uint64_t bits = bit_cast<uint64_t>(value);
+            uint low = WaveMaskMatch(mask, uint(bits));
+            uint high = WaveMaskMatch(mask, uint(bits >> 32));
+            return low & high;
+        }
     case glsl: __intrinsic_asm "subgroupPartitionNV($1).x";
     case cuda: __intrinsic_asm "_waveMatchScalar($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
@@ -17109,6 +17214,14 @@ WaveMask WaveMaskMatch(WaveMask mask, vector<T,N> value)
 {
     __target_switch
     {
+    case nvvm:
+        uint result = mask;
+        [ForceUnroll] for (int i = 0; i < N; ++i)
+        {
+            uint component = WaveMaskMatch(mask, value[i]);
+            result &= component;
+        }
+        return result;
     case glsl: __intrinsic_asm "subgroupPartitionNV($1).x";
     case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
@@ -17131,6 +17244,14 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
 {
     __target_switch
     {
+    case nvvm:
+        uint result = mask;
+        [ForceUnroll] for (int i = 0; i < N; ++i)
+        {
+            uint row = WaveMaskMatch(mask, value[i]);
+            result &= row;
+        }
+        return result;
     case cuda: __intrinsic_asm "_waveMatchMultiple($0, $1)";
     case glsl: __intrinsic_asm "subgroupPartitionNV($1).x";
     case hlsl: __intrinsic_asm "WaveMatch($1).x";
@@ -17874,8 +17995,10 @@ uint WaveGetLaneCount()
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.read.ptx.sreg.warpsize";
     case glsl: __intrinsic_asm  "(gl_SubgroupSize)";
-    case cuda: __intrinsic_asm(nvvmWaveLaneCount) "(warpSize)";
+    case cuda: __intrinsic_asm "(warpSize)";
     case hlsl: __intrinsic_asm  "WaveGetLaneCount()";
     case spirv:
         return spirv_asm
@@ -17901,8 +18024,10 @@ uint WaveGetLaneIndex()
 {
     __target_switch
     {
+    case nvvm:
+        __intrinsic_asm "llvm.nvvm.read.ptx.sreg.laneid";
     case glsl: __intrinsic_asm  "(gl_SubgroupInvocationID)";
-    case cuda: __intrinsic_asm(nvvmWaveLaneIndex) "_getLaneId()";
+    case cuda: __intrinsic_asm "_getLaneId()";
     case hlsl: __intrinsic_asm  "WaveGetLaneIndex()";
     case spirv:
         return spirv_asm
@@ -18887,6 +19012,9 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 {
     __target_switch
     {
+    case nvvm:
+        uint mask = WaveMaskBallot(__WaveGetConvergedMask(), true);
+        return WaveMaskReadLaneAt(mask, value, lane);
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     default:
@@ -18952,6 +19080,9 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 {
     __target_switch
     {
+    case nvvm:
+        uint mask = WaveMaskBallot(__WaveGetConvergedMask(), true);
+        return WaveMaskReadLaneAt(mask, value, lane);
     case cuda: __intrinsic_asm "_waveShuffleMultiple(_getActiveMask(), $0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     default:
@@ -19057,6 +19188,8 @@ uint4 WaveGetConvergedMulti()
 {
     __target_switch
     {
+    case nvvm:
+        return uint4(__WaveGetConvergedMask(), 0, 0, 0);
     case glsl:
     case wgsl:
         __intrinsic_asm "subgroupBallot(true)";
@@ -19150,6 +19283,8 @@ uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
     __target_switch
     {
+    case nvvm:
+        return WaveMaskPrefixCountBits(mask.x, value);
     case cuda: __intrinsic_asm "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())";
     case hlsl: __intrinsic_asm "WaveMultiPrefixCountBits";
     }

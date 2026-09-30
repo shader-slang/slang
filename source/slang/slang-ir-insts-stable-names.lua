@@ -881,5 +881,6 @@ return {
 	["TerminatorInst.nvvmIntrinsic"] = 905,
 	["Decoration.nvvmSemantic"] = 906,
 	["NVVMSurfaceLoad"] = 907,
-	["NVVMSurfaceStore"] = 908
+	["NVVMSurfaceStore"] = 908,
+	["waveGetConvergedMask"] = 909
 }

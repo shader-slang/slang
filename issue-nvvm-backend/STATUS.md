@@ -1,10 +1,9 @@
 # NVVM current status
 
-The combined values/clock/atomic migration has **qualified local acceptance with one inherited
-failure**. Core abs/min/max/sign, two named clocks, nine atomic reduction families and two ByteAddress
-helpers replace their CUDA-text/tag paths. Four numeric IDs and thirteen semantic tags are retired;
-wave MIN43/MAX44 remain. Unsigned abs, integer sign, shared integer reductions and integer64 reduction
-increment/decrement gain canonical paths. Module 43, provider ABI 46 and container 2 remain unchanged.
+The wave producer migration has **focused local acceptance**: eight named wave primitives and core
+raw-payload/aggregate composition replace nine tags and six numeric IDs. A genuine effectful
+hardware-mask IR operation preserves the distinction from logical active-mask synthesis. Module43,
+provider ABI46 and container2 remain unchanged. The earlier signed16 abs O3 failure remains active.
 
 **Continue under the accelerated workflow authorized on 2026-09-30.** Use eight build jobs,
 larger related intrinsic batches, focused compile/PTX checks and no routine module-version bumps.
@@ -15,36 +14,40 @@ removal of CUDA-string recognizers. No push, Slack or system changes. Preserve t
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-core-values/`; plans and reports remain uncommitted.
+`build/nvvm-core-waves/`; plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
 | Evidence | Result |
 | --- | --- |
-| Build | Eight-job production build passed in 301 seconds; test builds took 23 and 19 seconds |
-| Focused units | 13 pass: ten initial results reused, three corrected/new checks passed |
-| CUDA smoke | 22 pass, 1 inherited downstream failure; 18 non-CUDA cases excluded |
-| Failure | Signed16 abs(INT_MIN) at O3; exact active test remains failing |
-| Diagnostic | Correct i16 LLVM; equivalent old select control also fails; SASS lacks signed16 normalization after IABS |
-| Last full / targeted / implementations since full | log-family / core-values-and-atomics / 3 |
-| Historical evidence | Full baseline/identity unchanged; all 29 earlier feature objects preserved |
+| Build | Eight-job production build passed in 316 seconds; successful focused test builds took 20 and 19 seconds |
+| Focused units | 13 pass: ten initial results reused, three corrected assertions passed |
+| CUDA smoke | 18 pass; 8 non-CUDA cases excluded |
+| Scope | Named signatures/both serializers, legacy rejection, masks, raw-bit equality and aggregate transport |
+| Last full / targeted / implementations since full | log-family / core-waves / 4 |
+| Historical evidence | Full baseline/identity unchanged; all 30 earlier feature objects preserved |
 
-This is not an all-pass checkpoint or publication/CI readiness. The failure returns correct low16
-bits but compares/widens the value as +32768 rather than -32768 at O3; O0 passes. General narrow-integer
-lowering remains separate from producer migration. Do not disable the test, change its expectation,
-or add a special-case abs workaround to claim success. Two stale unit expectations were corrected:
-integer/Half abs needs no fabsf call, and local atomic destinations now diagnose earlier with E41403.
-Ignored diagnostic NVRTC controls also failed narrow-select C++ overload resolution and are not passes.
-No full campaign ran; no full suite rerun follows from these focused results.
+No full campaign or redundant PTX assembly campaign ran. A test-build macro-brace error and three
+stale unit assertions were corrected without changing production: named versus numeric lane reads,
+the hardware-mask catalog name, and exact early retired-tag diagnostics. Successful units and GPU
+runs were reused through those test-only corrections.
+
+This is not an all-pass repository checkpoint or publication/CI readiness. The inherited
+`nvvm-core-values.slang.1` O3 failure remains active with its exact expectation: signed16 abs(INT_MIN)
+returns correct low16 bits but compares/widens as +32768. Correct LLVM and an equivalent old select
+control locate the issue in downstream signed16 normalization. Do not disable it or add a per-abs
+workaround. Its evidence remains in `features.nvvm-core-values-and-atomics`; it was not rerun here.
+CUDA WaveMaskMatch historically uses match-all while NVVM uses match-any; the shared wave fixture
+covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `4d18503346028be698054c1800ad3a0e142d6019` plus compiler patch
-`3106b1dac662315749de32c2f4e09ccaba94b165ab3d0ca831d290b28586cabd`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `2c6b63e007000d5afedeb3b4e77e245e9bbb759cd1fbb43986577731c68a74ea`.
-Provider SHA-256: `1b542e29de5338b29ade9fe4f5402933fab2bb4475a0f69d43d74fc16abbcad0`.
+Revision `44c7461777b6bba99fb86580f5c6f84f2047abfa` plus compiler patch
+`bdd8324aec1f79521c30e3314d11d2404e5262079805c66da7eb3bde54540b8c`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `17128411d8d8a0ecfbc9bd78bea81a1cf4b0d69f924cbcf5dd4048444bfebebf`.
+Provider SHA-256: `dcdd63edf1bbfabc675ca08a289587c6ceb7637f2a71c305d4c6a0fe4d7cb1cb`.
 The later commit does not relabel these binaries. Current source/runtime hashes, exact outcomes and
-failure history live in `focused-evidence.json` under `features.nvvm-core-values-and-atomics`.
+failure history live in `focused-evidence.json` under `features.nvvm-core-waves`.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -61,11 +64,11 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 
 ## Next action
 
-Migrate wave producer identities and straightforward compositions through named NVVM calls and
-existing canonical operations. Preserve convergence, explicit masks and reduction/scan combination
-order; validate the affected contracts with a compact existing runtime selection. Keep pointer-result
-frexp/modf, resource producer representation and general narrow-integer normalization as separate
-bounded design work. Continue larger batches without routine module-version bumps.
+Move masked reductions/scans, quad votes, rotation and scalar truthiness into core in one substantial
+batch. Preserve current mask traversal, floating combination order, special-value selection and
+Half seeds. Use a compact existing runtime selection and focused unit negatives; no new oracle or
+full campaign. Keep pointer-result frexp/modf, resource representation and general narrow-integer
+normalization as separate bounded work. Continue without routine module-version bumps.
 
 ## Retained boundaries
 

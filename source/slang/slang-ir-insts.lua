@@ -1644,6 +1644,8 @@ local insts = {
 		},
 	},
 	{ waveGetActiveMask = {} },
+	-- A changing hardware snapshot, distinct from the synthesized logical active mask.
+	{ waveGetConvergedMask = {} },
 	-- trueMask = waveMaskBallot(mask, condition)
 	{ waveMaskBallot = { operands = { { "mask" }, { "condition" } } } },
 	-- matchMask = waveMaskBallot(mask, value)
