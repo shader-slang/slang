@@ -142,7 +142,18 @@ target_link_libraries(spvdb PUBLIC
 
 # When embedded in another project, skip the stb_image implementation to avoid
 # duplicate symbol errors if the parent already compiles it.
-if(NOT SPVDB_IS_TOPLEVEL)
+#
+# Compiling it in the parent is only useful if the resulting stbi_* symbols are
+# actually linkable from here. A parent that defines STB_IMAGE_STATIC gives them
+# internal linkage, so they never leave the parent's own translation unit and
+# spvdb has to compile its own copy after all. Such a parent sets
+# SPVDB_PARENT_PROVIDES_STB_IMAGE to FALSE before add_subdirectory(); the
+# default is TRUE, matching the common case of a parent that compiles the
+# implementation with external linkage.
+if(NOT DEFINED SPVDB_PARENT_PROVIDES_STB_IMAGE)
+    set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
+endif()
+if(NOT SPVDB_IS_TOPLEVEL AND SPVDB_PARENT_PROVIDES_STB_IMAGE)
     target_compile_definitions(spvdb PRIVATE SPVDB_SKIP_STB_IMAGE_IMPL=1)
 endif()
 

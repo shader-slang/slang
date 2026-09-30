@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -allow-glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK_SPV): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//TEST:SIMPLE_EX(filecheck=CHECK_GLSL): -lang glsl tests/glsl/ssboMemberMemoryQualifier.slang -stage compute -entry computeMain -target glsl
+//TEST:SIMPLE_EX(filecheck=CHECK_SPV): -lang glsl tests/glsl/ssboMemberMemoryQualifier.slang -stage compute -entry computeMain -target spirv -emit-spirv-directly
 
 // due to implementation limitations (slang-check-expr.cpp, `void visitMemberExpr()`) we are unable to 
 // implement and use .length with glsl vectors to test `readonly writeonly` 

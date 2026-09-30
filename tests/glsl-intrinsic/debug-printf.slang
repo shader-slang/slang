@@ -1,5 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -stage compute -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -stage compute -entry main
+
+import glsl;
 
 void main()
 {

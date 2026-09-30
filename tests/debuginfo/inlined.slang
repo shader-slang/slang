@@ -1,5 +1,5 @@
-// Tests inlined function call-stack reconstruction via DebugInlinedAt.
-//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
+// Tests inlined function call-stack reconstruction via DebugInlinedAt; -O1 performs the inlining.
+//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute -O1
 
 uint add_values(uint x, uint y) { return x + y; }
 

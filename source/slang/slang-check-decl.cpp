@@ -32,6 +32,19 @@ static Val* _getNonEmptyConstraintPackVal(
     ASTBuilder* astBuilder,
     DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef);
 
+/// Return the outermost declaration in a synthesized declaration's generic wrapper chain.
+///
+/// Witness synthesis can wrap an inner callable or type in one or more cloned `GenericDecl`s. The
+/// wrapper is the root that owns the cloned parameters and constraints, so registering only the
+/// inner declaration would leave part of the synthesized declaration graph unchecked.
+static Decl* _getSynthesizedDeclRoot(Decl* decl)
+{
+    SLANG_RELEASE_ASSERT(decl);
+    while (auto genericDecl = as<GenericDecl>(decl->parentDecl))
+        decl = genericDecl;
+    return decl;
+}
+
 // ============================================================================
 // Declaration nesting validation (disallowed-by-default)
 //
@@ -556,8 +569,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         if (isGlobalDecl(decl) && (hasConst || hasUniform) && !hasStatic &&
             !hasSpecializationConstant && decl->initExpr)
         {
-            auto moduleDecl = getModuleDecl(decl);
-            if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
+            if (!getShared()->isGLSLSourceLanguage())
             {
                 getSink()->diagnose(
                     Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
@@ -735,6 +747,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void checkCallableDeclCommon(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
+    void maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
     void checkCallableConstraints(CallableDecl* decl);
@@ -1189,6 +1202,7 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitThisExpr(ThisExpr*) { return; }
 
     void visitThisTypeExpr(ThisTypeExpr*) { return; }
+    void visitHLSLUnsignedTypeExpr(HLSLUnsignedTypeExpr*) { return; }
     void visitThisInterfaceExpr(ThisInterfaceExpr*) { return; }
     void visitAndTypeExpr(AndTypeExpr* expr)
     {
@@ -2130,6 +2144,18 @@ void SemanticsVisitor::ensureAllDeclsRec(Decl* decl, DeclCheckState state)
     }
 }
 
+void SemanticsVisitor::ensureRegisteredSynthesizedDecls(DeclCheckState state)
+{
+    auto shared = getShared();
+
+    // Checking one root can publish another. Query the live count on every iteration so the new
+    // declaration reaches this phase before we move on to the next one.
+    for (Index i = 0; i < shared->getSynthesizedDeclRootCount(); ++i)
+    {
+        ensureAllDeclsRec(shared->getSynthesizedDeclRoot(i), state);
+    }
+}
+
 bool isUnsizedArrayType(Type* type)
 {
     // Not an array?
@@ -2881,7 +2907,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
     if (as<NamespaceDeclBase>(varDecl->parentDecl))
     {
-        if (getModuleDecl(varDecl)->hasModifier<GLSLModuleModifier>())
+        if (getShared()->isGLSLSourceLanguage())
         {
             // If we are in GLSL compatiblity mode, we want to treat all global variables
             // without any `uniform` modifiers as true global variables by default.
@@ -3745,6 +3771,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         // No conformance needed for MinimalContext (unlike BwdCallable which needs IBwdCallable).
 
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
+        getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(synStructDecl));
         return true;
     }
     else if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
@@ -3793,6 +3820,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         checkAggTypeConformance(synStructDecl);
 
         witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
+        getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(synStructDecl));
         return true;
     }
     else
@@ -3854,6 +3882,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         witnessTable->add(
             requirementDeclRef.getDecl(),
             RequirementWitness(context->conformingType));
+        getShared()->registerSynthesizedDeclRoot(assocTypeDef);
         // Increase the epoch so that future calls to Type::getCanonicalType will return the
         // up-to-date folded types.
         m_astBuilder->incrementEpoch();
@@ -4031,6 +4060,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     checkAggTypeConformance(aggTypeDecl);
 
     witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(satisfyingType));
+    getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(aggTypeDecl));
     return true;
 }
 
@@ -5317,6 +5347,7 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         // file.
         //
         ensureAllDeclsRec(moduleDecl, s);
+        ensureRegisteredSynthesizedDecls(s);
     }
 
     // Once we have completed the above loop, all declarations not
@@ -5762,6 +5793,22 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> requiredGenericDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
+    // Ensure the satisfying generic's constraint decls are SignatureChecked before we count and
+    // compare its members below -- that state populates each constraint's operands and flattens
+    // `T : A & B` into separate members. This matcher is the single point that every generic
+    // requirement match funnels through (module-scope, on-demand, and function-local), so the
+    // invariant belongs here, not at any one producer (#12987). We advance the constraints
+    // only (advancing the enclosing type would re-enter its in-progress conformance check), and
+    // snapshot members first since flattening appends to the list.
+    {
+        List<Decl*> satisfyingDirectMembers;
+        for (auto m : satisfyingGenericDeclRef.getDecl()->getDirectMemberDecls())
+            satisfyingDirectMembers.add(m);
+        for (auto m : satisfyingDirectMembers)
+            if (isConstraintDecl(m))
+                ensureDecl(m, DeclCheckState::SignatureChecked);
+    }
+
     auto memberCount = requiredGenericDeclRef.getDecl()->getDirectMemberDeclCount();
     auto satisfyingMemberCount = satisfyingGenericDeclRef.getDecl()->getDirectMemberDeclCount();
 
@@ -6008,9 +6055,14 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
 
+            auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+            auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+            // Fail loud rather than build a witness from a null type: a self-referential
+            // constraint can still trip ensureDecl's cyclic-reference guard and leave these null.
+            SLANG_RELEASE_ASSERT(satisfyingSubType && satisfyingSuperType);
             auto satisfyingWitness = m_astBuilder->getDeclaredSubtypeWitness(
-                getSub(m_astBuilder, satisfyingConstraintDeclRef),
-                getSup(m_astBuilder, satisfyingConstraintDeclRef),
+                satisfyingSubType,
+                satisfyingSuperType,
                 satisfyingConstraintDeclRef);
 
             requiredSubstArgs.add(satisfyingWitness);
@@ -6023,9 +6075,11 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-            auto satisfyingWitness = m_astBuilder->getBuiltinTypeCoercionWitness(
-                getFromType(m_astBuilder, satisfyingConstraintDeclRef),
-                getToType(m_astBuilder, satisfyingConstraintDeclRef));
+            auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
+            auto satisfyingToType = getToType(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingFromType && satisfyingToType);
+            auto satisfyingWitness =
+                m_astBuilder->getBuiltinTypeCoercionWitness(satisfyingFromType, satisfyingToType);
 
             requiredSubstArgs.add(satisfyingWitness);
         }
@@ -6151,11 +6205,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingSubType);
             if (!satisfyingSubType->equals(requiredSubType))
                 return false;
 
             auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingSuperType);
             if (!satisfyingSuperType->equals(requiredSuperType))
                 return false;
         }
@@ -6176,11 +6232,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                     .as<TypeCoercionConstraintDecl>();
             auto requiredFromType = getFromType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingFromType);
             if (!satisfyingFromType->equals(requiredFromType))
                 return false;
 
             auto requiredToType = getToType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingToType = getToType(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_RELEASE_ASSERT(satisfyingToType);
             if (!satisfyingToType->equals(requiredToType))
                 return false;
 
@@ -6375,7 +6433,7 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
     if (!conformance)
     {
         for (auto requirementDecl : addedRequirementDecls)
-            witnessTable->m_requirementDictionary.remove(requirementDecl);
+            witnessTable->removeRequirement(InterfaceRequirementKey(requirementDecl));
     }
     return conformance;
 }
@@ -7120,11 +7178,15 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             .as<CallableDecl>();
 
     SLANG_ASSERT(requiredFuncDeclRef);
-    ConformanceCheckingContext subContext = *context;
-    subContext.parentDecl = synGenericDecl;
+    RefPtr<ConformanceCheckingContext> subContext = new ConformanceCheckingContext();
+    subContext->conformingType = context->conformingType;
+    subContext->conformingWitness = context->conformingWitness;
+    subContext->parentDecl = synGenericDecl;
+    subContext->rootInheritanceDecl = context->rootInheritanceDecl;
+    subContext->mapInterfaceToWitnessTable = context->mapInterfaceToWitnessTable;
 
     synGenericDecl->inner = synthesizeMethodSignatureForRequirementWitnessInner(
-        &subContext,
+        subContext,
         requiredFuncDeclRef,
         synArgs,
         synThis);
@@ -7535,6 +7597,33 @@ void SemanticsVisitor::markOverridingDecl(
     addModifier(memberDecl, overridingModifier);
 }
 
+// Decide whether the non-static-satisfies-static adaptation may bind `firstArg` (the static
+// requirement's first synthesized argument) as the implicit `this` of a non-static method. The
+// synthesized body attaches this argument as the base of candidates that were looked up in the
+// conforming type; nothing downstream re-checks that the base's type actually has those members, so
+// this predicate -- not the later overload resolution -- is what keeps the receiver well-typed.
+//
+// The argument can serve as the receiver when its type is the conforming type. Requirements
+// declared with a direct function type (the `__associatedfunc` autodiff derivatives
+// `fwd_diff`/`bwd_diff`/ `remat`) are also permitted: these conform a *function* to a function
+// interface
+// (`IForwardDifferentiable<FType>` and friends), so `context->conformingType` is that function and
+// never equals the receiver's type even though `firstArg` is in fact the receiver -- the equality
+// test cannot recognize the receiver here, and the adaptation is how those derivatives are wired.
+static bool canBindFirstArgAsReceiver(
+    ConformanceCheckingContext* context,
+    DeclRef<FuncDecl> requiredMemberDeclRef,
+    Expr* firstArg)
+{
+    if (hasDirectFuncType(requiredMemberDeclRef))
+        return true;
+
+    auto firstArgType = firstArg->type.type;
+    SLANG_ASSERT(firstArgType);
+    SLANG_ASSERT(context->conformingType);
+    return firstArgType->getCanonicalType()->equals(context->conformingType->getCanonicalType());
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -7622,19 +7711,16 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     {
         removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
 
-        // If no static candidates remain, check if a non-static method can satisfy
-        // this static requirement when the first parameter type matches the conforming
-        // type (i.e. the 'This' type). In that case, we can synthesize a static wrapper
-        // that calls the non-static method on the first argument.
+        // If no static candidates remain, a non-static method can still satisfy this static
+        // requirement by treating the requirement's first parameter as the implicit `this`:
         //
-        // E.g.:
         //      interface IFoo { static int method(This val, int x); }
         //      struct MyStruct : IFoo { int method(int x) { ... } }
-        //
         // Synthesized:
         //      static int $__syn_method(MyStruct val, int x) { return val.method(x); }
         //
-        if (!baseOverloadedExpr->lookupResult2.isValid() && synArgs.getCount() > 0)
+        if (!baseOverloadedExpr->lookupResult2.isValid() && synArgs.getCount() > 0 &&
+            canBindFirstArgAsReceiver(context, requiredMemberDeclRef, synArgs[0]))
         {
             // Restore the full lookup result and keep only non-static items.
             baseOverloadedExpr->lookupResult2 = lookupResult;
@@ -7879,7 +7965,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 // differentiability specific but can be generalized later if we add more function
                 // conformance kinds.
                 //
-                ensureDecl(callee, DeclCheckState::ReadyForLookup);
                 if (!isFuncForwardDifferentiable(callee))
                 {
                     if (auto fwdDiffModifier =
@@ -7968,11 +8053,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // to it to indicate that it should be ignored by things like lookup.
     //
 
-    // If the synthesized func is differentiable, make sure to populate its
-    // differential type dictionary.
-    SemanticsDeclBodyVisitor bodyVisitor(withParentFunc(synFuncDecl));
-    bodyVisitor.registerDifferentiableTypesForFunc(synFuncDecl);
-
     // Once our synthesized declaration is complete, we need
     // to install it as the witness that satifies the given
     // requirement.
@@ -7985,11 +8065,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     auto containerDeclRef = getDefaultDeclRef(containerDecl);
     auto synDeclRef = m_astBuilder->getMemberDeclRef(containerDeclRef, synFuncDecl);
     //_addMethodWitness(witnessTable, requiredMemberDeclRef, synDeclRef);
-
-    // Check the synthesized declaration up until the point that it's derivative extensions
-    // have been created.
-    //
-    this->ensureDecl(synFuncDecl, DeclCheckState::ReadyForLookup);
 
     if (requiredMemberDeclRef.getParent().as<GenericDecl>())
     {
@@ -8017,6 +8092,11 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             return false;
         }
     }
+
+    // The wrapper is intentionally absent from its parent's member list so that ordinary lookup
+    // cannot expose it. Register only after signature validation has installed the final witness;
+    // failed speculative wrappers must not participate in later semantic phases.
+    getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(synFuncDecl));
 
     return true;
 }
@@ -8130,6 +8210,11 @@ bool SemanticsVisitor::trySynthesizeConstructorRequirementWitness(
     auto synDeclRef = m_astBuilder->getMemberDeclRef(containerDeclRef, ctorDecl);
     _addMethodWitness(witnessTable, requiredMemberDeclRef, synDeclRef);
 
+    // Non-default constructor witnesses stay out of the member list, while default constructor
+    // witnesses are published late during conformance checking. Register both shapes at their
+    // common successful-publication point.
+    getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(ctorDecl));
+
     return true;
 }
 
@@ -8205,101 +8290,13 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
     synPropertyDecl->type.type = propertyType;
 
 
-    // We start by constructing an expression that represents
-    // `this.name` where `name` is the name of the required
-    // member. The caller already passed in a `lookupResult`
-    // that should indicate all the declarations found by
-    // looking up `name`, so we can start with that.
-    //
-    // TODO: Note that there are many cases for member lookup
-    // that are not handled just by using `createLookupResultExpr`
-    // because they are currently being special-cased (the most
-    // notable cases are swizzles, as well as lookup of static
-    // members in types).
-    //
-    // The main result here is that we will not be able to synthesize
-    // a requirement for a built-in scalar/vector/matrix type to
-    // a property with a name like `.xy` based on the presence of
-    // swizles, even though it seems like such a thing should Just Work.
-    //
-    // If this is important we could "fix" it by allowing this
-    // code to dispatch to the special-case logic used when doing
-    // semantic checking for member expressions.
-    //
-    // Note: an alternative would be to change the core module declarations
-    // of vectors/matrices so that all the swizzles are defined as
-    // `property` declarations. There are some C++ math libraries (like GLM)
-    // that implement swizzle syntax by a similar approach of statically
-    // enumerating all possible swizzles. The down-side to such an
-    // approach is that the combinatorial space of swizzles is quite
-    // large (especially for matrices) so that supporting them via
-    // general-purpose language features is unlikely to be as efficient
-    // as special-case logic.
-    //
-    // We are going to synthesize an expression and then perform
-    // semantic checking on it, but if there are semantic errors
-    // we do *not* want to report them to the user as such, and
-    // instead want the result to be a failure to synthesize
-    // a valid witness.
-    //
-    // We will buffer up diagnostics into a temporary sink and
-    // then throw them away when we are done.
-    //
-    // TODO: This behavior might be something we want to make
-    // into a more fundamental capability of `DiagnosticSink` and/or
-    // `SemanticsVisitor` so that code can push/pop the emission
-    // of diagnostics more easily.
-    //
-    DiagnosticSink tempSink(getSourceManager(), nullptr);
-    SemanticsVisitor subVisitor(withSink(&tempSink));
-
-    // We need to create a `this` expression to be used in the body
-    // of the synthesized accessor.
-    //
-    // TODO: if we ever allow `static` properties or subscripts,
-    // we will need to handle that case here, by *not* creating
-    // a `this` expression.
-    //
-    ThisExpr* synThis = m_astBuilder->create<ThisExpr>();
-    synThis->scope = synPropertyDecl->ownedScope;
-
-    // The type of `this` in our accessor will be the type for
-    // which we are synthesizing a conformance.
-    //
-    synThis->type.type = context->conformingType;
-    synThis->type.isLeftValue = true;
-    auto synMemberRef = subVisitor.createLookupResultExpr(
-        requiredMemberDeclRef.getName(),
-        lookupResult,
-        synThis,
-        requiredMemberDeclRef.getLoc(),
-        nullptr);
-    synMemberRef->loc = requiredMemberDeclRef.getLoc();
-
-    // Special-case field-backed storage here: `visitVarDecl()` currently strips
-    // `no_diff` off a field's type and records it on the `VarDecl` instead, so
-    // a plain lookup expression would otherwise expose the field's base type.
-    //
-    // TODO: Remove this special-case once modified types can be treated
-    // uniformly and `no_diff` no longer needs to be normalized onto `VarDecl`s.
-    if (lookupResult.isValid() && !lookupResult.isOverloaded())
-    {
-        if (auto storageDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
-        {
-            if (storageDeclRef.getDecl()->findModifier<NoDiffModifier>())
-            {
-                synMemberRef->type.type = getTypeWithModifier(
-                    synMemberRef->type.type,
-                    m_astBuilder->getNoDiffModifierVal());
-            }
-        }
-    }
-
+    List<Expr*> synthesizedContainerArgs;
     bool canSynAccessors = synthesizeAccessorRequirements(
         context,
         requiredMemberDeclRef,
         propertyType,
-        synMemberRef,
+        lookupResult,
+        synthesizedContainerArgs,
         synPropertyDecl,
         witnessTable);
     if (!canSynAccessors)
@@ -8314,15 +8311,107 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synPropertyDecl, visibility);
     }
+
+    // The property and its accessors are private witness implementation details and deliberately
+    // stay out of ordinary lookup. Their witness-table entries are final at this point.
+    getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(synPropertyDecl));
     return true;
+}
+
+/// Construct the storage expression for one synthesized property or subscript accessor.
+///
+/// Consider a field satisfying `property value : int { get; set; }`. The getter and setter need
+/// distinct `this.value` expression trees whose `ThisExpr`s are scoped to their respective
+/// accessors. Sharing a property-scoped tree would cause body checking to treat the setter's
+/// receiver as immutable. Subscript wrappers follow the same rule and clone their index argument
+/// expressions so that each accessor body owns its complete expression tree.
+static Expr* _createSynthesizedAccessorStorageExpr(
+    SemanticsVisitor* visitor,
+    DeclRef<ContainerDecl> requiredMemberDeclRef,
+    LookupResult const& lookupResult,
+    List<Expr*> const& synthesizedContainerArgs,
+    ThisExpr* synthesizedThisExpr)
+{
+    auto astBuilder = visitor->getASTBuilder();
+
+    // Check only the accessor-local receiver syntax before materializing the selected lookup path.
+    // `createLookupResultExpr()` constructs semantic AST from that path, including transparent-
+    // member, dereference, and supertype breadcrumbs. Sending those constructed member nodes back
+    // through ordinary expression checking would perform name lookup again and could select a
+    // different path.
+    auto checkedThisExpr = visitor->CheckTerm(synthesizedThisExpr);
+    SLANG_RELEASE_ASSERT(checkedThisExpr == synthesizedThisExpr);
+
+    if (requiredMemberDeclRef.as<PropertyDecl>())
+    {
+        auto storageExpr = visitor->createLookupResultExpr(
+            requiredMemberDeclRef.getName(),
+            lookupResult,
+            synthesizedThisExpr,
+            requiredMemberDeclRef.getLoc(),
+            nullptr);
+        storageExpr->loc = requiredMemberDeclRef.getLoc();
+
+        // Treat the materialized lookup path as checked syntax, while still letting `CheckExpr`
+        // disambiguate the overloaded-root case. Overload resolution can return a new semantic
+        // root, so mark that result as checked as well.
+        storageExpr->checked = true;
+        storageExpr = visitor->CheckExpr(storageExpr);
+        storageExpr->checked = true;
+
+        // `visitVarDecl()` currently strips `no_diff` off a field's type and records it on the
+        // declaration. Restore that modifier on the field reference observed by the wrapper.
+        // TODO: Remove this special case once modified types no longer need that normalization.
+        if (lookupResult.isValid() && !lookupResult.isOverloaded())
+        {
+            if (auto storageDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
+            {
+                if (storageDeclRef.getDecl()->findModifier<NoDiffModifier>())
+                {
+                    storageExpr->type.type = getTypeWithModifier(
+                        storageExpr->type.type,
+                        astBuilder->getNoDiffModifierVal());
+                }
+            }
+        }
+        return storageExpr;
+    }
+
+    SLANG_RELEASE_ASSERT(requiredMemberDeclRef.as<SubscriptDecl>());
+
+    List<Expr*> synthesizedArgs;
+    ASTCloner cloner(astBuilder, visitor);
+    for (auto arg : synthesizedContainerArgs)
+        synthesizedArgs.add(cloner.cloneExpr(arg));
+
+    if (lookupResult.isValid())
+    {
+        auto calleeExpr = astBuilder->create<OverloadedExpr>();
+        calleeExpr->base = synthesizedThisExpr;
+        calleeExpr->lookupResult2 = lookupResult;
+
+        auto invokeExpr = astBuilder->create<InvokeExpr>();
+        invokeExpr->functionExpr = calleeExpr;
+        invokeExpr->arguments = _Move(synthesizedArgs);
+
+        // Fully resolve the selected original subscript before publishing the wrapper. Leaving the
+        // invocation unresolved could let later body checking bind it back to the wrapper itself.
+        return visitor->CheckExpr(invokeExpr);
+    }
+
+    auto indexExpr = astBuilder->create<IndexExpr>();
+    indexExpr->baseExpression = synthesizedThisExpr;
+    indexExpr->indexExprs = _Move(synthesizedArgs);
+    return visitor->CheckTerm(indexExpr);
 }
 
 bool SemanticsVisitor::synthesizeAccessorRequirements(
     ConformanceCheckingContext* context,
     DeclRef<ContainerDecl> requiredMemberDeclRef,
     Type* resultType,
-    Expr* synBoundStorageExpr,
-    ContainerDecl* synAccesorContainer,
+    LookupResult const& lookupResult,
+    List<Expr*> const& synthesizedContainerArgs,
+    ContainerDecl* synthesizedAccessorContainer,
     RefPtr<WitnessTable> witnessTable)
 {
     Dictionary<DeclRef<AccessorDecl>, AccessorDecl*> mapRequiredAccessorToSynAccessor;
@@ -8446,6 +8535,13 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             auto synAttr = m_astBuilder->create<ConstRefAttribute>();
             synAccessorDecl->modifiers.first = synAttr;
         }
+
+        // Parent the accessor before checking its body. In particular, checking an accessor-local
+        // `this` expression needs to find the accessor that determines whether receiver storage is
+        // writable. The enclosing property or subscript is still speculative and is not published
+        // as a witness unless all of its accessors succeed.
+        synthesizedAccessorContainer->addMember(synAccessorDecl);
+
         // We are going to synthesize an expression and then perform
         // semantic checking on it, but if there are semantic errors
         // we do *not* want to report them to the user as such, and
@@ -8463,6 +8559,15 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         DiagnosticSink tempSink(getSourceManager(), nullptr);
         SemanticsVisitor subVisitor(withSink(&tempSink));
 
+        auto synthesizedStorageExpr = _createSynthesizedAccessorStorageExpr(
+            &subVisitor,
+            requiredMemberDeclRef,
+            lookupResult,
+            synthesizedContainerArgs,
+            synThis);
+        if (tempSink.getErrorCount() != 0)
+            return false;
+
         // The body of the accessor will depend on the class of the accessor
         // we are synthesizing (e.g., `get` vs. `set`).
         //
@@ -8476,8 +8581,11 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // which involves coercing the member access `this.name` to
             // the expected type of the property.
             //
-            auto coercedMemberRef =
-                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr, getSink());
+            auto coercedMemberRef = subVisitor.coerce(
+                CoercionSite::Return,
+                resultType,
+                synthesizedStorageExpr,
+                &tempSink);
             auto synReturn = m_astBuilder->create<ReturnStmt>();
             synReturn->expression = coercedMemberRef;
 
@@ -8501,7 +8609,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // expression.
 
             auto synAssign = m_astBuilder->create<AssignExpr>();
-            synAssign->left = synBoundStorageExpr;
+            synAssign->left = synthesizedStorageExpr;
             synAssign->right = synArgs[0];
 
             auto synCheckedAssign = subVisitor.checkAssignWithCheckedOperands(synAssign);
@@ -8537,8 +8645,6 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
         // TODO: This a slight workaround for accessor differentiability being tricky to handle
         addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
 
-        synAccesorContainer->addMember(synAccessorDecl);
-
         // If synthesis of an accessor worked, then we will record it into
         // a local dictionary. We do *not* install the accessor into the
         // witness table yet, because it is possible that synthesis will
@@ -8557,7 +8663,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
     // difference between our synthetic property and a hand-written
     // one with the same behavior.
     //
-    auto containerDecl = getParentDecl(synAccesorContainer);
+    auto containerDecl = getParentDecl(synthesizedAccessorContainer);
     auto containerDeclRef = getDefaultDeclRef(containerDecl);
     for (auto& [key, value] : mapRequiredAccessorToSynAccessor)
     {
@@ -8568,7 +8674,8 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
 
     witnessTable->add(
         requiredMemberDeclRef.getDecl(),
-        RequirementWitness(m_astBuilder->getMemberDeclRef(containerDeclRef, synAccesorContainer)));
+        RequirementWitness(
+            m_astBuilder->getMemberDeclRef(containerDeclRef, synthesizedAccessorContainer)));
     return true;
 }
 
@@ -8640,36 +8747,8 @@ bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
         requiredMemberDeclRef,
         synArgs,
         synThis);
-    synThis->type.isLeftValue = true;
-    synThis->checked = true;
-
     auto declType = getType(m_astBuilder, getDefaultDeclRef(synSubscriptDecl).as<SubscriptDecl>());
-
-    // Form a `this[args...]` expression that we will use to coerce from
-    // in the synthesized subscript accessors.
-    //
-    DiagnosticSink tempSink(getSourceManager(), nullptr);
-    SemanticsVisitor subVisitor(withSink(&tempSink));
-    Expr* synBaseStorageExpr = nullptr;
-    if (lookupResult.isValid())
-    {
-        auto calleeExpr = m_astBuilder->create<OverloadedExpr>();
-        calleeExpr->base = synThis;
-        calleeExpr->lookupResult2 = lookupResult;
-        auto invokeExpr = m_astBuilder->create<InvokeExpr>();
-        invokeExpr->functionExpr = calleeExpr;
-        invokeExpr->arguments = _Move(synArgs);
-        synBaseStorageExpr = subVisitor.ResolveInvoke(invokeExpr);
-    }
-    else
-    {
-        IndexExpr* indexExpr = m_astBuilder->create<IndexExpr>();
-        indexExpr->baseExpression = synThis;
-        indexExpr->indexExprs = _Move(synArgs);
-        synBaseStorageExpr = subVisitor.CheckTerm(indexExpr);
-    }
-    if (tempSink.getErrorCount() != 0)
-        return false;
+    SLANG_UNUSED(synThis);
 
     // Our synthesized subscript will have an accessor declaration for
     // each accessor of the requirement.
@@ -8678,7 +8757,8 @@ bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
         context,
         requiredMemberDeclRef,
         declType,
-        synBaseStorageExpr,
+        lookupResult,
+        synArgs,
         synSubscriptDecl,
         witnessTable);
     if (!canSynAccessors)
@@ -8693,6 +8773,10 @@ bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
         addVisibilityModifier(synSubscriptDecl, visibility);
     }
+
+    // As with a synthesized property, this container is reachable through the witness table but
+    // deliberately absent from the parent's member list.
+    getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(synSubscriptDecl));
 
     return true;
 }
@@ -9863,8 +9947,6 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     Decl* witnessDecl = synGeneric ? (Decl*)synGeneric : synFunc;
     SLANG_ASSERT(context->parentDecl == witnessDecl->parentDecl);
 
-    context->parentDecl->addDirectMemberDecl(witnessDecl);
-
     addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
 
     // If `This` is nested inside a generic, we need to form a complete declref type to the
@@ -9904,11 +9986,6 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     if (!synthesizedWitnessDeclRef)
         synthesizedWitnessDeclRef = m_astBuilder->getDirectDeclRef(witnessDecl);
 
-    // Check the synthesized declaration up until the point that it's derivative extensions
-    // have been created.
-    //
-    this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
-
     auto synthesizedCallableDeclRef = synthesizedWitnessDeclRef.as<CallableDecl>();
 
     // Test signature and register in witness table.
@@ -9920,7 +9997,13 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     // If we decide that it is possible to synthesize this requirement, then we should
     // have produced one that is consistent with the expected signature.
     //
-    SLANG_ASSERT(doesSignatureMatch);
+    SLANG_RELEASE_ASSERT(doesSignatureMatch);
+
+    // Publish the synthesized method only after signature matching has installed its witness.
+    // In particular, a candidate that could not form a specialized declaration reference above
+    // must not enter the declaration tree or trigger autodiff side effects.
+    context->parentDecl->addDirectMemberDecl(witnessDecl);
+    getShared()->registerSynthesizedDeclRoot(_getSynthesizedDeclRoot(witnessDecl));
 
     return true;
 }
@@ -9928,6 +10011,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
 bool SemanticsVisitor::findDefaultInterfaceImpl(
     ConformanceCheckingContext* context,
     DeclRef<Decl> requiredMemberDeclRef,
+    SubtypeWitness* subTypeConformsToInterfaceWitness,
     RefPtr<WitnessTable> witnessTable)
 {
     // Interface default implementations are represented as callable stubs over
@@ -9978,7 +10062,7 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     //    ```
     // Given this, we can simply form a GenericAppDeclRef to `IFoo::bar_defaultImpl`
     // with `This` being `context->conformingType` and `This:IFoo` being
-    // `context->conformingWitness`.
+    // `subTypeConformsToInterfaceWitness`.
     //
     // The following logic will create this declref, and register it to the witness table.
     //
@@ -9996,7 +10080,7 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
         m_astBuilder->getMemberDeclRef(interfaceDeclRef, genericDeclOfDefaultImplStub);
     List<Val*> specArgs;
     specArgs.add(context->conformingType);
-    specArgs.add(context->conformingWitness);
+    specArgs.add(subTypeConformsToInterfaceWitness);
 
     // Form a declref to `IFoo::bar_defaultImpl<conformingType>`.
     resultDeclRef = m_astBuilder->getGenericAppDeclRef(
@@ -10140,6 +10224,93 @@ static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targ
     return false;
 }
 
+/// Returns whether `declRef` still identifies a requirement rather than its satisfying declaration.
+///
+/// Most projected requirements have the interface as their decl-ref parent. A synthesized generic
+/// constraint requirement instead has its wrapping `GenericDecl` as the immediate parent while the
+/// inner declaration retains interface-requirement identity.
+static bool _doesDeclRefNameInterfaceRequirement(DeclRef<Decl> declRef)
+{
+    auto decl = declRef.getDecl();
+    if (as<InterfaceDecl>(declRef.getParent().getDecl()))
+        return true;
+    return as<GenericTypeConstraintDecl>(decl) && isInterfaceRequirement(decl);
+}
+
+bool SemanticsVisitor::ensureInheritedInterfaceRequirement(
+    ConformanceCheckingContext* context,
+    Type* subType,
+    DeclRef<InheritanceDecl> requiredInheritanceDeclRef,
+    RefPtr<WitnessTable> witnessTable,
+    InheritedInterfaceRequirementMode mode)
+{
+    auto requirementDecl = requiredInheritanceDeclRef.getDecl();
+    InterfaceRequirementKey requirementKey(requirementDecl);
+    auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
+    auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
+    if (!subIsReqWitness)
+    {
+        // The current conformance can provide a path before the flattened inheritance cache has
+        // observed it. Preserve the actual specialized inheritance requirement in that path.
+        subIsReqWitness =
+            m_astBuilder->getDeclaredSubtypeWitness(subType, reqType, requiredInheritanceDeclRef);
+    }
+
+    bool isOnCanonicalPath =
+        doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
+    if (!isOnCanonicalPath)
+    {
+        if (!witnessTable->containsRequirement(requirementKey))
+            witnessTable->add(requirementKey, RequirementWitness(subIsReqWitness));
+        return true;
+    }
+
+    RefPtr<WitnessTable> satisfyingWitnessTable;
+    RequirementWitness existingWitness;
+    if (witnessTable->tryGetRequirementWitness(requirementKey, existingWitness))
+    {
+        // A canonical inherited-interface entry is created only by this branch, including its
+        // `PrepareForLookup` mode, and is always a nested table. A non-canonical path stores a
+        // `SubtypeWitness` value in the branch above and is finalized without re-entering this
+        // canonical branch. Seeing that value here would mean the path classification or the
+        // per-requirement checking state has changed underneath an already-published entry.
+        SLANG_RELEASE_ASSERT(
+            existingWitness.getFlavor() == RequirementWitness::Flavor::witnessTable);
+        satisfyingWitnessTable = existingWitness.getWitnessTable();
+    }
+    else
+    {
+        satisfyingWitnessTable = new WitnessTable();
+        satisfyingWitnessTable->witnessedType = subType;
+        satisfyingWitnessTable->baseType = reqType;
+        witnessTable->add(requirementKey, RequirementWitness(satisfyingWitnessTable));
+    }
+
+    auto reqInterfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(reqType);
+    if (reqInterfaceDeclRef)
+    {
+        registerConformanceInterfaceCheckingState(
+            context,
+            subType,
+            reqType,
+            requirementDecl,
+            reqInterfaceDeclRef,
+            satisfyingWitnessTable,
+            subIsReqWitness);
+    }
+
+    if (mode == InheritedInterfaceRequirementMode::PrepareForLookup)
+        return true;
+
+    return checkConformanceToType(
+        context,
+        subType,
+        requirementDecl,
+        reqType,
+        subIsReqWitness,
+        satisfyingWitnessTable);
+}
+
 bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     ConformanceCheckingContext* context,
     Type* subType,
@@ -10151,7 +10322,6 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
 {
     SLANG_UNUSED(superInterfaceDeclRef)
-    SLANG_UNUSED(subTypeConformsToSuperInterfaceWitness);
     SLANG_UNUSED(superInterfaceType);
 
 
@@ -10181,11 +10351,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // IBackwardDifferentiable<This.f<T>>) }`. Do not treat that wrapped constraint shape as
     // already resolved just because the decl-ref parent is the generic wrapper; it still needs its
     // own witness-table entry.
-    auto requiredDecl = requiredMemberDeclRef.getDecl();
-    auto isGenericWrappedConstraintRequirement =
-        as<GenericTypeConstraintDecl>(requiredDecl) && isInterfaceRequirement(requiredDecl);
-    if (!as<InterfaceDecl>(requiredMemberDeclRef.getParent().getDecl()) &&
-        !isGenericWrappedConstraintRequirement)
+    if (!_doesDeclRefNameInterfaceRequirement(requiredMemberDeclRef))
     {
         return true;
     }
@@ -10205,7 +10371,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // actually conform to `__BuiltinIntegerType`. Respecting a synthesis-provided
     // witness here is therefore the contract, not a constraint-specific quirk.
     //
-    if (witnessTable->getRequirementDictionary().containsKey(requiredMemberDeclRef.getDecl()))
+    if (witnessTable->containsRequirement(InterfaceRequirementKey(requiredMemberDeclRef.getDecl())))
     {
         return true;
     }
@@ -10349,62 +10515,12 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     //
     if (auto requiredInheritanceDeclRef = requiredMemberDeclRef.as<InheritanceDecl>())
     {
-        // Recursively check that the type conforms
-        // to the inherited interface.
-        //
-        // TODO: we *really* need a linearization step here!!!!
-
-        auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
-        auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
-        if (!subIsReqWitness)
-        {
-            // `requiredInheritanceDeclRef` is the inherited-interface requirement being checked,
-            // looked up through `subTypeConformsToSuperInterfaceWitness`. When no cached/global
-            // path exists yet, the current conformance itself provides the path: `subType`
-            // conforms to `superInterfaceType`, and that interface inherits `reqType`. This case
-            // matters for compiler-synthesized enum conformances, where the `__EnumType` witness
-            // table is being populated before `TonemapMode : ILogical` has appeared in the
-            // flattened inheritance cache. Build the declared witness from the actual inheritance
-            // decl-ref so the nested witness table below can synthesize `ILogical` requirements.
-            subIsReqWitness = m_astBuilder->getDeclaredSubtypeWitness(
-                subType,
-                reqType,
-                requiredInheritanceDeclRef);
-        }
-
-        bool isOnCanonicalPath =
-            doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
-        if (isOnCanonicalPath)
-        {
-            // Only create a nested witness table if this is the canonical path.
-            RefPtr<WitnessTable> satisfyingWitnessTable = new WitnessTable();
-            satisfyingWitnessTable->witnessedType = subType;
-            satisfyingWitnessTable->baseType = reqType;
-
-            witnessTable->add(
-                requiredInheritanceDeclRef.getDecl(),
-                RequirementWitness(satisfyingWitnessTable));
-
-            if (!checkConformanceToType(
-                    context,
-                    subType,
-                    requiredInheritanceDeclRef.getDecl(),
-                    reqType,
-                    subIsReqWitness,
-                    satisfyingWitnessTable))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            // Otherwise, store a reference to the canonical path instead.
-            witnessTable->add(
-                requiredInheritanceDeclRef.getDecl(),
-                RequirementWitness(subIsReqWitness));
-        }
-
-        return true;
+        return ensureInheritedInterfaceRequirement(
+            context,
+            subType,
+            requiredInheritanceDeclRef,
+            witnessTable,
+            InheritedInterfaceRequirementMode::CheckConformance);
     }
 
     // We will look up members with the same name,
@@ -10543,6 +10659,12 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // code required to handle all the conversions that might be
     // required on `this`.
     //
+    // We try synthesis before the interface default below: a member of the conforming type that can
+    // satisfy the requirement takes precedence over an inherited default.
+    // `trySynthesizeRequirementWitness` returning false therefore means "no member satisfies this",
+    // which is what lets an inherited default (or, failing that, an unsatisfied-requirement
+    // diagnostic) take over.
+    //
     MethodWitnessSynthesisFailureDetails failureDetails = {};
     if (trySynthesizeRequirementWitness(
             context,
@@ -10557,7 +10679,11 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     // Finally, if there is a default implementation for the required member,
     // we can use that as a witness.
     //
-    if (findDefaultInterfaceImpl(context, requiredMemberDeclRef, witnessTable))
+    if (findDefaultInterfaceImpl(
+            context,
+            requiredMemberDeclRef,
+            subTypeConformsToSuperInterfaceWitness,
+            witnessTable))
         return true;
 
     // We failed to find a member of the type that can be used
@@ -10627,19 +10753,625 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     return false;
 }
 
+SemanticsVisitor::ConformanceRequirementCheckResult SemanticsVisitor::ensureConformanceRequirement(
+    ConformanceCheckingContext* context,
+    Type* subType,
+    Type* superInterfaceType,
+    InheritanceDecl* inheritanceDecl,
+    DeclRef<InterfaceDecl> superInterfaceDeclRef,
+    DeclRef<Decl> requiredMemberDeclRef,
+    RefPtr<WitnessTable> witnessTable,
+    SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
+{
+    auto requirementDecl = requiredMemberDeclRef.getDecl();
+
+    // A resolved declaration reference already names the concrete satisfying declaration rather
+    // than a key in this interface table. `ThisType` is likewise synthesized structurally by
+    // requirement lookup. Neither case owns a table entry or per-entry checking state.
+    if (as<ThisTypeDecl>(requirementDecl) ||
+        !_doesDeclRefNameInterfaceRequirement(requiredMemberDeclRef))
+    {
+        return ConformanceRequirementCheckResult::Satisfied;
+    }
+
+    InterfaceRequirementKey requirementKey(requirementDecl);
+
+    auto previousState = witnessTable->getRequirementCheckState(requirementKey);
+    switch (previousState)
+    {
+    case RequirementCheckState::Succeeded:
+        SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(requirementKey));
+        return ConformanceRequirementCheckResult::Satisfied;
+    case RequirementCheckState::Failed:
+        SLANG_RELEASE_ASSERT(!witnessTable->containsRequirement(requirementKey));
+        return ConformanceRequirementCheckResult::Failed;
+    case RequirementCheckState::Checking:
+        // Consider this example:
+        //
+        //     interface IA { associatedtype A : IB; }
+        //     interface IB { associatedtype B : IA; }
+        //
+        // Resolving one entry may legitimately request another entry that eventually reaches the
+        // first. The outer request still owns the attempt and may make progress after this nested
+        // request unwinds, so report the dependency instead of diagnosing a declaration cycle.
+        return ConformanceRequirementCheckResult::InProgress;
+    case RequirementCheckState::WitnessReady:
+        {
+            RequirementWitness preparedWitness;
+            SLANG_RELEASE_ASSERT(
+                witnessTable->tryGetRequirementWitness(requirementKey, preparedWitness));
+            SLANG_RELEASE_ASSERT(
+                preparedWitness.getFlavor() == RequirementWitness::Flavor::witnessTable);
+            break;
+        }
+    case RequirementCheckState::Unchecked:
+        break;
+    }
+
+    // Conformance synthesis can populate a final witness before ordinary requirement checking
+    // reaches it. A witness deliberately marked `WitnessReady`, in contrast, is only a structural
+    // answer published to break a recursive lookup path and still needs validation below.
+    if (previousState == RequirementCheckState::Unchecked &&
+        witnessTable->containsRequirement(requirementKey))
+    {
+        witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Succeeded);
+        return ConformanceRequirementCheckResult::Satisfied;
+    }
+
+    witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Checking);
+    bool requirementSatisfied = false;
+    if (previousState == RequirementCheckState::WitnessReady)
+    {
+        // The forceful projection path currently publishes only inherited-interface tables. The
+        // table is already present, so validate that nested conformance without treating mere
+        // dictionary presence as success.
+        if (auto requiredInheritanceDeclRef = requiredMemberDeclRef.as<InheritanceDecl>())
+        {
+            requirementSatisfied = ensureInheritedInterfaceRequirement(
+                context,
+                subType,
+                requiredInheritanceDeclRef,
+                witnessTable,
+                InheritedInterfaceRequirementMode::CheckConformance);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("only an inherited-interface requirement may be prepared");
+        }
+    }
+    else
+    {
+        requirementSatisfied = findWitnessForInterfaceRequirement(
+            context,
+            subType,
+            superInterfaceType,
+            inheritanceDecl,
+            superInterfaceDeclRef,
+            requiredMemberDeclRef,
+            witnessTable,
+            subTypeConformsToSuperInterfaceWitness);
+    }
+
+    if (requirementSatisfied)
+    {
+        SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(requirementKey));
+        witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Succeeded);
+        return ConformanceRequirementCheckResult::Satisfied;
+    }
+
+    // A failed attempt must not leave a provisional structural answer visible to passive lookup.
+    witnessTable->removeRequirement(requirementKey);
+    witnessTable->setRequirementCheckState(requirementKey, RequirementCheckState::Failed);
+    return ConformanceRequirementCheckResult::Failed;
+}
+
+static bool _doesTypeDeclHaveDefinition(ContainerDecl* decl);
+
+SemanticsVisitor::ConformanceCheckingContext* SemanticsVisitor::
+    getOrCreateConformanceCheckingContext(
+        Type* conformingType,
+        InheritanceDecl* inheritanceDecl,
+        ContainerDecl* parentDecl)
+{
+    auto shared = getShared();
+    if (auto existing =
+            shared->m_mapInheritanceDeclToConformanceCheckingContext.tryGetValue(inheritanceDecl))
+    {
+        SLANG_RELEASE_ASSERT((*existing)->conformingType->equals(conformingType));
+        SLANG_RELEASE_ASSERT((*existing)->parentDecl == parentDecl);
+        SLANG_RELEASE_ASSERT((*existing)->rootInheritanceDecl == inheritanceDecl);
+        return existing->Ptr();
+    }
+
+    RefPtr<ConformanceCheckingContext> context = new ConformanceCheckingContext();
+    context->conformingType = conformingType;
+    context->parentDecl = parentDecl;
+    context->rootInheritanceDecl = inheritanceDecl;
+
+    auto inheritanceDeclRef =
+        createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(inheritanceDecl))
+            .as<InheritanceDecl>();
+    auto interfaceType = inheritanceDecl->base.type;
+    context->conformingWitness =
+        m_astBuilder->getDeclaredSubtypeWitness(conformingType, interfaceType, inheritanceDeclRef);
+
+    RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
+    if (!witnessTable)
+    {
+        witnessTable = new WitnessTable();
+        witnessTable->baseType = interfaceType;
+        witnessTable->witnessedType = conformingType;
+        witnessTable->isExtern =
+            (!_doesTypeDeclHaveDefinition(parentDecl) && parentDecl->hasModifier<ExternModifier>());
+        inheritanceDecl->witnessTable = witnessTable;
+    }
+
+    shared->m_mapInheritanceDeclToConformanceCheckingContext.add(inheritanceDecl, context);
+
+    if (auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(interfaceType))
+    {
+        registerConformanceInterfaceCheckingState(
+            context,
+            conformingType,
+            interfaceType,
+            inheritanceDecl,
+            interfaceDeclRef,
+            witnessTable,
+            context->conformingWitness);
+    }
+    return context.Ptr();
+}
+
+SemanticsVisitor::ConformanceInterfaceCheckingState* SemanticsVisitor::
+    registerConformanceInterfaceCheckingState(
+        ConformanceCheckingContext* context,
+        Type* conformingType,
+        Type* interfaceType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> interfaceDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        SubtypeWitness* conformingWitness)
+{
+    auto shared = getShared();
+    if (auto existing =
+            shared->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(witnessTable))
+    {
+        // Synthesizing a generic requirement can use an ephemeral child context with a different
+        // parent declaration while referring to the same conformance table. The table's original
+        // persistent owner remains authoritative. Every other input describes the table itself and
+        // must agree with that original registration.
+        auto state = existing->Ptr();
+        SLANG_RELEASE_ASSERT(state->conformingType->equals(conformingType));
+        SLANG_RELEASE_ASSERT(state->interfaceType->equals(interfaceType));
+        SLANG_RELEASE_ASSERT(state->inheritanceDecl == inheritanceDecl);
+        SLANG_RELEASE_ASSERT(state->interfaceDeclRef == interfaceDeclRef);
+        SLANG_RELEASE_ASSERT(state->witnessTable.Ptr() == witnessTable.Ptr());
+        SLANG_RELEASE_ASSERT(state->conformingWitness->equals(conformingWitness));
+        return state;
+    }
+
+    RefPtr<ConformanceInterfaceCheckingState> state = new ConformanceInterfaceCheckingState();
+    state->owner = context;
+    state->conformingType = conformingType;
+    state->interfaceType = interfaceType;
+    state->inheritanceDecl = inheritanceDecl;
+    state->interfaceDeclRef = interfaceDeclRef;
+    state->witnessTable = witnessTable;
+    state->conformingWitness = conformingWitness;
+
+    if (auto existingTable = context->mapInterfaceToWitnessTable.tryGetValue(interfaceDeclRef))
+        SLANG_RELEASE_ASSERT(existingTable->Ptr() == witnessTable.Ptr());
+    else
+        context->mapInterfaceToWitnessTable.add(interfaceDeclRef, witnessTable);
+
+    shared->m_mapWitnessTableToConformanceInterfaceCheckingState.add(witnessTable, state);
+    return state.Ptr();
+}
+
+SemanticsVisitor::ConformanceRequirementCheckResult SemanticsVisitor::ensureConformanceRequirement(
+    WitnessTable* witnessTable,
+    DeclRef<Decl> requiredMemberDeclRef)
+{
+    auto state =
+        getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(witnessTable);
+    SLANG_RELEASE_ASSERT(state);
+
+    auto interfaceState = state->Ptr();
+    return ensureConformanceRequirement(
+        interfaceState->owner.Ptr(),
+        interfaceState->conformingType,
+        interfaceState->interfaceType,
+        interfaceState->inheritanceDecl,
+        interfaceState->interfaceDeclRef,
+        requiredMemberDeclRef,
+        interfaceState->witnessTable,
+        interfaceState->conformingWitness);
+}
+
+SemanticsVisitor::RequirementLookupResult SemanticsVisitor::ensureAndLookupRequirementWitness(
+    SubtypeWitness* conformanceWitness,
+    DeclRef<Decl> requirementDeclRef)
+{
+    RequirementLookupResult result;
+    if (!conformanceWitness || !requirementDeclRef)
+        return result;
+
+    // `locateNextRequirementWitnessLookupFrontier` returns the first missing structural step, not
+    // necessarily the originally requested leaf. Each successful mutation therefore restarts the
+    // passive lookup from the original witness and requirement. Every path that reaches the bottom
+    // of the loop must set `madeProgress` after publishing the table or entry named by its
+    // frontier; the release assertion makes that restart contract structural rather than merely
+    // documentary. Both publication and the next lookup normalize an entry through
+    // `InterfaceRequirementKey`, so the next traversal must observe the newly inserted key and
+    // advance beyond that frontier. `gh-12822-multistep-inheritance.slang` exercises multiple such
+    // restarts. Encountering an entry already owned by an outer request returns `Recursive` instead
+    // of spinning, and every finite witness path therefore either advances to a later missing step
+    // or returns a terminal result.
+    for (;;)
+    {
+        bool madeProgress = false;
+        auto frontier = locateNextRequirementWitnessLookupFrontier(
+            m_astBuilder,
+            conformanceWitness,
+            requirementDeclRef);
+        switch (frontier.getStatus())
+        {
+        case RequirementWitnessLookupFrontierStatus::Found:
+            result.status = RequirementLookupStatus::Found;
+            result.witness = frontier.getWitness();
+            return result;
+
+        case RequirementWitnessLookupFrontierStatus::Indeterminate:
+            return result;
+
+        case RequirementWitnessLookupFrontierStatus::NeedsConcreteConformance:
+            return ensureAndLookupRequirementWitnessThroughProjectedConformance(
+                frontier.getProjectedConformanceWitness(),
+                requirementDeclRef);
+
+        case RequirementWitnessLookupFrontierStatus::MissingConcreteTable:
+            {
+                auto inheritanceDeclRef = frontier.getConcreteConformanceDeclRef();
+                auto inheritanceDecl = inheritanceDeclRef.getDecl();
+                auto conformanceParent = as<ContainerDecl>(inheritanceDecl->parentDecl);
+                SLANG_RELEASE_ASSERT(
+                    conformanceParent && !as<InterfaceDecl>(conformanceParent) &&
+                    !as<AssocTypeDecl>(conformanceParent));
+
+                // Witness tables contain declaration-context answers. Reconstruct the default
+                // declaration context rather than writing a specialized answer into the shared
+                // table for a generic conformance.
+                auto declarationInheritanceDeclRef = createDefaultSubstitutionsIfNeeded(
+                                                         m_astBuilder,
+                                                         this,
+                                                         makeDeclRef(inheritanceDecl))
+                                                         .as<InheritanceDecl>();
+                auto conformanceSubType =
+                    calcThisType(DeclRef<Decl>(declarationInheritanceDeclRef).getParent());
+                auto superInterfaceType = getBaseType(m_astBuilder, declarationInheritanceDeclRef);
+                if (!conformanceSubType || !isDeclRefTypeOf<InterfaceDecl>(superInterfaceType))
+                    return result;
+
+                getOrCreateConformanceCheckingContext(
+                    conformanceSubType,
+                    inheritanceDecl,
+                    conformanceParent);
+                SLANG_RELEASE_ASSERT(inheritanceDecl->witnessTable);
+                // Publishing the root table can change how a nested `LookupDeclRef` resolves. Make
+                // that change visible before restarting the lookup from its original value.
+                m_astBuilder->incrementEpoch();
+                madeProgress = true;
+                break;
+            }
+
+        case RequirementWitnessLookupFrontierStatus::MissingEntry:
+            {
+                auto witnessTable = frontier.getWitnessTable();
+                // Extern conformances accept the interface relationship without providing local
+                // satisfying declarations, so no structural entry can be forced here.
+                if (!witnessTable || witnessTable->isExtern)
+                    return result;
+
+                auto registeredState =
+                    getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(
+                        witnessTable);
+                // Abstract generic constraints own path-resolution tables rather than declared
+                // conformances, and serialized or synthesized tables may likewise have no live
+                // declaration-context checker. Passive lookup may traverse such a table, but there
+                // is no concrete conformance state from which this operation could synthesize a
+                // missing entry, so leave the projection symbolic.
+                if (!registeredState)
+                    return result;
+                auto interfaceState = registeredState->Ptr();
+
+                auto frontierRequirementDeclRef = frontier.getRequirementDeclRef();
+                ensureDecl(frontierRequirementDeclRef, DeclCheckState::ReadyForReference);
+                auto declarationRequirementDeclRef = m_astBuilder->getLookupDeclRef(
+                    interfaceState->conformingWitness,
+                    frontierRequirementDeclRef.getDecl());
+
+                // A canonical inherited-interface entry is itself the table needed to continue
+                // toward a deeper leaf; a non-canonical entry instead points at the canonical
+                // conformance path. Publish either form without conflating structural progress on
+                // the canonical table with validation of all of its requirements.
+                if (auto requiredInheritanceDeclRef =
+                        declarationRequirementDeclRef.as<InheritanceDecl>())
+                {
+                    auto requirementDecl = requiredInheritanceDeclRef.getDecl();
+                    InterfaceRequirementKey requirementKey(requirementDecl);
+                    switch (witnessTable->getRequirementCheckState(requirementKey))
+                    {
+                    case RequirementCheckState::Checking:
+                        result.status = RequirementLookupStatus::Recursive;
+                        return result;
+                    case RequirementCheckState::Failed:
+                        result.status = RequirementLookupStatus::Failed;
+                        return result;
+                    case RequirementCheckState::Succeeded:
+                    case RequirementCheckState::WitnessReady:
+                        // Both states require a dictionary entry. `removeRequirement` clears the
+                        // entry and its state together, while failure paths set `Failed` only after
+                        // removing the entry, so the frontier could not have reported it missing.
+                        SLANG_UNEXPECTED("checked requirement has no structural witness");
+                    case RequirementCheckState::Unchecked:
+                        break;
+                    }
+
+                    // Preparation only publishes the canonical nested table (or its existing
+                    // non-canonical conformance witness); validation is deliberately deferred.
+                    // It therefore cannot fail for a well-formed inherited-interface requirement.
+                    SLANG_RELEASE_ASSERT(ensureInheritedInterfaceRequirement(
+                        interfaceState->owner.Ptr(),
+                        interfaceState->conformingType,
+                        requiredInheritanceDeclRef,
+                        witnessTable,
+                        InheritedInterfaceRequirementMode::PrepareForLookup));
+                    RequirementWitness preparedWitness;
+                    SLANG_RELEASE_ASSERT(
+                        witnessTable->tryGetRequirementWitness(requirementKey, preparedWitness));
+                    switch (preparedWitness.getFlavor())
+                    {
+                    case RequirementWitness::Flavor::witnessTable:
+                        witnessTable->setRequirementCheckState(
+                            requirementKey,
+                            RequirementCheckState::WitnessReady);
+                        break;
+                    case RequirementWitness::Flavor::val:
+                        witnessTable->setRequirementCheckState(
+                            requirementKey,
+                            RequirementCheckState::Succeeded);
+                        break;
+                    default:
+                        SLANG_UNEXPECTED("inherited-interface requirement has invalid witness");
+                    }
+                    // The next lookup step may need to resolve the newly published conformance
+                    // witness before it can identify another concrete table.
+                    m_astBuilder->incrementEpoch();
+                    madeProgress = true;
+                    break;
+                }
+
+                auto checkResult =
+                    ensureConformanceRequirement(witnessTable, declarationRequirementDeclRef);
+                switch (checkResult)
+                {
+                case ConformanceRequirementCheckResult::InProgress:
+                    result.status = RequirementLookupStatus::Recursive;
+                    return result;
+                case ConformanceRequirementCheckResult::Failed:
+                    result.status = RequirementLookupStatus::Failed;
+                    return result;
+                case ConformanceRequirementCheckResult::Satisfied:
+                    SLANG_RELEASE_ASSERT(witnessTable->containsRequirement(
+                        InterfaceRequirementKey(declarationRequirementDeclRef.getDecl())));
+                    m_astBuilder->incrementEpoch();
+                    madeProgress = true;
+                    break;
+                }
+                break;
+            }
+        }
+        SLANG_RELEASE_ASSERT(madeProgress);
+    }
+}
+
+SemanticsVisitor::RequirementLookupResult SemanticsVisitor::
+    ensureAndLookupRequirementWitnessThroughProjectedConformance(
+        SubtypeWitness* projectedConformanceWitness,
+        DeclRef<Decl> requirementDeclRef)
+{
+    RequirementLookupResult result;
+
+    // Consider `T.Element.Value` where `T : IOuter`, `IOuter.Element : IInner`, and `Value` is an
+    // `IInner` requirement. The outer table stores a symbolic witness for
+    // `T.Element : IInner`. Resolve `T.Element` first, recover the ordinary concrete conformance
+    // witness for that type, and continue the original `Value` lookup through it.
+    Type* concreteSubType = nullptr;
+    Type* concreteSuperType = nullptr;
+    result.status =
+        ensureConcreteConformanceEndpoint(projectedConformanceWitness->getSub(), concreteSubType);
+    if (result.status != RequirementLookupStatus::Found)
+        return result;
+    result.status =
+        ensureConcreteConformanceEndpoint(projectedConformanceWitness->getSup(), concreteSuperType);
+    if (result.status != RequirementLookupStatus::Found)
+        return result;
+
+    auto concreteConformanceWitness = tryGetSubtypeWitness(concreteSubType, concreteSuperType);
+    if (!concreteConformanceWitness)
+    {
+        result.status = RequirementLookupStatus::Failed;
+        return result;
+    }
+    if (concreteConformanceWitness->equals(projectedConformanceWitness))
+    {
+        // Resolving the endpoints reproduced the same symbolic relation, so recursing through it
+        // cannot make progress. Leave the projection unavailable to the forceful caller instead of
+        // claiming to have found an empty requirement witness.
+        result.status = RequirementLookupStatus::Unavailable;
+        return result;
+    }
+
+    return ensureAndLookupRequirementWitness(concreteConformanceWitness, requirementDeclRef);
+}
+
+SemanticsVisitor::RequirementLookupStatus SemanticsVisitor::ensureConcreteConformanceEndpoint(
+    Type* type,
+    Type*& outType)
+{
+    auto resolution = ensureAndResolveRequirementProjection(type);
+    switch (resolution.status)
+    {
+    case RequirementProjectionResolutionStatus::Resolved:
+        outType = as<Type>(resolution.value);
+        SLANG_RELEASE_ASSERT(outType);
+        return RequirementLookupStatus::Found;
+    case RequirementProjectionResolutionStatus::Unchanged:
+        return RequirementLookupStatus::Unavailable;
+    case RequirementProjectionResolutionStatus::Failed:
+        return RequirementLookupStatus::Failed;
+    }
+    SLANG_UNREACHABLE("unhandled requirement projection resolution result");
+}
+
+SemanticsVisitor::RequirementProjectionResolutionResult SemanticsVisitor::
+    ensureAndResolveRequirementProjection(Val* value)
+{
+    RequirementProjectionResolutionResult result;
+    result.value = value;
+    if (!value)
+        return result;
+
+    auto resolvedValue = value->resolve();
+    result.value = resolvedValue;
+
+    SubtypeWitness* conformanceWitness = nullptr;
+    DeclRef<Decl> requirementDeclRef;
+    bool resultMustBeType = false;
+
+    if (auto declRefType = as<DeclRefType>(resolvedValue))
+    {
+        resultMustBeType = true;
+        if (auto lookupDeclRef = SubstitutionSet(declRefType->getDeclRef()).findLookupDeclRef())
+        {
+            conformanceWitness = lookupDeclRef->getWitness();
+            requirementDeclRef = DeclRef<Decl>(lookupDeclRef);
+        }
+    }
+    else if (auto declRef = as<DeclRefBase>(resolvedValue))
+    {
+        if (auto lookupDeclRef = SubstitutionSet(declRef).findLookupDeclRef())
+        {
+            conformanceWitness = lookupDeclRef->getWitness();
+            requirementDeclRef = DeclRef<Decl>(lookupDeclRef);
+        }
+    }
+    else if (auto witnessLookupValue = as<WitnessLookupIntVal>(resolvedValue))
+    {
+        conformanceWitness = witnessLookupValue->getWitness();
+        requirementDeclRef = makeDeclRef(witnessLookupValue->getKey());
+    }
+
+    // The value is already as structurally resolved as ordinary canonicalization requires. This
+    // includes aliases and every value that is not a conformance-requirement projection.
+    if (!conformanceWitness || !requirementDeclRef)
+    {
+        result.status = RequirementProjectionResolutionStatus::Resolved;
+        return result;
+    }
+
+    auto lookupResult = ensureAndLookupRequirementWitness(conformanceWitness, requirementDeclRef);
+    switch (lookupResult.status)
+    {
+    case RequirementLookupStatus::Unavailable:
+    case RequirementLookupStatus::Recursive:
+        // Neither result provides a concrete value: the former path is not forceable here, while
+        // the latter is owned by an enclosing request. Both must remain symbolic for the caller.
+        return result;
+    case RequirementLookupStatus::Failed:
+        result.status = RequirementProjectionResolutionStatus::Failed;
+        return result;
+    case RequirementLookupStatus::Found:
+        break;
+    }
+
+    // A successful force invalidates the ordinary resolution cache, so first let the existing
+    // `Val` machinery rebuild any enclosing `MemberDeclRef` or `GenericAppDeclRef`. Direct
+    // projections fall back to extracting the value from `RequirementWitness` below.
+    auto resolvedAfterLookup = resolvedValue->resolve();
+    if (resolvedAfterLookup != resolvedValue)
+    {
+        // Each recursive step removes at least one alias, member, or generic wrapper that ordinary
+        // resolution could not simplify before the witness was published. `Val::resolve()` caches
+        // one canonical result per epoch, so a wrapper cannot reappear or alternate with an earlier
+        // representation.
+        return ensureAndResolveRequirementProjection(resolvedAfterLookup);
+    }
+
+    Val* satisfyingValue = nullptr;
+    switch (lookupResult.witness.getFlavor())
+    {
+    case RequirementWitness::Flavor::none:
+    case RequirementWitness::Flavor::witnessTable:
+        // Optional and inherited-interface requirements can be found structurally without naming
+        // a satisfying value. They are not value projections, so leave the input symbolic.
+        return result;
+    case RequirementWitness::Flavor::declRef:
+        satisfyingValue = lookupResult.witness.getDeclRef().declRefBase;
+        break;
+    case RequirementWitness::Flavor::val:
+        satisfyingValue = lookupResult.witness.getVal();
+        break;
+    default:
+        SLANG_UNEXPECTED("unknown requirement witness flavor");
+    }
+
+    if (resultMustBeType)
+    {
+        if (auto satisfyingType = as<Type>(satisfyingValue))
+            result.value = satisfyingType;
+        else if (auto satisfyingDeclRef = as<DeclRefBase>(satisfyingValue))
+            result.value = DeclRefType::create(m_astBuilder, DeclRef<Decl>(satisfyingDeclRef));
+        else
+            SLANG_UNEXPECTED("associated-type requirement did not produce a type");
+    }
+    else
+    {
+        result.value = satisfyingValue;
+    }
+    result.status = RequirementProjectionResolutionStatus::Resolved;
+    return result;
+}
+
 RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     ConformanceCheckingContext* context,
     Type* subType,
     Type* superInterfaceType,
     InheritanceDecl* inheritanceDecl,
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
-    SubtypeWitness* subTypeConformsToSuperInterfaceWitnes)
+    SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
 {
-    // Has somebody already checked this conformance,
-    // and/or is in the middle of checking it?
+    // A table is registered before its members are checked so recursive interface paths can reuse
+    // it. Registration alone is not completion: on-demand projection lookup may have prepared a
+    // nested table whose requirements still need to be checked here.
     RefPtr<WitnessTable> witnessTable;
     if (context->mapInterfaceToWitnessTable.tryGetValue(superInterfaceDeclRef, witnessTable))
-        return witnessTable;
+    {
+        auto registeredState =
+            getShared()->m_mapWitnessTableToConformanceInterfaceCheckingState.tryGetValue(
+                witnessTable);
+        SLANG_RELEASE_ASSERT(registeredState);
+        switch ((*registeredState)->status)
+        {
+        case ConformanceInterfaceCheckStatus::Checking:
+        case ConformanceInterfaceCheckStatus::Succeeded:
+            return witnessTable;
+        case ConformanceInterfaceCheckStatus::Failed:
+            return nullptr;
+        case ConformanceInterfaceCheckStatus::Unchecked:
+            break;
+        }
+    }
 
     // We need to check the declaration of the interface
     // before we can check that we conform to it.
@@ -10650,18 +11382,32 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     // *before* we go about checking fine-grained requirements,
     // in order to short-circuit any potential for infinite recursion.
 
-    // Note: we will re-use the witnes table attached to the inheritance decl,
-    // if there is one. This catches cases where semantic checking might
-    // have synthesized some of the conformance witnesses for us.
+    // Reuse a table already registered for this interface first. Otherwise, use a table attached
+    // to the inheritance declaration when earlier semantic work has synthesized entries there,
+    // and allocate a new table only when neither source exists.
     //
-    witnessTable = inheritanceDecl->witnessTable;
     if (!witnessTable)
     {
-        witnessTable = new WitnessTable();
-        witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
-        witnessTable->witnessedType = subType;
+        witnessTable = inheritanceDecl->witnessTable;
+        if (!witnessTable)
+        {
+            witnessTable = new WitnessTable();
+            witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
+            witnessTable->witnessedType = subType;
+        }
+        context->mapInterfaceToWitnessTable.add(superInterfaceDeclRef, witnessTable);
     }
-    context->mapInterfaceToWitnessTable.add(superInterfaceDeclRef, witnessTable);
+
+    auto interfaceState = registerConformanceInterfaceCheckingState(
+        context,
+        subType,
+        superInterfaceType,
+        inheritanceDecl,
+        superInterfaceDeclRef,
+        witnessTable,
+        subTypeConformsToSuperInterfaceWitness);
+    SLANG_RELEASE_ASSERT(interfaceState->status == ConformanceInterfaceCheckStatus::Unchecked);
+    interfaceState->status = ConformanceInterfaceCheckStatus::Checking;
 
     if (!checkInterfaceConformance(
             context,
@@ -10669,10 +11415,14 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
             superInterfaceType,
             inheritanceDecl,
             superInterfaceDeclRef,
-            subTypeConformsToSuperInterfaceWitnes,
+            subTypeConformsToSuperInterfaceWitness,
             witnessTable))
+    {
+        interfaceState->status = ConformanceInterfaceCheckStatus::Failed;
         return nullptr;
+    }
 
+    interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
     return witnessTable;
 }
 
@@ -10685,6 +11435,15 @@ bool SemanticsVisitor::checkInterfaceConformance(
     SubtypeWitness* subTypeConformsToSuperInterfaceWitness,
     WitnessTable* witnessTable)
 {
+    registerConformanceInterfaceCheckingState(
+        context,
+        subType,
+        superInterfaceType,
+        inheritanceDecl,
+        superInterfaceDeclRef,
+        witnessTable,
+        subTypeConformsToSuperInterfaceWitness);
+
     // We need to check the declaration of the interface
     // before we can check that we conform to it.
     //
@@ -10730,6 +11489,25 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
     bool result = true;
 
+    auto ensureRequirement = [&](DeclRef<Decl> requiredMemberDeclRef) -> bool
+    {
+        auto checkResult = ensureConformanceRequirement(
+            context,
+            subType,
+            superInterfaceType,
+            inheritanceDecl,
+            superInterfaceDeclRef,
+            requiredMemberDeclRef,
+            witnessTable,
+            subTypeConformsToSuperInterfaceWitness);
+
+        // An in-progress result means that an outer request still owns this entry. Existing
+        // conformance checking already handles recursive interface paths coinductively by reusing
+        // an in-progress witness table, so preserve that policy here. The owning request will
+        // eventually record success or failure on the entry.
+        return checkResult != ConformanceRequirementCheckResult::Failed;
+    };
+
     auto checkGenericTypeConstraintRequirement = [&](Decl* requiredMemberDecl) -> bool
     {
         ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
@@ -10769,15 +11547,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
                 requiredMemberDecl);
         }
 
-        return findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        return ensureRequirement(requiredMemberDeclRef);
     };
 
     // TODO: If we ever allow for implementation inheritance,
@@ -10787,13 +11557,17 @@ bool SemanticsVisitor::checkInterfaceConformance(
     // that interface, so that all of the requirements are
     // already satisfied with inherited implementations...
 
-    // Note: we break this logic into two loops, where we first
-    // check conformance for all associated-type requirements
-    // and *then* check conformance for all other requirements.
+    // On-demand checking makes correctness less dependent on this sequence: a later requirement
+    // may force an earlier or later entry whenever it needs to inspect that entry structurally.
+    // Keeping a regular order still acts as a heuristic topological sort. It minimizes the depth of
+    // re-entrant checking and therefore the risk of reaching a valid fixpoint only after deeply
+    // nesting the native call stack.
     //
-    // Checking associated-type requirements first ensures that
-    // we can make use of the identity of the associated types
-    // when checking other members.
+    // Associated types currently come before inherited-interface tables because their identities
+    // are used broadly by member-signature and conformance checks. If an inherited-interface table
+    // needs one of those identities to become resolvable, it can force the individual associated-
+    // type entry. Reversing these first two stages is now possible, but should be motivated by
+    // examples or measurements that show it yields a shallower dependency traversal.
     //
     // TODO: There could in theory be subtle cases involving
     // circular or recursive dependency chains that make such
@@ -10816,15 +11590,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        auto requirementSatisfied = ensureRequirement(requiredMemberDeclRef);
 
         result = result && requirementSatisfied;
     }
@@ -10853,15 +11619,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredInheritanceDecl);
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        auto requirementSatisfied = ensureRequirement(requiredMemberDeclRef);
 
         result = result && requirementSatisfied;
     }
@@ -10906,15 +11664,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
-        auto requirementSatisfied = findWitnessForInterfaceRequirement(
-            context,
-            subType,
-            superInterfaceType,
-            inheritanceDecl,
-            superInterfaceDeclRef,
-            requiredMemberDeclRef,
-            witnessTable,
-            subTypeConformsToSuperInterfaceWitness);
+        auto requirementSatisfied = ensureRequirement(requiredMemberDeclRef);
 
         result = result && requirementSatisfied;
     }
@@ -10974,15 +11724,7 @@ bool SemanticsVisitor::checkInterfaceConformance(
             auto requiredInheritanceDeclRef = m_astBuilder->getLookupDeclRef(
                 subTypeConformsToSuperInterfaceWitness,
                 requiredInheritanceDecl.getDecl());
-            auto requirementSatisfied = findWitnessForInterfaceRequirement(
-                context,
-                subType,
-                superInterfaceType,
-                inheritanceDecl,
-                superInterfaceDeclRef,
-                requiredInheritanceDeclRef,
-                witnessTable,
-                subTypeConformsToSuperInterfaceWitness);
+            auto requirementSatisfied = ensureRequirement(requiredInheritanceDeclRef);
 
             result = result && requirementSatisfied;
         }
@@ -11143,29 +11885,34 @@ bool SemanticsVisitor::checkConformanceToType(
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
-            auto conformanceResult = checkInterfaceConformance(
+            auto conformanceWitnessTable = checkInterfaceConformance(
                 context,
                 subType,
                 superType,
                 inheritanceDecl,
                 superInterfaceDeclRef,
-                subIsSuperWitness,
-                witnessTable);
+                subIsSuperWitness);
+
+            // The caller supplies the declaration-context table associated with this conformance.
+            // The status-owning overload above must either validate that same table or report
+            // failure; silently replacing it would split one conformance across two tables.
+            SLANG_RELEASE_ASSERT(
+                !conformanceWitnessTable || conformanceWitnessTable.Ptr() == witnessTable);
 
             // If the interface is IDifferentiable, perform additional
             // derivative member checking now that the associated types
             // (including .Differential) have been resolved.
-            if (conformanceResult)
+            if (conformanceWitnessTable)
             {
                 _checkDifferentialConformance(
                     context,
                     subType,
                     inheritanceDecl,
                     superInterfaceDeclRef,
-                    witnessTable);
+                    conformanceWitnessTable);
             }
 
-            return conformanceResult;
+            return conformanceWitnessTable != nullptr;
         }
         else if (auto superStructDeclRef = superTypeDeclRef.as<StructDecl>())
         {
@@ -11196,7 +11943,6 @@ bool SemanticsVisitor::checkConformance(
     ContainerDecl* parentDecl)
 {
     auto superType = inheritanceDecl->base.type;
-    DeclRef<Decl> declRefForSubTypeWitness;
 
     if (auto declRefType = as<DeclRefType>(subType))
     {
@@ -11277,41 +12023,15 @@ bool SemanticsVisitor::checkConformance(
         }
     }
 
-    // Look at the type being inherited from, and validate
-    // appropriately.
-    //
-    if (!declRefForSubTypeWitness)
-    {
-        declRefForSubTypeWitness = makeDeclRef(inheritanceDecl);
-        declRefForSubTypeWitness =
-            createDefaultSubstitutionsIfNeeded(m_astBuilder, this, declRefForSubTypeWitness)
-                .as<InheritanceDecl>();
-    }
-    DeclaredSubtypeWitness* subIsSuperWitness =
-        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, declRefForSubTypeWitness);
-
-    ConformanceCheckingContext context;
-    context.conformingType = subType;
-    context.parentDecl = parentDecl;
-    context.conformingWitness = subIsSuperWitness;
-
+    auto context = getOrCreateConformanceCheckingContext(subType, inheritanceDecl, parentDecl);
     RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
-    if (!witnessTable)
-    {
-        witnessTable = new WitnessTable();
-        witnessTable->baseType = superType;
-        witnessTable->witnessedType = subType;
-        witnessTable->isExtern =
-            (!_doesTypeDeclHaveDefinition(parentDecl) && parentDecl->hasModifier<ExternModifier>());
-        inheritanceDecl->witnessTable = witnessTable;
-    }
 
     if (!checkConformanceToType(
-            &context,
+            context,
             subType,
             inheritanceDecl,
             superType,
-            subIsSuperWitness,
+            context->conformingWitness,
             witnessTable))
     {
         return false;
@@ -15513,6 +16233,30 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
     }
 }
 
+// True if `name` is an *actual* operator: a name that can appear as the operator in a prefix,
+// postfix, or infix operator expression (`-a`, `a++`, `a + b`). This is intentionally not every
+// name that may be spelled with `operator <op>` syntax -- `operator()`, `operator[]`/`__subscript`,
+// and `operator=` are written that way for historical reasons but are not operators in this sense
+// (call and subscript are resolved by member lookup on the operand; assignment is checked as an
+// `AssignExpr`), so this predicate returns false for them.
+static bool isOperatorName(Name* name)
+{
+    if (!name)
+        return false;
+    auto text = name->text.getUnownedSlice();
+    static const char* const kOperatorNames[] = {
+        "+",  "-",  "*",  "/",   "%",   "!",  "~",  "<<", ">>", "==", "!=", ">",
+        "<",  ">=", "<=", "&&",  "||",  "&",  "|",  "^",  "++", "--", "+=", "-=",
+        "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^=", ",",  "?:",
+    };
+    for (auto op : kOperatorNames)
+    {
+        if (text == op)
+            return true;
+    }
+    return false;
+}
+
 // True if `name` is an operator that can appear in prefix (unary) position:
 // `-`, `+`, `~`, or `!`. These are the unary operators the core module declares
 // with `__prefix` and that a user may overload. `~`/`!` are unary-only, while
@@ -15575,6 +16319,27 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     auto prefixModifier = m_astBuilder->create<PrefixModifier>();
     prefixModifier->loc = decl->loc;
     addModifier(decl, prefixModifier);
+}
+
+// Diagnose an operator function declared as a member of a type or extension. A prefix/postfix/infix
+// operator call site (`a + b`) resolves the operator name only through the enclosing lexical
+// scopes, never by member lookup on the operand type, so an operator declared as a member can never
+// be found from such a call and the user hits a confusing "no overload" at every use. We reject it
+// at the declaration and steer the user to the free-function spelling instead (see #12761).
+void SemanticsDeclHeaderVisitor::maybeDiagnoseOperatorDeclaredAsMember(FuncDecl* decl)
+{
+    // Only an actual operator name is relevant; `operator()`/`__subscript` (member-looked-up) and
+    // ordinary function names are not.
+    if (!isOperatorName(decl->getName()))
+        return;
+
+    // `getParentAggTypeDeclBase` (which walks past a wrapping `GenericDecl`) is null at
+    // module/namespace scope -- where a free operator function is the supported form -- and
+    // non-null for a type/interface/extension member.
+    if (getParentAggTypeDeclBase(decl) == nullptr)
+        return;
+
+    getSink()->diagnose(Diagnostics::OperatorDeclaredAsMember{.decl = decl});
 }
 
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
@@ -15696,6 +16461,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     }
 
     checkCallableDeclCommon(funcDecl);
+    maybeDiagnoseOperatorDeclaredAsMember(funcDecl);
 }
 
 IntegerLiteralValue SemanticsVisitor::GetMinBound(IntVal* val)
@@ -17056,8 +17822,11 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
 
     if (getText(moduleDecl->getName()) == "glsl")
     {
-        getShared()->glslModuleDecl = moduleDecl;
-        getShared()->m_isGLSLModuleImported = true;
+        // This is deliberately narrower than selecting GLSL as the source language. The parser
+        // has already run, and all other language-dependent behavior continues to use the
+        // translation unit's effective `sourceLanguage`. Retain only the historical effect that
+        // importing this module enables GLSL's builtin operator rules.
+        getShared()->m_hasImportedGLSLModule = true;
     }
 
     importedModulesList.add(moduleDecl);
@@ -17101,6 +17870,7 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     auto name = decl->moduleNameAndLoc.name;
     if (!name)
         return;
+
     auto scope = getModuleDecl(decl)->ownedScope;
 
     // Try to load a module matching the name
@@ -17637,6 +18407,17 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
             m_mapTypePairToImplicitCastMethod.remove(key);
         }
     }
+}
+
+void SharedSemanticsContext::registerSynthesizedDeclRoot(Decl* decl)
+{
+    SLANG_RELEASE_ASSERT(decl);
+    SLANG_RELEASE_ASSERT(m_module);
+    SLANG_RELEASE_ASSERT(!as<GenericDecl>(decl->parentDecl));
+    SLANG_RELEASE_ASSERT(getModuleDecl(decl) == m_module->getModuleDecl());
+
+    if (m_synthesizedDeclRootSet.add(decl))
+        m_synthesizedDeclRoots.add(decl);
 }
 
 void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
@@ -19816,6 +20597,50 @@ bool tryCheckDerivativeOfAttributeImpl(
 
 void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
+    // This producer check is selected by the semantic `GLSLAtomicUintType`, independently of the
+    // source language. A supported GLSL global atomic counter has a `layout(binding = ...)`
+    // modifier; parsing that modifier also creates an explicit or implicit offset that the checked
+    // modifier and parameter-layout paths preserve for the backing-storage rewrite. By contrast,
+    // `import glsl; atomic_uint counter;` in Slang source creates the same semantic type but does
+    // not pass through that GLSL layout producer, so it is deliberately rejected here. Otherwise
+    // the declaration would become a decoration-less `kIROp_GLSLAtomicUintType` global that no
+    // target can emit.
+    //
+    // Existing atomic-counter legalization supports only directly-declared globals. Reject arrays
+    // at this producer boundary even when they have a binding; otherwise their element type
+    // remains an unhandled placeholder at emission. Supporting arrays requires a corresponding
+    // aggregate representation and legalization design, not a recursive scan in the linker.
+    if (isGlobalDecl(varDecl))
+    {
+        Type* declaredType = varDecl->getType();
+        Type* arrayElementType = unwrapArrayType(declaredType);
+        if (as<GLSLAtomicUintType>(arrayElementType))
+        {
+            const bool isAtomicCounterArray = as<ArrayExpressionType>(declaredType) != nullptr;
+            if (isAtomicCounterArray)
+            {
+                getSink()->diagnose(Diagnostics::GlslAtomicCounterArraysNotSupported{
+                    .location = varDecl->nameAndLoc.loc});
+            }
+            else
+            {
+                const bool hasBinding = varDecl->findModifier<GLSLBindingAttribute>() != nullptr;
+                const bool hasOffset =
+                    varDecl->findModifier<GLSLOffsetLayoutAttribute>() != nullptr;
+
+                // The earlier ModifiersChecked phase emits MissingLayoutBindingModifier for
+                // `hasOffset && !hasBinding`. Diagnose the remaining binding-less shape here:
+                // `!hasOffset && !hasBinding`, such as an `atomic_uint` introduced into Slang
+                // source by `import glsl`. A binding-producing GLSL declaration has both.
+                if (!hasBinding && !hasOffset)
+                {
+                    getSink()->diagnose(Diagnostics::GlslAtomicCounterRequiresBinding{
+                        .location = varDecl->nameAndLoc.loc});
+                }
+            }
+        }
+    }
+
     bool hasSpecConstAttr = false;
     bool hasPushConstAttr = false;
     for (auto modifier : varDecl->modifiers)
@@ -20140,6 +20965,60 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     return true;
 }
 
+// Options that control bitfield-packing behavior.
+//
+// `getEffectiveBitfieldPackingRules` selects a rule from the compilation options, and
+// `getBitfieldPackingOptions` maps that rule to these two choices.
+struct BitfieldPackingOptions
+{
+    bool shouldPackBitfieldsMSBFirst = false;
+    bool shouldStartNewBitfieldStorageOnTypeSizeChange = false;
+};
+
+// Resolve the packing rules indicated by the given compilation options.
+//
+// We consider these options from highest to lowest precedence:
+// - An explicit `BitfieldPackingRules` option takes precedence, including when its value is
+//   `Default`. Its command-line spelling is `-bitfield-packing-rules`.
+// - A true `UseMSVCStyleBitfieldPacking` option selects `LegacyMSBFirstMSVC` when no explicit
+//   rule is present. Its command-line spelling is `-msvc-style-bitfield-packing`.
+// - The `Default` rules apply when neither option selects a rule.
+static slang::BitfieldPackingRules getEffectiveBitfieldPackingRules(CompilerOptionSet& optionSet)
+{
+    if (optionSet.hasOption(CompilerOptionName::BitfieldPackingRules))
+    {
+        return optionSet.getEnumOption<slang::BitfieldPackingRules>(
+            CompilerOptionName::BitfieldPackingRules);
+    }
+    if (optionSet.getBoolOption(CompilerOptionName::UseMSVCStyleBitfieldPacking))
+        return slang::BitfieldPackingRules::LegacyMSBFirstMSVC;
+    return slang::BitfieldPackingRules::Default;
+}
+
+// Map a bitfield-packing rules enumerant to the packing options it implies.
+static BitfieldPackingOptions getBitfieldPackingOptions(slang::BitfieldPackingRules rules)
+{
+    switch (rules)
+    {
+    case slang::BitfieldPackingRules::Default:
+        return {
+            .shouldPackBitfieldsMSBFirst = false,
+            .shouldStartNewBitfieldStorageOnTypeSizeChange = false,
+        };
+    case slang::BitfieldPackingRules::MSVC:
+        return {
+            .shouldPackBitfieldsMSBFirst = false,
+            .shouldStartNewBitfieldStorageOnTypeSizeChange = true,
+        };
+    case slang::BitfieldPackingRules::LegacyMSBFirstMSVC:
+        return {
+            .shouldPackBitfieldsMSBFirst = true,
+            .shouldStartNewBitfieldStorageOnTypeSizeChange = true,
+        };
+    }
+    SLANG_UNREACHABLE("invalid bitfield packing rules");
+}
+
 void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 {
     // add the member initialize constructor here to avoid circular checking logic
@@ -20161,9 +21040,10 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         checkRayPayloadStructFields(structDecl);
     }
 
-    // Check if we should use MSVC-style bitfield packing
-    const bool useMSVCPacking =
-        getOptionSet().getBoolOption(CompilerOptionName::UseMSVCStyleBitfieldPacking);
+    // We group adjacent bitfields into synthesized backing integers. The selected rules tell us
+    // where to place each bitfield within its backing integer and when to start another one.
+    const auto bitfieldPackingRules = getEffectiveBitfieldPackingRules(getOptionSet());
+    const auto bitfieldPackingOptions = getBitfieldPackingOptions(bitfieldPackingRules);
 
     int backingWidth = 0;
     [[maybe_unused]] int totalWidth = 0;
@@ -20178,7 +21058,16 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 
     int memberIndex = 0;
     int backing_nonce = 0;
-    const auto dispatchSomeBitPackedMembers = [&]()
+
+    // Some packing rules start a new backing integer when the declared bitfield type changes
+    // size. Consider `uint8_t a : 7; uint32_t b : 1;`: the type width changes from 8 to 32 bits.
+    // We track the type width of the preceding bitfield in the current group. Zero means there
+    // is no preceding bitfield, since every built-in integer type has a nonzero bit width.
+    int previousFieldTypeWidth = 0;
+
+    // We insert a backing integer and assign bit offsets when the current group is nonempty.
+    // The helper then clears the accumulated state so the next group starts fresh.
+    const auto finishBitfieldGroup = [&]()
     {
         SLANG_ASSERT(totalWidth <= backingWidth);
         SLANG_ASSERT(backingWidth <= 64);
@@ -20224,9 +21113,10 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             backingMember->parentDecl = structDecl;
             const auto backingMemberDeclRef = DeclRef<VarDecl>(backingMember->getDefaultDeclRef());
 
-            if (useMSVCPacking)
+            if (bitfieldPackingOptions.shouldPackBitfieldsMSBFirst)
             {
-                // MSVC packs from MSB to LSB
+                // With MSB-first packing, the first declared field occupies the high bits of the
+                // backing integer. We count downward by each field's width to assign offsets.
                 int currentBitPosition = backingWidth;
                 for (const auto& m : groupInfo)
                 {
@@ -20239,7 +21129,8 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             }
             else
             {
-                // GCC/Clang pack from LSB to MSB
+                // With LSB-first packing, the first declared field occupies the low bits of the
+                // backing integer. We count upward by each field's width to assign offsets.
                 int bottomOfMember = 0;
                 for (const auto& m : groupInfo)
                 {
@@ -20261,38 +21152,35 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             ++memberIndex;
         }
 
-        // Reset everything
+        // Clear the group's widths and members. The next group has no preceding field type width.
         backingWidth = 0;
         totalWidth = 0;
         groupInfo.clear();
+        previousFieldTypeWidth = 0;
     };
-
-    int previousFieldTypeWidth = 0; // Track the type width of the previous bitfield for MSVC mode
 
     for (; memberIndex < structDecl->getDirectMemberDeclCount(); ++memberIndex)
     {
         const auto& m = structDecl->getDirectMemberDecl(memberIndex);
 
-        // We can trivially skip any non-property decls
+        // A non-property declaration adds no bits to the group. A variable ends the group.
         const auto v = as<PropertyDecl>(m);
         if (!v)
         {
-            // If this is a non-bitfield member then finish the current group
             if (as<VarDecl>(m))
-                dispatchSomeBitPackedMembers();
+                finishBitfieldGroup();
             continue;
         }
 
         const auto bfm = m->findModifier<BitFieldModifier>();
-        // If there isn't a bit field modifier, then dispatch the
-        // current group and continue
+        // An ordinary property ends the current bitfield group.
         if (!bfm)
         {
-            dispatchSomeBitPackedMembers();
+            finishBitfieldGroup();
             continue;
         }
 
-        // Verify that this makes sense as a bitfield
+        // A bitfield property must have an integral declared type.
         const auto t = v->type.type->getCanonicalType();
         SLANG_ASSERT(t);
         const auto b = as<BasicExpressionType>(t);
@@ -20309,7 +21197,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             continue;
         }
 
-        // The bit width of this member, and the member type width
+        // The declared bit width cannot exceed the width of its underlying integer type.
         const auto thisFieldWidth = bfm->width;
         const auto thisFieldTypeWidth = getMaximumTypeBitSize(b);
         SLANG_ASSERT(thisFieldTypeWidth != 0);
@@ -20320,45 +21208,43 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
                 .type = t,
                 .typeWidth = (int64_t)thisFieldTypeWidth,
                 .location = v->loc});
-            // Not much we can do with this field, just ignore it
+            // An oversized field cannot join a backing group.
             continue;
         }
 
-        // At this point we're sure that we have a bit field,
-        // update our bit packing state
-
-        // If there's a 0 width type, dispatch the current group
+        // A zero-width bitfield ends the preceding group. This group break does not implement
+        // MSVC's alignment rule for zero-width fields, so the MSVC mode diagnoses the field.
         if (thisFieldWidth == 0)
         {
-            dispatchSomeBitPackedMembers();
-            previousFieldTypeWidth = 0;
+            if (bitfieldPackingRules == slang::BitfieldPackingRules::MSVC)
+            {
+                getSink()->diagnose(
+                    Diagnostics::ZeroWidthBitFieldUnsupportedInMsvcPacking{.location = bfm->loc});
+            }
+            finishBitfieldGroup();
         }
 
-        // MSVC-specific behavior: start a new backing field if the type size changes
-        if (useMSVCPacking && groupInfo.getCount() > 0 &&
-            thisFieldTypeWidth != previousFieldTypeWidth)
+        // Some packing rules start a new backing field if the declared type size changes.
+        if (bitfieldPackingOptions.shouldStartNewBitfieldStorageOnTypeSizeChange &&
+            groupInfo.getCount() > 0 && thisFieldTypeWidth != previousFieldTypeWidth)
         {
-            dispatchSomeBitPackedMembers();
+            finishBitfieldGroup();
         }
 
-        // If this member wouldn't fit into the current group, dispatch
-        // everything so far;
+        // If this member would not fit in the current backing integer, finish the group first.
         if (totalWidth + thisFieldWidth > std::max(thisFieldTypeWidth, backingWidth))
-            dispatchSomeBitPackedMembers();
+            finishBitfieldGroup();
 
-        // Add this member to the group,
-        // Grow the backing width if necessary
+        // The backing integer must fit the widest declared type in the group, while totalWidth
+        // records how many of its bits the bitfields use.
         backingWidth = std::max(thisFieldTypeWidth, backingWidth);
-        // Grow the total width
         totalWidth += int(thisFieldWidth);
         groupInfo.add({memberIndex, int(thisFieldWidth), t, bfm});
 
-        // Track the type width for MSVC mode
         previousFieldTypeWidth = thisFieldTypeWidth;
     }
-    // If the struct ended with a bitpacked member, then make sure we don't forget the last
-    // group
-    dispatchSomeBitPackedMembers();
+    // Finish any bitfield group still open after the last member.
+    finishBitfieldGroup();
 }
 
 void SemanticsDeclDifferentialAttributesVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)

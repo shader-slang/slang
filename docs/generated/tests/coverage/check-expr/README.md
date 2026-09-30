@@ -95,7 +95,7 @@ profile. Prefer that two-step check over trusting the profile alone.
   only with pathological deeply-nested types / recursive generic
   evaluation; they are stress-limit guards rather than ordinary
   expression-checking behaviour and are out of scope for this bundle.
-- **Dead code — `visitThisTypeExpr`** (`slang-check-expr.cpp:9135`, 23
+- **Dead code — `visitThisTypeExpr`** (`slang-check-expr.cpp:9191`, 26
   lines, 0% covered). Nothing in the repository ever constructs a
   `ThisTypeExpr`: the only mentions outside this visitor are the class
   declaration in `slang-ast-expr.h`, the visitor declaration in
@@ -153,3 +153,19 @@ profile. Prefer that two-step check over trusting the profile alone.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 18 commits touched its watched paths in between; all
+22 existing tests still pass.
+
+Two diagnostics new since the base commit are raised from
+`slang-check-expr.cpp` -- E29118 (zero-operand `spirv_asm` opcode given
+operands) and E30087 (casting literal 0 to a struct type under Slang 202c) --
+and both are already pinned by hand-written tests. The rest of the window is
+compile-time work on the `Val`/type DAG (#12106 and its follow-up #12877) whose
+observable surface is performance, not behaviour. No test was added.
+
+One citation had drifted: the dead `visitThisTypeExpr` is at
+`slang-check-expr.cpp:9191` and is 26 lines, not `:9135` and 23 lines.

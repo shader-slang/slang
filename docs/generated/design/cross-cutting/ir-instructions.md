@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:32:00Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 32a6f83c708fb280660629cff147cc6b41bd0816fc7f889340630eb73cb6b9f1
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 6cc1f27b7c4044abad70fcc276f1e5ca521a9a4af4fef418ff0928c79ae44053
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -322,6 +322,28 @@ why hoistable emitters are named `get*` (`getPoison`,
 `getBuiltinRequirementKey`) rather than `emit*`: they may return an
 existing deduplicated inst instead of creating a new one.
 
+Deduplication of a hoistable inst is structural, over the operand list
+as written, so an opcode whose operands are conceptually an unordered
+*set* only dedupes if every producer emits the members in one canonical
+order. That is what `IRBuilder::getSet` is for: it takes a `HashSet`,
+sorts by `getUniqueID`, and builds the inst from the sorted list.
+`getSetFromSortedElements`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7573) is the
+same thing for a caller that already holds a canonical list, skipping
+the intermediate hash set and the sort. Its precondition — strictly
+increasing by `getUniqueID`, duplicate-free, and all global — is the
+caller's to keep, and the failure mode if they do not is quiet: a
+non-canonical operand list yields a set inst that hash-consing cannot
+match against its structural equals, so pointer identity silently stops
+holding. The definition checks what it cheaply can and is explicit that
+the checks do not add up to the contract: globality and
+adjacent-duplicate checks run in every build, but the
+adjacent-duplicate test is only a complete duplicate check *given* the
+ordering, and the ordering itself is verified in debug builds only — and
+even then only by reading the module's existing unique-ID map, because
+calling `getUniqueID` here would hand out IDs earlier than the normal
+path and perturb the canonical order of unrelated sets.
+
 ## Decorations
 
 A number of opcodes are conceptually *decorations*: every entry in the
@@ -378,7 +400,27 @@ version of module regarding semantics and doesn't have anything to do
 with serialization format". `IRModule` holds the range as
 `k_minSupportedModuleVersion` (4) and `k_maxSupportedModuleVersion`
 (28), and a freshly built module records `m_version =
-k_maxSupportedModuleVersion`. The design rationale is in
+k_maxSupportedModuleVersion`.
+
+Growing an *existing* instruction is a third case, distinct from both
+adding and removing one, and it need not move the range at all. The
+mechanism is an optional trailing operand read through a
+count-checking accessor. `IRDebugFunction` is the worked example: it
+gained a sixth operand for the function's lexical parent scope, and
+`getParentScope`
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
+2826) is written as `getOperandCount() > 5 ? getOperand(5) : nullptr`,
+so a `DebugFunction` from an IR blob that predates the operand simply
+reads as having no parent scope. The emitter cooperates by never
+storing a null in the slot — `IRBuilder::emitDebugFunction` builds the
+five-operand form when no scope was recorded and the six-operand form
+otherwise — which keeps "absent" and "present but null" from becoming
+two different encodings of the same thing. Null is a real outcome
+here rather than an error: at `Minimal` debug level no compilation
+units exist at all, and a function whose source has no compilation
+unit of its own (an `#include`d or `#line`-remapped source) has no
+scope to name. Correspondingly, adding that operand did not change
+`k_maxSupportedModuleVersion`. The design rationale is in
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).
 
 ## Adding a new opcode

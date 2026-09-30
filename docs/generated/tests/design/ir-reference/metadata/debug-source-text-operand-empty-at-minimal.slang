@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#debugsource
-//META: doc_section_digest=b5f9379c3ae784a8c84d746fdd7054d5fed6c514b77fb98e7c2882abd3165834
+//META: doc_section_digest=c3e1ce68343ea764de69074a2743917e1632704b0d47873ab2035e3408e6691d
 //META: purpose=Compiling at -g1 leaves the DebugSource text operand an empty string, so the record carries the path without a copy of the file.
 //META: intent=boundary
 //META: pipeline_stage=lower

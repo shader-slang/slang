@@ -67,6 +67,8 @@ The Slang project provides a variety of different [documentation](docs/), but mo
 
 For developers writing Slang code, the [Slang Core Module Reference](https://shader-slang.com/stdlib-reference/) provides detailed documentation on Slang's built-in types and functions.
 
+Agent Skills-compatible assistants can use the [Slang user skills](https://github.com/shader-slang/slang-user-skills); Slang binary release packages include a tested snapshot under `share/slang/agent-skills` for optional, explicit installation.
+
 We also provide a few [examples](examples/) of how to integrate Slang into a rendering application.
 
 These examples use a graphics layer that we include with Slang called "GFX" which is an abstraction library of various graphics APIs (D3D11, D2D12, OpenGL, Vulkan, CUDA, and the CPU) to support cross-platform applications using GPU graphics and compute capabilities.
@@ -118,8 +120,7 @@ Slang can compile shader code to the following targets:
 
 > \*\*WGSL support is still work in-progress.
 
-For greater detail, see the [Supported Compilation
-Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
+For greater detail, see the [Supported Compilation Targets](https://shader-slang.com/slang/user-guide/targets.html) section of the
 [User Guide](https://shader-slang.github.io/slang/user-guide/)
 
 The Slang project has been used for production applications and large shader
@@ -136,9 +137,11 @@ The Slang code itself is under the Apache 2.0 with LLVM Exception license (see [
 Builds of the core Slang tools depend on the following projects, either automatically or optionally, which may have their own licenses:
 
 - [`ankerl::unordered_dense::{map, set}`](https://github.com/martinus/unordered_dense) (MIT)
+- [`cmark-gfm`](https://github.com/swiftlang/swift-cmark) (BSD 2-Clause and MIT)
 - [`fast_float`](https://github.com/fastfloat/fast_float) (Apache 2.0 / MIT / Boost)
 - [`glslang`](https://github.com/KhronosGroup/glslang) (BSD)
 - [`lz4`](https://github.com/lz4/lz4) (BSD)
+- [`mimalloc`](https://github.com/microsoft/mimalloc) (MIT)
 - [`miniz`](https://github.com/richgel999/miniz) (MIT)
 - [`spirv-headers`](https://github.com/KhronosGroup/SPIRV-Headers) (Modified MIT)
 - [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)

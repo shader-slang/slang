@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:18:32Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 72308d5b1cf5b2f873570484f93cd6c423c9d145955c7dd61b2a25d788038770
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 671b9ed682adbf414a55ec67fa68b82abc91c2aea9c886087f23ead3285a7c2d
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -266,6 +266,46 @@ names a state of the severity machinery, not a form of output.
 `fatal error` and `internal error` are printed and then abort the
 compile through `SLANG_ABORT_COMPILATION`.
 
+`fatal error` is the one rendered name with no single obvious trigger,
+so it is worth saying where it comes from. There are two routes.
+
+The first is a diagnostic declared with the `fatal` helper rather than
+`err`. Nine exist in
+[slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua):
+
+| Code | Name | Message |
+| --- | --- | --- |
+| E39901 | `cannot-process-include` | internal compiler error: cannot process `__include` in the current semantic checking context |
+| E39997 | `maximum-type-nesting-level-exceeded` | maximum type nesting level exceeded |
+| E40002 | `cyclic-reference` | cyclic reference `'~decl'` |
+| E40003 | `compilation-ceased` | compilation ceased |
+| E40030 | `function-never-returns-fatal` | function never returns |
+| E51701 | `cooperative-matrix-unsupported-capture` | `CoopMat.MapElement` per-element function cannot capture buffers, resources or any opaque type values |
+| E55206 | `generic-specialization-recursion-cycle` | recursive generic specialization detected |
+| E55207 | `generic-specialization-budget-exceeded` | generic specialization exceeded maximum depth |
+| E56003 | `use-of-uninitialized-opaque-handle` | use of uninitialized opaque handle |
+
+Read that table as a list of candidates, not of guarantees. The `fatal`
+helper fixes the *declared* severity; whether a given compile reaches
+the raise site, and whether something upstream recovers first, is
+decided in the checking and IR passes that raise them — files outside
+this document's watched paths, so this page cannot say which of the
+nine a given input will actually produce.
+
+The second route needs no declared entry at all and is fully visible
+here: `outputExceptionDiagnostic` in
+[slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
+(line 978) calls `diagnoseRaw(Severity::Fatal, "An unknown exception
+occurred")`, so any C++ exception that escapes to that boundary renders
+a code-less `fatal error: An unknown exception occurred`. It then
+catches the resulting `AbortCompilationException` itself, deliberately,
+so the abort does not leak out through `loadModule`.
+
+Note also that `getEffectiveMessageSeverity` (below) will not let a
+`-Wno-` style override lower a severity that has already reached
+`Error`, `Fatal`, or `Internal` — a fatal diagnostic cannot be
+suppressed from the command line.
+
 `DiagnosticSink::getEffectiveMessageSeverity` in
 [slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
 turns the static `DiagnosticInfo::severity` into the severity actually
@@ -420,8 +460,8 @@ cross-catalog checks. Because
 notes that "it is possible for multiple diagnostics to have the same id"
 and returns only the first added, a tool that needs to target a precise
 diagnostic should prefer the `name` over the integer id. The same
-caveat applies when *reading* output: `39999` is carried by about two
-dozen entries, `no-applicable-overload-for-name-with-args` and
+caveat applies when *reading* output: `39999` is carried by 27
+entries, `no-applicable-overload-for-name-with-args` and
 `ambiguous-overload-for-name-with-args` among them, and the rendered
 header carries the id and the message but never the name, so for a
 multi-bound code the message text is the only discriminator.

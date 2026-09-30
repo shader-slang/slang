@@ -1127,6 +1127,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // Maximum number of payload registers (32 registers = 128 bytes)
     static const int kMaxPayloadRegisters = 32;
 
+    // Maximum number of OptiX hit attribute registers (8 registers = 32 bytes). Shared by the read
+    // path (`emitOptiXAttributeFetch`) and the `ReportHit` write path.
+    static const int kMaxOptiXHitAttributeRegisters = 8;
+
     // Track payload write-back info for inout parameters
     struct PayloadWritebackInfo
     {
@@ -2190,6 +2194,177 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         EntryPointVaryingParamLegalizeContext::processEntryPoint(entryPointFunc, entryPointDecor);
     }
 
+    static bool isSupportedOptiXHitAttributeLeaf(IRBasicType* basicType)
+    {
+        switch (basicType->getBaseType())
+        {
+        case BaseType::Float:
+        case BaseType::Bool:
+        case BaseType::Int8:
+        case BaseType::Int16:
+        case BaseType::Int:
+        case BaseType::UInt8:
+        case BaseType::UInt16:
+        case BaseType::UInt:
+        case BaseType::Char:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    // OptiX has no aggregate hit-attribute ABI: attributes are passed only as individual 32-bit
+    // registers (`optixReportIntersection` / `optixGetAttribute_N`), so a `ReportHit` aggregate
+    // must be flattened into per-register scalars. Append `value`'s scalar leaves to `outLeaves` in
+    // the same order the reader (`emitOptiXAttributeFetch`) consumes registers — struct fields,
+    // then array/vector/matrix elements, in index order — so the value round-trips. Returns false
+    // (the caller diagnoses) for an unsized array or an unsupported leaf type.
+    bool flattenOptiXHitAttributes(
+        IRInst* value,
+        IRType* type,
+        IRBuilder* builder,
+        List<IRInst*>& outLeaves)
+    {
+        // Attributes are reported by value, so a scalar attribute register never round-trips a
+        // pointer: extracting a field from a pointer value would emit `(&a).x`, and dereferencing
+        // would silently change which value is reported. Reject any pointer type rather than
+        // miscompile it.
+        if (tryGetPointedToType(builder, type))
+            return false;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldVal = builder->emitFieldExtract(fieldType, value, field->getKey());
+                if (!flattenOptiXHitAttributes(fieldVal, fieldType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCountInst)
+                return false;
+            auto elementType = arrayType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCountInst->getValue(); ++ii)
+            {
+                auto idx = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(elementType, value, idx);
+                if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto matType = as<IRMatrixType>(type))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            auto colCountInst = as<IRIntLit>(matType->getColumnCount());
+            if (!rowCountInst || !colCountInst)
+                return false;
+            auto elementType = matType->getElementType();
+            auto rowType = builder->getVectorType(elementType, matType->getColumnCount());
+            for (IRIntegerValue row = 0; row < rowCountInst->getValue(); ++row)
+            {
+                auto rowIdx = builder->getIntValue(builder->getIntType(), row);
+                auto rowVal = builder->emitElementExtract(rowType, value, rowIdx);
+                for (IRIntegerValue col = 0; col < colCountInst->getValue(); ++col)
+                {
+                    auto colIdx = builder->getIntValue(builder->getIntType(), col);
+                    auto elementVal = builder->emitElementExtract(elementType, rowVal, colIdx);
+                    if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                        return false;
+                }
+            }
+            return true;
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return false;
+            auto elementType = vecType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCountInst->getValue(); ++ii)
+            {
+                auto idx = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(elementType, value, idx);
+                if (!flattenOptiXHitAttributes(elementVal, elementType, builder, outLeaves))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto basicType = as<IRBasicType>(type))
+        {
+            if (!isSupportedOptiXHitAttributeLeaf(basicType))
+                return false;
+            outLeaves.add(value);
+            return true;
+        }
+
+        return false;
+    }
+
+    // Rewrite each `ReportOptiXIntersection(tHit, hitKind, attributes)` produced by the core-module
+    // `ReportHit` into a call carrying the aggregate's flattened scalar leaves, so the CUDA emitter
+    // can render a single `optixReportIntersection(tHit, hitKind, a0..aN)`. Collect the marker
+    // insts first, then rewrite: the rewrite creates a new (already-flattened) inst that must not
+    // be re-collected, and the pass runs exactly once per module.
+    void legalizeOptiXReportIntersections(IRModule* module, DiagnosticSink* sink)
+    {
+        List<IRInst*> workList;
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+                for (auto inst : block->getChildren())
+                    if (inst->getOp() == kIROp_ReportOptiXIntersection &&
+                        inst->getOperandCount() == 3)
+                        workList.add(inst);
+        }
+
+        for (auto inst : workList)
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+
+            auto tHit = inst->getOperand(0);
+            auto hitKind = inst->getOperand(1);
+            auto attrs = inst->getOperand(2);
+
+            List<IRInst*> leaves;
+            if (!flattenOptiXHitAttributes(attrs, attrs->getDataType(), &builder, leaves))
+            {
+                sink->diagnose(
+                    Diagnostics::OptixHitAttributeTypeNotSupported{.location = inst->sourceLoc});
+                continue;
+            }
+            if (leaves.getCount() > kMaxOptiXHitAttributeRegisters)
+            {
+                sink->diagnose(Diagnostics::OptixHitAttributeTooLarge{
+                    .registerCount = int(leaves.getCount()),
+                    .location = inst->sourceLoc});
+                continue;
+            }
+
+            List<IRInst*> args;
+            args.add(tHit);
+            args.add(hitKind);
+            args.addRange(leaves);
+            auto newInst = builder.emitIntrinsicInst(
+                inst->getFullType(),
+                kIROp_ReportOptiXIntersection,
+                args.getCount(),
+                args.getBuffer());
+            newInst->sourceLoc = inst->sourceLoc;
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -2425,7 +2600,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*ioBaseAttributeIndex*/ ioBaseAttributeIndex,
                     /* type to fetch */ info.type,
                     /*the builder in use*/ &builder);
-                if (ioBaseAttributeIndex > 8)
+                if (ioBaseAttributeIndex > kMaxOptiXHitAttributeRegisters)
                 {
                     // A hit attribute is always a parameter, never a result, so
                     // `m_param` is set here; guard the deref in release too.
@@ -2626,6 +2801,12 @@ void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* si
     context.processModule(module, sink);
 }
 
+void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink)
+{
+    CUDAEntryPointVaryingParamLegalizeContext context;
+    context.legalizeOptiXReportIntersections(module, sink);
+}
+
 void depointerizeInputParams(IRFunc* entryPointFunc)
 {
     List<IRParam*> workList;
@@ -2781,7 +2962,7 @@ protected:
         SLANG_UNUSED(entryPoint);
     }
 
-    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const
+    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint)
     {
         SLANG_UNUSED(entryPoint);
     }
@@ -3791,12 +3972,14 @@ private:
         {
             auto parent = layoutDecor->parent;
             layoutDecor->removeAndDeallocate();
-            builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
+            return builder.addLayoutDecoration(parent, builder.getVarLayout(layoutOps));
         }
         return layoutDecor;
     }
 
-    // Find overlapping field semantics and legalize them
+protected:
+    // Canonicalize each field's semantic to a lowercase (name, index) pair and legalize
+    // overlapping indices
     void fixFieldSemanticsOfFlatStruct(IRStructType* structType)
     {
         // Goal is to ensure we do not have overlapping semantics for the user defined semantics:
@@ -3979,6 +4162,7 @@ private:
         }
     }
 
+private:
     void wrapReturnValueInStruct(EntryPointInfo entryPoint)
     {
         // Wrap return value into a struct if it is not already a struct.
@@ -4633,20 +4817,62 @@ protected:
         }
     }
 
+    // Inline every helper containing a DispatchMesh call into its callers until each call sits
+    // directly in an entry point, where the Metal intrinsic's `_slang_mesh_payload` and
+    // `_slang_mgp` parameters are in scope. This is module-wide and a no-op once done, so running
+    // it once per entry point is harmless. Each pass inlines each helper's current call sites
+    // once, moving every call one caller closer, so it converges unless a helper reaches itself;
+    // that recursion is normally rejected up front, but the check can be disabled, so it is
+    // asserted here rather than assumed.
+    void inlineHelpersCallingDispatchMesh(IRGlobalValueWithCode* dispatchMeshFunc) const
+    {
+        for (bool inlined = true; inlined;)
+        {
+            inlined = false;
+
+            HashSet<IRFunc*> helpers;
+            traverseUses(
+                dispatchMeshFunc,
+                [&](const IRUse* use)
+                {
+                    auto parent = getParentFunc(use->getUser());
+                    if (as<IRCall>(use->getUser()) && parent &&
+                        !parent->findDecoration<IREntryPointDecoration>())
+                        helpers.add(parent);
+                });
+            for (auto helper : helpers)
+            {
+                // Only calls of `helper`, not uses that pass it as a value.
+                traverseUses(
+                    helper,
+                    [&](const IRUse* use)
+                    {
+                        auto call = as<IRCall>(use->getUser());
+                        if (!call || call->getCallee() != helper)
+                            return;
+                        SLANG_RELEASE_ASSERT(getParentFunc(call) != helper);
+                        inlined |= inlineCall(call);
+                    });
+            }
+        }
+    }
+
     void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
     {
+        auto func = entryPoint.entryPointFunc;
+
         // Find out DispatchMesh function
         IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-        for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
+        for (const auto globalInst : func->getModule()->getGlobalInsts())
         {
-            if (const auto func = as<IRGlobalValueWithCode>(globalInst))
+            if (const auto f = as<IRGlobalValueWithCode>(globalInst))
             {
-                if (const auto dec = func->findDecoration<IRKnownBuiltinDecoration>())
+                if (const auto dec = f->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (dec->getName() == KnownBuiltinDeclName::DispatchMesh)
                     {
                         SLANG_ASSERT(!dispatchMeshFunc && "Multiple DispatchMesh functions found");
-                        dispatchMeshFunc = func;
+                        dispatchMeshFunc = f;
                     }
                 }
             }
@@ -4655,52 +4881,47 @@ protected:
         if (!dispatchMeshFunc)
             return;
 
-        IRBuilder builder{entryPoint.entryPointFunc->getModule()};
+        inlineHelpersCallingDispatchMesh(dispatchMeshFunc);
 
-        // We'll rewrite the call to use mesh_grid_properties.set_threadgroups_per_grid
+        // A module has one DispatchMesh specialization (asserted above), so every call in an
+        // entry point writes the same [[payload]] type and any one will do.
+        IRCall* dispatchCall = nullptr;
         traverseUses(
             dispatchMeshFunc,
             [&](const IRUse* use)
             {
-                if (const auto call = as<IRCall>(use->getUser()))
-                {
-                    SLANG_ASSERT(call->getArgCount() == 4);
-                    const auto payload = call->getArg(3);
-
-                    const auto payloadPtrType =
-                        composeGetters<IRPtrType>(payload, &IRInst::getDataType);
-                    SLANG_ASSERT(payloadPtrType);
-                    const auto payloadType = payloadPtrType->getValueType();
-                    SLANG_ASSERT(payloadType);
-
-                    builder.setInsertBefore(
-                        entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-                    const auto annotatedPayloadType = builder.getPtrType(
-                        kIROp_RefParamType,
-                        payloadPtrType->getValueType(),
-                        AddressSpace::MetalObjectData,
-                        payloadPtrType->getDataLayout());
-                    auto packedParam = builder.emitParam(annotatedPayloadType);
-                    builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
-                    IRVarLayout::Builder varLayoutBuilder(
-                        &builder,
-                        IRTypeLayout::Builder{&builder}.build());
-
-                    // Add the MetalPayload resource info, so we can emit [[payload]]
-                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
-                    auto paramVarLayout = varLayoutBuilder.build();
-                    builder.addLayoutDecoration(packedParam, paramVarLayout);
-
-                    // Now we replace the call to DispatchMesh with a call to the mesh grid
-                    // properties But first we need to create the parameter
-                    const auto meshGridPropertiesType = builder.getMetalMeshGridPropertiesType();
-                    auto mgp = builder.emitParam(meshGridPropertiesType);
-                    builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
-                }
+                auto call = as<IRCall>(use->getUser());
+                if (!dispatchCall && call && getParentFunc(call) == func)
+                    dispatchCall = call;
             });
+        if (!dispatchCall)
+            return; // nothing dispatches here; a helper no entry point reaches is never emitted
+
+        SLANG_ASSERT(dispatchCall->getArgCount() == 4);
+        const auto payloadPtrType = as<IRPtrTypeBase>(dispatchCall->getArg(3)->getDataType());
+        SLANG_ASSERT(payloadPtrType);
+
+        IRBuilder builder{func->getModule()};
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        const auto annotatedPayloadType = builder.getPtrType(
+            kIROp_RefParamType,
+            payloadPtrType->getValueType(),
+            AddressSpace::MetalObjectData,
+            payloadPtrType->getDataLayout());
+        auto packedParam = builder.emitParam(annotatedPayloadType);
+        builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
+        IRVarLayout::Builder varLayoutBuilder(&builder, IRTypeLayout::Builder{&builder}.build());
+
+        // Add the MetalPayload resource info, so we can emit [[payload]]
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::MetalPayload);
+        builder.addLayoutDecoration(packedParam, varLayoutBuilder.build());
+
+        // The intrinsic sets the grid size through mesh_grid_properties.set_threadgroups_per_grid
+        auto mgp = builder.emitParam(builder.getMetalMeshGridPropertiesType());
+        builder.addExternCppDecoration(mgp, toSlice("_slang_mgp"));
     }
 
-    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
+    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) SLANG_OVERRIDE
     {
         auto func = entryPoint.entryPointFunc;
 
@@ -4770,6 +4991,9 @@ protected:
 
                 verticesParam = param;
                 auto vertStruct = as<IRStructType>(vertexType);
+                // Neither an input nor the result, so nothing else canonicalizes the semantics;
+                // the case-insensitive sv_position match below still holds afterwards.
+                fixFieldSemanticsOfFlatStruct(vertStruct);
                 for (auto field : vertStruct->getFields())
                 {
                     auto key = field->getKey();
@@ -4801,6 +5025,8 @@ protected:
 
                 primitivesParam = param;
                 auto primStruct = as<IRStructType>(primitiveType);
+                // Lifted like the vertex struct above, so canonicalized the same way.
+                fixFieldSemanticsOfFlatStruct(primStruct);
                 for (auto field : primStruct->getFields())
                 {
                     auto key = field->getKey();

@@ -143,6 +143,14 @@ runner per claim:
   resolver emits multiple notes (candidate locations) alongside the
   primary error.
 
+For the legacy GLSL operator-scope claim, keep the file as Slang source and
+write `import glsl;` explicitly. Do not pass the deprecated `-allow-glsl`
+option: it now selects GLSL as the translation unit's source language and
+implicitly imports the builtin module, so combining it with `import glsl;`
+emits both a deprecation warning and a redundant-import warning. The explicit
+import alone is what exercises the non-GLSL compatibility path described by
+`isGLSLOperatorScope()`.
+
 Do not use any GPU-only directive. Do not add multi-backend
 directives — one directive per claim suffices.
 

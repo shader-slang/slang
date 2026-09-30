@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T12:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#differential-pair-construction
-//META: doc_section_digest=e2a5528190c393d3701cc8f2de7339874632f622a35e167abada2fa7bfd2e742
+//META: doc_section_digest=94baa99b60cb82fe486d311fcf1a6ed19cf37b8c6ff65ecb372a31812c6e6208
 //META: purpose=Verifies bwd_diff over a function taking an IDifferentiable struct accumulates a per-field gradient into the struct's Differential.
 //META: intent=characterization
 //META: covers=source/slang/slang-ir-autodiff-transpose.cpp

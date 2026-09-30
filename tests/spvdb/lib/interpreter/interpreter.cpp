@@ -1415,7 +1415,16 @@ StopReason Interpreter::exec_composite(const Instruction &inst)
                         panic("OpCompositeExtract index out of bounds");
                         return StopReason::Panic;
                     }
-                    comp = comp.elements[idx];
+                    // Detach the element into independent storage before
+                    // assigning it back into `comp`. Assigning directly from a
+                    // sub-object — `comp = comp.elements[idx]` or
+                    // `comp = std::move(comp.elements[idx])` — is a use-after-free:
+                    // Value's member-wise assignment handles `elements` first,
+                    // which releases the buffer the right-hand side lives in, and
+                    // then goes on to read `member_names` and `type_name` from that
+                    // destroyed element.
+                    Value elem = std::move(comp.elements[idx]);
+                    comp = std::move(elem);
                 }
                 id_map_[inst.result_id] = comp;
                 break;

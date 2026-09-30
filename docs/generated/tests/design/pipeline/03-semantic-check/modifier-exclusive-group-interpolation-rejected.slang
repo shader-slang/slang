@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#modifier-validation
-//META: doc_section_digest=233c54717a586cdba7e515d0d6fbb4c7e6363f272d4b60a4aed8b9997a298ad9
+//META: doc_section_digest=cf9986ac73585feb8d7138003d7be69083848e024e0c79dad6db42132ddad3fe
 //META: purpose=The interpolation modifiers `nointerpolation`, `noperspective`, `linear`, `sample` and `centroid` share one conflict group, so two of them on one field is rejected (E31202).
 //META: intent=negative
 //META: pipeline_stage=check
