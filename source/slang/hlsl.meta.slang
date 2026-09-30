@@ -7748,8 +7748,18 @@ T acos(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmAcos) "$P_acos($0)";
-    case cuda: __intrinsic_asm(nvvmAcos) "$P_acos($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM acos requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(acos(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_acosf", x;
+        else
+            __intrinsic_asm "__nv_acos", x;
+    case cpp: __intrinsic_asm "$P_acos($0)";
+    case cuda: __intrinsic_asm "$P_acos($0)";
     case glsl: __intrinsic_asm "acos";
     case hlsl: __intrinsic_asm "acos";
     case metal: __intrinsic_asm "acos";
@@ -8338,8 +8348,18 @@ T asin(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmAsin) "$P_asin($0)";
-    case cuda: __intrinsic_asm(nvvmAsin) "$P_asin($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM asin requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(asin(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_asinf", x;
+        else
+            __intrinsic_asm "__nv_asin", x;
+    case cpp: __intrinsic_asm "$P_asin($0)";
+    case cuda: __intrinsic_asm "$P_asin($0)";
     case glsl: __intrinsic_asm "asin";
     case hlsl: __intrinsic_asm "asin";
     case metal: __intrinsic_asm "asin";
@@ -8941,8 +8961,18 @@ T atan(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmAtan) "$P_atan($0)";
-    case cuda: __intrinsic_asm(nvvmAtan) "$P_atan($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM atan requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(atan(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_atanf", x;
+        else
+            __intrinsic_asm "__nv_atan", x;
+    case cpp: __intrinsic_asm "$P_atan($0)";
+    case cuda: __intrinsic_asm "$P_atan($0)";
     case glsl: __intrinsic_asm "atan";
     case hlsl: __intrinsic_asm "atan";
     case metal: __intrinsic_asm "atan";
@@ -8999,8 +9029,18 @@ T atan2(T y, T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmAtan2) "$P_atan2($0, $1)";
-    case cuda: __intrinsic_asm(nvvmAtan2) "$P_atan2($0, $1)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM atan2 requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(atan2(__realCast<float>(y), __realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_atan2f", y, x;
+        else
+            __intrinsic_asm "__nv_atan2", y, x;
+    case cpp: __intrinsic_asm "$P_atan2($0, $1)";
+    case cuda: __intrinsic_asm "$P_atan2($0, $1)";
     case glsl: __intrinsic_asm "atan($0,$1)";
     case hlsl: __intrinsic_asm "atan2";
     case metal: __intrinsic_asm "atan2";
@@ -9453,8 +9493,18 @@ T cos(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmCos) "$P_cos($0)";
-    case cuda: __intrinsic_asm(nvvmCos) "$P_cos($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM cos requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(cos(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_cosf", x;
+        else
+            __intrinsic_asm "__nv_cos", x;
+    case cpp: __intrinsic_asm "$P_cos($0)";
+    case cuda: __intrinsic_asm "$P_cos($0)";
     case glsl: __intrinsic_asm "cos";
     case hlsl: __intrinsic_asm "cos";
     case metal: __intrinsic_asm "cos";
@@ -9510,8 +9560,18 @@ T cosh(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmCosh) "$P_cosh($0)";
-    case cuda: __intrinsic_asm(nvvmCosh) "$P_cosh($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM cosh requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(cosh(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_coshf", x;
+        else
+            __intrinsic_asm "__nv_cosh", x;
+    case cpp: __intrinsic_asm "$P_cosh($0)";
+    case cuda: __intrinsic_asm "$P_cosh($0)";
     case glsl: __intrinsic_asm "cosh";
     case hlsl: __intrinsic_asm "cosh";
     case metal: __intrinsic_asm "cosh";
@@ -11545,8 +11605,18 @@ T fma(T a, T b, T c)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM fma requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(fma(__realCast<float>(a), __realCast<float>(b), __realCast<float>(c)));
+        else if (T is float)
+            __intrinsic_asm "__nv_fmaf", a, b, c;
+        else
+            __intrinsic_asm "__nv_fma", a, b, c;
+    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
+    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl:
         if (__isFloat<T>() || __isHalf<T>())
@@ -11657,8 +11727,18 @@ T fmod(T x, T y)
 
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFmod) "$P_fmod($0, $1)";
-    case cuda: __intrinsic_asm(nvvmFmod) "$P_fmod($0, $1)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM fmod requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(fmod(__realCast<float>(x), __realCast<float>(y)));
+        else if (T is float)
+            __intrinsic_asm "__nv_fmodf", x, y;
+        else
+            __intrinsic_asm "__nv_fmod", x, y;
+    case cpp: __intrinsic_asm "$P_fmod($0, $1)";
+    case cuda: __intrinsic_asm "$P_fmod($0, $1)";
     case glsl:
         // GLSL doesn't have a function for remainder.
         __intrinsic_asm "(($0 < 0.0) ? -mod(-$0,abs($1)) : mod($0,abs($1)))";
@@ -13071,8 +13151,9 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
+    case nvvm: return fma(mvalue, avalue, bvalue);
+    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
+    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
     case metal: __intrinsic_asm "fma";
@@ -13124,8 +13205,9 @@ T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
-    case cuda: __intrinsic_asm(nvvmFma) "$P_fma($0, $1, $2)";
+    case nvvm: return mvalue * avalue + bvalue;
+    case cpp: __intrinsic_asm "$P_fma($0, $1, $2)";
+    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
     case glsl: __intrinsic_asm "fma";
     case hlsl: __intrinsic_asm "mad";
     case spirv: return spirv_asm {
@@ -14418,8 +14500,18 @@ T pow(T x, T y)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmPow) "$P_pow($0, $1)";
-    case cuda: __intrinsic_asm(nvvmPow) "$P_pow($0, $1)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM pow requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(pow(__realCast<float>(x), __realCast<float>(y)));
+        else if (T is float)
+            __intrinsic_asm "__nv_powf", x, y;
+        else
+            __intrinsic_asm "__nv_pow", x, y;
+    case cpp: __intrinsic_asm "$P_pow($0, $1)";
+    case cuda: __intrinsic_asm "$P_pow($0, $1)";
     case glsl: __intrinsic_asm "pow";
     case hlsl: __intrinsic_asm "pow";
     case metal: __intrinsic_asm "pow";
@@ -15260,8 +15352,18 @@ T sin(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmSin) "$P_sin($0)";
-    case cuda: __intrinsic_asm(nvvmSin) "$P_sin($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM sin requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(sin(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_sinf", x;
+        else
+            __intrinsic_asm "__nv_sin", x;
+    case cpp: __intrinsic_asm "$P_sin($0)";
+    case cuda: __intrinsic_asm "$P_sin($0)";
     case glsl: __intrinsic_asm "sin";
     case hlsl: __intrinsic_asm "sin";
     case metal: __intrinsic_asm "sin";
@@ -15343,6 +15445,10 @@ void sincos(T x, out T s, out T c)
 {
     __target_switch
     {
+    case nvvm:
+        s = sin(x);
+        c = cos(x);
+        return;
     case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
     case hlsl: __intrinsic_asm "sincos";
     case metal:
@@ -15414,8 +15520,18 @@ T sinh(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmSinh) "$P_sinh($0)";
-    case cuda: __intrinsic_asm(nvvmSinh) "$P_sinh($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM sinh requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(sinh(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_sinhf", x;
+        else
+            __intrinsic_asm "__nv_sinh", x;
+    case cpp: __intrinsic_asm "$P_sinh($0)";
+    case cuda: __intrinsic_asm "$P_sinh($0)";
     case glsl: __intrinsic_asm "sinh";
     case hlsl: __intrinsic_asm "sinh";
     case metal: __intrinsic_asm "sinh";
@@ -15681,8 +15797,18 @@ T tan(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmTan) "$P_tan($0)";
-    case cuda: __intrinsic_asm(nvvmTan) "$P_tan($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM tan requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(tan(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_tanf", x;
+        else
+            __intrinsic_asm "__nv_tan", x;
+    case cpp: __intrinsic_asm "$P_tan($0)";
+    case cuda: __intrinsic_asm "$P_tan($0)";
     case glsl: __intrinsic_asm "tan";
     case hlsl: __intrinsic_asm "tan";
     case metal: __intrinsic_asm "tan";
@@ -15738,8 +15864,18 @@ T tanh(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmTanh) "$P_tanh($0)";
-    case cuda: __intrinsic_asm(nvvmTanh) "$P_tanh($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM tanh requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(tanh(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_tanhf", x;
+        else
+            __intrinsic_asm "__nv_tanh", x;
+    case cpp: __intrinsic_asm "$P_tanh($0)";
+    case cuda: __intrinsic_asm "$P_tanh($0)";
     case glsl: __intrinsic_asm "tanh";
     case hlsl: __intrinsic_asm "tanh";
     case metal: __intrinsic_asm "tanh";

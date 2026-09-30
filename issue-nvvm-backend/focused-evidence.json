@@ -74597,6 +74597,202 @@
           "sha256": "a2e3fd1b232bb103aed44d736963d4643ce42821373fad66688b0160abb379e6"
         }
       }
+    },
+    "nvvm-core-math": {
+      "status": "accepted",
+      "scope": "Thirteen public math operations select26 libdevice names; sincos and mad compose in core. Twelve numeric operations and13 CUDA-text/tag routes retired; canonical FRem keeps FMOD58. New integer mad and Half sincos have exact execution smoke.",
+      "compiler_identity": {
+        "revision": "dc0a9acc36a74ac31912a010672a0a116f4e2883",
+        "compiler_patch_sha256": "2b3fbdae8d3d4ef49a80822cfabb676dc5ea71a7a94b3de8fa6d280be1972226",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "a278eff1ec954d476d1d062fabe414054bd3506d018ef2c6a71521e94821cbf3",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "92687fd7e9aca29f26cec8f0b25eff5c88210a0f99a7a9af95cf6c440df52fa4",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "b634996e15783937fecb6354cb52b70819aa69540b497bee51a57c54bc6ac042",
+          "source/slang/hlsl.meta.slang": "771f316a27f45343a63bf82a53b7fd041dafe51be137c944637538a409190026",
+          "source/slang/slang-emit-nvvm.cpp": "390668cb6dd2b0e4c0a1ec58211dba039c2622afd52d36e25ea3f25580162e54",
+          "source/slang/slang-lower-to-ir.cpp": "32c8740e4e7511ae5aacbc8752c2c89022da0c09c8b4b0ea9a291659d9757cf5",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "f9e8ebcc0000f562bc139fc3ac772e2ed03a3707b1d5afeacbb129a52efbc5d6",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "088edbb5c4780ca4a3c71d0c2ab6c61c30b247bb9d6f6cd4b7df347e3490aaea",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "291de4136cc157e27db2f302ef485ea1d09455d7c31233900edeea50cce4dcc2",
+          "tests/cuda/nvvm-core-math-composition.slang": "65bc13217ff3bf93cf10b77ec6842ce3a65edb70b05f26bc7268d35a2cfb97cf"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "fce265212542c21bd2d6d6babd7afada5c6605b2db1a840bdb56e1cf3a0f19f9",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "32b5c68259916f101f86255f1757671a5d2f0f8b67d9c37d357e2d6c86e6833d",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "d285dd06326eabec1a35a6e32a5c004b1d7639fdff1c83003a18b19ad6e72d7b",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b"
+        }
+      },
+      "validation": {
+        "units": {
+          "passed": 23,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderBuildsExtendedScalarMathOperations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryUsesSelectedDefinitions.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryRejectsUnsupportedABI.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryPreservesParseDiagnostics.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsScalarMathOperations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderRequiresDeviceLibraryInterface.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsCoreMathNamedCalls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsDirectedRoundingCalls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryEmitsAndRejectsWithoutMutation.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsRsqrtCalls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsExp2Calls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsExpCalls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsLogCalls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsLog2Calls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryBuildsLog10Calls.internal",
+            "slang-unit-test-tool/nvvmIRBuilderRetiredCoreMathRejectsWithoutMutation.internal",
+            "slang-unit-test-tool/nvvmSlangScalarMathHelpersRequestTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary.internal",
+            "slang-unit-test-tool/nvvmSlangCoreMathUsesNamedCalls.internal",
+            "slang-unit-test-tool/nvvmSlangCoreMathLegacyRoutesRejectBeforeOutput.internal",
+            "slang-unit-test-tool/nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation.internal"
+          ],
+          "record": {
+            "path": "build/nvvm-core-math/units-final.json",
+            "sha256": "520932ce6301a3fa2ccc234bc520bca42082b45762b576714a11d74ce4f77f64"
+          }
+        },
+        "cuda_smoke": {
+          "passed": 17,
+          "outcomes": [
+            "tests/hlsl-intrinsic/scalar-double-atan2.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-atan2.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-atan2.slang.3 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-pow.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-sincos.slang.1 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-pow.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-sincos.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-pow.slang.3 (cuda)",
+            "tests/hlsl-intrinsic/scalar-double-sincos.slang.3 (cuda)",
+            "tests/hlsl-intrinsic/scalar-float.slang.4 (cuda)",
+            "tests/hlsl-intrinsic/scalar-float.slang.5 (cuda)",
+            "tests/hlsl-intrinsic/scalar-half.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/scalar-float.slang.6 (cuda)",
+            "tests/hlsl-intrinsic/scalar-half.slang.3 (cuda)",
+            "tests/hlsl-intrinsic/scalar-half.slang.4 (cuda)",
+            "tests/cuda/nvvm-core-math-composition.slang (cuda)",
+            "tests/cuda/nvvm-core-math-composition.slang.1 (cuda)"
+          ],
+          "excluded_non_cuda_subtests": 14,
+          "records": [
+            {
+              "path": "build/nvvm-core-math/smoke.json",
+              "sha256": "549a217dffd6f8fa193b8dab5e5a70ffada151c5d754ec46ffebd96db4b004e9"
+            },
+            {
+              "path": "build/nvvm-core-math/composition-retry.json",
+              "sha256": "4264aa864a4a785ce762b2462ef18bd8f309c9da10cb3878b6865c93d4c27ee8"
+            }
+          ]
+        },
+        "material_ptx_smoke": {
+          "path": "build/nvvm-core-math/ptx-comparison.json",
+          "sha256": "a24f9a23ff53e5623354495a48268b99dddb5940384abd0aadc70999a2c8b5ee"
+        },
+        "material_commands": [
+          {
+            "path": "build/nvvm-core-math/material-nvrtc-compile.json",
+            "sha256": "6a2a77ef73f94f31120a6cfa7889130c55c30a1af7065ab1482f3f02ad154531"
+          },
+          {
+            "path": "build/nvvm-core-math/material-nvrtc-assembly.json",
+            "sha256": "574378690c4caefa61de9d1923b5ad41d6e736251a2b93dcd5821b99126c838e"
+          },
+          {
+            "path": "build/nvvm-core-math/material-nvvm-compile.json",
+            "sha256": "1c5e0c6a9f1cad594c52816276466289fe1f030b537755a29744edc9c5061616"
+          },
+          {
+            "path": "build/nvvm-core-math/material-nvvm-assembly.json",
+            "sha256": "928e684bfaee25465d773114c57cc80b507ae4c36130b1a8ec15a733a028d410"
+          }
+        ],
+        "build": {
+          "path": "build/nvvm-core-math/build-retry.json",
+          "sha256": "5dbf9f10c78674178467932b38e7b22e8bac013a4409ff8cca425f673fbda41e"
+        },
+        "test_only_rebuild": {
+          "path": "build/nvvm-core-math/unit-fix-build.json",
+          "sha256": "f505a0e2921921163519504e5c3c3cdb90bf8a40bbac00f31e532a84887d5949"
+        }
+      },
+      "validation_incidents": [
+        {
+          "id": "initial-build",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-math/build.json",
+            "sha256": "b8f61c349e5f2a4b2bbf419ad11838b789501d58f83260bfa164dacb70e7d785"
+          },
+          "resolution": {
+            "path": "build/nvvm-core-math/build-retry.json",
+            "sha256": "5dbf9f10c78674178467932b38e7b22e8bac013a4409ff8cca425f673fbda41e"
+          },
+          "cause": "Standalone provider assertion macro unavailable; legacy shader raw-string delimiter collision.",
+          "fix": "LLVM fatal invariant without core linkage and custom raw-string delimiter."
+        },
+        {
+          "id": "fake-builder-and-half-test-shape",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-math/units.json",
+            "sha256": "0b23a59b30cadddaa88acebc142fb90d42ec54e478027bd849e1d2fab39a6451"
+          },
+          "diagnostic": {
+            "path": "build/nvvm-core-math/unit-diagnostic.json",
+            "sha256": "6d0641402525ac83534c907ce489c41f135bcdff2e2d8df539d03fce2537fa5e"
+          },
+          "resolution": {
+            "path": "build/nvvm-core-math/units-final.json",
+            "sha256": "520932ce6301a3fa2ccc234bc520bca42082b45762b576714a11d74ce4f77f64"
+          },
+          "cause": "33rd valid function exceeded fake capacity32; test assumed direct Half parameters and exactly one composition.",
+          "fix": "Cohesive capacity64; direct widening/call/narrowing bijection respecting physical Half decoding and fmod inlining. Production unchanged."
+        },
+        {
+          "id": "intentional-alias-warning",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-math/smoke.json",
+            "sha256": "549a217dffd6f8fa193b8dab5e5a70ffada151c5d754ec46ffebd96db4b004e9"
+          },
+          "resolution": {
+            "path": "build/nvvm-core-math/composition-retry.json",
+            "sha256": "4264aa864a4a785ce762b2462ef18bd8f309c9da10cb3878b6865c93d4c27ee8"
+          },
+          "cause": "Intentional alias emitted warning30051; shader returned0 but expected stderr empty.",
+          "fix": "Scoped pragma push/disable30051/pop. Exact output checks retained; only affected cells rerun."
+        },
+        {
+          "id": "runtime-record-path",
+          "status": "resolved",
+          "cause": "First identity preparation used nonexistent standalone render-test path.",
+          "fix": "Record actual librender-test-tool.so loaded by test-server; no tests or source changed."
+        }
+      ],
+      "last_full_baseline": {
+        "revision": "dc0a9acc36a74ac31912a010672a0a116f4e2883",
+        "path": "issue-nvvm-backend/accepted-baseline.json",
+        "sha256": "f6df540235ea04c97f6b1a49d546ffd716763123b5a57988d40dbde6a71d087b"
+      },
+      "limits": [
+        "Focused compile/assembly/unit and finite runtime smoke; no new full corpus or exhaustive numerical qualification.",
+        "Module43/ABI46 unchanged; stale prototype modules, including earlier43 bodies, may need recompilation.",
+        "Historical features/full results retain their original identities."
+      ]
     }
   }
 }

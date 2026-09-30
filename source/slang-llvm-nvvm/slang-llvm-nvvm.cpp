@@ -28,6 +28,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -3562,7 +3563,15 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
         name != "__nv_truncf" && name != "__nv_trunc" && name != "__nv_rsqrtf" &&
         name != "__nv_rsqrt" && name != "__nv_expf" && name != "__nv_exp" && name != "__nv_exp2f" &&
         name != "__nv_exp2" && name != "__nv_logf" && name != "__nv_log" && name != "__nv_log2f" &&
-        name != "__nv_log2" && name != "__nv_log10f" && name != "__nv_log10")
+        name != "__nv_log2" && name != "__nv_log10f" && name != "__nv_log10" &&
+        name != "__nv_sinf" && name != "__nv_sin" && name != "__nv_cosf" && name != "__nv_cos" &&
+        name != "__nv_acosf" && name != "__nv_acos" && name != "__nv_asinf" &&
+        name != "__nv_asin" && name != "__nv_atanf" && name != "__nv_atan" &&
+        name != "__nv_atan2f" && name != "__nv_atan2" && name != "__nv_powf" &&
+        name != "__nv_pow" && name != "__nv_tanf" && name != "__nv_tan" && name != "__nv_sinhf" &&
+        name != "__nv_sinh" && name != "__nv_coshf" && name != "__nv_cosh" &&
+        name != "__nv_tanhf" && name != "__nv_tanh" && name != "__nv_fmaf" && name != "__nv_fma" &&
+        name != "__nv_fmodf" && name != "__nv_fmod")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3677,24 +3686,6 @@ static const char* _getLibdeviceFunctionName(
         {
         case SLANG_NVVM_VALUE_OP_ABS:
             return isFloat32 ? "__nv_fabsf" : "__nv_fabs";
-        case SLANG_NVVM_VALUE_OP_ACOS:
-            return isFloat32 ? "__nv_acosf" : "__nv_acos";
-        case SLANG_NVVM_VALUE_OP_ASIN:
-            return isFloat32 ? "__nv_asinf" : "__nv_asin";
-        case SLANG_NVVM_VALUE_OP_ATAN:
-            return isFloat32 ? "__nv_atanf" : "__nv_atan";
-        case SLANG_NVVM_VALUE_OP_COS:
-            return isFloat32 ? "__nv_cosf" : "__nv_cos";
-        case SLANG_NVVM_VALUE_OP_SIN:
-            return isFloat32 ? "__nv_sinf" : "__nv_sin";
-        case SLANG_NVVM_VALUE_OP_SINH:
-            return isFloat32 ? "__nv_sinhf" : "__nv_sinh";
-        case SLANG_NVVM_VALUE_OP_COSH:
-            return isFloat32 ? "__nv_coshf" : "__nv_cosh";
-        case SLANG_NVVM_VALUE_OP_TAN:
-            return isFloat32 ? "__nv_tanf" : "__nv_tan";
-        case SLANG_NVVM_VALUE_OP_TANH:
-            return isFloat32 ? "__nv_tanhf" : "__nv_tanh";
         default:
             return nullptr;
         }
@@ -3703,22 +3694,16 @@ static const char* _getLibdeviceFunctionName(
     {
         switch (operation)
         {
-        case SLANG_NVVM_VALUE_OP_ATAN2:
-            return isFloat32 ? "__nv_atan2f" : "__nv_atan2";
         case SLANG_NVVM_VALUE_OP_FMOD:
             return isFloat32 ? "__nv_fmodf" : "__nv_fmod";
         case SLANG_NVVM_VALUE_OP_MAX:
             return isFloat32 ? "__nv_fmaxf" : "__nv_fmax";
         case SLANG_NVVM_VALUE_OP_MIN:
             return isFloat32 ? "__nv_fminf" : "__nv_fmin";
-        case SLANG_NVVM_VALUE_OP_POW:
-            return isFloat32 ? "__nv_powf" : "__nv_pow";
         default:
             return nullptr;
         }
     }
-    if (operandCount == 3 && operation == SLANG_NVVM_VALUE_OP_FMA)
-        return isFloat32 ? "__nv_fmaf" : "__nv_fma";
     return nullptr;
 }
 
@@ -3953,8 +3938,9 @@ static SlangResult _emitCatalogOperation(
     {
         return _emitModfProjectionOperation(module, operation, operands, outValue);
     }
+    // The only library-backed exact entries are the projections handled above.
     if (entry.requiresCUDADeviceLibrary)
-        return _emitLibdeviceOperation(module, operation, operands, outValue);
+        llvm::report_fatal_error("Unhandled library-backed exact NVVM operation");
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
         if (entry.operandCount == 1)
@@ -4448,18 +4434,12 @@ static SlangResult _emitValueOperationFamily(
             break;
         case SLANG_NVVM_VALUE_OP_MIN:
         case SLANG_NVVM_VALUE_OP_MAX:
-        case SLANG_NVVM_VALUE_OP_ATAN2:
         case SLANG_NVVM_VALUE_OP_FMOD:
-        case SLANG_NVVM_VALUE_OP_POW:
             return _emitLibdeviceOperation(module, operation, operands, outValue);
         default:
             return SLANG_E_INVALID_ARG;
         }
         break;
-    case Slang::NVVMSemantics::ValueOperationFamily::FloatTernary:
-        return operation.operation == SLANG_NVVM_VALUE_OP_FMA
-                   ? _emitLibdeviceOperation(module, operation, operands, outValue)
-                   : SLANG_E_INVALID_ARG;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatClassification:
         result = state->builder.CreateFCmpUNO(llvmOperands[0], llvmOperands[0]);
         break;

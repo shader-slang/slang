@@ -5121,11 +5121,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExtendedScalarMathOperations)
     const SlangNVVMValueTypeDesc float32 = NVVMSemantics::kFloat32;
     const SlangNVVMValueTypeDesc unaryOperands[] = {float32};
     for (SlangNVVMValueOperation operation :
-         {SLANG_NVVM_VALUE_OP_SINH,
-          SLANG_NVVM_VALUE_OP_COSH,
-          SLANG_NVVM_VALUE_OP_TANH,
-          SLANG_NVVM_VALUE_OP_MODF_FRACTION,
-          SLANG_NVVM_VALUE_OP_MODF_INTEGRAL})
+         {SLANG_NVVM_VALUE_OP_MODF_FRACTION, SLANG_NVVM_VALUE_OP_MODF_INTEGRAL})
     {
         const SlangNVVMValueOperationDesc desc = {
             operation,
@@ -5139,22 +5135,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExtendedScalarMathOperations)
             SLANG_SUCCEEDED(builder.emitValueOperation(scope.module, desc, parameters, 1, result)));
         SLANG_CHECK_ABORT(result != nullptr);
     }
-    const SlangNVVMValueTypeDesc ternaryOperands[] = {float32, float32, float32};
-    const SlangNVVMValueOperationDesc fma = {
-        SLANG_NVVM_VALUE_OP_FMA,
-        float32,
-        ternaryOperands,
-        SLANG_COUNT_OF(ternaryOperands),
-    };
-    SLANG_CHECK(builder.supportsValueOperation(fma));
-    SlangNVVMValueHandle fusedResult = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueOperation(
-        scope.module,
-        fma,
-        parameters,
-        SLANG_COUNT_OF(parameters),
-        fusedResult)));
-    SLANG_CHECK_ABORT(fusedResult != nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
 
     for (SlangNVVMSerializationFormat format :
@@ -5164,13 +5144,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExtendedScalarMathOperations)
         ComPtr<ISlangBlob> assembly;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(scope.module, format, assembly)));
         const String text = _getBlobText(assembly);
-        SLANG_CHECK(text.indexOf("declare float @__nv_sinhf(float)") >= 0);
-        SLANG_CHECK(text.indexOf("declare float @__nv_coshf(float)") >= 0);
-        SLANG_CHECK(text.indexOf("declare float @__nv_tanhf(float)") >= 0);
         SLANG_CHECK(text.indexOf("declare float @__nv_modff(float, float*)") >= 0);
         SLANG_CHECK(
             _countOccurrences(text.getUnownedSlice(), toSlice("call float @__nv_modff")) == 2);
-        SLANG_CHECK(text.indexOf("declare float @__nv_fmaf(float, float, float)") >= 0);
     }
 }
 
@@ -8794,138 +8770,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsIntegerBitOperations)
     }
 }
 
-SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)
-{
-    NVVMIRBuilder builder;
-    _requireRealNVVMBuilder(unitTestContext, builder);
-
-    const SlangNVVMValueTypeDesc float32Operands[] = {NVVMSemantics::kFloat32};
-    const SlangNVVMValueTypeDesc float64Operands[] = {NVVMSemantics::kFloat64};
-    const SlangNVVMValueOperationDesc operations[] = {
-        {
-            SLANG_NVVM_VALUE_OP_SIN,
-            NVVMSemantics::kFloat32,
-            float32Operands,
-            1,
-        },
-        {
-            SLANG_NVVM_VALUE_OP_COS,
-            NVVMSemantics::kFloat32,
-            float32Operands,
-            1,
-        },
-        {
-            SLANG_NVVM_VALUE_OP_SIN,
-            NVVMSemantics::kFloat64,
-            float64Operands,
-            1,
-        },
-        {
-            SLANG_NVVM_VALUE_OP_COS,
-            NVVMSemantics::kFloat64,
-            float64Operands,
-            1,
-        },
-    };
-    for (const auto& operation : operations)
-        SLANG_CHECK(builder.supportsValueOperation(operation));
-
-    SlangNVVMValueTypeDesc vectorFloat32 = NVVMSemantics::kFloat32;
-    vectorFloat32.laneCount = 2;
-    const SlangNVVMValueTypeDesc vectorFloat32Operands[] = {vectorFloat32};
-    SlangNVVMValueOperationDesc unsupported = operations[0];
-    unsupported.resultType = vectorFloat32;
-    unsupported.operandTypes = vectorFloat32Operands;
-    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
-    unsupported = operations[0];
-    unsupported.operandTypes = float64Operands;
-    SLANG_CHECK(!builder.supportsValueOperation(unsupported));
-
-    ScopedNVVMBuilderModule module;
-    module.builder = &builder;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createModule(toSlice("exact-libdevice-transcendentals"), module.module)));
-
-    SlangNVVMTypeHandle voidType = nullptr;
-    SlangNVVMTypeHandle float32Type = nullptr;
-    SlangNVVMTypeHandle float64Type = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 32, float32Type)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, 64, float64Type)));
-    const SlangNVVMTypeHandle parameterTypes[] = {float32Type, float64Type};
-    SlangNVVMTypeHandle functionType = nullptr;
-    SlangNVVMValueHandle function = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
-        module.module,
-        voidType,
-        parameterTypes,
-        SLANG_COUNT_OF(parameterTypes),
-        functionType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
-        module.module,
-        functionType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("useTranscendentals"),
-        function)));
-
-    SlangNVVMValueHandle float32Value = nullptr;
-    SlangNVVMValueHandle float64Value = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, float32Value)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, float64Value)));
-    SlangNVVMBlockHandle entryBlock = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
-
-    SlangNVVMValueHandle rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitValueOperation(module.module, operations[0], &float64Value, 1, rejected) ==
-        SLANG_E_INVALID_ARG);
-    SLANG_CHECK(rejected == nullptr);
-    rejected = reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
-    SLANG_CHECK(
-        builder.emitValueOperation(module.module, unsupported, &float32Value, 1, rejected) ==
-        SLANG_E_NOT_AVAILABLE);
-    SLANG_CHECK(rejected == nullptr);
-
-    const SlangNVVMValueHandle operands[] =
-        {float32Value, float32Value, float64Value, float64Value};
-    for (Index i = 0; i < SLANG_COUNT_OF(operations); ++i)
-    {
-        SlangNVVMValueHandle result = nullptr;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            builder.emitValueOperation(module.module, operations[i], &operands[i], 1, result)));
-        SLANG_CHECK_ABORT(result != nullptr);
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
-
-    const SlangNVVMSerializationFormat formats[] = {
-        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
-        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
-    };
-    for (const auto format : formats)
-    {
-        ComPtr<ISlangBlob> assembly;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
-        const String text = _getBlobText(assembly);
-        const UnownedStringSlice textSlice = text.getUnownedSlice();
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare float @__nv_sinf(float)")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare float @__nv_cosf(float)")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare double @__nv_sin(double)")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare double @__nv_cos(double)")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_sinf")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_cosf")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("call double @__nv_sin")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("call double @__nv_cos")) == 1);
-    }
-}
-
 struct ScopedNVVMTestDeviceLibrary
 {
     const NVVMIRBuilder* builder;
@@ -8939,7 +8783,8 @@ static ComPtr<ISlangBlob> _makeNVVMDeviceLibraryFixture(
     const NVVMIRBuilder& builder,
     uint32_t width,
     bool definition = true,
-    const char* name = "__nv_roundf")
+    const char* name = "__nv_roundf",
+    uint32_t operandCount = 1)
 {
     ScopedNVVMBuilderModule module;
     module.builder = &builder;
@@ -8949,8 +8794,10 @@ static ComPtr<ISlangBlob> _makeNVVMDeviceLibraryFixture(
     SlangNVVMValueHandle function = nullptr, value = nullptr;
     SlangNVVMBlockHandle block = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, width, type)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionType(module.module, type, &type, 1, functionType)));
+    const SlangNVVMTypeHandle parameterTypes[] = {type, type, type};
+    SLANG_CHECK_ABORT(operandCount >= 1 && operandCount <= SLANG_COUNT_OF(parameterTypes));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.getFunctionType(module.module, type, parameterTypes, operandCount, functionType)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
         module.module,
         functionType,
@@ -8987,15 +8834,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
     };
     const SlangNVVMValueOperation unaryMathOperations[] = {
         SLANG_NVVM_VALUE_OP_ABS,
-        SLANG_NVVM_VALUE_OP_ACOS,
-        SLANG_NVVM_VALUE_OP_ASIN,
-        SLANG_NVVM_VALUE_OP_ATAN,
-        SLANG_NVVM_VALUE_OP_TAN,
     };
     const SlangNVVMValueOperation binaryMathOperations[] = {
-        SLANG_NVVM_VALUE_OP_ATAN2,
         SLANG_NVVM_VALUE_OP_FMOD,
-        SLANG_NVVM_VALUE_OP_POW,
     };
 
     SlangNVVMValueOperationDesc operation = {
@@ -9055,14 +8896,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
     vectorFloat64.laneCount = 2;
     const SlangNVVMValueTypeDesc vectorFloat64Operands[] = {vectorFloat64};
     operation = {
-        SLANG_NVVM_VALUE_OP_TAN,
+        SlangNVVMValueOperation(66),
         vectorFloat64,
         vectorFloat64Operands,
         1,
     };
     SLANG_CHECK(!builder.supportsValueOperation(operation));
     operation = {
-        SLANG_NVVM_VALUE_OP_TAN,
+        SlangNVVMValueOperation(66),
         NVVMSemantics::kFloat16,
         halfOperands,
         1,
@@ -9252,8 +9093,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
             SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
         const String text = _getBlobText(assembly);
         SLANG_CHECK(text.indexOf("declare float @__nv_fabsf(float)") >= 0);
-        SLANG_CHECK(text.indexOf("declare double @__nv_acos(double)") >= 0);
-        SLANG_CHECK(text.indexOf("declare double @__nv_pow(double, double)") >= 0);
         SLANG_CHECK(text.indexOf("declare float @__nv_frexpf(float, i32*)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @__nv_frexp(double, i32*)") >= 0);
         SLANG_CHECK(text.indexOf("declare double @llvm.sqrt.f64(double)") >= 0);
@@ -11431,7 +11270,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsRetiredDirectedRoundingWithoutMutation)
         }
 }
 
-// Check a selected unary definition through one live call in both LLVM serializers.
+// Check a selected definition through one live call in both LLVM serializers.
 // Consider __nv_rsqrt with a double(double) definition: the module must return the selected
 // call's result and declare that same type. The selected fixture owns the signature; the two
 // serializers must preserve it without folding the runtime argument or replacing the call.
@@ -11439,9 +11278,10 @@ static void _checkNVVMDeviceLibraryTypedCall(
     NVVMIRBuilder& builder,
     const char* name,
     uint32_t width,
-    const char* moduleName)
+    const char* moduleName,
+    uint32_t operandCount = 1)
 {
-    auto bytes = _makeNVVMDeviceLibraryFixture(builder, width, true, name);
+    auto bytes = _makeNVVMDeviceLibraryFixture(builder, width, true, name, operandCount);
     ScopedNVVMTestDeviceLibrary library{&builder};
     String diagnostics;
     SLANG_CHECK_ABORT(
@@ -11450,14 +11290,18 @@ static void _checkNVVMDeviceLibraryTypedCall(
     SlangNVVMNamedIntrinsicOperandDesc operand = {
         {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, width, 1},
         SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
-    SlangNVVMNamedIntrinsicDesc desc = {name, strlen(name), operand.type, &operand, 1};
+    SlangNVVMNamedIntrinsicOperandDesc operands[] = {operand, operand, operand};
+    SlangNVVMNamedIntrinsicDesc desc = {name, strlen(name), operand.type, operands, operandCount};
     SLANG_CHECK(builder.supportsDeviceLibraryFunction(library.library, desc));
     for (const uint32_t wrongWidth : {16u, width == 32 ? 64u : 32u})
     {
-        desc.resultType.bitWidth = operand.type.bitWidth = wrongWidth;
+        desc.resultType.bitWidth = operands[0].type.bitWidth = wrongWidth;
         SLANG_CHECK(!builder.supportsDeviceLibraryFunction(library.library, desc));
     }
-    desc.resultType.bitWidth = operand.type.bitWidth = width;
+    desc.resultType.bitWidth = operands[0].type.bitWidth = width;
+    desc.operandCount = operandCount - 1;
+    SLANG_CHECK(!builder.supportsDeviceLibraryFunction(library.library, desc));
+    desc.operandCount = operandCount;
     desc.name = "__nv_unadmitted";
     desc.nameSize = strlen(desc.name);
     SLANG_CHECK(!builder.supportsDeviceLibraryFunction(library.library, desc));
@@ -11486,20 +11330,24 @@ static void _checkNVVMDeviceLibraryTypedCall(
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(builder.createBlock(module.module, function, toSlice("entry"), block)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+    const SlangNVVMValueHandle arguments[] = {parameter, parameter, parameter};
     SlangNVVMValueHandle result = nullptr;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitDeviceLibraryFunction(
         library.library,
         module.module,
         desc,
-        &parameter,
-        1,
+        arguments,
+        operandCount,
         result)));
     SLANG_CHECK_ABORT(result != nullptr);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(module.module, result)));
     const char* typeName = width == 32 ? "float" : "double";
     StringBuilder call, declaration;
     call << "call " << typeName << " @" << name << "(" << typeName;
-    declaration << "declare " << typeName << " @" << name << "(" << typeName << ")";
+    declaration << "declare " << typeName << " @" << name << "(";
+    for (uint32_t i = 0; i < operandCount; ++i)
+        declaration << (i ? ", " : "") << typeName;
+    declaration << ")";
     for (const auto format :
          {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
           SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
@@ -11512,6 +11360,21 @@ static void _checkNVVMDeviceLibraryTypedCall(
         SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), declaration.getUnownedSlice()) == 1);
     }
 }
+
+SLANG_UNIT_TEST(nvvmIRBuilderBuildsCoreMathNamedCalls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const auto& testCase : kNVVMCoreMathTestCases)
+        for (uint32_t width : {32u, 64u})
+            _checkNVVMDeviceLibraryTypedCall(
+                builder,
+                width == 32 ? testCase.floatName : testCase.doubleName,
+                width,
+                testCase.name,
+                testCase.operandCount);
+}
+
 
 SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryBuildsDirectedRoundingCalls)
 {
@@ -12318,10 +12181,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderReservedExp2OperationRejectsWithoutMutation)
         }
 }
 
-// Reject a retired logarithm ID without changing the module or returning an output value.
-static void _checkNVVMReservedLogOperation(
+// Reject a retired math ID without changing the module or returning an output value.
+static void _checkNVVMReservedMathOperation(
     UnitTestContext* unitTestContext,
-    SlangNVVMValueOperation operation)
+    SlangNVVMValueOperation operation,
+    uint32_t operandCount = 1)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -12336,8 +12200,8 @@ static void _checkNVVMReservedLogOperation(
             {
                 ScopedNVVMBuilderModule scope;
                 scope.builder = &builder;
-                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-                    builder.createModule(toSlice("retired-log-family"), scope.module)));
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.createModule(toSlice("retired-math"), scope.module)));
                 SlangNVVMTypeHandle valueType = nullptr, functionType = nullptr;
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
                     builder.getFloatingPointType(scope.module, type.bitWidth, valueType)));
@@ -12367,15 +12231,23 @@ static void _checkNVVMReservedLogOperation(
                 if (injectFailures)
                 {
                     // Keep the raw historical identity here: no public operation name remains.
+                    const SlangNVVMValueTypeDesc operandTypes[] = {
+                        testedType,
+                        testedType,
+                        testedType};
+                    const SlangNVVMValueHandle operands[] = {value, value, value};
                     const SlangNVVMValueOperationDesc desc =
-                        {operation, testedType, &testedType, 1};
+                        {operation, testedType, operandTypes, operandCount};
                     SLANG_CHECK(!builder.supportsValueOperation(desc));
                     SlangNVVMValueHandle rejected =
                         reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
                     SLANG_CHECK(
-                        builder.getValueOperationsAPI()
-                            ->emitOperation(scope.module, &desc, &value, 1, &rejected) ==
-                        SLANG_E_INVALID_ARG);
+                        builder.getValueOperationsAPI()->emitOperation(
+                            scope.module,
+                            &desc,
+                            operands,
+                            operandCount,
+                            &rejected) == SLANG_E_INVALID_ARG);
                     SLANG_CHECK(rejected == nullptr);
                 }
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, value)));
@@ -12400,15 +12272,25 @@ static void _checkNVVMReservedLogOperation(
 
 SLANG_UNIT_TEST(nvvmIRBuilderReservedLogOperationRejectsWithoutMutation)
 {
-    _checkNVVMReservedLogOperation(unitTestContext, SlangNVVMValueOperation(60));
+    _checkNVVMReservedMathOperation(unitTestContext, SlangNVVMValueOperation(60));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderReservedLog2OperationRejectsWithoutMutation)
 {
-    _checkNVVMReservedLogOperation(unitTestContext, SlangNVVMValueOperation(61));
+    _checkNVVMReservedMathOperation(unitTestContext, SlangNVVMValueOperation(61));
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderReservedLog10OperationRejectsWithoutMutation)
 {
-    _checkNVVMReservedLogOperation(unitTestContext, SlangNVVMValueOperation(62));
+    _checkNVVMReservedMathOperation(unitTestContext, SlangNVVMValueOperation(62));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderRetiredCoreMathRejectsWithoutMutation)
+{
+    for (const auto& testCase : kNVVMCoreMathTestCases)
+        if (testCase.operation != SLANG_NVVM_VALUE_OP_FMOD)
+            _checkNVVMReservedMathOperation(
+                unitTestContext,
+                testCase.operation,
+                testCase.operandCount);
 }

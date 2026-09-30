@@ -65,7 +65,8 @@ actual types, constant promises, provenance and dominance before creating a decl
 Conflicting intrinsic symbols reject before mutation.
 
 Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
-names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp`, `exp2`, `log`, `log2` and `log10`
+names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp`, `exp2`, `log`, `log2`, `log10`,
+`sin`, `cos`, `acos`, `asin`, `atan`, `atan2`, `pow`, `tan`, `sinh`, `cosh`, `tanh`, `fma` and `fmod`
 (`__nv_roundf`/`__nv_round`, and the corresponding pairs for the other operations).
 Complete signatures come from definitions in the selected immutable
 library; there is no parallel name-to-signature table. Core scalar bodies select these names in
@@ -75,6 +76,16 @@ Existing vector and matrix mappings call the scalar bodies. Round retains NVVM t
 zero and CUDA Half `hrint` ties to even. Numeric operations 42/54/57/64 are reserved, and their
 semantic tags, lowering-name entries and CUDA-text recognizers are removed. Shared promotion
 recipes remain for other math.
+
+The ordinary trigonometric, hyperbolic, power, fused multiply-add and public remainder calls use
+the same selected-definition boundary. Each Half operand widens to Float32 before the call, and
+the result narrows once. Core `sincos(x, s, c)` evaluates `sin(x)` and then `cos(x)`, assigning
+`s` before `c`; the separate backend SinCos recipe is removed. Floating `mad` calls `fma`, while
+integer `mad` uses ordinary multiply/add. Scalar Half `sincos` and integer `mad` are newly supported
+through those compositions. Numeric IDs 40/41/50/51/52/53/63/66/73/74/75/76 are reserved, and all
+thirteen public tag/text routes are removed. Numeric FMOD 58 remains for canonical `kIROp_FRem`
+lowering, which has a real backend consumer independent of the public `fmod` body. Module version
+43 and provider ABI 46 remain unchanged; direct retired-ID rejection does not depend on a version gate.
 
 Public `frac` expresses `x - floor(x)` in its NVVM core body. The checked source produces the
 existing named floor call and ordinary subtraction; no provider-specific frac operation remains.

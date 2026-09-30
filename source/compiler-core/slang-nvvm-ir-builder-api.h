@@ -156,8 +156,8 @@ extern "C"
 /* Value 37 is retired; synchronization uses named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_BIT_REINTERPRET ((SlangNVVMValueOperation)38u)
 #define SLANG_NVVM_VALUE_OP_SELECT ((SlangNVVMValueOperation)39u)
-#define SLANG_NVVM_VALUE_OP_SIN ((SlangNVVMValueOperation)40u)
-#define SLANG_NVVM_VALUE_OP_COS ((SlangNVVMValueOperation)41u)
+/* Value 40 is retired; core math uses named calls and ordinary composition. */
+/* Value 41 is retired; core math uses named calls and ordinary composition. */
 /* Value 42 is retired; trunc uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_MIN ((SlangNVVMValueOperation)43u)
 #define SLANG_NVVM_VALUE_OP_MAX ((SlangNVVMValueOperation)44u)
@@ -165,10 +165,10 @@ extern "C"
 /* Values 46-47 are retired; public integer-bit operations use named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW ((SlangNVVMValueOperation)48u)
 #define SLANG_NVVM_VALUE_OP_ABS ((SlangNVVMValueOperation)49u)
-#define SLANG_NVVM_VALUE_OP_ACOS ((SlangNVVMValueOperation)50u)
-#define SLANG_NVVM_VALUE_OP_ASIN ((SlangNVVMValueOperation)51u)
-#define SLANG_NVVM_VALUE_OP_ATAN ((SlangNVVMValueOperation)52u)
-#define SLANG_NVVM_VALUE_OP_ATAN2 ((SlangNVVMValueOperation)53u)
+/* Value 50 is retired; core math uses named calls and ordinary composition. */
+/* Value 51 is retired; core math uses named calls and ordinary composition. */
+/* Value 52 is retired; core math uses named calls and ordinary composition. */
+/* Value 53 is retired; core math uses named calls and ordinary composition. */
 /* Value 54 is retired; ceil uses named selected-libdevice functions. */
 /* Value 55 is retired; exp uses named selected-libdevice functions. */
 /* Value 56 is retired; exp2 uses named selected-libdevice functions. */
@@ -178,20 +178,20 @@ extern "C"
 /* Value 60 is retired; logarithms use named selected-libdevice functions. */
 /* Value 61 is retired; logarithms use named selected-libdevice functions. */
 /* Value 62 is retired; logarithms use named selected-libdevice functions. */
-#define SLANG_NVVM_VALUE_OP_POW ((SlangNVVMValueOperation)63u)
+/* Value 63 is retired; core math uses named calls and ordinary composition. */
 /* Value 64 is retired; round uses named selected-libdevice functions. */
 /* Value 65 is retired; rsqrt uses named selected-libdevice functions. */
-#define SLANG_NVVM_VALUE_OP_TAN ((SlangNVVMValueOperation)66u)
+/* Value 66 is retired; core math uses named calls and ordinary composition. */
 #define SLANG_NVVM_VALUE_OP_IS_NAN ((SlangNVVMValueOperation)67u)
 #define SLANG_NVVM_VALUE_OP_SIGN ((SlangNVVMValueOperation)68u)
 #define SLANG_NVVM_VALUE_OP_FREXP_FRACTION ((SlangNVVMValueOperation)69u)
 #define SLANG_NVVM_VALUE_OP_FREXP_EXPONENT ((SlangNVVMValueOperation)70u)
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH ((SlangNVVMValueOperation)71u)
 /* Value 72 is retired; synchronization uses named LLVM intrinsics. */
-#define SLANG_NVVM_VALUE_OP_SINH ((SlangNVVMValueOperation)73u)
-#define SLANG_NVVM_VALUE_OP_COSH ((SlangNVVMValueOperation)74u)
-#define SLANG_NVVM_VALUE_OP_TANH ((SlangNVVMValueOperation)75u)
-#define SLANG_NVVM_VALUE_OP_FMA ((SlangNVVMValueOperation)76u)
+/* Value 73 is retired; core math uses named calls and ordinary composition. */
+/* Value 74 is retired; core math uses named calls and ordinary composition. */
+/* Value 75 is retired; core math uses named calls and ordinary composition. */
+/* Value 76 is retired; core math uses named calls and ordinary composition. */
 #define SLANG_NVVM_VALUE_OP_MODF_FRACTION ((SlangNVVMValueOperation)77u)
 #define SLANG_NVVM_VALUE_OP_MODF_INTEGRAL ((SlangNVVMValueOperation)78u)
 /** Snapshots currently executing lanes without synchronization; not a logical convergence mask. */

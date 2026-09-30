@@ -489,7 +489,6 @@ enum class FakeNVVMBuilderScalarFamily : uint32_t
     Compare,
     FloatingUnary,
     FloatingBinary,
-    FloatingTernary,
     FloatingCompare,
     Select,
     Count,
@@ -902,9 +901,12 @@ struct FakeNVVMBuilderState
 
     FakeNVVMBuilderModuleStorage moduleStorage;
     FakeNVVMBuilderVoidTypeStorage voidTypeStorage;
-    FakeNVVMBuilderFunctionTypeStorage functionTypeStorage[32];
-    FakeNVVMBuilderFunctionStorage functionStorage[32];
-    FakeNVVMBuilderBlockStorage blockStorage[64];
+    // Public core compositions retain their scalar helpers in addition to the fixture helpers.
+    // Keep their stable function, parameter, block and call handles sized together.
+    static constexpr Index kFunctionCapacity = 64;
+    FakeNVVMBuilderFunctionTypeStorage functionTypeStorage[kFunctionCapacity];
+    FakeNVVMBuilderFunctionStorage functionStorage[kFunctionCapacity];
+    FakeNVVMBuilderBlockStorage blockStorage[kFunctionCapacity * 2];
     FakeNVVMBuilderIntegerTypeStorage integerTypeStorage;
     FakeNVVMBuilderBooleanTypeStorage booleanTypeStorage;
     FakeNVVMBuilderHalfTypeStorage halfTypeStorage;
@@ -923,7 +925,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderResourceViewTypeStorage
         resourceViewTypeStorage[static_cast<uint32_t>(FakeNVVMBuilderScalarTypeKind::Count)];
     FakeNVVMBuilderPointerTypeStorage vectorPointerTypeStorage[4][3];
-    FakeNVVMBuilderParameterStorage parameterStorage[32 * 8];
+    FakeNVVMBuilderParameterStorage parameterStorage[kFunctionCapacity * 8];
     FakeNVVMBuilderLoadStorage loadStorage[64];
     FakeNVVMBuilderScalarOperationStorage scalarOperationStorage[256];
     FakeNVVMBuilderIntrinsicStorage intrinsicStorage[32];
@@ -932,7 +934,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[64];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
     FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[32];
-    FakeNVVMBuilderCallStorage callStorage[32];
+    FakeNVVMBuilderCallStorage callStorage[kFunctionCapacity * 2];
     // Aggregate tests keep scalar/vector/matrix results live, including split Float64 words.
     // Reserve enough stable handles for those addresses without changing pointer validation.
     FakeNVVMBuilderPointerOffsetStorage pointerOffsetStorage[64];
@@ -5993,19 +5995,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             &operation->resultType,
             operation->operandTypes);
     }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatTernary)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingTernary, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingTernary, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
     if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerConvert)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
@@ -6293,6 +6282,33 @@ static void SLANG_NVVM_CALL _fakeNVVMBuilderDestroyDeviceLibrary(SlangNVVMDevice
     ++gFakeNVVMBuilder.deviceLibraryDestroyCount;
 }
 
+// Keeps this migration's test inputs together; selected library definitions own production
+// signatures.
+struct NVVMCoreMathTestCase
+{
+    const char* name;
+    const char* floatName;
+    const char* doubleName;
+    SlangNVVMValueOperation operation;
+    uint32_t operandCount;
+};
+
+static const NVVMCoreMathTestCase kNVVMCoreMathTestCases[] = {
+    {"sin", "__nv_sinf", "__nv_sin", 40, 1},
+    {"cos", "__nv_cosf", "__nv_cos", 41, 1},
+    {"acos", "__nv_acosf", "__nv_acos", 50, 1},
+    {"asin", "__nv_asinf", "__nv_asin", 51, 1},
+    {"atan", "__nv_atanf", "__nv_atan", 52, 1},
+    {"atan2", "__nv_atan2f", "__nv_atan2", 53, 2},
+    {"pow", "__nv_powf", "__nv_pow", 63, 2},
+    {"tan", "__nv_tanf", "__nv_tan", 66, 1},
+    {"sinh", "__nv_sinhf", "__nv_sinh", 73, 1},
+    {"cosh", "__nv_coshf", "__nv_cosh", 74, 1},
+    {"tanh", "__nv_tanhf", "__nv_tanh", 75, 1},
+    {"fma", "__nv_fmaf", "__nv_fma", 76, 3},
+    {"fmod", "__nv_fmodf", "__nv_fmod", 58, 2},
+};
+
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSupported(
     SlangNVVMDeviceLibraryHandle library,
     const SlangNVVMNamedIntrinsicDesc* function,
@@ -6302,25 +6318,37 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSuppor
     *supported = 0;
     if (!library || !function)
         return SLANG_E_INVALID_ARG;
-    if (gFakeNVVMBuilder.rejectDeviceLibraryFunctions || function->operandCount != 1 ||
-        !function->operands)
+    if (gFakeNVVMBuilder.rejectDeviceLibraryFunctions || !function->operands)
         return SLANG_OK;
     const UnownedStringSlice name(function->name, function->nameSize);
-    const bool isFloat32 = name == toSlice("__nv_roundf") || name == toSlice("__nv_ceilf") ||
-                           name == toSlice("__nv_floorf") || name == toSlice("__nv_truncf") ||
-                           name == toSlice("__nv_rsqrtf") || name == toSlice("__nv_expf") ||
-                           name == toSlice("__nv_exp2f") || name == toSlice("__nv_logf") ||
-                           name == toSlice("__nv_log2f") || name == toSlice("__nv_log10f");
-    const bool isFloat64 = name == toSlice("__nv_round") || name == toSlice("__nv_ceil") ||
-                           name == toSlice("__nv_floor") || name == toSlice("__nv_trunc") ||
-                           name == toSlice("__nv_rsqrt") || name == toSlice("__nv_exp") ||
-                           name == toSlice("__nv_exp2") || name == toSlice("__nv_log") ||
-                           name == toSlice("__nv_log2") || name == toSlice("__nv_log10");
+    bool isFloat32 = name == toSlice("__nv_roundf") || name == toSlice("__nv_ceilf") ||
+                     name == toSlice("__nv_floorf") || name == toSlice("__nv_truncf") ||
+                     name == toSlice("__nv_rsqrtf") || name == toSlice("__nv_expf") ||
+                     name == toSlice("__nv_exp2f") || name == toSlice("__nv_logf") ||
+                     name == toSlice("__nv_log2f") || name == toSlice("__nv_log10f");
+    bool isFloat64 = name == toSlice("__nv_round") || name == toSlice("__nv_ceil") ||
+                     name == toSlice("__nv_floor") || name == toSlice("__nv_trunc") ||
+                     name == toSlice("__nv_rsqrt") || name == toSlice("__nv_exp") ||
+                     name == toSlice("__nv_exp2") || name == toSlice("__nv_log") ||
+                     name == toSlice("__nv_log2") || name == toSlice("__nv_log10");
+    uint32_t operandCount = 1;
+    for (const auto& testCase : kNVVMCoreMathTestCases)
+    {
+        if (name == UnownedStringSlice(testCase.floatName) ||
+            name == UnownedStringSlice(testCase.doubleName))
+        {
+            isFloat32 = name == UnownedStringSlice(testCase.floatName);
+            isFloat64 = !isFloat32;
+            operandCount = testCase.operandCount;
+            break;
+        }
+    }
     const auto type = isFloat32 ? NVVMSemantics::kFloat32 : NVVMSemantics::kFloat64;
-    *supported = (isFloat32 || isFloat64) &&
-                 NVVMSemantics::areSameType(function->resultType, type) &&
-                 NVVMSemantics::areSameType(function->operands[0].type, type) &&
-                 function->operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+    *supported = (isFloat32 || isFloat64) && function->operandCount == operandCount &&
+                 NVVMSemantics::areSameType(function->resultType, type);
+    for (size_t i = 0; i < function->operandCount; ++i)
+        *supported &= NVVMSemantics::areSameType(function->operands[i].type, type) &&
+                      function->operands[i].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
     return SLANG_OK;
 }
 
@@ -6337,8 +6365,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitDeviceLibraryFunction(
         _fakeNVVMBuilderIsDeviceLibraryFunctionSupported(library, function, &supported));
     if (!supported)
         return SLANG_E_NOT_AVAILABLE;
-    SlangNVVMValueTypeDesc operandType = function->operands[0].type;
-    SlangNVVMValueOperationDesc operation = {UINT32_MAX, function->resultType, &operandType, 1};
+    SlangNVVMValueTypeDesc operandTypes[3] = {};
+    SLANG_RELEASE_ASSERT(function->operandCount <= SLANG_COUNT_OF(operandTypes));
+    for (size_t i = 0; i < function->operandCount; ++i)
+        operandTypes[i] = function->operands[i].type;
+    SlangNVVMValueOperationDesc operation =
+        {UINT32_MAX, function->resultType, operandTypes, uint32_t(function->operandCount)};
     SLANG_RETURN_ON_FAIL(
         _fakeNVVMBuilderEmitIntrinsic(module, operation, operands, operandCount, outValue));
     gFakeNVVMBuilder.namedIntrinsicNames.add(
@@ -12280,62 +12312,32 @@ int signHalf(half value)
 
 half hyperbolicSineHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_sinh($0)";
-    default: return value;
-    }
+    return sinh(value);
 }
 
 half hyperbolicCosineHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_cosh($0)";
-    default: return value;
-    }
+    return cosh(value);
 }
 
 half hyperbolicTangentHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_tanh($0)";
-    default: return value;
-    }
+    return tanh(value);
 }
 
 half fusedMultiplyAddHalf(half left, half right, half addend)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_fma($0, $1, $2)";
-    default: return left * right + addend;
-    }
+    return fma(left, right, addend);
 }
 
 void sineCosineFloat(float value, out float sineValue, out float cosineValue)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
-    default:
-        sineValue = value;
-        cosineValue = value;
-        return;
-    }
+    sincos(value, sineValue, cosineValue);
 }
 
 void sineCosineDouble(double value, out double sineValue, out double cosineValue)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_sincos($0, $1, $2)";
-    default:
-        sineValue = value;
-        cosineValue = value;
-        return;
-    }
+    sincos(value, sineValue, cosineValue);
 }
 
 float frexpFloat(float value, out int exponent)

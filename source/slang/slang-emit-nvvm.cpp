@@ -3449,21 +3449,8 @@ static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[]
     {"$P_min($0, $1)", SLANG_NVVM_VALUE_OP_MIN, 2},
     {"$P_max($0, $1)", SLANG_NVVM_VALUE_OP_MAX, 2},
     {"$P_abs($0)", SLANG_NVVM_VALUE_OP_ABS, 1},
-    {"$P_acos($0)", SLANG_NVVM_VALUE_OP_ACOS, 1},
-    {"$P_asin($0)", SLANG_NVVM_VALUE_OP_ASIN, 1},
-    {"$P_atan($0)", SLANG_NVVM_VALUE_OP_ATAN, 1},
-    {"$P_atan2($0, $1)", SLANG_NVVM_VALUE_OP_ATAN2, 2},
-    {"$P_cos($0)", SLANG_NVVM_VALUE_OP_COS, 1},
-    {"$P_fma($0, $1, $2)", SLANG_NVVM_VALUE_OP_FMA, 3},
-    {"$P_fmod($0, $1)", SLANG_NVVM_VALUE_OP_FMOD, 2},
     {"$P_isnan($0)", SLANG_NVVM_VALUE_OP_IS_NAN, 1},
-    {"$P_pow($0, $1)", SLANG_NVVM_VALUE_OP_POW, 2},
     {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
-    {"$P_sin($0)", SLANG_NVVM_VALUE_OP_SIN, 1},
-    {"$P_sinh($0)", SLANG_NVVM_VALUE_OP_SINH, 1},
-    {"$P_tan($0)", SLANG_NVVM_VALUE_OP_TAN, 1},
-    {"$P_tanh($0)", SLANG_NVVM_VALUE_OP_TANH, 1},
-    {"$P_cosh($0)", SLANG_NVVM_VALUE_OP_COSH, 1},
     {"__ballot_sync($0, $1)", SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT, 2},
     {"_slang_vector_dot", SLANG_NVVM_VALUE_OP_BFLOAT16_DOT, 2},
     {"clock", SLANG_NVVM_VALUE_OP_CLOCK, 0},
@@ -3660,7 +3647,6 @@ enum class NVVMScalarIntrinsicRecipeKind
     IsFiniteFloating,
     IsInfiniteFloating,
     IsNaNHalf,
-    SinCos,
     Frexp,
     FrexpHalf,
     ModfHalf,
@@ -4030,20 +4016,6 @@ bool _resolveNVVMScalarIntrinsicRecipe(
          1,
          0,
          "Float16 NaN classification"},
-        {"$P_sincos($0, $1, $2)",
-         NVVMScalarIntrinsicRecipeKind::SinCos,
-         NVVMSemantics::kVoid,
-         {NVVMSemantics::kFloat32, NVVMSemantics::kFloat32, NVVMSemantics::kFloat32},
-         3,
-         6,
-         "Float32 sine/cosine pair"},
-        {"$P_sincos($0, $1, $2)",
-         NVVMScalarIntrinsicRecipeKind::SinCos,
-         NVVMSemantics::kVoid,
-         {NVVMSemantics::kFloat64, NVVMSemantics::kFloat64, NVVMSemantics::kFloat64},
-         3,
-         6,
-         "Float64 sine/cosine pair"},
         {"$P_frexp($0, $1)",
          NVVMScalarIntrinsicRecipeKind::Frexp,
          NVVMSemantics::kFloat32,
@@ -4271,19 +4243,6 @@ bool _resolveNVVMScalarIntrinsicRecipe(
                    NVVMSemantics::kBool,
                    NVVMSemantics::kBool,
                    NVVMSemantics::kBool,
-                   outRecipe.diagnosticName);
-    case NVVMScalarIntrinsicRecipeKind::SinCos:
-        return _appendNVVMScalarIntrinsicUnaryStep(
-                   outRecipe,
-                   SLANG_NVVM_VALUE_OP_SIN,
-                   outRecipe.parameterTypes[0],
-                   outRecipe.parameterTypes[0],
-                   outRecipe.diagnosticName) &&
-               _appendNVVMScalarIntrinsicUnaryStep(
-                   outRecipe,
-                   SLANG_NVVM_VALUE_OP_COS,
-                   outRecipe.parameterTypes[0],
-                   outRecipe.parameterTypes[0],
                    outRecipe.diagnosticName);
     case NVVMScalarIntrinsicRecipeKind::Frexp:
         return _appendNVVMScalarIntrinsicUnaryStep(
@@ -12951,47 +12910,6 @@ SlangResult _emitNVVMScalarIntrinsicRecipe(
                 result));
         }
         break;
-    case NVVMScalarIntrinsicRecipeKind::SinCos:
-        {
-            SlangNVVMValueHandle sine = nullptr;
-            SlangNVVMValueHandle cosine = nullptr;
-            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-                codeGenContext,
-                builder,
-                module,
-                recipe.steps[0],
-                parameters,
-                1,
-                sine));
-            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
-                codeGenContext,
-                builder,
-                module,
-                recipe.steps[1],
-                parameters,
-                1,
-                cosine));
-            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
-                codeGenContext,
-                builder,
-                module,
-                recipe,
-                1,
-                parameters[1],
-                sine));
-            SLANG_RETURN_ON_FAIL(_emitNVVMScalarIntrinsicOutStore(
-                codeGenContext,
-                builder,
-                module,
-                recipe,
-                2,
-                parameters[2],
-                cosine));
-            return _requireBuilderOperation(
-                codeGenContext,
-                "scalar intrinsic recipe void return",
-                builder.emitReturnVoid(module));
-        }
     case NVVMScalarIntrinsicRecipeKind::Frexp:
         {
             SlangNVVMValueHandle exponent = nullptr;

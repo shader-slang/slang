@@ -17,7 +17,6 @@ enum class ValueOperationFamily : uint32_t
     IntegerCompare,
     FloatUnary,
     FloatBinary,
-    FloatTernary,
     FloatClassification,
     FloatSign,
     FloatCompare,
@@ -362,38 +361,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_SIN,
-        kFloat32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 sine",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_COS,
-        kFloat32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 cosine",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_SIN,
-        kFloat64,
-        {kFloat64, kNoType, kNoType},
-        1,
-        "float64 sine",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_COS,
-        kFloat64,
-        {kFloat64, kNoType, kNoType},
-        1,
-        "float64 cosine",
-        true,
     },
     {
         SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
@@ -908,11 +875,7 @@ inline bool resolveValueOperationFamily(
     const bool isScalarFloat32Or64Unary =
         isUnaryFloat && (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
         desc.resultType.laneCount == 1;
-    const bool isScalarMathUnary =
-        desc.operation == SLANG_NVVM_VALUE_OP_ABS || desc.operation == SLANG_NVVM_VALUE_OP_ACOS ||
-        desc.operation == SLANG_NVVM_VALUE_OP_ASIN || desc.operation == SLANG_NVVM_VALUE_OP_ATAN ||
-        desc.operation == SLANG_NVVM_VALUE_OP_SINH || desc.operation == SLANG_NVVM_VALUE_OP_COSH ||
-        desc.operation == SLANG_NVVM_VALUE_OP_TANH || desc.operation == SLANG_NVVM_VALUE_OP_TAN;
+    const bool isScalarMathUnary = desc.operation == SLANG_NVVM_VALUE_OP_ABS;
     if (isScalarFloat16Abs || (isScalarFloat32Or64Unary && isScalarMathUnary))
     {
         outResolution = {
@@ -964,9 +927,7 @@ inline bool resolveValueOperationFamily(
         (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
         desc.resultType.laneCount == 1 && areSameType(desc.resultType, desc.operandTypes[0]) &&
         areSameType(desc.resultType, desc.operandTypes[1]);
-    if (isScalarFloat32Or64Binary &&
-        (desc.operation == SLANG_NVVM_VALUE_OP_ATAN2 ||
-         desc.operation == SLANG_NVVM_VALUE_OP_FMOD || desc.operation == SLANG_NVVM_VALUE_OP_POW))
+    if (isScalarFloat32Or64Binary && desc.operation == SLANG_NVVM_VALUE_OP_FMOD)
     {
         outResolution = {
             ValueOperationFamily::FloatBinary,
@@ -989,18 +950,6 @@ inline bool resolveValueOperationFamily(
             "scalar floating-point minimum or maximum",
             true,
         };
-        return true;
-    }
-
-    const bool isScalarFloat32Or64Ternary =
-        desc.operandCount == 3 && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-        (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
-        desc.resultType.laneCount == 1 && areSameType(desc.resultType, desc.operandTypes[0]) &&
-        areSameType(desc.resultType, desc.operandTypes[1]) &&
-        areSameType(desc.resultType, desc.operandTypes[2]);
-    if (isScalarFloat32Or64Ternary && desc.operation == SLANG_NVVM_VALUE_OP_FMA)
-    {
-        outResolution = {ValueOperationFamily::FloatTernary, "scalar fused multiply-add", true};
         return true;
     }
 

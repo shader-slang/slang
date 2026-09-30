@@ -1,88 +1,68 @@
 # NVVM current status
 
-The log/log2/log10 core migration and full environment checkpoint are accepted. Core NVVM branches
-select six libdevice names; Half widens exactly, evaluates Float32 and narrows once. Numeric
-operations 60/61/62, their semantic tags and CUDA-text recognizers are retired. The module range
-is `min = max = 43`; provider ABI 46 and container format 2 remain unchanged.
+The broad core-math migration is accepted after the log family. Thirteen public operations now
+select 26 named libdevice functions; `sincos` and floating/integer `mad` compose in the core.
+Twelve numeric operations and thirteen tag/text routes are retired. Numeric FMOD 58 remains for
+canonical `FRem`. Integer `mad` and scalar Half `sincos` are newly supported and have exact runtime
+smoke coverage. Module 43, provider ABI 46 and container format 2 remain unchanged.
 
-**Continuation explicitly resumed under the faster workflow on 2026-09-30.** The maintainer
-superseded the stop-after-log request: use eight build jobs, larger related intrinsic batches,
-focused compile/PTX checks and no routine module-version bumps. Prioritize removal of CUDA-string
-recognizers. No Slack, push or system changes. Raw log-family evidence stays under ignored
-`build/nvvm-log-family/`; active plans and report drafts remain uncommitted. The user's untracked
-`tests/cuda/complex/tiled_brass_material_mtlx_update.slang` remains unchanged.
+**Continue under the accelerated workflow authorized on 2026-09-30.** Use eight build jobs,
+larger related intrinsic batches, focused compile/PTX checks and no routine module-version bumps.
+The maintainer superseded the stop-after-log request and automatic full-suite cadence. Prioritize
+removal of CUDA-string recognizers. No push, Slack or system changes. Preserve the user's untracked
+`tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
-Read [WORKFLOW](WORKFLOW.md), the [architecture](../docs/design/nvvm-backend.md),
+Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
-[HISTORY](HISTORY.md) explains Git recovery. The [accepted baseline](accepted-baseline.json),
-[identity](accepted-identity.json) and [focused evidence](focused-evidence.json) own current results.
+[HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
+`build/nvvm-core-math/`; plans and reports remain uncommitted.
 
-## Accepted validation
+## Latest focused acceptance
 
 | Evidence | Result |
 | --- | --- |
-| Cases / sources / mode cells | 580 / 576 / 1,740; all 1,356 frozen and 384 discovery outcomes unchanged |
-| Main outcomes | 1,704 correct; 36 unresolved and 21 resolved histories retained |
-| Physical surfaces | 249 cells: 214 pass, 24 compile failures, 11 retained NVRTC mismatches |
-| Native units | 1,189 identities: 1,177 pass, 12 inherited skips; 12 new log-family passes |
-| Semantic regressions | 1,248 identities: 1,170 pass, 78 inherited skips; unchanged |
-| Focused coverage | 95 units mapped to full native; 90 GPU cells, 12 tag diagnostics, 106 capability tests |
-| Oracles | Eight suites / 30 fixtures; log checker reference/path controls and fixture/source mutations passed |
-| Log-family preservation | All 27 raw mode buffers byte-identical to their respective baselines |
-| Selected neighbors | 156 cells: 153 frozen and three discovery outcomes unchanged |
-| Runtime / toolkit / material | 4 / 18 / 6 pass; material coverage remains compile/assembly only |
-| Runner contracts | 119 pass, one inherited skip; 83 surface CPU contracts pass |
-| Module boundary | 192 baseline module42 phases; 90 old rejection phases; 96 fresh module43 phases; three static units |
-| Focused features | 27; all 26 prior feature objects retain their original evidence identities |
-| Last full / targeted / implementations since full | log-family / log-family / 0 |
-| Validation stability | 139 source, two configuration, 39 runtime and 100 layout entries unchanged |
+| Build | Eight-job main build passed; later rebuilds changed only unit tests |
+| Focused units | 23 pass, including 26 named signatures and 39 public width paths |
+| CUDA smoke | 17 pass; 14 non-CUDA subtests explicitly excluded |
+| Material PTX | One representative material compiled and assembled through NVRTC O3 and NVVM O3 |
+| PTX comparison | SM80, 64-bit addresses, expected entry and live stores; no byte/numerical equivalence claim |
+| Last full / targeted / implementations since full | log-family / core-math / 1 |
+| Historical evidence | Full baseline/identity unchanged; all 27 earlier feature objects preserved |
 
-The numerical corpus has 91/62/62 Half/Float32/Float64 inputs for log and log2 and 91/62/80 for
-log10: 663 inputs with 15 live observations each. Independent signed references qualify the
-empirical, non-guaranteed library spacing/encoding union; CUDA Half checks ideal RN-even results
-on this finite corpus. All such checks passed without tolerance changes. Bounded correction/path
-controls preserve distinct CUDA Half algorithms without claiming complete PTX approximation
-qualification. CUDA double log10 retains its existing RN32 input / Float32 evaluation / Float64
-widening path, confirmed in emitted source/PTX; preservation is not true-double accuracy evidence.
-All 27 raw buffers, including NaN payloads, retain their own target/mode baseline bytes.
+The initial compile errors, fake-builder capacity/shape assumptions and intentional alias-warning
+failure are retained with their resolutions. The corrected unit tests preserve direct Half
+widen/call/narrow checks without assuming a fixed inlining shape. No full corpus, static-version,
+old-module or new numerical-oracle campaign ran for this batch.
 
-Named library admission now covers round, ceil, floor, trunc, rsqrt, exp, exp2, log, log2 and log10.
-Selected definitions own signatures. No shared signature validation, ABI or loading behavior
-changed. One final main build and one isolated static build were used. Direct retired-ID/text
-negatives prove rejection independently of the module-version boundary.
+## Current tested identity
 
-The initial runtime4/toolkit18 qualification used the unchanged accepted compiler on the new
-machine. The full final checkpoint supplies environment requalification and the originally requested
-stop-point gate. The campaign's full native run satisfies focused units; checkpoint cells satisfy the selected
-neighbor/runtime/material obligations. Those checks were not rerun separately. Preserved failures
-include an invalid source-probe profile, a review
-path-binding preflight failure, a source-gate filename collision and a static-cache wrapper
-regex/detail-path failure. The cache initialized without running tests; a separate receipt validates
-that observation while preserving the failed wrapper. Reviewed recovery reused
-completed gates with unchanged identities/timestamps instead of repeating successful tests.
+Revision `dc0a9acc36a74ac31912a010672a0a116f4e2883` plus compiler patch
+`2b3fbdae8d3d4ef49a80822cfabb676dc5ea71a7a94b3de8fa6d280be1972226`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `fce265212542c21bd2d6d6babd7afada5c6605b2db1a840bdb56e1cf3a0f19f9`.
+Provider SHA-256: `d285dd06326eabec1a35a6e32a5c004b1d7639fdff1c83003a18b19ad6e72d7b`.
+The later commit does not relabel these binaries. Current source/runtime hashes and exact focused
+outcomes live in `focused-evidence.json` under `features.nvvm-core-math`.
 
-## Tested identity
+The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
+still identify the earlier **full log-family checkpoint**, not these current binaries. That full
+run preserved all 1,740 corpus and 249 surface outcomes: 1,704 correct main outcomes, 36 unresolved
+and 21 resolved histories; surfaces 214 pass, 24 compile failures and 11 NVRTC mismatches.
+It passed 1,177 native tests with 12 inherited skips and 1,170 semantic tests with 78 skips,
+plus runtime 4 / toolkit 18 / material 6. Runner checks passed 119 with one skip, plus 83 surface
+contracts. Log numerical preservation covered all 27 buffers. Earlier feature/static/material-runtime/performance claims
+retain their original identities.
 
-Source revision `76f3cb8763f5847c133b91a69d47b87675f2a068` plus compiler patch
-`1d27642656a5990e0b9d8dac54a04a55c6392a1ff43762d134ebd2f54141d56d`, compiler version
-`2026.18.3-349-g76f3cb876`. The later acceptance commit does not relabel these compiled bytes.
-Compiler SHA-256: `29f55117eba63e74eeb350a624ea732a00f281dad44cf4844167b5be203824dc`.
-Provider SHA-256: `2bedd7348e2c04a7cc10686f1d577831bb759ab60e50e74294b0b9bf95aa404f`.
-
-Qualification: native Ubuntu 24.04, L4 SM89, driver 595.71.05, CUDA 12.9.2 / NVRTC 12.9.86,
-LLVM 14 and target SM80. GPU UUID `GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736`; host has eight
-logical AMD EPYC CPUs and about 30 GiB RAM. Earlier feature, static, material-runtime and performance
-claims retain their original tested identities. No new performance claim follows from the upgrade.
+Environment: native Ubuntu 24.04, eight logical AMD EPYC CPUs, about 30 GiB RAM, L4 SM89,
+UUID `GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736`, driver 595.71.05, CUDA 12.9.2 / NVRTC 12.9.86,
+LLVM 14, target SM80. No performance claim follows from the upgrade.
 
 ## Next action
 
-Continue the core-intrinsic migration in larger batches under WORKFLOW. Inventory remaining math,
-compound and wave consumers; use existing named calls and core composition, then retire their
-legacy CUDA-text/tag routes. The earlier single-atan proposal is superseded by the larger-batch
-priority. Use focused compile/PTX/unit checks and small runtime selections where semantics require
-execution. Do not repeat this full checkpoint for each addition or bump module43 routinely.
-Preserve the user's untracked material and keep current tested identities distinct from historical
-full evidence.
+Move bit transport and floating classification into core expressions using existing bit casts,
+shifts, masks and assignments. Reuse Half conversion/classification smoke tests. Keep pointer-result
+frexp/modf, wave synchronization and resource/atomic boundaries separate where their behavior
+requires different lowering. Continue larger batches, preserve numeric holes and do not bump module 43
+for ordinary source migrations; stale prototype modules may need recompilation.
 
 ## Retained boundaries
 

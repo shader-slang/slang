@@ -205,6 +205,18 @@ of true-double accuracy. The corpus excludes negative tiny doubles that narrow t
 its common NaN classification does not establish that untested case. Direct retired-ID rejection
 and legacy-text preflight tests remain independent of old-module version rejection.
 
+Public `sin`, `cos`, `acos`, `asin`, `atan`, `atan2`, `pow`, `tan`, `sinh`, `cosh`, `tanh`, `fma`
+and `fmod` use 26 selected Float32/Float64 library names. Shared table-driven units cover their
+real-provider signatures, explicit argument order, Half widen/call/narrow composition and scalar/vector
+public paths. Twelve retired numeric IDs reject without module mutation; all thirteen legacy tag/text
+routes and legacy `sincos` text reject before output. FMOD 58 remains for canonical `kIROp_FRem`.
+Core `sincos` assigns sine then cosine, floating `mad` calls `fma`, and integer `mad` uses multiply/add.
+The small [composition smoke](../../tests/cuda/nvvm-core-math-composition.slang) checks exact
+runtime-loaded integer `mad` results across signed/unsigned widths, scalar Half/Float32/Float64
+`sincos` at zero, aliased output order and floating `mad`, under NVVM O0/O3. Integer `mad` and scalar
+Half `sincos` are new support. These focused checks establish routing and composition, without
+claiming a new per-operation numerical qualification. Current acceptance remains owned by STATUS.
+
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider
 admission; public vector/matrix operations map to scalar calls. Pure queries reject floating
