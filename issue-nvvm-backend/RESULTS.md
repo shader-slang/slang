@@ -45,6 +45,13 @@ comparison decides preservation. Running processes are killed as a group after t
 
 ## Correctness baseline and comparison
 
+For an authorized migration after a host/driver change with unchanged verified compiler/toolkit
+bytes, follow WORKFLOW's consolidated sequence: run the existing runtime and toolkit validators
+first, capture old migration controls on the new environment, then run the full checkpoint and
+remaining full-acceptance gates on the final compiler. Preserve the historical accepted baseline
+until exact comparison and review succeed. Do not duplicate focused tests already represented by
+the final full run; retain their exact identity-to-result mapping.
+
 After a master/toolchain merge, first run the small GPU gate and full corpus wrapper:
 
 ```bash

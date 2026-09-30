@@ -15,9 +15,10 @@ NVVM semantic-tag extension after its users migrate. Continue through reviewed l
 until these slices finish or a human decision is needed. The maintainer subsequently authorized
 a prototype module-version break: reject earlier capability layouts before deserialization and
 require old modules to be recompiled; stable historical capability decoding is outside this slice.
-The maintainer's stop-after-exp request was satisfied by the accepted local exp commit. On
-2026-09-30 the maintainer explicitly resumed the remaining migration and approved the streamlined
-workflow below. Start with exp2, then handle log/log2/log10 as a bounded family. Keep remaining
+The maintainer's stop-after-exp request was satisfied by the accepted local exp commit. Exp2 and
+its full checkpoint were subsequently accepted before a reboot stop. The maintainer
+explicitly resumed on 2026-09-30 and approved the streamlined validation sequence below. Continue
+with log/log2/log10 as a bounded family. Keep remaining
 math, compound and wave work separate where their semantics or consumers differ. Do not undertake
 build-system, caching or parallelism investigations as part of this continuation.
 STATUS records the current evidence and next leads. Earlier independent review
@@ -82,6 +83,22 @@ calling convention and validation structure. Preserve operation-specific numeric
 negative tests. A family accepted in one commit is one implementation for checkpoint cadence; do
 not enlarge a batch merely to evade a checkpoint or combine unrelated unresolved semantics.
 
+Do not run the same test twice merely because it appears in focused and full manifests. A full
+native run subsumes its focused units; a full checkpoint subsumes matching neighbor, runtime and
+material cells on the same final identity. Preserve the selection-to-result mapping so subsumption
+is verifiable. Targeted acceptance requires relevant units, not an automatic full native run.
+Reuse unchanged artifacts after identity verification instead of rebuilding for baseline capture.
+Performance measurements are unnecessary for a semantic migration without performance claims.
+
+For operation migrations through an unchanged selected-library path, numerical validation must
+include independent references, special values, width/ordering controls and exact per-mode
+before/after buffers. Scope unchanged CUDA algorithm checks to controls that distinguish the actual
+paths; a comprehensive new qualification of CUDA approximations is not required. Review and freeze
+the reduced contract before baseline observations, state its limitations, and keep known target
+differences separate. Differential preservation does not replace independent numerical checks or
+prove universal accuracy. The log family retains all three execution modes, Half ordering controls
+and the existing CUDA double-log10 narrowing limitation.
+
 ## Acceptance and checkpoint cadence
 
 For compiler changes, require focused positive/boundary/negative coverage and real GPU outputs at
@@ -103,6 +120,15 @@ qualified named-library path, removing its operation-specific legacy routes, or 
 prototype semantic-version rejection boundary does not by itself trigger a full checkpoint. Require
 focused proof of those boundaries and document why shared behavior is unchanged. A larger provider
 or library change still triggers the full gate; merely touching such a file does not determine risk.
+
+After an environment change with verified unchanged compiler/toolkit artifacts, first qualify the
+existing compiler with the runtime and toolkit gates and capture the new device/driver identity.
+Only then capture migration baselines on that environment. One full checkpoint on the final compiler
+may satisfy both environment requalification and migration acceptance, including a requested stopping
+point. Do not additionally run a full pre-migration checkpoint by default. If initial qualification
+fails or final comparison exposes a regression, stop feature work and investigate with the preserved
+old artifacts before accepting anything. Keep the historical baseline unchanged until final full
+acceptance; the initial gates alone do not establish complete environment equivalence.
 
 Full acceptance includes the native, toolkit and runner gates in RESULTS. Targeted acceptance keeps
 the last full baseline and its tested identity unchanged, records fresh source/runtime identity and

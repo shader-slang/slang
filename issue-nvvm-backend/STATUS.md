@@ -5,10 +5,12 @@ The exp2 core migration and full checkpoint are accepted. The core explicitly se
 Numeric operation 56, its semantic tag and CUDA-text recognizer are retired. The module range is
 `min = max = 42`; provider ABI 46 and container format 2 remain unchanged.
 
-**Stopped after exp2 for the maintainer's machine reboot. Wait for explicit resume.** This
-supersedes the earlier continuation request. No logarithm-family implementation or baseline
-execution has started. No Slack, push or system changes. Raw evidence is under ignored
-`build/nvvm-exp2/`; active plans and reports remain uncommitted.
+**Resumed explicitly on 2026-09-30 after the reboot.** The maintainer approved the streamlined
+validation in WORKFLOW: qualify the existing compiler with runtime/toolkit gates, capture log-family
+baselines, then run one full checkpoint on the final compiler. Log-family preparation is active;
+implementation and baseline execution have not started. No Slack, push or system changes.
+Raw evidence is under ignored `build/nvvm-exp2/` and `build/nvvm-log-family/`; active plans and reports
+remain uncommitted.
 
 Read [WORKFLOW](WORKFLOW.md), the [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
@@ -62,9 +64,9 @@ static tests cover historical versions 31–38 and a dynamic future version. Imm
 cover exact version41 rejection. Earlier feature, material-runtime and performance evidence retains
 its original tested identity.
 
-## Resume after reboot
+## Current continuation
 
-1. Wait for explicit resume, then read this file and WORKFLOW. Check the working tree and preserve
+1. Resume is authorized. Read this file and WORKFLOW. Check the working tree and preserve
    the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 2. Verify actual compiler, provider, core-module, configuration and runtime-layout identities against
    accepted-identity.json. Recheck CUDA/toolkit, driver, device and target architecture after reboot.
@@ -76,7 +78,7 @@ its original tested identity.
    ordinary comma-separated `__intrinsic_asm` arguments.
 4. Read the unaccepted preparation under `build/nvvm-log-family/worker/`: `policy-proposal.md`,
    `plan-proposal.md` and `scope.json`. Create a bounded ExecPlan. Independently review and freeze
-   signed logarithm references, PTX lg2 bounds, special values and concrete correction controls
+   signed logarithm references, special values and bounded CUDA correction/path controls
    before capturing old-module or GPU baselines. No prepared proposal is accepted runtime evidence.
 5. Preserve distinct CUDA Half algorithms: log2 corrections use the evolving result; log/log10
    corrections use the input. Confirm the emitted CUDA `double log10` path: its existing
@@ -86,6 +88,14 @@ its original tested identity.
    and combine the family migration/version bump in one build. Keep direct retired-ID/text negatives
    independent of version rejection. Then continue remaining math, compound-text migrations and
    recorded wave work as separately bounded slices, subject to checkpoint cadence and review.
+
+Post-reboot inspection found all 126 source, 39 runtime/toolkit, two configuration and 100 layout
+entries unchanged against accepted-identity.json. HEAD is `af34a0ef4`. The current host has eight
+logical AMD EPYC CPUs and about 30 GiB RAM. Device remains L4 SM89, but UUID changed to
+`GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736` and driver changed to 595.71.05. These observations are
+not new accepted GPU results. Full requalification is pending; the accepted identities above retain
+their historical driver and device. The worker proposal's older cadence is superseded: exp2 is
+the last full checkpoint and there are zero accepted implementations since it.
 
 ## Retained boundaries
 
