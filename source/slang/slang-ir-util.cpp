@@ -3485,24 +3485,53 @@ bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
     if (!isReadNoneCallee(callee))
         return false;
 
-    // We look the annotations up on the callee as it appears at the call site.
-    // For a generic primary that is the `IRSpecialize`, which is where its
-    // derivative annotations live, so a generic `[__readNone]` primary with a
-    // side-effecting derivative is caught. The built-in derivatives in
-    // `diff.meta.slang` are `[__readNone]`, so generic math calls such as `dot`
-    // stay elidable.
-    IRBuilder builder(callee->getModule());
+    // Look annotations up on the resolved inner function rather than on the
+    // unresolved callee. This is intentionally conservative: stdlib generics
+    // (e.g. `sqrt`) attach `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`
+    // annotations on the `IRSpecialize` wrapper, and not all of those
+    // derivatives are marked `[__readNone]` even though they are pure (e.g.
+    // `__d_reflect`). Looking them up on the unresolved callee would find
+    // them and force a non-readNone verdict on every call site to such a
+    // stdlib math function, regressing the false-positive fixes from #11286.
+    //
+    // The trade-off is that user-defined generic primaries (whose
+    // `[ForwardDerivative]` / `[BackwardDerivative]` annotations also live
+    // on the `IRSpecialize`) bypass this gate. That's an under-approximation
+    // — a generic `[__readNone]` primary with a side-effecting user-supplied
+    // derivative is not currently caught. A more accurate fix would
+    // distinguish "stdlib-style pure derivative not explicitly annotated"
+    // from "user-supplied derivative with possible side effects" without
+    // requiring stdlib annotation churn; see follow-up tracking.
+    IRInst* annotated = getResolvedInstForDecorations(callee);
+    if (!annotated)
+        return true;
 
-    // Only these kinds associate a derivative *callee*. The others associate a
-    // type or witness table, or a remat callee that only rebuilds a context and
-    // never runs the user's derivative body. A new kind left out here would
-    // silently suppress E41031, so we force the decision to be re-made
-    // whenever the enum changes.
+    IRBuilder builder(annotated->getModule());
+
+    // These are the annotation kinds whose value is a derivative *callee* that
+    // runs after the autodiff transform, and so can have side effects. The
+    // other kinds are deliberately absent:
+    //
+    //  - `BackwardDerivativeContext` and `BackwardDerivativeMinimalContext`
+    //    associate a *type* (the `BwdCallable` / minimal-context types), so
+    //    there is no body to be impure.
+    //  - `BackwardDerivativeContextRemat` associates a remat callee, but a
+    //    remat only reconstructs the context it is handed; it never runs the
+    //    user's derivative body. This holds semantically, not by op-code: the
+    //    legacy `kIROp_Backward*Remat*` ops are unconditionally readNone in
+    //    `isReadNoneCallee`, but a `__apply` extension synthesizes
+    //    `kIROp_IdentityRemat`, which is not among them.
+    //  - The two `FwdDiff*WitnessTable` kinds associate witness tables, and
+    //    the `Differential*` kinds are attached to differentiable *types*,
+    //    never to a function.
+    //
+    // A new kind left out here would silently suppress E41031, so we force the
+    // decision to be re-made whenever the enum changes.
     static_assert(
         int(AnnotationKind::CountOf) == 16,
         "AnnotationKind changed: does the new kind associate a derivative "
         "callee that can have side effects? If so, add it here.");
-    static const AnnotationKind kDerivativeKinds[] = {
+    static const AnnotationKind kDerivativeCalleeKinds[] = {
         AnnotationKind::ForwardDerivative,
         // For a legacy `[BackwardDerivative]` this is
         // `BackwardPrimalFromLegacyBwdDiffFunc(primary, bwd)`, which
@@ -3516,9 +3545,9 @@ bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
         // context's `operator()`.
         AnnotationKind::BackwardDerivativePropagate,
     };
-    for (auto kind : kDerivativeKinds)
+    for (auto kind : kDerivativeCalleeKinds)
     {
-        IRInst* derivativeFunc = builder.tryLookupAnnotation(callee, kind);
+        IRInst* derivativeFunc = builder.tryLookupAnnotation(annotated, kind);
         if (derivativeFunc && !isReadNoneCallee(derivativeFunc))
             return false;
     }

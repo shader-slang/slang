@@ -1,12 +1,12 @@
 // Companion to no-diff-carry-readnone-derivative.slang for issue
 // shader-slang/slang#11374.
 //
-// A derivative variant marked `[PreferRecompute(SideEffectBehavior.Allow)]`
-// has explicitly opted OUT of the side-effect-free guarantee — that form
-// only suppresses the side-effect warning. The carry-set gate must NOT treat
-// such a derivative as readNone-elidable, so storing the call result into a
-// no_diff slot must still fire E41031. This guards against the readNone gate
-// accepting `[PreferRecompute]` unconditionally as a purity signal.
+// `[PreferRecompute(SideEffectBehavior.Allow)]` only suppresses the
+// side-effect warning; like the default form, it says nothing about purity.
+// A side-effecting derivative carrying it must still make the call carry, so
+// storing the call result into a no_diff slot fires E41031. This guards
+// against the carry-set gate treating `[PreferRecompute]` in any form as a
+// purity signal.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 

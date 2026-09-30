@@ -207,18 +207,19 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
-// Controls what the compiler does when a `[PreferRecompute]` function is found
-// to have side effects. Keep these values in sync with the `SideEffectBehavior`
-// enum in core.meta.slang, which is the user-visible spelling; both the
-// front-end attribute (`PreferRecomputeAttribute`) and the IR consumers of
-// `IRPreferRecomputeDecoration` decode its operand against these values.
+// Controls whether `checkAutodiffPatterns` warns when a `[PreferRecompute]`
+// function has side effects; neither value says anything about purity. The
+// user-visible `SideEffectBehavior` enum in core.meta.slang takes its values
+// from this one, and they are stored as the integer operand of
+// `IRPreferRecomputeDecoration`, so renumbering them changes the meaning of
+// already-compiled modules.
 enum class SideEffectBehavior
 {
     // Warn if the decorated function is detected to have side effects.
     Warn = 0,
 
-    // Suppress that warning — the author accepts that the side effects may run
-    // more than once, so the decoration is no longer a purity signal.
+    // Suppress that warning: the author accepts that the side effects may run
+    // more than once.
     Allow = 1,
 };
 
