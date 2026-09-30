@@ -220,7 +220,7 @@ warning(
 err(
     "layout-rules-version-unsupported-for-target",
     23,
-    "layout rules version 202c and later is only supported when emitting SPIR-V directly; target '~target' is generated through GLSL, where type sizes cannot be rounded up to their alignment"
+    "layout rules version 202c and later cannot be used for target '~target', which is generated through GLSL: glslang does not round scalar-layout struct sizes up to their alignment. Emit SPIR-V directly instead."
 )
 
 err(

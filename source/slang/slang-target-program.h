@@ -127,6 +127,11 @@ private:
     // The computed layout, if it has been generated yet
     RefPtr<ProgramLayout> m_layout;
 
+    // Whether `getOrCreateLayout` has already reported that the target cannot honor the requested
+    // layout rules version. The layout is never created in that case, so we remember the report
+    // to give it once per target program rather than once per request for the layout.
+    bool m_hasReportedUnsupportedLayoutRules = false;
+
     CompilerOptionSet m_optionSet;
     // Parallel backend emission shares these lazy result caches across threads.
     mutable std::mutex m_resultCacheMutex;

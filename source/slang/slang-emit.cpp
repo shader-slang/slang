@@ -1029,21 +1029,6 @@ Result linkAndOptimizeIR(
     // Get the artifact desc for the target
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
 
-    // Layout rules version 202c rounds scalar-layout aggregate sizes, which Slang can only honor
-    // where it assigns member offsets itself. When GLSL is generated, glslang lays out
-    // `layout(scalar)` blocks without that rounding, so we reject the combination rather than
-    // silently produce code whose layout differs from the requested rules.
-    auto& codeGenOptions = targetProgram->getOptionSet();
-    if (isScalarLayoutRoundingRequested(codeGenOptions) && isKhronosTarget(targetRequest) &&
-        !isScalarLayoutRoundedUpToAlignment(codeGenOptions))
-    {
-        if (sink)
-            sink->diagnose(Diagnostics::LayoutRulesVersionUnsupportedForTarget{
-                .target =
-                    TypeTextUtil::getCompileTargetName(asExternal(targetRequest->getTarget()))});
-        return SLANG_FAIL;
-    }
-
     // We start out by performing "linking" at the level of the IR.
     // This step will create a fresh IR module to be used for
     // code generation, and will copy in any IR definitions that

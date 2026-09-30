@@ -1,5 +1,5 @@
 // Under `-fvk-use-dx-layout`, structured buffers use natural layout, which is not scalar layout and
-// so is not rounded by `-layout-rules-version 202c`. What a pointer points at is still scalar
+// so is not rounded by `-layout-rules-version 202c`, in reflection or in the emitted SPIR-V. What a pointer points at is still scalar
 // layout, as is a buffer declared with `ScalarDataLayout`, and both follow 202c.
 //
 // `U.w` is at offset 12 in a 16-byte `U` without rounding, and at 16 in a 24-byte `U` with it.
@@ -42,8 +42,22 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     output[2] = pointers[0]->v.y;
 }
 
-// With 202c the `ScalarDataLayout` buffer is reflected with rounded scalar layout, and the pointee
+// The natural structured buffer keeps `U.w` at 12 and `U` at 16 bytes in reflection either way.
+// Without 202c, the `ScalarDataLayout` buffer has the same numbers, since unrounded scalar layout
+// equals natural layout; with 202c it is reflected with rounded scalar layout, and the pointee
 // follows 202c.
+// REFL_OLD: "name": "sb"
+// REFL_OLD: "name": "w"
+// REFL_OLD: "binding": {"kind": "uniform", "offset": 12, "size": 4
+// REFL_OLD: {"kind": "uniform", "value": 16, "alignment": 8}
+// REFL_OLD: "name": "sbScalar"
+// REFL_OLD: "name": "w"
+// REFL_OLD: "binding": {"kind": "uniform", "offset": 12, "size": 4
+// REFL_OLD: {"kind": "uniform", "value": 16, "alignment": 8}
+// REFL_NEW: "name": "sb"
+// REFL_NEW: "name": "w"
+// REFL_NEW: "binding": {"kind": "uniform", "offset": 12, "size": 4
+// REFL_NEW: {"kind": "uniform", "value": 16, "alignment": 8}
 // REFL_NEW: "name": "sbScalar"
 // REFL_NEW: "name": "w"
 // REFL_NEW: "binding": {"kind": "uniform", "offset": 16, "size": 4

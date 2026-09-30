@@ -522,7 +522,6 @@ enum class SideEffectAnalysisOptions
 enum class IRTypeLayoutRuleName
 {
     Natural,
-    Scalar = Natural,
     Std430,
     Std140,
     D3DConstantBuffer,
@@ -530,6 +529,10 @@ enum class IRTypeLayoutRuleName
     C,
     CUDA,
     LLVM,
+    /// Scalar layout under layout rules version 202c and later: natural layout, except that every
+    /// struct size is rounded up to a multiple of its alignment. Unrounded scalar layout is
+    /// `Natural`, so a target's scalar rule is one of the two (see
+    /// `isScalarLayoutRoundedUpToAlignment`).
     ScalarRounded,
     _Count,
 };

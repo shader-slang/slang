@@ -479,6 +479,9 @@ local insts = {
 			{ MetalParameterBlockLayout = { struct_name = "MetalParameterBlockLayoutType", hoistable = true } },
 			{ CUDALayout = { struct_name = "CUDABufferLayoutType", hoistable = true } },
 			{ LLVMLayout = { struct_name = "LLVMBufferLayoutType", hoistable = true } },
+			-- Compiler-internal encoding of natural layout, used only where the scalar op above
+			-- means rounded scalar layout (SPIR-V emitted directly with layout rules version 202c).
+			-- User code cannot name it; see `getStorageLayoutOpForRule`.
 			{ NaturalLayout = { struct_name = "NaturalBufferLayoutType", hoistable = true } },
 			{
 				SubpassInputType = {

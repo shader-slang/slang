@@ -93,19 +93,25 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // REFL_NEW: "name": "v"
 // REFL_NEW: "binding": {"kind": "uniform", "offset": 20, "size": 12
 
-// Emitted SPIR-V uses the same offsets and strides as reflection. `U`'s rounded numbers happen to
-// coincide with std430, so the `Q.v` offsets (16 unrounded, 20 rounded, 32 under std430) are what
-// show that the constant buffer and the pointee use rounded scalar layout.
-// SPV_OLD: OpMemberDecorate %U_{{[a-z_]+}} 1 Offset 12
-// SPV_OLD: OpDecorate %_runtimearr_U_{{[a-z_0-9]+}} ArrayStride 16
-// SPV_OLD: OpMemberDecorate %Q_{{[a-z_]+}} 1 Offset 12
-// SPV_OLD: OpMemberDecorate %Q_{{[a-z_]+}} 2 Offset 16
-// SPV_OLD: OpMemberDecorate %Q_{{[a-z_0-9]+}} 1 Offset 12
-// SPV_OLD: OpMemberDecorate %Q_{{[a-z_0-9]+}} 2 Offset 16
+// Emitted SPIR-V uses the same offsets and strides as reflection. Each lowered struct is named
+// after its layout rule: `cb` points at `U_*`, the `sb` element is `U_*_0`, `cbQ` points at `Q_*`,
+// and the pointer in `params` points at `Q_*_0`. `U`'s rounded numbers happen to coincide with
+// std430, so the `Q.v` offsets (16 unrounded, 20 rounded, 32 under std430) are what show that the
+// constant buffer and the pointee use rounded scalar layout.
+// SPV_OLD: OpMemberDecorate %U_natural 1 Offset 12
+// SPV_OLD: OpMemberDecorate %U_natural_0 1 Offset 12
+// SPV_OLD: OpDecorate %_runtimearr_U_natural_0 ArrayStride 16
+// SPV_OLD: OpMemberDecorate %Q_natural 2 Offset 16
+// SPV_OLD: OpMemberDecorate %Q_natural_0 2 Offset 16
+// SPV_OLD: %_ptr_PhysicalStorageBuffer_Q_natural_0 = OpTypePointer PhysicalStorageBuffer %Q_natural_0
+// SPV_OLD: %cb = OpVariable %_ptr_Uniform_U_natural Uniform
+// SPV_OLD: %cbQ = OpVariable %_ptr_Uniform_Q_natural Uniform
 
-// SPV_NEW: OpMemberDecorate %U_{{[a-z_]+}} 1 Offset 16
-// SPV_NEW: OpDecorate %_runtimearr_U_{{[a-z_0-9]+}} ArrayStride 24
-// SPV_NEW: OpMemberDecorate %Q_{{[a-z_]+}} 1 Offset 16
-// SPV_NEW: OpMemberDecorate %Q_{{[a-z_]+}} 2 Offset 20
-// SPV_NEW: OpMemberDecorate %Q_{{[a-z_0-9]+}} 1 Offset 16
-// SPV_NEW: OpMemberDecorate %Q_{{[a-z_0-9]+}} 2 Offset 20
+// SPV_NEW: OpMemberDecorate %U_scalar_rounded 1 Offset 16
+// SPV_NEW: OpMemberDecorate %U_scalar_rounded_0 1 Offset 16
+// SPV_NEW: OpDecorate %_runtimearr_U_scalar_rounded_0 ArrayStride 24
+// SPV_NEW: OpMemberDecorate %Q_scalar_rounded 2 Offset 20
+// SPV_NEW: OpMemberDecorate %Q_scalar_rounded_0 2 Offset 20
+// SPV_NEW: %_ptr_PhysicalStorageBuffer_Q_scalar_rounded_0 = OpTypePointer PhysicalStorageBuffer %Q_scalar_rounded_0
+// SPV_NEW: %cb = OpVariable %_ptr_Uniform_U_scalar_rounded Uniform
+// SPV_NEW: %cbQ = OpVariable %_ptr_Uniform_Q_scalar_rounded Uniform

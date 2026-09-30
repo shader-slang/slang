@@ -83,18 +83,34 @@ bool isKhronosTarget(CodeGenTarget target);
 bool isSPIRV(CodeGenTarget codeGenTarget);
 
 /// Does the layout rules version in `options` (`-layout-rules-version`) ask scalar layout to round
-/// the size of each aggregate type up to a multiple of its alignment? That is the case from 202c
-/// on. Whether the target honors the request is `isScalarLayoutRoundedUpToAlignment`.
+/// the size of each struct up to a multiple of its alignment? That is the case from 202c on, on any
+/// target; `isScalarLayoutRoundedUpToAlignment` says whether the target honors the request.
 bool isScalarLayoutRoundingRequested(CompilerOptionSet& options);
 
-/// Does scalar layout round the size of each aggregate type up to a multiple of its alignment
-/// for the target described by `options`?
+/// Does scalar layout round the size of each struct up to a multiple of its alignment for the
+/// target whose option set is `options`? `options` must be a target's option set (that of a
+/// `TargetRequest` or `TargetProgram`), because the answer depends on the target and on how SPIR-V
+/// is emitted.
 ///
-/// Rounding is part of layout rules version 202c and later (`-layout-rules-version`). We only
-/// apply it when SPIR-V is emitted directly, because that is the only Khronos path where Slang,
-/// rather than glslang, chooses the member offsets and array strides of the emitted code; applying
-/// it anywhere else would make reflection disagree with the generated code.
+/// Layout rules version 202c brings Slang's scalar layout in line with the struct-size rounding
+/// that microsoft/DirectXShaderCompiler#7996 added to DXC's `-fvk-use-scalar-layout`. Each target
+/// handles a 202c request in one of three ways:
+///
+/// - SPIR-V emitted directly: Slang chooses every member offset and array stride, so reflection
+///   and code generation both round.
+/// - GLSL, or SPIR-V generated through GLSL: glslang lays out `layout(scalar)` blocks without the
+///   rounding, so the request is rejected (`isScalarLayoutRoundingUnsupportedForTarget`) rather
+///   than letting reflection disagree with the generated code.
+/// - Every other target: the request is accepted and has no effect. DXC's option is a Vulkan
+///   option, so we scope the revision to Khronos targets; that also keeps it away from
+///   CPU-via-LLVM, where `ScalarDataLayout` and `-fvk-use-scalar-layout` also select Slang's
+///   scalar rules.
 bool isScalarLayoutRoundedUpToAlignment(CompilerOptionSet& options);
+
+/// Does `options` request layout rules version 202c or later for a Khronos target that cannot
+/// honor it because its code is generated through GLSL? `options` must be a target's option set;
+/// see `isScalarLayoutRoundedUpToAlignment` for the full case analysis.
+bool isScalarLayoutRoundingUnsupportedForTarget(CompilerOptionSet& options);
 
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);

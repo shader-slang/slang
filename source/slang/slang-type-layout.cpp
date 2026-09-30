@@ -420,6 +420,19 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 };
 
+// Scalar layout under layout rules version 202c and later: the default rules, except that
+// `EndStructLayout` rounds a struct's size up to a multiple of its alignment, which the default
+// rules deliberately skip. Fields are placed by the inherited `AddStructField`, so a field moves
+// only when it follows a nested struct whose size was rounded. Code generation implements the
+// same rule as `ScalarRoundedLayoutRules` (slang-ir-layout.cpp).
+struct ScalarRoundedLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
 /// Common behavior for GLSL-family layout.
 struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
 {
@@ -1316,16 +1329,6 @@ struct CUDARayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
 
 DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
 
-// Scalar layout as revised by layout rules version 202c: the struct size is rounded up to the
-// struct's alignment, which the default rules deliberately skip (see
-// `DefaultLayoutRulesImpl::EndStructLayout`). Field placement and scalar sizes are unchanged.
-struct ScalarRoundedLayoutRulesImpl : DefaultLayoutRulesImpl
-{
-    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
-    {
-        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
-    }
-};
 ScalarRoundedLayoutRulesImpl kScalarRoundedLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
@@ -3345,10 +3348,20 @@ bool isScalarLayoutRoundingRequested(CompilerOptionSet& options)
     return options.getLayoutRulesVersion() >= SLANG_LANGUAGE_VERSION_202C;
 }
 
+static bool isSPIRVEmittedDirectly(CompilerOptionSet& options)
+{
+    return isSPIRV(options.getTarget()) && options.shouldEmitSPIRVDirectly();
+}
+
 bool isScalarLayoutRoundedUpToAlignment(CompilerOptionSet& options)
 {
-    return isScalarLayoutRoundingRequested(options) && isSPIRV(options.getTarget()) &&
-           options.shouldEmitSPIRVDirectly();
+    return isScalarLayoutRoundingRequested(options) && isSPIRVEmittedDirectly(options);
+}
+
+bool isScalarLayoutRoundingUnsupportedForTarget(CompilerOptionSet& options)
+{
+    return isScalarLayoutRoundingRequested(options) && isKhronosTarget(options.getTarget()) &&
+           !isSPIRVEmittedDirectly(options);
 }
 
 bool isCPUTarget(TargetRequest* targetReq)
@@ -4564,12 +4577,17 @@ RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     auto& options = context.targetReq->getOptionSet();
     auto structuredBufferLayoutRules = context.getRulesFamily()->getStructuredBufferRules(options);
 
-    // Code generation always honors an explicit `ScalarDataLayout` on a structured buffer. When
-    // that selects rounded scalar layout, reflection must use it as well to agree with the code.
+    // Reflection lays out a structured buffer with the family's structured-buffer rules and
+    // ignores an explicit data layout, which code generation honors; for example,
+    // `RWStructuredBuffer<T, ScalarDataLayout>` reflects std430 by default. The one exception is
+    // an explicit `ScalarDataLayout` on a target that rounds scalar layout: layout rules version
+    // 202c is new, so its reflection can match code generation without changing the reflection
+    // of existing code.
     auto sbType = as<HLSLStructuredBufferTypeBase>(structuredBufferType);
-    if (sbType && as<ScalarDataLayoutType>(sbType->getLayoutType()) &&
-        isScalarLayoutRoundedUpToAlignment(options))
-        structuredBufferLayoutRules = getScalarLayoutRules(options);
+    SLANG_ASSERT(sbType);
+    if (isScalarLayoutRoundedUpToAlignment(options) &&
+        as<ScalarDataLayoutType>(sbType->getLayoutType()))
+        structuredBufferLayoutRules = &kScalarRoundedLayoutRulesImpl_;
 
     // Create and save type layout for the buffer contents.
     auto elementTypeLayout =

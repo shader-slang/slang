@@ -687,9 +687,13 @@ struct NaturalLayoutRules : IRTypeLayoutRules
     }
 };
 
-// Scalar layout as revised by layout rules version 202c: like natural layout, but the size of an
-// aggregate is rounded up to its alignment, as C does (unlike `CLayoutRules`, `bool` keeps its
-// natural 4-byte size).
+// Scalar layout under layout rules version 202c and later: natural layout, except that every
+// struct size is rounded up to a multiple of its alignment, as C does (unlike `CLayoutRules`,
+// `bool` keeps its natural 4-byte size). Reflection implements the same rule in
+// `ScalarRoundedLayoutRulesImpl` (slang-type-layout.cpp), which rounds only in `EndStructLayout`.
+// Rounding every composite element here gives the same layout, because under natural layout
+// only a struct can have a size that is not a multiple of its alignment: scalars, vectors and
+// matrices never do, and an array of elements whose sizes are multiples is one too.
 struct ScalarRoundedLayoutRules : NaturalLayoutRules
 {
     ScalarRoundedLayoutRules() { ruleName = IRTypeLayoutRuleName::ScalarRounded; }
@@ -1092,8 +1096,9 @@ IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName)
     case IRTypeLayoutRuleName::Std430:
         return kIROp_Std430BufferLayoutType;
     case IRTypeLayoutRuleName::Natural:
-    case IRTypeLayoutRuleName::ScalarRounded:
         return kIROp_ScalarBufferLayoutType;
+    case IRTypeLayoutRuleName::ScalarRounded:
+        SLANG_UNEXPECTED("ScalarRounded has no target-independent data-layout op");
     case IRTypeLayoutRuleName::C:
         return kIROp_CBufferLayoutType;
     case IRTypeLayoutRuleName::D3DConstantBuffer:

@@ -143,14 +143,18 @@ Result getStd430SizeAndAlignment(
 ///
 Result getStd430Offset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset);
 
-/// Return the layout rule that the data-layout op `layoutTypeOp` names at the language level, or
-/// `defaultLayout` for a default data layout. `sizeof` and `alignof` use this meaning, in which
-/// `ScalarDataLayout` is natural layout on every target. The storage layout of a buffer or
-/// pointer on a given target can differ from it (see `getTypeLayoutRuleNameForBuffer`).
+/// Return the layout rule that the data-layout op `layoutTypeOp` names independently of target
+/// options, `defaultLayout` for a default data layout, or `std::nullopt` if `layoutTypeOp` is not
+/// a data-layout op. `sizeof` and `alignof` use this meaning, in which `ScalarDataLayout` is
+/// natural layout on every target. The storage layout that the same op selects for a buffer or
+/// pointer can depend on the target (see `getTypeLayoutRuleNameForBuffer`).
 std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
     IROp layoutTypeOp,
     IRTypeLayoutRuleName defaultLayout);
 
+/// Return the data-layout op for `ruleName`, the inverse of `getTypeLayoutRuleNameFromOp`.
+/// `ScalarRounded` has no target-independent op, since the scalar op names it only on a target
+/// that rounds scalar layout; its encoding lives in `getTypeLayoutTypeForBuffer`.
 IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName);
 
 } // namespace Slang
