@@ -28,7 +28,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -3433,6 +3432,23 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     return SLANG_OK;
 }
 
+// Maps each checked libdevice operand role once, for both capability queries and emission.
+// For example, frexp's output operand carries SignedI32 as its pointee and lowers to i32* in
+// generic address space. The immutable selected definition still decides the complete signature.
+static llvm::Type* _getDeviceLibraryOperandType(
+    llvm::LLVMContext& context,
+    const SlangNVVMNamedIntrinsicOperandDesc& operand)
+{
+    if (operand.kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE)
+        return _isScalarFloat32Or64Type(operand.type) ? _getSemanticLLVMType(context, operand.type)
+                                                      : nullptr;
+    if (operand.kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_OUT_POINTER &&
+        (_isScalarFloat32Or64Type(operand.type) ||
+         Slang::NVVMSemantics::areSameType(operand.type, Slang::NVVMSemantics::kSignedI32)))
+        return llvm::PointerType::getUnqual(_getSemanticLLVMType(context, operand.type));
+    return nullptr;
+}
+
 // The selected definition is the signature authority. The admitted names bound the supported
 // scalar math functions; no parallel name-to-signature mapping exists here. For example,
 // __nv_roundf accepts float(float) only because that is the definition present in the immutable
@@ -3459,7 +3475,8 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
         name != "__nv_tanhf" && name != "__nv_tanh" && name != "__nv_fmaf" && name != "__nv_fma" &&
         name != "__nv_fmodf" && name != "__nv_fmod" && name != "__nv_fabsf" &&
         name != "__nv_fabs" && name != "__nv_fminf" && name != "__nv_fmin" &&
-        name != "__nv_fmaxf" && name != "__nv_fmax")
+        name != "__nv_fmaxf" && name != "__nv_fmax" && name != "__nv_frexpf" &&
+        name != "__nv_frexp" && name != "__nv_modff" && name != "__nv_modf")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3474,11 +3491,10 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
     llvm::SmallVector<llvm::Type*, 3> parameters;
     for (size_t i = 0; i < desc.operandCount; ++i)
     {
-        if (!_isScalarFloat32Or64Type(desc.operands[i].type) ||
-            desc.operands[i].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
-            attributes.getParamAttrs(unsigned(i)).hasAttributes())
+        auto type = _getDeviceLibraryOperandType(library->context, desc.operands[i]);
+        if (!type || attributes.getParamAttrs(unsigned(i)).hasAttributes())
             return nullptr;
-        parameters.push_back(_getSemanticLLVMType(library->context, desc.operands[i].type));
+        parameters.push_back(type);
     }
     auto requested = llvm::FunctionType::get(
         _getSemanticLLVMType(library->context, desc.resultType),
@@ -3522,7 +3538,7 @@ static SlangResult SLANG_NVVM_CALL _emitDeviceLibraryFunction(
     llvm::SmallVector<llvm::Type*, 3> parameters;
     for (size_t i = 0; i < operandCount; ++i)
     {
-        auto type = _getSemanticLLVMType(state->context, function->operands[i].type);
+        auto type = _getDeviceLibraryOperandType(state->context, function->operands[i]);
         auto value = _getValue(operands[i]);
         if (!_isValueUsableAtInsertionPoint(state, block, value) || value->getType() != type)
             return SLANG_E_INVALID_ARG;
@@ -3644,155 +3660,6 @@ static SlangResult _emitLibdeviceOperation(
     return SLANG_OK;
 }
 
-// Emits one pure projection of libdevice frexp through the existing typed value-operation ABI.
-// The compiler requests the fraction and exponent independently because the generic callback has
-// one result. Keeping libdevice's temporary exponent pointer inside the provider avoids exposing an
-// LLVM pointer type through the semantic descriptor while preserving every special-value case.
-static SlangResult _emitFrexpProjectionOperation(
-    SlangNVVMModuleHandle module,
-    const SlangNVVMValueOperationDesc& operation,
-    const SlangNVVMValueHandle* operands,
-    SlangNVVMValueHandle* outValue)
-{
-    if (outValue)
-        *outValue = nullptr;
-
-    ModuleState* state = _getModule(module);
-    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    llvm::Value* operand =
-        operands && operation.operandCount == 1 ? _getValue(operands[0]) : nullptr;
-    const bool isFloat32 = Slang::NVVMSemantics::areSameType(
-        operation.operandTypes[0],
-        Slang::NVVMSemantics::kFloat32);
-    const bool isFloat64 = Slang::NVVMSemantics::areSameType(
-        operation.operandTypes[0],
-        Slang::NVVMSemantics::kFloat64);
-    const bool isFraction = operation.operation == SLANG_NVVM_VALUE_OP_FREXP_FRACTION;
-    const bool isExponent = operation.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT;
-    if (!state || !insertionBlock || !operand || (!isFloat32 && !isFloat64) ||
-        (!isFraction && !isExponent) || !outValue ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, operand))
-    {
-        return SLANG_E_INVALID_ARG;
-    }
-
-    llvm::Type* floatingType = isFloat32 ? llvm::Type::getFloatTy(state->context)
-                                         : llvm::Type::getDoubleTy(state->context);
-    llvm::Type* exponentType = llvm::Type::getInt32Ty(state->context);
-    const SlangNVVMValueTypeDesc& floatingSemanticType =
-        isFloat32 ? Slang::NVVMSemantics::kFloat32 : Slang::NVVMSemantics::kFloat64;
-    llvm::Function* function = insertionBlock->getParent();
-    if (!function || operand->getType() != floatingType ||
-        (isFraction &&
-         !Slang::NVVMSemantics::areSameType(operation.resultType, floatingSemanticType)) ||
-        (isExponent && !Slang::NVVMSemantics::areSameType(
-                           operation.resultType,
-                           Slang::NVVMSemantics::kSignedI32)))
-    {
-        return SLANG_E_INVALID_ARG;
-    }
-
-    llvm::Type* exponentPointerType = llvm::PointerType::getUnqual(exponentType);
-    llvm::FunctionType* functionType =
-        llvm::FunctionType::get(floatingType, {floatingType, exponentPointerType}, false);
-    const char* functionName = isFloat32 ? "__nv_frexpf" : "__nv_frexp";
-    llvm::Function* frexp = state->module->getFunction(functionName);
-    if (frexp && (frexp->getFunctionType() != functionType || !frexp->isDeclaration()))
-        return SLANG_E_INVALID_ARG;
-    if (!frexp)
-    {
-        frexp = llvm::Function::Create(
-            functionType,
-            llvm::GlobalValue::ExternalLinkage,
-            functionName,
-            state->module.get());
-    }
-
-    llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
-    llvm::AllocaInst* exponentStorage =
-        entryBuilder.CreateAlloca(exponentType, nullptr, "frexp.exponent");
-    exponentStorage->setAlignment(llvm::Align(4));
-
-    llvm::Value* fraction = state->builder.CreateCall(frexp, {operand, exponentStorage});
-    llvm::Value* result =
-        isFraction
-            ? fraction
-            : state->builder.CreateAlignedLoad(exponentType, exponentStorage, llvm::Align(4));
-    if (!result || result->getType() != (isFraction ? floatingType : exponentType))
-        return SLANG_E_INVALID_ARG;
-    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
-    return SLANG_OK;
-}
-
-// Emits one pure projection of libdevice modf through the existing one-result value-operation
-// callback. Keeping temporary integral storage inside the provider preserves signed zero,
-// infinity, and NaN behavior without exposing an LLVM pointer through the semantic ABI.
-static SlangResult _emitModfProjectionOperation(
-    SlangNVVMModuleHandle module,
-    const SlangNVVMValueOperationDesc& operation,
-    const SlangNVVMValueHandle* operands,
-    SlangNVVMValueHandle* outValue)
-{
-    if (outValue)
-        *outValue = nullptr;
-
-    ModuleState* state = _getModule(module);
-    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    llvm::Value* operand =
-        operands && operation.operandCount == 1 ? _getValue(operands[0]) : nullptr;
-    const bool isFloat32 =
-        Slang::NVVMSemantics::areSameType(operation.resultType, Slang::NVVMSemantics::kFloat32);
-    const bool isFloat64 =
-        Slang::NVVMSemantics::areSameType(operation.resultType, Slang::NVVMSemantics::kFloat64);
-    const bool isFraction = operation.operation == SLANG_NVVM_VALUE_OP_MODF_FRACTION;
-    const bool isIntegral = operation.operation == SLANG_NVVM_VALUE_OP_MODF_INTEGRAL;
-    if (!state || !insertionBlock || !operand || (!isFloat32 && !isFloat64) ||
-        (!isFraction && !isIntegral) || !outValue ||
-        !Slang::NVVMSemantics::areSameType(operation.resultType, operation.operandTypes[0]) ||
-        !_isValueUsableAtInsertionPoint(state, insertionBlock, operand))
-    {
-        return SLANG_E_INVALID_ARG;
-    }
-
-    llvm::Type* floatingType = isFloat32 ? llvm::Type::getFloatTy(state->context)
-                                         : llvm::Type::getDoubleTy(state->context);
-    llvm::Function* function = insertionBlock->getParent();
-    if (!function || operand->getType() != floatingType)
-        return SLANG_E_INVALID_ARG;
-
-    llvm::Type* pointerType = llvm::PointerType::getUnqual(floatingType);
-    llvm::FunctionType* functionType =
-        llvm::FunctionType::get(floatingType, {floatingType, pointerType}, false);
-    const char* functionName = isFloat32 ? "__nv_modff" : "__nv_modf";
-    llvm::Function* modf = state->module->getFunction(functionName);
-    if (modf && (modf->getFunctionType() != functionType || !modf->isDeclaration()))
-        return SLANG_E_INVALID_ARG;
-    if (!modf)
-    {
-        modf = llvm::Function::Create(
-            functionType,
-            llvm::GlobalValue::ExternalLinkage,
-            functionName,
-            state->module.get());
-    }
-
-    llvm::IRBuilder<> entryBuilder(&function->getEntryBlock(), function->getEntryBlock().begin());
-    llvm::AllocaInst* integralStorage =
-        entryBuilder.CreateAlloca(floatingType, nullptr, "modf.integral");
-    integralStorage->setAlignment(llvm::Align(isFloat32 ? 4 : 8));
-
-    llvm::Value* fraction = state->builder.CreateCall(modf, {operand, integralStorage});
-    llvm::Value* result = isFraction ? fraction
-                                     : state->builder.CreateAlignedLoad(
-                                           floatingType,
-                                           integralStorage,
-                                           llvm::Align(isFloat32 ? 4 : 8));
-    if (!result || result->getType() != floatingType)
-        return SLANG_E_INVALID_ARG;
-    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
-    return SLANG_OK;
-}
-
 static SlangResult _emitCatalogOperation(
     SlangNVVMModuleHandle module,
     const Slang::NVVMSemantics::CatalogEntry& entry,
@@ -3800,19 +3667,6 @@ static SlangResult _emitCatalogOperation(
     SlangNVVMValueHandle* outValue)
 {
     const SlangNVVMValueOperationDesc operation = Slang::NVVMSemantics::getOperationDesc(entry);
-    if (entry.operation == SLANG_NVVM_VALUE_OP_FREXP_FRACTION ||
-        entry.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT)
-    {
-        return _emitFrexpProjectionOperation(module, operation, operands, outValue);
-    }
-    if (entry.operation == SLANG_NVVM_VALUE_OP_MODF_FRACTION ||
-        entry.operation == SLANG_NVVM_VALUE_OP_MODF_INTEGRAL)
-    {
-        return _emitModfProjectionOperation(module, operation, operands, outValue);
-    }
-    // The only library-backed exact entries are the projections handled above.
-    if (entry.requiresCUDADeviceLibrary)
-        llvm::report_fatal_error("Unhandled library-backed exact NVVM operation");
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
         if (entry.operandCount == 1)
@@ -3949,35 +3803,19 @@ static llvm::Value* _emitFloat8Widen(
     return state->builder.CreateBitCast(resultBits, resultType);
 }
 
-// Evaluates the qualified BF16 dot in CUDA prelude lane order, rounding every product
-// and addition separately. With BF2 denoting vector<BFloat16, 2>, consider
-// dot(BF2(-1, 1.0078125), BF2(1.015625, 1.0078125)):
-// the second product rounds to 1.015625 before addition, so the result is zero. Fusing
-// that product with the accumulated -1.015625 instead gives 2^-14. SM80 has BF16 FMA,
-// but native BF16 add/mul require SM90. These two exact FMA recipes match CUDA's
-// __hmul/__hadd: negative zero preserves the product's sign, and multiplication by one
-// implements addition. Each inline assembly call is a distinct BF16 rounding boundary.
-static llvm::Value* _emitBFloat16Dot(
+// Emits one scalar BF16 rounding boundary. SM80 supports this FMA even though native BF16
+// add/multiply require SM90; core composition supplies their exact FMA identities and order.
+static llvm::Value* _emitBFloat16Fma(
     ModuleState* state,
     llvm::Value* left,
     llvm::Value* right,
-    uint32_t laneCount)
+    llvm::Value* addend)
 {
     auto scalarType = llvm::Type::getInt16Ty(state->context);
     auto signature =
         llvm::FunctionType::get(scalarType, {scalarType, scalarType, scalarType}, false);
     auto fma = llvm::InlineAsm::get(signature, "fma.rn.bf16 $0, $1, $2, $3;", "=h,h,h,h", false);
-    auto negativeZero = llvm::ConstantInt::get(scalarType, 0x8000);
-    auto one = llvm::ConstantInt::get(scalarType, 0x3f80);
-    llvm::Value* sum = llvm::ConstantInt::get(scalarType, 0);
-    for (uint32_t lane = 0; lane < laneCount; ++lane)
-    {
-        auto leftLane = state->builder.CreateExtractElement(left, lane);
-        auto rightLane = state->builder.CreateExtractElement(right, lane);
-        auto product = state->builder.CreateCall(fma, {leftLane, rightLane, negativeZero});
-        sum = state->builder.CreateCall(fma, {product, one, sum});
-    }
-    return sum;
+    return state->builder.CreateCall(fma, {left, right, addend});
 }
 
 static llvm::Type* _getSemanticLLVMType(
@@ -4319,12 +4157,8 @@ static SlangResult _emitValueOperationFamily(
             resultType,
             operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOAT_E4M3);
         break;
-    case Slang::NVVMSemantics::ValueOperationFamily::BFloat16Dot:
-        result = _emitBFloat16Dot(
-            state,
-            llvmOperands[0],
-            llvmOperands[1],
-            operation.operandTypes[0].laneCount);
+    case Slang::NVVMSemantics::ValueOperationFamily::BFloat16Fma:
+        result = _emitBFloat16Fma(state, llvmOperands[0], llvmOperands[1], llvmOperands[2]);
         break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatConvert:
         if (operation.resultType.bitWidth == 16 && operation.operandTypes[0].bitWidth == 32)

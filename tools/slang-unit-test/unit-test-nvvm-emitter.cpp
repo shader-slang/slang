@@ -1614,11 +1614,11 @@ SLANG_UNIT_TEST(nvvmSlangCUDATypeLayoutQueriesUseDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.scalarReturnValueRefs.getCount() == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 6);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 9);
         SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emittedValueOperations.getCount() == 0);
 
-        const int64_t expectedValues[] = {1, 4, 4, 16, 8, 32};
+        const int64_t expectedValues[] = {1, 4, 4, 16, 8, 32, 8, 0, 16};
         SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs.getCount() == SLANG_COUNT_OF(expectedValues));
         for (Index storeIndex = 0; storeIndex < SLANG_COUNT_OF(expectedValues); ++storeIndex)
         {
@@ -8109,10 +8109,12 @@ SLANG_UNIT_TEST(nvvmSlangScalarIntrinsicHelpersUseTypedRecipes)
         SLANG_CHECK(operationCounts[40] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_cosf"));
         SLANG_CHECK(operationCounts[41] == 0);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FREXP_FRACTION] == 3);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FREXP_EXPONENT] == 3);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MODF_FRACTION] == 1);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MODF_INTEGRAL] == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_frexpf"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_frexp"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_modff"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_modf"));
+        for (uint32_t retired : {69u, 70u, 77u, 78u})
+            SLANG_CHECK(operationCounts[retired] == 0);
         SLANG_CHECK(operationCounts[SlangNVVMValueOperation(43)] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fminf"));
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmaxf"));
@@ -8127,7 +8129,24 @@ SLANG_UNIT_TEST(nvvmSlangScalarIntrinsicHelpersUseTypedRecipes)
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmaf"));
         SLANG_CHECK(operationCounts[76] == 0);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FLOAT_CONVERT] >= 20);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 10);
+        // The selected libdevice call writes its output pointer internally, without a
+        // separate provider store. Check that each named path carries actual storage.
+        for (const char* name : {"__nv_frexpf", "__nv_frexp", "__nv_modff", "__nv_modf"})
+        {
+            bool sawOutputPointer = false;
+            for (Index i = 0; i < gFakeNVVMBuilder.intrinsicNames.getCount(); ++i)
+            {
+                if (gFakeNVVMBuilder.intrinsicNames[i] != name)
+                    continue;
+                SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[i] == 2);
+                const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+                FakeNVVMBuilderScalarTypeKind pointee;
+                sawOutputPointer |= _getFakeNVVMBuilderPointerScalarTypeKind(
+                    gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset + 1],
+                    pointee);
+            }
+            SLANG_CHECK(sawOutputPointer);
+        }
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
@@ -12985,4 +13004,140 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarAdmissionStaysBounded)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
+}
+
+SLANG_UNIT_TEST(nvvmSlangCoreTailLegacyRoutesRejectBeforeOutput)
+{
+    struct Case
+    {
+        const char* declaration;
+        const char* invocation;
+    };
+    const Case cases[] = {
+        {R"SLANG(float legacy(float x, out int e) { __intrinsic_asm "$P_frexp($0, $1)"; })SLANG",
+         "int e; output[0] = legacy(asfloat(input[0]), e); output[1] = e;"},
+        {R"SLANG(double legacy(double x, out int e) { __intrinsic_asm "$P_frexp($0, $1)"; })SLANG",
+         "int e; output[0] = float(legacy(double(input[0]), e)); output[1] = e;"},
+        {R"SLANG(half legacy(half x, out int e) { __intrinsic_asm "$P_frexp($0, $1)"; })SLANG",
+         "int e; output[0] = float(legacy(half(input[0]), e)); output[1] = e;"},
+        {R"SLANG(half legacy(half x, out half e) { __intrinsic_asm "$P_modf($0, $1)"; })SLANG",
+         "half e; output[0] = float(legacy(half(input[0]), e)); output[1] = float(e);"},
+        {R"SLANG(BFloat16 legacy(vector<BFloat16,2> x, vector<BFloat16,2> y) { __intrinsic_asm "_slang_vector_dot"; })SLANG",
+         "let b = bit_cast<BFloat16>(uint16_t(input[0])); output[0] = "
+         "float(legacy(vector<BFloat16,2>(b,b), vector<BFloat16,2>(b,b)));"},
+        {R"SLANG(int legacy() { __intrinsic_asm "sizeof($[0])", float3; })SLANG",
+         "output[0] = legacy();"},
+        {R"SLANG(int legacy(float3 x) { __intrinsic_asm "sizeof($T0)"; })SLANG",
+         "output[0] = legacy(float3(input[0]));"},
+        {R"SLANG(int legacy() { __intrinsic_asm "alignof($[0])", float3; })SLANG",
+         "output[0] = legacy();"},
+        {R"SLANG(int legacy(float3 x) { __intrinsic_asm "alignof($T0)"; })SLANG",
+         "output[0] = legacy(float3(input[0]));"},
+    };
+    for (const auto& test : cases)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << test.declaration
+               << "\nStructuredBuffer<uint> input; RWStructuredBuffer<float> output; "
+               << "[numthreads(1,1,1)] void computeMain() {" << test.invocation << "}";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            session,
+            source.getBuffer(),
+            code,
+            diagnostics,
+            "cuda_sm_8_0")));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains("GenericAsm assembly="));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangCoreLayoutQueriesRejectInvalidSize)
+{
+    struct Case
+    {
+        const char* declaration;
+        const char* diagnostic;
+    };
+    const Case cases[] = {
+        {"struct Empty {}; typedef Empty Sized;", "E41400"},
+        {"typedef int Sized[536870912];", "E41402"},
+    };
+    for (const auto& test : cases)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << test.declaration << "\nRWStructuredBuffer<int> output; "
+               << "[numthreads(1,1,1)] void computeMain() { output[0] = __sizeOf<Sized>(); }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            session,
+            source.getBuffer(),
+            code,
+            diagnostics,
+            "cuda_sm_8_0")));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains(test.diagnostic))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(text.contains(test.diagnostic));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangBFloat16CoreDotComposition)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    session->setSharedLibraryLoader(loader);
+    const char* source = R"SLANG(
+        StructuredBuffer<uint> input; RWStructuredBuffer<uint> output;
+        [numthreads(1,1,1)] void computeMain() {
+            let x = bit_cast<BFloat16>(uint16_t(input[0]));
+            let y = bit_cast<BFloat16>(uint16_t(input[1]));
+            output[0] = uint(bit_cast<uint16_t>(dot(vector<BFloat16,1>(x), vector<BFloat16,1>(y))));
+            output[1] = uint(bit_cast<uint16_t>(dot(vector<BFloat16,2>(x,y), vector<BFloat16,2>(y,x))));
+        })SLANG";
+    ComPtr<slang::IBlob> code, diagnostics;
+    auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics, "cuda_sm_8_0");
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    uint32_t fmas = 0, floatProducts = 0;
+    for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+    {
+        if (operation.key.operation == SLANG_NVVM_VALUE_OP_FMA)
+        {
+            ++fmas;
+            SLANG_CHECK(operation.operandCount == 3);
+            SLANG_CHECK(NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kBFloat16));
+        }
+        if (operation.key.operation == SLANG_NVVM_VALUE_OP_MULTIPLY &&
+            NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat32))
+            ++floatProducts;
+        SLANG_CHECK(operation.key.operation != 82);
+    }
+    SLANG_CHECK(fmas == 4);
+    SLANG_CHECK(floatProducts == 1);
 }

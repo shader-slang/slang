@@ -886,5 +886,6 @@ return {
 	["sampleLevel"] = 910,
 	["textureFetch"] = 911,
 	["textureGather"] = 912,
-	["textureQuerySize"] = 913
+	["textureQuerySize"] = 913,
+	["fma"] = 914
 }

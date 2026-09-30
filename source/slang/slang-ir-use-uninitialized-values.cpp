@@ -469,6 +469,12 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     case kIROp_SPIRVAsm:
         return Store;
 
+    case kIROp_GenericAsm:
+        // Consider `__intrinsic_asm "__nv_frexpf", x, &exponent`: the explicit address
+        // passes writable storage, not its uninitialized contents. Keep the existing opaque
+        // assembly write policy for pointers, while ordinary value operands still read data.
+        return as<IRPtrTypeBase>(inst->getDataType()) ? Store : Load;
+
     case kIROp_SPIRVAsmOperandInst:
         // For SPIRV asm instructions, need to check out the entire
         // block when doing reachability checks

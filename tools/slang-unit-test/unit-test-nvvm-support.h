@@ -490,6 +490,7 @@ enum class FakeNVVMBuilderScalarFamily : uint32_t
     FloatingUnary,
     FloatingBinary,
     FloatingCompare,
+    FloatingTernary,
     Select,
     Count,
 };
@@ -2416,7 +2417,9 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
             if (operation.resultType.kind != SLANG_NVVM_VALUE_TYPE_VOID)
             {
                 return (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
-                        operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+                        operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+                        (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16 &&
+                         operation.resultType.bitWidth == 16)) &&
                        operation.resultType.laneCount == 1;
             }
             // Legacy scalar callbacks predate typed result recording and are integer-only.
@@ -2612,7 +2615,9 @@ static bool _isFakeNVVMBuilderVectorValue(
         const bool isExpectedKind =
             expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer
                 ? resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
-                      resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
+                      resultType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+                      (resultType.kind == SLANG_NVVM_VALUE_TYPE_BFLOAT16 &&
+                       resultType.bitWidth == 16)
             : expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Boolean
                 ? resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL
                 : resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
@@ -4545,7 +4550,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsic(
     const SlangNVVMValueOperationDesc& operation,
     const SlangNVVMValueHandle* arguments,
     size_t argumentCount,
-    SlangNVVMValueHandle* outValue)
+    SlangNVVMValueHandle* outValue,
+    const SlangNVVMNamedIntrinsicOperandDesc* namedOperands = nullptr)
 {
     ++gFakeNVVMBuilder.emitIntrinsicCallCount;
     if (outValue)
@@ -4567,6 +4573,20 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitIntrinsic(
     {
         if (!_getFakeNVVMBuilderValueRef(arguments[i], argumentRefs[i]))
             return SLANG_E_INVALID_ARG;
+        if (namedOperands &&
+            namedOperands[i].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_OUT_POINTER)
+        {
+            FakeNVVMBuilderScalarTypeKind pointee;
+            const auto expected = namedOperands[i].type.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                                      ? FakeNVVMBuilderScalarTypeKind::Integer
+                                  : namedOperands[i].type.bitWidth == 32
+                                      ? FakeNVVMBuilderScalarTypeKind::Float
+                                      : FakeNVVMBuilderScalarTypeKind::Double;
+            if (!_getFakeNVVMBuilderPointerScalarTypeKind(argumentRefs[i], pointee) ||
+                pointee != expected)
+                return SLANG_E_INVALID_ARG;
+            continue;
+        }
         const SlangNVVMValueTypeKind kind = operation.operandTypes[i].kind;
         const bool typeMatches = kind == SLANG_NVVM_VALUE_TYPE_BOOL
                                      ? _isFakeNVVMBuilderBooleanValue(arguments[i])
@@ -6025,7 +6045,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             &operation->resultType,
             operation->operandTypes);
     }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatConvert)
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatConvert ||
+        resolution.family == NVVMSemantics::ValueOperationFamily::BFloat16Convert)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
             {FakeNVVMBuilderScalarFamily::FloatingUnary, uint32_t(operation->operation)});
@@ -6037,6 +6058,15 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             outValue,
             &operation->resultType,
             operation->operandTypes);
+    }
+    if (resolution.family == NVVMSemantics::ValueOperationFamily::BFloat16Fma)
+    {
+        return _recordFakeNVVMBuilderCatalogScalarOperation(
+            module,
+            FakeNVVMBuilderScalarFamily::FloatingTernary,
+            *operation,
+            operands,
+            outValue);
     }
     if (resolution.family == NVVMSemantics::ValueOperationFamily::Select)
     {
@@ -6433,12 +6463,26 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSuppor
             break;
         }
     }
+    const bool isFrexp = name == toSlice("__nv_frexpf") || name == toSlice("__nv_frexp");
+    const bool isModf = name == toSlice("__nv_modff") || name == toSlice("__nv_modf");
+    if (isFrexp || isModf)
+    {
+        isFloat32 = name == toSlice("__nv_frexpf") || name == toSlice("__nv_modff");
+        isFloat64 = !isFloat32;
+        operandCount = 2;
+    }
     const auto type = isFloat32 ? NVVMSemantics::kFloat32 : NVVMSemantics::kFloat64;
     *supported = (isFloat32 || isFloat64) && function->operandCount == operandCount &&
                  NVVMSemantics::areSameType(function->resultType, type);
     for (size_t i = 0; i < function->operandCount; ++i)
-        *supported &= NVVMSemantics::areSameType(function->operands[i].type, type) &&
-                      function->operands[i].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+    {
+        const bool isOutput = (isFrexp || isModf) && i == 1;
+        const auto expectedType = isOutput && isFrexp ? NVVMSemantics::kSignedI32 : type;
+        const auto expectedKind = isOutput ? SLANG_NVVM_NAMED_INTRINSIC_OPERAND_OUT_POINTER
+                                           : SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+        *supported &= NVVMSemantics::areSameType(function->operands[i].type, expectedType) &&
+                      function->operands[i].kind == expectedKind;
+    }
     return SLANG_OK;
 }
 
@@ -6461,10 +6505,16 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitDeviceLibraryFunction(
         operandTypes[i] = function->operands[i].type;
     SlangNVVMValueOperationDesc operation =
         {UINT32_MAX, function->resultType, operandTypes, uint32_t(function->operandCount)};
-    SLANG_RETURN_ON_FAIL(
-        _fakeNVVMBuilderEmitIntrinsic(module, operation, operands, operandCount, outValue));
-    gFakeNVVMBuilder.namedIntrinsicNames.add(
-        String(UnownedStringSlice(function->name, function->nameSize)));
+    SLANG_RETURN_ON_FAIL(_fakeNVVMBuilderEmitIntrinsic(
+        module,
+        operation,
+        operands,
+        operandCount,
+        outValue,
+        function->operands));
+    const String name(UnownedStringSlice(function->name, function->nameSize));
+    gFakeNVVMBuilder.intrinsicNames.getLast() = name;
+    gFakeNVVMBuilder.namedIntrinsicNames.add(name);
     return SLANG_OK;
 }
 
@@ -10249,6 +10299,8 @@ void computeMain(
 }
 )";
 static const char kDirectNVVMCUDATypeLayoutSource[] = R"(
+struct Empty {};
+typedef int Unsized[];
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
@@ -10259,6 +10311,9 @@ void computeMain(
     destination[3] = __alignOf<vector<double, 2> >();
     destination[4] = __sizeOf<vector<half, 3> >();
     destination[5] = __sizeOf<vector<double, 4> >();
+    destination[6] = __alignOf<Unsized>();
+    destination[7] = sizeof(Empty, __CUDADataLayout);
+    destination[8] = __sizeOf<Unsized>();
 }
 )";
 static const char kDirectNVVMCUDAAggregateLayoutSource[] = R"(
@@ -11813,46 +11868,22 @@ void sineCosineDouble(double value, out double sineValue, out double cosineValue
 
 float frexpFloat(float value, out int exponent)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
-    default:
-        exponent = 0;
-        return value;
-    }
+    return frexp(value, exponent);
 }
 
 double frexpDouble(double value, out int exponent)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
-    default:
-        exponent = 0;
-        return value;
-    }
+    return frexp(value, exponent);
 }
 
 half frexpHalf(half value, out int exponent)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_frexp($0, $1)";
-    default:
-        exponent = 0;
-        return value;
-    }
+    return frexp(value, exponent);
 }
 
 half modfHalf(half value, out half integral)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_modf($0, $1)";
-    default:
-        integral = value;
-        return half(0);
-    }
+    return modf(value, integral);
 }
 
 [CUDAKernel]
@@ -11884,6 +11915,10 @@ void computeMain(
     half halfFraction = frexpHalf(signedHalf, halfExponent);
     half integralHalf;
     half fractionalHalf = modfHalf(unsignedHalf, integralHalf);
+    float integralFloat;
+    double integralDouble;
+    float fractionalFloat = modf(value, integralFloat);
+    double fractionalDouble = modf(assembled, integralDouble);
     half halfMath =
         minimumHalf(signedHalf, unsignedHalf) + maximumHalf(signedHalf, unsignedHalf) +
         hyperbolicSineHalf(signedHalf) + hyperbolicCosineHalf(unsignedHalf) +
@@ -11902,7 +11937,7 @@ void computeMain(
         int(sineFloat + cosineFloat + sineDouble + cosineDouble) +
         int(floatFraction + doubleFraction) + floatExponent + doubleExponent + classifications +
         signHalf(signedHalf) + halfExponent + int(halfFraction + fractionalHalf + integralHalf) +
-        int(halfMath);
+        int(halfMath) + int(fractionalFloat + integralFloat + fractionalDouble + integralDouble);
 }
 )SLANG";
 

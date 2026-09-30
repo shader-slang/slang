@@ -70,6 +70,11 @@ __magic_type(CDataLayoutType)
 struct CDataLayout : IBufferDataLayout
 {};
 
+// Internal CUDA layout token reuses the existing IR layout identity without a new AST type.
+__intrinsic_type($(kIROp_CUDABufferLayoutType))
+struct __CUDADataLayout : IBufferDataLayout
+{};
+
 //@hidden:
 __generic<T, L : IBufferDataLayout = DefaultDataLayout>
 __intrinsic_type($(kIROp_GLSLShaderStorageBufferType))
@@ -10666,6 +10671,12 @@ T dot(vector<T, N> x, vector<T, N> y)
     return __vectorDotImpl(x, y);
 }
 
+// Keep each BF16 product/addition rounding boundary explicit on SM80.
+[__readNone]
+[require(nvvm, cuda_sm_8_0)]
+__intrinsic_op($(kIROp_Fma))
+BFloat16 __nvvmBFloat16Fma(BFloat16 left, BFloat16 right, BFloat16 addend);
+
 BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
 {
     // Handle 1-vector case explicitly since many backends don't support it natively
@@ -10680,6 +10691,18 @@ BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
 
     __target_switch
     {
+    case nvvm:
+        static_assert(N <= 4, "NVVM BF16 dot supports at most four lanes");
+        BFloat16 sum = bit_cast<BFloat16>(uint16_t(0));
+        let negativeZero = bit_cast<BFloat16>(uint16_t(0x8000));
+        let one = bit_cast<BFloat16>(uint16_t(0x3f80));
+        [ForceUnroll]
+        for (int lane = 0; lane < N; ++lane)
+        {
+            let product = __nvvmBFloat16Fma(x[lane], y[lane], negativeZero);
+            sum = __nvvmBFloat16Fma(product, one, sum);
+        }
+        return sum;
     case spirv:
         return spirv_asm {
             OpCapability BFloat16DotProductKHR;
@@ -11997,6 +12020,14 @@ T frexp(T x, out int exp)
     {
     case cpp: __intrinsic_asm "$P_frexp($0, $1)";
     case cuda: __intrinsic_asm "$P_frexp($0, $1)";
+    case nvvm:
+        if (T is float) { __intrinsic_asm "__nv_frexpf", x, &exp; }
+        else if (T is double) { __intrinsic_asm "__nv_frexp", x, &exp; }
+        else
+        {
+            static_assert(T is half, "NVVM frexp requires Half, Float32 or Float64");
+            return __realCast<T>(frexp(__realCast<float>(x), exp));
+        }
     case glsl: __intrinsic_asm "frexp";
     case hlsl: __intrinsic_asm "frexp";
     case metal: __intrinsic_asm "frexp($0, *($1))";
@@ -14068,6 +14099,17 @@ T modf(T x, out T ip)
     {
     case cpp: __intrinsic_asm "$P_modf($0, $1)";
     case cuda: __intrinsic_asm "$P_modf($0, $1)";
+    case nvvm:
+        if (T is float) { __intrinsic_asm "__nv_modff", x, &ip; }
+        else if (T is double) { __intrinsic_asm "__nv_modf", x, &ip; }
+        else
+        {
+            static_assert(T is half, "NVVM modf requires Half, Float32 or Float64");
+            float whole;
+            float fraction = modf(__realCast<float>(x), whole);
+            ip = __realCast<T>(whole);
+            return __realCast<T>(fraction);
+        }
     case hlsl: __intrinsic_asm "modf";
     case glsl: __intrinsic_asm "modf";
     case metal: __intrinsic_asm "modf($0, *($1))";

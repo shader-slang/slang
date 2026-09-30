@@ -316,8 +316,8 @@ nested helpers remain outside that qualification.
 | Physical LLVM construction             | [slang-llvm-nvvm.cpp](../../source/slang-llvm-nvvm/slang-llvm-nvvm.cpp): LLVM 14 typed pointers, NVVM metadata, generic instructions and qualified recipes                    |
 | Vendor compiler lifecycle              | [slang-nvvm-compiler.cpp](../../source/compiler-core/slang-nvvm-compiler.cpp): coherent toolkit discovery, verification, compilation and diagnostics                          |
 
-`legalizeIRForNVVM` runs after common linking and late bitcast normalization. It folds CUDA layout
-queries, removes the canonical read-none `unmodified` check, discharges the selected CUDA derivative
+`legalizeIRForNVVM` runs after common linking and late bitcast normalization. It folds the remaining CUDA
+field-offset query, removes the canonical read-none `unmodified` check, discharges the selected CUDA derivative
 requirement, applies the requested zero-index bounds policy, runs DCE and checks its postconditions.
 Selected local Boolean-vector lane addresses are normalized to SSA lane updates before preflight;
 this does not authorize escaping lane references.
@@ -335,8 +335,28 @@ The semantic-tag extension has no active producer, parser acceptance, lowering t
 route. Its serialized AST token field and stable IR terminator/decoration slots remain reserved so
 module 43 layout does not change; old tagged source or decoded tokens diagnose rather than revive
 those semantics. Ordinary comma-separated intrinsic-assembly arguments and named calls remain.
-Scalar pointer-output helpers and CUDA layout queries retain their separately bounded recognizers.
+Only the CUDA field-offset helper retains its bounded text recognizer. Its exact direct same-base
+FieldExtract supplies the canonical field key. A future producer must retain that key before value
+folding; a generic hidden helper or arbitrary operand-graph recovery is not equivalent.
 `RequirePrelude`, arbitrary GenericAsm and standalone execution requirements are not general no-ops.
+
+Pointer-output math uses the real selected `__nv_frexp[f]` and `__nv_modf[f]` definitions. The named
+operand descriptor's OUT_POINTER kind carries the pointee type without changing ABI 46's layout.
+Compiler preflight reuses the writable generic local numeric pointer classifier; one provider
+mapping supplies the same typed AS0 pointer to signature queries and emission. Exact selected
+function types, calling convention, linkage, visibility and attribute rejection remain authoritative.
+LLVM registry calls do not admit this role. Core passes `&exp`/`&ip`, promotes Half to Float32 and
+narrows floating results once; frexp's integer exponent is unchanged. Shared uninitialized-use analysis treats an explicit assembly address
+under its existing opaque write policy; explicit ordinary values still read their contents.
+Numeric projection IDs 69/70/77/78 are reserved and their paired-call recipes are gone.
+
+CUDA size/alignment helpers select ordinary `SizeOf`/`AlignOf` with the existing CUDALayout type.
+A hidden ordinary core struct exposes that IR type through IBufferDataLayout conformance, without
+adding an AST type class. Shared folding refuses signed Int32 overflow. CUDA layout represents an
+unsized array as a 16-byte wrapper aligned to 8 bytes. General zero size remains valid; the NVVM
+helpers keep their stricter positive-result assertion. ForceInline removes these metadata wrappers
+before aggregate parameter lowering, including at O0; opaque CPP/CUDA assembly arms remain protected
+by ordinary inlining eligibility. No size/alignment CUDA text is interpreted.
 
 A shared producer fix belongs before this boundary when its IR shape or semantics are wrong. For
 example, aggregate receiver snapshots must be established before deferred buffer loading. Flattening
@@ -498,10 +518,14 @@ literal recovery uses the shared producer's bits, including signed encodings at 
 boundary. This does not license integer→BF16 through Float32: that can double round. For example,
 integer 16842753 should narrow to BF16 bits `0x4b81`, while nearest Float32 then BF16 gives `0x4b80`.
 
-BF16 dot for widths 2–4 starts at positive zero and rounds each product and sum separately in source
+BF16 dot core composition for widths 2–4 starts at positive zero and rounds each product and sum separately in source
 lane order. Two BF16 FMA instructions per lane implement those separately rounded operations on SM80.
 Unrestricted Float32 accumulation or a fused product-plus-accumulator changes the contract. General
 BF16 arithmetic, comparison, integer and Half/double conversions remain separate admissions.
+The core loop invokes canonical scalar Fma (stable IR 914, provider operation 83) twice per lane:
+`fma(x, y, -0)` then `fma(product, 1, sum)`. The provider only emits the qualified scalar BF16
+instruction; retired numeric dot 82 and its CUDA spelling no longer own the algorithm. Existing
+zero/one-lane source branches remain distinct from the qualified dot2/3/4 runtime contract.
 
 FP8 transport preserves all bytes, including nonfinite encodings. Same-width signed/unsigned and
 cross-format bitcasts preserve bits; same-format Select preserves semantic type. Runtime widening to

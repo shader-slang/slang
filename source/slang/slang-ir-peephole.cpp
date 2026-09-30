@@ -378,6 +378,11 @@ struct PeepholeContext : InstPassBase
                     IRIntegerValue value =
                         (inst->getOp() == kIROp_AlignOf) ? sizeAlign.alignment : sizeAlign.size;
 
+                    // A layout query returns an integer value, not a truncating integer cast.
+                    // Keep an unrepresentable result unfolded so normal validation diagnoses it.
+                    if (inst->getDataType()->getOp() == kIROp_IntType &&
+                        (value < 0 || value > 2147483647))
+                        break;
                     auto resultVal = builder.getIntValue(inst->getDataType(), value);
                     inst->replaceUsesWith(resultVal);
                     maybeRemoveOldInst(inst);
@@ -398,11 +403,12 @@ struct PeepholeContext : InstPassBase
                 IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                 builder.setInsertBefore(inst);
-                IRInst* resultVal = nullptr;
-                if (inst->getOp() == kIROp_AlignOf)
-                    resultVal = builder.getIntValue(inst->getDataType(), sizeAlignment.alignment);
-                else
-                    resultVal = builder.getIntValue(inst->getDataType(), sizeAlignment.size);
+                IRIntegerValue value =
+                    inst->getOp() == kIROp_AlignOf ? sizeAlignment.alignment : sizeAlignment.size;
+                if (inst->getDataType()->getOp() == kIROp_IntType &&
+                    (value < 0 || value > 2147483647))
+                    break;
+                IRInst* resultVal = builder.getIntValue(inst->getDataType(), value);
                 inst->replaceUsesWith(resultVal);
                 maybeRemoveOldInst(inst);
                 changed = true;

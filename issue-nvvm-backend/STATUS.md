@@ -1,39 +1,41 @@
 # NVVM current status
 
-The resource migration has **focused local acceptance**: sampling, fetch, gather, base dimensions
-and surface producers now emit typed operations. Five CUDA-text texture recognizers and the final
-three active semantic tags are removed. Serialized AST/IR slots remain reserved. Direct 2D-array
-Store now shares the existing subscript store path. Module43, ABI46 and container2 are unchanged;
-the earlier signed16 abs O3 failure remains active.
+The core math/layout migration has **focused local acceptance**. `frexp`/`modf` use named
+libdevice calls with checked output pointers, BF16 dot is core composition of a scalar FMA,
+and size/alignment use canonical IR with explicit CUDA layout. Their old text recognizers and
+projection recipes are removed. **Field offset is the sole remaining CUDA-text recognizer.**
+Module43, ABI46 and container2 are unchanged; the earlier signed16 abs O3 failure remains active.
 
-**Continue under the accelerated workflow authorized on 2026-09-30.** Use eight build jobs,
-larger related intrinsic batches, focused compile/PTX checks and no routine module-version bumps.
-The maintainer superseded the stop-after-log request and automatic full-suite cadence. Prioritize
-removal of CUDA-string recognizers. No push, Slack or system changes. Preserve the user's untracked
-`tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
+The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
+related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
+campaigns. The maintainer superseded the earlier stop-after-log request. This checkpoint stops at
+a concrete public offset-contract decision; a question is pending. No push, Slack or system changes.
+Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-core-resources/`; plans and reports remain uncommitted.
+`build/nvvm-core-tail/`; plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
-| Evidence | Result |
-| --- | --- |
-| Build | Eight-job production build passed first try in 323 seconds; test build passed in 22 seconds |
-| Focused units | 7 pass |
-| Runtime | 7 NVVM texture cases and 4 bounded surface cells pass |
-| Compile checks | 2 gather PTX checks and 6 diagnostic cases pass |
-| Scope | Typed resource operands/admission, retired-route rejection, surface provenance/conversion and exact shape diagnostics |
-| Last full / targeted / implementations since full | log-family / core-resources / 6 |
-| Historical evidence | Full baseline/identity unchanged; all 32 earlier feature objects preserved |
+| Evidence                                          | Result                                                                                                |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Build                                             | Eight-job corrected production build passed in 86 seconds; final unit-tool build passed in 20 seconds |
+| Focused units                                     | 10 unique passes; successful checks reused, only failures rerun                                       |
+| Runtime                                           | 12 existing NVVM cases and 1 NVRTC array-layout control pass                                          |
+| Diagnostics                                       | 3 initialization controls pass, including explicit address versus value assembly operands             |
+| Scope                                             | Checked pointer calls, retired routes, BF16 composition and exact CUDA layout/size bounds             |
+| Last full / targeted / implementations since full | log-family / core-tail / 7                                                                            |
+| Historical evidence                               | Full baseline/identity unchanged; all 33 earlier feature objects preserved                            |
 
-No full campaign, fresh NVRTC controls or broad surface matrix ran. Canonical ImageLoad inlines the
-old helper, so unsupported Texture1DArray now rejects at its collected field address rather than a
-helper parameter. The one stale exact diagnostic expectation was corrected and rerun; all other
-passes and production binaries were reused. Gather evidence is compile/PTX only. Surface execution
-covers native float32 whole store and Half component store at O0/O3 using existing fixtures.
+No full campaign, new numerical oracle, material run or performance experiment ran. Float64 modf
+has provider/compiler evidence only, not fresh numerical qualification. Runtime covers Float32/64
+frexp, Half scalar math, BF16 dot and selected layouts. Initial generic-cast and initialization
+build failures, pointer validation/metadata-wrapper failures, fake-builder gaps and stale test
+expectations are resolved and retained in `features.nvvm-core-tail`. Unsized CUDA arrays remain
+16-byte pointer/count wrappers aligned to 8, not indeterminate-size arrays. Formatting after
+validation changed only two C++ line wraps and did not trigger another build.
 
 This is not an all-pass repository checkpoint or publication/CI readiness. The inherited
 `nvvm-core-values.slang.1` O3 failure remains active with its exact expectation: signed16 abs(INT_MIN)
@@ -45,12 +47,13 @@ covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `4f25d04719c325883eb099fba40db913ea557d90` plus compiler patch
-`31cbb06b5c504bb7c82f8034151af68f4d502c9e06632c6db795c802a182a0e0`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `9b38d177c52188f963504fc263083f99872252f766fe592d1ead45ff4a502426`.
-Provider SHA-256: `a8fd827876dc5995e82b29d638e0c3e7fb83dc901b23eefd3e690bd5f52498fe`.
-The later commit does not relabel these binaries. Current source/runtime hashes, exact outcomes and
-failure history live in `focused-evidence.json` under `features.nvvm-core-resources`.
+Revision `bb8cd379340aaa6b75ffc39c92096453ffd83c39` plus compiler patch
+`6cbdcf73b00a00afb3bac8fdaa825be392c9079eb283e150d5e26387909cdbbe`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `66529ca693d4e600b3f9f1367fbcbfe69dbf880280c7b2b9b77921dd2d527ef9`.
+Provider SHA-256: `17ae8a44e43df07a2f329d58901eb3c54cead1d5baf238a1d02358329e3b7964`.
+The later commit and whitespace-only formatting do not relabel these binaries. Source/runtime hashes,
+exact outcomes, initial/intermediate identities and failure history live in `focused-evidence.json`
+under `features.nvvm-core-tail`.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -67,11 +70,18 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 
 ## Next action
 
-Finish the remaining text routes in one bounded batch: named frexp/modf calls with checked local
-output pointers, exact BF16 dot composition through a typed scalar FMA, and CUDA layout queries.
-Reuse existing SizeOf/AlignOf with explicit CUDALayout; preserve field keys for offsets. Audit actual
-libdevice pointer attributes before widening named-call admission. Keep general signed16 normalization
-separate. Use focused existing checks and no routine module-version bump.
+Resolve the `__offsetOf` producer contract before implementing the final migration. NVVM currently
+accepts a direct field of the same base object; CUDA/CPP text also accepts address subtraction
+between unrelated objects. `__offsetOf(left, left.value)` has a field-offset meaning, while
+`__offsetOf(left, right.value)` does not have that same contract.
+
+The pending choice is whether to define a same-object member offset across targets and reject
+unrelated objects, or preserve CUDA/CPP address-difference behavior while retaining NVVM's narrower
+contract. A canonical producer must capture the checked aggregate type and substituted field key
+before SSA/value optimization. A hidden helper loses the caller's field identity; unconditional
+intrinsic-op lowering would bypass a proposed target-specific fallback. Do not introduce a late
+operand-graph walker, marker or new text recognizer to evade this decision. Resume the bounded
+migration after the maintainer chooses the contract. Keep signed16 normalization separate.
 
 ## Retained boundaries
 

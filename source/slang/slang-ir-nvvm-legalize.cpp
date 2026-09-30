@@ -15,20 +15,6 @@ namespace
 
 static const IRIntegerValue kNVVMI32Max = 2147483647;
 
-enum class NVVMCUDALayoutQueryKind
-{
-    None,
-    Size,
-    Alignment,
-    Offset,
-};
-
-struct NVVMCUDALayoutQuery
-{
-    NVVMCUDALayoutQueryKind kind = NVVMCUDALayoutQueryKind::None;
-    IRType* explicitType = nullptr;
-};
-
 // Returns whether the compile request selected the bounds policy implemented by the CUDA and CPU
 // preludes. Consider this example:
 //
@@ -267,11 +253,10 @@ SlangResult _diagnoseNVVMLegalization(
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-// Recognizes one exact CUDA-prelude layout-query helper. These helpers describe compile-time
-// metadata; their aggregate parameters are not part of the direct backend's runtime value ABI.
-bool _getNVVMCUDALayoutQuery(IRFunc* function, NVVMCUDALayoutQuery& outQuery)
+// Recognizes the remaining CUDA-prelude offset helper. Size and alignment now use canonical
+// layout IR; offset still requires its qualified direct same-base field identity.
+bool _isNVVMCUDAOffsetQuery(IRFunc* function)
 {
-    outQuery = {};
     if (!function || !isNVVMSignedI32Type(function->getResultType()))
         return false;
 
@@ -288,44 +273,16 @@ bool _getNVVMCUDALayoutQuery(IRFunc* function, NVVMCUDALayoutQuery& outQuery)
             return false;
     }
 
-    const UnownedStringSlice assembly = genericAsm->getAsm();
-    if (assembly == toSlice("sizeof($[0])") || assembly == toSlice("alignof($[0])"))
-    {
-        if (function->getParamCount() != 0 || genericAsm->getOperandCount() != 2)
-            return false;
-        auto explicitType = as<IRType>(genericAsm->getOperand(1));
-        if (!explicitType)
-            return false;
-        outQuery.kind = assembly == toSlice("sizeof($[0])") ? NVVMCUDALayoutQueryKind::Size
-                                                            : NVVMCUDALayoutQueryKind::Alignment;
-        outQuery.explicitType = explicitType;
-        return true;
-    }
-    if (assembly == toSlice("sizeof($T0)") || assembly == toSlice("alignof($T0)"))
-    {
-        if (function->getParamCount() != 1 || genericAsm->getOperandCount() != 1)
-            return false;
-        outQuery.kind = assembly == toSlice("sizeof($T0)") ? NVVMCUDALayoutQueryKind::Size
-                                                           : NVVMCUDALayoutQueryKind::Alignment;
-        return true;
-    }
-    if (assembly == toSlice("int(((char*)&($1)) - ((char*)&($0)))"))
-    {
-        if (function->getParamCount() != 2 || genericAsm->getOperandCount() != 1)
-            return false;
-        outQuery.kind = NVVMCUDALayoutQueryKind::Offset;
-        return true;
-    }
-    return false;
+    return function->getParamCount() == 2 && genericAsm->getOperandCount() == 1 &&
+           genericAsm->getAsm() == toSlice("int(((char*)&($1)) - ((char*)&($0)))");
 }
 
 // Resolves one canonical query call through the shared CUDA layout rules. An offset is owned by
 // the exact struct-field key already present in IR, never by positional or structural matching.
-bool _getNVVMCUDALayoutQueryValue(
+bool _getNVVMCUDAOffsetQueryValue(
     CodeGenContext* codeGenContext,
     IRCall* call,
     IRFunc* function,
-    const NVVMCUDALayoutQuery& query,
     IRIntegerValue& outValue)
 {
     outValue = 0;
@@ -345,78 +302,49 @@ bool _getNVVMCUDALayoutQueryValue(
         }
     }
 
-    if (query.kind == NVVMCUDALayoutQueryKind::Offset)
-    {
-        auto aggregateType =
-            call->getArgCount() == 2 ? as<IRStructType>(call->getArg(0)->getDataType()) : nullptr;
-        auto fieldExtract =
-            call->getArgCount() == 2 ? as<IRFieldExtract>(call->getArg(1)) : nullptr;
-        if (!aggregateType || !fieldExtract || fieldExtract->getBase() != call->getArg(0))
-            return false;
-
-        IRStructField* selectedField = nullptr;
-        for (auto field : aggregateType->getFields())
-        {
-            if (field->getKey() == fieldExtract->getField())
-            {
-                selectedField = field;
-                break;
-            }
-        }
-        if (!selectedField ||
-            !isTypeEqual(selectedField->getFieldType(), fieldExtract->getDataType()))
-        {
-            return false;
-        }
-
-        IRIntegerValue offset = 0;
-        if (SLANG_FAILED(getOffset(
-                codeGenContext->getTargetReq(),
-                IRTypeLayoutRules::getCUDA(),
-                selectedField,
-                &offset)) ||
-            offset < 0 || offset > kNVVMI32Max)
-        {
-            return false;
-        }
-        outValue = offset;
-        return true;
-    }
-
-    IRType* queriedType = query.explicitType;
-    if (!queriedType && call->getArgCount() == 1)
-        queriedType = function->getParamType(0);
-    if (!queriedType)
+    auto aggregateType =
+        call->getArgCount() == 2 ? as<IRStructType>(call->getArg(0)->getDataType()) : nullptr;
+    auto fieldExtract = call->getArgCount() == 2 ? as<IRFieldExtract>(call->getArg(1)) : nullptr;
+    if (!aggregateType || !fieldExtract || fieldExtract->getBase() != call->getArg(0))
         return false;
 
-    IRSizeAndAlignment layout;
-    if (SLANG_FAILED(getSizeAndAlignment(
+    IRStructField* selectedField = nullptr;
+    for (auto field : aggregateType->getFields())
+    {
+        if (field->getKey() == fieldExtract->getField())
+        {
+            selectedField = field;
+            break;
+        }
+    }
+    if (!selectedField || !isTypeEqual(selectedField->getFieldType(), fieldExtract->getDataType()))
+    {
+        return false;
+    }
+
+    IRIntegerValue offset = 0;
+    if (SLANG_FAILED(getOffset(
             codeGenContext->getTargetReq(),
             IRTypeLayoutRules::getCUDA(),
-            queriedType,
-            &layout)))
+            selectedField,
+            &offset)) ||
+        offset < 0 || offset > kNVVMI32Max)
     {
         return false;
     }
-
-    const IRIntegerValue value =
-        query.kind == NVVMCUDALayoutQueryKind::Alignment ? layout.alignment : layout.size;
-    if (value <= 0 || value > kNVVMI32Max)
-        return false;
-
-    outValue = value;
+    outValue = offset;
     return true;
 }
 
-struct NVVMFoldedLayoutQuery
+struct NVVMFoldedOffsetQuery
 {
     IRCall* call = nullptr;
     IRIntegerValue value = 0;
 };
 
-SlangResult _foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
+SlangResult _foldNVVMCompileTimeOffsetQueries(CodeGenContext* codeGenContext, LinkedIR& linkedIR)
 {
-    List<NVVMFoldedLayoutQuery> folds;
+    List<NVVMFoldedOffsetQuery> folds;
     for (auto globalInst : linkedIR.module->getGlobalInsts())
     {
         auto function = as<IRFunc>(globalInst);
@@ -428,12 +356,11 @@ SlangResult _foldNVVMCompileTimeLayoutQueries(CodeGenContext* codeGenContext, Li
             {
                 auto call = as<IRCall>(inst);
                 auto callee = call ? as<IRFunc>(call->getCallee()) : nullptr;
-                NVVMCUDALayoutQuery query;
-                if (!callee || !_getNVVMCUDALayoutQuery(callee, query))
+                if (!callee || !_isNVVMCUDAOffsetQuery(callee))
                     continue;
 
                 IRIntegerValue value = 0;
-                if (!_getNVVMCUDALayoutQueryValue(codeGenContext, call, callee, query, value))
+                if (!_getNVVMCUDAOffsetQueryValue(codeGenContext, call, callee, value))
                     return _diagnoseNVVMLegalization(codeGenContext, toSlice("CUDA layout query"));
                 folds.add({call, value});
             }
@@ -649,8 +576,7 @@ SlangResult _verifyNVVMReadyIR(CodeGenContext* codeGenContext, const LinkedIR& l
                 }
                 auto call = as<IRCall>(inst);
                 auto callee = call ? as<IRFunc>(call->getCallee()) : nullptr;
-                NVVMCUDALayoutQuery query;
-                if (callee && _getNVVMCUDALayoutQuery(callee, query))
+                if (callee && _isNVVMCUDAOffsetQuery(callee))
                     return _diagnoseNVVMLegalization(codeGenContext, toSlice("CUDA layout query"));
             }
         }
@@ -666,7 +592,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
         return _diagnoseNVVMLegalization(codeGenContext, toSlice("CUDA layout query module"));
 
     SLANG_RETURN_ON_FAIL(_legalizeNVVMZeroIndexBounds(codeGenContext, linkedIR));
-    SLANG_RETURN_ON_FAIL(_foldNVVMCompileTimeLayoutQueries(codeGenContext, linkedIR));
+    SLANG_RETURN_ON_FAIL(_foldNVVMCompileTimeOffsetQueries(codeGenContext, linkedIR));
     SLANG_RETURN_ON_FAIL(_removeNVVMCompileTimeOnlyInstructions(codeGenContext, linkedIR));
     _legalizeNVVMLocalBooleanVectorAddresses(linkedIR);
 

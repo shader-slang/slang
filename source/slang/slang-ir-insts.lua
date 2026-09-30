@@ -2825,6 +2825,8 @@ local insts = {
 	{ CastUIntToUntypedSamplerHandle = { operands = { { "index" } } } },
 	{ CastUntypedSamplerHandleToUInt = { operands = { { "handle" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
+	-- One fused floating-point multiply-add; the target owns supported scalar formats.
+	{ fma = { operands = { { "left" }, { "right" }, { "addend" } }, hoistable = true } },
 	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },

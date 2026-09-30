@@ -3469,12 +3469,16 @@ int __SyntaxError()
 __generic<T>
 [__readNone]
 [require(cpp_cuda_llvm)]
+[ForceInline]
 int __sizeOf()
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "sizeof($[0])", T;
     case cuda: __intrinsic_asm "sizeof($[0])", T;
+    case nvvm:
+        static_assert(sizeof(T, __CUDADataLayout) > 0, "NVVM size must be positive");
+        return sizeof(T, __CUDADataLayout);
     case llvm: __intrinsic_asm "ret i32 $[S0]", T;
     }
 }
@@ -3482,12 +3486,16 @@ int __sizeOf()
 __generic<T>
 [__readNone]
 [require(cpp_cuda_llvm)]
+[ForceInline]
 int __sizeOf(T v)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "sizeof($T0)";
     case cuda: __intrinsic_asm "sizeof($T0)";
+    case nvvm:
+        static_assert(sizeof(T, __CUDADataLayout) > 0, "NVVM size must be positive");
+        return sizeof(T, __CUDADataLayout);
     case llvm: __intrinsic_asm "ret i32 $S0";
     }
 }
@@ -3495,6 +3503,7 @@ int __sizeOf(T v)
 __generic<T>
 [__readNone]
 [require(cpp_cuda_llvm)]
+[ForceInline]
 int __alignOf()
 {
     __target_switch
@@ -3502,6 +3511,9 @@ int __alignOf()
     case cuda :
     case cpp :
         __intrinsic_asm "alignof($[0])", T;
+    case nvvm:
+        static_assert(alignof(T, __CUDADataLayout) > 0, "NVVM alignment must be positive");
+        return alignof(T, __CUDADataLayout);
     case llvm:
         return __sizeOf<Tuple<int8_t, T> >() - __sizeOf<T>();
     }
@@ -3510,12 +3522,16 @@ int __alignOf()
 __generic<T>
 [__readNone]
 [require(cpp_cuda_llvm)]
+[ForceInline]
 int __alignOf(T v)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "alignof($T0)";
     case cuda: __intrinsic_asm "alignof($T0)";
+    case nvvm:
+        static_assert(alignof(T, __CUDADataLayout) > 0, "NVVM alignment must be positive");
+        return alignof(T, __CUDADataLayout);
     case llvm:
         return __sizeOf<Tuple<int8_t, T> >() - __sizeOf<T>();
     }

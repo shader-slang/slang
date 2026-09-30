@@ -184,24 +184,25 @@ extern "C"
 /* Value 66 is retired; core math uses named calls and ordinary composition. */
 // 67 is reserved (retired scalar NaN classification).
 // 68 is reserved (retired sign operation).
-#define SLANG_NVVM_VALUE_OP_FREXP_FRACTION ((SlangNVVMValueOperation)69u)
-#define SLANG_NVVM_VALUE_OP_FREXP_EXPONENT ((SlangNVVMValueOperation)70u)
+// 69 is reserved (retired pointer-result projection).
+// 70 is reserved (retired pointer-result projection).
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH ((SlangNVVMValueOperation)71u)
 /* Value 72 is retired; synchronization uses named LLVM intrinsics. */
 /* Value 73 is retired; core math uses named calls and ordinary composition. */
 /* Value 74 is retired; core math uses named calls and ordinary composition. */
 /* Value 75 is retired; core math uses named calls and ordinary composition. */
 /* Value 76 is retired; core math uses named calls and ordinary composition. */
-#define SLANG_NVVM_VALUE_OP_MODF_FRACTION ((SlangNVVMValueOperation)77u)
-#define SLANG_NVVM_VALUE_OP_MODF_INTEGRAL ((SlangNVVMValueOperation)78u)
+// 77 is reserved (retired pointer-result projection).
+// 78 is reserved (retired pointer-result projection).
 /** Snapshots currently executing lanes without synchronization; not a logical convergence mask. */
 #define SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK ((SlangNVVMValueOperation)79u)
 /** Reads the per-multiprocessor cycle counter; each observation remains live. */
 // 80 is reserved (retired clock operation).
 // 81 is reserved (retired clock64 operation).
-/** BF16 dot: positive-zero accumulator, separately rounded products/sums in lane order. */
-#define SLANG_NVVM_VALUE_OP_BFLOAT16_DOT ((SlangNVVMValueOperation)82u)
-#define SLANG_NVVM_VALUE_OPERATION_COUNT 83u
+// 82 is reserved (retired BF16 dot composition).
+/** Scalar fused multiply-add with one round-to-nearest-even BF16 result. */
+#define SLANG_NVVM_VALUE_OP_FMA ((SlangNVVMValueOperation)83u)
+#define SLANG_NVVM_VALUE_OPERATION_COUNT 84u
 
     /** Describes one complete semantic value-operation overload. */
     typedef struct SlangNVVMValueOperationDesc
@@ -524,9 +525,12 @@ extern "C"
     typedef uint32_t SlangNVVMNamedIntrinsicOperandKind;
 #define SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ((SlangNVVMNamedIntrinsicOperandKind)0u)
 #define SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT ((SlangNVVMNamedIntrinsicOperandKind)1u)
+#define SLANG_NVVM_NAMED_INTRINSIC_OPERAND_OUT_POINTER ((SlangNVVMNamedIntrinsicOperandKind)2u)
 
     /** A checked operand type and its guaranteed constant classification. INTEGER_CONSTANT
-        promises an integer or Boolean literal; emission independently verifies the value handle. */
+        promises an integer or Boolean literal. OUT_POINTER describes generic-address-space writable
+        local storage whose pointee has `type`; it is admitted only for selected device-library
+        calls. Emission independently verifies the value handle. */
     typedef struct SlangNVVMNamedIntrinsicOperandDesc
     {
         SlangNVVMValueTypeDesc type;

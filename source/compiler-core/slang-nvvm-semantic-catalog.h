@@ -26,7 +26,7 @@ enum class ValueOperationFamily : uint32_t
     FloatConvert,
     BFloat16Convert,
     Float8Widen,
-    BFloat16Dot,
+    BFloat16Fma,
     BitReinterpret,
     Select,
 };
@@ -358,70 +358,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         {kUnsignedI32, kNoType, kNoType},
         1,
         "32-bit value reinterpretation",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
-        kFloat32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 frexp fraction",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
-        kSignedI32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 frexp exponent",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_FREXP_FRACTION,
-        kFloat64,
-        {kFloat64, kNoType, kNoType},
-        1,
-        "float64 frexp fraction",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_FREXP_EXPONENT,
-        kSignedI32,
-        {kFloat64, kNoType, kNoType},
-        1,
-        "float64 frexp exponent",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_MODF_FRACTION,
-        kFloat32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 modf fraction",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_MODF_INTEGRAL,
-        kFloat32,
-        {kFloat32, kNoType, kNoType},
-        1,
-        "float32 modf integral part",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_MODF_FRACTION,
-        kFloat64,
-        {kFloat64, kNoType, kNoType},
-        1,
-        "float64 modf fraction",
-        true,
-    },
-    {
-        SLANG_NVVM_VALUE_OP_MODF_INTEGRAL,
-        kFloat64,
-        {kFloat64, kNoType, kNoType},
-        1,
-        "float64 modf integral part",
-        true,
     },
     {
         SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
@@ -768,15 +704,12 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    // The CUDA prelude owns dot overloads for BF16 widths 2, 3, and 4. Preserve the
-    // specialized signature rather than admitting BF16 through ordinary floating arithmetic.
-    if (desc.operation == SLANG_NVVM_VALUE_OP_BFLOAT16_DOT && desc.operandCount == 2 &&
-        areSameType(desc.resultType, kBFloat16) &&
-        haveSameElementType(desc.operandTypes[0], kBFloat16) &&
-        desc.operandTypes[0].laneCount >= 2 && desc.operandTypes[0].laneCount <= 4 &&
-        areSameType(desc.operandTypes[0], desc.operandTypes[1]))
+    if (desc.operation == SLANG_NVVM_VALUE_OP_FMA && desc.operandCount == 3 &&
+        areSameType(desc.resultType, kBFloat16) && areSameType(desc.operandTypes[0], kBFloat16) &&
+        areSameType(desc.operandTypes[1], kBFloat16) &&
+        areSameType(desc.operandTypes[2], kBFloat16))
     {
-        outResolution = {ValueOperationFamily::BFloat16Dot, "source-ordered BF16 dot"};
+        outResolution = {ValueOperationFamily::BFloat16Fma, "scalar BF16 fused multiply-add"};
         return true;
     }
 

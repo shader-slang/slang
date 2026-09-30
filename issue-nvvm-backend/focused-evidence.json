@@ -75793,6 +75793,403 @@
         "The inherited signed16 abs INT_MIN O3 normalization failure remains active under nvvm-core-values-and-atomics; this is not an all-pass repository checkpoint.",
         "Module43/ABI46/container2 unchanged; old same-version prototype modules may need recompilation."
       ]
+    },
+    "nvvm-core-tail": {
+      "status": "accepted-focused",
+      "scope": "Core frexp/modf use four real selected libdevice calls with checked output pointers. BF16 dot is core composition of genuine scalar FMA (stable IR914/provider83); size/alignment use canonical IR with explicit CUDA layout and forced metadata-wrapper inlining. Retire numeric69/70/77/78/82, projection recipes and math/size/alignment CUDA-text recognizers. The field-offset text recognizer remains pending a public producer contract decision.",
+      "compiler_identity": {
+        "revision": "bb8cd379340aaa6b75ffc39c92096453ffd83c39",
+        "compiler_patch_sha256": "6cbdcf73b00a00afb3bac8fdaa825be392c9079eb283e150d5e26387909cdbbe",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "container_version": 2,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "fc3630e93b75eb5155a95c4c584895c736b7025bf687418fee1b57aff0371d7c",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "e1b9e6749bad242e1854494541b88e8c4b5b46b39c4212be0bfc2b21c6ea97fb",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "ac1dd2b9ab6b5cbfb87e29e1204a86b798c2c3b289e6bb38af5841f86e72d462",
+          "source/slang/core.meta.slang": "0eaab569e492f8aec0089e74028e489ab6ae2e3bf34677b8748439bad1841f47",
+          "source/slang/hlsl.meta.slang": "96a4812d9c85db589d008649a8bca11a343c3cb1fa1c87d7f670c30fe57746d7",
+          "source/slang/slang-emit-nvvm.cpp": "8656a21a8a6d3cdaa56f4fa829cd48f24e38193ef4cae2cfc728ec5626be606b",
+          "source/slang/slang-ir-insts-stable-names.cpp": "909ae6a8aa5e18c38d1c9557537324871ff81575148bd7b5ec51c10b88961fb7",
+          "source/slang/slang-ir-insts-stable-names.lua": "095e892120db1e868ffc5e3d4865d4e86d184187c95bcbed043098da5d67258a",
+          "source/slang/slang-ir-insts.lua": "5708c4e0466cf8e2f0beb8c1f3559244528b16e5310d1298f26c9522e087e48d",
+          "source/slang/slang-ir-nvvm-legalize.cpp": "ebbbc3f4cb9f24e98b9d7b26b7919b687c5dcf8e2bde090363245f49b9ee6864",
+          "source/slang/slang-ir-peephole.cpp": "4f0e1d2e7a4b2540615d194d969c495d4972bdb71ff8fcb5b506e092c5192404",
+          "source/slang/slang-ir-use-uninitialized-values.cpp": "656a19c339c0d41fbfd821d561549bacbc0edf3c43b4e670a49bcfcb72006b37"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "66529ca693d4e600b3f9f1367fbcbfe69dbf880280c7b2b9b77921dd2d527ef9",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e37eef63f323f051d965368d4de9a96f2b93e65bdbbf671418e7037ee326fa5d",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "17ae8a44e43df07a2f329d58901eb3c54cead1d5baf238a1d02358329e3b7964",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "tested_identity": {
+          "path": "build/nvvm-core-tail/tested-identity-final.json",
+          "sha256": "bd183d4f2cdd5a8cf18aa559ae9057434c8b468269198841b1cc89838c0897ab"
+        },
+        "final_formatting": {
+          "path": "build/nvvm-core-tail/formatting-only.patch",
+          "sha256": "5cc0a2b7bd35951c8b2af6d1de67247561a2ef25fbc0feb4f9141a90e0c2082b"
+        },
+        "formatting_policy": "Two C++ line wraps after validation; no semantic change or rebuild. Tested source hashes remain unchanged here."
+      },
+      "validation": {
+        "builds": [
+          {
+            "path": "build/nvvm-core-tail/build-production.json",
+            "sha256": "edf71ae01394eed035f30d327ffc827fe6c0e8f43b49c555eb722ebe163b5110",
+            "return_code": 1,
+            "elapsed_seconds": 303.5502107143402
+          },
+          {
+            "path": "build/nvvm-core-tail/build-production-retry.json",
+            "sha256": "a0c29bc2ce4d0c0b721cec4c71f75c6eaf100582f0148cf531ae4d9c15a93689",
+            "return_code": 1,
+            "elapsed_seconds": 76.10109996795654
+          },
+          {
+            "path": "build/nvvm-core-tail/build-production-final.json",
+            "sha256": "c95f12b46d75f7117994ff12ae891e1f5d20806a390ec91da84f4ec8cfe3588b",
+            "return_code": 0,
+            "elapsed_seconds": 25.067352056503296
+          },
+          {
+            "path": "build/nvvm-core-tail/build-tests.json",
+            "sha256": "ea77d88ee41da5764adece751528525436215f86faf890fbeea6a482b7ab3e31",
+            "return_code": 0,
+            "elapsed_seconds": 22.678531408309937
+          },
+          {
+            "path": "build/nvvm-core-tail/build-production-corrected.json",
+            "sha256": "196a2991c8140ca8f7fd2cf0ca686499ac5f1af6fed92d301d43eb188fed16d0",
+            "return_code": 0,
+            "elapsed_seconds": 86.13739728927612
+          },
+          {
+            "path": "build/nvvm-core-tail/build-tests-corrected.json",
+            "sha256": "1245e46355b63ef40fee1ca4c59c6c5357eec38c59a903eee70f501b620aea4f",
+            "return_code": 0,
+            "elapsed_seconds": 19.846307039260864
+          },
+          {
+            "path": "build/nvvm-core-tail/build-tests-final.json",
+            "sha256": "b53c7fcf6f8286d18de56371f2b9fe62c26f151d0bbe2654e39bf467cf7f22b5",
+            "return_code": 0,
+            "elapsed_seconds": 19.72628879547119
+          },
+          {
+            "path": "build/nvvm-core-tail/build-tests-reviewed.json",
+            "sha256": "f95a573f09bfffedd0f3864b5cd3cd8a0396b3ff4a68af97f127aa4cea83d724",
+            "return_code": 0,
+            "elapsed_seconds": 19.82662868499756
+          }
+        ],
+        "units": {
+          "passed": 10,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderBFloat16FmaContract.internal",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryPointerOutputs.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsScalarMathOperations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderRejectsRetiredPointerMathOperations.internal",
+            "slang-unit-test-tool/nvvmSlangCoreTailLegacyRoutesRejectBeforeOutput.internal",
+            "slang-unit-test-tool/nvvmSlangCUDAAggregateLayoutQueriesFoldBeforeDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangCUDATypeLayoutQueriesUseDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangCoreLayoutQueriesRejectInvalidSize.internal",
+            "slang-unit-test-tool/nvvmSlangBFloat16CoreDotComposition.internal",
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-core-tail/units.json",
+              "sha256": "d1146a44ff1fbbea85617f9b61cccb79556fe3c43ce8beb141d5dd4ad083950b",
+              "return_code": 1,
+              "elapsed_seconds": 3.5058417320251465
+            },
+            {
+              "path": "build/nvvm-core-tail/units-corrected.json",
+              "sha256": "d551172e85d9585e2bae153843b85b887a34c6eae04611371d31af1a5bf74261",
+              "return_code": 1,
+              "elapsed_seconds": 2.236895799636841
+            },
+            {
+              "path": "build/nvvm-core-tail/units-final.json",
+              "sha256": "a83403ed2562dff33fe92eee61e8bcfd23175808bcb1d74f9a3110d5a64780da",
+              "return_code": 0,
+              "elapsed_seconds": 1.8577947616577148
+            }
+          ],
+          "reuse": "Four unchanged provider units and retired-text negative passed initially; only five failed compiler units rerun, then only two remaining fake/expectation failures. All successes retained.",
+          "initial_identity": {
+            "path": "build/nvvm-core-tail/tested-identity.json",
+            "sha256": "c7dca6d1df41cc7e1e88dd314081951c4ccfa8285cf94d3acb7d491f13893768"
+          },
+          "intermediate_identity": {
+            "path": "build/nvvm-core-tail/tested-identity-corrected.json",
+            "sha256": "7691b893a2f929557da6fed6eb9c53d9e5b29c9a9fb3f18760f9298f6e9c2b50"
+          }
+        },
+        "runtime": {
+          "nvvm_passed": 12,
+          "nvrtc_passed": 1,
+          "outcomes": [
+            "tests/bugs/frexp-double.slang.6 (cuda)",
+            "tests/bugs/frexp-double.slang.7 (cuda)",
+            "tests/bugs/frexp.slang.6 (cuda)",
+            "tests/bugs/frexp.slang.7 (cuda)",
+            "tests/cuda/cuda-array-layout.slang (cuda)",
+            "tests/cuda/cuda-array-layout.slang.1 (cuda)",
+            "tests/cuda/cuda-layout.slang.1 (cuda)",
+            "tests/cuda/nvvm-bf16-cuda-layout.slang.1 (cuda)",
+            "tests/cuda/nvvm-bf16-cuda-layout.slang.2 (cuda)",
+            "tests/cuda/nvvm-bf16-dot.slang.1 (cuda)",
+            "tests/cuda/nvvm-bf16-dot.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/scalar-half.slang.3 (cuda)",
+            "tests/hlsl-intrinsic/scalar-half.slang.4 (cuda)"
+          ],
+          "record": {
+            "path": "build/nvvm-core-tail/runtime-corrected.json",
+            "sha256": "ebf53b03f05c827588eb7f9325ddcaa9d58eb86c1368465918b41e8a8b6c97a3",
+            "return_code": 0,
+            "elapsed_seconds": 9.48007583618164
+          },
+          "identity": {
+            "path": "build/nvvm-core-tail/runtime-identity-corrected.json",
+            "sha256": "a9185b6a772167e73947ff12270a6c49287b91d5a1e7e5ba35827efcfd73d631"
+          },
+          "policy": "Existing fixtures and exact expectations; one NVRTC array-layout control bounds the shared inline annotation. No new numerical oracle or full campaign."
+        },
+        "diagnostics": {
+          "passed": 3,
+          "outcomes": [
+            "tests/diagnostics/uninitialized-out-parameters.slang",
+            "tests/diagnostics/uninitialized-direct-copy.slang",
+            "tests/diagnostics/uninitialized-intrinsic-asm-operands.slang"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-core-tail/diagnostics.json",
+              "sha256": "addf16813e69a28e84a22f5fa576944b9f96c4fde9bc663c17cd4c0a8a1d763f",
+              "return_code": 1,
+              "elapsed_seconds": 1.5761568546295166
+            },
+            {
+              "path": "build/nvvm-core-tail/diagnostics-corrected.json",
+              "sha256": "370356051246f4efae6b0feb072958cd842f554e147d02d888d3b7eb986408ff",
+              "return_code": 1,
+              "elapsed_seconds": 1.4278993606567383
+            },
+            {
+              "path": "build/nvvm-core-tail/diagnostics-final.json",
+              "sha256": "fdac586d1d0ec17a3a3688cb3902c91e4562d3d8371e314648f6547482df7347",
+              "return_code": 0,
+              "elapsed_seconds": 1.4277479648590088
+            }
+          ],
+          "reuse": "Two existing initialization controls passed initially; only new explicit-address-versus-value diagnostic rerun after adding its missing compute-stage attribute and correcting exact diagnostic underline columns."
+        },
+        "test_source_sha256": {
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "3dc55d2f56633eea8ca8289a06572ee3c2aee10333135a48dc4fed6803e3f8c5",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "cbadd899c00e0aebd027f96bc708cc9dc9d9e41c4ea15be0391b8ce74b32a2ab",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "eacb0d0988d8c9b7b13e93d244b7aa72069ff381dcc8337b40bfce4b691da665",
+          "tests/diagnostics/uninitialized-intrinsic-asm-operands.slang": "63a4eff2a59a61413a08df1789dcbc68a6ac46db74b014c3e78c44239ae348cb"
+        },
+        "selected_libdevice_definition_audit": {
+          "path": "build/nvvm-core-tail/libdevice-pointer-functions.ll",
+          "sha256": "acc4ea3142ceb8340795a9e8cb3ba500d3fd8a9b627b5749288882f475c40ec3"
+        }
+      },
+      "validation_incidents": [
+        {
+          "id": "generic-half-cast",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-tail/build-production.json",
+            "sha256": "edf71ae01394eed035f30d327ffc827fe6c0e8f43b49c555eb722ebe163b5110",
+            "return_code": 1,
+            "elapsed_seconds": 303.5502107143402
+          },
+          "resolution": {
+            "path": "build/nvvm-core-tail/build-production-final.json",
+            "sha256": "c95f12b46d75f7117994ff12ae891e1f5d20806a390ec91da84f4ec8cfe3588b",
+            "return_code": 0,
+            "elapsed_seconds": 25.067352056503296
+          },
+          "cause": "E30080: static_assert does not refine generic T for float(x).",
+          "fix": "Reuse canonical __realCast for Half promotion and narrowing."
+        },
+        {
+          "id": "explicit-assembly-address-initialization",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-tail/build-production-retry.json",
+            "sha256": "a0c29bc2ce4d0c0b721cec4c71f75c6eaf100582f0148cf531ae4d9c15a93689",
+            "return_code": 1,
+            "elapsed_seconds": 76.10109996795654
+          },
+          "resolution": {
+            "path": "build/nvvm-core-tail/build-production-final.json",
+            "sha256": "c95f12b46d75f7117994ff12ae891e1f5d20806a390ec91da84f4ec8cfe3588b",
+            "return_code": 0,
+            "elapsed_seconds": 25.067352056503296
+          },
+          "cause": "E41018: explicit address operand was classified as a pointee read despite existing opaque assembly store policy.",
+          "fix": "Shared GenericAsm use classification treats pointer operands as stores and ordinary value operands as reads; paired diagnostic preserves real uninitialized-value rejection."
+        },
+        {
+          "id": "named-output-pointer-availability",
+          "status": "resolved",
+          "failures": [
+            {
+              "path": "build/nvvm-core-tail/units.json",
+              "sha256": "d1146a44ff1fbbea85617f9b61cccb79556fe3c43ce8beb141d5dd4ad083950b",
+              "return_code": 1,
+              "elapsed_seconds": 3.5058417320251465
+            },
+            {
+              "path": "build/nvvm-core-tail/runtime.json",
+              "sha256": "95268027229c4e1d89a819bc8f5a0e6924cd69f9290bebfc9184318be5cfa7cc",
+              "return_code": 1,
+              "elapsed_seconds": 6.155885934829712
+            }
+          ],
+          "failed_runtime_outcomes": [
+            "tests/bugs/frexp-double.slang.6 (cuda)",
+            "tests/bugs/frexp-double.slang.7 (cuda)",
+            "tests/bugs/frexp.slang.6 (cuda)",
+            "tests/bugs/frexp.slang.7 (cuda)"
+          ],
+          "resolutions": [
+            {
+              "path": "build/nvvm-core-tail/units-final.json",
+              "sha256": "a83403ed2562dff33fe92eee61e8bcfd23175808bcb1d74f9a3110d5a64780da",
+              "return_code": 0,
+              "elapsed_seconds": 1.8577947616577148
+            },
+            {
+              "path": "build/nvvm-core-tail/runtime-corrected.json",
+              "sha256": "ebf53b03f05c827588eb7f9325ddcaa9d58eb86c1368465918b41e8a8b6c97a3",
+              "return_code": 0,
+              "elapsed_seconds": 9.48007583618164
+            }
+          ],
+          "fix": "Consume the planned OUT_POINTER role through the existing writable pointer validator instead of scalar validation."
+        },
+        {
+          "id": "metadata-wrapper-and-test-shapes",
+          "status": "resolved",
+          "failures": [
+            {
+              "path": "build/nvvm-core-tail/units.json",
+              "sha256": "d1146a44ff1fbbea85617f9b61cccb79556fe3c43ce8beb141d5dd4ad083950b",
+              "return_code": 1,
+              "elapsed_seconds": 3.5058417320251465
+            },
+            {
+              "path": "build/nvvm-core-tail/units-corrected.json",
+              "sha256": "d551172e85d9585e2bae153843b85b887a34c6eae04611371d31af1a5bf74261",
+              "return_code": 1,
+              "elapsed_seconds": 2.236895799636841
+            }
+          ],
+          "failed_outcomes": [
+            "slang-unit-test-tool/nvvmSlangCUDATypeLayoutQueriesUseDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangCUDAAggregateLayoutQueriesFoldBeforeDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangCoreLayoutQueriesRejectInvalidSize.internal",
+            "slang-unit-test-tool/nvvmSlangBFloat16CoreDotComposition.internal"
+          ],
+          "resolutions": [
+            {
+              "path": "build/nvvm-core-tail/units-corrected.json",
+              "sha256": "d551172e85d9585e2bae153843b85b887a34c6eae04611371d31af1a5bf74261",
+              "return_code": 1,
+              "elapsed_seconds": 2.236895799636841
+            },
+            {
+              "path": "build/nvvm-core-tail/units-final.json",
+              "sha256": "a83403ed2562dff33fe92eee61e8bcfd23175808bcb1d74f9a3110d5a64780da",
+              "return_code": 0,
+              "elapsed_seconds": 1.8577947616577148
+            }
+          ],
+          "fix": "ForceInline type-only layout wrappers before runtime aggregate parameter lowering. Correct unsized CUDA wrapper expectations to size16/alignment8; remove invalid unsized-size negative. Recognize scalar BF16 operation results as physical i16 in fake builder; real BF16 already passed.",
+          "rejected_hypothesis": "A speculative generic AlignOf indeterminate-size change was reverted after checking the actual CUDA layout override. No such shared behavior change remains."
+        },
+        {
+          "id": "fake-builder-operation-families-and-store-expectation",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-tail/units-corrected.json",
+            "sha256": "d551172e85d9585e2bae153843b85b887a34c6eae04611371d31af1a5bf74261",
+            "return_code": 1,
+            "elapsed_seconds": 2.236895799636841
+          },
+          "failed_outcomes": [
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangBFloat16CoreDotComposition.internal"
+          ],
+          "resolution": {
+            "path": "build/nvvm-core-tail/units-final.json",
+            "sha256": "a83403ed2562dff33fe92eee61e8bcfd23175808bcb1d74f9a3110d5a64780da",
+            "return_code": 0,
+            "elapsed_seconds": 1.8577947616577148
+          },
+          "fix": "Record admitted BF16 conversion/FMA families through existing fake typed-operation recording. Replace old projection-recipe store-count expectation with checks for the actual named output-pointer contract. Review added missing fake device-name recording and exact BF16 vector physical mapping before any unit run against the penultimate test build; the final test-only rebuild includes both. Production and all passing runtime results unchanged."
+        },
+        {
+          "id": "diagnostic-fixture-stage-and-columns",
+          "status": "resolved",
+          "failures": [
+            {
+              "path": "build/nvvm-core-tail/diagnostics.json",
+              "sha256": "addf16813e69a28e84a22f5fa576944b9f96c4fde9bc663c17cd4c0a8a1d763f",
+              "return_code": 1,
+              "elapsed_seconds": 1.5761568546295166
+            },
+            {
+              "path": "build/nvvm-core-tail/diagnostics-corrected.json",
+              "sha256": "370356051246f4efae6b0feb072958cd842f554e147d02d888d3b7eb986408ff",
+              "return_code": 1,
+              "elapsed_seconds": 1.4278993606567383
+            }
+          ],
+          "resolution": {
+            "path": "build/nvvm-core-tail/diagnostics-final.json",
+            "sha256": "fdac586d1d0ec17a3a3688cb3902c91e4562d3d8371e314648f6547482df7347",
+            "return_code": 0,
+            "elapsed_seconds": 1.4277479648590088
+          },
+          "fix": "Add missing compute-stage attribute and match actual assembly-statement diagnostic columns5-20; retain both exact expected uninitialized scalar messages and exhaustive matching."
+        },
+        {
+          "id": "half-runtime-selector",
+          "status": "resolved",
+          "initial": {
+            "path": "build/nvvm-core-tail/runtime.json",
+            "sha256": "95268027229c4e1d89a819bc8f5a0e6924cd69f9290bebfc9184318be5cfa7cc",
+            "return_code": 1,
+            "elapsed_seconds": 6.155885934829712
+          },
+          "resolution": {
+            "path": "build/nvvm-core-tail/runtime-corrected.json",
+            "sha256": "ebf53b03f05c827588eb7f9325ddcaa9d58eb86c1368465918b41e8a8b6c97a3",
+            "return_code": 0,
+            "elapsed_seconds": 9.48007583618164
+          },
+          "fix": "Initial .6/.7 matched no cases; corrected to actual NVVM .3/.4. Initial run had10 cases, final run has12NVVM plus1NVRTC control; missing execution was not counted as pass."
+        }
+      ],
+      "limitations": [
+        "No full suite, fresh exhaustive numerical campaign, material run or performance claim. Float64 modf has provider/compiler coverage only, not fresh numerical qualification.",
+        "Module43/ABI46/container2 unchanged; stale same-version prototype modules may require rebuilding.",
+        "Offset is the sole remaining CUDA-text recognizer; its direct same-base field contract is unchanged. Broader CPP/CUDA address-difference behavior needs a producer contract decision.",
+        "The inherited signed16 abs INT_MIN O3 normalization failure remains active under nvvm-core-values-and-atomics; this is not an all-pass repository checkpoint."
+      ]
     }
   }
 }
