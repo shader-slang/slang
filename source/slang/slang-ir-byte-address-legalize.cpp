@@ -376,11 +376,8 @@ struct ByteAddressBufferLegalizationContext
                                                     : kIROp_CastUInt2ToDescriptorHandle;
     }
 
-    // Return the layout rules for data in a byte-address buffer on `target`: natural layout, or,
-    // where layout rules version 202c applies (`isScalarLayoutRoundedUpToAlignment`), natural
-    // layout with struct sizes rounded up to their alignment. DXC lays out the struct of a
-    // templated `Load<T>`/`Store<T>` with its structured-buffer rule, which rounds struct sizes, so
-    // with 202c `bab.Load<T>` reads what a scalar-layout buffer of `T` holds.
+    // DXC rounds struct sizes for templated `Load<T>`/`Store<T>`, so under 202c a byte-address read
+    // uses the same layout as a scalar-layout buffer of `T`.
     IRTypeLayoutRules* getByteAddressLayoutRules(TargetProgram* target)
     {
         return isScalarLayoutRoundedUpToAlignment(target->getOptionSet())
@@ -389,16 +386,16 @@ struct ByteAddressBufferLegalizationContext
     }
 
     // Compute the size and alignment of `type` as an element of a byte-address buffer, which
-    // gives the stride between array elements and the extent of an aligned wide access.
+    // gives the stride between array elements and the extent of an aligned wide access. Under
+    // 202c it comes from the same rules as field offsets; otherwise it is the natural size, which
+    // differs from the std430 field offsets under `-fvk-use-gl-layout`.
     SlangResult getByteAddressElementSizeAndAlignment(
         IRType* type,
         IRSizeAndAlignment* outSizeAlignment)
     {
-        return Slang::getSizeAndAlignment(
-            m_target,
-            getByteAddressLayoutRules(m_targetProgram),
-            type,
-            outSizeAlignment);
+        if (isScalarLayoutRoundedUpToAlignment(m_targetProgram->getOptionSet()))
+            return getSizeAndAlignment(m_targetProgram, type, outSizeAlignment);
+        return getNaturalSizeAndAlignment(m_target, type, outSizeAlignment);
     }
 
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)

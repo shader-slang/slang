@@ -38,7 +38,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     rwbab.Store<U>(0, sb[tid.x]);
 }
 
-// `sizeof(U) + 1000` folds to 1016 either way.
 // OLD: %uint_1016 = OpConstant %uint 1016
 // NEW: %uint_1016 = OpConstant %uint 1016
 
