@@ -11,10 +11,11 @@ implementing numerics;
 //   preferred independently of that compatibility rule.
 // - Rank -4 is immediately below the legacy IArithmetic operator tier at -3 (with IFloat at -2
 //   and IDifferentiableArithmetic at -1), so existing generic constraints retain their operators.
-// - Ranks -9 and -11 bracket the legacy core adapters at -10. For min/max, core's -10 adapter is
-//   the `IFloat`/`IInteger` one and its `IComparable` adapter sits at -11. Scalar bool-valued
-//   relations and min/max win at -9, while component-wise Mask-valued relations remain fallback
-//   behavior at -11 for types that also conform to IComparable.
+// - Ranks -9 and -11 bracket the legacy IComparable relation adapters at -10. Scalar bool-valued
+//   relations win at -9, while component-wise Mask-valued relations remain fallback behavior at
+//   -11 for types that also conform to IComparable.
+// - For min/max the order is -9 here, -10 in differentiable-wrappers.slang, then the core
+//   adapters for `IFloat` (-11), `IInteger` (-12) and `IComparable` (-13).
 
 /// Converts between non-void builtin scalar representations using compiler numeric-cast semantics.
 /// Conversion to `bool` tests whether the source is nonzero; this is not bit reinterpretation.

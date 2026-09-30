@@ -5,22 +5,22 @@
 // `lessThan`, as the `IComparable` overloads always did. `lessThan` here is deliberately reversed,
 // so the results show which ordering was used.
 
-struct Rev : IFloat, IDifferentiable
+struct ReversedOrder : IFloat
 {
     float v;
     [Differentiable] __init(float value) { v = value; }
-    [Differentiable] __init(Rev other) { v = other.v; }
+    [Differentiable] __init(ReversedOrder other) { v = other.v; }
     [Differentiable] float toFloat() { return v; }
-    [Differentiable] Rev add(Rev o) { return Rev(v + o.v); }
-    [Differentiable] Rev sub(Rev o) { return Rev(v - o.v); }
-    [Differentiable] Rev mul(Rev o) { return Rev(v * o.v); }
-    [Differentiable] Rev div(Rev o) { return Rev(v / o.v); }
-    [Differentiable] Rev mod(Rev o) { return Rev(v % o.v); }
-    [Differentiable] Rev neg() { return Rev(-v); }
-    [Differentiable] Rev scale<T : __BuiltinFloatingPointType>(T s) { return Rev(v * s.toFloat()); }
-    bool equals(Rev o) { return v == o.v; }
-    bool lessThan(Rev o) { return v > o.v; }
-    bool lessThanOrEquals(Rev o) { return v >= o.v; }
+    [Differentiable] ReversedOrder add(ReversedOrder o) { return ReversedOrder(v + o.v); }
+    [Differentiable] ReversedOrder sub(ReversedOrder o) { return ReversedOrder(v - o.v); }
+    [Differentiable] ReversedOrder mul(ReversedOrder o) { return ReversedOrder(v * o.v); }
+    [Differentiable] ReversedOrder div(ReversedOrder o) { return ReversedOrder(v / o.v); }
+    [Differentiable] ReversedOrder mod(ReversedOrder o) { return ReversedOrder(v % o.v); }
+    [Differentiable] ReversedOrder neg() { return ReversedOrder(-v); }
+    [Differentiable] ReversedOrder scale<T : __BuiltinFloatingPointType>(T s) { return ReversedOrder(v * s.toFloat()); }
+    bool equals(ReversedOrder o) { return v == o.v; }
+    bool lessThan(ReversedOrder o) { return v > o.v; }
+    bool lessThanOrEquals(ReversedOrder o) { return v >= o.v; }
 }
 
 T genMin<T : IFloat>(T a, T b)
@@ -38,6 +38,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0] = genMin(Rev(1.0), Rev(2.0)).v; // CHECK: 2.0
-    outputBuffer[1] = genMax(Rev(1.0), Rev(2.0)).v; // CHECK: 1.0
+    outputBuffer[0] = genMin(ReversedOrder(1.0), ReversedOrder(2.0)).v; // CHECK: 2.0
+    outputBuffer[1] = genMax(ReversedOrder(1.0), ReversedOrder(2.0)).v; // CHECK: 1.0
 }

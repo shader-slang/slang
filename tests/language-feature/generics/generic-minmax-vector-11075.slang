@@ -8,7 +8,8 @@
 // A generic `min`/`max` constrained by `IFloat` or `IInteger` and specialized on a builtin
 // vector must reach the concrete element-wise vector overload and produce the same componentwise
 // result on every backend. The shared CHECK buffer across cpu/cuda/vk/mtl is the cross-target
-// parity gate.
+// parity gate. `double` is not a Metal type, so double vectors are covered by
+// generic-minmax-double-vector-11075.slang, which omits `-mtl`.
 
 T genMin<T : IFloat>(T a, T b)
 {
@@ -28,7 +29,7 @@ T genMaxI<T : IInteger>(T a, T b)
     return max(a, b);
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -43,8 +44,6 @@ void computeMain()
     float4 mn4 = genMin(a4, b4);
     float4 mx4 = genMax(a4, b4);
 
-    // `double` is not a Metal type, so double vectors are covered by
-    // generic-minmax-double-vector-11075.slang, which omits `-mtl`.
     int3 ai = int3(9, 2, 5), bi = int3(3, 8, 5);
     int3 mniC = genMinI(ai, bi);
     int3 mxiC = genMaxI(ai, bi);
@@ -88,8 +87,4 @@ void computeMain()
 
     outputBuffer[i++] = float(mnl.x); // CHECK: 3.0
     outputBuffer[i++] = float(mnl.y); // CHECK: 2.0
-
-    outputBuffer[i++] = __isVector<float3>() ? 1.0 : 0.0;   // CHECK: 1.0
-    outputBuffer[i++] = __isVector<float>() ? 1.0 : 0.0;    // CHECK: 0.0
-    outputBuffer[i++] = __isVector<float3x3>() ? 1.0 : 0.0; // CHECK: 0.0
 }

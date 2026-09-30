@@ -112,11 +112,19 @@ interface IComparable
 }
 
 //@hidden:
-// The builtin scalar and vector conformances override `__min`/`__max` with calls to their concrete
-// `min`/`max` overloads, and the matrix conformance calls the vector overloads row by row. Those
-// calls are resolved against the concrete shape when the conformance is checked, so a generic
-// `min`/`max` specialized on, say, `float3` reaches the element-wise vector overload instead of a
-// scalar-only target intrinsic.
+// A generic `min(x, y)` binds once, against the abstract `T`, and specialization does not revisit
+// that choice, so on its own it cannot reach the concrete `vector<T, N>` overload. The core
+// `min`/`max` overloads for `IFloat` and `IInteger` therefore call `x.__min(y)` / `x.__max(y)`, and
+// the builtin scalar, vector and float matrix conformances implement these as `min(this, other)` /
+// `max(this, other)`. That call is resolved when the conformance is checked, where `This` is
+// concrete, so it binds the concrete overload, which ranks above the generic ones that would call
+// back into `__min`/`__max` without end. Each target then gets its native vector operation where
+// it has one, and the same per-element code as a direct call on cpp/cuda.
+//
+// The defaults order whole values with `lessThan`, as the `IComparable` overloads do, so a user
+// `IFloat`/`IInteger` type needs no new members but may override them. The requirements live here
+// rather than in `IComparable` so that a type conforming only to `IComparable` gains no new
+// requirements and `IComparable` stays a pure ordering interface.
 interface __IMinMax : IComparable
 {
     This __min(This other)
@@ -2526,25 +2534,23 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
-    // A whole-matrix `min(this, other)` would need a layout conversion to reach the concrete
-    // matrix overload, which then ranks below the generic `min<T : __IMinMax>` that dispatches
-    // back here. Each row is a `vector<T, M>`, so the per-row calls bind the concrete overloads.
+    // The concrete matrix overloads take the default layout. We convert to it explicitly because
+    // an implicit layout conversion at the call would cost more than the conversion-free generic
+    // `min<T : IFloat>`, which would win and call back into `__min` without end.
     [__unsafeForceInlineEarly]
     override This __min(This other)
     {
-        This result;
-        for (int i = 0; i < N; ++i)
-            result[i] = min(this[i], other[i]);
-        return result;
+        matrix<T, N, M> x = this;
+        matrix<T, N, M> y = other;
+        return min(x, y);
     }
 
     [__unsafeForceInlineEarly]
     override This __max(This other)
     {
-        This result;
-        for (int i = 0; i < N; ++i)
-            result[i] = max(this[i], other[i]);
-        return result;
+        matrix<T, N, M> x = this;
+        matrix<T, N, M> y = other;
+        return max(x, y);
     }
 
     [Differentiable]

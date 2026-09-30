@@ -37,10 +37,10 @@ void computeMain()
     vector<intptr_t, 4> b4 = {intptr_t(7), intptr_t(2), intptr_t(6), intptr_t(4)};
     vector<intptr_t, 4> mn4 = genMinI(a4, b4);
 
-    // Values above 2^32 confirm the pointer-sized element is preserved at full 64-bit width (a
-    // path that narrowed to 32 bits would pick the wrong element / wrong value). Compared as
-    // exact integers, since `float` cannot represent these magnitudes precisely. Signed and
-    // unsigned are checked separately so a narrowing in either IPTR or UPTR is caught.
+    // Values above 2^32 show that the pointer-sized element keeps its full 64-bit width; a
+    // lowering that narrowed it to 32 bits would compare the wrong values. We compare exact
+    // integers because `float` cannot represent these magnitudes, and check `intptr_t` and
+    // `uintptr_t` separately so that narrowing of either is caught.
     intptr_t bigLo = intptr_t(0x0000000100000002);
     intptr_t bigHi = intptr_t(0x0000000100000009);
     vector<intptr_t, 2> wa = {bigHi, bigLo};
