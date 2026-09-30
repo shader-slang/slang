@@ -5,9 +5,10 @@ The exp core migration and full checkpoint are accepted. The core selects `__nv_
 narrowing. Numeric operation 55, its semantic tag and CUDA-text recognizer are retired. The module
 range is `min = max = 41`; provider ABI 46 and container format 2 remain unchanged.
 
-**Stopped after this exp slice, as requested.** Exp2 remains unselected and requires a new explicit
-request before investigation or implementation. No Slack, push or system changes. Plans, reports
-and raw artifacts remain ignored. Current accepted raw evidence: `build/nvvm-exp/`.
+The maintainer resumed the remaining migration on 2026-09-30 under the streamlined
+[workflow](WORKFLOW.md): exp2 next, then the log/log2/log10 family. The earlier stop-after-exp
+request is satisfied and superseded. No Slack, push or system changes. Plans, reports and raw
+artifacts remain ignored. Current accepted raw evidence: `build/nvvm-exp/`.
 
 Start with the [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
@@ -69,8 +70,10 @@ module probes cover exact version 40. Performance and material-runtime evidence 
 
 ## Boundaries and next action
 
-- Work is stopped after the completed exp slice. Do not investigate, prepare or implement another
-  slice without a new explicit request.
+- Resume with exp2 using existing preparation and validation machinery, then the logarithm family.
+  Combine migration and version bump in one final compiler build, use focused acceptance where
+  shared semantics are unchanged, and apply the full-checkpoint cadence in WORKFLOW. Keep build
+  tuning and other investigations outside this continuation.
 - Module version 41 requires older modules and separately supplied built-ins to be recompiled for
   every backend. Metadata inspection and source fallback remain available. The semantic-tag extension
   remains until its final consumers migrate; ordinary comma-separated intrinsic arguments remain.

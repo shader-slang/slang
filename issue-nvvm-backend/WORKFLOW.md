@@ -15,10 +15,11 @@ NVVM semantic-tag extension after its users migrate. Continue through reviewed l
 until these slices finish or a human decision is needed. The maintainer subsequently authorized
 a prototype module-version break: reject earlier capability layouts before deserialization and
 require old modules to be recompiled; stable historical capability decoding is outside this slice.
-The maintainer requested stopping after the canonical conversion/module-version34 slice on
-2026-09-29; that slice was accepted and locally committed. The maintainer then explicitly resumed
-the migration on 2026-09-29. Continue with bounded integer-bit work and the remaining authorized
-slices, accepting and locally committing each before proceeding.
+The maintainer's stop-after-exp request was satisfied by the accepted local exp commit. On
+2026-09-30 the maintainer explicitly resumed the remaining migration and approved the streamlined
+workflow below. Start with exp2, then handle log/log2/log10 as a bounded family. Keep remaining
+math, compound and wave work separate where their semantics or consumers differ. Do not undertake
+build-system, caching or parallelism investigations as part of this continuation.
 STATUS records the current evidence and next leads. Earlier independent review
 keeps a transforming local-storage pass deferred because its bounded rewrite cannot retire the
 existing conversion responsibility. Accept and locally commit each bounded task before proceeding;
@@ -50,6 +51,37 @@ production changes. Apply the helper inventory and input-shape audit from AGENTS
 immutable; discovery has 50–128 unique sources excluding frozen overlap. Extend a harness explicitly
 for new test contracts instead of relabeling failures. Queue unrelated blockers separately.
 
+## Reuse validation and consolidate review
+
+Use the existing approved validation machinery with a small slice manifest containing operations,
+fixtures, expected outcomes, neighboring cases and the required gates. Reuse schemas and helpers;
+do not clone a new orchestration stack or add a general framework for each migration. Changes to
+runner semantics require focused runner tests and a full checkpoint; manifest-only additions do not.
+
+Use two main independent review gates:
+
+1. Review the numerical contract, implementation and concrete validation scope before scored
+   post-change execution. Freeze numerical policy and fixtures before baseline GPU observations;
+   the same reviewer may review these prerequisites as they become ready. Keep this review cohesive
+   rather than requiring separate approvals for each capture, helper or record-generation step.
+2. Review final results, preserved identities and histories, documentation and the exact staged tree
+   before the local commit. Prepare documentation during validation and fill in actual results at
+   closeout. Routine capture, formatting and evidence generation run under the reviewed runner.
+
+For a prototype semantic retirement, capture immutable old-module controls with the existing
+compiler, then implement the migration and module-version bump together. Build and validate the
+final compiler once. Direct tests must reject retired numeric operations and legacy text before
+output mutation, independently of the version gate; a fresh tagged-source diagnostic alone is
+insufficient. Also retain old-module metadata/rejection, fresh-module loading, source fallback and
+isolated static version tests. These replace the intermediate same-version retirement campaign;
+old-module rejection alone must not conceal an unretired backend route. Do not rewrite old module
+metadata to make it pass the new reader. Keep the separate static build for now.
+
+Group small related operations into one bounded, reviewed family when they share the established
+calling convention and validation structure. Preserve operation-specific numerical contracts and
+negative tests. A family accepted in one commit is one implementation for checkpoint cadence; do
+not enlarge a batch merely to evade a checkpoint or combine unrelated unresolved semantics.
+
 ## Acceptance and checkpoint cadence
 
 For compiler changes, require focused positive/boundary/negative coverage and real GPU outputs at
@@ -59,12 +91,25 @@ Explain why the chosen coverage bounds the change. Require one result per reques
 compare classification, return code, execution counts, diagnostic and canonical shape. Wrong output,
 crashes, timeouts, skips and missing execution never become passes. Preserve failure histories.
 
-Run full frozen/discovery/physical-surface/all-material checkpoints after three implementations and
-before a fourth; also after shared lowering/type, ABI/provider/library or corpus-runner changes, uncertain impact,
-host/toolchain/configuration changes, and before publication. Full acceptance includes the native,
-toolkit and runner gates in RESULTS. Use `census.slice-195.tsv` for frozen selection; do not substitute
-unfiltered discovery. STATUS records last full, last targeted and implementations since full.
-Documentation-only consolidation does not create fresh GPU evidence or reset this cadence.
+Run full frozen/discovery/physical-surface/all-material checkpoints after three accepted
+implementations and before a fourth, at publication, and at a requested stopping point after any
+implementation since the last full checkpoint. An immediate stop request takes precedence: stop
+promptly and record any outstanding validation without claiming it passed.
+
+Also run a full checkpoint when behavior changes in shared lowering/type legalization, signature
+validation, ABI, provider/library loading or resolution, corpus-runner semantics, host/toolchain or
+configuration, or when the affected scope is uncertain. Adding a function name through an unchanged,
+qualified named-library path, removing its operation-specific legacy routes, or advancing the
+prototype semantic-version rejection boundary does not by itself trigger a full checkpoint. Require
+focused proof of those boundaries and document why shared behavior is unchanged. A larger provider
+or library change still triggers the full gate; merely touching such a file does not determine risk.
+
+Full acceptance includes the native, toolkit and runner gates in RESULTS. Targeted acceptance keeps
+the last full baseline and its tested identity unchanged, records fresh source/runtime identity and
+focused results separately, and compares inherited tests against their exact accepted outcomes.
+Use `census.slice-195.tsv` for frozen selection; do not substitute unfiltered discovery. STATUS records
+last full, last targeted and implementations since full. Documentation-only changes do not create
+fresh GPU evidence or reset this cadence.
 
 `compare` rejects missing, duplicate, changed and false-passing cells. Retain review-required results;
 resolve regressions or review intentional transitions before updating the accepted baseline. A manual
