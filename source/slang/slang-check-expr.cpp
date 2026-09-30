@@ -7627,8 +7627,7 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
 
 // Strip the projections that read a part of an object -- `.field`, `[i]`, a single-component
 // swizzle such as `.x` or `._m00`, and `(...)` -- to reach the object whose declaration carries the
-// address space. `groupshared` sits on that
-// object, never on the part.
+// address space. `groupshared` sits on that object, never on the part.
 //
 // Anything reached through a pointer stops the walk, because there the pointer's own type carries
 // the address space.
@@ -7680,6 +7679,17 @@ static bool isTypeOnlyPlaceholderArg(Expr* arg)
            !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
 }
 
+// Return whether `arg` comes from an expression that already failed to check. Coercion wraps an
+// error-typed operand in an implicit cast to the parameter's type, so we look through that cast; a
+// storage diagnostic for such an argument would only repeat the reported error.
+static bool isArgumentOfFailedCheck(Expr* arg)
+{
+    if (as<ErrorType>(arg->type))
+        return true;
+    auto castExpr = as<ImplicitCastExpr>(arg);
+    return castExpr && as<ErrorType>(castExpr->arguments[0]->type);
+}
+
 // Return whether `arg` names thread-group-shared storage: strip the projections that read a part of
 // an object to reach the addressed object, then ask `getValidTypeForAddressOf` for its addressable
 // pointer type and inspect that pointer's address space. `getValidTypeForAddressOf` already
@@ -7711,7 +7721,7 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
     if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>() ||
-        isTypeOnlyPlaceholderArg(argIn) || as<ErrorType>(argIn->type))
+        isTypeOnlyPlaceholderArg(argIn) || isArgumentOfFailedCheck(argIn))
         return;
 
     if (!argumentNamesGroupSharedStorage(argIn))
@@ -7757,7 +7767,7 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
             continue;
 
         auto argExpr = invoke->arguments[i];
-        if (as<ErrorType>(argExpr->type))
+        if (isArgumentOfFailedCheck(argExpr))
             continue;
         auto addressedExpr = argExpr;
         if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
