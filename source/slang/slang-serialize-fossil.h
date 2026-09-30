@@ -645,17 +645,33 @@ public:
     ///
     Fossil::AnyValPtr readValPtr();
 
-    /// Run the actions deferred by the readers sharing this reader's `ReadContext`.
+    /// Finish reading the values read so far.
     ///
-    /// Every reader must be flushed before it is destroyed. Only the outermost
-    /// reader on a context runs the actions, and it does so here rather than in
-    /// its destructor so that an exception thrown by an action reaches the caller.
+    /// After `flush()` returns on the outermost reader of a `ReadContext`, every
+    /// object read through that context is fully populated. On a nested reader it
+    /// does nothing, and the objects it read are completed when the outermost
+    /// reader is flushed.
+    ///
+    /// Code that constructs a reader must call `flush()` before the reader goes
+    /// out of scope normally; the destructor does not, because completing objects
+    /// can throw. The destructor checks this for the outermost reader.
     ///
     void flush();
 
 private:
     /// The shared context that this reader is using.
     ReadContext& _context;
+
+    /// The number of exceptions in flight when this reader was created, so that
+    /// the destructor can tell whether an exception is unwinding through the
+    /// scope that owns it.
+    int _uncaughtExceptionCountAtConstruction;
+
+    /// Whether this is the outermost reader on its `ReadContext`.
+    ///
+    /// Readers on one context are strictly nested on the call stack, so the
+    /// reader that is the only live one on its context is the outermost.
+    bool _isOutermostReader() const;
 
     /// A state that the reader can be in.
     struct State

@@ -1151,7 +1151,7 @@ SerialReader::SerialReader(
     ReadContext& context,
     Fossil::AnyValPtr valPtr,
     InitialStateType initialState)
-    : _context(context)
+    : _context(context), _uncaughtExceptionCountAtConstruction(std::uncaught_exceptions())
 {
     // We track the number of active `SerialReader`s that
     // are working with the same `ReadContext`, and will
@@ -1180,20 +1180,30 @@ SerialReader::~SerialReader()
     // Deferred actions are run by `flush()` rather than here, because an
     // action can throw (for example, when a serialized module refers to a
     // declaration that can no longer be resolved), and an exception must
-    // not escape a destructor. The outermost reader can only have pending
-    // actions here if an exception is unwinding through it (anything else
-    // means a caller did not call `flush()`, which the assertion catches),
-    // and we drop them. The objects those actions would have filled in stay
-    // cached in the `ReadContext` only partially read, so whoever catches
-    // the exception must abandon the data being read.
+    // not escape a destructor.
     //
-    if (_context._readerCount == 1)
+    // The outermost reader is left with pending actions when an exception
+    // is unwinding through the scope that owns it. We drop the actions, and
+    // since any object read through the context may then be incomplete,
+    // nothing should read from this `ReadContext` again.
+    //
+    // Pending actions on a normal exit mean that a caller did not call
+    // `flush()`. The assertion then fails, and because its exception cannot
+    // leave a destructor, the process terminates.
+    //
+    if (_isOutermostReader())
     {
         SLANG_RELEASE_ASSERT(
-            _context._deferredActions.getCount() == 0 || std::uncaught_exceptions() != 0);
+            _context._deferredActions.getCount() == 0 ||
+            std::uncaught_exceptions() > _uncaughtExceptionCountAtConstruction);
         _context._deferredActions.clear();
     }
     _context._readerCount--;
+}
+
+bool SerialReader::_isOutermostReader() const
+{
+    return _context._readerCount == 1;
 }
 
 void SerialReader::flush()
@@ -1202,10 +1212,10 @@ void SerialReader::flush()
     // and only the outermost reader drains it, because letting each nested
     // reader drain its own actions could lead to very deep call stacks. This
     // reader is still counted while it flushes, so nested readers created by
-    // the deferred actions see a count above one and leave their actions to
-    // the loop in this reader's `_flush()`.
+    // the deferred actions are not outermost and leave their actions to the
+    // loop in this reader's `_flush()`.
     //
-    if (_context._readerCount == 1)
+    if (_isOutermostReader())
     {
         _flush();
     }

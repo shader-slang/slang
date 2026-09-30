@@ -3,8 +3,12 @@
 //
 // Importing `lib.rng` before `lib.impl` names that module `lib/rng`, so when `lib/dist` is
 // compiled from source here, `IDist`'s requirements mangle differently from what
-// `impl.slang-module` recorded. Both requirement keys of `Impl`'s witness table fail to resolve;
-// loading stops at the first one.
+// `impl.slang-module` recorded. This relies on the module-naming behavior tracked in #13343; if
+// that changes, the test needs another way to produce an unresolvable imported declaration.
+//
+// `IDist` needs two unresolved requirement keys for this regression: if the reader returned null,
+// one key would fit in the `Decl*`-keyed requirement dictionary of `Impl`'s witness table, but the
+// second would collide.
 
 //TEST:COMPILE: tests/serialization/unresolved-imported-decl/lib/impl.slang -I tests/serialization/unresolved-imported-decl -o tests/serialization/unresolved-imported-decl/lib/impl.slang-module
 //TEST:SIMPLE(filecheck=CHECK): -I tests/serialization/unresolved-imported-decl -target spirv-asm -entry main -stage compute
