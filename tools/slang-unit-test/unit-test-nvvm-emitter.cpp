@@ -11966,6 +11966,12 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation)
         {"__nv_exp", true},
         {"__nv_exp2f", false},
         {"__nv_exp2", true},
+        {"__nv_logf", false},
+        {"__nv_log", true},
+        {"__nv_log2f", false},
+        {"__nv_log2", true},
+        {"__nv_log10f", false},
+        {"__nv_log10", true},
     };
     for (const auto& testCase : cases)
         for (int variant = 0; variant < 6; ++variant)
@@ -12048,6 +12054,12 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary)
         double unusedExpDouble(double value) { __intrinsic_asm "__nv_exp", value; }
         float unusedExp2Float(float value) { __intrinsic_asm "__nv_exp2f", value; }
         double unusedExp2Double(double value) { __intrinsic_asm "__nv_exp2", value; }
+        float unusedLogFloat(float value) { __intrinsic_asm "__nv_logf", value; }
+        double unusedLogDouble(double value) { __intrinsic_asm "__nv_log", value; }
+        float unusedLog2Float(float value) { __intrinsic_asm "__nv_log2f", value; }
+        double unusedLog2Double(double value) { __intrinsic_asm "__nv_log2", value; }
+        float unusedLog10Float(float value) { __intrinsic_asm "__nv_log10f", value; }
+        double unusedLog10Double(double value) { __intrinsic_asm "__nv_log10", value; }
         uint readX() { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }
         [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
         { words[0] = readX(); }
@@ -12864,6 +12876,21 @@ SLANG_UNIT_TEST(nvvmSlangPublicExp2UsesNamedDeviceLibrary)
     _checkNVVMPublicUnaryDeviceLibrary("exp2", "__nv_exp2f", "__nv_exp2", 56);
 }
 
+SLANG_UNIT_TEST(nvvmSlangPublicLogUsesNamedDeviceLibrary)
+{
+    _checkNVVMPublicUnaryDeviceLibrary("log", "__nv_logf", "__nv_log", 60);
+}
+
+SLANG_UNIT_TEST(nvvmSlangPublicLog2UsesNamedDeviceLibrary)
+{
+    _checkNVVMPublicUnaryDeviceLibrary("log2", "__nv_log2f", "__nv_log2", 61);
+}
+
+SLANG_UNIT_TEST(nvvmSlangPublicLog10UsesNamedDeviceLibrary)
+{
+    _checkNVVMPublicUnaryDeviceLibrary("log10", "__nv_log10f", "__nv_log10", 62);
+}
+
 SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
 {
     // Fresh tagged source is diagnosed as an unknown tag before NVVM planning. Immutable old
@@ -12985,4 +13012,62 @@ SLANG_UNIT_TEST(nvvmSlangLegacyExp2AssemblyRejectsBeforeOutputCreation)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
+}
+
+// Reject legacy logarithm text during planning, before library or output-module creation.
+static void _checkNVVMLegacyLogAssembly(const char* operation)
+{
+    // Builder units reject each reserved numeric ID independently of the module-version gate.
+    // This unit independently rejects legacy untagged text before any output module is created.
+    StringBuilder legacyAssembly;
+    legacyAssembly << "$P_" << operation << "($0)";
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "words[1] = uint(bit_cast<uint16_t>(oldLog(bit_cast<half>(uint16_t(words[0])))));",
+        "words[1] = asuint(oldLog(asfloat(words[0])));",
+        "uint low, high; asuint(oldLog(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << types[variant] << " oldLog(" << types[variant] << " x) { " << "__intrinsic_asm \""
+               << legacyAssembly << "\"; } " << "[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << bodies[variant] << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017") || !text.contains(legacyAssembly.getUnownedSlice()))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(!code);
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains(legacyAssembly.getUnownedSlice()));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacyLogAssemblyRejectsBeforeOutputCreation)
+{
+    _checkNVVMLegacyLogAssembly("log");
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacyLog2AssemblyRejectsBeforeOutputCreation)
+{
+    _checkNVVMLegacyLogAssembly("log2");
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacyLog10AssemblyRejectsBeforeOutputCreation)
+{
+    _checkNVVMLegacyLogAssembly("log10");
 }

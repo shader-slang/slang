@@ -8990,9 +8990,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_NVVM_VALUE_OP_ACOS,
         SLANG_NVVM_VALUE_OP_ASIN,
         SLANG_NVVM_VALUE_OP_ATAN,
-        SLANG_NVVM_VALUE_OP_LOG,
-        SLANG_NVVM_VALUE_OP_LOG2,
-        SLANG_NVVM_VALUE_OP_LOG10,
         SLANG_NVVM_VALUE_OP_TAN,
     };
     const SlangNVVMValueOperation binaryMathOperations[] = {
@@ -10855,7 +10852,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryUsesSelectedDefinitions)
           "__nv_expf",
           "__nv_exp",
           "__nv_exp2f",
-          "__nv_exp2"})
+          "__nv_exp2",
+          "__nv_logf",
+          "__nv_log",
+          "__nv_log2f",
+          "__nv_log2",
+          "__nv_log10f",
+          "__nv_log10"})
         for (uint32_t width : {32u, 64u})
         {
             auto bytes = _makeNVVMDeviceLibraryFixture(builder, width, true, name);
@@ -10968,7 +10971,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryRejectsUnsupportedABI)
           "__nv_expf",
           "__nv_exp",
           "__nv_exp2f",
-          "__nv_exp2"})
+          "__nv_exp2",
+          "__nv_logf",
+          "__nv_log",
+          "__nv_log2f",
+          "__nv_log2",
+          "__nv_log10f",
+          "__nv_log10"})
         for (uint32_t width : {32u, 64u})
         {
             auto declaration = _makeNVVMDeviceLibraryFixture(builder, width, false, name);
@@ -11042,7 +11051,13 @@ SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryEmitsAndRejectsWithoutMutation)
           "__nv_expf",
           "__nv_exp",
           "__nv_exp2f",
-          "__nv_exp2"})
+          "__nv_exp2",
+          "__nv_logf",
+          "__nv_log",
+          "__nv_log2f",
+          "__nv_log2",
+          "__nv_log10f",
+          "__nv_log10"})
         for (uint32_t width : {32u, 64u})
         {
             const uint32_t wrongWidth = width == 32 ? 64u : 32u;
@@ -11545,6 +11560,30 @@ SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryBuildsExp2Calls)
     _requireRealNVVMBuilder(unitTestContext, builder);
     _checkNVVMDeviceLibraryTypedCall(builder, "__nv_exp2f", 32, "named-exp2-float");
     _checkNVVMDeviceLibraryTypedCall(builder, "__nv_exp2", 64, "named-exp2-double");
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryBuildsLogCalls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    _checkNVVMDeviceLibraryTypedCall(builder, "__nv_logf", 32, "named-log-float");
+    _checkNVVMDeviceLibraryTypedCall(builder, "__nv_log", 64, "named-log-double");
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryBuildsLog2Calls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    _checkNVVMDeviceLibraryTypedCall(builder, "__nv_log2f", 32, "named-log2-float");
+    _checkNVVMDeviceLibraryTypedCall(builder, "__nv_log2", 64, "named-log2-double");
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryBuildsLog10Calls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    _checkNVVMDeviceLibraryTypedCall(builder, "__nv_log10f", 32, "named-log10-float");
+    _checkNVVMDeviceLibraryTypedCall(builder, "__nv_log10", 64, "named-log10-double");
 }
 
 SLANG_UNIT_TEST(nvvmIRBuilderFracRetainsFloorAndSubtract)
@@ -12277,4 +12316,99 @@ SLANG_UNIT_TEST(nvvmIRBuilderReservedExp2OperationRejectsWithoutMutation)
                 }
             }
         }
+}
+
+// Reject a retired logarithm ID without changing the module or returning an output value.
+static void _checkNVVMReservedLogOperation(
+    UnitTestContext* unitTestContext,
+    SlangNVVMValueOperation operation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const auto type :
+         {NVVMSemantics::kFloat16, NVVMSemantics::kFloat32, NVVMSemantics::kFloat64})
+        for (uint32_t lanes : {1u, 2u})
+        {
+            auto testedType = type;
+            testedType.laneCount = lanes;
+            String control;
+            for (bool injectFailures : {false, true})
+            {
+                ScopedNVVMBuilderModule scope;
+                scope.builder = &builder;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.createModule(toSlice("retired-log-family"), scope.module)));
+                SlangNVVMTypeHandle valueType = nullptr, functionType = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFloatingPointType(scope.module, type.bitWidth, valueType)));
+                if (lanes == 2)
+                {
+                    SlangNVVMTypeHandle vectorType = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        builder.getVectorType(scope.module, valueType, lanes, vectorType)));
+                    valueType = vectorType;
+                }
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionType(scope.module, valueType, &valueType, 1, functionType)));
+                SlangNVVMValueHandle function = nullptr, value = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                    scope.module,
+                    functionType,
+                    SLANG_NVVM_LINKAGE_EXTERNAL,
+                    SLANG_NVVM_FUNCTION_FLAG_NONE,
+                    toSlice("identity"),
+                    function)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionParameter(scope.module, function, 0, value)));
+                SlangNVVMBlockHandle block = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.createBlock(scope.module, function, toSlice("entry"), block)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+                if (injectFailures)
+                {
+                    // Keep the raw historical identity here: no public operation name remains.
+                    const SlangNVVMValueOperationDesc desc =
+                        {operation, testedType, &testedType, 1};
+                    SLANG_CHECK(!builder.supportsValueOperation(desc));
+                    SlangNVVMValueHandle rejected =
+                        reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                    SLANG_CHECK(
+                        builder.getValueOperationsAPI()
+                            ->emitOperation(scope.module, &desc, &value, 1, &rejected) ==
+                        SLANG_E_INVALID_ARG);
+                    SLANG_CHECK(rejected == nullptr);
+                }
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, value)));
+                ComPtr<ISlangBlob> assembly;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+                    scope.module,
+                    SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                    assembly)));
+                const String text = _getBlobText(assembly);
+                SLANG_CHECK(!text.contains("@__nv_log"));
+                if (injectFailures)
+                {
+                    SLANG_CHECK(text == control);
+                }
+                else
+                {
+                    control = text;
+                }
+            }
+        }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderReservedLogOperationRejectsWithoutMutation)
+{
+    _checkNVVMReservedLogOperation(unitTestContext, SlangNVVMValueOperation(60));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderReservedLog2OperationRejectsWithoutMutation)
+{
+    _checkNVVMReservedLogOperation(unitTestContext, SlangNVVMValueOperation(61));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderReservedLog10OperationRejectsWithoutMutation)
+{
+    _checkNVVMReservedLogOperation(unitTestContext, SlangNVVMValueOperation(62));
 }

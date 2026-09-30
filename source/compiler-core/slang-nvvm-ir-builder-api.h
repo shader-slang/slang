@@ -175,9 +175,9 @@ extern "C"
 /* Value 57 is retired; floor uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_FMOD ((SlangNVVMValueOperation)58u)
 /* Value 59 is retired; frac uses named floor followed by ordinary subtraction. */
-#define SLANG_NVVM_VALUE_OP_LOG ((SlangNVVMValueOperation)60u)
-#define SLANG_NVVM_VALUE_OP_LOG2 ((SlangNVVMValueOperation)61u)
-#define SLANG_NVVM_VALUE_OP_LOG10 ((SlangNVVMValueOperation)62u)
+/* Value 60 is retired; logarithms use named selected-libdevice functions. */
+/* Value 61 is retired; logarithms use named selected-libdevice functions. */
+/* Value 62 is retired; logarithms use named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_POW ((SlangNVVMValueOperation)63u)
 /* Value 64 is retired; round uses named selected-libdevice functions. */
 /* Value 65 is retired; rsqrt uses named selected-libdevice functions. */

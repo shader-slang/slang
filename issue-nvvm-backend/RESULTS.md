@@ -373,6 +373,45 @@ Preserve the six earlier suites and 18 fixtures unchanged; exp2 adds the seventh
 fixtures outside frozen corpus membership. Targeted acceptance retains the last full baseline's
 identity and records these fresh results separately, following WORKFLOW.
 
+### Logarithm-family numerical contracts
+
+```bash
+python3 extras/test-generators/check-nvvm-log-oracles.py --check --self-test --negative-controls \
+  --cuda-header "$CUDA_PATH/include/cuda_fp16.hpp"
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-log- tests/cuda/nvvm-log2- tests/cuda/nvvm-log10-
+```
+
+Require 27 numerical cells and three removed-tag diagnostics, with no skips. Log and log2 each
+contain 91/62/62 Half/Float32/Float64 inputs; log10 contains 91/62/80. Each input has 15 live
+scalar/noinline/vector2/3/4/matrix2x2 observations. Half outputs have 367 words, Float32 and ordinary
+Float64 outputs have 250, and double log10 has 322. Check all shape-error bits, full scalar low/high
+words, completion, guards and exact lengths. Half policy markers 60043/61043/62043 and 1209 identify
+contracts, not the current module version. Preserve all 27 raw buffers across the three modes,
+including NaNs.
+
+The checker independently encloses signed logarithms using directed integer recurrence and
+same-width IEEE midpoint cells. Library admission reflects the existing empirical spacing/encoding
+union for negative results: Float32 radii 1/1/2 for log/log2/log10, Float64 radius 1, with exact
+special-input overrides. NVVM Half narrows the Float32 admission set once. CUDA Half checks the
+ideal RN-even result on this finite corpus; bounded source/correction controls distinguish its
+installed sequence without a complete PTX approximation model. A failed API check remains a
+failure; do not fit tolerances to observed results.
+
+CUDA double log10 separately models RN32 input conversion, Float32 log10 and widening because the
+existing wrapper takes float. This is preservation evidence, not true-double accuracy. The selected
+corpus excludes negative tiny doubles that narrow to negative zero, so its shared NaN classification
+does not qualify that case. Require the independent checker, all three execution modes and exact
+per-mode preservation; one is not a replacement for another.
+
+Retain direct numeric60/61/62 rejection before mutation and legacy-text rejection before output
+independently of module42 rejection. Immutable old-module metadata/rejection, source fallback,
+fresh module43 loading and isolated static version checks complete the boundary proof. Initialize
+the isolated static core cache before its scored identity capture; a reviewed unmatched-filter
+invocation may initialize the session while executing zero tests, avoiding a duplicate version suite.
+The final full native run and checkpoint may subsume matching focused selections as described in
+WORKFLOW. Keep the seven earlier oracle suites and 21 fixtures unchanged.
+
 ## Report environment
 
 Execution and comparison use the Python standard library. Shareable SVG/PNG charts use Matplotlib:

@@ -12858,8 +12858,18 @@ T log(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmLog) "$P_log($0)";
-    case cuda: __intrinsic_asm(nvvmLog) "$P_log($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM log requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(log(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_logf", x;
+        else
+            __intrinsic_asm "__nv_log", x;
+    case cpp: __intrinsic_asm "$P_log($0)";
+    case cuda: __intrinsic_asm "$P_log($0)";
     case glsl: __intrinsic_asm "log";
     case hlsl: __intrinsic_asm "log";
     case metal: __intrinsic_asm "log";
@@ -12915,12 +12925,22 @@ T log10(T x)
 {
     __target_switch
     {
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM log10 requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(log10(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_log10f", x;
+        else
+            __intrinsic_asm "__nv_log10", x;
     case hlsl: __intrinsic_asm "log10";
     case metal: __intrinsic_asm "log10";
     case wgsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
     case glsl: __intrinsic_asm "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )";
-    case cuda: __intrinsic_asm(nvvmLog10) "$P_log10($0)";
-    case cpp: __intrinsic_asm(nvvmLog10) "$P_log10($0)";
+    case cuda: __intrinsic_asm "$P_log10($0)";
+    case cpp: __intrinsic_asm "$P_log10($0)";
     case spirv:
     {
         const T tmp = T(0.43429448190325182765112891891661);
@@ -12982,8 +13002,18 @@ T log2(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmLog2) "$P_log2($0)";
-    case cuda: __intrinsic_asm(nvvmLog2) "$P_log2($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM log2 requires half, float, or double.");
+        // Preserve Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(log2(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_log2f", x;
+        else
+            __intrinsic_asm "__nv_log2", x;
+    case cpp: __intrinsic_asm "$P_log2($0)";
+    case cuda: __intrinsic_asm "$P_log2($0)";
     case glsl: __intrinsic_asm "log2";
     case hlsl: __intrinsic_asm "log2";
     case metal: __intrinsic_asm "log2";

@@ -74,7 +74,7 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 42 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 43 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
@@ -182,6 +182,28 @@ with `--operation exp2 --check --self-test` reconstructs 212 references and runs
 38 retained shared checks and 19 exp2 checks. Optional preparation-proposal auditing rejects 14
 mutations. Default invocation still checks exp unchanged. The [removed-tag test](../../tests/cuda/nvvm-exp2-removed-tag.slang)
 checks fresh tagged source; current acceptance and exact tested identity remain owned by STATUS.
+
+Public `log`, `log2` and `log10` use six selected Float32/Float64 library names and canonical Half
+widening/evaluation/narrowing. Operations 60/61/62 and their tag/text paths are retired. The
+[log](../../tests/cuda/nvvm-log-half.slang), [log2](../../tests/cuda/nvvm-log2-half.slang) and
+[log10](../../tests/cuda/nvvm-log10-half.slang) families each have Half/Float32/Float64 fixtures:
+91/62/62 inputs for log and log2, and 91/62/80 for log10. Each input has 15 scalar/helper/vector/matrix
+observations, guarded full scalar bits and completion; all 27 mode buffers must preserve their
+respective baseline bytes. Current acceptance remains owned by STATUS.
+
+The [independent checker](../../extras/test-generators/check-nvvm-log-oracles.py) certifies signed
+references using directed integer logarithm intervals. Ordinary library admission uses the
+empirical test-defined spacing/encoding union reflected by sign, with Float32 radii 1/1/2 and
+Float64 radius 1. NVVM Half narrows the Float32 set; CUDA Half checks ideal RN-even results on the
+finite corpus. Bounded source/correction controls distinguish the installed Half paths without
+claiming comprehensive PTX approximation qualification. Exact specials preserve signed input-zero
+handling, positive output zero at one, infinities and NaN class; NaN payloads remain unpromised.
+
+CUDA double-log10 checks RN32 input conversion, Float32 log10 admission and exact widening because
+the existing `F64_log10(float)` wrapper narrows. This qualified preservation result is not evidence
+of true-double accuracy. The corpus excludes negative tiny doubles that narrow to negative zero;
+its common NaN classification does not establish that untested case. Direct retired-ID rejection
+and legacy-text preflight tests remain independent of old-module version rejection.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

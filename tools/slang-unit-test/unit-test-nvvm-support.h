@@ -6309,11 +6309,13 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSuppor
     const bool isFloat32 = name == toSlice("__nv_roundf") || name == toSlice("__nv_ceilf") ||
                            name == toSlice("__nv_floorf") || name == toSlice("__nv_truncf") ||
                            name == toSlice("__nv_rsqrtf") || name == toSlice("__nv_expf") ||
-                           name == toSlice("__nv_exp2f");
+                           name == toSlice("__nv_exp2f") || name == toSlice("__nv_logf") ||
+                           name == toSlice("__nv_log2f") || name == toSlice("__nv_log10f");
     const bool isFloat64 = name == toSlice("__nv_round") || name == toSlice("__nv_ceil") ||
                            name == toSlice("__nv_floor") || name == toSlice("__nv_trunc") ||
                            name == toSlice("__nv_rsqrt") || name == toSlice("__nv_exp") ||
-                           name == toSlice("__nv_exp2");
+                           name == toSlice("__nv_exp2") || name == toSlice("__nv_log") ||
+                           name == toSlice("__nv_log2") || name == toSlice("__nv_log10");
     const auto type = isFloat32 ? NVVMSemantics::kFloat32 : NVVMSemantics::kFloat64;
     *supported = (isFloat32 || isFloat64) &&
                  NVVMSemantics::areSameType(function->resultType, type) &&

@@ -65,8 +65,9 @@ actual types, constant promises, provenance and dominance before creating a decl
 Conflicting intrinsic symbols reject before mutation.
 
 Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
-names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp` and `exp2` (`__nv_roundf`/`__nv_round`, and the
-corresponding pairs for the other six). Complete signatures come from definitions in the selected immutable
+names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp`, `exp2`, `log`, `log2` and `log10`
+(`__nv_roundf`/`__nv_round`, and the corresponding pairs for the other operations).
+Complete signatures come from definitions in the selected immutable
 library; there is no parallel name-to-signature table. Core scalar bodies select these names in
 NVVM branches. Half preserves its existing evaluation through canonical casts, for example
 `__realCast<T>(floor(__realCast<float>(x)))`: widen exactly, evaluate in Float32 and narrow once.
@@ -138,6 +139,28 @@ passes through output FTZ, the exact FMA rounding and RN16; neither a prematurel
 `1 + 2^-24` nor an FMA after narrowing preserves that sequence. NVVM Half directly narrows the
 selected Float32 library result. Their candidate sets agree on the qualified finite corpus, but a
 synthetic midpoint candidate distinguishes the policies. No universal target equivalence follows.
+
+Public `log`, `log2` and `log10` select their Float32/Float64 `__nv_log*` definitions in explicit
+NVVM core bodies. Half widens exactly, calls the Float32 operation and narrows once; existing
+vector/matrix maps retain scalar ownership. Numeric operations 60/61/62, their semantic tags and
+CUDA-text recognizers are retired. The selected definitions own signatures through the unchanged
+named-library boundary.
+
+Independent signed logarithm references qualify the default-mode library calls using the same
+test-defined spacing/encoding union, reflected for negative results. Float32 radii are 1, 1 and 2
+for log, log2 and log10; Float64 uses 1. Exact special-input rules override approximation: either
+zero returns negative infinity, one returns positive zero, negative nonzero inputs produce NaN,
+positive infinity returns positive infinity, and NaNs require only NaN classification. NVVM Half
+narrows the Float32 admission set. CUDA Half has a finite-corpus check against the ideal RN-even
+Half result, plus bounded controls for the installed approximation/correction sequence; this does
+not certify every possible PTX approximation output.
+
+CUDA Half log2 corrections inspect the evolving result. For log/log10, an encoded Float32
+multiplication and Half narrowing precede corrections keyed by the original input.
+These remain distinct source paths.
+CUDA double log10 also retains an existing limitation: `F64_log10(float)` narrows its double input,
+evaluates Float32 log10 and widens the result. Its preservation contract models that sequence;
+NVVM evaluates true double log10. Preserving CUDA's output does not establish double accuracy.
 
 Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
 matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
@@ -223,9 +246,9 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 42. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 43. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including exp2 in version 41. Existing guards reject these
+or retired numeric NVVM operations, including log/log2/log10 in version 42. Existing guards reject these
 before decoding AST or IR; metadata inspection and speculative import fallback to source remain
 available. Source modules that explicitly used retired semantic tags need current core calls or
 supported explicit intrinsic bodies. Container format 2 and provider ABI 46 are separate contracts.

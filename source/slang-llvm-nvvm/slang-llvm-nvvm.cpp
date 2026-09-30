@@ -3561,7 +3561,8 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
         name != "__nv_ceil" && name != "__nv_floorf" && name != "__nv_floor" &&
         name != "__nv_truncf" && name != "__nv_trunc" && name != "__nv_rsqrtf" &&
         name != "__nv_rsqrt" && name != "__nv_expf" && name != "__nv_exp" && name != "__nv_exp2f" &&
-        name != "__nv_exp2")
+        name != "__nv_exp2" && name != "__nv_logf" && name != "__nv_log" && name != "__nv_log2f" &&
+        name != "__nv_log2" && name != "__nv_log10f" && name != "__nv_log10")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3684,12 +3685,6 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_atanf" : "__nv_atan";
         case SLANG_NVVM_VALUE_OP_COS:
             return isFloat32 ? "__nv_cosf" : "__nv_cos";
-        case SLANG_NVVM_VALUE_OP_LOG:
-            return isFloat32 ? "__nv_logf" : "__nv_log";
-        case SLANG_NVVM_VALUE_OP_LOG2:
-            return isFloat32 ? "__nv_log2f" : "__nv_log2";
-        case SLANG_NVVM_VALUE_OP_LOG10:
-            return isFloat32 ? "__nv_log10f" : "__nv_log10";
         case SLANG_NVVM_VALUE_OP_SIN:
             return isFloat32 ? "__nv_sinf" : "__nv_sin";
         case SLANG_NVVM_VALUE_OP_SINH:

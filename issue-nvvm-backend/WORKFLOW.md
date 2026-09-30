@@ -7,143 +7,92 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-The maintainer authorized the NVVM target/intrinsic migration sequence on 2026-09-29:
-introduce explicit target selection and direct LLVM/NVVM primitives, migrate tagged operations,
-replace compound CUDA-text recognizers in bounded families, then pursue the recorded wave
-optimization. Preserve existing comma-separated `__intrinsic_asm` arguments; remove only the
-NVVM semantic-tag extension after its users migrate. Continue through reviewed local commits
-until these slices finish or a human decision is needed. The maintainer subsequently authorized
-a prototype module-version break: reject earlier capability layouts before deserialization and
-require old modules to be recompiled; stable historical capability decoding is outside this slice.
-The maintainer's stop-after-exp request was satisfied by the accepted local exp commit. Exp2 and
-its full checkpoint were subsequently accepted before a reboot stop. The maintainer
-explicitly resumed on 2026-09-30 and approved the streamlined validation sequence below. Continue
-with log/log2/log10 as a bounded family. Keep remaining
-math, compound and wave work separate where their semantics or consumers differ. Do not undertake
-build-system, caching or parallelism investigations as part of this continuation.
-STATUS records the current evidence and next leads. Earlier independent review
-keeps a transforming local-storage pass deferred because its bounded rewrite cannot retire the
-existing conversion responsibility. Accept and locally commit each bounded task before proceeding;
-regressions or decisions requiring maintainer input stop continuation. Skip Slack notifications.
-No push, publication, system installation, driver change or reboot is implied. Finite maintenance,
-results-refresh and documentation requests alone do not resume the general development loop.
+The maintainer explicitly resumed development on 2026-09-30 with a faster migration workflow.
+This supersedes the earlier stop-after-log request, four-worker limit, per-family numerical
+campaigns, routine module-version bumps and automatic full-checkpoint cadence. The immediate
+objective is to remove NVVM dependence on CUDA target-switch strings: express operations in the
+core module through explicit NVVM branches, named LLVM/NVVM/libdevice calls and ordinary Slang
+composition. Migrate related operations in substantial batches. Keep ordinary comma-separated
+`__intrinsic_asm` arguments; remove the NVVM semantic-tag extension after its last consumers migrate.
 
-For authorized implementation work, use a fresh bounded worker and independent review when available.
-The lead owns scope, acceptance and commits; one writer owns the checkout at a time. Read-only review
-can overlap. If delegation is unavailable, record that and perform separate local audits without
-claiming independent review. Serialize builds, GPU suites and measurements; use at most four CPU
-workers, two unit-test servers and 30-minute long gates. Preserve failed and interrupted attempts.
+Continue through bounded, reviewed local commits until the migration is complete or a concrete
+regression/design decision needs maintainer input. No push, publication, system installation,
+driver change or reboot is implied. Skip Slack notifications. The already-running log-family full
+checkpoint may finish and be reused; do not repeat it under the new workflow.
+
+Use one implementation owner and an independent reviewer when available. The lead owns scope,
+acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight
+build jobs** on the upgraded eight-CPU host. Use focused test selections and existing runners;
+do not build a new orchestration, approval or evidence framework for each batch.
 
 ## Select and implement
 
-Inspect revision, working changes, submodule pins and actual compiler/provider/module/cache bytes.
-Use the platform-specific slang-build skill. Record toolkit, device/driver, architecture, configuration
-and exact inputs. Reuse accepted evidence only with its original source and binary identity.
+Read STATUS and inspect the working tree and actual compiler/provider identity. Preserve unrelated
+user files. Follow the platform-specific slang-build skill and compiler methodology in AGENTS.
+For substantial batches, keep a short uncommitted ExecPlan with scope, input-shape audit and actual
+validation results. Do not turn the plan into the program backlog.
 
-Correctness regressions take priority. Select a bounded result from application relevance, feature
-composition, severity and uncertainty; avoid selecting work merely to increase passing test counts.
-Aim for a material-driven slice per three accepted implementations, explaining correctness or
-infrastructure exceptions. A moved unsupported diagnostic alone does not justify a compiler change.
-Write an uncommitted bounded ExecPlan when AGENTS requires it; include exact acceptance obligations.
+Inventory the remaining tags and CUDA-text recognizers and group migrations by shared lowering
+and calling convention. Prefer a large batch of straightforward named calls and core compositions
+to one commit per intrinsic. Include compound users when they are the remaining consumers of the
+same legacy operation; isolate genuinely new ABI, resource, control-flow or synchronization behavior.
+Use existing helpers and canonical IR. Delete recognizers/dispatch routes once all live consumers
+have migrated. Do not retain duplicate signature tables or target-specific repairs for malformed IR.
 
-Trace workload -> producer IR -> consumer -> runnable fixture. Preserve application inputs and
-independent oracles; NVRTC differential comparison is supplemental. Reproduce failures before
-production changes. Apply the helper inventory and input-shape audit from AGENTS. Keep frozen v1
-immutable; discovery has 50–128 unique sources excluding frozen overlap. Extend a harness explicitly
-for new test contracts instead of relabeling failures. Queue unrelated blockers separately.
+## Fast validation by default
 
-## Reuse validation and consolidate review
+Choose the smallest checks that establish the batch's actual contracts:
 
-Use the existing approved validation machinery with a small slice manifest containing operations,
-fixtures, expected outcomes, neighboring cases and the required gates. Reuse schemas and helpers;
-do not clone a new orchestration stack or add a general framework for each migration. Changes to
-runner semantics require focused runner tests and a full checkpoint; manifest-only additions do not.
+- For a name migration through an unchanged qualified call path, run focused compiler units and
+  compile representative scalar/aggregate/Half/Float32/Float64 inputs as applicable. Inspect NVVM
+  LLVM/PTX output and compare relevant operations/call paths with NVRTC PTX. Whole PTX files need
+  not be identical. This is a code-generation smoke check, not proof of numerical equivalence.
+- Keep direct negative tests for removed IDs/tags/text and signature/no-mutation boundaries when
+  affected. Reuse existing generic coverage instead of multiplying every check per operation.
+- Run a small existing runtime selection when composition, casts, special-value behavior or the
+  emitted operation changes. Require focused execution for synchronization, memory, ABI or control
+  semantics that compile/PTX inspection cannot establish. Expand only in response to a concrete
+  failure or unresolved risk.
+- Reuse existing numerical fixtures and policies. Do not generate exhaustive independent oracles,
+  baseline buffers, correction proofs or old-module campaigns for straightforward migrations that
+  preserve the selected operation. New numerical algorithms need their own bounded correctness
+  evidence; a name migration does not create a new algorithm.
+- Build incrementally with eight jobs. Reuse unchanged binaries and successful test results tied
+  to their actual identity. Do not rerun focused tests just because a broader suite includes them.
+  Formatting/documentation/evidence updates do not require a compiler rebuild.
 
-Use two main independent review gates:
+No full native, frozen/discovery, surface, toolkit or material campaign is required for each batch
+or stopping point. Run broader checks at an integration milestone or when a shared change/failure
+makes the affected scope uncertain. Name-list additions and operation-specific legacy-route removal
+alone do not trigger them. Before publication, follow the repository's required CI/review checks.
 
-1. Review the numerical contract, implementation and concrete validation scope before scored
-   post-change execution. Freeze numerical policy and fixtures before baseline GPU observations;
-   the same reviewer may review these prerequisites as they become ready. Keep this review cohesive
-   rather than requiring separate approvals for each capture, helper or record-generation step.
-2. Review final results, preserved identities and histories, documentation and the exact staged tree
-   before the local commit. Prepare documentation during validation and fill in actual results at
-   closeout. Routine capture, formatting and evidence generation run under the reviewed runner.
+Consolidate independent review around the batch diff, chosen checks and actual results. Routine
+captures and record updates do not require separate approvals. Preserve failures and investigate
+regressions; do not turn wrong output, crashes, missing execution or skips into passes. A PTX smoke
+check must be recorded as such, never as fresh GPU or universal accuracy evidence.
 
-For a prototype semantic retirement, capture immutable old-module controls with the existing
-compiler, then implement the migration and module-version bump together. Build and validate the
-final compiler once. Direct tests must reject retired numeric operations and legacy text before
-output mutation, independently of the version gate; a fresh tagged-source diagnostic alone is
-insufficient. Also retain old-module metadata/rejection, fresh-module loading, source fallback and
-isolated static version tests. These replace the intermediate same-version retirement campaign;
-old-module rejection alone must not conceal an unretired backend route. Do not rewrite old module
-metadata to make it pass the new reader. Keep the separate static build for now.
+## Module compatibility
 
-Group small related operations into one bounded, reviewed family when they share the established
-calling convention and validation structure. Preserve operation-specific numerical contracts and
-negative tests. A family accepted in one commit is one implementation for checkpoint cadence; do
-not enlarge a batch merely to evade a checkpoint or combine unrelated unresolved semantics.
+Keep the already-tested log migration at semantic module version43, provider ABI46 and container
+format2. **Do not bump the semantic module version for each further intrinsic migration.** The
+prototype does not need a historical-module compatibility campaign for each source change; rebuild
+stale modules against the current core, including earlier modules carrying the same version43.
+This does not promise compatibility for every prototype binary with that version. Preserve numeric
+holes, capability numbering and serialized layouts. Retired explicit operations may diagnose through
+normal validation. Revisit versioning only for an actual serialized-format/decoding change or a separately
+identified compatibility requirement. Do not rewrite old modules or silently accept invalid IR.
 
-Do not run the same test twice merely because it appears in focused and full manifests. A full
-native run subsumes its focused units; a full checkpoint subsumes matching neighbor, runtime and
-material cells on the same final identity. Preserve the selection-to-result mapping so subsumption
-is verifiable. Targeted acceptance requires relevant units, not an automatic full native run.
-Reuse unchanged artifacts after identity verification instead of rebuilding for baseline capture.
-Performance measurements are unnecessary for a semantic migration without performance claims.
+## Acceptance and current evidence
 
-For operation migrations through an unchanged selected-library path, numerical validation must
-include independent references, special values, width/ordering controls and exact per-mode
-before/after buffers. Scope unchanged CUDA algorithm checks to controls that distinguish the actual
-paths; a comprehensive new qualification of CUDA approximations is not required. Review and freeze
-the reduced contract before baseline observations, state its limitations, and keep known target
-differences separate. Differential preservation does not replace independent numerical checks or
-prove universal accuracy. The log family retains all three execution modes, Half ordering controls
-and the existing CUDA double-log10 narrowing limitation.
+Record the actual commands, outcomes, tested source/binary identity and evidence scope concisely.
+For targeted batches, retain the last full baseline unchanged and update current feature/status
+records with focused evidence. Historical GPU/numerical/performance results keep their original
+identities. A source/PTX smoke batch does not reset or claim a full checkpoint.
 
-## Acceptance and checkpoint cadence
-
-For compiler changes, require focused positive/boundary/negative coverage and real GPU outputs at
-NVRTC O3/NVVM O0/O3; relevant units and runtime smoke; toolkit/assembly for affected ABI/emission;
-explicit neighboring frozen/discovery selections; and all registered material compile/assembly cells.
-Explain why the chosen coverage bounds the change. Require one result per requested `(id, mode)` and
-compare classification, return code, execution counts, diagnostic and canonical shape. Wrong output,
-crashes, timeouts, skips and missing execution never become passes. Preserve failure histories.
-
-Run full frozen/discovery/physical-surface/all-material checkpoints after three accepted
-implementations and before a fourth, at publication, and at a requested stopping point after any
-implementation since the last full checkpoint. An immediate stop request takes precedence: stop
-promptly and record any outstanding validation without claiming it passed.
-
-Also run a full checkpoint when behavior changes in shared lowering/type legalization, signature
-validation, ABI, provider/library loading or resolution, corpus-runner semantics, host/toolchain or
-configuration, or when the affected scope is uncertain. Adding a function name through an unchanged,
-qualified named-library path, removing its operation-specific legacy routes, or advancing the
-prototype semantic-version rejection boundary does not by itself trigger a full checkpoint. Require
-focused proof of those boundaries and document why shared behavior is unchanged. A larger provider
-or library change still triggers the full gate; merely touching such a file does not determine risk.
-
-After an environment change with verified unchanged compiler/toolkit artifacts, first qualify the
-existing compiler with the runtime and toolkit gates and capture the new device/driver identity.
-Only then capture migration baselines on that environment. One full checkpoint on the final compiler
-may satisfy both environment requalification and migration acceptance, including a requested stopping
-point. Do not additionally run a full pre-migration checkpoint by default. If initial qualification
-fails or final comparison exposes a regression, stop feature work and investigate with the preserved
-old artifacts before accepting anything. Keep the historical baseline unchanged until final full
-acceptance; the initial gates alone do not establish complete environment equivalence.
-
-Full acceptance includes the native, toolkit and runner gates in RESULTS. Targeted acceptance keeps
-the last full baseline and its tested identity unchanged, records fresh source/runtime identity and
-focused results separately, and compares inherited tests against their exact accepted outcomes.
-Use `census.slice-195.tsv` for frozen selection; do not substitute unfiltered discovery. STATUS records
-last full, last targeted and implementations since full. Documentation-only changes do not create
-fresh GPU evidence or reset this cadence.
-
-`compare` rejects missing, duplicate, changed and false-passing cells. Retain review-required results;
-resolve regressions or review intentional transitions before updating the accepted baseline. A manual
-status edit or matching total is insufficient. Compare input hashes and exact native identities,
-including skips. Surface comparison preserves complete three-mode physical outcomes, exact source/oracle
-contracts and known failures; it never converts an expected failure into a passing shader result.
-New surface cells or changed obligations require explicit reviewed baseline adoption. A regression
-blocks subsequent feature work. Respect user stopping instructions.
+When a full checkpoint is deliberately selected, retain exact input/outcome comparisons and existing
+failure histories. Use the frozen census and existing discovery/surface/material contracts; matching
+totals alone are insufficient. Requalify changed environment components with the smallest relevant
+checks before relying on them. The final log-family checkpoint already qualifies the upgraded host.
 
 ## Measurement
 
