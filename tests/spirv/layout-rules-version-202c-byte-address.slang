@@ -1,7 +1,8 @@
 // `-layout-rules-version 202c` also rounds the layout of structs read and written through a
 // `ByteAddressBuffer` with `Load<T>`/`Store<T>`, as DXC does, so that `bab.Load<U>` reads what a
 // scalar-layout buffer of `U` holds. `sizeof` stays natural, because it is folded to a constant
-// before the target is known; whether it should follow 202c is open on #12714.
+// before the target is known. The `sizeof` checks record that behavior provisionally, not as a
+// settled design.
 //
 // `U` is 16 bytes and `U.w` is at byte 12 (32-bit word 3) without rounding. With 202c `U` is 24
 // bytes and `U.w` is at byte 16 (word 4), so in `U[2]` the second element's `w` moves from byte 28
