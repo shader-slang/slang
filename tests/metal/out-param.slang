@@ -1,10 +1,13 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib
-//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type -xslang -Wno-30709
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -xslang -Wno-30709
 
 // Test that we can specailize mutable parameters based on the argument
 // address space when generating code for Metal.
+//
+// Passing `sharedValue[0]` to an `out` parameter deliberately triggers warning E30709; the
+// compute tests disable it because they require empty compiler output.
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
