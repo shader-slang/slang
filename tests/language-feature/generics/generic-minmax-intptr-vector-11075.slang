@@ -41,15 +41,15 @@ void computeMain()
     // path that narrowed to 32 bits would pick the wrong element / wrong value). Compared as
     // exact integers, since `float` cannot represent these magnitudes precisely. Signed and
     // unsigned are checked separately so a narrowing in either IPTR or UPTR is caught.
-    intptr_t bigLo = intptr_t(0x0000000100000002); // 2^32 + 2
-    intptr_t bigHi = intptr_t(0x0000000100000009); // 2^32 + 9
+    intptr_t bigLo = intptr_t(0x0000000100000002);
+    intptr_t bigHi = intptr_t(0x0000000100000009);
     vector<intptr_t, 2> wa = {bigHi, bigLo};
     vector<intptr_t, 2> wb = {bigLo, bigHi};
     vector<intptr_t, 2> wmin = genMinI(wa, wb);
     vector<intptr_t, 2> wmax = genMaxI(wa, wb);
 
-    uintptr_t ubigLo = uintptr_t(0x0000000100000002); // 2^32 + 2
-    uintptr_t ubigHi = uintptr_t(0x0000000100000009); // 2^32 + 9
+    uintptr_t ubigLo = uintptr_t(0x0000000100000002);
+    uintptr_t ubigHi = uintptr_t(0x0000000100000009);
     vector<uintptr_t, 2> uwa = {ubigHi, ubigLo};
     vector<uintptr_t, 2> uwb = {ubigLo, ubigHi};
     vector<uintptr_t, 2> uwmin = genMinI(uwa, uwb);

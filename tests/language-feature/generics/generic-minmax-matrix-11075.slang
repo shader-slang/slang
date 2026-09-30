@@ -15,7 +15,7 @@ T genMax<T : IFloat>(T a, T b)
     return max(a, b);
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -27,6 +27,9 @@ void computeMain()
     float3x3 a3 = float3x3(1, 2, 3, 4, 5, 6, 7, 8, 9);
     float3x3 b3 = float3x3(9, 8, 7, 6, 5, 4, 3, 2, 1);
     float3x3 mx3 = genMax(a3, b3);
+
+    float2x3 a23 = float2x3(1, 8, 3, 7, 5, 9), b23 = float2x3(4, 2, 6, 3, 6, 1);
+    float2x3 mn23 = genMin(a23, b23);
 
     int i = 0;
     outputBuffer[i++] = mn2[0][0]; // CHECK: 1.0
@@ -43,4 +46,11 @@ void computeMain()
     outputBuffer[i++] = mx3[2][0]; // CHECK: 7.0
     outputBuffer[i++] = mx3[2][1]; // CHECK: 8.0
     outputBuffer[i++] = mx3[2][2]; // CHECK: 9.0
+
+    outputBuffer[i++] = mn23[0][0]; // CHECK: 1.0
+    outputBuffer[i++] = mn23[0][1]; // CHECK: 2.0
+    outputBuffer[i++] = mn23[0][2]; // CHECK: 3.0
+    outputBuffer[i++] = mn23[1][0]; // CHECK: 3.0
+    outputBuffer[i++] = mn23[1][1]; // CHECK: 5.0
+    outputBuffer[i++] = mn23[1][2]; // CHECK: 1.0
 }
