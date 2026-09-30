@@ -163,8 +163,12 @@ Grouped by the anchor each `doc_ref` must resolve to.
   instruction to a source range with five operands (file, start/end line,
   start/end column).
 - `DebugScope` operand 0 references the enclosing scope (a `DebugFunction` for a
-  function-level scope) and operand 1 records the inlining context.
-  `DebugNoScope` is emitted with zero operands.
+  function-level scope) and operand 1, when present, records the inlining
+  context. An inlined region is closed by a `DebugScope` that restores the
+  caller's scope, not by `DebugNoScope`, which has no producer at HEAD
+  (#13175); in a caller without an inline chain that restore is the one-operand
+  `DebugScope(<caller DebugFunction>)`. Do not write a test that expects
+  `DebugNoScope` to be emitted.
 - `DebugVar` for an entry-point parameter carries the optional argument-index
   operand after source, line and column; for an ordinary local it omits that
   operand, and the variable's own type is the **pointee of the instruction's
