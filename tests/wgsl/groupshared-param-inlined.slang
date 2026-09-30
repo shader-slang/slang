@@ -9,12 +9,19 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-wgpu -compute -output-using-type
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=FIELD): -target wgsl -stage compute -entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 static const uint N = 8;
 groupshared uint groupSharedData[N];
+
+struct Slots
+{
+    uint v[N];
+}
+groupshared Slots groupSharedSlots;
 
 // `scratch` is a bare `groupshared` parameter. On WGSL this helper must be inlined so the
 // parameter disappears and the store lands directly on the `workgroup` global.
@@ -23,11 +30,20 @@ void writeSlot(uint tid, groupshared uint scratch[N])
     scratch[tid] = tid + 1;
 }
 
+// `slot` is passed an element of a field of a group-shared struct. WGSL cannot form a pointer to
+// part of a composite, so if this helper were still a call when `legalizeIRForWGSL` runs, its
+// `legalizeCall` would bridge the argument through a `function`-space temporary.
+void writeField(uint tid, groupshared uint slot)
+{
+    slot = tid + 1;
+}
+
 [shader("compute")]
 [numthreads(N, 1, 1)]
 void computeMain(uint3 tid : SV_GroupThreadID)
 {
     writeSlot(tid.x, groupSharedData);
+    writeField(tid.x, groupSharedSlots.v[tid.x]);
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[tid.x] = groupSharedData[(tid.x + 1) % N];
 }
@@ -49,3 +65,9 @@ void computeMain(uint3 tid : SV_GroupThreadID)
 // BUF: 7
 // BUF: 8
 // BUF: 1
+
+// The field argument is not bridged through a temporary: no `u32` local is initialized from the
+// group-shared struct, and the store lands on the struct's field directly.
+// FIELD-NOT: ptr<workgroup
+// FIELD-NOT: var {{[A-Za-z0-9_]+}} : u32 = groupSharedSlots
+// FIELD: groupSharedSlots{{[_0-9]*}}.v{{.*}}] =

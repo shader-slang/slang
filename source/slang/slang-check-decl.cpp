@@ -7315,13 +7315,17 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             }
             else if (
                 as<InOutModifier>(modifier) || as<OutModifier>(modifier) ||
-                as<BorrowModifier>(modifier) || as<RefModifier>(modifier))
+                as<BorrowModifier>(modifier) || as<RefModifier>(modifier) ||
+                as<HLSLGroupSharedModifier>(modifier) || as<ConstModifier>(modifier))
             {
+                // A `groupshared` parameter's passing mode depends on `groupshared` and `const` as
+                // well as the explicit mode modifier, so all of them are cloned; otherwise the
+                // synthesized parameter would forward non-group-shared storage (E30711).
                 auto clonedModifier =
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
                 clonedModifier->keywordName = modifier->keywordName;
                 addModifier(synParamDecl, clonedModifier);
-                if (as<BorrowModifier>(modifier))
+                if (as<BorrowModifier>(modifier) || as<ConstModifier>(modifier))
                     paramType.isLeftValue = false;
             }
         }
@@ -14668,13 +14672,14 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         // Every `groupshared` parameter takes the `ref` passing mode, which passes the argument's
         // own address and, unlike a borrow, has no copy-in fallback: a copy would leave a callee
         // that reads after a group barrier looking at a stale snapshot. `__constref` asks for a
-        // borrow, so it is an error; we drop it after reporting so that the rest of checking sees
-        // a well-formed `ref` parameter.
+        // borrow, so it is an error; we drop every `__constref` after reporting so that the rest of
+        // checking sees a well-formed `ref` parameter.
         if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
         {
             getSink()->diagnose(
                 Diagnostics::GroupsharedParameterCannotBeConstref{.modifier = borrowModifier});
-            removeModifier(paramDecl, borrowModifier);
+            while (auto extraBorrowModifier = paramDecl->findModifier<BorrowModifier>())
+                removeModifier(paramDecl, extraBorrowModifier);
         }
         if (!paramDecl->hasModifier<RefModifier>())
             addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());

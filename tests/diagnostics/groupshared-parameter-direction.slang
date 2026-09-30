@@ -42,6 +42,24 @@ uint badConstRef(uint tid, __constref groupshared uint s[N])
 }
 //diag: '__constref' cannot be used with 'groupshared' -- use 'const groupshared'
 
+// A doubled `__constref` reports the duplicate once and E30712 once. Every `__constref` is dropped
+// after reporting, so checking the call below sees a well-formed `ref` parameter instead of
+// tripping the passing-mode assert.
+uint badDoubleConstRef(uint tid, __constref __constref groupshared uint s[N])
+//diag:                                     ^^^^^^^^^^ duplicate modifier
+//diag:                                     ^^^^^^^^^^ modifier '__constref' is redundant or conflicting with existing modifier '__constref'
+{
+    return s[tid];
+}
+//diag: '__constref' cannot be used with 'groupshared' -- use 'const groupshared'
+
+groupshared uint doubleConstRefStorage[N];
+
+uint callDoubleConstRef(uint tid)
+{
+    return badDoubleConstRef(tid, doubleConstRefStorage);
+}
+
 // --- Accepted: bare (read-write) and `const` (read-only) `groupshared` ---
 
 void okReadWrite(uint tid, groupshared uint s[N])

@@ -4020,6 +4020,10 @@ public:
 
     bool argumentNamesGroupSharedStorage(Expr* arg);
     void checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn);
+    void checkGroupSharedArgumentsOfCopiedParams(
+        InvokeExpr* invoke,
+        FuncType* funcType,
+        FunctionDeclBase* funcDeclBase);
     void _checkAliasedOutArguments(
         InvokeExpr* invoke,
         FuncType* funcType,

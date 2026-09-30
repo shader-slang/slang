@@ -3905,6 +3905,13 @@ err(
     span { loc = "location", message = "this function keeps a call boundary that could not be inlined away, and HLSL cannot pass thread-group-shared memory across one" }
 )
 
+warning(
+    "groupshared-argument-to-copied-parameter",
+    30709,
+    "argument names thread-group-shared memory, which other invocations can access during the call, but '~param' is an 'out' or 'inout' parameter, which assumes its argument is not aliased -- declare the parameter 'groupshared' to pass the shared memory by reference",
+    span { loc = "arg:Expr" }
+)
+
 err(
     "groupshared-argument-must-be-groupshared-lvalue",
     30711,

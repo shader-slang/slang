@@ -4503,6 +4503,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             // least one of them is out/inout/ref, the behavior is
             // undefined (issue #10699).
             _checkAliasedOutArguments(invoke, funcType, funcDeclBase);
+            checkGroupSharedArgumentsOfCopiedParams(invoke, funcType, funcDeclBase);
 
             if (!IsErrorExpr(invoke))
             {
@@ -7712,6 +7713,66 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
         getSink()->diagnose(Diagnostics::GroupsharedArgumentMustBeGroupsharedLvalue{
             .param = getText(paramIn->getName()),
             .arg = argIn});
+}
+
+// Return whether every call to `callee` is replaced by the callee's body or by an intrinsic, so
+// that no call boundary remains at which an `out`/`inout` argument would be copied. The core
+// module's compound assignments and increments (`g[i] += 1`, `g[i]++`) are such calls.
+static bool isCallAlwaysInlinedOrIntrinsic(FunctionDeclBase* callee)
+{
+    return callee->hasModifier<ForceInlineAttribute>() ||
+           callee->hasModifier<UnsafeForceInlineEarlyAttribute>() ||
+           callee->hasModifier<IntrinsicOpModifier>() ||
+           callee->hasModifier<TargetIntrinsicModifier>();
+}
+
+// An `out`/`inout` parameter that is not `groupshared` has copy-in/copy-out semantics, which an
+// implementation may realize by reference only because it assumes the argument is not aliased.
+// Thread-group-shared storage is aliased by every invocation in the group, so either way the callee
+// can miss the other invocations' writes or overwrite them, and we warn. The implicit `this` of a
+// `[mutating]` method is such a parameter too. A direct argument of a call that is always inlined
+// is not passed across a call boundary, but an implicitly converted one still goes through a
+// temporary.
+void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
+    InvokeExpr* invoke,
+    FuncType* funcType,
+    FunctionDeclBase* funcDeclBase)
+{
+    if (!funcDeclBase)
+        return;
+
+    bool callIsInlined = isCallAlwaysInlinedOrIntrinsic(funcDeclBase);
+    auto params = funcDeclBase->getParameters();
+    Index checkCount = Math::Min(invoke->arguments.getCount(), funcType->getParamCount());
+    for (Index i = 0; i < checkCount && i < params.getCount(); ++i)
+    {
+        auto paramDecl = params[i];
+        if (!as<OutParamTypeBase>(funcType->getParamTypeWithModeWrapper(i)) ||
+            paramDecl->hasModifier<HLSLGroupSharedModifier>())
+            continue;
+
+        auto argExpr = invoke->arguments[i];
+        auto addressedExpr = argExpr;
+        if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
+            addressedExpr = lValueCast->arguments[0];
+        else if (callIsInlined)
+            continue;
+
+        if (argumentNamesGroupSharedStorage(addressedExpr))
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
+                .param = getText(paramDecl->getName()),
+                .arg = argExpr});
+    }
+
+    if (callIsInlined || !funcDeclBase->hasModifier<MutatingAttribute>())
+        return;
+    if (auto memberExpr = as<MemberExpr>(invoke->functionExpr))
+    {
+        if (argumentNamesGroupSharedStorage(memberExpr->baseExpression))
+            getSink()->diagnose(Diagnostics::GroupsharedArgumentToCopiedParameter{
+                .param = "this",
+                .arg = memberExpr->baseExpression});
+    }
 }
 
 Expr* SemanticsExprVisitor::visitBuiltinCastExpr(BuiltinCastExpr* expr)
