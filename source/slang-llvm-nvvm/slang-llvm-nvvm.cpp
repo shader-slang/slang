@@ -3546,9 +3546,10 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     return SLANG_OK;
 }
 
-// The selected definition is the signature authority. The admitted names bound the rounding
-// family; no parallel name-to-signature mapping exists here. For example, __nv_roundf accepts
-// float(float) only because that is the definition present in the immutable selected bitcode.
+// The selected definition is the signature authority. The admitted names bound the supported
+// scalar math functions; no parallel name-to-signature mapping exists here. For example,
+// __nv_roundf accepts float(float) only because that is the definition present in the immutable
+// selected bitcode.
 static llvm::FunctionType* _resolveDeviceLibraryFunction(
     DeviceLibraryState* library,
     const SlangNVVMNamedIntrinsicDesc& desc)
@@ -3558,7 +3559,8 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
     llvm::StringRef name(desc.name, desc.nameSize);
     if (name != "__nv_roundf" && name != "__nv_round" && name != "__nv_ceilf" &&
         name != "__nv_ceil" && name != "__nv_floorf" && name != "__nv_floor" &&
-        name != "__nv_truncf" && name != "__nv_trunc")
+        name != "__nv_truncf" && name != "__nv_trunc" && name != "__nv_rsqrtf" &&
+        name != "__nv_rsqrt")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3691,8 +3693,6 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_log2f" : "__nv_log2";
         case SLANG_NVVM_VALUE_OP_LOG10:
             return isFloat32 ? "__nv_log10f" : "__nv_log10";
-        case SLANG_NVVM_VALUE_OP_RSQRT:
-            return isFloat32 ? "__nv_rsqrtf" : "__nv_rsqrt";
         case SLANG_NVVM_VALUE_OP_SIN:
             return isFloat32 ? "__nv_sinf" : "__nv_sin";
         case SLANG_NVVM_VALUE_OP_SINH:

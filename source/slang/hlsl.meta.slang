@@ -14971,8 +14971,18 @@ T rsqrt(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmRsqrt) "$P_rsqrt($0)";
-    case cuda: __intrinsic_asm(nvvmRsqrt) "$P_rsqrt($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM rsqrt requires half, float, or double.");
+        // Preserve the selected Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(rsqrt(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_rsqrtf", x;
+        else
+            __intrinsic_asm "__nv_rsqrt", x;
+    case cpp: __intrinsic_asm "$P_rsqrt($0)";
+    case cuda: __intrinsic_asm "$P_rsqrt($0)";
     case glsl: __intrinsic_asm "inversesqrt($0)";
     case hlsl: __intrinsic_asm "rsqrt";
     case metal: __intrinsic_asm "rsqrt";

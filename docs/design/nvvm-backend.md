@@ -65,8 +65,8 @@ actual types, constant promises, provenance and dominance before creating a decl
 Conflicting intrinsic symbols reject before mutation.
 
 Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
-names for `round`, `ceil`, `floor` and `trunc` (`__nv_roundf`/`__nv_round`, and the corresponding
-pairs for the other three). Complete signatures come from definitions in the selected immutable
+names for `round`, `ceil`, `floor`, `trunc` and `rsqrt` (`__nv_roundf`/`__nv_round`, and the
+corresponding pairs for the other four). Complete signatures come from definitions in the selected immutable
 library; there is no parallel name-to-signature table. Core scalar bodies select these names in
 NVVM branches. Half preserves its existing evaluation through canonical casts, for example
 `__realCast<T>(floor(__realCast<float>(x)))`: widen exactly, evaluate in Float32 and narrow once.
@@ -80,7 +80,7 @@ existing named floor call and ordinary subtraction; no provider-specific frac op
 Half uses `__realCast<T>(frac(__realCast<float>(x)))`, preserving the whole Float32 expression
 before one final narrowing. Vector/matrix `frac` and scalar/vector `fract` map to this scalar body.
 Operation 59 is reserved, and its tag, lowering-name entry and CUDA-text recognizer are retired.
-Named-library admission remains round/ceil/floor/trunc; frac adds no symbol or provider ABI.
+Frac adds no library symbol; it reuses named floor and ordinary subtraction.
 
 For finite Half inputs, the exact residual `x - floor(x)` is an integer multiple of 2^-24 in
 [0, 1), hence exactly representable in Float32. The NVVM promoted expression and CUDA's direct
@@ -88,6 +88,20 @@ Half subtraction therefore have identical finite RN-even results. The rounded re
 one for tiny negative inputs; it must not be clamped. Both signed-zero inputs and finite integers
 produce positive zero. Either infinity and NaN inputs produce NaN; payload and sign are not
 promised. These numerical contracts concern the qualified default math mode.
+
+Public `rsqrt` selects `__nv_rsqrtf` or `__nv_rsqrt` through explicit NVVM core bodies. Half uses
+canonical `__realCast<T>(rsqrt(__realCast<float>(x)))`, preserving selected Float32 evaluation
+before one narrowing. Vector and matrix mappings call the scalar body. Numeric operation 65, its
+tag and CUDA-text recognizer are retired. The selected immutable definition owns the signature;
+reciprocal division, `llvm.sqrt` and approximate PTX do not replace the selected operation.
+
+Numerical qualification uses an explicit union around the same-width RN-even reference: a radius
+of N times its larger adjacent spacing, or N encoding steps (Float32 N=2, Float64 N=1). This is a
+bounded empirical test convention, not a vendor-defined ULP metric or universal guarantee. NVVM
+Half uses the exact RN16 image of that Float32 set; CUDA Half uses the exact Float32 PTX
+relative-error set with epsilon 2^-22.9 before narrowing. The selected Half corpus's sets agree,
+but the policies remain distinct. Signed zeros return signed infinities; positive infinity returns
+positive zero; negative nonzero inputs and NaNs require NaN classification.
 
 Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
 matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
@@ -173,9 +187,9 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 39. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 40. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including frac in version 38. Existing guards reject these
+or retired numeric NVVM operations, including rsqrt in version 39. Existing guards reject these
 before decoding AST or IR; metadata inspection and speculative import fallback to source remain
 available. Source modules that explicitly used retired semantic tags need current core calls or
 supported explicit intrinsic bodies. Container format 2 and provider ABI46 are separate contracts.

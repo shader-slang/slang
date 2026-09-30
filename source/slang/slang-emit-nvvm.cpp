@@ -3463,7 +3463,6 @@ static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[]
     {"$P_log2($0)", SLANG_NVVM_VALUE_OP_LOG2, 1},
     {"$P_log10($0)", SLANG_NVVM_VALUE_OP_LOG10, 1},
     {"$P_pow($0, $1)", SLANG_NVVM_VALUE_OP_POW, 2},
-    {"$P_rsqrt($0)", SLANG_NVVM_VALUE_OP_RSQRT, 1},
     {"$P_sign($0)", SLANG_NVVM_VALUE_OP_SIGN, 1},
     {"$P_sin($0)", SLANG_NVVM_VALUE_OP_SIN, 1},
     {"$P_sinh($0)", SLANG_NVVM_VALUE_OP_SINH, 1},

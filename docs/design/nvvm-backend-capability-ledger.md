@@ -74,7 +74,7 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 39 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 40 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
@@ -120,6 +120,25 @@ compiler execution or ignored manifests. The [removed-tag test](../../tests/cuda
 checks the frontend boundary. Real-provider tests retain the named-floor/ordered-subtract contract
 in both serializers and reject reserved 59 without mutation; emitter tests verify the public
 composition and Half cast ordering. Current acceptance and exact compiler identity are owned by STATUS.
+
+Public `rsqrt` uses selected named Float32/64 library functions and canonical Half widening,
+Float32 evaluation and one narrowing. Numeric 65, its tag and text route are retired. Real-provider
+tests derive signatures from selected definitions, including deliberate name/width crossings,
+preserve typed calls in both serializers and reject invalid insertion without mutation. Emitter
+tests verify direct Half widen/call/narrow edges and live scalar/vector/matrix outputs.
+The [Half](../../tests/cuda/nvvm-rsqrt-half.slang), [Float32](../../tests/cuda/nvvm-rsqrt-32.slang)
+and [Float64](../../tests/cuda/nvvm-rsqrt-64.slang) fixtures contain 64 unique IEEE inputs and 15
+observations per lane. Exact rational references define a test union of reference-spacing radius
+and encoding-step neighborhoods (Float32 N=2, Float64 N=1), with empirical, non-guaranteed library
+scope. Separate NVVM and CUDA Half policies use the exact narrowed images of the library union
+and the PTX epsilon 2^-22.9 set, respectively. These policies agree on the selected Half inputs;
+a shared selector drives both the admission table and visible policy marker.
+Six shape-error bits, raw scalar low/high pairs, completion and guards occupy 259 Half or 258
+other words. The [standalone checker](../../extras/test-generators/check-nvvm-rsqrt-oracles.py)
+recomputes tables without a compiler or ignored manifest and exercises six negative certificate
+controls. The [removed-tag test](../../tests/cuda/nvvm-rsqrt-removed-tag.slang) checks the frontend
+boundary. Preserve all nine pre-migration buffers byte-for-byte, including raw NaNs; payloads remain
+unpromised by numerical admission. Current acceptance and exact compiler identity are owned by STATUS.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

@@ -180,7 +180,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_LOG10 ((SlangNVVMValueOperation)62u)
 #define SLANG_NVVM_VALUE_OP_POW ((SlangNVVMValueOperation)63u)
 /* Value 64 is retired; round uses named selected-libdevice functions. */
-#define SLANG_NVVM_VALUE_OP_RSQRT ((SlangNVVMValueOperation)65u)
+/* Value 65 is retired; rsqrt uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_TAN ((SlangNVVMValueOperation)66u)
 #define SLANG_NVVM_VALUE_OP_IS_NAN ((SlangNVVMValueOperation)67u)
 #define SLANG_NVVM_VALUE_OP_SIGN ((SlangNVVMValueOperation)68u)

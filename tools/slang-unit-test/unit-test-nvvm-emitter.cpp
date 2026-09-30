@@ -11953,61 +11953,75 @@ SLANG_UNIT_TEST(nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation)
 SLANG_UNIT_TEST(nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
-    const char* bodies[] = {
-        "float selected(float x) { __intrinsic_asm \"__nv_roundf\", x; }",
-        "float selected(float x) { __intrinsic_asm \"__nv_missing\", x; }",
-        "float selected(float x) { __intrinsic_asm \"__nv_round\", x; }",
-        "float selected(float x) { __intrinsic_asm \"__nv_roundf\"; }",
-    };
-    for (int variant = 0; variant < 6; ++variant)
+    struct Case
     {
-        _resetDirectNVVMFakes();
-        ComPtr<slang::IGlobalSession> session;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        session->setSharedLibraryLoader(loader);
-        TempDirectory toolkit;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
-        gFakeNVVMBuilder.rejectDeviceLibraryLoad = variant == 4;
-        gFakeNVVMBuilder.rejectDeviceLibraryFunctions = variant == 5;
-        gFakeNVVMBuilder.replaceDeviceLibraryPath =
-            Path::combine(toolkit.path, "nvvm/libdevice/libdevice.10.bc");
-        StringBuilder source;
-        source << bodies[variant < 4 ? variant : 0] << R"(
-            [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
-            { words[1] = asuint(selected(asfloat(words[0]))); }
-        )";
-        ComPtr<slang::IBlob> code, diagnostics;
-        const auto result =
-            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
-        SLANG_CHECK(SLANG_SUCCEEDED(result) == (variant == 0));
-        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryDestroyCount == (variant == 4 ? 0 : 1));
-        if (variant == 0)
+        const char* name;
+        bool isDouble;
+    };
+    const Case cases[] = {
+        {"__nv_roundf", false},
+        {"__nv_rsqrtf", false},
+        {"__nv_rsqrt", true},
+    };
+    for (const auto& testCase : cases)
+        for (int variant = 0; variant < 6; ++variant)
         {
-            SLANG_CHECK(code != nullptr);
-            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
-            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
-            SLANG_CHECK(gFakeNVVM.addedLibraryModule == gFakeNVVMBuilder.deviceLibraryBytes);
-            SLANG_CHECK(gFakeNVVM.addedLibraryModule != "replaced-after-query");
-            SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_roundf"));
-        }
-        else
-        {
-            SLANG_CHECK(!code);
-            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-            if (variant == 4)
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            TempDirectory toolkit;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
+            gFakeNVVMBuilder.rejectDeviceLibraryLoad = variant == 4;
+            gFakeNVVMBuilder.rejectDeviceLibraryFunctions = variant == 5;
+            gFakeNVVMBuilder.replaceDeviceLibraryPath =
+                Path::combine(toolkit.path, "nvvm/libdevice/libdevice.10.bc");
+            const bool isDouble = variant == 2 ? !testCase.isDouble : testCase.isDouble;
+            const char* type = isDouble ? "double" : "float";
+            StringBuilder source;
+            source << type << " selected(" << type << " x) { __intrinsic_asm \""
+                   << (variant == 1 ? "__nv_missing" : testCase.name) << "\""
+                   << (variant == 3 ? "; } " : ", x; } ") << "[CUDAKernel] void computeMain("
+                   << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { ";
+            if (isDouble)
+                source
+                    << "uint low, high; asuint(selected(asdouble(words[0], words[1])), low, high); "
+                    << "words[2] = low; words[3] = high; }";
+            else
+                source << "words[1] = asuint(selected(asfloat(words[0]))); }";
+            ComPtr<slang::IBlob> code, diagnostics;
+            const auto result =
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+            SLANG_CHECK(SLANG_SUCCEEDED(result) == (variant == 0));
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryDestroyCount == (variant == 4 ? 0 : 1));
+            if (variant == 0)
             {
-                SLANG_CHECK(_getBlobText(diagnostics).contains("fake corrupt selected bitcode"));
+                SLANG_CHECK(code != nullptr);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 1);
+                SLANG_CHECK(gFakeNVVM.addedLibraryModule == gFakeNVVMBuilder.deviceLibraryBytes);
+                SLANG_CHECK(gFakeNVVM.addedLibraryModule != "replaced-after-query");
+                SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains(testCase.name));
             }
             else
             {
-                SLANG_CHECK(_getBlobText(diagnostics).contains("__nv_"));
+                SLANG_CHECK(!code);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+                if (variant == 4)
+                {
+                    SLANG_CHECK(
+                        _getBlobText(diagnostics).contains("fake corrupt selected bitcode"));
+                }
+                else
+                {
+                    SLANG_CHECK(_getBlobText(diagnostics).contains("__nv_"));
+                }
             }
         }
-    }
 #else
     SLANG_IGNORE_TEST;
 #endif
@@ -12024,6 +12038,8 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary)
     ComPtr<slang::IBlob> code, diagnostics;
     const char* source = R"(
         float unused(float value) { __intrinsic_asm "__nv_roundf", value; }
+        float unusedRsqrtFloat(float value) { __intrinsic_asm "__nv_rsqrtf", value; }
+        double unusedRsqrtDouble(double value) { __intrinsic_asm "__nv_rsqrt", value; }
         uint readX() { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }
         [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
         { words[0] = readX(); }
@@ -12620,4 +12636,236 @@ SLANG_UNIT_TEST(nvvmSlangPublicFracUsesNamedFloorAndSubtract)
 #else
     SLANG_IGNORE_TEST;
 #endif
+}
+
+SLANG_UNIT_TEST(nvvmSlangPublicRsqrtUsesNamedDeviceLibrary)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    const char* types[] = {"half", "float", "double"};
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+        for (bool rejectLibrary : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            gFakeNVVMBuilder.rejectDeviceLibraryFunctions = rejectLibrary;
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            TempDirectory toolkit;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
+            const char* type = types[variant];
+            StringBuilder source;
+            source << "[noinline] " << type << " rsqrtHelper(" << type
+                   << " x) { return rsqrt(x); } "
+                   << "[CUDAKernel] void computeMain("
+                   << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { ";
+            for (Index i = 0; i < 4; ++i)
+            {
+                source << type << " x" << i << " = ";
+                if (variant == 0)
+                    source << "bit_cast<half>(uint16_t(words[" << i << "])); ";
+                else if (variant == 1)
+                    source << "asfloat(words[" << i << "]); ";
+                else
+                    source << "asdouble(words[" << 2 * i << "], words[" << 2 * i + 1 << "]); ";
+            }
+            source << type << " scalar = rsqrt(x0); " << type << " helper = rsqrtHelper(x1); ";
+            for (Index size = 2; size <= 4; ++size)
+            {
+                source << "vector<" << type << ", " << size << "> v" << size << " = rsqrt(vector<"
+                       << type << ", " << size << ">(";
+                for (Index i = 0; i < size; ++i)
+                    source << (i ? ", " : "") << "x" << i;
+                source << ")); ";
+            }
+            source << "matrix<" << type << ", 2, 2> m = rsqrt(matrix<" << type
+                   << ", 2, 2>(x0, x1, x2, x3)); ";
+            const char* values[] = {
+                "scalar",
+                "helper",
+                "v2.x",
+                "v2.y",
+                "v3.x",
+                "v3.y",
+                "v3.z",
+                "v4.x",
+                "v4.y",
+                "v4.z",
+                "v4.w",
+                "m[0][0]",
+                "m[0][1]",
+                "m[1][0]",
+                "m[1][1]"};
+            for (Index i = 0; i < SLANG_COUNT_OF(values); ++i)
+            {
+                if (variant == 2)
+                    source << "{ uint low, high; asuint(" << values[i] << ", low, high); words["
+                           << 8 + 2 * i << "] = low; words[" << 9 + 2 * i << "] = high; } ";
+                else
+                    source << "words[" << 4 + i
+                           << "] = " << (variant == 0 ? "uint(bit_cast<uint16_t>(" : "asuint(")
+                           << values[i] << (variant == 0 ? ")); " : "); ");
+            }
+            source << "}";
+            ComPtr<slang::IBlob> code, diagnostics;
+            const auto result =
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount > 0);
+            if (rejectLibrary)
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(!code);
+                SLANG_CHECK(_getBlobText(diagnostics).contains("E52018"));
+                SLANG_CHECK(_getBlobText(diagnostics).contains("__nv_rsqrt"));
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+                continue;
+            }
+            if (SLANG_FAILED(result))
+            {
+                StringBuilder detail;
+                detail << type << ": " << gFakeNVVMBuilder.pointerOffsetBaseValueRefs.getCount()
+                       << "/" << SLANG_COUNT_OF(gFakeNVVMBuilder.pointerOffsetStorage)
+                       << " pointer offsets, " << gFakeNVVMBuilder.localStorageValueTypes.getCount()
+                       << "/" << SLANG_COUNT_OF(gFakeNVVMBuilder.localStorage) << " local slots, "
+                       << gFakeNVVMBuilder.loadPointerValueRefs.getCount() << "/"
+                       << SLANG_COUNT_OF(gFakeNVVMBuilder.loadStorage) << " loads recorded\n"
+                       << _getBlobText(diagnostics);
+                getTestReporter()->message(TestMessageType::Info, detail.getBuffer());
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK(code != nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryDestroyCount == 1);
+            SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+            SLANG_CHECK(gFakeNVVM.addedLibraryModule == gFakeNVVMBuilder.deviceLibraryBytes);
+            // The kernel's word accesses use pointer offsets; ordinary temporary locals have
+            // separate storage handles. Count the observable input/output words, not those locals.
+            Index wordLoads = 0;
+            Index wordStores = 0;
+            for (const auto& pointer : gFakeNVVMBuilder.loadPointerValueRefs)
+                wordLoads += pointer.kind == FakeNVVMBuilderValueKind::PointerOffset;
+            for (const auto& pointer : gFakeNVVMBuilder.storePointerValueRefs)
+                wordStores += pointer.kind == FakeNVVMBuilderValueKind::PointerOffset;
+            SLANG_CHECK(wordLoads == (variant == 2 ? 8 : 4));
+            SLANG_CHECK(wordStores == (variant == 2 ? 30 : 15));
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 1);
+            for (const auto& name : gFakeNVVMBuilder.namedIntrinsicNames)
+                SLANG_CHECK(name == (variant == 2 ? "__nv_rsqrt" : "__nv_rsqrtf"));
+            SLANG_CHECK(_countFakeNVVMNoInlineHelperCalls("rsqrtHelper", 1) == 1);
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
+            for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[i] == UINT32_MAX);
+                SLANG_CHECK(NVVMSemantics::areSameType(
+                    gFakeNVVMBuilder.intrinsicResultTypes[i],
+                    variant == 2 ? NVVMSemantics::kFloat64 : NVVMSemantics::kFloat32));
+                SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[i] == 1);
+                const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+                const auto& operand = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
+                SLANG_CHECK(operand.kind == FakeNVVMBuilderValueKind::Parameter);
+                SLANG_CHECK(
+                    operand.functionIndex ==
+                    gFakeNVVMBuilder
+                        .blockFunctionIndices[gFakeNVVMBuilder.intrinsicCallerBlockIndices[i]]);
+            }
+            Index widen = -1, narrow = -1;
+            for (Index i = 0; i < gFakeNVVMBuilder.scalarOperations.getCount(); ++i)
+            {
+                const auto& operation = gFakeNVVMBuilder.scalarOperations[i];
+                SLANG_CHECK(operation.key.operation != 65);
+                if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
+                    continue;
+                SLANG_CHECK_ABORT(operation.operandCount == 1);
+                if (NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat32) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat16))
+                {
+                    SLANG_CHECK(widen == -1);
+                    widen = i;
+                }
+                if (NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat32))
+                {
+                    SLANG_CHECK(narrow == -1);
+                    narrow = i;
+                }
+            }
+            if (variant == 0)
+            {
+                SLANG_CHECK_ABORT(widen >= 0 && narrow >= 0);
+                // Consider rsqrt(halfValue), including a lane of the vectors and matrix above.
+                // Its scalar Half body widens the argument, calls the Float32 body that owns
+                // __nv_rsqrtf, then narrows that call's result. Check these direct value edges;
+                // merely finding unrelated conversions would not establish Half evaluation.
+                const auto& narrowing = gFakeNVVMBuilder.scalarOperations[narrow];
+                const auto call = narrowing.operands[0];
+                SLANG_CHECK_ABORT(call.kind == FakeNVVMBuilderValueKind::Call);
+                const Index namedFunction =
+                    gFakeNVVMBuilder
+                        .blockFunctionIndices[gFakeNVVMBuilder.intrinsicCallerBlockIndices[0]];
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.callCalleeFunctionIndices[call.index] == namedFunction);
+                SLANG_CHECK_ABORT(gFakeNVVMBuilder.callArgumentCounts[call.index] == 1);
+                const auto argument =
+                    gFakeNVVMBuilder
+                        .callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[call.index]];
+                SLANG_CHECK(argument.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                SLANG_CHECK(argument.index == widen);
+                SLANG_CHECK(
+                    narrowing.callerBlockIndex ==
+                    gFakeNVVMBuilder.callCallerBlockIndices[call.index]);
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.scalarOperations[widen].callerBlockIndex ==
+                    narrowing.callerBlockIndex);
+            }
+            else
+            {
+                SLANG_CHECK(widen == -1 && narrow == -1);
+            }
+        }
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
+{
+    // Fresh tagged source is diagnosed as an unknown tag before NVVM planning. Immutable old
+    // modules separately prove retirement of numeric 65; this unit owns legacy untagged text.
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "words[1] = uint(bit_cast<uint16_t>(oldRsqrt(bit_cast<half>(uint16_t(words[0])))));",
+        "words[1] = asuint(oldRsqrt(asfloat(words[0])));",
+        "uint low, high; asuint(oldRsqrt(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << types[variant] << " oldRsqrt(" << types[variant] << " x) { "
+               << "__intrinsic_asm \"$P_rsqrt($0)\"; } "
+               << "[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << bodies[variant] << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017") || !text.contains("$P_rsqrt($0)"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(!code);
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains("$P_rsqrt($0)"));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
 }

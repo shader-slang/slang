@@ -267,6 +267,38 @@ requires review even when the mathematical contract promises only NaN classifica
 expected values from compiler or vendor output. Keep the existing rounding/sqrt fixtures unchanged;
 these focused contracts do not change frozen corpus membership.
 
+### Reciprocal-square-root numerical contracts
+
+```bash
+python3 extras/test-generators/check-nvvm-rsqrt-oracles.py --check
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-rsqrt-
+```
+
+Require nine numerical cells and one removed-tag diagnostic, with no skips. Each fixture uses 64
+unique IEEE inputs and 15 scalar/noinline/vector2/3/4/matrix2x2 observations per lane. Float32/64
+outputs have 258 uint words: leading guard, 64 records of `errors, low, high, 65000 + lane`, and
+trailing guard. Half adds a policy marker after the leading guard for 259 words: 65039 for NVVM
+or 1209 for CUDA. The marker identifies the policy, not the current module version. Require every
+completion, zero shape-error masks, exact guards/length and host-checked paired scalar admission;
+Half/Float32 high words must be zero.
+
+The library policy is the union of a radius N times the exact same-width RN-even reference's
+larger adjacent spacing and an N-encoding-step neighborhood (Float32 N=2, Float64 N=1). This
+explicit empirical test convention is neither a vendor-defined ULP metric nor a guaranteed bound.
+NVVM Half uses the exact discrete RN16 image of the Float32 union. CUDA Half uses the exact PTX
+relative-error set with epsilon 2^-22.9: integer tenth-power brackets must give matching inner/outer
+Float32 candidate intervals before discrete RN16 narrowing. Special values check signed infinity,
+positive zero or NaN class as appropriate. No observed output defines an oracle.
+
+The standalone checker independently recomputes references, admission tables and fixture contracts,
+and runs six negative certificate checks without an ignored manifest. Preserve all nine original
+buffers and compare every byte after migration, including raw NaNs. Even an admitted alternative
+requires review if its raw bits change. Keep earlier math fixtures and frozen corpus membership
+unchanged. Exact version 39 module controls separately qualify retirement and reader40 rejection;
+the three static module units cover historical versions31–38 and a dynamic future version, and do
+not substitute for those exact version39 controls.
+
 ## Report environment
 
 Execution and comparison use the Python standard library. Shareable SVG/PNG charts use Matplotlib:
