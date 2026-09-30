@@ -786,33 +786,34 @@ extension<Offset : __TensorViewOffsetType> TensorView<float, Offset>
     }
 }
 
+__generic<Offset : __TensorViewOffsetType = uint>
 interface IDiffTensorWrapper
 {
     // Derivatives for universal load/store operations.
 
     __generic<T : __BuiltinFloatingPointType>
-    T load_forward(uint i);
+    T load_forward(Offset i);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T load_forward(vector<uint, N> i);
+    T load_forward(vector<Offset, N> i);
 
     __generic<T : __BuiltinFloatingPointType>
-    void load_backward(uint i, T dOut);
+    void load_backward(Offset i, T dOut);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void load_backward(vector<uint, N> i, T dOut);
+    void load_backward(vector<Offset, N> i, T dOut);
 
     __generic<T : __BuiltinFloatingPointType>
-    void store_forward(uint i, T dx);
+    void store_forward(Offset i, T dx);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void store_forward(vector<uint, N> i, T dx);
+    void store_forward(vector<Offset, N> i, T dx);
 
     __generic<T : __BuiltinFloatingPointType>
-    T store_backward(uint i);
+    T store_backward(Offset i);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T store_backward(vector<uint, N> i);
+    T store_backward(vector<Offset, N> i);
 
     // Derivatives for loadOnce/storeOnce operations. These operations
     // are designed to only run once per-address and don't need atomic
@@ -820,76 +821,77 @@ interface IDiffTensorWrapper
     //
 
     __generic<T : __BuiltinFloatingPointType>
-    T loadOnce_forward(uint i);
+    T loadOnce_forward(Offset i);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T loadOnce_forward(vector<uint, N> i);
+    T loadOnce_forward(vector<Offset, N> i);
 
     __generic<T : __BuiltinFloatingPointType>
-    void loadOnce_backward(uint i, T dOut);
+    void loadOnce_backward(Offset i, T dOut);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void loadOnce_backward(vector<uint, N> i, T dOut);
+    void loadOnce_backward(vector<Offset, N> i, T dOut);
 
     __generic<T : __BuiltinFloatingPointType>
-    void storeOnce_forward(uint i, T dx);
+    void storeOnce_forward(Offset i, T dx);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void storeOnce_forward(vector<uint, N> i, T dx);
+    void storeOnce_forward(vector<Offset, N> i, T dx);
 
     __generic<T : __BuiltinFloatingPointType>
-    T storeOnce_backward(uint i);
+    T storeOnce_backward(Offset i);
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T storeOnce_backward(vector<uint, N> i);
+    T storeOnce_backward(vector<Offset, N> i);
 };
 
-struct AtomicAdd : IDiffTensorWrapper
+__generic<Offset : __TensorViewOffsetType = uint>
+struct AtomicAdd : IDiffTensorWrapper<Offset>
 {
-    TensorView<float> diff;
+    TensorView<float, Offset> diff;
 
     // Derivatives for universal load/store operations.
 
     __generic<T : __BuiltinFloatingPointType>
-    T load_forward(uint i)
+    T load_forward(Offset i)
     {
         return __realCast<T, float>(diff.load(i));
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T load_forward(vector<uint, N> i)
+    T load_forward(vector<Offset, N> i)
     {
         return __realCast<T, float>(diff.load(i));
     }
 
     __generic<T : __BuiltinFloatingPointType>
-    void load_backward(uint i, T dOut)
+    void load_backward(Offset i, T dOut)
     {
         float oldVal;
         diff.InterlockedAdd(i, __realCast<float, T>(dOut), oldVal);
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void load_backward(vector<uint, N> i, T dOut)
+    void load_backward(vector<Offset, N> i, T dOut)
     {
         float oldVal;
         diff.InterlockedAdd(i, __realCast<float, T>(dOut), oldVal);
     }
 
     __generic<T : __BuiltinFloatingPointType>
-    void store_forward(uint i, T dx)
+    void store_forward(Offset i, T dx)
     {
         diff.store(i, __realCast<float, T>(dx));
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void store_forward(vector<uint, N> i, T dx)
+    void store_forward(vector<Offset, N> i, T dx)
     {
         diff.store(i, __realCast<float, T>(dx));
     }
 
     __generic<T : __BuiltinFloatingPointType>
-    T store_backward(uint i)
+    T store_backward(Offset i)
     {
         float oldVal;
         diff.InterlockedExchange(i, (float)0, oldVal);
@@ -897,7 +899,7 @@ struct AtomicAdd : IDiffTensorWrapper
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T store_backward(vector<uint, N> i)
+    T store_backward(vector<Offset, N> i)
     {
         float oldVal;
         diff.InterlockedExchange(i, (float)0, oldVal);
@@ -910,61 +912,64 @@ struct AtomicAdd : IDiffTensorWrapper
     //
 
     __generic<T : __BuiltinFloatingPointType>
-    T loadOnce_forward(uint i)
+    T loadOnce_forward(Offset i)
     {
         return __realCast<T, float>(diff.load(i));
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T loadOnce_forward(vector<uint, N> i)
+    T loadOnce_forward(vector<Offset, N> i)
     {
         return __realCast<T, float>(diff.load(i));
     }
 
     __generic<T : __BuiltinFloatingPointType>
-    void loadOnce_backward(uint i, T dOut)
+    void loadOnce_backward(Offset i, T dOut)
     {
         diff.store(i, __realCast<float, T>(dOut));
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void loadOnce_backward(vector<uint, N> i, T dOut)
+    void loadOnce_backward(vector<Offset, N> i, T dOut)
     {
         diff.store(i, __realCast<float, T>(dOut));
     }
 
     __generic<T : __BuiltinFloatingPointType>
-    void storeOnce_forward(uint i, T dx)
+    void storeOnce_forward(Offset i, T dx)
     {
         diff.store(i, __realCast<float, T>(dx));
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    void storeOnce_forward(vector<uint, N> i, T dx)
+    void storeOnce_forward(vector<Offset, N> i, T dx)
     {
         diff.store(i, __realCast<float, T>(dx));
     }
 
     __generic<T : __BuiltinFloatingPointType>
-    T storeOnce_backward(uint i)
+    T storeOnce_backward(Offset i)
     {
         return __realCast<T, float>(diff.load(i));
     }
 
     __generic<T : __BuiltinFloatingPointType, let N : int>
-    T storeOnce_backward(vector<uint, N> i)
+    T storeOnce_backward(vector<Offset, N> i)
     {
         return __realCast<T, float>(diff.load(i));
     }
 };
 
-__generic<T: __BuiltinFloatingPointType = float, A : IDiffTensorWrapper = AtomicAdd>
+/// Represents a differentiable tensor view whose primal and gradient use the same index type.
+__generic<T : __BuiltinFloatingPointType = float,
+    Offset : __TensorViewOffsetType = uint,
+    A : IDiffTensorWrapper<Offset> = AtomicAdd<Offset>>
 struct DiffTensorView
 {
-    TensorView<T> primal;
+    TensorView<T, Offset> primal;
     A diff;
 
-    uint size(uint i)
+    Offset size(uint i)
     {
         return primal.size(i);
     }
@@ -974,19 +979,19 @@ struct DiffTensorView
         return primal.dims();
     }
 
-    uint stride(uint i)
+    Offset stride(uint i)
     {
         return primal.stride(i);
     }
 
     // Constructors
-    __init(TensorView<T> primal, A diff)
+    __init(TensorView<T, Offset> primal, A diff)
     {
         this.primal = primal;
         this.diff = diff;
     }
 
-    __init(TensorView<T> primal)
+    __init(TensorView<T, Offset> primal)
     {
         this.primal = primal;
     }
@@ -996,35 +1001,35 @@ struct DiffTensorView
     [BackwardDerivative(__load_backward)]
     [ForwardDerivative(__load_forward)]
     [NoDiffThis]
-    T load(uint i) { return primal.load(i); }
+    T load(Offset i) { return primal.load(i); }
 
     [BackwardDerivative(__load_backward)]
     [ForwardDerivative(__load_forward)]
     [NoDiffThis]
     __generic<let N : int>
-    T load(vector<uint, N> i) { return primal.load(i); }
+    T load(vector<Offset, N> i) { return primal.load(i); }
 
-    DifferentialPair<T> __load_forward(uint x)
+    DifferentialPair<T> __load_forward(Offset x)
     {
         return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.load_forward<T>(x)));
     }
 
     [ForceInline]
     __generic<let N : int>
-    DifferentialPair<T> __load_forward(vector<uint, N> x)
+    DifferentialPair<T> __load_forward(vector<Offset, N> x)
     {
         return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.load_forward<T, N>(x)));
     }
 
     [ForceInline]
-    void __load_backward(uint x, T.Differential dOut)
+    void __load_backward(Offset x, T.Differential dOut)
     {
         diff.load_backward<T>(x, reinterpret<T, T.Differential>(dOut));
     }
 
     [ForceInline]
     __generic<let N : int>
-    void __load_backward(vector<uint, N> x, T.Differential dOut)
+    void __load_backward(vector<Offset, N> x, T.Differential dOut)
     {
         diff.load_backward<T, N>(x, reinterpret<T, T.Differential>(dOut));
     }
@@ -1032,41 +1037,41 @@ struct DiffTensorView
     [BackwardDerivative(__store_backward)]
     [ForwardDerivative(__store_forward)]
     [NoDiffThis]
-    void store(uint x, T val) { primal.store(x, val); }
+    void store(Offset x, T val) { primal.store(x, val); }
 
     [BackwardDerivative(__store_backward)]
     [ForwardDerivative(__store_forward)]
     [NoDiffThis]
     __generic<let N : int>
-    void store(vector<uint, N> x, T val) { primal.store(x, val); }
+    void store(vector<Offset, N> x, T val) { primal.store(x, val); }
 
-    void __store_forward(uint x, DifferentialPair<T> dpval)
+    void __store_forward(Offset x, DifferentialPair<T> dpval)
     {
         primal.store(x, dpval.p);
         diff.store_forward<T>(x, reinterpret<T, T.Differential>(dpval.d));
     }
 
     __generic<let N : int>
-    void __store_forward(vector<uint, N> x, DifferentialPair<T> dpval)
+    void __store_forward(vector<Offset, N> x, DifferentialPair<T> dpval)
     {
         primal.store(x, dpval.p);
         diff.store_forward<T, N>(x, reinterpret<T, T.Differential>(dpval.d));
     }
 
     [ForceInline]
-    void __store_backward(uint x, inout DifferentialPair<T> dpval)
+    void __store_backward(Offset x, inout DifferentialPair<T> dpval)
     {
         dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.store_backward<T>(x)));
     }
 
     [ForceInline]
     __generic<let N : int>
-    void __store_backward(vector<uint, N> x, inout DifferentialPair<T> dpval)
+    void __store_backward(vector<Offset, N> x, inout DifferentialPair<T> dpval)
     {
         dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.store_backward<T, N>(x)));
     }
 
-    __subscript(uint index)->T
+    __subscript(Offset index)->T
     {
         [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(index); }
         [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(index, newValue); }
@@ -1076,7 +1081,7 @@ struct DiffTensorView
         ref;
     }
 
-    __subscript(uint2 index)->T
+    __subscript(vector<Offset, 2> index)->T
     {
         [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(index); }
         [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(index, newValue); }
@@ -1086,17 +1091,17 @@ struct DiffTensorView
         ref;
     }
 
-    __subscript(uint x, uint y)->T
+    __subscript(Offset x, Offset y)->T
     {
-        [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(uint2(x, y)); }
-        [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(uint2(x, y), newValue); }
+        [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(vector<Offset, 2>(x, y)); }
+        [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(vector<Offset, 2>(x, y), newValue); }
 
         [__NoSideEffect]
         [nonmutating]
         ref;
     }
 
-    __subscript(uint3 index)->T
+    __subscript(vector<Offset, 3> index)->T
     {
         [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(index); }
         [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(index, newValue); }
@@ -1106,17 +1111,17 @@ struct DiffTensorView
         ref;
     }
 
-    __subscript(uint x, uint y, uint z)->T
+    __subscript(Offset x, Offset y, Offset z)->T
     {
-        [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(uint3(x, y, z)); }
-        [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(uint3(x, y, z), newValue); }
+        [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(vector<Offset, 3>(x, y, z)); }
+        [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(vector<Offset, 3>(x, y, z), newValue); }
 
         [__NoSideEffect]
         [nonmutating]
         ref;
     }
 
-    __subscript(uint4 index)->T
+    __subscript(vector<Offset, 4> index)->T
     {
         [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(index); }
         [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(index, newValue); }
@@ -1126,10 +1131,10 @@ struct DiffTensorView
         ref;
     }
 
-    __subscript(uint x, uint y, uint z, uint w)->T
+    __subscript(Offset x, Offset y, Offset z, Offset w)->T
     {
-        [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(uint4(x, y, z, w)); }
-        [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(uint4(x, y, z, w), newValue); }
+        [__unsafeForceInlineEarly] [Differentiable] [__NoSideEffect] get { return load(vector<Offset, 4>(x, y, z, w)); }
+        [__unsafeForceInlineEarly] [Differentiable] [nonmutating] set { store(vector<Offset, 4>(x, y, z, w), newValue); }
 
         [__NoSideEffect]
         [nonmutating]
@@ -1143,34 +1148,34 @@ struct DiffTensorView
     [BackwardDerivative(__loadOnce_backward)]
     [ForwardDerivative(__loadOnce_forward)]
     [NoDiffThis]
-    T loadOnce(uint i) { return primal.load(i); }
+    T loadOnce(Offset i) { return primal.load(i); }
 
     [BackwardDerivative(__loadOnce_backward)]
     [ForwardDerivative(__loadOnce_forward)]
     [NoDiffThis]
     __generic<let N : int>
-    T loadOnce(vector<uint, N> i) { return primal.load(i); }
+    T loadOnce(vector<Offset, N> i) { return primal.load(i); }
 
-    DifferentialPair<T> __loadOnce_forward(uint x)
+    DifferentialPair<T> __loadOnce_forward(Offset x)
     {
         return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.loadOnce_forward<T>(x)));
     }
 
     __generic<let N : int>
-    DifferentialPair<T> __loadOnce_forward(vector<uint, N> x)
+    DifferentialPair<T> __loadOnce_forward(vector<Offset, N> x)
     {
         return diffPair(primal.load(x), reinterpret<T.Differential, T>(diff.loadOnce_forward<T, N>(x)));
     }
 
     [ForceInline]
-    void __loadOnce_backward(uint x, T.Differential dOut)
+    void __loadOnce_backward(Offset x, T.Differential dOut)
     {
         diff.loadOnce_backward<T>(x, reinterpret<T, T.Differential>(dOut));
     }
 
     [ForceInline]
     __generic<let N : int>
-    void __loadOnce_backward(vector<uint, N> x, T.Differential dOut)
+    void __loadOnce_backward(vector<Offset, N> x, T.Differential dOut)
     {
         diff.loadOnce_backward<T, N>(x, reinterpret<T, T.Differential>(dOut));
     }
@@ -1178,36 +1183,36 @@ struct DiffTensorView
     [BackwardDerivative(__storeOnce_backward)]
     [ForwardDerivative(__storeOnce_forward)]
     [NoDiffThis]
-    void storeOnce(uint x, T val) { primal.store(x, val); }
+    void storeOnce(Offset x, T val) { primal.store(x, val); }
 
     [BackwardDerivative(__storeOnce_backward)]
     [ForwardDerivative(__storeOnce_forward)]
     [NoDiffThis]
     __generic<let N : int>
-    void storeOnce(vector<uint, N> x, T val) { primal.store(x, val); }
+    void storeOnce(vector<Offset, N> x, T val) { primal.store(x, val); }
 
-    void __storeOnce_forward(uint x, DifferentialPair<T> dpval)
+    void __storeOnce_forward(Offset x, DifferentialPair<T> dpval)
     {
         primal.store(x, dpval.p);
         diff.storeOnce_forward<T>(x, reinterpret<T, T.Differential>(dpval.d));
     }
 
     __generic<let N : int>
-    void __storeOnce_forward(vector<uint, N> x, DifferentialPair<T> dpval)
+    void __storeOnce_forward(vector<Offset, N> x, DifferentialPair<T> dpval)
     {
         primal.store(x, dpval.p);
         diff.storeOnce_forward<T, N>(x, reinterpret<T, T.Differential>(dpval.d));
     }
 
     [ForceInline]
-    void __storeOnce_backward(uint x, inout DifferentialPair<T> dpval)
+    void __storeOnce_backward(Offset x, inout DifferentialPair<T> dpval)
     {
         dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.storeOnce_backward<T>(x)));
     }
 
     [ForceInline]
     __generic<let N : int>
-    void __storeOnce_backward(vector<uint, N> x, inout DifferentialPair<T> dpval)
+    void __storeOnce_backward(vector<Offset, N> x, inout DifferentialPair<T> dpval)
     {
         dpval = diffPair(dpval.p, reinterpret<T.Differential, T>(diff.storeOnce_backward<T, N>(x)));
     }

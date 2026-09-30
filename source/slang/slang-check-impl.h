@@ -260,9 +260,12 @@ struct GenericArgumentInferenceFailure
     // interface (`supType`). The capture site records these only once both are
     // concrete (its `hasUnreadyDependenciesForVal` guard), so they are always
     // fully substituted under the current (failed) specialization when read.
+    // The source constraint lets default-argument diagnostics point at the
+    // default expression that supplied the invalid argument.
     struct InterfaceConformanceNotSatisfied
     {
         SourceLoc location = SourceLoc();
+        GenericTypeConstraintDecl* constraintDecl = nullptr;
         Type* subType = nullptr;
         Type* supType = nullptr;
     };
