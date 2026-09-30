@@ -7680,7 +7680,7 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
 // `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types: a bare `VarExpr`
 // with a checked type but neither a name nor a declaration. A placeholder stands for some l-value
 // of its type and names no storage, so a check about which storage an argument names has no answer
-// for it. Any other expression without a declaration is malformed and is not exempted here.
+// for it. No other expression shape is exempted.
 static bool isTypeOnlyPlaceholderArg(Expr* arg)
 {
     auto varExpr = as<VarExpr>(arg);
