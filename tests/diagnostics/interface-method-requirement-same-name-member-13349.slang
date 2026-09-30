@@ -1,7 +1,6 @@
 // A conforming type whose only member named like an interface method requirement is not a
-// method must fail conformance with E38105. Witness synthesis tries to call that member, and
-// the non-callable single candidate used to be reported as an ambiguous reference, which read
-// an empty overload list and aborted the compiler (gh-13349).
+// method fails conformance with E38105. Witness synthesis tries to call that member, and a
+// single non-callable candidate is not an ambiguous reference (gh-13349).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

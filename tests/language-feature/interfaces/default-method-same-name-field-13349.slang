@@ -1,8 +1,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// A conforming type may declare a field named like an interface method that has a default
-// body. The field cannot satisfy the requirement, so conformance falls back to the default
-// (gh-13349; previously this aborted the compiler during witness synthesis).
+// A same-named field does not satisfy a defaulted interface method requirement, so
+// conformance currently falls back to the default implementation (gh-13349).
 
 interface IFoo
 {
