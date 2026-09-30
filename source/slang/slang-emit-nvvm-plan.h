@@ -203,6 +203,45 @@ struct NVVMPlannedStorageConversion
     IRType* type = nullptr;
     uint32_t laneCount = 0;
     NVVMTypeUse resultUse = NVVMTypeUse::Value;
+    Index structuredRecipe = -1;
+};
+
+enum class NVVMStructuredConversionKind
+{
+    Identity,
+    Boolean,
+    Elements,
+};
+
+/// Executes one checked external-storage boundary over canonical IR types. Child indices refer
+/// to owned recipes, so recursive planning never retains references across list growth.
+struct NVVMStructuredConversionRecipe
+{
+    IRType* type = nullptr;
+    NVVMStructuredConversionKind kind = NVVMStructuredConversionKind::Identity;
+    bool storageToValue = false;
+    bool extractAggregate = false;
+    bool constructAggregate = false;
+    List<Index> children;
+};
+
+/// Retains the original resource view and the complete direct-load emission decision.
+struct NVVMPlannedStructuredLoad
+{
+    IRInst* source = nullptr;
+    IRInst* buffer = nullptr;
+    IRInst* elementIndex = nullptr;
+    NVVMRawBufferType bufferType;
+    IRType* resultType = nullptr;
+    uint32_t alignment = 0;
+    SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
+    NVVMPlannedStorageConversion conversion;
+};
+
+struct NVVMPlannedAggregateStorageConstruction
+{
+    IRInst* source = nullptr;
+    Index elementRecipe = -1;
 };
 
 /// Owns the admitted local allocation role and its proven physical alignment.
@@ -254,12 +293,30 @@ struct NVVMPlannedFieldAddress
 {
     IRInst* source = nullptr;
     IRInst* base = nullptr;
+    IRInst* root = nullptr;
     NVVMStructFieldSelection selection;
+};
+
+struct NVVMRawBufferDataPointer
+{
+    IRInst* source = nullptr;
+    IRInst* buffer = nullptr;
+    NVVMRawBufferType bufferType;
+    NVVMBufferDataPointerType resultType;
+};
+
+struct NVVMStructuredBufferElementPointer
+{
+    IRInst* source = nullptr;
+    IRInst* buffer = nullptr;
+    IRInst* elementIndex = nullptr;
+    NVVMRawBufferType bufferType;
+    IRPtrTypeBase* resultType = nullptr;
 };
 
 enum class NVVMElementAddressKind
 {
-    // Direct device/shared result types defer producer relation checks to the operand pass.
+    // Local construction state; only completed records enter the address plan.
     Pending,
     RawBuffer,
     Sequential,
@@ -272,11 +329,13 @@ struct NVVMPlannedElementAddress
     IRInst* source = nullptr;
     IRInst* base = nullptr;
     IRInst* index = nullptr;
+    IRInst* root = nullptr;
     IRType* aggregateType = nullptr;
     IRPtrTypeBase* resultType = nullptr;
     NVVMElementAddressKind kind = NVVMElementAddressKind::Pending;
     bool isReadOnly = false;
     bool isParameterGroupStorage = false;
+    bool isLocalSubstandardRecordStorage = false;
     bool propagatesGlobalUserPointer = false;
     const char* diagnosticName = nullptr;
 };
@@ -289,15 +348,24 @@ class NVVMAddressPlan
 public:
     void addFieldAddress(const NVVMPlannedFieldAddress& address);
     void addElementAddress(const NVVMPlannedElementAddress& address);
-    NVVMPlannedElementAddress* findElementAddress(IRInst* source);
+    void addDataPointer(const NVVMRawBufferDataPointer& address);
+    void addStructuredElement(const NVVMStructuredBufferElementPointer& address);
     const NVVMPlannedFieldAddress* findFieldAddress(IRInst* source) const;
     const NVVMPlannedElementAddress* findElementAddress(IRInst* source) const;
+    const NVVMRawBufferDataPointer* findDataPointer(IRInst* source) const;
+    const NVVMStructuredBufferElementPointer* findStructuredElement(IRInst* source) const;
+    IRInst* getRoot(IRInst* source) const;
+    const NVVMRawBufferType* findRootBuffer(IRInst* source) const;
 
 private:
     List<NVVMPlannedFieldAddress> m_fieldAddresses;
     List<NVVMPlannedElementAddress> m_elementAddresses;
+    List<NVVMRawBufferDataPointer> m_dataPointers;
+    List<NVVMStructuredBufferElementPointer> m_structuredElements;
     Dictionary<IRInst*, Index> m_fieldAddressIndices;
     Dictionary<IRInst*, Index> m_elementAddressIndices;
+    Dictionary<IRInst*, Index> m_dataPointerIndices;
+    Dictionary<IRInst*, Index> m_structuredElementIndices;
 };
 
 /// Retains the exact source name and signature validated before module creation.
@@ -330,6 +398,9 @@ struct NVVMEmissionPlan
     List<NVVMPlannedLocalStorage> localStorage;
     List<NVVMPlannedLoad> loads;
     List<NVVMPlannedStore> stores;
+    List<NVVMPlannedStructuredLoad> structuredLoads;
+    List<NVVMStructuredConversionRecipe> structuredConversions;
+    List<NVVMPlannedAggregateStorageConstruction> aggregateStorageConstructions;
     List<IRFunc*> functions;
     List<String> functionNames;
     List<NVVMPlannedValueOperation> valueOperations;
@@ -391,6 +462,9 @@ public:
     const NVVMPlannedLocalStorage* findLocalStorage(IRInst* source) const;
     const NVVMPlannedLoad* findLoad(IRInst* source) const;
     const NVVMPlannedStore* findStore(IRInst* source) const;
+    const NVVMPlannedStructuredLoad* findStructuredLoad(IRInst* source) const;
+    const NVVMPlannedAggregateStorageConstruction* findAggregateStorageConstruction(
+        IRInst* source) const;
     const NVVMPlannedNamedIntrinsic* findNamedIntrinsic(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
@@ -408,6 +482,8 @@ private:
     Dictionary<IRInst*, Index> m_localStorage;
     Dictionary<IRInst*, Index> m_loads;
     Dictionary<IRInst*, Index> m_stores;
+    Dictionary<IRInst*, Index> m_structuredLoads;
+    Dictionary<IRInst*, Index> m_aggregateStorageConstructions;
     Dictionary<IRInst*, Index> m_valueOperations;
     Dictionary<IRInst*, Index> m_namedIntrinsics;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;

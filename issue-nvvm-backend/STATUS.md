@@ -6,7 +6,7 @@ recognizer is replaced by a typed query that preserves the exact field key befor
 Explicit LLVM/libdevice names and genuine primitive PTX remain intentional backend interfaces.
 Module43, ABI46 and container2 are unchanged. The signed16 O3 failure is corrected by provider-side
 normalization at exact-width integer consumers. The consolidated integration checkpoint is accepted;
-operation-dispatch and shared type-role admission cleanup are accepted. Structured-buffer planning is next.
+operation dispatch, shared type-role admission and structured-buffer planning are accepted. Fake-provider maintenance and architecture refresh are next.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -14,31 +14,40 @@ campaigns. The maintainer superseded the earlier stop-after-log request. The mai
 offset scope: preserve existing NVVM restrictions and leave CUDA/CPP behavior unchanged. The final
 offset migration is accepted. The maintainer has now authorized the ordered correctness,
 integration, cleanup and Float16 work below; continue through bounded reviewed local commits,
-stopping only for a decision that actually needs human input. No push, Slack or system changes.
+stopping only for a decision that actually needs human input. After all queued cleanup and Float16
+work, the maintainer additionally requests a full NVVM validation checkpoint, fixes for discovered
+issues, and resumption of feature development under the standard workflow. No push, Slack or system changes.
 Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-type-admission/`; dispatch evidence remains under `build/nvvm-dispatch/`, and integration evidence remains under `build/nvvm-integration/run-1/`.
+`build/nvvm-storage-planning/`; earlier cleanup evidence remains in its recorded ignored paths, and integration evidence remains under `build/nvvm-integration/run-1/`.
 Plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
-| Evidence                                          | Result                                                                                              |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Build                                             | Eight-job compiler build 31 seconds; unchanged provider and test tools reused                       |
-| Focused units                                     | 12 pass in 8 seconds: helper roles, Half ABI, resources, negative preflight and module-local caches |
-| Ownership                                         | One provider-independent canonical type classifier feeds helper preflight and lowering              |
-| Retained                                          | Role-specific supports policy, supports-before-cache order, provenance/export/layout checks         |
-| Last full / targeted / implementations since full | log-family / shared type-role admission / 11                                                        |
-| Historical evidence                               | Full baseline/identity and all 38 earlier feature objects retained                                  |
+| Evidence                                          | Result                                                                                                                  |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Build                                             | Eight-job shared build 30 seconds; isolated static refresh 318 seconds; test-only corrections 19/10 seconds             |
+| Focused units                                     | 23 shared and 5 direct static pass; only affected units rerun after diagnostic corrections                              |
+| Runtime / PTX                                     | 7 NVVM runtime cells and matrix PTX check pass; new recursive bool/float3 fixture also passed unchanged before refactor |
+| Ownership                                         | Structured load/root facts and conversion recipes retained; child addresses reuse checked parent facts                  |
+| Retained                                          | Canonical types, role caches, raw-view access, Half ABI, physical layout and preflight no-mutation contracts            |
+| Last full / targeted / implementations since full | log-family / structured storage planning / 12                                                                           |
+| Historical evidence                               | Full baseline/identity and all 39 earlier feature objects retained                                                      |
 
-The existing classifier was extracted unchanged; no representation or admission policy changed.
-An initial test command lacked plugin prefixes and failed before tests started; its corrected
-selection passed all twelve tests. No new runtime or full integration campaign was needed.
-The preceding dispatch cleanup passed 63 units with byte-identical representative PTX and removed
-33 duplicate catalog rows, three unreachable Float32 helpers and repeated fake dispatch.
+The structured-buffer load/store family now selects conversions during preflight; emission executes
+the retained recipes. The emitter no longer recursively rediscovers parent address provenance.
+Dimensions, surfaces and general physical-storage legalization remain separate scope.
+Three external BF16 negatives now diagnose the unsupported resource root before deferred field
+selection; one direct global-array negative now diagnoses unavailable `global_var` before its child.
+Only those exact test expectations changed. Initial 22/23 shared and 4/5 static outcomes remain
+recorded; all rejection/no-output/no-mutation checks already passed. No production fix was needed.
+
+Earlier dispatch and shared type-admission acceptance remains recorded with its own identity.
+The user-requested full checkpoint follows the remaining fake/docs cleanup and Float16 batch;
+then fix discovered issues and resume standard feature work.
 
 The bounded integration checkpoint is accepted in `features.nvvm-post-migration-integration`.
 Five native failures were outdated migration assertions: early-folded size/alignment constants,
@@ -62,11 +71,12 @@ covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `caf98bcfd132e714c9d13ca9058d3df252b26d8a` plus compiler patch
-`146a8d5795aec990458a2f4000747f4fe10b8337730917a3d633a3f0cb04a99c`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `3c92fd16d059703dc71a07b34d2cfa09459b443ad08b502438173664ddf494ee`.
+Revision `18fbbf036995c502a5874beb465bcd00e20a7f5a` plus compiler patch
+`427b9e476dfd01462505b2c16f114f9d8f0b217a889d5763bda6bb2a62003d9b`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `42e1d1106cbe72d3333e88a48d703077c1ba5bb2df0ec1d5a0ca559ed2fef756`.
 Provider SHA-256: `4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72`.
-Source/runtime/test/configuration hashes are in `features.nvvm-shared-type-admission`.
+Source/runtime/test/configuration hashes are in `features.nvvm-structured-storage-planning`.
+Static tests retain separate compiler/core/provider identities and explicit reuse after test-only fixes.
 Later commits do not relabel these binaries. Earlier integration and failure evidence retain their
 actual identities, including the explicit signed16 resolution.
 
@@ -86,7 +96,7 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 ## Next action
 
 The agreed migration and residual-text audit are finished. The maintainer authorized this sequence
-on 2026-09-30. Steps 1–4 are complete; step 5 is next:
+on 2026-09-30. Steps 1–5 are complete; steps 6–7 are next:
 
 1. Fix the known signed16 O3 normalization failure at its responsible layer, retaining its failure
    history and avoiding an abs-specific workaround.
@@ -106,6 +116,10 @@ on 2026-09-30. Steps 1–4 are complete; step 5 is next:
 7. Refresh architecture around surviving ownership/invariants. Remove stale scalar/wave resolution
    descriptions; keep numerical qualifications with maintained contracts/evidence and preserve histories.
 8. Address Float16 instruction selection after cleanup, using the bounded sequence below.
+9. Run the full NVVM validation checkpoint once the queued work is complete; preserve exact failure
+   outcomes and fix discovered issues, rerunning the affected checks before accepting the checkpoint.
+10. Resume bounded reviewed feature development under WORKFLOW, selecting the next concrete gap
+    from the capability ledger and retained failures. Economical per-batch validation remains in force.
 
 Each cleanup uses existing positive, negative and no-mutation tests with focused runtime checks
 where semantics require them. Eight-job incremental builds and economical testing remain the default.

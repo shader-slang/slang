@@ -263,12 +263,13 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
             SLANG_CHECK(SLANG_FAILED(result));
             SLANG_CHECK(requirements.emissionPlan.addresses.findElementAddress(element) == nullptr);
             SLANG_CHECK(requirements.emissionPlan.addresses.findFieldAddress(inner) == nullptr);
-            // This producer reaches element resolution before module-wide global rejection.
+            // Parent availability is checked before selecting a child role. This ordinary global
+            // is neither admitted shared/parameter storage nor an available local SSA producer.
             if (kind == RootKind::Global)
             {
                 SLANG_CHECK(
-                    context.sink.outputBuffer.getUnownedSlice().indexOf(
-                        toSlice("sequential element pointer")) >= 0);
+                    context.sink.outputBuffer.getUnownedSlice().indexOf(toSlice("global_var")) >=
+                    0);
             }
             continue;
         }

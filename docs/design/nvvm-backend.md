@@ -433,15 +433,19 @@ without scanning unrelated module addresses. Pointer validation and ordinary mem
 these records; selected address emission does not rerun the recognizers. Canonical IR pointer types
 remain authoritative for pointee, access qualifier and address space.
 
-Preflight preserves its two-stage diagnostic order. Direct device/shared element-pointer results
-retain pending recipes until their original second-stage raw/sequential/device-array recognition;
-all recipes must be complete before emission. Ordinary load/store planning computes its canonical root after pointer validation. Read-only selection permits reads but does not itself authorize invariant-load metadata.
+The operand pass validates parent/index availability in dominance order, then records complete
+field and element facts. Children inherit the checked parent's canonical root and storage/access
+roles without recursively reclassifying ancestor instructions. Raw buffer views retain their own
+access permission even when a derived pointer has a more permissive spelling. Read-only selection
+permits reads but does not itself authorize invariant-load metadata.
 
-The plan boundary is incomplete: initial ancestor admission remains recursive, and some scalar
-intrinsic and wave families still resolve during both validation and emission. Field-value
-extraction, dedicated resource operations, helper-signature classification and general
-structured-storage conversion retain repeated or recursive decisions. This is current
-architectural debt, not a reason to bypass preflight or add a second semantic catalog.
+Direct structured-buffer loads retain their buffer/index, exact raw view, alignment, flags and
+conversion recipe. Preflight plans both storage directions over canonical types, collecting the
+exact Boolean conversion requirements in the same traversal. Recipes preserve physical-array-struct
+identity and vector3's aggregate storage versus vector value construction. Explicit-stride array
+construction uses that same planned converter. Emission follows child recipe indices rather than
+classifying types again. Field-value extraction and other dedicated resource operations remain
+outside this completed storage family; this is not a general transforming storage pass.
 
 ## Canonical types and use-specific representation
 
@@ -506,8 +510,8 @@ allocation. Increasing allocation alignment cannot repair wrong member offsets o
 a physical type.
 
 Storage conversion is explicit where representations differ: Boolean storage, compact numeric
-vectors, physical matrices and BF16 vectors cannot inherit register layout without proof. Ordinary BF16 and compact-vector memory conversions execute checked plan recipes. General recursive
-structured-storage conversions still happen in the emitter. Shared
+vectors, physical matrices and BF16 vectors cannot inherit register layout without proof. BF16,
+compact-vector and recursive structured-storage conversions execute checked plan recipes. Shared
 [buffer-element lowering](../../source/slang/slang-ir-lower-buffer-element-type.cpp) already provides
 physical types and packing/unpacking operations. Its discovery currently selects resources and
 UserPointer/Input/Output roots, not Generic local Ptr/Out/BorrowInOut roots. Reuse for local storage
@@ -789,8 +793,8 @@ physical roles. A successful physical-type lookup still cannot authorize another
 
 A future transforming pass should reuse existing physical-storage lowering after defining per-root
 selection/specialization and retained semantic admission. Field/index recipes already supply checked
-facts to pointer validation, ordinary memory planning and emission. A broader address analysis could
-consolidate their remaining recursive ancestor admission and extend that authority to other address
+facts to pointer validation, ordinary memory planning and emission, deriving child roles from checked
+parents in dominance order. A broader address analysis could extend that authority to other address
 producers and consumers. It must not invent a second type hierarchy. Remaining compound recipes can move
 into the existing immutable plan as their families are touched. File separation should follow these
 ownership boundaries.

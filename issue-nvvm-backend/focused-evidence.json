@@ -77304,6 +77304,282 @@
         "No type representation or admission changes; static cache-order coverage retains historical identity. Upcoming address-planning change will rerun direct static units.",
         "No new GPU/full integration/numerical campaign; provider and test plugin reused unchanged. All earlier feature records and full baseline/identity preserved."
       ]
+    },
+    "nvvm-structured-storage-planning": {
+      "status": "accepted-focused",
+      "scope": "One complete structured-buffer load/store family, checked parent/root address facts, and preflight-selected conversion recipes. Canonical types, raw-view access, physical representations, Half ABI and role caches retained. Dimensions/surfaces/general physical-storage legalization excluded.",
+      "identity": {
+        "revision": "18fbbf036995c502a5874beb465bcd00e20a7f5a",
+        "compiler_patch_sha256": "427b9e476dfd01462505b2c16f114f9d8f0b217a889d5763bda6bb2a62003d9b",
+        "files": {
+          "source/slang/slang-emit-nvvm.cpp": "f44db93cf911aabce8fc098f3892988fab5ce173a48e7cb90ea61d6d83dcae6d",
+          "source/slang/slang-emit-nvvm-plan.cpp": "5e6b021226d54c1720fdc951de4ef1a77a8909f8fecbe17ad67221be3a489c73",
+          "source/slang/slang-emit-nvvm-plan.h": "b1694c019db448372c55dec87ac67c0a0b00880e6437b8c49ff8c2a437507fa4",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "b9640d03e770ae16cf01d365b6330c48fe66e25a3b3c43804dba87cf60895216",
+          "tests/cuda/nvvm-structured-bool-vector-roundtrip.slang": "736ec39c828370faf61fd1ee1030494a1c447efda8de50d7d237661a698234e6"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "42e1d1106cbe72d3333e88a48d703077c1ba5bb2df0ec1d5a0ca559ed2fef756",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "009b8de2948abe765a9d56e19e70e3708a22d2a05c5994022b5d2d750da90a7f",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "reuse": "Only shared test plugin rebuilt after exact diagnostic corrections; production/runtime binaries unchanged.",
+        "record": {
+          "path": "build/nvvm-storage-planning/tested-identity-final.json",
+          "sha256": "4cef9f93cd5c1f3bf7866f8dca65c0e6f21ade774c41e31ed27ea1e78eb9bb22"
+        }
+      },
+      "units": {
+        "passed": 23,
+        "records": [
+          {
+            "path": "build/nvvm-storage-planning/units.json",
+            "sha256": "327d75865613404459c615b5cf3506f45863d4f3329e9118fe504b7958e07d24",
+            "return_code": 1,
+            "elapsed_seconds": 16.083669900894165
+          },
+          {
+            "path": "build/nvvm-storage-planning/units-retry.json",
+            "sha256": "692e25e123524d5e1e4bac7f1167cf81b9908cbbfc236eb389ba83b5cca91ef7",
+            "return_code": 0,
+            "elapsed_seconds": 13.675760507583618
+          }
+        ],
+        "outcomes": {
+          "slang-unit-test-tool/nvvmIRBuilderRejectsInvalidSequentialAddressingOperations.internal": "passed",
+          "slang-unit-test-tool/nvvmIRBuilderRejectsInvalidPointerAddressingOperations.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangStructuredMatrixMemoryUsesPhysicalResourceStorage.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangReadOnlyStructuredMatrixMemoryUsesStorageBufferPointer.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangComposesLocalAggregateElementAndFieldAddresses.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangCopyableStructLocalStoresToStructuredBuffer.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangCopyableStructLoadsAndLocalArraysUseGenericAggregates.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangMutableStructuredBufferAggregateFieldsUseGenericPointers.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRawRWStructuredBufferI32StoreUsesDirectPipeline.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRawBufferDataPointersUseGenericPipeline.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRejectsNestedArrayByteAddressAccessBeforeProviderMutation.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRejectsReadOnlyByteAddressDataPointerStoreBeforeProviderMutation.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangVectorStructuredBuffersUseGenericTransport.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangSelectedNumericStructuredBuffersUseGenericTransport.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRejectsAdjacentStructuredBufferShapesBeforeProviderMutation.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangNestedBorrowedVectorAddressesPreserveStorageRoles.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangPreflightsExactValueOperationCapabilities.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRealRawRWStructuredBufferI32DifferentialPTX.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRealRawRWStructuredBufferI32PtxasAccepts.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangRawRWStructuredBufferI32RuntimeMatchesNVRTC.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal": "passed"
+        },
+        "reuse": "22 original passes retained after only three exact diagnostic expectations were updated; production binary unchanged."
+      },
+      "runtime": {
+        "passed": 7,
+        "record": {
+          "path": "build/nvvm-storage-planning/runtime.json",
+          "sha256": "7bdcc62be87d51bb59dc57435a0c22d4f15bca227674aad06fcd5a954b800c66",
+          "return_code": 0,
+          "elapsed_seconds": 5.390935182571411
+        },
+        "outcomes": {
+          "tests/compute/matrix-layout-structured-buffer.slang.5 (cuda)": "passed",
+          "tests/cuda/nvvm-borrowed-vector-storage.slang.1 (cuda)": "passed",
+          "tests/cuda/nvvm-borrowed-vector-storage.slang.2 (cuda)": "passed",
+          "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)": "passed",
+          "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)": "passed",
+          "tests/cuda/nvvm-structured-bool-vector-roundtrip.slang (cuda)": "passed",
+          "tests/cuda/nvvm-structured-bool-vector-roundtrip.slang.1 (cuda)": "passed"
+        }
+      },
+      "ptx": {
+        "passed": 1,
+        "record": {
+          "path": "build/nvvm-storage-planning/ptx.json",
+          "sha256": "9e0620d3b60a867480a3e535131334587fa07ab7f50019df2aeffc67d16e1056",
+          "return_code": 0,
+          "elapsed_seconds": 1.4854261875152588
+        },
+        "outcomes": {
+          "tests/compute/matrix-layout-structured-buffer.slang.6": "passed"
+        }
+      },
+      "static": {
+        "passed": 5,
+        "records": [
+          {
+            "path": "build/nvvm-storage-planning/static-units.json",
+            "sha256": "a437306d6bd1722e5177762c940d88f9f0626d219df3da001a40548ac11e9193",
+            "return_code": 1,
+            "elapsed_seconds": 0.28266167640686035
+          },
+          {
+            "path": "build/nvvm-storage-planning/static-units-retry.json",
+            "sha256": "f5df92a1440c7c000fb3cd8ac16578c50a750b5ede62bd729f7e1c4d79907011",
+            "return_code": 0,
+            "elapsed_seconds": 7.0305609703063965
+          },
+          {
+            "path": "build/nvvm-storage-planning/static-units-cache-confirmed.json",
+            "sha256": "05d95898133085c459efaeb7b3ec4b7fbd1ecc2ebf973d04948cc259e298360d",
+            "return_code": 0,
+            "elapsed_seconds": 0.266491174697876
+          }
+        ],
+        "outcomes": [
+          "nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder",
+          "nvvmScalarHalfBoundaryRolesIgnoreCacheOrder",
+          "nvvmHalfVectorBoundaryRolesIgnoreCacheOrder",
+          "nvvmHalfHelperABIClassifierUsesExactValueTypes",
+          "nvvmLocalRecordArrayAddressesRequireLocalProducer"
+        ],
+        "reuse": "Four original static passes retained after one exact diagnostic expectation correction; compiler objects/provider unchanged.",
+        "identity": {
+          "file_sha256": {
+            "source/slang/slang-emit-nvvm.cpp": "f44db93cf911aabce8fc098f3892988fab5ce173a48e7cb90ea61d6d83dcae6d",
+            "source/slang/slang-emit-nvvm-plan.h": "b1694c019db448372c55dec87ac67c0a0b00880e6437b8c49ff8c2a437507fa4",
+            "source/slang/slang-emit-nvvm-plan.cpp": "5e6b021226d54c1720fdc951de4ef1a77a8909f8fecbe17ad67221be3a489c73",
+            "source/slang/slang-emit-nvvm-type-lowering.cpp": "3a422a9c7877c6f251459273508ce2c1a16f13049c57cb21a31f6c6659f6e982",
+            "source/slang/slang-emit-nvvm-type-lowering.h": "cffcfe4830043ea55c19928cde017a4ae00286ea631389a9273172645a8debe3",
+            "source/slang/hlsl.meta.slang": "96a4812d9c85db589d008649a8bca11a343c3cb1fa1c87d7f670c30fe57746d7",
+            "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "5fac9ea2c31572d86fd7cbb29fe0693b2c6df94fd4691f96a14bbc185de755c4",
+            "tools/slang-static-unit-test/unit-test-nvvm-type-lowering.cpp": "a8289f3287c291aec2c5a816437a5ef4beb7e180f1f760abecc1fc5240da8982",
+            "tools/slang-unit-test/unit-test-nvvm-support.h": "f9ebf24fb5e1780fef7a1ede4e91cd94ec65b72ca6cd5954a5fd2f4bbd871e96",
+            "build/nvvm-local-record-arrays/static-unit-build/CMakeCache.txt": "e1fd59dbfc11ebed26c6c7b67a897c0cd2c9dab033b68a37f15e1ba415a8ad4e",
+            "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "346cf5aa2a05554073ea20fdd4ca8e5f80c57a9238a338d75fd2a07e4536f5c1",
+            "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-core-module.bin": "b92d0a88f86c49709c2976838ddb1ba4c7b55c463c4b754d4e583aae5054b90e",
+            "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72"
+          },
+          "linkage": "\tlinux-vdso.so.1 (0x00007ecc7cdb2000)\n\tlibstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007ecc7b800000)\n\tlibm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007ecc7ccb1000)\n\tlibgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ecc7bbd2000)\n\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ecc7b400000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007ecc7cdb4000)\n",
+          "configuration_note": "Existing isolated static configuration rebuilt with8jobs; matching current compiler source and existing realNVVM provider. No shared compiler linkage.",
+          "reuse": "One static test/executable rebuilt after diagnostic correction. Its singleton retry regenerated core cache during session startup; source/config/provider stayed unchanged. Final record captures settled post-retry cache."
+        },
+        "cache_warm": {
+          "path": "build/nvvm-storage-planning/static-cache-warm.json",
+          "sha256": "d22270f23cdafe33620eba2ff349ddf92eeaed951ba3032c6eaa29803a09d8a8",
+          "return_code": 1,
+          "elapsed_seconds": 6.996745824813843
+        }
+      },
+      "before_roundtrip": {
+        "passed": 2,
+        "record": {
+          "path": "build/nvvm-storage-planning/before-roundtrip.json",
+          "sha256": "ba481f68e0c5ae4e50b2f4398d503edb6f4d875227d8459c38919db45e0833c7",
+          "return_code": 0,
+          "elapsed_seconds": 2.677297830581665
+        },
+        "identity": {
+          "path": "build/nvvm-storage-planning/before-roundtrip-identity.json",
+          "sha256": "869d25f647958fd04cbf2bbe47401f5935bd4c476616de65f2737ab6e5a59be7"
+        },
+        "meaning": "New recursive bool/float3 fixture already passed O0/O3 on unchanged pre-refactor compiler; same fixture bytes/expectations passed after."
+      },
+      "builds": [
+        {
+          "path": "build/nvvm-storage-planning/build-shared.json",
+          "sha256": "211c99400c18e6aeaff8126016700ca26e8b9df18322c3486107b949376a63d1",
+          "return_code": 0,
+          "elapsed_seconds": 30.12999653816223
+        },
+        {
+          "path": "build/nvvm-storage-planning/build-static.json",
+          "sha256": "da461be78fe792d12bcdd8eda3e7d6e54132582494503ede9a8f8a48b96a7ce5",
+          "return_code": 0,
+          "elapsed_seconds": 318.22678875923157
+        },
+        {
+          "path": "build/nvvm-storage-planning/build-tests-corrected.json",
+          "sha256": "857e94ae5ff21fbdd17e2d5bfcaeb01e6f8ce417546ad6aaf747f40e6bb35b2d",
+          "return_code": 0,
+          "elapsed_seconds": 18.96743154525757
+        },
+        {
+          "path": "build/nvvm-storage-planning/build-static-test-corrected.json",
+          "sha256": "1c7f1b9f6a7603024e299604c03bbb560ae92a63b919a94a1cd364b6238132a5",
+          "return_code": 0,
+          "elapsed_seconds": 9.743168830871582
+        }
+      ],
+      "validation_incidents": [
+        {
+          "status": "resolved-test-expectations",
+          "attempt": {
+            "path": "build/nvvm-storage-planning/units.json",
+            "sha256": "327d75865613404459c615b5cf3506f45863d4f3329e9118fe504b7958e07d24",
+            "return_code": 1,
+            "elapsed_seconds": 16.083669900894165
+          },
+          "resolution": {
+            "path": "build/nvvm-storage-planning/units-retry.json",
+            "sha256": "692e25e123524d5e1e4bac7f1167cf81b9908cbbfc236eb389ba83b5cca91ef7",
+            "return_code": 0,
+            "elapsed_seconds": 13.675760507583618
+          },
+          "cause": "Three unsupported external BF16 structured-buffer cases now diagnose the unchanged first-pass resource element-pointer refusal before deferred child FieldAddress validation. E52017, no output and all no-mutation assertions remained correct.",
+          "change": "Only the three exact diagnostic strings changed; no production change or relaxed rejection.",
+          "initial_identity": {
+            "path": "build/nvvm-storage-planning/tested-identity.json",
+            "sha256": "64f28e008eb3d4e6305e2cea69026daff64acdcbfcb505e146f162fe123fb3f3"
+          }
+        },
+        {
+          "status": "resolved-static-test-expectation",
+          "attempt": {
+            "path": "build/nvvm-storage-planning/static-units.json",
+            "sha256": "a437306d6bd1722e5177762c940d88f9f0626d219df3da001a40548ac11e9193",
+            "return_code": 1,
+            "elapsed_seconds": 0.28266167640686035
+          },
+          "resolution": {
+            "path": "build/nvvm-storage-planning/static-units-retry.json",
+            "sha256": "f5df92a1440c7c000fb3cd8ac16578c50a750b5ede62bd729f7e1c4d79907011",
+            "return_code": 0,
+            "elapsed_seconds": 7.0305609703063965
+          },
+          "cause": "Global local-record-array root now fails unchanged operand-availability validation with global_var before sequential child resolution. Actual rejection and absent child-plan checks passed initially.",
+          "change": "Only exact expected diagnostic and explanation changed; no production change.",
+          "initial_identity": {
+            "path": "build/nvvm-storage-planning/static-identity.json",
+            "sha256": "7bff9941934692ba0fca0e203be028d73546a3e98a9c316c51fb731be8d40fd4"
+          }
+        },
+        {
+          "status": "resolved-static-cache-identity",
+          "transition": {
+            "path": "build/nvvm-storage-planning/static-cache-transition.json",
+            "sha256": "698fbda0880c579e82cb4e4e82fcb47e6e1d21ba72215191ca8736d7d5e1a472"
+          },
+          "before_retry_identity": {
+            "path": "build/nvvm-storage-planning/static-identity-before-retry.json",
+            "sha256": "9a06f1d110378ed620d1725abba8b287e6e6785fb61487c523ff3cdfb97ac02d"
+          },
+          "confirmation": {
+            "path": "build/nvvm-storage-planning/static-units-cache-confirmed.json",
+            "sha256": "05d95898133085c459efaeb7b3ec4b7fbd1ecc2ebf973d04948cc259e298360d",
+            "return_code": 0,
+            "elapsed_seconds": 0.266491174697876
+          },
+          "cause": "Acceptance hash guard detected static core cache regeneration during successful singleton retry after executable relink. Only cache bytes changed; settled final identity was captured and singleton rechecked in0.27s."
+        },
+        {
+          "status": "expected-cache-initialization",
+          "attempt": {
+            "path": "build/nvvm-storage-planning/static-cache-warm.json",
+            "sha256": "d22270f23cdafe33620eba2ff349ddf92eeaed951ba3032c6eaa29803a09d8a8",
+            "return_code": 1,
+            "elapsed_seconds": 6.996745824813843
+          },
+          "cause": "Unmatched filter deliberately initializes the static core cache before identity capture; zero tests is an expected nonzero exit, not a scored test pass."
+        }
+      ],
+      "limitations": [
+        "No full native/corpus/surface/numerical/material campaign in this focused batch. User-authorized full checkpoint follows all queued cleanup and Float16 work.",
+        "All39 earlier feature records and full baseline/identity retained; diagnostic failure and before/after identities preserved."
+      ]
     }
   }
 }

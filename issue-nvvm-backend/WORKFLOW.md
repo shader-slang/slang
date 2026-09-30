@@ -29,6 +29,13 @@ reviewed commits; stop only when human judgment is actually required. This super
 completion stopping condition above. CUDA C++ is comparison evidence, not the universal oracle;
 verify Slang semantics against Vulkan/D3D12 contracts and document intentional differences.
 
+After this entire queued cleanup and Float16 sequence, the maintainer additionally authorized one
+full NVVM validation checkpoint, correction of issues it reveals, and then resumption of feature
+development under this standard workflow. This is an explicit integration milestone; it does not
+restore full campaigns after every small change. Preserve exact failures, rerun affected checks
+after fixes, and complete the checkpoint before returning to bounded reviewed feature batches.
+Continue until a recorded stopping condition actually requires human input.
+
 Use one implementation owner and an independent reviewer when available. The lead owns scope,
 acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight
 build jobs** on the upgraded eight-CPU host. Use focused test selections and existing runners;

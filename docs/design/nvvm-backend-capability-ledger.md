@@ -308,8 +308,11 @@ Ordinary Var/Load/Store decisions are now retained in the checked emission plan:
 alignment, conversion recipe, load flags and pointer ABI/provenance. BF2 identity and BF3/BF4 lane
 conversion are planned before provider mutation. Native readonly borrows remain distinct from compact
 storage and from immutable locations. This changes ownership, not the supported language surface.
-General structured-storage recursion and recursive ancestor admission remain outside this
-boundary; no transforming Slang IR storage pass is claimed.
+Structured-buffer roots and direct loads also retain their checked view/access/operand facts.
+Recursive Boolean/aggregate/vector3 conversions use recipes built during preflight, including
+explicit-stride construction; children inherit checked parent address facts in dominance order.
+The [recursive round trip](../../tests/cuda/nvvm-structured-bool-vector-roundtrip.slang) covers nested
+Boolean fields and float3 storage in both directions. No transforming Slang IR storage pass is claimed.
 
 Half-vector helper parameters/results use physical integer lane transport while body arithmetic and
 storage retain their selected Half representations. [Parameter transport](../../tests/cuda/nvvm-half-vector-helper-parameters.slang)
@@ -544,7 +547,8 @@ Field/index address recipes are shared by pointer validation, ordinary memory pl
 provider emission. Nested borrowed-vector coverage checks dynamic lane access across a mutation,
 scalar alignment and the absence of invariant-load metadata for Generic Read borrows. Compact
 parameter-group loads retain their independent representation, alignment and invariant metadata.
-These checks preserve existing support boundaries; initial recursive ancestor admission remains.
+These checks preserve existing support boundaries. Parent proofs and raw-view access are retained
+directly; pointer spelling alone cannot grant a child writable resource access.
 
 ## Current compilation observations
 

@@ -7548,6 +7548,9 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
     };
     const SlangNVVMValueTypeDesc float32ToFloat16Operands[] = {NVVMSemantics::kFloat32};
     const SlangNVVMValueTypeDesc signedI8Operands[] = {signedI8, signedI8};
+    const SlangNVVMValueTypeDesc unsignedI8 = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 8, 1};
+    const SlangNVVMValueTypeDesc storageBoolLoadOperands[] = {unsignedI8, unsignedI8};
+    const SlangNVVMValueTypeDesc storageBoolStoreOperands[] = {NVVMSemantics::kBool};
 
     struct CapabilityCase
     {
@@ -7556,6 +7559,22 @@ SLANG_UNIT_TEST(nvvmSlangPreflightsExactValueOperationCapabilities)
         const char* diagnosticName;
     };
     const CapabilityCase cases[] = {
+        {
+            "struct Payload { bool flags[2]; float3 value; }; "
+            "StructuredBuffer<Payload> source; RWStructuredBuffer<uint> destination; "
+            "[numthreads(1,1,1)] void computeMain() { destination[0] = uint(source[0].flags[1]); }",
+            {SLANG_NVVM_VALUE_OP_NOT_EQUAL, NVVMSemantics::kBool, storageBoolLoadOperands, 2},
+            "structured-buffer Boolean load conversion",
+        },
+        {
+            "struct Payload { bool flags[2]; float3 value; }; "
+            "RWStructuredBuffer<Payload> destination; "
+            "[numthreads(1,1,1)] void computeMain() { "
+            "Payload value; value.flags[0] = true; value.flags[1] = false; "
+            "value.value = float3(1,2,3); destination[0] = value; }",
+            {SLANG_NVVM_VALUE_OP_INTEGER_CONVERT, unsignedI8, storageBoolStoreOperands, 1},
+            "structured-buffer Boolean store conversion",
+        },
         {
             kDirectNVVMIntegerMultiplySource,
             {
@@ -9309,7 +9328,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
             [numthreads(32,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             { outputBuffer[tid.x].value = vector<BFloat16,3>(BFloat16(1.0f)); }
         )SLANG",
-         "struct field address result"},
+         "raw RWStructuredBuffer numeric element pointer"},
         // Bare local BF16 references do not qualify external helpers or numeric casts.
 
         {R"SLANG(
@@ -9369,18 +9388,20 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
             }
         )SLANG",
          "helper function parameter"},
+        // Field proofs follow checked parents in the operand pass. These external BF16 roots
+        // are rejected by the earlier result-shape check before any field plan is constructed.
         {R"SLANG(
             RWStructuredBuffer<vector<BFloat16,4>> outputBuffer;
             [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             { outputBuffer[tid.x] = vector<BFloat16,4>(bit_cast<BFloat16>(uint16_t(tid.x))); }
         )SLANG",
-         "struct field address result"},
+         "raw RWStructuredBuffer numeric element pointer"},
         {R"SLANG(
             RWStructuredBuffer<BFloat16> outputBuffer;
             [numthreads(32, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             { outputBuffer[tid.x] = bit_cast<BFloat16>(uint16_t(tid.x)); }
         )SLANG",
-         "struct field address result"},
+         "raw RWStructuredBuffer numeric element pointer"},
 
         {R"SLANG(
             RWStructuredBuffer<uint> outputBuffer;

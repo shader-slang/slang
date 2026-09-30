@@ -32,6 +32,7 @@ const T* _findOperation(
 void NVVMAddressPlan::addFieldAddress(const NVVMPlannedFieldAddress& address)
 {
     SLANG_RELEASE_ASSERT(address.source && !m_fieldAddressIndices.containsKey(address.source));
+    SLANG_RELEASE_ASSERT(address.root && address.selection.field);
     m_fieldAddressIndices[address.source] = m_fieldAddresses.getCount();
     m_fieldAddresses.add(address);
 }
@@ -39,6 +40,7 @@ void NVVMAddressPlan::addFieldAddress(const NVVMPlannedFieldAddress& address)
 void NVVMAddressPlan::addElementAddress(const NVVMPlannedElementAddress& address)
 {
     SLANG_RELEASE_ASSERT(address.source && !m_elementAddressIndices.containsKey(address.source));
+    SLANG_RELEASE_ASSERT(address.root && address.kind != NVVMElementAddressKind::Pending);
     m_elementAddressIndices[address.source] = m_elementAddresses.getCount();
     m_elementAddresses.add(address);
 }
@@ -48,10 +50,56 @@ const NVVMPlannedFieldAddress* NVVMAddressPlan::findFieldAddress(IRInst* source)
     return _findOperation(m_fieldAddresses, m_fieldAddressIndices, source);
 }
 
-NVVMPlannedElementAddress* NVVMAddressPlan::findElementAddress(IRInst* source)
+void NVVMAddressPlan::addDataPointer(const NVVMRawBufferDataPointer& address)
 {
-    const Index* index = m_elementAddressIndices.tryGetValue(source);
-    return index ? &m_elementAddresses[*index] : nullptr;
+    SLANG_RELEASE_ASSERT(address.source && !m_dataPointerIndices.containsKey(address.source));
+    m_dataPointerIndices[address.source] = m_dataPointers.getCount();
+    m_dataPointers.add(address);
+}
+
+void NVVMAddressPlan::addStructuredElement(const NVVMStructuredBufferElementPointer& address)
+{
+    SLANG_RELEASE_ASSERT(address.source && !m_structuredElementIndices.containsKey(address.source));
+    m_structuredElementIndices[address.source] = m_structuredElements.getCount();
+    m_structuredElements.add(address);
+}
+
+const NVVMRawBufferDataPointer* NVVMAddressPlan::findDataPointer(IRInst* source) const
+{
+    return _findOperation(m_dataPointers, m_dataPointerIndices, source);
+}
+
+const NVVMStructuredBufferElementPointer* NVVMAddressPlan::findStructuredElement(
+    IRInst* source) const
+{
+    return _findOperation(m_structuredElements, m_structuredElementIndices, source);
+}
+
+IRInst* NVVMAddressPlan::getRoot(IRInst* source) const
+{
+    if (auto field = findFieldAddress(source))
+    {
+        SLANG_RELEASE_ASSERT(field->root);
+        return field->root;
+    }
+    if (auto element = findElementAddress(source))
+    {
+        SLANG_RELEASE_ASSERT(element->root);
+        return element->root;
+    }
+    SLANG_RELEASE_ASSERT(
+        source && source->getOp() != kIROp_FieldAddress && source->getOp() != kIROp_GetElementPtr);
+    return source;
+}
+
+const NVVMRawBufferType* NVVMAddressPlan::findRootBuffer(IRInst* source) const
+{
+    IRInst* root = getRoot(source);
+    if (auto element = findStructuredElement(root))
+        return &element->bufferType;
+    if (auto data = findDataPointer(root))
+        return &data->bufferType;
+    return nullptr;
 }
 
 const NVVMPlannedElementAddress* NVVMAddressPlan::findElementAddress(IRInst* source) const
@@ -78,6 +126,8 @@ void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
     _indexOperations(plan.localStorage, m_localStorage);
     _indexOperations(plan.loads, m_loads);
     _indexOperations(plan.stores, m_stores);
+    _indexOperations(plan.structuredLoads, m_structuredLoads);
+    _indexOperations(plan.aggregateStorageConstructions, m_aggregateStorageConstructions);
     _indexOperations(plan.valueOperations, m_valueOperations);
     _indexOperations(plan.namedIntrinsics, m_namedIntrinsics);
     _indexOperations(plan.uint64WordConstructions, m_uint64WordConstructions);
@@ -106,6 +156,16 @@ SLANG_NVVM_DEFINE_PLAN_FIND(
     m_namedIntrinsics)
 SLANG_NVVM_DEFINE_PLAN_FIND(findLoad, NVVMPlannedLoad, loads, m_loads)
 SLANG_NVVM_DEFINE_PLAN_FIND(findStore, NVVMPlannedStore, stores, m_stores)
+SLANG_NVVM_DEFINE_PLAN_FIND(
+    findStructuredLoad,
+    NVVMPlannedStructuredLoad,
+    structuredLoads,
+    m_structuredLoads)
+SLANG_NVVM_DEFINE_PLAN_FIND(
+    findAggregateStorageConstruction,
+    NVVMPlannedAggregateStorageConstruction,
+    aggregateStorageConstructions,
+    m_aggregateStorageConstructions)
 SLANG_NVVM_DEFINE_PLAN_FIND(
     findValueOperation,
     NVVMPlannedValueOperation,
