@@ -3550,8 +3550,8 @@ static bool _isAdmittedDeviceLibraryType(const SlangNVVMValueTypeDesc& type)
            (type.bitWidth == 32 || type.bitWidth == 64);
 }
 
-// The selected definition is the signature authority. The two names bound this pilot's public
-// admission; no parallel name-to-signature mapping exists here. For example, __nv_roundf accepts
+// The selected definition is the signature authority. The admitted names bound the rounding
+// family; no parallel name-to-signature mapping exists here. For example, __nv_roundf accepts
 // float(float) only because that is the definition present in the immutable selected bitcode.
 static llvm::FunctionType* _resolveDeviceLibraryFunction(
     DeviceLibraryState* library,
@@ -3560,7 +3560,9 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
     if (!library || !desc.name || (!desc.operands && desc.operandCount))
         return nullptr;
     llvm::StringRef name(desc.name, desc.nameSize);
-    if (name != "__nv_roundf" && name != "__nv_round")
+    if (name != "__nv_roundf" && name != "__nv_round" && name != "__nv_ceilf" &&
+        name != "__nv_ceil" && name != "__nv_floorf" && name != "__nv_floor" &&
+        name != "__nv_truncf" && name != "__nv_trunc")
         return nullptr;
     auto function = library->module->getFunction(name);
     if (!function || function->isDeclaration() || !function->hasExternalLinkage() ||
@@ -3681,15 +3683,12 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_asinf" : "__nv_asin";
         case SLANG_NVVM_VALUE_OP_ATAN:
             return isFloat32 ? "__nv_atanf" : "__nv_atan";
-        case SLANG_NVVM_VALUE_OP_CEIL:
-            return isFloat32 ? "__nv_ceilf" : "__nv_ceil";
         case SLANG_NVVM_VALUE_OP_COS:
             return isFloat32 ? "__nv_cosf" : "__nv_cos";
         case SLANG_NVVM_VALUE_OP_EXP:
             return isFloat32 ? "__nv_expf" : "__nv_exp";
         case SLANG_NVVM_VALUE_OP_EXP2:
             return isFloat32 ? "__nv_exp2f" : "__nv_exp2";
-        case SLANG_NVVM_VALUE_OP_FLOOR:
         case SLANG_NVVM_VALUE_OP_FRAC:
             return isFloat32 ? "__nv_floorf" : "__nv_floor";
         case SLANG_NVVM_VALUE_OP_LOG:
@@ -3710,8 +3709,6 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_tanf" : "__nv_tan";
         case SLANG_NVVM_VALUE_OP_TANH:
             return isFloat32 ? "__nv_tanhf" : "__nv_tanh";
-        case SLANG_NVVM_VALUE_OP_TRUNC:
-            return isFloat32 ? "__nv_truncf" : "__nv_trunc";
         default:
             return nullptr;
         }

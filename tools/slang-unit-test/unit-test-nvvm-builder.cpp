@@ -8826,12 +8826,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)
             float64Operands,
             1,
         },
-        {
-            SLANG_NVVM_VALUE_OP_TRUNC,
-            NVVMSemantics::kFloat32,
-            float32Operands,
-            1,
-        },
     };
     for (const auto& operation : operations)
         SLANG_CHECK(builder.supportsValueOperation(operation));
@@ -8900,7 +8894,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)
     SLANG_CHECK(rejected == nullptr);
 
     const SlangNVVMValueHandle operands[] =
-        {float32Value, float32Value, float64Value, float64Value, float32Value};
+        {float32Value, float32Value, float64Value, float64Value};
     for (Index i = 0; i < SLANG_COUNT_OF(operations); ++i)
     {
         SlangNVVMValueHandle result = nullptr;
@@ -8925,13 +8919,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsExactLibdeviceUnaryOperations)
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare float @__nv_cosf(float)")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare double @__nv_sin(double)")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("declare double @__nv_cos(double)")) == 1);
-        SLANG_CHECK(
-            _countOccurrences(textSlice, toSlice("declare float @__nv_truncf(float)")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_sinf")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_cosf")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call double @__nv_sin")) == 1);
         SLANG_CHECK(_countOccurrences(textSlice, toSlice("call double @__nv_cos")) == 1);
-        SLANG_CHECK(_countOccurrences(textSlice, toSlice("call float @__nv_truncf")) == 1);
     }
 }
 
@@ -8952,10 +8943,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_NVVM_VALUE_OP_ACOS,
         SLANG_NVVM_VALUE_OP_ASIN,
         SLANG_NVVM_VALUE_OP_ATAN,
-        SLANG_NVVM_VALUE_OP_CEIL,
         SLANG_NVVM_VALUE_OP_EXP,
         SLANG_NVVM_VALUE_OP_EXP2,
-        SLANG_NVVM_VALUE_OP_FLOOR,
         SLANG_NVVM_VALUE_OP_FRAC,
         SLANG_NVVM_VALUE_OP_LOG,
         SLANG_NVVM_VALUE_OP_LOG2,
@@ -8963,7 +8952,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_NVVM_VALUE_OP_RSQRT,
         SLANG_NVVM_VALUE_OP_SQRT,
         SLANG_NVVM_VALUE_OP_TAN,
-        SLANG_NVVM_VALUE_OP_TRUNC,
     };
     const SlangNVVMValueOperation binaryMathOperations[] = {
         SLANG_NVVM_VALUE_OP_ATAN2,
@@ -10794,7 +10782,8 @@ struct ScopedNVVMTestDeviceLibrary
 static ComPtr<ISlangBlob> _makeNVVMDeviceLibraryFixture(
     const NVVMIRBuilder& builder,
     uint32_t width,
-    bool definition = true)
+    bool definition = true,
+    const char* name = "__nv_roundf")
 {
     ScopedNVVMBuilderModule module;
     module.builder = &builder;
@@ -10811,7 +10800,7 @@ static ComPtr<ISlangBlob> _makeNVVMDeviceLibraryFixture(
         functionType,
         SLANG_NVVM_LINKAGE_EXTERNAL,
         SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("__nv_roundf"),
+        UnownedStringSlice(name),
         function)));
     if (definition)
     {
@@ -11247,6 +11236,232 @@ SLANG_UNIT_TEST(nvvmIRBuilderRejectsRetiredRoundWithoutMutation)
             {
                 control = _getBlobText(assembly);
             }
+        }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderRejectsRetiredDirectedRoundingWithoutMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const uint32_t identity : {42u, 54u, 57u})
+        for (const auto type :
+             {NVVMSemantics::kFloat16, NVVMSemantics::kFloat32, NVVMSemantics::kFloat64})
+        {
+            const SlangNVVMValueOperationDesc operation =
+                {SlangNVVMValueOperation(identity), type, &type, 1};
+            SLANG_CHECK(!builder.supportsValueOperation(operation));
+            auto unsupported = operation;
+            unsupported.operandCount = 0;
+            SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+            unsupported = operation;
+            unsupported.resultType.laneCount = 2;
+            SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+            unsupported = operation;
+            unsupported.resultType.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+            SLANG_CHECK(!builder.supportsValueOperation(unsupported));
+            String control;
+            for (bool attempt : {false, true})
+            {
+                ScopedNVVMBuilderModule module;
+                module.builder = &builder;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.createModule(toSlice("retired-directed-rounding"), module.module)));
+                SlangNVVMTypeHandle valueType = nullptr, functionType = nullptr;
+                SlangNVVMValueHandle function = nullptr, parameter = nullptr;
+                SlangNVVMBlockHandle block = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFloatingPointType(module.module, type.bitWidth, valueType)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder
+                        .getFunctionType(module.module, valueType, &valueType, 1, functionType)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                    module.module,
+                    functionType,
+                    SLANG_NVVM_LINKAGE_EXTERNAL,
+                    SLANG_NVVM_FUNCTION_FLAG_NONE,
+                    toSlice("identity"),
+                    function)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionParameter(module.module, function, 0, parameter)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.createBlock(module.module, function, toSlice("entry"), block)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+                if (attempt)
+                {
+                    SlangNVVMValueHandle rejected = parameter;
+                    SLANG_CHECK(SLANG_FAILED(builder.emitValueOperation(
+                        module.module,
+                        operation,
+                        &parameter,
+                        1,
+                        rejected)));
+                    SLANG_CHECK(!rejected);
+                }
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.emitValueReturn(module.module, parameter)));
+                ComPtr<ISlangBlob> assembly;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+                    module.module,
+                    SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                    assembly)));
+                if (attempt)
+                {
+                    SLANG_CHECK(_getBlobText(assembly) == control);
+                }
+                else
+                {
+                    control = _getBlobText(assembly);
+                }
+            }
+        }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderDeviceLibraryBuildsDirectedRoundingCalls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    struct Case
+    {
+        const char* name;
+        uint32_t width;
+    };
+    const Case cases[] = {
+        {"__nv_ceilf", 32},
+        {"__nv_ceil", 64},
+        {"__nv_floorf", 32},
+        {"__nv_floor", 64},
+        {"__nv_truncf", 32},
+        {"__nv_trunc", 64},
+    };
+    for (const auto& testCase : cases)
+    {
+        auto bytes = _makeNVVMDeviceLibraryFixture(builder, testCase.width, true, testCase.name);
+        ScopedNVVMTestDeviceLibrary library{&builder};
+        String diagnostics;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.loadDeviceLibrary(bytes, library.library, diagnostics)));
+        SLANG_CHECK(diagnostics.getLength() == 0);
+        SlangNVVMNamedIntrinsicOperandDesc operand = {
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, testCase.width, 1},
+            SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+        SlangNVVMNamedIntrinsicDesc desc =
+            {testCase.name, strlen(testCase.name), operand.type, &operand, 1};
+        SLANG_CHECK(builder.supportsDeviceLibraryFunction(library.library, desc));
+        for (const uint32_t wrongWidth : {16u, testCase.width == 32 ? 64u : 32u})
+        {
+            desc.resultType.bitWidth = operand.type.bitWidth = wrongWidth;
+            SLANG_CHECK(!builder.supportsDeviceLibraryFunction(library.library, desc));
+        }
+        desc.resultType.bitWidth = operand.type.bitWidth = testCase.width;
+        desc.name = "__nv_unadmitted";
+        desc.nameSize = strlen(desc.name);
+        SLANG_CHECK(!builder.supportsDeviceLibraryFunction(library.library, desc));
+        desc.name = testCase.name;
+        desc.nameSize = strlen(desc.name);
+
+        ScopedNVVMBuilderModule module;
+        module.builder = &builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createModule(toSlice("named-directed-rounding"), module.module)));
+        SlangNVVMTypeHandle type = nullptr, functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr, parameter = nullptr;
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, testCase.width, type)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionType(module.module, type, &type, 1, functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            module.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("apply"),
+            function)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, parameter)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(module.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitDeviceLibraryFunction(
+            library.library,
+            module.module,
+            desc,
+            &parameter,
+            1,
+            result)));
+        SLANG_CHECK_ABORT(result != nullptr);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(module.module, result)));
+        const char* typeName = testCase.width == 32 ? "float" : "double";
+        StringBuilder call, declaration;
+        call << "call " << typeName << " @" << testCase.name << "(" << typeName;
+        declaration << "declare " << typeName << " @" << testCase.name << "(" << typeName << ")";
+        for (const auto format :
+             {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+              SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+        {
+            ComPtr<ISlangBlob> assembly;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
+            const String text = _getBlobText(assembly);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), call.getUnownedSlice()) == 1);
+            SLANG_CHECK(
+                _countOccurrences(text.getUnownedSlice(), declaration.getUnownedSlice()) == 1);
+        }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderFracRetainsFloorAndSubtract)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const auto type : {NVVMSemantics::kFloat32, NVVMSemantics::kFloat64})
+    {
+        const SlangNVVMValueOperationDesc operation = {SLANG_NVVM_VALUE_OP_FRAC, type, &type, 1};
+        SLANG_CHECK(builder.supportsValueOperation(operation));
+        ScopedNVVMBuilderModule module;
+        module.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("retained-frac"), module.module)));
+        SlangNVVMTypeHandle valueType = nullptr, functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr, parameter = nullptr;
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFloatingPointType(module.module, type.bitWidth, valueType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(module.module, valueType, &valueType, 1, functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            module.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("fraction"),
+            function)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, parameter)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(module.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitValueOperation(module.module, operation, &parameter, 1, result)));
+        SLANG_CHECK_ABORT(result != nullptr);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(module.module, result)));
+        for (const auto format :
+             {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+              SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+        {
+            ComPtr<ISlangBlob> assembly;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assembly)));
+            const String text = _getBlobText(assembly);
+            const char* call = type.bitWidth == 32 ? "call float @__nv_floorf(float"
+                                                   : "call double @__nv_floor(double";
+            const char* subtract = type.bitWidth == 32 ? "fsub float" : "fsub double";
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), UnownedStringSlice(call)) == 1);
+            SLANG_CHECK(
+                _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(subtract)) == 1);
         }
     }
 }

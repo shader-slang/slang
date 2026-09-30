@@ -63,15 +63,17 @@ attributes require constant operands during the pure support query. Emission sep
 actual types, constant promises, provenance and dominance before creating a declaration or call.
 Conflicting intrinsic symbols reject before mutation.
 
-Named libdevice calls reuse these explicit operands. This pilot admits `__nv_roundf` and
-`__nv_round`; their complete signatures come from definitions in the selected immutable library,
-with scalar Float32/Float64 ABI values admitted. There is no parallel name-to-signature table.
-Core `round` selects these names in its NVVM branch. Half preserves its existing evaluation through
-`__realCast<T>(round(__realCast<float>(x)))`: widen exactly, round in Float32 and narrow once.
-The existing vector and matrix mappings call the scalar body. NVVM retains ties away from zero;
-CUDA Half retains its `hrint` ties-to-even behavior. Numeric operation64 is reserved, and the round
-semantic tag, lowering-name entry and CUDA-text recognizer are removed. Shared promotion recipes
-remain for other math, but their catalog validation no longer admits the retired operation.
+Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
+names for `round`, `ceil`, `floor` and `trunc` (`__nv_roundf`/`__nv_round`, and the corresponding
+pairs for the other three). Complete signatures come from definitions in the selected immutable
+library; there is no parallel name-to-signature table. Core scalar bodies select these names in
+NVVM branches. Half preserves its existing evaluation through canonical casts, for example
+`__realCast<T>(floor(__realCast<float>(x)))`: widen exactly, evaluate in Float32 and narrow once.
+Existing vector and matrix mappings call the scalar bodies. Round retains NVVM ties away from
+zero and CUDA Half `hrint` ties to even. Numeric operations 42/54/57/64 are reserved, and their
+semantic tags, lowering-name entries and CUDA-text recognizers are removed. Shared promotion
+recipes remain for other math. FRAC59 independently retains its floor call followed by subtraction;
+retiring public floor does not remove that recipe or its library symbols.
 
 The integer primitive boundary admits signed/unsigned scalar widths 8, 16, 32 and 64. Core
 `countbits` converts the same-width population count to uint; its existing pre-switch conversion
@@ -147,9 +149,10 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 36. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 37. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including round's operation64. Existing guards reject these before decoding AST or IR;
+or retired numeric NVVM operations, including ceil/floor/trunc in version36. Existing guards reject
+these before decoding AST or IR;
 metadata inspection and speculative import fallback to source remain available. Source modules
 that explicitly used retired semantic tags need named intrinsic bodies. Container format 2 and
 provider ABI46 are separate contracts. See the

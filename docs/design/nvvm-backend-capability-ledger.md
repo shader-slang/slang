@@ -74,15 +74,15 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 36 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 37 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
 Public `round` uses named `__nv_roundf`/`__nv_round` calls validated against actual definitions in
 an immutable snapshot of the selected libdevice. The same bytes reach libNVVM. Half uses canonical
 FloatCast widening/narrowing around Float32 round, preserving NVVM ties-away and CUDA Half ties-even.
-Numeric operation64 and the old tag/text recognizers are retired. Other scalar math and compound
-recognizers remain outside this migration. Scalar library ABI admission does not admit vector calls.
+Numeric operation64 and the old tag/text recognizers are retired. Scalar library ABI admission
+does not admit vector calls; the public vector/matrix bodies map to scalar operations.
 The [Float32](../../tests/cuda/nvvm-round-32.slang), [Float64](../../tests/cuda/nvvm-round-64.slang)
 and [Half](../../tests/cuda/nvvm-round-half.slang) contracts cover live scalar/noinline helper,
 vector2/3/4 and matrix2x2 results with independent integer/rational oracles, signed-zero checks,
@@ -90,6 +90,18 @@ NaN classification, guards and completion. Half compares both tie policies uncon
 The [oracle checker](../../extras/test-generators/check-nvvm-round-oracles.py) recomputes frozen
 expectations without a compiler; the [removed-tag control](../../tests/cuda/nvvm-round-removed-tag.slang)
 checks the source boundary. Current acceptance and compiler identity remain owned by STATUS.
+
+Public `ceil`, `floor` and `trunc` use the same named-library boundary and canonical Half promotion.
+Their six Float32/64 names come from selected definitions; IDs 42/54/57 and their tag/text paths are
+retired. FRAC59 retains its independent floor-call/subtract recipe. The combined
+[Float32](../../tests/cuda/nvvm-directed-rounding-32.slang),
+[Float64](../../tests/cuda/nvvm-directed-rounding-64.slang) and
+[Half](../../tests/cuda/nvvm-directed-rounding-half.slang) fixtures check 64 live IEEE inputs each,
+with signed zero, subnormal and integer/precision neighbors, infinity and NaN class. Each input
+has 45 scalar/helper/vector/matrix observations, distinct operation/shape masks, guards and completion.
+The [integer-bit oracle checker](../../extras/test-generators/check-nvvm-directed-rounding-oracles.py)
+validates the frozen rationally generated constants without executing a compiler. Other scalar math
+and compound recognizers remain outside this migration.
 
 Core bit reinterpretation and Half-value conversions use canonical NVVM `BitCast`/`FloatCast`
 instructions. The [conversion API fixture](../../tests/cuda/nvvm-conversion-intrinsics.slang) checks

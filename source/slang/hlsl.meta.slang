@@ -9112,8 +9112,18 @@ T ceil(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmCeil) "$P_ceil($0)";
-    case cuda: __intrinsic_asm(nvvmCeil) "$P_ceil($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM ceil requires half, float, or double.");
+        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
+        if (T is half)
+            return __realCast<T>(ceil(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_ceilf", x;
+        else
+            __intrinsic_asm "__nv_ceil", x;
+    case cpp: __intrinsic_asm "$P_ceil($0)";
+    case cuda: __intrinsic_asm "$P_ceil($0)";
     case glsl: __intrinsic_asm "ceil";
     case hlsl: __intrinsic_asm "ceil";
     case metal: __intrinsic_asm "ceil";
@@ -11446,8 +11456,18 @@ T floor(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFloor) "$P_floor($0)";
-    case cuda: __intrinsic_asm(nvvmFloor) "$P_floor($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM floor requires half, float, or double.");
+        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
+        if (T is half)
+            return __realCast<T>(floor(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_floorf", x;
+        else
+            __intrinsic_asm "__nv_floor", x;
+    case cpp: __intrinsic_asm "$P_floor($0)";
+    case cuda: __intrinsic_asm "$P_floor($0)";
     case glsl: __intrinsic_asm "floor";
     case hlsl: __intrinsic_asm "floor";
     case metal: __intrinsic_asm "floor";
@@ -15796,8 +15816,18 @@ T trunc(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmTrunc) "$P_trunc($0)";
-    case cuda: __intrinsic_asm(nvvmTrunc) "$P_trunc($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM trunc requires half, float, or double.");
+        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
+        if (T is half)
+            return __realCast<T>(trunc(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_truncf", x;
+        else
+            __intrinsic_asm "__nv_trunc", x;
+    case cpp: __intrinsic_asm "$P_trunc($0)";
+    case cuda: __intrinsic_asm "$P_trunc($0)";
     case glsl: __intrinsic_asm "trunc";
     case hlsl: __intrinsic_asm "trunc";
     case metal: __intrinsic_asm "trunc";

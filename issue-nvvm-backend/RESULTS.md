@@ -190,7 +190,7 @@ Use the reviewed current `NVVM_BASELINE` identified by STATUS before quality mea
 retain `runtime_input_sha256`,
 `provenance.artifact_sha256`, and per-corpus `fresh_cell_outcomes` for the next refresh.
 
-### Round signature and numerical contracts
+### Rounding signature and numerical contracts
 
 Run the read-only oracle check before the focused shader tests:
 
@@ -208,6 +208,20 @@ backend-specific FileCheck masks. Signed zeros/infinities compare bits and NaNs 
 Scalar, noinline helper, vector2/3/4 and matrix2x2 outputs retain guards and per-lane completion.
 The checker uses only integer IEEE decoding and Fraction arithmetic; shader or vendor output must
 not regenerate expected values. These focused contracts do not change frozen corpus membership.
+
+For the combined ceil/floor/trunc contracts, run:
+
+```bash
+python3 extras/test-generators/check-nvvm-directed-rounding-oracles.py --check
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-directed-rounding-
+```
+
+Require all nine numerical mode cells and three removed-tag diagnostics. Each width uses 64 live
+IEEE inputs and 45 scalar/helper/vector2/3/4/matrix2x2 observations per lane. Six mask bits per
+operation, completion words and end guards must match exactly. Expected constants come from rational
+arithmetic and are checked independently by integer IEEE bit operations. Preserve signed zeros and
+infinities exactly; NaNs promise classification only. Keep the separate round fixtures unchanged.
 
 ## Report environment
 

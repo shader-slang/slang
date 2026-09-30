@@ -158,7 +158,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_SELECT ((SlangNVVMValueOperation)39u)
 #define SLANG_NVVM_VALUE_OP_SIN ((SlangNVVMValueOperation)40u)
 #define SLANG_NVVM_VALUE_OP_COS ((SlangNVVMValueOperation)41u)
-#define SLANG_NVVM_VALUE_OP_TRUNC ((SlangNVVMValueOperation)42u)
+/* Value 42 is retired; trunc uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_MIN ((SlangNVVMValueOperation)43u)
 #define SLANG_NVVM_VALUE_OP_MAX ((SlangNVVMValueOperation)44u)
 #define SLANG_NVVM_VALUE_OP_COUNT_BITS ((SlangNVVMValueOperation)45u)
@@ -169,10 +169,10 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_ASIN ((SlangNVVMValueOperation)51u)
 #define SLANG_NVVM_VALUE_OP_ATAN ((SlangNVVMValueOperation)52u)
 #define SLANG_NVVM_VALUE_OP_ATAN2 ((SlangNVVMValueOperation)53u)
-#define SLANG_NVVM_VALUE_OP_CEIL ((SlangNVVMValueOperation)54u)
+/* Value 54 is retired; ceil uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_EXP ((SlangNVVMValueOperation)55u)
 #define SLANG_NVVM_VALUE_OP_EXP2 ((SlangNVVMValueOperation)56u)
-#define SLANG_NVVM_VALUE_OP_FLOOR ((SlangNVVMValueOperation)57u)
+/* Value 57 is retired; floor uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_FMOD ((SlangNVVMValueOperation)58u)
 #define SLANG_NVVM_VALUE_OP_FRAC ((SlangNVVMValueOperation)59u)
 #define SLANG_NVVM_VALUE_OP_LOG ((SlangNVVMValueOperation)60u)

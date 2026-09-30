@@ -6293,9 +6293,12 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsDeviceLibraryFunctionSuppor
         !function->operands)
         return SLANG_OK;
     const UnownedStringSlice name(function->name, function->nameSize);
-    const auto type =
-        name == toSlice("__nv_roundf") ? NVVMSemantics::kFloat32 : NVVMSemantics::kFloat64;
-    *supported = (name == toSlice("__nv_roundf") || name == toSlice("__nv_round")) &&
+    const bool isFloat32 = name == toSlice("__nv_roundf") || name == toSlice("__nv_ceilf") ||
+                           name == toSlice("__nv_floorf") || name == toSlice("__nv_truncf");
+    const bool isFloat64 = name == toSlice("__nv_round") || name == toSlice("__nv_ceil") ||
+                           name == toSlice("__nv_floor") || name == toSlice("__nv_trunc");
+    const auto type = isFloat32 ? NVVMSemantics::kFloat32 : NVVMSemantics::kFloat64;
+    *supported = (isFloat32 || isFloat64) &&
                  NVVMSemantics::areSameType(function->resultType, type) &&
                  NVVMSemantics::areSameType(function->operands[0].type, type) &&
                  function->operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
