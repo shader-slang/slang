@@ -1503,10 +1503,10 @@ void SemanticsVisitor::diagnoseAmbiguousReference(
     LookupResult const& lookupResult)
 {
     getSink()->diagnose(Diagnostics::AmbiguousReference{
-        .name = getText(lookupResult.items[0].declRef.getName()),
+        .name = getText(lookupResult.getName()),
         .location = overloadedExpr->loc});
 
-    for (auto item : lookupResult.items)
+    for (auto item : lookupResult)
     {
         String declString = ASTPrinter::getDeclSignatureString(item, m_astBuilder);
         getSink()->diagnose(Diagnostics::OverloadCandidate{

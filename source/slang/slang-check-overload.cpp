@@ -3963,7 +3963,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // In all other cases, this is an error.
     if (auto overloadExpr = as<OverloadedExpr>(funcExpr))
     {
-        if (overloadExpr->lookupResult2.isValid())
+        if (overloadExpr->lookupResult2.isOverloaded())
         {
             diagnoseAmbiguousReference(funcExpr);
             return CreateErrorExpr(expr);
