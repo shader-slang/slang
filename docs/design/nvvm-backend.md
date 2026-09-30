@@ -48,8 +48,9 @@ each entry block; the backend no longer recognizes CUDA `threadIdx`/`blockIdx` g
 admit the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes), three
 void synchronization operations (`llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
 `llvm.nvvm.membar.gl`), and four scalar integer intrinsics (`llvm.ctpop`, `llvm.bitreverse`,
-`llvm.ctlz` and `llvm.cttz`). The provider resolves exact base names through LLVM's registry and
-validates the complete signature and dialect admission before module creation. Calls retain LLVM's
+`llvm.ctlz` and `llvm.cttz`), and scalar Float32/Float64 `llvm.sqrt`. The provider resolves exact
+base names through LLVM's registry and validates the complete signature and dialect admission before
+module creation. Calls retain LLVM's
 intrinsic attributes. Void calls have no result handle; emission adds an ordinary LLVM void return
 for the helper. This does not admit arbitrary LLVM snippets or arbitrary registry intrinsics.
 
@@ -74,6 +75,16 @@ zero and CUDA Half `hrint` ties to even. Numeric operations 42/54/57/64 are rese
 semantic tags, lowering-name entries and CUDA-text recognizers are removed. Shared promotion
 recipes remain for other math. FRAC59 independently retains its floor call followed by subtraction;
 retiring public floor does not remove that recipe or its library symbols.
+
+Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
+matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
+VALUE operands. Floating descriptors cannot claim INTEGER_CONSTANT metadata. Half uses canonical
+`__realCast<T>(sqrt(__realCast<float>(x)))` evaluation, and vector/matrix mappings use the scalar
+body. This path needs no libdevice load or query. Numeric operation 36, its semantic tag and CUDA-text
+recognizer are retired; LLVM sqrt serialization remains shared infrastructure. CUDA Half keeps its
+existing approximate Float32 square root before Half narrowing. That policy has a separate bounded
+oracle from NVVM's precise Float32 evaluation in the qualified default math mode. Observed
+agreement on those inputs does not make the policies equivalent.
 
 The integer primitive boundary admits signed/unsigned scalar widths 8, 16, 32 and 64. Core
 `countbits` converts the same-width population count to uint; its existing pre-switch conversion
@@ -149,11 +160,10 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 37. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 38. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including ceil/floor/trunc in version36. Existing guards reject
-these before decoding AST or IR;
-metadata inspection and speculative import fallback to source remain available. Source modules
+or retired numeric NVVM operations, including sqrt in version 37. Existing guards reject
+these before decoding AST or IR; metadata inspection and speculative import fallback to source remain available. Source modules
 that explicitly used retired semantic tags need named intrinsic bodies. Container format 2 and
 provider ABI46 are separate contracts. See the
 [module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).

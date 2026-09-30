@@ -80,9 +80,9 @@ Two types of versions are tracked:
 
 ### Current Prototype Boundary
 
-The prototype writes semantic module version 37 and accepts only version 37. Earlier versions
-contain incompatible numeric capability identities or retired NVVM integer-bit and rounding
-operations; version36 still admitted ceil/floor/trunc IDs 54/57/42. Recompile older user modules and
+The prototype writes semantic module version 38 and accepts only version 38. Earlier versions
+contain incompatible numeric capability identities or retired NVVM integer-bit and math
+operations; version 37 still admitted sqrt ID 36. Recompile older user modules and
 built-ins for every backend. Public APIs then use the current core bodies; modules that explicitly
 named retired semantic tags must migrate those source bodies. Metadata inspection remains available
 without loading AST or IR, and speculative binary imports can fall back to available source.

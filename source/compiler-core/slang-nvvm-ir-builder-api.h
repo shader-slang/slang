@@ -152,7 +152,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_SHIFT_LEFT ((SlangNVVMValueOperation)33u)
 #define SLANG_NVVM_VALUE_OP_SHIFT_RIGHT ((SlangNVVMValueOperation)34u)
 #define SLANG_NVVM_VALUE_OP_FLOAT_CONVERT ((SlangNVVMValueOperation)35u)
-#define SLANG_NVVM_VALUE_OP_SQRT ((SlangNVVMValueOperation)36u)
+/* Value 36 is retired; sqrt uses the named LLVM intrinsic. */
 /* Value 37 is retired; synchronization uses named LLVM intrinsics. */
 #define SLANG_NVVM_VALUE_OP_BIT_REINTERPRET ((SlangNVVMValueOperation)38u)
 #define SLANG_NVVM_VALUE_OP_SELECT ((SlangNVVMValueOperation)39u)

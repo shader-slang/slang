@@ -2257,11 +2257,11 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    // Version 37 retires the serialized NVVM ceil, floor and trunc semantic IDs. Earlier
-    // versions also permit retired integer-bit and round IDs. Recompile older modules to use
-    // the core module's named LLVM intrinsic and selected-libdevice calls.
-    const static UInt k_minSupportedModuleVersion = 37;
-    const static UInt k_maxSupportedModuleVersion = 37;
+    // Version 38 retires the serialized NVVM sqrt semantic ID. Earlier versions also permit
+    // retired integer-bit and rounding IDs. Recompile older modules to use the core module's
+    // named LLVM intrinsic and selected-libdevice calls.
+    const static UInt k_minSupportedModuleVersion = 38;
+    const static UInt k_maxSupportedModuleVersion = 38;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.

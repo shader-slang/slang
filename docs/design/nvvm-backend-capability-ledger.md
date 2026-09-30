@@ -48,8 +48,8 @@ Core execution helpers and varying-parameter legalization use named
 `llvm.nvvm.read.ptx.sreg.*` intrinsics for all twelve thread/block/grid coordinates.
 The named-intrinsic boundary admits zero-argument scalar i32 register reads, the three void
 barrier/fence operations described below, and scalar integer `llvm.ctpop`, `llvm.bitreverse`,
-`llvm.ctlz` and `llvm.cttz`. It does not admit arbitrary LLVM assembly. ABI 46 carries explicit
-ordinary `__intrinsic_asm` operands; pure provider queries validate LLVM registry signatures and
+`llvm.ctlz` and `llvm.cttz`, and scalar Float32/Float64 `llvm.sqrt`. It does not admit arbitrary LLVM
+assembly. ABI 46 carries explicit ordinary `__intrinsic_asm` operands; pure provider queries validate LLVM registry signatures and
 immediate-constant requirements before module creation. Actual emission separately validates value
 handles and rejects conflicting symbols without mutation. CUDA source and NVRTC retain CUDA target
 selection, including when an explicit `nvvm` capability is supplied.
@@ -74,7 +74,7 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 37 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 38 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
@@ -102,6 +102,21 @@ has 45 scalar/helper/vector/matrix observations, distinct operation/shape masks,
 The [integer-bit oracle checker](../../extras/test-generators/check-nvvm-directed-rounding-oracles.py)
 validates the frozen rationally generated constants without executing a compiler. Other scalar math
 and compound recognizers remain outside this migration.
+
+Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
+Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider
+admission; public vector/matrix operations map to scalar calls. Pure queries reject floating
+INTEGER_CONSTANT metadata, and typed emission preserves registry attributes and ownership checks.
+Sqrt-only programs make no library query or load. The [Half](../../tests/cuda/nvvm-sqrt-half.slang),
+[Float32](../../tests/cuda/nvvm-sqrt-32.slang) and [Float64](../../tests/cuda/nvvm-sqrt-64.slang)
+fixtures cover 64 live IEEE inputs, 15 scalar/helper/vector/matrix observations per lane, signed
+zeros, subnormal/normal boundaries, infinity, NaN classification, guards and completion. CUDA Half
+uses an independently bounded approximate-root oracle; NVVM uses exact Float32 evaluation followed
+by Half rounding. Distinct visible mode markers prevent accepting the wrong policy. All nine
+observed output buffers retain their pre-migration bytes; NaN payloads remain unpromised.
+The [standalone integer oracle](../../extras/test-generators/check-nvvm-sqrt-oracles.py) requires no
+compiler or ignored manifest. The [removed-tag test](../../tests/cuda/nvvm-sqrt-removed-tag.slang)
+checks the frontend diagnostic; preserved old modules separately qualify numeric-tag retirement.
 
 Core bit reinterpretation and Half-value conversions use canonical NVVM `BitCast`/`FloatCast`
 instructions. The [conversion API fixture](../../tests/cuda/nvvm-conversion-intrinsics.slang) checks

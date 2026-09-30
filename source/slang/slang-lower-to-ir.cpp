@@ -87,7 +87,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmSign", SLANG_NVVM_VALUE_OP_SIGN},
     {"nvvmSin", SLANG_NVVM_VALUE_OP_SIN},
     {"nvvmSinh", SLANG_NVVM_VALUE_OP_SINH},
-    {"nvvmSqrt", SLANG_NVVM_VALUE_OP_SQRT},
     {"nvvmTan", SLANG_NVVM_VALUE_OP_TAN},
     {"nvvmTanh", SLANG_NVVM_VALUE_OP_TANH},
     {"nvvmWaveMaskAllEqual", SLANG_NVVM_VALUE_OP_WAVE_MASK_ALL_EQUAL},

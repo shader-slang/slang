@@ -1327,7 +1327,8 @@ static SlangResult _emitFloatingBinary(
     }
 }
 
-static SlangResult _emitFloatingUnary(
+// Emits the remaining exact Float32 unary catalog operation after validating its operand.
+static SlangResult _emitFloat32Negate(
     SlangNVVMModuleHandle module,
     SlangNVVMValueOperation operation,
     SlangNVVMValueHandle value,
@@ -1339,28 +1340,14 @@ static SlangResult _emitFloatingUnary(
     ModuleState* state = _getModule(module);
     llvm::Value* llvmValue = _getValue(value);
     llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!outValue || !insertionBlock ||
-        (operation != SLANG_NVVM_VALUE_OP_NEGATE && operation != SLANG_NVVM_VALUE_OP_SQRT) ||
+    if (!outValue || !insertionBlock || operation != SLANG_NVVM_VALUE_OP_NEGATE ||
         !_isValueUsableAtInsertionPoint(state, insertionBlock, llvmValue) ||
         llvmValue->getType() != llvm::Type::getFloatTy(state->context))
     {
         return SLANG_E_INVALID_ARG;
     }
 
-    llvm::Value* result = nullptr;
-    if (operation == SLANG_NVVM_VALUE_OP_NEGATE)
-    {
-        result = state->builder.CreateFNeg(llvmValue);
-    }
-    else
-    {
-        llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(
-            state->module.get(),
-            llvm::Intrinsic::sqrt,
-            {llvmValue->getType()});
-        result = state->builder.CreateCall(intrinsic, {llvmValue});
-    }
-    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateFNeg(llvmValue));
     return SLANG_OK;
 }
 
@@ -3413,6 +3400,14 @@ static llvm::Type* _getSemanticLLVMType(
     llvm::LLVMContext& context,
     const SlangNVVMValueTypeDesc& type);
 
+// Classifies scalar Float32/Float64 values admitted by the named math paths. The LLVM registry
+// or selected device-library definition still owns the complete function signature.
+static bool _isScalarFloat32Or64Type(const SlangNVVMValueTypeDesc& type)
+{
+    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.laneCount == 1 &&
+           (type.bitWidth == 32 || type.bitWidth == 64);
+}
+
 // Resolves a borrowed signature through LLVM's registry without creating any module state.
 // Consider `llvm.ctlz` with (i32, i1): IIT matching derives the i32 overload and LLVM's ImmArg
 // attribute requires the second operand's constant guarantee. The same path handles other
@@ -3431,14 +3426,16 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
     auto id = llvm::Function::lookupIntrinsicID(name);
     if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::getBaseName(id) != name ||
         (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id) &&
-         !_isIntegerBitIntrinsic(id)))
+         !_isIntegerBitIntrinsic(id) && id != llvm::Intrinsic::sqrt))
         return llvm::Intrinsic::not_intrinsic;
 
+    const bool isSqrt = id == llvm::Intrinsic::sqrt;
     const auto& result = intrinsic.resultType;
     const bool isIntegerResult = (result.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                                   result.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
                                  result.laneCount == 1;
-    if ((_isIntegerBitIntrinsic(id) && !isIntegerResult) ||
+    if ((isSqrt && !_isScalarFloat32Or64Type(result)) ||
+        (_isIntegerBitIntrinsic(id) && !isIntegerResult) ||
         (_isExecutionRegisterIntrinsic(id) && (!isIntegerResult || result.bitWidth != 32)) ||
         (_isSynchronizationIntrinsic(id) &&
          !Slang::NVVMSemantics::areSameType(result, Slang::NVVMSemantics::kVoid)))
@@ -3451,7 +3448,14 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
     for (size_t i = 0; i < intrinsic.operandCount; ++i)
     {
         const auto& operand = intrinsic.operands[i];
-        if ((operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+        if (isSqrt)
+        {
+            if (operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
+                !_isScalarFloat32Or64Type(operand.type))
+                return llvm::Intrinsic::not_intrinsic;
+        }
+        else if (
+            (operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
              operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT) ||
             operand.type.laneCount != 1 ||
             (operand.type.kind != SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER &&
@@ -3542,14 +3546,6 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     return SLANG_OK;
 }
 
-// This pilot admits scalar Float32/Float64 ABI values. The selected definition, not this
-// classification, determines which complete function signatures are accepted.
-static bool _isAdmittedDeviceLibraryType(const SlangNVVMValueTypeDesc& type)
-{
-    return type.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && type.laneCount == 1 &&
-           (type.bitWidth == 32 || type.bitWidth == 64);
-}
-
 // The selected definition is the signature authority. The admitted names bound the rounding
 // family; no parallel name-to-signature mapping exists here. For example, __nv_roundf accepts
 // float(float) only because that is the definition present in the immutable selected bitcode.
@@ -3572,12 +3568,12 @@ static llvm::FunctionType* _resolveDeviceLibraryFunction(
     const auto attributes = function->getAttributes();
     if (attributes.getRetAttrs().hasAttributes())
         return nullptr;
-    if (!_isAdmittedDeviceLibraryType(desc.resultType))
+    if (!_isScalarFloat32Or64Type(desc.resultType))
         return nullptr;
     llvm::SmallVector<llvm::Type*, 3> parameters;
     for (size_t i = 0; i < desc.operandCount; ++i)
     {
-        if (!_isAdmittedDeviceLibraryType(desc.operands[i].type) ||
+        if (!_isScalarFloat32Or64Type(desc.operands[i].type) ||
             desc.operands[i].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
             attributes.getParamAttrs(unsigned(i)).hasAttributes())
             return nullptr;
@@ -3974,7 +3970,7 @@ static SlangResult _emitCatalogOperation(
     if (entry.operandCount && entry.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
     {
         if (entry.operandCount == 1)
-            return _emitFloatingUnary(module, entry.operation, operands[0], outValue);
+            return _emitFloat32Negate(module, entry.operation, operands[0], outValue);
         if (entry.resultType.kind == SLANG_NVVM_VALUE_TYPE_BOOL)
             return _emitFloatingCompare(
                 module,
@@ -4438,14 +4434,6 @@ static SlangResult _emitValueOperationFamily(
             llvm::Value* bits = state->builder.CreateBitCast(llvmOperands[0], int16Type);
             bits = state->builder.CreateAnd(bits, llvm::ConstantInt::get(int16Type, 0x7fff));
             result = state->builder.CreateBitCast(bits, resultType);
-        }
-        else if (operation.operation == SLANG_NVVM_VALUE_OP_SQRT)
-        {
-            llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(
-                state->module.get(),
-                llvm::Intrinsic::sqrt,
-                {resultType});
-            result = state->builder.CreateCall(intrinsic, {llvmOperands[0]});
         }
         else
         {

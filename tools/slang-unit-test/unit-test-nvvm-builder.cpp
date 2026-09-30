@@ -8950,7 +8950,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_NVVM_VALUE_OP_LOG2,
         SLANG_NVVM_VALUE_OP_LOG10,
         SLANG_NVVM_VALUE_OP_RSQRT,
-        SLANG_NVVM_VALUE_OP_SQRT,
         SLANG_NVVM_VALUE_OP_TAN,
     };
     const SlangNVVMValueOperation binaryMathOperations[] = {
@@ -9115,6 +9114,14 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
     }
+    const SlangNVVMNamedIntrinsicOperandDesc sqrtOperand = {
+        NVVMSemantics::kFloat64,
+        SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+    const SlangNVVMNamedIntrinsicDesc sqrtOperation =
+        {"llvm.sqrt", sizeof("llvm.sqrt") - 1, NVVMSemantics::kFloat64, &sqrtOperand, 1};
+    SLANG_CHECK_ABORT(builder.supportsNamedIntrinsic(sqrtOperation));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.emitNamedIntrinsic(module.module, sqrtOperation, &values[3], 1, result)));
     const SlangNVVMValueHandle binaryOperands[] = {values[3], values[3]};
     for (auto mathOperation : binaryMathOperations)
     {
@@ -11462,6 +11469,352 @@ SLANG_UNIT_TEST(nvvmIRBuilderFracRetainsFloorAndSubtract)
             SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), UnownedStringSlice(call)) == 1);
             SLANG_CHECK(
                 _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(subtract)) == 1);
+        }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNamedSqrtSignaturesArePure)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &builder;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("sqrt-query"), scope.module)));
+    ComPtr<ISlangBlob> before;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, before)));
+    const auto api = builder.getValueOperationsAPI();
+    for (const auto type : {NVVMSemantics::kFloat32, NVVMSemantics::kFloat64})
+    {
+        SlangNVVMNamedIntrinsicOperandDesc operands[] = {
+            {type, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE},
+            {type, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE}};
+        SlangNVVMNamedIntrinsicDesc desc =
+            {"llvm.sqrt", sizeof("llvm.sqrt") - 1, type, operands, 1};
+        SLANG_CHECK(builder.supportsNamedIntrinsic(desc));
+        for (size_t count : {size_t(0), size_t(2)})
+        {
+            desc.operandCount = count;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        }
+        desc.operandCount = 1;
+        operands[0].type.bitWidth = type.bitWidth == 32 ? 64 : 32;
+        SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        operands[0].type = type;
+        for (auto kind :
+             {SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT,
+              SlangNVVMNamedIntrinsicOperandKind(99)})
+        {
+            operands[0].kind = kind;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        }
+        operands[0].kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+        const SlangNVVMValueTypeDesc invalidTypes[] = {
+            NVVMSemantics::kFloat16,
+            NVVMSemantics::kSignedI32,
+            NVVMSemantics::kUnsignedI32,
+            NVVMSemantics::kBool,
+            NVVMSemantics::kVoid,
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 24, 1},
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, type.bitWidth, 0},
+            {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, type.bitWidth, 2},
+            {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 1},
+            {SlangNVVMValueTypeKind(99), type.bitWidth, 1}};
+        for (const auto invalid : invalidTypes)
+        {
+            desc.resultType = invalid;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+            operands[0].type = invalid;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+            desc.resultType = type;
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+            operands[0].type = type;
+        }
+        for (const char* name :
+             {"llvm.sqrt.f32", "llvm.sqrt.f64", "llvm.sqrt()", "llvm.sin", "llvm.missing"})
+        {
+            desc.name = name;
+            desc.nameSize = strlen(name);
+            SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        }
+        const char embeddedNull[] = "llvm.sqrt\0suffix";
+        desc.name = embeddedNull;
+        desc.nameSize = sizeof(embeddedNull) - 1;
+        SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        desc.name = "llvm.sqrt";
+        desc.nameSize = 0;
+        SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        desc.nameSize = sizeof("llvm.sqrt") - 1;
+        desc.name = nullptr;
+        SLANG_CHECK(!builder.supportsNamedIntrinsic(desc));
+        desc.name = "llvm.sqrt";
+        desc.operands = nullptr;
+        uint32_t supported = 77;
+        SLANG_CHECK(api->isNamedIntrinsicSupported(&desc, &supported) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK(supported == 0);
+    }
+    uint32_t supported = 77;
+    SLANG_CHECK(api->isNamedIntrinsicSupported(nullptr, &supported) == SLANG_E_INVALID_ARG);
+    SLANG_CHECK(supported == 0);
+    ComPtr<ISlangBlob> after;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, after)));
+    SLANG_CHECK(_getBlobText(before) == _getBlobText(after));
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderNamedSqrtPreservesTypedCallsAndOwnership)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const auto api = builder.getValueOperationsAPI();
+    for (const auto type : {NVVMSemantics::kFloat32, NVVMSemantics::kFloat64})
+    {
+        String control[2];
+        for (bool injectFailures : {false, true})
+        {
+            ScopedNVVMBuilderModule scope, foreign;
+            scope.builder = foreign.builder = &builder;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.createModule(toSlice("sqrt-ownership"), scope.module)));
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.createModule(toSlice("foreign"), foreign.module)));
+            SlangNVVMTypeHandle voidType = nullptr, types[3] = {}, foreignType = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFloatingPointType(scope.module, type.bitWidth, types[0])));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(
+                scope.module,
+                type.bitWidth == 32 ? 64 : 32,
+                types[1])));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 1, types[2])));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFloatingPointType(foreign.module, type.bitWidth, foreignType)));
+            SlangNVVMValueHandle foreignValue = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointConstant(
+                foreign.module,
+                foreignType,
+                type.bitWidth,
+                0,
+                foreignValue)));
+            SlangNVVMTypeHandle functionType = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionType(scope.module, voidType, types, 3, functionType)));
+            SlangNVVMValueHandle function = nullptr, otherFunction = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                scope.module,
+                functionType,
+                SLANG_NVVM_LINKAGE_EXTERNAL,
+                SLANG_NVVM_FUNCTION_FLAG_NONE,
+                toSlice("host"),
+                function)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                scope.module,
+                functionType,
+                SLANG_NVVM_LINKAGE_EXTERNAL,
+                SLANG_NVVM_FUNCTION_FLAG_NONE,
+                toSlice("other"),
+                otherFunction)));
+            SlangNVVMValueHandle parameters[3] = {}, otherParameter = nullptr;
+            for (Index i = 0; i < 3; ++i)
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionParameter(scope.module, function, i, parameters[i])));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionParameter(scope.module, otherFunction, 0, otherParameter)));
+            const SlangNVVMNamedIntrinsicOperandDesc operands[] = {
+                {type, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE},
+                {type, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE}};
+            SlangNVVMNamedIntrinsicDesc desc =
+                {"llvm.sqrt", sizeof("llvm.sqrt") - 1, type, operands, 1};
+            if (injectFailures)
+            {
+                SlangNVVMValueHandle rejected =
+                    reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                SLANG_CHECK(
+                    api->emitNamedIntrinsic(scope.module, &desc, parameters, 1, &rejected) ==
+                    SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+            }
+            SlangNVVMBlockHandle entry = nullptr, left = nullptr, right = nullptr, merge = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.createBlock(scope.module, function, toSlice("entry"), entry)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.createBlock(scope.module, function, toSlice("left"), left)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.createBlock(scope.module, function, toSlice("right"), right)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.createBlock(scope.module, function, toSlice("merge"), merge)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entry)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitConditionalBranch(scope.module, parameters[2], left, right)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, left)));
+            SlangNVVMValueHandle leftValue = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitNamedIntrinsic(scope.module, desc, parameters, 1, leftValue)));
+            SLANG_CHECK_ABORT(leftValue != nullptr);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(scope.module, merge)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, right)));
+            if (injectFailures)
+            {
+                for (auto invalid :
+                     {foreignValue,
+                      otherParameter,
+                      leftValue,
+                      parameters[1],
+                      SlangNVVMValueHandle(nullptr)})
+                {
+                    SlangNVVMValueHandle rejected =
+                        reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                    SLANG_CHECK(
+                        api->emitNamedIntrinsic(scope.module, &desc, &invalid, 1, &rejected) ==
+                        SLANG_E_INVALID_ARG);
+                    SLANG_CHECK(rejected == nullptr);
+                }
+                SlangNVVMValueHandle rejected =
+                    reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                SLANG_CHECK(
+                    api->emitNamedIntrinsic(scope.module, &desc, nullptr, 1, &rejected) ==
+                    SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+                SLANG_CHECK(
+                    api->emitNamedIntrinsic(scope.module, &desc, parameters, 0, &rejected) ==
+                    SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+                SLANG_CHECK(
+                    api->emitNamedIntrinsic(scope.module, &desc, parameters, 1, nullptr) ==
+                    SLANG_E_INVALID_ARG);
+                for (size_t count : {size_t(0), size_t(2)})
+                {
+                    desc.operandCount = count;
+                    SLANG_CHECK(
+                        api->emitNamedIntrinsic(
+                            scope.module,
+                            &desc,
+                            parameters,
+                            count,
+                            &rejected) == SLANG_E_NOT_AVAILABLE);
+                    SLANG_CHECK(rejected == nullptr);
+                }
+                desc.operandCount = 1;
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitBranch(scope.module, merge)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, merge)));
+            SlangNVVMValueHandle result = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitNamedIntrinsic(scope.module, desc, parameters, 1, result)));
+            SLANG_CHECK_ABORT(result != nullptr);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+            if (injectFailures)
+            {
+                SlangNVVMValueHandle rejected =
+                    reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                SLANG_CHECK(
+                    api->emitNamedIntrinsic(scope.module, &desc, parameters, 1, &rejected) ==
+                    SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+            }
+            Index formatIndex = 0;
+            for (auto format :
+                 {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                  SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+            {
+                ComPtr<ISlangBlob> assembly;
+                String diagnostics;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.serializeModule(scope.module, format, assembly, diagnostics)));
+                SLANG_CHECK(diagnostics.getLength() == 0);
+                const String text = _getBlobText(assembly);
+                const char* call = type.bitWidth == 32 ? "call float @llvm.sqrt.f32(float"
+                                                       : "call double @llvm.sqrt.f64(double";
+                const char* declaration = type.bitWidth == 32
+                                              ? "declare float @llvm.sqrt.f32(float)"
+                                              : "declare double @llvm.sqrt.f64(double)";
+                SLANG_CHECK(
+                    _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(call)) == 2);
+                SLANG_CHECK(
+                    _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(declaration)) ==
+                    1);
+                SLANG_CHECK(!text.contains("__nv_"));
+                if (format == SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY)
+                    for (const char* attribute :
+                         {"nofree", "nosync", "nounwind", "readnone", "speculatable", "willreturn"})
+                        SLANG_CHECK(text.contains(attribute));
+                if (injectFailures)
+                {
+                    SLANG_CHECK(text == control[formatIndex]);
+                }
+                else
+                {
+                    control[formatIndex] = text;
+                }
+                ++formatIndex;
+            }
+        }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderReservedSqrtOperationRejectsWithoutMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    for (const auto type :
+         {NVVMSemantics::kFloat16, NVVMSemantics::kFloat32, NVVMSemantics::kFloat64})
+    {
+        String control;
+        for (bool injectFailures : {false, true})
+        {
+            ScopedNVVMBuilderModule scope;
+            scope.builder = &builder;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.createModule(toSlice("retired-sqrt"), scope.module)));
+            SlangNVVMTypeHandle valueType = nullptr, functionType = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFloatingPointType(scope.module, type.bitWidth, valueType)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionType(scope.module, valueType, &valueType, 1, functionType)));
+            SlangNVVMValueHandle function = nullptr, value = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                scope.module,
+                functionType,
+                SLANG_NVVM_LINKAGE_EXTERNAL,
+                SLANG_NVVM_FUNCTION_FLAG_NONE,
+                toSlice("identity"),
+                function)));
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, value)));
+            SlangNVVMBlockHandle block = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.createBlock(scope.module, function, toSlice("entry"), block)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+            if (injectFailures)
+            {
+                // Keep the raw historical identity here: no public operation name remains.
+                const SlangNVVMValueOperationDesc desc =
+                    {SlangNVVMValueOperation(36), type, &type, 1};
+                SLANG_CHECK(!builder.supportsValueOperation(desc));
+                SlangNVVMValueHandle rejected =
+                    reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                SLANG_CHECK(
+                    builder.getValueOperationsAPI()
+                        ->emitOperation(scope.module, &desc, &value, 1, &rejected) ==
+                    SLANG_E_INVALID_ARG);
+                SLANG_CHECK(rejected == nullptr);
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, value)));
+            ComPtr<ISlangBlob> assembly;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+                scope.module,
+                SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                assembly)));
+            const String text = _getBlobText(assembly);
+            SLANG_CHECK(!text.contains("@llvm.sqrt"));
+            if (injectFailures)
+            {
+                SLANG_CHECK(text == control);
+            }
+            else
+            {
+                control = text;
+            }
         }
     }
 }

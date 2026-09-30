@@ -12257,3 +12257,189 @@ SLANG_UNIT_TEST(nvvmSlangLegacyDirectedRoundingAssemblyRejectsBeforeOutputCreati
             SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
         }
 }
+
+SLANG_UNIT_TEST(nvvmSlangPublicSqrtUsesNamedIntrinsic)
+{
+    const char* types[] = {"half", "float", "double"};
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+        for (bool rejectNamed : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            gFakeNVVMBuilder.rejectNamedIntrinsics = rejectNamed;
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            const char* type = types[variant];
+            StringBuilder source;
+            source << "[noinline] " << type << " sqrtHelper(" << type << " x) { return sqrt(x); } "
+                   << "[CUDAKernel] void computeMain("
+                   << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { ";
+            for (Index i = 0; i < 4; ++i)
+            {
+                source << type << " x" << i << " = ";
+                if (variant == 0)
+                    source << "bit_cast<half>(uint16_t(words[" << i << "])); ";
+                else if (variant == 1)
+                    source << "asfloat(words[" << i << "]); ";
+                else
+                    source << "asdouble(words[" << 2 * i << "], words[" << 2 * i + 1 << "]); ";
+            }
+            source << type << " scalar = sqrt(x0); " << type << " helper = sqrtHelper(x1); ";
+            for (Index size = 2; size <= 4; ++size)
+            {
+                source << "vector<" << type << ", " << size << "> v" << size << " = sqrt(vector<"
+                       << type << ", " << size << ">(";
+                for (Index i = 0; i < size; ++i)
+                    source << (i ? ", " : "") << "x" << i;
+                source << ")); ";
+            }
+            source << "matrix<" << type << ", 2, 2> m = sqrt(matrix<" << type
+                   << ", 2, 2>(x0, x1, x2, x3)); ";
+            const char* values[] = {
+                "scalar",
+                "helper",
+                "v2.x",
+                "v2.y",
+                "v3.x",
+                "v3.y",
+                "v3.z",
+                "v4.x",
+                "v4.y",
+                "v4.z",
+                "v4.w",
+                "m[0][0]",
+                "m[0][1]",
+                "m[1][0]",
+                "m[1][1]"};
+            for (Index i = 0; i < SLANG_COUNT_OF(values); ++i)
+            {
+                if (variant == 2)
+                    source << "{ uint low, high; asuint(" << values[i] << ", low, high); words["
+                           << 8 + 2 * i << "] = low; words[" << 9 + 2 * i << "] = high; } ";
+                else
+                    source << "words[" << 4 + i
+                           << "] = " << (variant == 0 ? "uint(bit_cast<uint16_t>(" : "asuint(")
+                           << values[i] << (variant == 0 ? ")); " : "); ");
+            }
+            source << "}";
+            ComPtr<slang::IBlob> code, diagnostics;
+            const auto result =
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+            SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
+            if (rejectNamed)
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(!code);
+                SLANG_CHECK(_getBlobText(diagnostics).contains("E52018"));
+                SLANG_CHECK(_getBlobText(diagnostics).contains("llvm.sqrt"));
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+                continue;
+            }
+            if (SLANG_FAILED(result))
+            {
+                StringBuilder detail;
+                detail << type << ": " << gFakeNVVMBuilder.pointerOffsetBaseValueRefs.getCount()
+                       << "/" << SLANG_COUNT_OF(gFakeNVVMBuilder.pointerOffsetStorage)
+                       << " pointer offsets, " << gFakeNVVMBuilder.localStorageValueTypes.getCount()
+                       << "/" << SLANG_COUNT_OF(gFakeNVVMBuilder.localStorage) << " local slots, "
+                       << gFakeNVVMBuilder.loadPointerValueRefs.getCount() << "/"
+                       << SLANG_COUNT_OF(gFakeNVVMBuilder.loadStorage) << " loads recorded\n"
+                       << _getBlobText(diagnostics);
+                getTestReporter()->message(TestMessageType::Info, detail.getBuffer());
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK(code != nullptr);
+            // The kernel's word accesses use pointer offsets; ordinary temporary locals have
+            // separate storage handles. Count the observable input/output words, not those locals.
+            Index wordLoads = 0;
+            Index wordStores = 0;
+            for (const auto& pointer : gFakeNVVMBuilder.loadPointerValueRefs)
+                wordLoads += pointer.kind == FakeNVVMBuilderValueKind::PointerOffset;
+            for (const auto& pointer : gFakeNVVMBuilder.storePointerValueRefs)
+                wordStores += pointer.kind == FakeNVVMBuilderValueKind::PointerOffset;
+            SLANG_CHECK(wordLoads == (variant == 2 ? 8 : 4));
+            SLANG_CHECK(wordStores == (variant == 2 ? 30 : 15));
+            SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.getCount() > 0);
+            for (const auto& name : gFakeNVVMBuilder.namedIntrinsicNames)
+                SLANG_CHECK(name == "llvm.sqrt");
+            SLANG_CHECK(_countFakeNVVMNoInlineHelperCalls("sqrtHelper", 1) == 1);
+            for (Index i = 0; i < gFakeNVVMBuilder.intrinsicOperations.getCount(); ++i)
+            {
+                SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[i] == UINT32_MAX);
+                SLANG_CHECK(NVVMSemantics::areSameType(
+                    gFakeNVVMBuilder.intrinsicResultTypes[i],
+                    variant == 2 ? NVVMSemantics::kFloat64 : NVVMSemantics::kFloat32));
+                SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[i] == 1);
+                const Index offset = gFakeNVVMBuilder.intrinsicArgumentOffsets[i];
+                const auto& operand = gFakeNVVMBuilder.intrinsicArgumentValueRefs[offset];
+                SLANG_CHECK(operand.kind == FakeNVVMBuilderValueKind::Parameter);
+                SLANG_CHECK(
+                    operand.functionIndex ==
+                    gFakeNVVMBuilder
+                        .blockFunctionIndices[gFakeNVVMBuilder.intrinsicCallerBlockIndices[i]]);
+            }
+            bool widensHalf = false;
+            bool narrowsHalf = false;
+            for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+            {
+                SLANG_CHECK(operation.key.operation != 36);
+                if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT ||
+                    operation.operandCount != 1)
+                    continue;
+                widensHalf |=
+                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat32) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat16);
+                narrowsHalf |=
+                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat32);
+            }
+            SLANG_CHECK(widensHalf == (variant == 0));
+            SLANG_CHECK(narrowsHalf == (variant == 0));
+        }
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacySqrtAssemblyRejectsBeforeOutputCreation)
+{
+    // Fresh tagged source is diagnosed as an unknown tag before NVVM planning. Immutable old
+    // modules separately prove retirement of numeric 36; this unit owns legacy untagged text.
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "words[1] = uint(bit_cast<uint16_t>(oldSqrt(bit_cast<half>(uint16_t(words[0])))));",
+        "words[1] = asuint(oldSqrt(asfloat(words[0])));",
+        "uint low, high; asuint(oldSqrt(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << types[variant] << " oldSqrt(" << types[variant] << " x) { "
+               << "__intrinsic_asm \"$P_sqrt($0)\"; } "
+               << "[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << bodies[variant] << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017") || !text.contains("$P_sqrt($0)"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(!code);
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains("$P_sqrt($0)"));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}

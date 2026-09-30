@@ -15492,8 +15492,16 @@ T sqrt(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmSqrt) "$P_sqrt($0)";
-    case cuda: __intrinsic_asm(nvvmSqrt) "$P_sqrt($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM sqrt requires half, float, or double.");
+        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
+        if (T is half)
+            return __realCast<T>(sqrt(__realCast<float>(x)));
+        else
+            __intrinsic_asm "llvm.sqrt", x;
+    case cpp: __intrinsic_asm "$P_sqrt($0)";
+    case cuda: __intrinsic_asm "$P_sqrt($0)";
     case glsl: __intrinsic_asm "sqrt";
     case hlsl: __intrinsic_asm "sqrt";
     case metal: __intrinsic_asm "sqrt";

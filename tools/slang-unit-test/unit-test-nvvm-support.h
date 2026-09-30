@@ -933,7 +933,9 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
     FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[32];
     FakeNVVMBuilderCallStorage callStorage[32];
-    FakeNVVMBuilderPointerOffsetStorage pointerOffsetStorage[16];
+    // Aggregate tests keep scalar/vector/matrix results live, including split Float64 words.
+    // Reserve enough stable handles for those addresses without changing pointer validation.
+    FakeNVVMBuilderPointerOffsetStorage pointerOffsetStorage[64];
     FakeNVVMBuilderByteOffsetPointerStorage byteOffsetPointerStorage[16];
     FakeNVVMBuilderSequentialElementPointerStorage sequentialElementPointerStorage[16];
     FakeNVVMBuilderStructFieldPointerStorage structFieldPointerStorage[16];
@@ -943,7 +945,8 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderVectorConstructStorage vectorConstructStorage[16];
     FakeNVVMBuilderVectorElementStorage vectorElementStorage[64];
     FakeNVVMBuilderGlobalStorage globalStorage[4];
-    FakeNVVMBuilderLocalStorage localStorage[32];
+    // Split Float64 output words and aggregate temporaries coexist in the math fixtures.
+    FakeNVVMBuilderLocalStorage localStorage[64];
     FakeNVVMBuilderBitCastStorage bitCastStorage[32];
     FakeNVVMBuilderPointerAddressSpaceCastStorage pointerAddressSpaceCastStorage[32];
 
@@ -6141,6 +6144,16 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
     if (!intrinsic->name || gFakeNVVMBuilder.rejectNamedIntrinsics)
         return SLANG_OK;
     const UnownedStringSlice name(intrinsic->name, intrinsic->nameSize);
+    if (name == toSlice("llvm.sqrt"))
+    {
+        const auto& result = intrinsic->resultType;
+        *outSupported = result.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                        result.laneCount == 1 && (result.bitWidth == 32 || result.bitWidth == 64) &&
+                        intrinsic->operandCount == 1 &&
+                        intrinsic->operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+                        NVVMSemantics::areSameType(intrinsic->operands[0].type, result);
+        return SLANG_OK;
+    }
     const bool isScan = name == toSlice("llvm.ctlz") || name == toSlice("llvm.cttz");
     if (isScan || name == toSlice("llvm.ctpop") || name == toSlice("llvm.bitreverse"))
     {

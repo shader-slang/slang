@@ -223,6 +223,25 @@ operation, completion words and end guards must match exactly. Expected constant
 arithmetic and are checked independently by integer IEEE bit operations. Preserve signed zeros and
 infinities exactly; NaNs promise classification only. Keep the separate round fixtures unchanged.
 
+### Square-root signature and numerical contracts
+
+```bash
+python3 extras/test-generators/check-nvvm-sqrt-oracles.py --check
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-sqrt-
+```
+
+Require nine numerical mode cells and the removed-tag diagnostic, with no skips. Each width has
+64 live IEEE inputs and 15 scalar/noinline helper/vector2/3/4/matrix2x2 observations per lane.
+Float32/64 require 130 output words; Half requires 195, including an explicit policy marker and
+raw scalar bits. NVVM Half uses exact Float32 sqrt followed by Half rounding; CUDA Half retains
+its approximate Float32-root bound before narrowing. The independent checker computes both with
+integer arithmetic and integer square root. Signed zeros/infinities compare bits; NaNs promise
+classification. Preserve every actual buffer before migration and compare all nine buffers after
+migration. Any observed change requires review, even if a CUDA approximation interval permits it;
+never regenerate expectations from compiler or vendor output. Keep round and directed-rounding
+fixtures unchanged. These focused contracts do not change frozen corpus membership.
+
 ## Report environment
 
 Execution and comparison use the Python standard library. Shareable SVG/PNG charts use Matplotlib:
