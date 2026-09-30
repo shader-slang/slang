@@ -73,8 +73,21 @@ NVVM branches. Half preserves its existing evaluation through canonical casts, f
 Existing vector and matrix mappings call the scalar bodies. Round retains NVVM ties away from
 zero and CUDA Half `hrint` ties to even. Numeric operations 42/54/57/64 are reserved, and their
 semantic tags, lowering-name entries and CUDA-text recognizers are removed. Shared promotion
-recipes remain for other math. FRAC59 independently retains its floor call followed by subtraction;
-retiring public floor does not remove that recipe or its library symbols.
+recipes remain for other math.
+
+Public `frac` expresses `x - floor(x)` in its NVVM core body. The checked source produces the
+existing named floor call and ordinary subtraction; no provider-specific frac operation remains.
+Half uses `__realCast<T>(frac(__realCast<float>(x)))`, preserving the whole Float32 expression
+before one final narrowing. Vector/matrix `frac` and scalar/vector `fract` map to this scalar body.
+Operation 59 is reserved, and its tag, lowering-name entry and CUDA-text recognizer are retired.
+Named-library admission remains round/ceil/floor/trunc; frac adds no symbol or provider ABI.
+
+For finite Half inputs, the exact residual `x - floor(x)` is an integer multiple of 2^-24 in
+[0, 1), hence exactly representable in Float32. The NVVM promoted expression and CUDA's direct
+Half subtraction therefore have identical finite RN-even results. The rounded result may equal
+one for tiny negative inputs; it must not be clamped. Both signed-zero inputs and finite integers
+produce positive zero. Either infinity and NaN inputs produce NaN; payload and sign are not
+promised. These numerical contracts concern the qualified default math mode.
 
 Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
 matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
@@ -160,13 +173,13 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 38. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 39. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including sqrt in version 37. Existing guards reject
-these before decoding AST or IR; metadata inspection and speculative import fallback to source remain available. Source modules
-that explicitly used retired semantic tags need named intrinsic bodies. Container format 2 and
-provider ABI46 are separate contracts. See the
-[module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
+or retired numeric NVVM operations, including frac in version 38. Existing guards reject these
+before decoding AST or IR; metadata inspection and speculative import fallback to source remain
+available. Source modules that explicitly used retired semantic tags need current core calls or
+supported explicit intrinsic bodies. Container format 2 and provider ABI46 are separate contracts.
+See the [module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
 
 ## Preflight is a contract, not a trial emission
 

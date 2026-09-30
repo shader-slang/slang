@@ -74,7 +74,7 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 38 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 39 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
@@ -93,7 +93,7 @@ checks the source boundary. Current acceptance and compiler identity remain owne
 
 Public `ceil`, `floor` and `trunc` use the same named-library boundary and canonical Half promotion.
 Their six Float32/64 names come from selected definitions; IDs 42/54/57 and their tag/text paths are
-retired. FRAC59 retains its independent floor-call/subtract recipe. The combined
+retired. The combined
 [Float32](../../tests/cuda/nvvm-directed-rounding-32.slang),
 [Float64](../../tests/cuda/nvvm-directed-rounding-64.slang) and
 [Half](../../tests/cuda/nvvm-directed-rounding-half.slang) fixtures check 64 live IEEE inputs each,
@@ -102,6 +102,24 @@ has 45 scalar/helper/vector/matrix observations, distinct operation/shape masks,
 The [integer-bit oracle checker](../../extras/test-generators/check-nvvm-directed-rounding-oracles.py)
 validates the frozen rationally generated constants without executing a compiler. Other scalar math
 and compound recognizers remain outside this migration.
+
+Public `frac` uses an explicit NVVM `x - floor(x)` core body; `fract` forwards to it. Named selected
+floor calls, ordinary subtraction and canonical casts replace numeric 59, its tag and text path.
+Half evaluates the whole expression in Float32 before narrowing once. Every finite Half residual
+is exactly Float32, proving finite RN-even equivalence with CUDA's direct Half expression. Tiny
+negative inputs can round to one; finite integers and either signed zero return positive zero.
+The [Half](../../tests/cuda/nvvm-frac-half.slang), [Float32](../../tests/cuda/nvvm-frac-32.slang) and
+[Float64](../../tests/cuda/nvvm-frac-64.slang) fixtures have 64 live IEEE inputs per width and 26
+observations per lane: scalar/noinline/vector2/3/4/matrix2x2 `frac`, plus scalar/noinline/vector2/3/4
+`fract`. There is no matrix `fract` overload. Eleven shape-error bits, both scalar raw results,
+per-lane completion and endpoint guards occupy 386 words per fixture. Finite results compare exact
+bits; infinity and NaN inputs require NaN classification. All three modes use one mathematical
+oracle, with no target-policy marker. The [standalone integer checker](../../extras/test-generators/check-nvvm-frac-oracles.py)
+recomputes the independent rational expectations and validates the fixture/output contract without
+compiler execution or ignored manifests. The [removed-tag test](../../tests/cuda/nvvm-frac-removed-tag.slang)
+checks the frontend boundary. Real-provider tests retain the named-floor/ordered-subtract contract
+in both serializers and reject reserved 59 without mutation; emitter tests verify the public
+composition and Half cast ordering. Current acceptance and exact compiler identity are owned by STATUS.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

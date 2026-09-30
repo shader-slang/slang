@@ -3458,7 +3458,6 @@ static const NVVMGenericAsmOperationSpelling kNVVMGenericAsmOperationSpellings[]
     {"$P_exp2($0)", SLANG_NVVM_VALUE_OP_EXP2, 1},
     {"$P_fma($0, $1, $2)", SLANG_NVVM_VALUE_OP_FMA, 3},
     {"$P_fmod($0, $1)", SLANG_NVVM_VALUE_OP_FMOD, 2},
-    {"$P_frac($0)", SLANG_NVVM_VALUE_OP_FRAC, 1},
     {"$P_isnan($0)", SLANG_NVVM_VALUE_OP_IS_NAN, 1},
     {"$P_log($0)", SLANG_NVVM_VALUE_OP_LOG, 1},
     {"$P_log2($0)", SLANG_NVVM_VALUE_OP_LOG2, 1},

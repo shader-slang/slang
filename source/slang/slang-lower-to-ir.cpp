@@ -76,7 +76,6 @@ static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
     {"nvvmExp2", SLANG_NVVM_VALUE_OP_EXP2},
     {"nvvmFma", SLANG_NVVM_VALUE_OP_FMA},
     {"nvvmFmod", SLANG_NVVM_VALUE_OP_FMOD},
-    {"nvvmFrac", SLANG_NVVM_VALUE_OP_FRAC},
     {"nvvmLog", SLANG_NVVM_VALUE_OP_LOG},
     {"nvvmLog2", SLANG_NVVM_VALUE_OP_LOG2},
     {"nvvmLog10", SLANG_NVVM_VALUE_OP_LOG10},

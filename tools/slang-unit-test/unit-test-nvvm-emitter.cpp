@@ -12443,3 +12443,181 @@ SLANG_UNIT_TEST(nvvmSlangLegacySqrtAssemblyRejectsBeforeOutputCreation)
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
 }
+
+SLANG_UNIT_TEST(nvvmSlangLegacyFracAssemblyRejectsBeforeOutputCreation)
+{
+    // Fresh tagged source is diagnosed as an unknown tag before NVVM planning. Immutable old
+    // modules separately prove retirement of numeric 59; this unit owns legacy untagged text.
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "words[1] = uint(bit_cast<uint16_t>(oldFrac(bit_cast<half>(uint16_t(words[0])))));",
+        "words[1] = asuint(oldFrac(asfloat(words[0])));",
+        "uint low, high; asuint(oldFrac(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << types[variant] << " oldFrac(" << types[variant] << " x) { "
+               << "__intrinsic_asm \"$P_frac($0)\"; } "
+               << "[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << bodies[variant] << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017") || !text.contains("$P_frac($0)"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(!code);
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains("$P_frac($0)"));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangPublicFracUsesNamedFloorAndSubtract)
+{
+#if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "half value = bit_cast<half>(uint16_t(words[0])); "
+        "words[1] = uint(bit_cast<uint16_t>(selected(value)));",
+        "words[1] = asuint(selected(asfloat(words[0])));",
+        "uint low, high; asuint(selected(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (const char* operationName : {"frac", "fract"})
+        for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+        {
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            TempDirectory toolkit;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_configureFakeDirectNVVMLibdevice(session, toolkit)));
+            StringBuilder source;
+            source << "[noinline] " << types[variant] << " selected(" << types[variant]
+                   << " x) { return " << operationName << "(x); } "
+                   << "[CUDAKernel] void computeMain("
+                   << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+                   << bodies[variant] << " }";
+            ComPtr<slang::IBlob> code, diagnostics;
+            const auto result =
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+            if (SLANG_FAILED(result))
+            {
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    _getBlobText(diagnostics).getBuffer());
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK(code != nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryDestroyCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount > 0);
+            SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
+            SLANG_CHECK(_countFakeNVVMNoInlineHelperCalls("selected", 1) == 1);
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 1);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.namedIntrinsicNames[0] ==
+                (variant == 2 ? "__nv_floor" : "__nv_floorf"));
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[0] == UINT32_MAX);
+            const auto type = variant == 2 ? NVVMSemantics::kFloat64 : NVVMSemantics::kFloat32;
+            SLANG_CHECK(NVVMSemantics::areSameType(gFakeNVVMBuilder.intrinsicResultTypes[0], type));
+            SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[0] == 1);
+
+            // Consider selected(x), whose body calls frac(x) or the fract alias. The floor
+            // helper receives the same value that is the left operand of subtraction. Follow
+            // these direct call operands so swapping x and floor(x) cannot satisfy this test.
+            const Index floorFunction =
+                gFakeNVVMBuilder
+                    .blockFunctionIndices[gFakeNVVMBuilder.intrinsicCallerBlockIndices[0]];
+            Index floorCall = -1;
+            for (Index i = 0; i < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount(); ++i)
+            {
+                if (gFakeNVVMBuilder.callCalleeFunctionIndices[i] == floorFunction)
+                {
+                    SLANG_CHECK(floorCall == -1);
+                    floorCall = i;
+                }
+            }
+            SLANG_CHECK_ABORT(floorCall >= 0);
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.callArgumentCounts[floorCall] == 1);
+            const auto original =
+                gFakeNVVMBuilder
+                    .callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[floorCall]];
+            const auto subtraction = _findFakeNVVMScalarBinary(
+                SLANG_NVVM_VALUE_OP_SUBTRACT,
+                original,
+                {FakeNVVMBuilderValueKind::Call, floorCall});
+            const auto& subtract = gFakeNVVMBuilder.scalarOperations[subtraction.index];
+            SLANG_CHECK(NVVMSemantics::areSameType(subtract.resultType, type));
+            SLANG_CHECK(NVVMSemantics::areSameType(subtract.operandTypes[0], type));
+            SLANG_CHECK(NVVMSemantics::areSameType(subtract.operandTypes[1], type));
+            SLANG_CHECK(
+                subtract.callerBlockIndex == gFakeNVVMBuilder.callCallerBlockIndices[floorCall]);
+            const Index compositionFunction =
+                gFakeNVVMBuilder.blockFunctionIndices[subtract.callerBlockIndex];
+            Index widen = -1, narrow = -1;
+            for (Index i = 0; i < gFakeNVVMBuilder.scalarOperations.getCount(); ++i)
+            {
+                const auto& operation = gFakeNVVMBuilder.scalarOperations[i];
+                SLANG_CHECK(operation.key.operation != 59);
+                if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT)
+                    continue;
+                SLANG_CHECK_ABORT(operation.operandCount == 1);
+                if (NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat32) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat16))
+                {
+                    SLANG_CHECK(widen == -1);
+                    widen = i;
+                }
+                if (NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16) &&
+                    NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat32))
+                {
+                    SLANG_CHECK(narrow == -1);
+                    narrow = i;
+                }
+            }
+            if (variant == 0)
+            {
+                SLANG_CHECK_ABORT(widen >= 0 && narrow >= 0);
+                // Half narrows the result of the entire Float32 composition, never the floor
+                // result before subtraction. Its call argument is the exact widening of x.
+                const auto& conversion = gFakeNVVMBuilder.scalarOperations[narrow];
+                const auto call = conversion.operands[0];
+                SLANG_CHECK_ABORT(call.kind == FakeNVVMBuilderValueKind::Call);
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.callCalleeFunctionIndices[call.index] == compositionFunction);
+                SLANG_CHECK_ABORT(gFakeNVVMBuilder.callArgumentCounts[call.index] == 1);
+                const auto argument =
+                    gFakeNVVMBuilder
+                        .callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[call.index]];
+                SLANG_CHECK(argument.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                SLANG_CHECK(argument.index == widen);
+                SLANG_CHECK(
+                    conversion.callerBlockIndex ==
+                    gFakeNVVMBuilder.callCallerBlockIndices[call.index]);
+            }
+            else
+            {
+                SLANG_CHECK(widen == -1 && narrow == -1);
+            }
+        }
+#else
+    SLANG_IGNORE_TEST;
+#endif
+}

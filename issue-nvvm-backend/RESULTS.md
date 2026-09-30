@@ -242,6 +242,31 @@ migration. Any observed change requires review, even if a CUDA approximation int
 never regenerate expectations from compiler or vendor output. Keep round and directed-rounding
 fixtures unchanged. These focused contracts do not change frozen corpus membership.
 
+### Fraction composition and numerical contracts
+
+```bash
+python3 extras/test-generators/check-nvvm-frac-oracles.py --check
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-frac-
+```
+
+Require nine numerical mode cells and one removed-tag diagnostic, with no skips. Each fixture
+uses 64 distinct live IEEE inputs and 26 observations per lane: scalar/noinline/vector2/3/4/matrix2x2
+`frac`, plus scalar/noinline/vector2/3/4 `fract`. The public alias has no matrix overload. The exact
+integer/rational reference rounds `x - floor(x)` to the result width; every finite Half residual is
+exactly Float32, so both existing Half evaluation paths have the same finite result. Tiny negative
+inputs may round to positive one. Finite results, including zero sign, compare exact bits; either
+infinity and NaN inputs require NaN classification.
+
+Each output has 386 uint words: leading guard, 64 records of
+`errors, fracLow, fracHigh, fractLow, fractHigh, 59000 + lane`, and trailing guard. Require all eleven
+shape-error bits clear, every completion word, exact output size and unchanged guards. Half/Float32
+high words are zero; Float64 raw values use low/high pairs. Preserve all nine actual buffers before
+migration and compare every byte afterward, including observable NaN payloads. Any observed change
+requires review even when the mathematical contract promises only NaN classification. Never derive
+expected values from compiler or vendor output. Keep the existing rounding/sqrt fixtures unchanged;
+these focused contracts do not change frozen corpus membership.
+
 ## Report environment
 
 Execution and comparison use the Python standard library. Shareable SVG/PNG charts use Matplotlib:

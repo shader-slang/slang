@@ -912,8 +912,8 @@ inline bool resolveValueOperationFamily(
         desc.operation == SLANG_NVVM_VALUE_OP_ABS || desc.operation == SLANG_NVVM_VALUE_OP_ACOS ||
         desc.operation == SLANG_NVVM_VALUE_OP_ASIN || desc.operation == SLANG_NVVM_VALUE_OP_ATAN ||
         desc.operation == SLANG_NVVM_VALUE_OP_EXP || desc.operation == SLANG_NVVM_VALUE_OP_EXP2 ||
-        desc.operation == SLANG_NVVM_VALUE_OP_FRAC || desc.operation == SLANG_NVVM_VALUE_OP_LOG ||
-        desc.operation == SLANG_NVVM_VALUE_OP_LOG2 || desc.operation == SLANG_NVVM_VALUE_OP_LOG10 ||
+        desc.operation == SLANG_NVVM_VALUE_OP_LOG || desc.operation == SLANG_NVVM_VALUE_OP_LOG2 ||
+        desc.operation == SLANG_NVVM_VALUE_OP_LOG10 ||
         desc.operation == SLANG_NVVM_VALUE_OP_RSQRT || desc.operation == SLANG_NVVM_VALUE_OP_SINH ||
         desc.operation == SLANG_NVVM_VALUE_OP_COSH || desc.operation == SLANG_NVVM_VALUE_OP_TANH ||
         desc.operation == SLANG_NVVM_VALUE_OP_TAN;

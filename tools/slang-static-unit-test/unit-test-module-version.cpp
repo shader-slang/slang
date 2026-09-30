@@ -297,9 +297,9 @@ SLANG_UNIT_TEST(serializedModuleVersionValidation)
         SLANG_CHECK(getDiagnosticText(diagnostics).getLength() == 0);
     }
 
-    // Versions 31-33 predate the NVVM capability identities, and versions 34-37 permit
+    // Versions 31-33 predate the NVVM capability identities, and versions 34-38 permit
     // retired NVVM semantic IDs. Reject these bytes before decoding their AST or IR.
-    const UInt64 historicalVersions[] = {31, 32, 33, 34, 35, 36, 37};
+    const UInt64 historicalVersions[] = {31, 32, 33, 34, 35, 36, 37, 38};
     for (UInt64 version : historicalVersions)
     {
         List<uint8_t> patched = container;
@@ -499,7 +499,7 @@ SLANG_UNIT_TEST(serializedModuleVersionLibraryReference)
     }
 
     const UInt64 unsupportedVersions[] =
-        {31, 32, 33, 34, 35, 36, 37, IRModule::k_maxSupportedModuleVersion + 1};
+        {31, 32, 33, 34, 35, 36, 37, 38, IRModule::k_maxSupportedModuleVersion + 1};
     for (UInt64 version : unsupportedVersions)
     {
         List<uint8_t> patched = container;
@@ -563,7 +563,7 @@ SLANG_UNIT_TEST(serializedModuleVersionImportFallback)
 
     // Both obsolete capability layouts and future semantic versions must use available source.
     const UInt64 unsupportedVersions[] =
-        {31, 32, 33, 34, 35, 36, 37, IRModule::k_maxSupportedModuleVersion + 1};
+        {31, 32, 33, 34, 35, 36, 37, 38, IRModule::k_maxSupportedModuleVersion + 1};
     for (UInt64 version : unsupportedVersions)
     {
         List<uint8_t> patched = container;

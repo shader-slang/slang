@@ -11700,8 +11700,16 @@ T frac(T x)
 {
     __target_switch
     {
-    case cpp: __intrinsic_asm(nvvmFrac) "$P_frac($0)";
-    case cuda: __intrinsic_asm(nvvmFrac) "$P_frac($0)";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM frac requires half, float, or double.");
+        // Preserve the whole Half expression in Float32, then narrow once.
+        if (T is half)
+            return __realCast<T>(frac(__realCast<float>(x)));
+        else
+            return x - floor(x);
+    case cpp: __intrinsic_asm "$P_frac($0)";
+    case cuda: __intrinsic_asm "$P_frac($0)";
     case glsl: __intrinsic_asm "fract";
     case hlsl: __intrinsic_asm "frac";
     case metal: __intrinsic_asm "fract";

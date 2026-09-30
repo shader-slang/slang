@@ -174,7 +174,7 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_EXP2 ((SlangNVVMValueOperation)56u)
 /* Value 57 is retired; floor uses named selected-libdevice functions. */
 #define SLANG_NVVM_VALUE_OP_FMOD ((SlangNVVMValueOperation)58u)
-#define SLANG_NVVM_VALUE_OP_FRAC ((SlangNVVMValueOperation)59u)
+/* Value 59 is retired; frac uses named floor followed by ordinary subtraction. */
 #define SLANG_NVVM_VALUE_OP_LOG ((SlangNVVMValueOperation)60u)
 #define SLANG_NVVM_VALUE_OP_LOG2 ((SlangNVVMValueOperation)61u)
 #define SLANG_NVVM_VALUE_OP_LOG10 ((SlangNVVMValueOperation)62u)

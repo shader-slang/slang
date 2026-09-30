@@ -3685,8 +3685,6 @@ static const char* _getLibdeviceFunctionName(
             return isFloat32 ? "__nv_expf" : "__nv_exp";
         case SLANG_NVVM_VALUE_OP_EXP2:
             return isFloat32 ? "__nv_exp2f" : "__nv_exp2";
-        case SLANG_NVVM_VALUE_OP_FRAC:
-            return isFloat32 ? "__nv_floorf" : "__nv_floor";
         case SLANG_NVVM_VALUE_OP_LOG:
             return isFloat32 ? "__nv_logf" : "__nv_log";
         case SLANG_NVVM_VALUE_OP_LOG2:
@@ -3791,8 +3789,6 @@ static SlangResult _emitLibdeviceOperation(
     }
 
     llvm::Value* result = state->builder.CreateCall(function, llvmOperands);
-    if (operation.operation == SLANG_NVVM_VALUE_OP_FRAC)
-        result = state->builder.CreateFSub(llvmOperands[0], result);
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
