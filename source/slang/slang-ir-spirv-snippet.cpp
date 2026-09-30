@@ -189,7 +189,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.tryGetValue(refName, operand.content))
                         {
-                            throw Misc::TextFormatException(
+                            Misc::throwTextFormatException(
                                 "Text parsing error: SPIR-V snippet references an undefined "
                                 "instruction: %" +
                                 refName);
@@ -306,7 +306,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(
                         }
                         else
                         {
-                            throw Misc::TextFormatException(
+                            Misc::throwTextFormatException(
                                 "Text parsing error: Invalid SPIR-V ASM operand: \"" + identifier +
                                 "\"");
                         }
