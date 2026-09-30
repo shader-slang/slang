@@ -2827,6 +2827,13 @@ local insts = {
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
 	-- One fused floating-point multiply-add; the target owns supported scalar formats.
 	{ fma = { operands = { { "left" }, { "right" }, { "addend" } }, hoistable = true } },
+	{
+		offsetOf = {
+			-- Preserve the checked field identity before argument values can be folded.
+			-- A void field key denotes a source call outside the direct-field NVVM contract.
+			operands = { { "callee" }, { "base" }, { "fieldValue" }, { "fieldKey" } },
+		},
+	},
 	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },

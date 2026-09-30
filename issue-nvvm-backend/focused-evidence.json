@@ -76190,6 +76190,162 @@
         "Offset is the sole remaining CUDA-text recognizer; its direct same-base field contract is unchanged. Broader CPP/CUDA address-difference behavior needs a producer contract decision.",
         "The inherited signed16 abs INT_MIN O3 normalization failure remains active under nvvm-core-values-and-atomics; this is not an all-pass repository checkpoint."
       ]
+    },
+    "nvvm-offset": {
+      "status": "accepted-focused",
+      "scope": "Complete removal of NVVM CUDA-body text recognition. KnownBuiltin OffsetOf captures a genuine stable IR915 query with original callee/arguments and exact field-key operand before optimization. NVVM folds through existing CUDA layout and Int32 bounds; other targets restore the original call before target optimization. CPP/CUDA helper bodies and direct same-base NVVM restrictions remain unchanged.",
+      "compiler_identity": {
+        "revision": "04a2fb8d0b9f8ffc25d23f4567bad32724bbbff6",
+        "compiler_patch_sha256": "689fda7deffb9099a407a609f71f0042dbf999c983f7e20853f363c173e5d5de",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "container_version": 2,
+        "source_sha256": {
+          "source/slang/core.meta.slang": "36430de3d911ca91fb1a8df1feb548bdf316792af27c04a8dc10f160d474a2e2",
+          "source/slang/slang-ast-support-types.h": "ca352a56524783b788755de21dd5b84ad43ea2b245bc1c00e5f46e4359b15b4b",
+          "source/slang/slang-emit.cpp": "45a3fb8b3a9ae8209bd6fd539f47dec1ec060e389dbb86029e6fd578d967a32a",
+          "source/slang/slang-ir-insts-stable-names.cpp": "6cb42e5bbffda6b217809883509b796a827afa35aae0604469a3c717bd378522",
+          "source/slang/slang-ir-insts-stable-names.lua": "fd11d98372a0e505904c3aac42497065dbd433a933bb096314cfc34e8436ca2b",
+          "source/slang/slang-ir-insts.lua": "653ff57e1da989ba6ab8b4deb290d931ba03b56bdd7630c0bcc0e02363fb8b78",
+          "source/slang/slang-ir-nvvm-legalize.cpp": "bc1abafeac3e44c60f9c2fb245dec6a1ce70d7ff997243affa98f4f5f39fc6cc",
+          "source/slang/slang-ir.cpp": "f193799a2f6e543d2be5bcd3724960d49960d9a20bb72798da9585116693ecd8",
+          "source/slang/slang-lower-to-ir.cpp": "c4288c55d0442ed010fa2247de6bd511a31c02c46b29548dec54ff8abf724558"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "1378468640c4b444809566aade1257d2cb77682faf1d0a120c19439e96ddc528",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "c7af03ee23968cf545b810d4ac90d22a49ea2400afa6fbf48ea58cd1d5b9dd51",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "17ae8a44e43df07a2f329d58901eb3c54cead1d5baf238a1d02358329e3b7964",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "tested_identity": {
+          "path": "build/nvvm-offset/tested-identity.json",
+          "sha256": "d38688b9512e841e64a8ac612ab51042ccc21abfecccbceacb3b7796676fc07a"
+        },
+        "formatting_policy": "Production and tests formatted before their successful builds; final docs/evidence changes require no rebuild."
+      },
+      "validation": {
+        "builds": [
+          {
+            "path": "build/nvvm-offset/build-production.json",
+            "sha256": "c746d7b89db8192d68356f15222ca2fbcb71ccba0f8d4058a93818081f9c584f",
+            "return_code": 0,
+            "elapsed_seconds": 313.2729387283325
+          },
+          {
+            "path": "build/nvvm-offset/build-tests.json",
+            "sha256": "ff9bccf7a595ab7ecfe7d603b07aec1d8e0c3ca0bbca9f23fcadf03b1e61daf7",
+            "return_code": 0,
+            "elapsed_seconds": 23.350169897079468
+          }
+        ],
+        "units": {
+          "passed": 2,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmSlangCUDAAggregateLayoutQueriesFoldBeforeDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangOffsetQueryRejectsInvalidAndLegacyCalls.internal"
+          ],
+          "record": {
+            "path": "build/nvvm-offset/units.json",
+            "sha256": "7b2ed380a39172620bcfe28c83cac08471a3123d164e6b0ea743851bfadc3794",
+            "return_code": 0,
+            "elapsed_seconds": 1.9644436836242676
+          },
+          "contracts": "Exact aggregate constants, equal-valued distinct field keys, generic specialization, dead-query removal, active wrong-base rejection and retired exact-text rejection before provider creation."
+        },
+        "runtime": {
+          "nvvm_passed": 2,
+          "nvrtc_passed": 2,
+          "outcomes": [
+            "tests/cuda/cuda-array-layout.slang (cuda)",
+            "tests/cuda/cuda-array-layout.slang.1 (cuda)",
+            "tests/cuda/param-block-alignment.slang (cuda)",
+            "tests/cuda/param-block-alignment.slang.1 (cuda)"
+          ],
+          "record": {
+            "path": "build/nvvm-offset/runtime.json",
+            "sha256": "6d3615f6a360649ab9895c04da0d4a42280a3139763bae4cbdb712f0694e44d9",
+            "return_code": 0,
+            "elapsed_seconds": 3.9716200828552246
+          },
+          "policy": "Existing array-layout and parameter-block-alignment fixture defaults, not separate O0/O3 runtime cells."
+        },
+        "ptx_smoke": {
+          "records": [
+            {
+              "path": "build/nvvm-offset/before-equal-fields.json",
+              "sha256": "6c5f11bd49e7bac46aa125fc79ef3b2521d58b7d0538434dd8ffe9668793372a",
+              "return_code": 0,
+              "elapsed_seconds": 0.29128336906433105
+            },
+            {
+              "path": "build/nvvm-offset/equal-fields-o0.json",
+              "sha256": "4ec2cf443ce8861eb90f15ac4304953796147d446b5419fa985b77e8366d7280",
+              "return_code": 0,
+              "elapsed_seconds": 0.2810673713684082
+            },
+            {
+              "path": "build/nvvm-offset/equal-fields-o3.json",
+              "sha256": "43a1b9fd0368d9e173fa8e1ecd18c9237f564f34e968d251dc66ef73a53a0c44",
+              "return_code": 0,
+              "elapsed_seconds": 0.29390692710876465
+            }
+          ],
+          "artifacts": [
+            {
+              "path": "build/nvvm-offset/equal-fields.slang",
+              "sha256": "e8d4674a404e5a9705ac1b37e484b8974b61a553267d58c9b8047e1a65b4ec88"
+            },
+            {
+              "path": "build/nvvm-offset/before-equal-fields.ptx",
+              "sha256": "4d0337b9c64f50399a7708e530f77835702fe7c3698b34f8d18688b704fa889b"
+            },
+            {
+              "path": "build/nvvm-offset/equal-fields-o0.ptx",
+              "sha256": "4d0337b9c64f50399a7708e530f77835702fe7c3698b34f8d18688b704fa889b"
+            },
+            {
+              "path": "build/nvvm-offset/equal-fields-o3.ptx",
+              "sha256": "433d5279f1125b714588511e98119de0c746600d1b532326493e251ca59b238a"
+            }
+          ],
+          "outcome": "O0 PTX is byte-identical to the pre-migration control. O0 and O3 store exact offsets 0 and 4 for equal-valued distinct fields. This is code-generation preservation evidence, not fresh numerical or GPU evidence."
+        },
+        "text_route_audit": {
+          "path": "build/nvvm-offset/text-route-audit.json",
+          "sha256": "a6e58f3b7743f1a141fb1b042606c0145771d1cdc858c1fa308b0e79b9b8466a",
+          "cuda_body_recognizer_matches": [],
+          "intentional_string_routes": [
+            "Explicit llvm.* registry names with typed arguments",
+            "Explicit __nv_* selected libdevice names with checked signatures",
+            "Qualified primitive PTX instruction bodies in the LLVM provider"
+          ],
+          "core_offset_body_unchanged": true,
+          "source_sha256": {
+            "source/slang/slang-ir-nvvm-legalize.cpp": "bc1abafeac3e44c60f9c2fb245dec6a1ce70d7ff997243affa98f4f5f39fc6cc",
+            "source/slang/slang-emit-nvvm.cpp": "4214bcff33a21c829a59c85277f63a2232903506edc4456a9632673149d28c0c"
+          },
+          "inspection": "Independent review found the offset comparator was the last CUDA-body recognizer; its replacement removes it. Remaining emitter getAsm uses are diagnostics and explicit llvm./__nv_ named-call admission."
+        },
+        "test_source_sha256": {
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "648810d123928ffed51efa8cebdf3132a5a97c48cc9544cae393f40f2fd8d43c",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "336898e8675353de33ed9dca07c71bf18e89d474ce332aa71249529800fc5f2b",
+          "tests/cuda/cuda-array-layout.slang": "f72ff0eecea6b274bc6d54740fc47514dda56904db96df37cac668a726c68d6f",
+          "tests/cuda/param-block-alignment.slang": "dd09d6d2fe97e00836e719eab08a14cffab8857a41f9e4ff147537dc3e9a9281",
+          "build/nvvm-offset/equal-fields.slang": "e8d4674a404e5a9705ac1b37e484b8974b61a553267d58c9b8047e1a65b4ec88"
+        }
+      },
+      "validation_incidents": [],
+      "limitations": [
+        "No full campaign, new numerical oracle, material run or performance claim. Historical full baseline and all earlier focused objects retain their actual identities.",
+        "Explicit llvm.* and checked __nv_* names and genuine primitive PTX remain intentional. Ordinary CUDA/CPP target bodies remain for their backends. No CUDA-body pattern matching or active semantic tags remain in the NVVM operation route.",
+        "Module43/ABI46/container2 unchanged; stale same-version prototype modules may require rebuilding.",
+        "Inherited signed16 abs INT_MIN O3 normalization failure remains active under nvvm-core-values-and-atomics and was not rerun. This is not an all-pass repository checkpoint."
+      ]
     }
   }
 }

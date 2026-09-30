@@ -1,41 +1,40 @@
 # NVVM current status
 
-The core math/layout migration has **focused local acceptance**. `frexp`/`modf` use named
-libdevice calls with checked output pointers, BF16 dot is core composition of a scalar FMA,
-and size/alignment use canonical IR with explicit CUDA layout. Their old text recognizers and
-projection recipes are removed. **Field offset is the sole remaining CUDA-text recognizer.**
+The CUDA-text route migration is **complete with focused local acceptance**. NVVM no longer
+infers operations from CUDA assembly-body strings or active semantic tags. The final field-offset
+recognizer is replaced by a typed query that preserves the exact field key before optimization.
+Explicit LLVM/libdevice names and genuine primitive PTX remain intentional backend interfaces.
 Module43, ABI46 and container2 are unchanged; the earlier signed16 abs O3 failure remains active.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
-campaigns. The maintainer superseded the earlier stop-after-log request. This checkpoint stops at
-a concrete public offset-contract decision; a question is pending. No push, Slack or system changes.
+campaigns. The maintainer superseded the earlier stop-after-log request. The maintainer has resolved the
+offset scope: preserve existing NVVM restrictions and leave CUDA/CPP behavior unchanged. The final
+offset migration is accepted and the migration loop is stopped. No push, Slack or system changes.
 Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-core-tail/`; plans and reports remain uncommitted.
+`build/nvvm-offset/`; plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
-| Evidence                                          | Result                                                                                                |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Build                                             | Eight-job corrected production build passed in 86 seconds; final unit-tool build passed in 20 seconds |
-| Focused units                                     | 10 unique passes; successful checks reused, only failures rerun                                       |
-| Runtime                                           | 12 existing NVVM cases and 1 NVRTC array-layout control pass                                          |
-| Diagnostics                                       | 3 initialization controls pass, including explicit address versus value assembly operands             |
-| Scope                                             | Checked pointer calls, retired routes, BF16 composition and exact CUDA layout/size bounds             |
-| Last full / targeted / implementations since full | log-family / core-tail / 7                                                                            |
-| Historical evidence                               | Full baseline/identity unchanged; all 33 earlier feature objects preserved                            |
+| Evidence                                          | Result                                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Build                                             | Eight-job production build passed in 313 seconds; focused test-tool build passed in 23 seconds   |
+| Focused units                                     | 2 passes: exact layout/key preservation and wrong-base/retired-text rejection                    |
+| Runtime                                           | 2 NVVM and 2 NVRTC existing layout cases pass                                                    |
+| PTX smoke                                         | O0 and O3 store distinct offsets 0/4; O0 is byte-identical to the pre-migration control          |
+| Scope                                             | Same-base field identity, generic specialization, dead-query removal, unchanged CUDA restoration |
+| Last full / targeted / implementations since full | log-family / offset / 8                                                                          |
+| Historical evidence                               | Full baseline/identity unchanged; all 34 earlier feature objects preserved                       |
 
-No full campaign, new numerical oracle, material run or performance experiment ran. Float64 modf
-has provider/compiler evidence only, not fresh numerical qualification. Runtime covers Float32/64
-frexp, Half scalar math, BF16 dot and selected layouts. Initial generic-cast and initialization
-build failures, pointer validation/metadata-wrapper failures, fake-builder gaps and stale test
-expectations are resolved and retained in `features.nvvm-core-tail`. Unsized CUDA arrays remain
-16-byte pointer/count wrappers aligned to 8, not indeterminate-size arrays. Formatting after
-validation changed only two C++ line wraps and did not trigger another build.
+No full campaign, new numerical oracle, material run or performance experiment ran. The final
+offset batch had no validation failures. Production and tests were formatted before building;
+documentation/evidence updates did not trigger another build. Earlier core-tail qualifications and
+resolved failure histories remain in `features.nvvm-core-tail`, including Float64 modf's lack of
+fresh numerical qualification. Unsized CUDA arrays remain 16-byte pointer/count wrappers aligned to 8.
 
 This is not an all-pass repository checkpoint or publication/CI readiness. The inherited
 `nvvm-core-values.slang.1` O3 failure remains active with its exact expectation: signed16 abs(INT_MIN)
@@ -47,13 +46,13 @@ covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `bb8cd379340aaa6b75ffc39c92096453ffd83c39` plus compiler patch
-`6cbdcf73b00a00afb3bac8fdaa825be392c9079eb283e150d5e26387909cdbbe`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `66529ca693d4e600b3f9f1367fbcbfe69dbf880280c7b2b9b77921dd2d527ef9`.
+Revision `04a2fb8d0b9f8ffc25d23f4567bad32724bbbff6` plus compiler patch
+`689fda7deffb9099a407a609f71f0042dbf999c983f7e20853f363c173e5d5de`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `1378468640c4b444809566aade1257d2cb77682faf1d0a120c19439e96ddc528`.
 Provider SHA-256: `17ae8a44e43df07a2f329d58901eb3c54cead1d5baf238a1d02358329e3b7964`.
-The later commit and whitespace-only formatting do not relabel these binaries. Source/runtime hashes,
-exact outcomes, initial/intermediate identities and failure history live in `focused-evidence.json`
-under `features.nvvm-core-tail`.
+The later commit does not relabel these binaries. Source/runtime hashes and exact outcomes live in
+`focused-evidence.json` under `features.nvvm-offset`; earlier identities and failure histories remain
+in their original feature objects.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -70,18 +69,16 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 
 ## Next action
 
-Resolve the `__offsetOf` producer contract before implementing the final migration. NVVM currently
-accepts a direct field of the same base object; CUDA/CPP text also accepts address subtraction
-between unrelated objects. `__offsetOf(left, left.value)` has a field-offset meaning, while
-`__offsetOf(left, right.value)` does not have that same contract.
+The agreed migration and residual-text audit are finished. Stop here. Suggested next bounded work:
 
-The pending choice is whether to define a same-object member offset across targets and reject
-unrelated objects, or preserve CUDA/CPP address-difference behavior while retaining NVVM's narrower
-contract. A canonical producer must capture the checked aggregate type and substituted field key
-before SSA/value optimization. A hidden helper loses the caller's field identity; unconditional
-intrinsic-op lowering would bypass a proposed target-specific fallback. Do not introduce a late
-operand-graph walker, marker or new text recognizer to evade this decision. Resume the bounded
-migration after the maintainer chooses the contract. Keep signed16 normalization separate.
+1. Investigate the known signed16 O3 normalization failure at its responsible layer.
+2. Select one consolidated integration checkpoint for the accumulated migrations.
+3. Prioritize the remaining type/resource/ABI capability gaps from the feature matrix.
+
+These are proposals, not automatically started campaigns. CUDA/CPP offset helper bodies remain
+unchanged; their raw address-subtraction template does not establish a broader API contract for
+unrelated-object calls. Stable IR915 carries the original callee/arguments and exact field key as
+ordinary identity operands; no decoration-only identity or CUDA-body matching remains.
 
 ## Retained boundaries
 

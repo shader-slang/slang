@@ -3542,6 +3542,7 @@ int __alignOf(T v)
 __generic<T,F>
 [__readNone]
 [require(cpp_cuda)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::OffsetOf))]
 int __offsetOf(in T t, in F field)
 {
     __target_switch

@@ -1007,6 +1007,42 @@ void removeWeakUseInsts(IRModule* module)
     }
 }
 
+// Targets other than direct NVVM retain the original source helper and its target body.
+// Restore the call before optimization; its arguments were already evaluated exactly once
+// when the source query captured the field key.
+static void restoreOffsetOfCalls(IRModule* module)
+{
+    struct Pass : InstPassBase
+    {
+        Pass(IRModule* module)
+            : InstPassBase(module)
+        {
+        }
+
+        void run()
+        {
+            processInstsOfType<IROffsetOf>(
+                kIROp_OffsetOf,
+                [&](IROffsetOf* query)
+                {
+                    IRBuilder builder(query);
+                    builder.setInsertBefore(query);
+                    IRInst* args[] = {query->getBase(), query->getFieldValue()};
+                    auto call = builder.emitCallInst(
+                        query->getFullType(),
+                        query->getCallee(),
+                        SLANG_COUNT_OF(args),
+                        args);
+                    call->sourceLoc = query->sourceLoc;
+                    query->transferDecorationsTo(call);
+                    query->replaceUsesWith(call);
+                    query->removeAndDeallocate();
+                });
+        }
+    };
+    Pass(module).run();
+}
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -1052,6 +1088,9 @@ Result linkAndOptimizeIR(
     //
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
+
+    if (!emitNVVMDirectly)
+        restoreOffsetOfCalls(irModule);
 
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s

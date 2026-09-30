@@ -10331,6 +10331,12 @@ struct StructWithArray : IDefaultInitializable
     uint8_t d;
 };
 
+struct OffsetPair<T>
+{
+    T first;
+    T second;
+};
+
 [CUDAKernel]
 void computeMain(
     uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> destination)
@@ -10345,6 +10351,13 @@ void computeMain(
     destination[6] = __alignOf<StructWithArray>();
     destination[7] = __alignOf(value);
     destination[8] = __sizeOf<StructWithArray>();
+    OffsetPair<int> pair = {0, 0};
+    OffsetPair<double> wide = {0.0, 0.0};
+    destination[9] = __offsetOf(pair, pair.first);
+    destination[10] = __offsetOf(pair, pair.second);
+    destination[11] = __offsetOf(wide, wide.second);
+    OffsetPair<int> other = {0, 0};
+    __offsetOf(pair, other.second); // An unused readNone query remains removable.
 }
 )";
 static const char kDirectNVVMNonCanonicalCUDAOffsetSource[] = R"(

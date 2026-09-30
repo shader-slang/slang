@@ -9601,6 +9601,7 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeStruct:
+    case kIROp_OffsetOf:
     case kIROp_MakeString:
     case kIROp_GetNativeStr:
     case kIROp_MakeResultError:
@@ -10184,6 +10185,7 @@ bool isMovableInst(IRInst* inst)
 
     switch (inst->getOp())
     {
+    case kIROp_OffsetOf:
     case kIROp_MakeCoopVector:
     case kIROp_Add:
     case kIROp_Sub:

@@ -1659,11 +1659,11 @@ SLANG_UNIT_TEST(nvvmSlangCUDAAggregateLayoutQueriesFoldBeforeDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.declareFunctionCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emitValueReturnCallCount == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 9);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 12);
         SLANG_CHECK(gFakeNVVMBuilder.emitIntrinsicCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.emittedValueOperations.getCount() == 0);
 
-        const int64_t expectedValues[] = {48, 0, 16, 20, 44, 4, 8, 8, 48};
+        const int64_t expectedValues[] = {48, 0, 16, 20, 44, 4, 8, 8, 48, 0, 4, 8};
         SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs.getCount() == SLANG_COUNT_OF(expectedValues));
         for (Index storeIndex = 0; storeIndex < SLANG_COUNT_OF(expectedValues); ++storeIndex)
         {
@@ -9464,7 +9464,6 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {kDirectNVVMUnsupportedNestedArraySource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedStructPointerSource, "'entry-point parameter'"},
         {kDirectNVVMUnsupportedArrayPointerHelperSource, "'helper function parameter:"},
-        {kDirectNVVMNonCanonicalCUDAOffsetSource, "'CUDA layout query'"},
         // Clocks admit only their exact zero-operand scalar contracts and canonical bodies.
         {R"SLANG(
             int probe()
@@ -13059,6 +13058,44 @@ SLANG_UNIT_TEST(nvvmSlangCoreTailLegacyRoutesRejectBeforeOutput)
         SLANG_CHECK(text.contains("E52017"));
         SLANG_CHECK(text.contains("GenericAsm assembly="));
         SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangOffsetQueryRejectsInvalidAndLegacyCalls)
+{
+    const char* sources[] = {
+        kDirectNVVMNonCanonicalCUDAOffsetSource,
+        R"SLANG(
+            struct S { int field; };
+            int legacy(S base, int field)
+            {
+                __intrinsic_asm "int(((char*)&($1)) - ((char*)&($0)))";
+            }
+            [CUDAKernel] void computeMain(
+                uniform Ptr<int, Access::ReadWrite, AddressSpace::Device> output)
+            {
+                S value = {output[0]};
+                output[1] = legacy(value, value.field);
+            }
+        )SLANG",
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(sources); ++i)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(
+            SLANG_FAILED(_compileSlangWithDirectNVVM(session, sources[i], code, diagnostics)));
+        SLANG_CHECK(_getBlobText(diagnostics).contains("E52017"));
+        SLANG_CHECK(
+            _getBlobText(diagnostics).contains(i == 0 ? "CUDA layout query" : "GenericAsm"));
+        SLANG_CHECK(!code);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }

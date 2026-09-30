@@ -77,7 +77,7 @@ unavailable switch still rejects. [Layout controls](../../tests/language-feature
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
 unused resources. Semantic module version 43 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
-shim. Compound wave users still own count45/low48 until their separate migration.
+shim. Numeric count45/low48 are also retired after their compound wave consumers moved to core.
 
 Public `round` uses named `__nv_roundf`/`__nv_round` calls validated against actual definitions in
 an immutable snapshot of the selected libdevice. The same bytes reach libNVVM. Half uses canonical
@@ -101,8 +101,7 @@ retired. The combined
 with signed zero, subnormal and integer/precision neighbors, infinity and NaN class. Each input
 has 45 scalar/helper/vector/matrix observations, distinct operation/shape masks, guards and completion.
 The [integer-bit oracle checker](../../extras/test-generators/check-nvvm-directed-rounding-oracles.py)
-validates the frozen rationally generated constants without executing a compiler. Other scalar math
-and compound recognizers remain outside this migration.
+validates the frozen rationally generated constants without executing a compiler.
 
 Public `frac` uses an explicit NVVM `x - floor(x)` core body; `fract` forwards to it. Named selected
 floor calls, ordinary subtraction and canonical casts replace numeric 59, its tag and text path.
@@ -263,8 +262,13 @@ the pointer-output CUDA text recipes are retired; the LLVM registry still reject
 
 Size/alignment use canonical typed queries with explicit CUDA layout. Unit checks preserve general
 zero size and the CUDA unsized-array wrapper's size 16/alignment 8, while NVVM size helpers reject
-zero and signed Int32 overflow. The exact same-base field-offset text route remains
-a producer-design boundary; CUDA-string migration is not complete.
+zero and signed Int32 overflow. Field offset uses a typed source query with its exact field key
+captured before optimization. NVVM retains the direct same-base restriction and CUDA layout;
+CPP/CUDA restore the original call and bodies. Focused units cover equal-valued distinct fields,
+generic record specialization, dead queries, wrong-base rejection and the removed text spelling.
+The existing [array-layout](../../tests/cuda/cuda-array-layout.slang) and
+[parameter-block alignment](../../tests/cuda/param-block-alignment.slang) fixtures cover both
+NVVM and CUDA source paths. No active NVVM CUDA-text recognizer remains.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

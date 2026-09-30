@@ -316,7 +316,7 @@ nested helpers remain outside that qualification.
 | Physical LLVM construction             | [slang-llvm-nvvm.cpp](../../source/slang-llvm-nvvm/slang-llvm-nvvm.cpp): LLVM 14 typed pointers, NVVM metadata, generic instructions and qualified recipes                    |
 | Vendor compiler lifecycle              | [slang-nvvm-compiler.cpp](../../source/compiler-core/slang-nvvm-compiler.cpp): coherent toolkit discovery, verification, compilation and diagnostics                          |
 
-`legalizeIRForNVVM` runs after common linking and late bitcast normalization. It folds the remaining CUDA
+`legalizeIRForNVVM` runs after common linking and late bitcast normalization. It folds the typed
 field-offset query, removes the canonical read-none `unmodified` check, discharges the selected CUDA derivative
 requirement, applies the requested zero-index bounds policy, runs DCE and checks its postconditions.
 Selected local Boolean-vector lane addresses are normalized to SSA lane updates before preflight;
@@ -335,9 +335,15 @@ The semantic-tag extension has no active producer, parser acceptance, lowering t
 route. Its serialized AST token field and stable IR terminator/decoration slots remain reserved so
 module 43 layout does not change; old tagged source or decoded tokens diagnose rather than revive
 those semantics. Ordinary comma-separated intrinsic-assembly arguments and named calls remain.
-Only the CUDA field-offset helper retains its bounded text recognizer. Its exact direct same-base
-FieldExtract supplies the canonical field key. A future producer must retain that key before value
-folding; a generic hidden helper or arbitrary operand-graph recovery is not equivalent.
+No NVVM operation interprets a CUDA target-switch assembly template. `__offsetOf` is identified by
+the existing KnownBuiltin mechanism and lowers to a source `OffsetOf` query before value folding.
+Its operands retain the original callee, base, field value and exact field key; an unavailable key
+denotes a call outside NVVM's direct same-base field contract. The key participates in ordinary IR
+identity, so equal-valued fields retain distinct offsets. NVVM folds that key through CUDA layout
+rules with the existing signed Int32 range check. Other targets restore the original call directly
+after linking, retaining the unchanged CPP/CUDA bodies and single argument evaluation. Source
+capture inspects only the immediate field-extract/address and load forms emitted by argument
+lowering; legalization does not reconstruct a field path from optimized values.
 `RequirePrelude`, arbitrary GenericAsm and standalone execution requirements are not general no-ops.
 
 Pointer-output math uses the real selected `__nv_frexp[f]` and `__nv_modf[f]` definitions. The named

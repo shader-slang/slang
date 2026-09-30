@@ -887,5 +887,6 @@ return {
 	["textureFetch"] = 911,
 	["textureGather"] = 912,
 	["textureQuerySize"] = 913,
-	["fma"] = 914
+	["fma"] = 914,
+	["offsetOf"] = 915
 }

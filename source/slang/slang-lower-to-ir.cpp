@@ -951,6 +951,30 @@ IRInst* AstOrIRType::getIRType(IRGenContext* context)
     return irType;
 }
 
+// Preserve the field selected by `__offsetOf(s, s.member)` while these are still the
+// instructions produced directly by argument lowering. Mutable locals produce loads from
+// the same storage; immutable values produce a direct field extraction. Inspect only those
+// immediate producer forms, before SSA or constant folding can erase the field identity.
+static IRInst* getOffsetOfFieldKey(IRInst* base, IRInst* fieldValue)
+{
+    auto baseLoad = as<IRLoad>(base);
+    if (auto field = as<IRFieldExtract>(fieldValue))
+    {
+        if (field->getBase() == base)
+            return field->getField();
+        auto fieldBaseLoad = as<IRLoad>(field->getBase());
+        if (baseLoad && fieldBaseLoad && baseLoad->getPtr() == fieldBaseLoad->getPtr())
+            return field->getField();
+    }
+    else if (auto fieldLoad = as<IRLoad>(fieldValue))
+    {
+        auto fieldAddress = as<IRFieldAddress>(fieldLoad->getPtr());
+        if (baseLoad && fieldAddress && fieldAddress->getBase() == baseLoad->getPtr())
+            return fieldAddress->getField();
+    }
+    return nullptr;
+}
+
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -967,6 +991,23 @@ LoweredValInfo emitCallToDeclRef(
     auto builder = context->irBuilder;
 
     auto funcDecl = funcDeclRef.getDecl();
+    if (auto knownBuiltin = funcDecl->findModifier<KnownBuiltinAttribute>())
+    {
+        auto name = as<ConstantIntVal>(knownBuiltin->name);
+        if (name && name->getValue() == int(KnownBuiltinDeclName::OffsetOf))
+        {
+            SLANG_RELEASE_ASSERT(argCount == 2);
+            auto callee = getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType));
+            IRInst* fieldKey = getOffsetOfFieldKey(args[0], args[1]);
+            IRInst* operands[] =
+                {callee, args[0], args[1], fieldKey ? fieldKey : builder->getVoidValue()};
+            return LoweredValInfo::simple(builder->emitIntrinsicInst(
+                type,
+                kIROp_OffsetOf,
+                SLANG_COUNT_OF(operands),
+                operands));
+        }
+    }
     if (auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
     {
         // The intrinsic op maps to a single IR instruction,
