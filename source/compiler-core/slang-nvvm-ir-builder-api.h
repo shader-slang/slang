@@ -182,7 +182,7 @@ extern "C"
 /* Value 64 is retired; round uses named selected-libdevice functions. */
 /* Value 65 is retired; rsqrt uses named selected-libdevice functions. */
 /* Value 66 is retired; core math uses named calls and ordinary composition. */
-#define SLANG_NVVM_VALUE_OP_IS_NAN ((SlangNVVMValueOperation)67u)
+// 67 is reserved (retired scalar NaN classification).
 #define SLANG_NVVM_VALUE_OP_SIGN ((SlangNVVMValueOperation)68u)
 #define SLANG_NVVM_VALUE_OP_FREXP_FRACTION ((SlangNVVMValueOperation)69u)
 #define SLANG_NVVM_VALUE_OP_FREXP_EXPONENT ((SlangNVVMValueOperation)70u)

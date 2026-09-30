@@ -217,6 +217,16 @@ runtime-loaded integer `mad` results across signed/unsigned widths, scalar Half/
 Half `sincos` are new support. These focused checks establish routing and composition, without
 claiming a new per-operation numerical qualification. Current acceptance remains owned by STATUS.
 
+Public Half bit transport, packed `f16tof32`/`f32tof16`, double word conversion and
+`isfinite`/`isinf`/`isnan` use core expressions. Numeric NaN operation 67 is reserved; seven old
+transport spellings and nine width-specific classification shapes reject before provider mutation.
+The small [core bits smoke](../../tests/cuda/nvvm-core-bits.slang) checks eight runtime-loaded rows
+through CUDA and NVVM O0/O3: signed/unsigned Half bit transport including NaNs, ignored upper packed
+bits, zero-extension after packing, asymmetric double word order, aliased out stores, and all three
+floating widths' zero/subnormal/finite/infinity/NaN classifications. NaN numerical conversions check
+classification only; raw bit transport checks exact bits. Existing Half value/narrowing and vector
+classification fixtures cover the shared operations. Current focused acceptance remains in STATUS.
+
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider
 admission; public vector/matrix operations map to scalar calls. Pure queries reject floating

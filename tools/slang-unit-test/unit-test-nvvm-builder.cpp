@@ -8864,13 +8864,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_CHECK(builder.supportsValueOperation(operation));
     }
     operation = {
-        SLANG_NVVM_VALUE_OP_IS_NAN,
-        NVVMSemantics::kBool,
-        float64Operands,
-        1,
-    };
-    SLANG_CHECK(builder.supportsValueOperation(operation));
-    operation = {
         SLANG_NVVM_VALUE_OP_SIGN,
         NVVMSemantics::kSignedI32,
         float64Operands,
@@ -9033,14 +9026,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
             builder.emitValueOperation(module.module, operation, binaryOperands, 2, result)));
     }
     operation = {
-        SLANG_NVVM_VALUE_OP_IS_NAN,
-        NVVMSemantics::kBool,
-        float64Operands,
-        1,
-    };
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.emitValueOperation(module.module, operation, &values[3], 1, result)));
-    operation = {
         SLANG_NVVM_VALUE_OP_SIGN,
         NVVMSemantics::kSignedI32,
         float64Operands,
@@ -9099,7 +9084,6 @@ SLANG_UNIT_TEST(nvvmIRBuilderBuildsScalarMathOperations)
         SLANG_CHECK(text.indexOf("call double @__nv_floor(double") >= 0);
         SLANG_CHECK(text.indexOf("call double @__nv_rsqrt(double") >= 0);
         SLANG_CHECK(text.indexOf("declare double @__nv_rsqrt(double)") >= 0);
-        SLANG_CHECK(text.indexOf("fcmp uno double") >= 0);
         SLANG_CHECK(text.indexOf("fcmp ogt double") >= 0);
         SLANG_CHECK(text.indexOf("fcmp olt double") >= 0);
         SLANG_CHECK(text.indexOf("and i16") >= 0);
@@ -12185,7 +12169,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderReservedExp2OperationRejectsWithoutMutation)
 static void _checkNVVMReservedMathOperation(
     UnitTestContext* unitTestContext,
     SlangNVVMValueOperation operation,
-    uint32_t operandCount = 1)
+    uint32_t operandCount = 1,
+    bool booleanResult = false)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
@@ -12236,8 +12221,10 @@ static void _checkNVVMReservedMathOperation(
                         testedType,
                         testedType};
                     const SlangNVVMValueHandle operands[] = {value, value, value};
+                    auto resultType = booleanResult ? NVVMSemantics::kBool : testedType;
+                    resultType.laneCount = lanes;
                     const SlangNVVMValueOperationDesc desc =
-                        {operation, testedType, operandTypes, operandCount};
+                        {operation, resultType, operandTypes, operandCount};
                     SLANG_CHECK(!builder.supportsValueOperation(desc));
                     SlangNVVMValueHandle rejected =
                         reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
@@ -12293,4 +12280,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderRetiredCoreMathRejectsWithoutMutation)
                 unitTestContext,
                 testCase.operation,
                 testCase.operandCount);
+}
+
+SLANG_UNIT_TEST(nvvmIRBuilderRetiredNaNRejectsWithoutMutation)
+{
+    _checkNVVMReservedMathOperation(unitTestContext, SlangNVVMValueOperation(67), 1, true);
 }

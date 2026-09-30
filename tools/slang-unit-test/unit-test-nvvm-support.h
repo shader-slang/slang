@@ -5930,19 +5930,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             &operation->resultType,
             operation->operandTypes);
     }
-    if (resolution.family == NVVMSemantics::ValueOperationFamily::FloatClassification)
-    {
-        gFakeNVVMBuilder.emittedValueOperations.add(
-            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)});
-        return _recordFakeNVVMBuilderScalarOperation(
-            module,
-            {FakeNVVMBuilderScalarFamily::FloatingCompare, uint32_t(operation->operation)},
-            operands,
-            uint32_t(operandCount),
-            outValue,
-            &operation->resultType,
-            operation->operandTypes);
-    }
     if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerCompare)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
@@ -12156,131 +12143,72 @@ void computeMain(
 static const char kDirectNVVMScalarIntrinsicRecipeSource[] = R"SLANG(
 half halfFromSignedBits(int16_t value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "__short_as_half";
-    default: return half(value);
-    }
+    return asfloat16(value);
 }
 
 half halfFromUnsignedBits(uint16_t value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "__ushort_as_half";
-    default: return half(value);
-    }
+    return asfloat16(value);
 }
 
 uint16_t halfToBits(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "__half_as_ushort";
-    default: return uint16_t(value);
-    }
+    return asuint16(value);
 }
 
 float floatFromPackedHalf(uint value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
-    default: return float(value);
-    }
+    return f16tof32(value);
 }
 
 uint packedHalfFromFloat(float value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
-    default: return uint(value);
-    }
+    return f32tof16(value);
 }
 
 double doubleFromWords(uint low, uint high)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_asdouble($0, $1)";
-    default: return double(low) + double(high);
-    }
+    return asdouble(low, high);
 }
 
 void doubleToWords(double value, out uint low, out uint high)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_asuint($0, $1, $2)";
-    default:
-        low = uint(value);
-        high = 0;
-        return;
-    }
+    asuint(value, low, high);
 }
 
 bool finiteHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isfinite($0)";
-    default: return true;
-    }
+    return isfinite(value);
 }
 
 bool finiteFloat(float value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isfinite($0)";
-    default: return true;
-    }
+    return isfinite(value);
 }
 
 bool finiteDouble(double value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isfinite($0)";
-    default: return true;
-    }
+    return isfinite(value);
 }
 
 bool infiniteHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isinf($0)";
-    default: return false;
-    }
+    return isinf(value);
 }
 
 bool infiniteFloat(float value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isinf($0)";
-    default: return false;
-    }
+    return isinf(value);
 }
 
 bool infiniteDouble(double value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isinf($0)";
-    default: return false;
-    }
+    return isinf(value);
 }
 
 bool nanHalf(half value)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "$P_isnan($0)";
-    default: return false;
-    }
+    return isnan(value);
 }
 
 half minimumHalf(half left, half right)

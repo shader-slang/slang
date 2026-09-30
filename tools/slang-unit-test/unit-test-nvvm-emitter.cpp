@@ -8646,7 +8646,7 @@ SLANG_UNIT_TEST(nvvmSlangScalarMathHelpersRequestTypedOperations)
         SLANG_CHECK(operationCounts[66] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_pow"));
         SLANG_CHECK(operationCounts[63] == 0);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_IS_NAN] == 1);
+        SLANG_CHECK(operationCounts[67] == 0);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_SIGN] == 1);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
@@ -13243,4 +13243,66 @@ SLANG_UNIT_TEST(nvvmSlangCoreMathLegacyRoutesRejectBeforeOutput)
     SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
     SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+}
+
+SLANG_UNIT_TEST(nvvmSlangCoreBitsLegacyTextRejectsBeforeOutput)
+{
+    struct LegacyCase
+    {
+        const char* declaration;
+        const char* use;
+    };
+    const LegacyCase cases[] = {
+        {R"slang(half legacy(int16_t x) { __intrinsic_asm "__short_as_half"; })slang",
+         "words[1] = uint(asuint16(legacy(int16_t(words[0]))));"},
+        {R"slang(half legacy(uint16_t x) { __intrinsic_asm "__ushort_as_half"; })slang",
+         "words[1] = uint(asuint16(legacy(uint16_t(words[0]))));"},
+        {R"slang(uint16_t legacy(half x) { __intrinsic_asm "__half_as_ushort"; })slang",
+         "words[1] = uint(legacy(asfloat16(uint16_t(words[0]))));"},
+        {R"slang(float legacy(uint x) { __intrinsic_asm "__half2float(__ushort_as_half($0))"; })slang",
+         "words[1] = asuint(legacy(words[0]));"},
+        {R"slang(uint legacy(float x) { __intrinsic_asm "__half_as_ushort(__float2half($0))"; })slang",
+         "words[1] = legacy(asfloat(words[0]));"},
+        {R"slang(double legacy(uint x, uint y) { __intrinsic_asm "$P_asdouble($0, $1)"; })slang",
+         "uint lo, hi; asuint(legacy(words[0], words[1]), lo, hi); words[2]=lo; words[3]=hi;"},
+        {R"slang(void legacy(double x, out uint lo, out uint hi) { __intrinsic_asm "$P_asuint($0, $1, $2)"; })slang",
+         "uint lo, hi; legacy(asdouble(words[0], words[1]), lo, hi); words[2]=lo; words[3]=hi;"},
+    };
+    List<String> sources;
+    for (const auto& testCase : cases)
+    {
+        StringBuilder source;
+        source << testCase.declaration << " [CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << testCase.use << " }";
+        sources.add(source.produceString());
+    }
+    for (const char* name : {"isfinite", "isinf", "isnan"})
+        for (const char* type : {"half", "float", "double"})
+        {
+            StringBuilder source;
+            source << "bool legacy(" << type << " x) { __intrinsic_asm \"$P_" << name
+                   << "($0)\"; } [CUDAKernel] void computeMain("
+                   << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+                   << "words[1] = uint(legacy(" << type << "(asfloat(words[0])))); }";
+            sources.add(source.produceString());
+        }
+    for (const auto& source : sources)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(_getBlobText(diagnostics).contains("E52017"));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
 }

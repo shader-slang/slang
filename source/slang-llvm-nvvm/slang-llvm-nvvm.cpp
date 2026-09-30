@@ -4440,9 +4440,6 @@ static SlangResult _emitValueOperationFamily(
             return SLANG_E_INVALID_ARG;
         }
         break;
-    case Slang::NVVMSemantics::ValueOperationFamily::FloatClassification:
-        result = state->builder.CreateFCmpUNO(llvmOperands[0], llvmOperands[0]);
-        break;
     case Slang::NVVMSemantics::ValueOperationFamily::FloatSign:
         {
             llvm::Value* zero = llvm::ConstantFP::get(llvmOperands[0]->getType(), 0.0);

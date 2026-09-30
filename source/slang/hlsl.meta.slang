@@ -8192,6 +8192,7 @@ double asdouble(uint lowbits, uint highbits)
         %__v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
         result:$$double = OpExtInst glsl450 59 %__v
     };
+    case nvvm:
     case llvm:
         uint64_t val = uint64_t(lowbits) | (uint64_t(highbits)<<32u);
         return bit_cast<double>(val);
@@ -8611,6 +8612,7 @@ void asuint(double value, out uint lowbits, out uint highbits)
         lowbits = uv.x;
         highbits = uv.y;
         return;
+    case nvvm:
     case llvm:
         let value = bit_cast<uint64_t>(value);
         lowbits = uint(value);
@@ -8791,6 +8793,7 @@ uint16_t asuint16(float16_t value)
 {
     __target_switch
     {
+    case nvvm: return bit_cast<uint16_t>(value);
     case cuda: __intrinsic_asm "__half_as_ushort";
     case glsl: __intrinsic_asm "uint16_t(packHalf2x16(vec2($0, 0.0)))";
     case hlsl: __intrinsic_asm "asuint16";
@@ -8832,6 +8835,7 @@ float16_t asfloat16(uint16_t value)
 {
     __target_switch
     {
+    case nvvm: return bit_cast<float16_t>(value);
     case cuda: __intrinsic_asm "__ushort_as_half";
     case glsl: __intrinsic_asm "float16_t(unpackHalf2x16($0).x)";
     case hlsl: __intrinsic_asm "asfloat16";
@@ -8912,6 +8916,7 @@ float16_t asfloat16(int16_t value)
 {
     __target_switch
     {
+    case nvvm: return bit_cast<float16_t>(value);
     case cuda: __intrinsic_asm "__short_as_half";
     case hlsl: __intrinsic_asm "asfloat16";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
@@ -11058,6 +11063,7 @@ float f16tof32(uint value)
 {
     __target_switch
     {
+    case nvvm: return float(asfloat16(uint16_t(value)));
     case glsl: __intrinsic_asm "unpackHalf2x16($0).x";
     case hlsl: __intrinsic_asm "f16tof32($0)";
     case cuda: __intrinsic_asm "__half2float(__ushort_as_half($0))";
@@ -11111,6 +11117,7 @@ uint f32tof16(float value)
 {
     __target_switch
     {
+    case nvvm: return uint(asuint16(half(value)));
     case glsl: __intrinsic_asm "packHalf2x16(vec2($0,0.0))";
     case hlsl: __intrinsic_asm "f32tof16($0)";
     case cuda: __intrinsic_asm "__half_as_ushort(__float2half($0))";
@@ -12544,6 +12551,7 @@ bool isfinite(T x)
 {
     __target_switch
     {
+    case nvvm: return !(isinf(x) || isnan(x));
     case hlsl: __intrinsic_asm "isfinite";
     case cuda:
     case cpp:
@@ -12599,6 +12607,16 @@ bool isinf(T x)
 {
     __target_switch
     {
+    case nvvm:
+        // Classify the IEEE magnitude bits so fast math cannot erase NaN handling.
+        static_assert(T is half || T is float || T is double,
+            "NVVM isinf requires half, float, or double.");
+        if (T is half)
+            return (asuint16(__realCast<half>(x)) & uint16_t(0x7fffu)) == uint16_t(0x7c00u);
+        else if (T is float)
+            return (asuint(__realCast<float>(x)) & 0x7fffffffu) == 0x7f800000u;
+        else
+            return (bit_cast<uint64_t>(__realCast<double>(x)) & 0x7fffffffffffffffull) == 0x7ff0000000000000ull;
     case hlsl:
     case glsl:
     case metal:
@@ -12664,6 +12682,16 @@ bool isnan(T x)
 {
     __target_switch
     {
+    case nvvm:
+        // Classify the IEEE magnitude bits so fast math cannot erase NaN handling.
+        static_assert(T is half || T is float || T is double,
+            "NVVM isnan requires half, float, or double.");
+        if (T is half)
+            return (asuint16(__realCast<half>(x)) & uint16_t(0x7fffu)) > uint16_t(0x7c00u);
+        else if (T is float)
+            return (asuint(__realCast<float>(x)) & 0x7fffffffu) > 0x7f800000u;
+        else
+            return (bit_cast<uint64_t>(__realCast<double>(x)) & 0x7fffffffffffffffull) > 0x7ff0000000000000ull;
     case hlsl:
     case glsl:
     case metal:

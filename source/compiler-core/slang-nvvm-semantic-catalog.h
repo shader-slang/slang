@@ -17,7 +17,6 @@ enum class ValueOperationFamily : uint32_t
     IntegerCompare,
     FloatUnary,
     FloatBinary,
-    FloatClassification,
     FloatSign,
     FloatCompare,
     BooleanUnary,
@@ -891,14 +890,6 @@ inline bool resolveValueOperationFamily(
         desc.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
         (desc.operandTypes[0].bitWidth == 32 || desc.operandTypes[0].bitWidth == 64) &&
         desc.operandTypes[0].laneCount == 1;
-    if (isScalarFloat32Or64Operand && desc.operation == SLANG_NVVM_VALUE_OP_IS_NAN &&
-        areSameType(desc.resultType, kBool))
-    {
-        outResolution = {
-            ValueOperationFamily::FloatClassification,
-            "scalar floating-point classification"};
-        return true;
-    }
     if (isScalarFloat32Or64Operand && desc.operation == SLANG_NVVM_VALUE_OP_SIGN &&
         areSameType(desc.resultType, kSignedI32))
     {

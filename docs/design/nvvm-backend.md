@@ -87,6 +87,17 @@ thirteen public tag/text routes are removed. Numeric FMOD 58 remains for canonic
 lowering, which has a real backend consumer independent of the public `fmod` body. Module version
 43 and provider ABI 46 remain unchanged; direct retired-ID rejection does not depend on a version gate.
 
+Half bit transport, packed Half conversion and double word conversion also belong to the core.
+NVVM `asfloat16`/`asuint16` use ordinary bit casts; `f16tof32` truncates to unsigned low 16 bits,
+decodes Half and widens, while `f32tof16` narrows once, reinterprets as uint16 and zero-extends.
+`asdouble(low, high)` combines unsigned words before a bit cast. Double `asuint` uses a uint64
+bit cast, stores the low word, then shifts and stores the high word. These reuse the existing LLVM
+core compositions and ordinary provider cast/shift/store operations; their CUDA-text recipes are gone.
+Core `isinf` and `isnan` compare unsigned IEEE magnitude bits against the infinity encoding for
+Half/Float32/Float64. `isfinite` composes their Boolean results. This avoids floating comparisons
+whose NaN behavior could depend on fast-math assumptions. Numeric NaN operation 67 and the old
+classification text/recipe paths are retired; shared physical Half ABI bit casts remain unchanged.
+
 Public `frac` expresses `x - floor(x)` in its NVVM core body. The checked source produces the
 existing named floor call and ordinary subtraction; no provider-specific frac operation remains.
 Half uses `__realCast<T>(frac(__realCast<float>(x)))`, preserving the whole Float32 expression

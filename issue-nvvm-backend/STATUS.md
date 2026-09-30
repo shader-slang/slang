@@ -1,10 +1,10 @@
 # NVVM current status
 
-The broad core-math migration is accepted after the log family. Thirteen public operations now
-select 26 named libdevice functions; `sincos` and floating/integer `mad` compose in the core.
-Twelve numeric operations and thirteen tag/text routes are retired. Numeric FMOD 58 remains for
-canonical `FRem`. Integer `mad` and scalar Half `sincos` are newly supported and have exact runtime
-smoke coverage. Module 43, provider ABI 46 and container format 2 remain unchanged.
+The core bit/classification migration is accepted after core math. Seven bit transport/conversion
+spellings and three classification families now use core casts, masks and assignments. Nine backend
+recipe kinds and numeric IS_NAN 67 are retired. The preceding math batch moved thirteen public
+operations to named libdevice calls and composed sincos/mad in core. Module 43, provider ABI 46 and
+container format 2 remain unchanged.
 
 **Continue under the accelerated workflow authorized on 2026-09-30.** Use eight build jobs,
 larger related intrinsic batches, focused compile/PTX checks and no routine module-version bumps.
@@ -15,33 +15,33 @@ removal of CUDA-string recognizers. No push, Slack or system changes. Preserve t
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-core-math/`; plans and reports remain uncommitted.
+`build/nvvm-core-bits/`; plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
 | Evidence | Result |
 | --- | --- |
-| Build | Eight-job main build passed; later rebuilds changed only unit tests |
-| Focused units | 23 pass, including 26 named signatures and 39 public width paths |
-| CUDA smoke | 17 pass; 14 non-CUDA subtests explicitly excluded |
-| Material PTX | One representative material compiled and assembled through NVRTC O3 and NVVM O3 |
-| PTX comparison | SM80, 64-bit addresses, expected entry and live stores; no byte/numerical equivalence claim |
-| Last full / targeted / implementations since full | log-family / core-math / 1 |
-| Historical evidence | Full baseline/identity unchanged; all 27 earlier feature objects preserved |
+| Build | Eight-job incremental build passed in 317 seconds |
+| Focused units | 6 pass, including retired numeric/text rejection before output mutation |
+| Shader smoke | 11 CUDA cases and 1 PTX file check pass across four small fixtures |
+| Material PTX | One representative material compiled and assembled through NVVM O3 |
+| Test time | About 20 seconds for units and shader smoke combined |
+| Last full / targeted / implementations since full | log-family / core-bits / 2 |
+| Historical evidence | Full baseline/identity unchanged; all 28 earlier feature objects preserved |
 
-The initial compile errors, fake-builder capacity/shape assumptions and intentional alias-warning
-failure are retained with their resolutions. The corrected unit tests preserve direct Half
-widen/call/narrow checks without assuming a fixed inlining shape. No full corpus, static-version,
-old-module or new numerical-oracle campaign ran for this batch.
+This batch had no validation failures. Exact bit transport, double word/alias order, packed Half
+conversion edges and all-width IEEE classification have focused execution coverage. No full corpus,
+static-version, old-module or new numerical-oracle campaign ran. The prior math batch's resolved
+failures remain recorded with their original identities.
 
 ## Current tested identity
 
-Revision `dc0a9acc36a74ac31912a010672a0a116f4e2883` plus compiler patch
-`2b3fbdae8d3d4ef49a80822cfabb676dc5ea71a7a94b3de8fa6d280be1972226`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `fce265212542c21bd2d6d6babd7afada5c6605b2db1a840bdb56e1cf3a0f19f9`.
-Provider SHA-256: `d285dd06326eabec1a35a6e32a5c004b1d7639fdff1c83003a18b19ad6e72d7b`.
+Revision `2bf556480e04b1451d328a8104f82cbbc93a543a` plus compiler patch
+`5f3e4d820dafee3ba55c2c95c26b464a38f0c8eed08cf0d138484a74f97c6f70`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `690caf01988714cccd4113e78aebe714ff39fc438b6707bdb465c4907e9ddff5`.
+Provider SHA-256: `0c137803f2ffd728339e9a6d563820ebc78416e53a37fe32ca6d9a6f74dc187b`.
 The later commit does not relabel these binaries. Current source/runtime hashes and exact focused
-outcomes live in `focused-evidence.json` under `features.nvvm-core-math`.
+outcomes live in `focused-evidence.json` under `features.nvvm-core-bits`.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -58,11 +58,11 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 
 ## Next action
 
-Move bit transport and floating classification into core expressions using existing bit casts,
-shifts, masks and assignments. Reuse Half conversion/classification smoke tests. Keep pointer-result
-frexp/modf, wave synchronization and resource/atomic boundaries separate where their behavior
-requires different lowering. Continue larger batches, preserve numeric holes and do not bump module 43
-for ordinary source migrations; stale prototype modules may need recompilation.
+Move abs/min/max/sign and clocks together using named calls and core expressions. Preserve Half
+absolute-value bits, floating min/max selection, sign behavior and side-effecting clock observations.
+Then migrate atomic producers and wave compositions through existing canonical operations. Keep
+pointer-result frexp/modf and resource producer identity separate where their representation needs
+explicit design. Continue larger batches without routine module-version bumps.
 
 ## Retained boundaries
 

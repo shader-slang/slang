@@ -74793,6 +74793,102 @@
         "Module43/ABI46 unchanged; stale prototype modules, including earlier43 bodies, may need recompilation.",
         "Historical features/full results retain their original identities."
       ]
+    },
+    "nvvm-core-bits": {
+      "status": "accepted",
+      "scope": "Seven bit transport/conversion spellings and three floating classification families now use core casts, masks and assignments. Nine backend recipe kinds and numeric IS_NAN 67 are retired.",
+      "compiler_identity": {
+        "revision": "2bf556480e04b1451d328a8104f82cbbc93a543a",
+        "compiler_patch_sha256": "5f3e4d820dafee3ba55c2c95c26b464a38f0c8eed08cf0d138484a74f97c6f70",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "2c7507f6015008ce6e6a60525426c5b49f9591bc76c849746c029ed10e1078a2",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "38e2d872c57990413776260d898b59a4e420977602a75770038faf37c2ddf791",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "4f1276a19d773c2eca2741cdd8da5c37c46b36e364ab08e1bea7ca8d1373ef51",
+          "source/slang/hlsl.meta.slang": "ebde4d4f709be59be59fe10458d6085c12a52ab178076f40fe90493600063774",
+          "source/slang/slang-emit-nvvm.cpp": "1a5bf6d0a755c38c44b57aae649f405daa36ce218ead4ac5cdd1a256af0438df",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "d04af186a526d6426c647c1228ef904f7bf73dd87f0f63b086ea70ca9b215603",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "f9bd66cb833733000f798b99ca43a8b8bf685473bdf99fcab5f19cedf24519f9",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "485cc18627a3ace33909097fe26676c857ebbae8998fdcbf557847a66ea45da8",
+          "tests/cuda/nvvm-core-bits.slang": "9be2f91544eafa5b09473043c5c5a75f0e5b3eb27f69739b7076c899842a07c2"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "690caf01988714cccd4113e78aebe714ff39fc438b6707bdb465c4907e9ddff5",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "4d586e5c4d44fa51e3d8642246abe06f945a5215eb5c605a5b6f836990428331",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "0c137803f2ffd728339e9a6d563820ebc78416e53a37fe32ca6d9a6f74dc187b",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b"
+        }
+      },
+      "validation": {
+        "units": {
+          "passed": 6,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderBuildsScalarMathOperations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderRetiredNaNRejectsWithoutMutation.internal",
+            "slang-unit-test-tool/nvvmSlangScalarMathHelpersRequestTypedOperations.internal",
+            "slang-unit-test-tool/nvvmSlangScalarIntrinsicHelpersUseTypedRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangCoreBitsLegacyTextRejectsBeforeOutput.internal",
+            "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal"
+          ],
+          "record": {
+            "path": "build/nvvm-core-bits/units.json",
+            "sha256": "2f7c1cf37688951351aaa3c9a60a3503d14a4d749c062618b7c006909cd5f0cb"
+          }
+        },
+        "smoke": {
+          "passed": 12,
+          "outcomes": [
+            "tests/cuda/nvvm-half-narrow-conversion.slang (cuda)",
+            "tests/cuda/nvvm-core-bits.slang (cuda)",
+            "tests/cuda/nvvm-half-narrow-conversion.slang.1 (cuda)",
+            "tests/cuda/nvvm-core-bits.slang.1 (cuda)",
+            "tests/cuda/nvvm-half-narrow-conversion.slang.2 (cuda)",
+            "tests/cuda/nvvm-core-bits.slang.2 (cuda)",
+            "tests/cuda/nvvm-half-values.slang (cuda)",
+            "tests/cuda/nvvm-vector-classification.slang (cuda)",
+            "tests/cuda/nvvm-half-values.slang.1 (cuda)",
+            "tests/cuda/nvvm-half-values.slang.2",
+            "tests/cuda/nvvm-vector-classification.slang.1 (cuda)",
+            "tests/cuda/nvvm-vector-classification.slang.2 (cuda)"
+          ],
+          "record": {
+            "path": "build/nvvm-core-bits/smoke.json",
+            "sha256": "2356f43ce41124b8afed659cd5b3a594787d9ebda16630f0c443c0c921b5c8a0"
+          },
+          "cuda_passed": 11,
+          "ptx_filecheck_passed": 1
+        },
+        "build": {
+          "path": "build/nvvm-core-bits/build.json",
+          "sha256": "387380c8224cbdfdee505412d65dc61adbf28eb9ea48ec59385fcac83ab95c8d"
+        },
+        "material-nvvm-compile": {
+          "path": "build/nvvm-core-bits/material-nvvm-compile.json",
+          "sha256": "3331951aef7b7a93cb77f49628a042b5875713d166150ed66243578fd48c7b2e"
+        },
+        "material-nvvm-assembly": {
+          "path": "build/nvvm-core-bits/material-nvvm-assembly.json",
+          "sha256": "8fbdc90c6d8e91c634987c73388fbb4708f89eded59fb74c2e51fa6304b124f1"
+        }
+      },
+      "validation_incidents": [],
+      "last_full_baseline": {
+        "path": "issue-nvvm-backend/accepted-baseline.json",
+        "sha256": "f6df540235ea04c97f6b1a49d546ffd716763123b5a57988d40dbde6a71d087b"
+      },
+      "limits": [
+        "Focused execution and code-generation smoke; no full corpus or numerical campaign.",
+        "Material smoke compiles and assembles NVVM only; prior NVRTC material evidence retains its original identity.",
+        "Module 43 / ABI 46 unchanged; stale prototype modules may need recompilation."
+      ]
     }
   }
 }
