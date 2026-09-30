@@ -1,9 +1,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type -Xslang -experimental-feature
 
-// Regression test for shader-slang/slang#11075: with `slang.numerics.differentiable` imported,
-// `min`/`max` on a generic that names `IDifferentiableRealOrderingFunctions` next to a core
-// interface binds the numerics overload (rank -10). The core `IFloat` overload sits below it at
-// -11 and the core `IComparable` overload at -13, so neither spelling is ambiguous.
+// Regression test for shader-slang/slang#11075: with `slang.numerics.differentiable` imported, a
+// generic that names `IDifferentiableRealOrderingFunctions` next to `IComparable` or `IFloat` must
+// resolve `min`/`max` without ambiguity. The numerics overload (rank -10) outranks the core
+// `IFloat` (-11) and `IComparable` (-13) overloads.
 
 import slang.numerics.differentiable;
 

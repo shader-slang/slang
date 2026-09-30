@@ -3,9 +3,10 @@
 
 // Regression test for shader-slang/slang#11075: generic code that names `IComparable` or
 // `IArithmetic` next to `IFloat` or `IInteger` also reaches the concrete vector overloads. Overload
-// resolution compares conversion cost before rank, and a directly named `IComparable` costs
-// nothing, so these spellings rely on `min`/`max` overloads constrained by `IFloat` and `IInteger`
-// themselves, ranked above the `IComparable` ones.
+// resolution compares conversion cost before rank. A directly named `IComparable` costs nothing,
+// and `IArithmetic` reaches the `IComparable` overload through one refinement, as `IFloat` reaches
+// `__IMinMax`, so these spellings rely on `min`/`max` overloads constrained by `IFloat` and
+// `IInteger` themselves, ranked above the `IComparable` ones.
 
 T minFloatComparable<T : IFloat & IComparable>(T a, T b)
 {

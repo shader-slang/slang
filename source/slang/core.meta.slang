@@ -113,19 +113,23 @@ interface IComparable
 
 //@hidden:
 // A generic `min(x, y)` binds once, against the abstract `T`, and specialization does not revisit
-// that choice, so on its own it cannot reach the concrete `vector<T, N>` overload. The core
-// `min`/`max` overloads for `IFloat` and `IInteger` therefore call `x.__min(y)` / `x.__max(y)`, and
-// the builtin scalar, vector and float matrix conformances implement these by calling `min`/`max`
-// on their own operands (the matrix conformance converts them to the default layout first). That
-// call is resolved when the conformance is checked, where `This` is concrete, so it binds the
-// concrete overload, which ranks above the generic ones that would call back into `__min`/`__max`
-// without end. Each target then gets its native vector operation where
-// it has one, and the same per-element code as a direct call on cpp/cuda.
+// that choice, so on its own it cannot reach the concrete overload written for a scalar, vector or
+// matrix shape. The core `min`/`max` overloads for `IFloat` and `IInteger` therefore call
+// `x.__min(y)` / `x.__max(y)`, and the builtin scalar, vector and float matrix conformances
+// implement these by calling `min`/`max` on their own operands (the matrix conformance converts
+// them to the default layout first). That call is resolved when each builtin conformance is
+// checked, where the operand shape is known, so it binds the concrete overload for that shape,
+// which ranks above the generic ones that would call back into `__min`/`__max` without end. Each
+// target then gets its native vector operation where it has one, and the same per-element code as a
+// direct call on cpp/cuda.
 //
-// The defaults order whole values with `lessThan`, as the `IComparable` overloads do, so a user
-// `IFloat`/`IInteger` type needs no new members but may override them. The requirements live here
-// rather than in `IComparable` so that a type conforming only to `IComparable` gains no new
-// requirements and `IComparable` stays a pure ordering interface.
+// `x.__min(y)` and `x.__max(y)` return what `min(x, y)` and `max(x, y)` mean for the type. The
+// defaults order whole values with `lessThan`, as the `IComparable` overloads do, which suits a
+// type ordered as a whole. The builtin types override them: vectors and matrices are
+// component-wise, and scalars keep each target's own `min`/`max`, including its NaN handling, which
+// a `lessThan` comparison does not match. A user `IFloat`/`IInteger` type therefore needs no new
+// members. The requirements live here rather than in `IComparable` so that a type conforming only
+// to `IComparable` gains no new requirements and `IComparable` stays a pure ordering interface.
 interface __IMinMax : IComparable
 {
     This __min(This other)
@@ -2537,7 +2541,8 @@ extension matrix<T,N,M,L> : IFloat
 
     // The concrete matrix overloads take the default layout. We convert to it explicitly because
     // an implicit layout conversion at the call would cost more than the conversion-free generic
-    // `min<T : IFloat>`, which would win and call back into `__min` without end.
+    // `min<T : IFloat>`, which would win and call back into `__min` without end. Layout conversions
+    // preserve element values, so converting the result back to `This` returns the same matrix.
     [__unsafeForceInlineEarly]
     override This __min(This other)
     {

@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11075: HLSL has a native matrix `min`/`max`, and a generic
 // `IFloat` `min`/`max` on a matrix lowers to it, as the concrete matrix overload does, not to a
@@ -31,3 +32,10 @@ void computeMain()
 // HLSL: float3x3 genMin_{{[0-9]+}}(float3x3 a_{{[0-9]+}}, float3x3 b_{{[0-9]+}})
 // HLSL-NOT: }
 // HLSL: return min(a_{{[0-9]+}}, b_{{[0-9]+}});
+
+// SPIR-V has no matrix `FMin`/`FMax`, so the concrete overload applies the vector instruction to
+// each row; a matrix-typed extended instruction would be invalid SPIR-V.
+// SPIRV-NOT: OpExtInst %mat3v3float
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMin
+// SPIRV-DAG: OpExtInst %v3float %{{[0-9a-zA-Z_]+}} FMax
+// SPIRV-NOT: OpExtInst %mat3v3float

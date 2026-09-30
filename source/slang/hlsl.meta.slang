@@ -13411,9 +13411,11 @@ T max(T x, T y)
 
 //@hidden:
 // These overloads rank below the numerics module's (-9 and -10) and above the `IComparable` one
-// (-13). Overload resolution compares conversion cost before rank, so they are constrained by
-// `IFloat` and `IInteger` themselves rather than by `__IMinMax`, and their ranks differ so that a
-// type conforming to both is not ambiguous.
+// (-13). Overload resolution compares conversion cost before rank, and satisfying `__IMinMax`
+// through `IFloat` costs more than a constraint the caller names directly, such as `IComparable`.
+// The overloads are therefore constrained by `IFloat` and `IInteger` themselves, and their ranks
+// differ so that a type conforming to both is not ambiguous; both call the same `__IMinMax`
+// witness, so either choice gives the type's own `min`/`max`.
 __generic<T : IFloat>
 [__readNone]
 [ForceInline]
@@ -13450,7 +13452,9 @@ T max(T x, T y)
 {
     // `__isFloat`/`__isInt` also hold for builtin vectors and matrices, which `__max_impl` cannot
     // expand on cpp/cuda. Generic code constrained by `IFloat` or `IInteger` reaches the
-    // shape-specific overloads through `__IMinMax` instead.
+    // shape-specific overloads through `__IMinMax` instead. Generic code constrained only by
+    // `IComparable` or `IArithmetic` still sends builtin vectors and matrices here, a known
+    // limitation (#12720).
     if (__isFloat<T>() || __isInt<T>())
         return __max_impl(x, y);
 
@@ -13826,9 +13830,11 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 
 //@hidden:
 // These overloads rank below the numerics module's (-9 and -10) and above the `IComparable` one
-// (-13). Overload resolution compares conversion cost before rank, so they are constrained by
-// `IFloat` and `IInteger` themselves rather than by `__IMinMax`, and their ranks differ so that a
-// type conforming to both is not ambiguous.
+// (-13). Overload resolution compares conversion cost before rank, and satisfying `__IMinMax`
+// through `IFloat` costs more than a constraint the caller names directly, such as `IComparable`.
+// The overloads are therefore constrained by `IFloat` and `IInteger` themselves, and their ranks
+// differ so that a type conforming to both is not ambiguous; both call the same `__IMinMax`
+// witness, so either choice gives the type's own `min`/`max`.
 __generic<T : IFloat>
 [__readNone]
 [ForceInline]
@@ -13865,7 +13871,9 @@ T min(T x, T y)
 {
     // `__isFloat`/`__isInt` also hold for builtin vectors and matrices, which `__min_impl` cannot
     // expand on cpp/cuda. Generic code constrained by `IFloat` or `IInteger` reaches the
-    // shape-specific overloads through `__IMinMax` instead.
+    // shape-specific overloads through `__IMinMax` instead. Generic code constrained only by
+    // `IComparable` or `IArithmetic` still sends builtin vectors and matrices here, a known
+    // limitation (#12720).
     if (__isFloat<T>() || __isInt<T>())
         return __min_impl(x, y);
 
