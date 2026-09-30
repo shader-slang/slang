@@ -26,6 +26,10 @@ struct IRInst;
 /// instruction is hoisted, or copied to a use that its hoisted position does not enclose,
 /// and its operands are then scoped for that use.
 ///
+/// `shouldFoldInst` must give the emitter's fold decision for the IR as this pass leaves it.
+/// The pass adds uses as it goes (copies, stores into temporaries), so it asks again for
+/// each instruction when it visits it, including when it revisits the operands of a copy.
+///
 void fixValueScoping(RegionTree* regionTree, const Func<bool, IRInst*>& shouldFoldInst);
 
 } // namespace Slang

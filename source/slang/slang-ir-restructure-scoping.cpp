@@ -462,7 +462,9 @@ static void fixValueScopingForInst(
     }
 
     // The copies of `def` gave its operands new uses, which may be bad even if the
-    // operands have already been visited.
+    // operands have already been visited. Visiting an operand again only fixes its new bad
+    // uses, possibly with a second temporary, and the recursion ends because each operand
+    // is defined before the instruction that uses it.
     //
     if (isInstCopiedToUses)
     {

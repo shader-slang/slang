@@ -5,7 +5,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-via-glsl
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type -use-dxil
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
 // glslang rejects GLSL that names a variable outside its scope, so this line checks the GLSL
@@ -20,7 +20,7 @@
 
 // buf[0..3] fill the arrays, and buf[4] = 1 is the branch condition, index and stack top,
 // read from the buffer so that the branches are not folded away.
-//TEST_INPUT:ubuffer(data=[16 83 5 9 1 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
+//TEST_INPUT:ubuffer(data=[16 83 5 9 1 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=buf
 RWStructuredBuffer<uint> buf;
 
 struct S
@@ -50,7 +50,7 @@ uint branchIndex(inout S s, bool c, int t)
     return x;
 }
 
-// The index has two uses inside the `if`, so it is never folded.
+// Both reads share a branch-local index; the later store must not reference it out of scope.
 uint branchIndexTwoUses(inout S s, bool c, int t)
 {
     uint x;
@@ -63,6 +63,13 @@ uint branchIndexTwoUses(inout S s, bool c, int t)
 }
 
 // The index is read inside the `if` and must not be re-read after the store to `s.top`.
+// SRC-LABEL: branchIndexAfterStore_0(
+// SRC: [[SVAR:_S[0-9]+]]{{.*}} = {{(int\(|i32\()?}}0{{\)?}};
+// SRC: if
+// SRC: [[SIDX:_S[0-9]+]] {{.*}}= {{.*}}top_0;
+// SRC: [[SVAR]] = [[SIDX]];
+// SRC: top_0 = {{.*}}top_0 -
+// SRC: a_0{{\[}}[[SVAR]]{{\]}} =
 uint branchIndexAfterStore(inout S s, bool c)
 {
     uint x;
@@ -79,6 +86,7 @@ uint branchIndexAfterStore(inout S s, bool c)
     return x;
 }
 
+// A case-local index reused by the store after the switch must remain in scope.
 uint switchIndex(inout S s, int c, int t)
 {
     uint x;
@@ -105,6 +113,37 @@ uint groupsharedIndex(bool c, int t)
     else
         return 0;
     gs[t * 2] = x + 7;
+    return x;
+}
+
+struct Entry
+{
+    uint node;
+    uint pad;
+}
+
+struct EntryArray
+{
+    Entry e[4];
+}
+
+// Two always-folded instructions, a `FieldAddress` of a `getElementPtr`, are copied to the
+// store after the `if`, and the copy of the inner one is made for the copy of the outer one.
+// SRC-LABEL: branchField_0(
+// SRC: [[FVAR:_S[0-9]+]]{{.*}} = {{(int\(|i32\()?}}0{{\)?}};
+// SRC: if
+// SRC: [[FIDX:_S[0-9]+]] {{.*}}= {{.*}}t_{{[0-9]+}} *
+// SRC: [[FVAR]] = [[FIDX]];
+// SRC: e_0{{\[}}[[FIDX]]{{\]}}{{.*}}node_0
+// SRC: e_0{{\[}}[[FVAR]]{{\]}}{{.*}}node_0 =
+uint branchField(inout EntryArray s, bool c, int t)
+{
+    uint x;
+    if (c)
+        x = s.e[t * 2].node;
+    else
+        return 0;
+    s.e[t * 2].node = x + 7;
     return x;
 }
 
@@ -146,7 +185,25 @@ void computeMain()
         gs[i] = buf[i];
     buf[14] = groupsharedIndex(one != 0, one);
     buf[15] = gs[2];
+
+    EntryArray ea;
+    for (int i = 0; i < 4; i++)
+    {
+        ea.e[i].node = buf[i];
+        ea.e[i].pad = 0;
+    }
+    buf[16] = branchField(ea, one != 0, one);
+    buf[17] = ea.e[2].node;
 }
+
+// Each function returns the element it reads and adds 7 to the element it stores to; a
+// regression either fails to compile or stores to the wrong element.
+// buf[5], buf[6]: branchIndex reads a[2] = 5 and stores 12 there.
+// buf[7], buf[8]: branchIndexTwoUses reads a[2] + b[2] = 15 and stores 22 to a[2].
+// buf[9] to buf[11]: branchIndexAfterStore reads a[1] = 83 and stores 90 to a[1], not a[0].
+// buf[12], buf[13]: switchIndex, as branchIndex.
+// buf[14], buf[15]: groupsharedIndex, as branchIndex.
+// buf[16], buf[17]: branchField reads e[2].node = 5 and stores 12 there.
 
 // CHECK: 16
 // CHECK-NEXT: 83
@@ -160,6 +217,8 @@ void computeMain()
 // CHECK-NEXT: 83
 // CHECK-NEXT: 16
 // CHECK-NEXT: 90
+// CHECK-NEXT: 5
+// CHECK-NEXT: 12
 // CHECK-NEXT: 5
 // CHECK-NEXT: 12
 // CHECK-NEXT: 5

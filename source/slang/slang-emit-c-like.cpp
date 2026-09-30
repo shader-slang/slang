@@ -1898,6 +1898,8 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
             return false;
         remainingUseCount++;
     }
+    // Only an always-folded user reached through the recursion below can have no uses, and
+    // nothing is emitted for it.
     if (remainingUseCount == 0)
         return true;
 
@@ -1946,9 +1948,10 @@ bool CLikeSourceEmitter::isSafeToFoldIntoUseSitesUncached(IRInst* inst)
             // recursive check applies every condition of this function at those points,
             // including that they are in the same block and are not unconditional branches.
             //
-            // A user whose policy is `WhenSafe` is only folded after passing this same test,
-            // because an override of `shouldFoldInstIntoUseSites` may only decline a fold,
-            // so it needs no further check.
+            // A user whose policy is `WhenSafe` needs no further check. It is only folded if
+            // it passes this same test itself, because an override of
+            // `shouldFoldInstIntoUseSites` may only decline a fold, so nothing with side effects
+            // lies between it and its own emission points either.
             if (getFoldPolicy(ii) == FoldPolicy::Always && !isSafeToFoldIntoUseSites(ii))
                 return false;
 
