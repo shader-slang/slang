@@ -336,6 +336,36 @@ mutations. Independent generator proofs and checker proofs use different integer
 Keep all earlier five oracle suites and 15 fixtures unchanged, including six rsqrt negative controls;
 exp adds the sixth suite and three fixtures without changing frozen corpus membership.
 
+### Base-two exponential numerical contracts
+
+```bash
+python3 extras/test-generators/check-nvvm-exp-oracles.py --operation exp2 --check --self-test
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 2 -disable-retries \
+  tests/cuda/nvvm-exp2-
+```
+
+Require nine numerical cells and one removed-tag diagnostic, with no skips. Half/Float32/Float64
+have 74 / 69 / 69 unique inputs and 15 live scalar/noinline/vector/matrix observations per lane.
+Outputs contain 299 / 278 / 278 uint words; each lane records errors, raw low/high and `56000 + lane`.
+Half adds policy marker `56042` for NVVM or `1209` for CUDA. Require exact lengths, guards, completions,
+zero errors, scalar candidate admission and zero high words for Half/Float32. Compare all nine raw
+buffers to their own immutable baseline bytes, including unpromised NaN payloads.
+
+Use the exp endpoint convention above with exact references for `2^x`: Float32 N = 2, Float64 N = 1,
+and exact special-input overrides. The generator and independent checker certify integer powers,
+including exact underflow halfway ties, or bound ln2 and exponential endpoints for noninteger inputs.
+NVVM Half narrows selected Float32 library candidates. CUDA Half applies ex2 input/output FTZ,
+then exact `fma.rn.f32(q, 2^-24, q)`, then RN16. The multiplier bits are `0x33800000`; rounding
+`1 + 2^-24` first, omitting the FMA or moving it after Half narrowing changes the contract.
+
+The checker reconstructs 212 inputs/references without an ignored manifest. Its 57 synthetic
+controls comprise 38 shared exp checks and 19 exp2 checks, including independent FMA encoding rules,
+midpoint parity, FTZ and biased-narrowing negatives. Optional `--proposal PATH --negative-controls`
+audits preparation certificates and rejects 14 mutations. The default operation remains exp.
+Preserve the six earlier suites and 18 fixtures unchanged; exp2 adds the seventh suite and three
+fixtures outside frozen corpus membership. Targeted acceptance retains the last full baseline's
+identity and records these fresh results separately, following WORKFLOW.
+
 ## Report environment
 
 Execution and comparison use the Python standard library. Shareable SVG/PNG charts use Matplotlib:

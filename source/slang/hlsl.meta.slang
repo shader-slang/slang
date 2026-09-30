@@ -10887,10 +10887,20 @@ T exp2(T x)
     case hlsl:
         __intrinsic_asm "exp2($0)";
     case metal: __intrinsic_asm "exp2";
+    case nvvm:
+        static_assert(T is half || T is float || T is double,
+            "NVVM exp2 requires half, float, or double.");
+        // Preserve the selected Float32 evaluation before the single Half narrowing.
+        if (T is half)
+            return __realCast<T>(exp2(__realCast<float>(x)));
+        else if (T is float)
+            __intrinsic_asm "__nv_exp2f", x;
+        else
+            __intrinsic_asm "__nv_exp2", x;
     case cpp:
-        __intrinsic_asm(nvvmExp2) "$P_exp2($0)";
+        __intrinsic_asm "$P_exp2($0)";
     case cuda:
-        __intrinsic_asm(nvvmExp2) "$P_exp2($0)";
+        __intrinsic_asm "$P_exp2($0)";
     case wgsl:
         __intrinsic_asm "exp2";
     case llvm:

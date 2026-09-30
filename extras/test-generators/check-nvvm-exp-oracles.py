@@ -254,19 +254,37 @@ def half_fma_input(bits):
     return round_signed(x * decode(C_BITS, 32), 32, negative_zero=(bits == 0x8000))
 
 
-def row(bits, width):
+def bias_exp2(bits):
+    """Round the installed CUDA Half output FMA exactly, before Half narrowing."""
+    if bits >= infinity(32):
+        return bits
+    return round_positive(decode(bits, 32) * (1 + power2(-24)), 32)
+
+
+def row(bits, width, operation="exp"):
     kind, special = classify_input(bits, width)
     if kind != 'finite':
         return {'input': bits, 'kind': kind, 'nvvm': special, 'cuda': special}
     x = decode(bits, width)
     evaluation_width = 32 if width == 16 else width
-    ref = reference(x, evaluation_width)
+    ref = reference(x, evaluation_width, operation == "exp2")
     library = admission(ref, evaluation_width, 2 if evaluation_width == 32 else 1)
     result = {'input': bits, 'kind': kind, 'reference': ref, 'library': library}
     if width != 16:
         result.update(nvvm=library, cuda=library)
         return result
     nvvm = sorted({narrow(b) for b in library})
+    if operation == 'exp2':
+        input_bits = round_signed(x, 32)
+        flushed_input = flush(input_bits, 32)
+        ptx_ref = reference(decode(flushed_input, 32), 32, True)
+        ptx_admitted = admission(ptx_ref, 32, 2)
+        stages = [[b, flush(b, 32), bias_exp2(flush(b, 32)),
+                   narrow(bias_exp2(flush(b, 32)))] for b in ptx_admitted]
+        result.update(nvvm=nvvm, cuda=sorted({a[3] for a in stages}),
+                      ideal_half=reference(x, 16, True), fma=input_bits, ptx_reference=ptx_ref,
+                      ptx=ptx_admitted, cuda_stages=stages)
+        return result
     # For nonzero finite Half the exact product is normal Float32, but keep FTZ explicit.
     product_bits = half_fma_input(bits)
     flushed_input = flush(product_bits, 32)
@@ -284,10 +302,10 @@ def encoded(bits, width):
     return format(bits, '0{}x'.format(width // 4))
 
 
-def compute_record(width, input_bits):
+def compute_record(width, input_bits, operation="exp"):
     """Reconstruct worker-schema numerical fields without importing generator code."""
     bits = int(input_bits, 16) if isinstance(input_bits, str) else input_bits
-    r = row(bits, width)
+    r = row(bits, width, operation)
     out = {'input_bits': encoded(bits, width), 'special': r['kind'] != 'finite'}
     if r['kind'] == 'nan':
         out.update(reference_bits='nan', nvvm_candidates=['nan'], cuda_candidates=['nan'])
@@ -297,12 +315,24 @@ def compute_record(width, input_bits):
     if out['special']:
         out['reference_bits'] = encoded(r['nvvm'][0], width)
         return out
-    out['reference_bits'] = encoded(reference(decode(bits, width), width), width)
+    out['reference_bits'] = encoded(reference(decode(bits, width), width, operation == "exp2"), width)
     ew = 32 if width == 16 else width
     if width == 16:
         out['library_reference_bits'] = encoded(r['reference'], ew)
         out['library_candidates'] = [encoded(b, ew) for b in r['library']]
         post = sorted({flush(b, 32) for b in r['ptx']})
+        if operation == 'exp2':
+            biased = sorted({bias_exp2(b) for b in post})
+            out['cuda_half'] = {
+                't_bits': encoded(r['fma'], 32),
+                't_after_ftz_bits': encoded(flush(r['fma'], 32), 32),
+                'exp2_reference_bits': encoded(r['ptx_reference'], 32),
+                'pre_ftz_candidates': [encoded(b, 32) for b in r['ptx']],
+                'post_ftz_candidates': [encoded(b, 32) for b in post],
+                'biased_candidates': [encoded(b, 32) for b in biased],
+                'narrowed_candidates': [encoded(b, 16) for b in sorted({narrow(b) for b in biased})],
+            }
+            return out
         narrowed = sorted({narrow(b) for b in post})
         stages = []
         current = narrowed
@@ -414,24 +444,24 @@ def audit_certificate(x, width, reference_bits, descriptor, base_two=False):
     need(cell_contains(low, high, reference_bits, width), 'generator certificate does not fit claimed rounding cell')
 
 
-def audit_record_certificates(record, width):
+def audit_record_certificates(record, width, operation="exp"):
     if record['special']:
         need(not any('certificate' in key for key in record), 'special inputs must not carry finite proofs')
         return
     x = decode(int(record['input_bits'], 16), width)
-    audit_certificate(x, width, int(record['reference_bits'], 16), record['reference_certificate'])
+    audit_certificate(x, width, int(record['reference_bits'], 16), record['reference_certificate'], operation == 'exp2')
     if width == 16:
-        audit_certificate(x, 32, int(record['library_reference_bits'], 16), record['library_certificate'])
+        audit_certificate(x, 32, int(record['library_reference_bits'], 16), record['library_certificate'], operation == 'exp2')
         cuda = record['cuda_half']
         audit_certificate(decode(int(cuda['t_after_ftz_bits'], 16), 32), 32,
                           int(cuda['exp2_reference_bits'], 16), cuda['exp2_certificate'], True)
 
 
 
-def check_proposal(path, negative=False):
+def check_proposal(path, negative=False, operation="exp"):
     proposal = json.loads(path.read_text())
-    need(proposal['schema'] == 'nvvm-exp-policy-v1', 'unrecognized proposal schema')
-    need(proposal['policy_ids'] == {'nvvm_half': 55040, 'cuda_half': 1209}, 'policy markers differ')
+    need(proposal['schema'] == 'nvvm-' + operation + '-policy-v1', 'unrecognized proposal schema')
+    need(proposal['policy_ids'] == {'nvvm_half': 56042 if operation == 'exp2' else 55040, 'cuda_half': 1209}, 'policy markers differ')
     summaries = []
     half_records = []
     for group in proposal['formats']:
@@ -440,13 +470,46 @@ def check_proposal(path, negative=False):
         for actual in group['records']:
             need(actual['input_bits'] not in seen, 'duplicate input bits')
             seen.add(actual['input_bits'])
-            expected = compute_record(width, actual['input_bits'])
+            expected = compute_record(width, actual['input_bits'], operation)
             compare_record(actual, expected, str(width) + ':' + actual['input_bits'])
-            audit_record_certificates(actual, width)
+            audit_record_certificates(actual, width, operation)
             if width == 16:
                 half_records.append((actual, expected))
         summaries.append({'width': width, 'records': len(seen)})
     result = {'status': 'pass', 'formats': summaries, 'manifest_sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    if negative and operation == 'exp2':
+        controls = []
+        candidate = next((a, e) for a, e in half_records if not a['special'] and
+                         a['reference_certificate']['kind'] == 'ln2-exp')
+        for field in ('reference_bits', 'library_reference_bits', 'nvvm_candidates', 'cuda_candidates'):
+            altered = copy.deepcopy(candidate[0])
+            altered[field] = ['0000'] if field.endswith('candidates') else '0000'
+            try:
+                compare_record(altered, candidate[1])
+            except ValueError as error:
+                controls.append({'mutation': field, 'rejected': str(error)})
+            else:
+                raise ValueError('negative control admitted: ' + field)
+        for field in candidate[1]['cuda_half']:
+            altered = copy.deepcopy(candidate[0])
+            altered['cuda_half'][field] = [] if isinstance(altered['cuda_half'][field], list) else '00000000'
+            try:
+                compare_record(altered, candidate[1])
+            except ValueError as error:
+                controls.append({'mutation': field, 'rejected': str(error)})
+            else:
+                raise ValueError('negative control admitted: ' + field)
+        for field in ('k', 'precision', 'terms'):
+            altered = copy.deepcopy(candidate[0])
+            altered['reference_certificate'][field] += 1
+            try:
+                audit_record_certificates(altered, 16, operation)
+            except ValueError as error:
+                controls.append({'mutation': 'certificate-' + field, 'rejected': str(error)})
+            else:
+                raise ValueError('negative certificate admitted: ' + field)
+        result['negative_controls'] = controls
+        return result
     if negative:
         controls = []
         candidate = next((a, e) for a, e in half_records if a['input_bits'] == '1f79')
@@ -519,7 +582,7 @@ def bits_from_key(key, width):
     return ((1 << width) - 1) ^ key if key < sign else key - sign
 
 
-def compare_exp_to_boundary(x, boundary):
+def compare_exp_to_boundary(x, boundary, operation="exp"):
     if x >= 2048:
         need(boundary < power2(2048), 'coarse output boundary too large')
         return 1
@@ -527,7 +590,7 @@ def compare_exp_to_boundary(x, boundary):
         need(boundary > power2(-2048), 'coarse output boundary too small')
         return -1
     for precision in (128, 192, 256, 384, 512):
-        low, high = exp_enclosure(x, precision)
+        low, high = (exp2_enclosure if operation == "exp2" else exp_enclosure)(x, precision)
         if high < boundary:
             return -1
         if low > boundary:
@@ -538,7 +601,7 @@ def compare_exp_to_boundary(x, boundary):
 
 
 @lru_cache(maxsize=None)
-def frozen_inputs(width):
+def frozen_inputs(width, operation="exp"):
     """Reconstruct the bounded corpus from exact classes and independently certified boundaries."""
     fraction, bias = FORMATS[width]
     inf = infinity(width)
@@ -556,9 +619,15 @@ def frozen_inputs(width):
                   (midpoint_before(inf, width), (-2, -1, 0, 1)),
                   (Q(1, 2), (-2, -1, 0, 1)), (Q(2), (-2, -1, 0, 1)),
                   (Q(4), (-2, -1, 0, 1))]
-    if width == 16:
+    if operation == 'exp2':
+        required.update(round_signed(Q(e), width) for e in
+                        (-bias - fraction, 1 - bias - fraction, 1 - bias, bias, bias + 1))
+        boundaries.extend(((Q(1) + power2(-11), (-2, -1, 0, 1)),
+                           (Q(1) + 3 * power2(-11), (-2, -1, 0, 1))))
+    if width == 16 and operation == 'exp':
         for match, _ in CORRECTIONS:
             required.update((match - 1, match, match + 1))
+    if width == 16:
         boundaries.extend(((power2(-150), (-1, 0)),
                            (power2(-126) - power2(-150), (-1, 0)),
                            (midpoint_before(infinity(32), 32), (-1, 0))))
@@ -568,12 +637,14 @@ def frozen_inputs(width):
         while left < right:
             middle = (left + right) // 2
             x = decode(bits_from_key(middle, width), width)
-            if compare_exp_to_boundary(x, threshold) >= 0:
+            if compare_exp_to_boundary(x, threshold, operation) >= 0:
                 right = middle
             else:
                 left = middle + 1
         required.update(bits_from_key(left + delta, width) for delta in neighbors)
-    need(len(required) == {16: 80, 32: 62, 64: 62}[width], 'bounded corpus count changed')
+    need(len(required) <= 96, 'bounded corpus cap exceeded')
+    if operation == 'exp':
+        need(len(required) == {16: 80, 32: 62, 64: 62}[width], 'bounded exp corpus count changed')
     return sorted(required)
 
 
@@ -598,13 +669,15 @@ def fixture_table(records, target):
     return words
 
 
-def check_fixture(path, width):
+def check_fixture(path, width, operation="exp"):
     text = path.read_text()
+    marker = 56042 if operation == 'exp2' else 55040
+    completion = 56000 if operation == 'exp2' else 55000
     words = buffer(text, 'inputWords')
     need(len(words) % 2 == 0, 'unpaired IEEE input words')
     inputs = [words[i] | (words[i + 1] << 32) for i in range(0, len(words), 2)]
-    need(inputs == frozen_inputs(width), 'fixture boundary/material/correction input inventory differs')
-    records = [compute_record(width, bits) for bits in inputs]
+    need(inputs == frozen_inputs(width, operation), 'fixture boundary/material/correction input inventory differs')
+    records = [compute_record(width, bits, operation) for bits in inputs]
     count = len(inputs)
     need(buffer(text, 'expectedWords') == fixture_table(records, 'nvvm'), 'fixture NVVM candidates differ')
     base = 2 if width == 16 else 1
@@ -613,7 +686,7 @@ def check_fixture(path, width):
         need(buffer(text, 'cudaWords') == fixture_table(records, 'cuda'), 'fixture CUDA Half candidates differ')
         for snippet in ('case nvvm: return true;', 'default: return false;',
                         'return usesLibraryPolicy() ? expectedWords[offset] : cudaWords[offset];',
-                        'if (lane == 0) outputBuffer[1] = usesLibraryPolicy() ? 55040u : 1209u;'):
+                        f'if (lane == 0) outputBuffer[1] = usesLibraryPolicy() ? {marker}u : 1209u;'):
             need(snippet in text, 'missing Half policy selection/marker: ' + snippet)
         need(text.count('filecheck-buffer=CUDA') == 1 and text.count('filecheck-buffer=NVVM') == 2, 'Half mode directives differ')
     else:
@@ -625,33 +698,33 @@ def check_fixture(path, width):
                     'valueBits(scalarResult, low, high);', '[numthreads(128, 1, 1)]', f'if (lane >= {count}) return;'):
         need(snippet in text, 'missing discrete admission or live observation: ' + snippet)
     typ = {16: 'half', 32: 'float', 64: 'double'}[width]
-    need(typ + ' scalarResult = exp(loadValue(lane));' in text, 'scalar exp is not live')
-    need(re.search(r'\[noinline\]\s+' + typ + r' expThroughHelper\(' + typ + r' value\)\s*\{\s*return exp\(value\);\s*\}', text), 'helper exp is not live')
-    comparisons = ['scalarResult, lane', 'expThroughHelper(loadValue(lane)), lane']
+    need(typ + f' scalarResult = {operation}(loadValue(lane));' in text, 'scalar exp is not live')
+    need(re.search(r'\[noinline\]\s+' + typ + ' ' + operation + r'ThroughHelper\(' + typ + r' value\)\s*\{\s*return ' + operation + r'\(value\);\s*\}', text), 'helper exp is not live')
+    comparisons = ['scalarResult, lane', operation + 'ThroughHelper(loadValue(lane)), lane']
     masks = [1, 2]
     for size in (2, 3, 4):
         args = ', '.join(f'loadValue((lane + {i}) % {count})' for i in range(size))
-        need(f'{typ}{size} result{size} = exp({typ}{size}({args}));' in text, 'vector exp is not live')
+        need(f'{typ}{size} result{size} = {operation}({typ}{size}({args}));' in text, 'vector exp is not live')
         for i, component in enumerate('xyzw'[:size]):
             comparisons.append(f'result{size}.{component}, (lane + {i}) % {count}')
             masks.append(1 << size)
     args = ', '.join(f'loadValue((lane + {i}) % {count})' for i in range(4))
-    need(f'matrix<{typ}, 2, 2> resultMatrix = exp(matrix<{typ}, 2, 2>({args}));' in text, 'matrix exp is not live')
+    need(f'matrix<{typ}, 2, 2> resultMatrix = {operation}(matrix<{typ}, 2, 2>({args}));' in text, 'matrix exp is not live')
     for i in range(4):
         comparisons.append(f'resultMatrix[{i // 2}][{i % 2}], (lane + {i}) % {count}')
         masks.append(32)
     need(text.count('errors |= matchesExpected(') == 15, '15 live observations required')
     for expression, mask in zip(comparisons, masks):
         need(f'errors |= matchesExpected({expression}) ? 0u : {mask}u;' in text, 'missing comparison: ' + expression)
-    for offset, value in enumerate(('errors', 'low', 'high', '55000 + lane')):
+    for offset, value in enumerate(('errors', 'low', 'high', f'{completion} + lane')):
         need(f'outputBuffer[{base + offset} + 4 * lane] = {value};' in text, 'raw observation/completion layout differs')
     for prefix in (('CUDA', 'NVVM') if width == 16 else ('CHECK',)):
         checks = re.findall(r'^// ' + prefix + r'(-NEXT)?: (.+)\{\{\$\}\}$', text, re.M)
         expected = [str(0x13579bdf)]
         if width == 16:
-            expected.append('55040' if prefix == 'NVVM' else '1209')
+            expected.append(str(marker) if prefix == 'NVVM' else '1209')
         for lane in range(count):
-            expected += ['0', '{{[0-9]+}}', '{{[0-9]+}}', str(55000 + lane)]
+            expected += ['0', '{{[0-9]+}}', '{{[0-9]+}}', str(completion + lane)]
         expected.append(str(0xdeadbeef))
         need([v for _, v in checks] == expected, 'full output filecheck differs')
         need(checks[0][0] == '' and all(k == '-NEXT' for k, _ in checks[1:]), 'filecheck must be contiguous')
@@ -725,8 +798,38 @@ def self_test():
     return {'status': 'pass', 'checks': checks, 'correction_rows': correction_rows}
 
 
+def exp2_self_test():
+    """Cross-check exact FMA arithmetic against the independently derived encoding rule."""
+    checks = []
+    for bits in (0, 0x00800000, 0x00800001, 0x3f000000, 0x3f800000,
+                 0x3f800001, 0x3f801000, 0x3f803000, 0x7f7fffff, 0x7f800000):
+        expected = bits if bits in (0, infinity(32)) or bits & 0x7fffff == 0 else bits + 1
+        need(bias_exp2(bits) == expected, 'CUDA exp2 bias analytical rule differs')
+        checks.append('bias-' + encoded(bits, 32))
+    midpoint = 0x3f801000
+    need(narrow(bias_exp2(midpoint)) != narrow(midpoint), 'omitted bias not detected')
+    rounded_factor = round_positive(1 + power2(-24), 32)
+    need(round_positive(decode(midpoint, 32) * decode(rounded_factor, 32), 32) != bias_exp2(midpoint),
+         'premature factor rounding not detected')
+    need(narrow(bias_exp2(midpoint)) != round_positive(decode(narrow(midpoint), 16) * (1 + power2(-24)), 16),
+         'bias after Half narrowing not detected')
+    need(round_positive(decode(midpoint, 32) * (1 + power2(-25)), 32) != bias_exp2(midpoint),
+         'wrong FMA multiplier not detected')
+    need([narrow(midpoint)] != [narrow(bias_exp2(midpoint))], 'synthetic target-policy swap not detected')
+    need(bias_exp2(flush(1, 32)) != bias_exp2(1), 'missing output FTZ stage not detected')
+    checks.extend(('missing-bias', 'premature-factor-rounding', 'bias-after-narrow', 'wrong-multiplier',
+                   'synthetic-target-policy-swap', 'missing-output-ftz'))
+    for width, (fraction, bias) in FORMATS.items():
+        x = Q(-bias - fraction)
+        need(reference(x, width, True) == 0, 'exact exp2 underflow tie is not even zero')
+        need(reference(x + 1, width, True) == 1, 'exact exp2 minimum subnormal differs')
+        checks.append('exact-underflow-' + str(width))
+    return checks
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--operation', choices=('exp', 'exp2'), default='exp')
     parser.add_argument('--self-test', action='store_true')
     parser.add_argument('--rows', type=Path, help='CPU proposal JSON with width -> array of IEEE inputs')
     parser.add_argument('--proposal', '--manifest', type=Path)
@@ -738,14 +841,16 @@ def main():
     need(not args.negative_controls or args.proposal, '--negative-controls requires --proposal')
     start = time.monotonic()
     result = self_test() if args.self_test else {}
+    if args.self_test and args.operation == 'exp2':
+        result['checks'].extend(exp2_self_test())
     if args.check:
-        result['fixtures'] = [check_fixture(args.directory / ('nvvm-exp-' + name + '.slang'), width)
+        result['fixtures'] = [check_fixture(args.directory / ('nvvm-' + args.operation + '-' + name + '.slang'), width, args.operation)
                               for width, name in ((16, 'half'), (32, '32'), (64, '64'))]
     if args.proposal:
-        result['proposal'] = check_proposal(args.proposal, args.negative_controls)
+        result['proposal'] = check_proposal(args.proposal, args.negative_controls, args.operation)
     if args.rows:
         inputs = json.loads(args.rows.read_text())
-        result['rows'] = {w: [row(b, int(w)) for b in bits] for w, bits in inputs.items()}
+        result['rows'] = {w: [row(b, int(w), args.operation) for b in bits] for w, bits in inputs.items()}
     result['elapsed_seconds'] = time.monotonic() - start
     result['checker_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     text = json.dumps(result, indent=2) + '\n'

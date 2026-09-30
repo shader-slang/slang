@@ -74,7 +74,7 @@ The [target-switch helper test](../../tests/language-feature/capability/target-s
 checks that discarded NVVM helper branches do not diagnose during CUDA linking, while a live
 unavailable switch still rejects. [Layout controls](../../tests/language-feature/capability/target-switch-layout-lifetime.slang)
 cover uniform and resource-only CUDA/HLSL/SPIR-V programs; later HLSL/SPIR-V pruning still removes
-unused resources. Semantic module version 41 rejects older modules before AST/IR decoding; metadata inspection
+unused resources. Semantic module version 42 rejects older modules before AST/IR decoding; metadata inspection
 and source fallback remain available. Retired integer IDs 46/47 are not accepted through a compatibility
 shim. Compound wave users still own count45/low48 until their separate migration.
 
@@ -165,6 +165,23 @@ endpoint rules, FTZ, constants and corrections. An optional ignored proposal aud
 proof fields and rejects 16 mutations. The [removed-tag test](../../tests/cuda/nvvm-exp-removed-tag.slang)
 checks the frontend boundary. Preserve all nine raw baseline buffers, including NaNs. Current
 acceptance and exact compiler identity remain owned by STATUS.
+
+Public `exp2` selects named `__nv_exp2f`/`__nv_exp2`; Half preserves the selected Float32 call
+before narrowing once. Numeric 56, its tag and legacy text are retired. Direct real-provider
+rejection/no-mutation and emitter preflight tests remain independent of the module-version gate.
+The [Half](../../tests/cuda/nvvm-exp2-half.slang), [Float32](../../tests/cuda/nvvm-exp2-32.slang)
+and [Float64](../../tests/cuda/nvvm-exp2-64.slang) fixtures contain 74 / 69 / 69 unique inputs,
+15 live observations per lane and 299 / 278 / 278 output words. They preserve full scalar bits,
+completion and guards; Half markers `56042` and `1209` identify NVVM and CUDA policies.
+
+Library admission follows the same test-defined endpoint convention with independently certified
+base-two references. CUDA Half uses ex2 input/output FTZ, Float32 FMA with multiplier `2^-24` and
+then RN16; NVVM Half narrows its Float32 library result once. Candidate sets agree on this corpus,
+while synthetic midpoint candidates distinguish the policies. The existing exponential checker
+with `--operation exp2 --check --self-test` reconstructs 212 references and runs 57 controls:
+38 retained shared checks and 19 exp2 checks. Optional preparation-proposal auditing rejects 14
+mutations. Default invocation still checks exp unchanged. The [removed-tag test](../../tests/cuda/nvvm-exp2-removed-tag.slang)
+checks fresh tagged source; current acceptance and exact tested identity remain owned by STATUS.
 
 Public `sqrt` uses the named LLVM intrinsic with canonical Half promotion to Float32 and narrowing.
 Numeric 36, its tag and text path are retired. Direct named Half/vector sqrt is outside provider

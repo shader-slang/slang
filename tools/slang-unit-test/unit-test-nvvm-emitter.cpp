@@ -11964,6 +11964,8 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation)
         {"__nv_rsqrt", true},
         {"__nv_expf", false},
         {"__nv_exp", true},
+        {"__nv_exp2f", false},
+        {"__nv_exp2", true},
     };
     for (const auto& testCase : cases)
         for (int variant = 0; variant < 6; ++variant)
@@ -12044,6 +12046,8 @@ SLANG_UNIT_TEST(nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary)
         double unusedRsqrtDouble(double value) { __intrinsic_asm "__nv_rsqrt", value; }
         float unusedExpFloat(float value) { __intrinsic_asm "__nv_expf", value; }
         double unusedExpDouble(double value) { __intrinsic_asm "__nv_exp", value; }
+        float unusedExp2Float(float value) { __intrinsic_asm "__nv_exp2f", value; }
+        double unusedExp2Double(double value) { __intrinsic_asm "__nv_exp2", value; }
         uint readX() { __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x"; }
         [CUDAKernel] void computeMain(uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words)
         { words[0] = readX(); }
@@ -12855,6 +12859,11 @@ SLANG_UNIT_TEST(nvvmSlangPublicExpUsesNamedDeviceLibrary)
     _checkNVVMPublicUnaryDeviceLibrary("exp", "__nv_expf", "__nv_exp", 55);
 }
 
+SLANG_UNIT_TEST(nvvmSlangPublicExp2UsesNamedDeviceLibrary)
+{
+    _checkNVVMPublicUnaryDeviceLibrary("exp2", "__nv_exp2f", "__nv_exp2", 56);
+}
+
 SLANG_UNIT_TEST(nvvmSlangLegacyRsqrtAssemblyRejectsBeforeOutputCreation)
 {
     // Fresh tagged source is diagnosed as an unknown tag before NVVM planning. Immutable old
@@ -12930,6 +12939,47 @@ SLANG_UNIT_TEST(nvvmSlangLegacyExpAssemblyRejectsBeforeOutputCreation)
         SLANG_CHECK(!code);
         SLANG_CHECK(text.contains("E52017"));
         SLANG_CHECK(text.contains("$P_exp($0)"));
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangLegacyExp2AssemblyRejectsBeforeOutputCreation)
+{
+    // The builder unit directly rejects reserved numeric 56 without a module-version gate.
+    // This unit independently rejects legacy untagged text before any output module is created.
+    const char* types[] = {"half", "float", "double"};
+    const char* bodies[] = {
+        "words[1] = uint(bit_cast<uint16_t>(oldExp2(bit_cast<half>(uint16_t(words[0])))));",
+        "words[1] = asuint(oldExp2(asfloat(words[0])));",
+        "uint low, high; asuint(oldExp2(asdouble(words[0], words[1])), low, high); "
+        "words[2] = low; words[3] = high;",
+    };
+    for (Index variant = 0; variant < SLANG_COUNT_OF(types); ++variant)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << types[variant] << " oldExp2(" << types[variant] << " x) { "
+               << "__intrinsic_asm \"$P_exp2($0)\"; } "
+               << "[CUDAKernel] void computeMain("
+               << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> words) { "
+               << bodies[variant] << " }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        const String text = _getBlobText(diagnostics);
+        if (!text.contains("E52017") || !text.contains("$P_exp2($0)"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(!code);
+        SLANG_CHECK(text.contains("E52017"));
+        SLANG_CHECK(text.contains("$P_exp2($0)"));
         SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryQueryCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);

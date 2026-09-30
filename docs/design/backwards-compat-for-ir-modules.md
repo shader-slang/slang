@@ -80,9 +80,9 @@ Two types of versions are tracked:
 
 ### Current Prototype Boundary
 
-The prototype writes semantic module version 41 and accepts only version 41. Earlier versions
+The prototype writes semantic module version 42 and accepts only version 42. Earlier versions
 contain incompatible numeric capability identities or retired NVVM integer-bit and math operations;
-version 40 still admitted exp ID 55. Recompile older user modules and built-ins for every backend.
+version 41 still admitted exp2 ID 56. Recompile older user modules and built-ins for every backend.
 Public APIs then use the current core bodies; modules that explicitly named retired semantic tags
 must migrate those source bodies to current core calls or supported explicit intrinsic operations.
 Metadata inspection remains available without loading AST or IR, and speculative binary imports

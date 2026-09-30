@@ -65,8 +65,8 @@ actual types, constant promises, provenance and dominance before creating a decl
 Conflicting intrinsic symbols reject before mutation.
 
 Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
-names for `round`, `ceil`, `floor`, `trunc`, `rsqrt` and `exp` (`__nv_roundf`/`__nv_round`, and the
-corresponding pairs for the other five). Complete signatures come from definitions in the selected immutable
+names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp` and `exp2` (`__nv_roundf`/`__nv_round`, and the
+corresponding pairs for the other six). Complete signatures come from definitions in the selected immutable
 library; there is no parallel name-to-signature table. Core scalar bodies select these names in
 NVVM branches. Half preserves its existing evaluation through canonical casts, for example
 `__realCast<T>(floor(__realCast<float>(x)))`: widen exactly, evaluate in Float32 and narrow once.
@@ -125,6 +125,19 @@ Both input and result FTZ and every discrete correction image are retained in th
 PTX 2-ULP interpretation is separately test-defined; it is not the empirical expf table. Frozen
 baseline scalar outputs at Half inputs `0x1f79` and `0x25cf` differ between targets intentionally.
 Per-mode raw byte preservation, including unpromised NaN payloads, is a separate requirement.
+
+Public `exp2` selects `__nv_exp2f` or `__nv_exp2` with the same canonical Half widening and
+single narrowing. Numeric operation 56, its semantic tag and text recognizer are retired. Its
+independent default-mode contract uses the same endpoint convention and special classifications
+as exp, applied to certified references for `2^x`. Exact integer powers include the true underflow
+midpoint ties at -25, -150 and -1075 for Half, Float32 and Float64.
+
+CUDA Half exp2 widens, applies `ex2.approx.ftz.f32`, then computes `fma.rn.f32(q, 2^-24, q)`
+before narrowing to Half. The Float32 bias multiplier is `0x33800000`. Each admitted PTX candidate
+passes through output FTZ, the exact FMA rounding and RN16; neither a prematurely rounded multiplier
+`1 + 2^-24` nor an FMA after narrowing preserves that sequence. NVVM Half directly narrows the
+selected Float32 library result. Their candidate sets agree on the qualified finite corpus, but a
+synthetic midpoint candidate distinguishes the policies. No universal target equivalence follows.
 
 Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
 matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
@@ -210,9 +223,9 @@ multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary
 and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
 an NVVM representation or shared SSA legalization change.
 
-The prototype writes and accepts only semantic module version 41. Older user modules and built-ins
+The prototype writes and accepts only semantic module version 42. Older user modules and built-ins
 must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including exp in version 40. Existing guards reject these
+or retired numeric NVVM operations, including exp2 in version 41. Existing guards reject these
 before decoding AST or IR; metadata inspection and speculative import fallback to source remain
 available. Source modules that explicitly used retired semantic tags need current core calls or
 supported explicit intrinsic bodies. Container format 2 and provider ABI 46 are separate contracts.
