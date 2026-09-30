@@ -76600,6 +76600,467 @@
         "PTX permits excess precision in 16-bit operations; correction is keyed by integer semantic role, not physical i16 storage. No general type/storage legalization or numerical/performance campaign.",
         "Module43/ABI46/container2 unchanged. All earlier full and focused evidence keeps its actual identity."
       ]
+    },
+    "nvvm-post-migration-integration": {
+      "status": "accepted-bounded-integration",
+      "scope": "One consolidated integration checkpoint after eight text-route migrations and signed16 normalization. Exact native/semantic inventory comparison, compact migration runtime union, toolkit compilation/assembly and two physical-surface cases. Full corpus/numerical/material baseline remains unchanged.",
+      "production_identity": {
+        "path": "build/nvvm-signed16/tested-identity.json",
+        "sha256": "60da5f5cef04e3c98c2bdbcf7c55c17fed4e3dbd1b4aaefdc7c691d00736f4bb"
+      },
+      "test_identity": {
+        "revision": "028b25601dd80355816e5bf9e00147b22d0c5f60",
+        "test_patch_sha256": "4629eac4eb5230cad5f33c22ef0c115e8e36bc2d8602517022bc25abba3f5e6e",
+        "files": {
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "835bb2ca768b78eef0b35bc7485c6710c1211f47c43fcce4d7dda6dcb6f1fdbb",
+          "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "6ccaf5deefbac9b98f70ee9f394ebc4c6587d00e34c92c0d2fccde966a88d6de"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "1378468640c4b444809566aade1257d2cb77682faf1d0a120c19439e96ddc528",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "466833a5debf0e9e7f1fd50885e99a0588973cbae7d89939b1511ea5643cde09",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ce0c6bf613372977c4f985b8d6853fe36aa24f8e83181392091859555e66589c",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "tested_identity": {
+          "path": "build/nvvm-integration/run-1/tested-identity-final.json",
+          "sha256": "a4a7413ebfd01eecd511a986268d7c56d996afb4806a06289e98df0fbea81856"
+        }
+      },
+      "native": {
+        "passed": 1172,
+        "ignored": 12,
+        "records": [
+          {
+            "path": "build/nvvm-integration/run-1/native.json",
+            "sha256": "7fd76ca943b0a32910cce5cb1af7f66f3265efcc43a36a3774f2dd51d76802b5",
+            "return_code": 1,
+            "elapsed_seconds": 173.87182068824768
+          },
+          {
+            "path": "build/nvvm-integration/run-1/native-retry.json",
+            "sha256": "6356776c7519e6294f4d2320d951ce067e1a2640302d24539650e995dcb90ec3",
+            "return_code": 0,
+            "elapsed_seconds": 2.418630361557007
+          }
+        ],
+        "required_gpu_units": [
+          "slang-unit-test-tool/nvvmSlangCUDAExecutionRuntimeMatchesNVRTC.internal",
+          "slang-unit-test-tool/nvvmSlangSharedMemoryRuntimeMatchesNVRTC.internal",
+          "slang-unit-test-tool/nvvmSlangRelaxedGlobalI32AtomicAddRuntimeMatchesNVRTC.internal",
+          "slang-unit-test-tool/nvvmSlangWaveReadLaneAtUIntRuntimeMatchesNVRTC.internal"
+        ],
+        "baseline_delta": {
+          "added": {
+            "slang-unit-test-tool/nvvmIRBuilderBFloat16FmaContract.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsCoreMathNamedCalls.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderCoreValuesRejectRetiredOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderCoreValuesUseNamedFunctions.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderCoreWavesRejectRetiredOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderCoreWavesUseNamedSignatures.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryPointerOutputs.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderMaskedWavesRejectRetiredOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRejectsRetiredPointerMathOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRetiredCoreMathRejectsWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRetiredNaNRejectsWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangAtomicReductionProducersRejectInvalidInputs.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangAtomicReductionsUseCanonicalOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangBFloat16CoreDotComposition.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreBitsLegacyTextRejectsBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreLayoutQueriesRejectInvalidSize.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreMathLegacyRoutesRejectBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreMathUsesNamedCalls.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreTailLegacyRoutesRejectBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreValuesLegacyRoutesRejectBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreWaveLegacyRoutesRejectBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreWaveProducersUseNamedCalls.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangHardwareAndLogicalWaveMasksStayDistinct.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLocalAtomicReductionRejectsAtProducer.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveLegacyTextRejectsBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveScalarAdmissionStaysBounded.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangOffsetQueryRejectsInvalidAndLegacyCalls.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangResourceLegacyRoutesRejectBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangResourceOperationsUseTypedInstructions.internal": "passed"
+          },
+          "removed": {
+            "slang-unit-test-tool/nvvmIRBuilderBFloat16DotContract.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsExactLibdeviceUnaryOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsExtendedScalarMathOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsIntegerBitOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskAllEqualFloatKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskAllEqualIntKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskAllEqualUIntKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskAllTrueKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskAnyTrueKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveMaskIsFirstLaneKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveReadLaneAtFloatKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveReadLaneAtIntKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveReadLaneAtUIntKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveReadLaneFirstFloatKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveReadLaneFirstIntKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsWaveReadLaneFirstUIntKernel.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderRejectsShuffleOperandsWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangAtomicReductionsUseGlobalHelperReferences.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangUnmaskedWaveReadLaneAtFloatUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangUnmaskedWaveReadLaneAtIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangUnmaskedWaveReadLaneAtUIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveActiveAllEqualFloatUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveActiveAllEqualIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveActiveAllEqualUIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveActiveAllTrueUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveActiveAnyTrueUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveIsFirstLaneUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveReadLaneAtFloatUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveReadLaneAtIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveReadLaneAtUIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveReadLaneFirstFloatUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveReadLaneFirstIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangWaveReadLaneFirstUIntUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationRejectsMalformedTaggedHelpers.internal": "passed"
+          },
+          "changed": {}
+        },
+        "inventory_review": {
+          "path": "build/nvvm-integration/run-1/inventory-review.json",
+          "sha256": "b29c33a7d1b8d1dfcfbe226a7f7aac116936971208fbc15394c5ff80dd6b3f29"
+        },
+        "comparison": {
+          "path": "build/nvvm-integration/run-1/final-comparison.json",
+          "sha256": "299873d66afee1a3558fe7c92f4a768ef7a2d2039a2c96d4c15d484f2ef23cec"
+        },
+        "reuse": "1167 original passes and12 inherited skips retained. Only five failed units rebuilt/rerun after test-only assertion repairs; production binaries unchanged. No second full native run."
+      },
+      "semantics": {
+        "passed": 1171,
+        "ignored": 78,
+        "record": {
+          "path": "build/nvvm-integration/run-1/semantics.json",
+          "sha256": "cad75b632aee8b96c1d104671e54d0a4616c54a31a6f4619cc95f00126735bb5",
+          "return_code": 0,
+          "elapsed_seconds": 33.37075066566467
+        },
+        "baseline_delta": {
+          "added": {
+            "tests/diagnostics/uninitialized-intrinsic-asm-operands.slang": "passed"
+          },
+          "removed": {},
+          "changed": {}
+        }
+      },
+      "capability": {
+        "passed": 106,
+        "record": {
+          "path": "build/nvvm-integration/run-1/capability.json",
+          "sha256": "c3c85072aac43c9983417d2e0e479783af141e1ae920de5380c86d345e5dbd1c",
+          "return_code": 0,
+          "elapsed_seconds": 3.4442737102508545
+        },
+        "outcomes": [
+          "tests/bugs/segfault_on_empty_capability_switch_case.slang",
+          "tests/bugs/segfault_on_empty_capability_switch_case.slang.1",
+          "tests/language-feature/capability/address-of.slang",
+          "tests/bugs/segfault_on_empty_capability_switch_case.slang.2",
+          "tests/language-feature/capability/alternative-vendor-capability-warning.slang",
+          "tests/language-feature/capability/address-of.slang.1",
+          "tests/language-feature/capability/alternative-vendor-capability-warning.slang.1",
+          "tests/language-feature/capability/builtin-operator-operand-capability.slang",
+          "tests/language-feature/capability/capability-inheritance-1.slang",
+          "tests/language-feature/capability/capability-interface-requirement-1.slang",
+          "tests/language-feature/capability/capability-invalid-compute-in-fragment.slang",
+          "tests/language-feature/capability/capability-invalid-compute-in-fragment.slang.1",
+          "tests/language-feature/capability/capability-invalid-fragment-in-compute.slang",
+          "tests/language-feature/capability/capability-invalid-fragment-in-compute.slang.1",
+          "tests/language-feature/capability/capability1.slang",
+          "tests/language-feature/capability/capability1.slang.1",
+          "tests/language-feature/capability/capability2.slang",
+          "tests/language-feature/capability/capability2.slang.1",
+          "tests/language-feature/capability/capability3.slang",
+          "tests/language-feature/capability/capability3.slang.1",
+          "tests/language-feature/capability/capability4.slang",
+          "tests/language-feature/capability/capability4.slang.1",
+          "tests/language-feature/capability/capability5.slang",
+          "tests/language-feature/capability/capability5.slang.1",
+          "tests/language-feature/capability/capability5.slang.2",
+          "tests/language-feature/capability/capability5.slang.3",
+          "tests/language-feature/capability/capability5.slang.4",
+          "tests/language-feature/capability/capability6.slang",
+          "tests/language-feature/capability/capability6.slang.1",
+          "tests/language-feature/capability/capability7.slang",
+          "tests/language-feature/capability/capability7.slang.1",
+          "tests/language-feature/capability/capability8.slang",
+          "tests/language-feature/capability/capability8.slang.1",
+          "tests/language-feature/capability/capabilitySimplification1.slang",
+          "tests/language-feature/capability/capabilitySimplification1.slang.1",
+          "tests/language-feature/capability/capabilitySimplification2.slang",
+          "tests/language-feature/capability/capabilitySimplification2.slang.1",
+          "tests/language-feature/capability/capabilitySimplification2.slang.2",
+          "tests/language-feature/capability/capabilitySimplification2.slang.3",
+          "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang",
+          "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.1",
+          "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.2",
+          "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.3",
+          "tests/language-feature/capability/conflicting-profile-stage-for-entry-point.slang.4",
+          "tests/language-feature/capability/cpp-target-graphics-stage.slang",
+          "tests/language-feature/capability/cpp-target-graphics-stage.slang.1",
+          "tests/language-feature/capability/cpp-target-graphics-stage.slang.2",
+          "tests/language-feature/capability/capability-as-string.slang (vk)",
+          "tests/language-feature/capability/cpp-target-graphics-stage.slang.3",
+          "tests/language-feature/capability/cpp-target-graphics-stage.slang.4",
+          "tests/language-feature/capability/cpp-target-graphics-stage.slang.5",
+          "tests/language-feature/capability/cpp-target-has-cpp-impl-from-default.slang",
+          "tests/language-feature/capability/cpp-target-has-cpp-impl-from-default2.slang",
+          "tests/language-feature/capability/explicit-shader-stage-1.slang",
+          "tests/language-feature/capability/cpp-target-missing-cpp-impl.slang",
+          "tests/language-feature/capability/explicit-shader-stage-2.slang",
+          "tests/language-feature/capability/cpp-target-missing-cpp-impl.slang.1",
+          "tests/language-feature/capability/explicit-shader-stage-2.slang.1",
+          "tests/language-feature/capability/explicit-shader-stage-3.slang",
+          "tests/language-feature/capability/explicit-shader-stage-4.slang",
+          "tests/language-feature/capability/explicit-shader-stage-5.slang",
+          "tests/language-feature/capability/explicit-shader-stage-6.slang",
+          "tests/language-feature/capability/explicit-shader-stage-8.slang",
+          "tests/language-feature/capability/explicit-shader-stage-7.slang",
+          "tests/language-feature/capability/explicit-shader-stage-9.slang",
+          "tests/language-feature/capability/explicit-shader-stage-7.slang.1",
+          "tests/language-feature/capability/no-spurious-capability-for-inverse.slang",
+          "tests/language-feature/capability/profile-implicitly-upgraded.slang",
+          "tests/language-feature/capability/profile-implicitly-upgraded.slang.1",
+          "tests/language-feature/capability/sm-6-0-subgroup-basic-no-warning.slang",
+          "tests/language-feature/capability/specializeTargetSwitch.slang",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.1",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.2",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.3",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.4",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.5",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.6",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.7",
+          "tests/language-feature/capability/specializeTargetSwitch.slang.8",
+          "tests/language-feature/capability/target-switch-dead-helper.slang",
+          "tests/language-feature/capability/target-switch-dead-helper.slang.1",
+          "tests/language-feature/capability/target-switch-dead-helper.slang.2",
+          "tests/language-feature/capability/target-switch-layout-lifetime.slang",
+          "tests/language-feature/capability/target-switch-layout-lifetime.slang.1",
+          "tests/language-feature/capability/target-switch-layout-lifetime.slang.2",
+          "tests/language-feature/capability/target-switch-layout-lifetime.slang.3",
+          "tests/language-feature/capability/target-switch-layout-lifetime.slang.4",
+          "tests/language-feature/capability/target-switch-layout-lifetime.slang.5",
+          "tests/language-feature/capability/target-switch-merge-target-rule-1.slang",
+          "tests/language-feature/capability/target-switch-merge-target-rule.slang",
+          "tests/language-feature/capability/intrinsic-texture-ignore-capability.slang",
+          "tests/language-feature/capability/testing-framework-with-profiles.slang (vk)",
+          "tests/language-feature/capability/testing-framework-with-profiles.slang.1 (vk)",
+          "tests/language-feature/capability/testing-framework-with-profiles.slang.2",
+          "tests/language-feature/capability/testing-framework-with-profiles.slang.3",
+          "tests/language-feature/capability/testing-framework-with-profiles.slang.4",
+          "tests/language-feature/capability/testing-framework-with-profiles.slang.5",
+          "tests/language-feature/capability/usingInternalCapabilityWarning.slang",
+          "tests/language-feature/capability/usingInternalCapabilityWarning.slang.1",
+          "tests/language-feature/capability/var-capability-incompatible.slang",
+          "tests/language-feature/capability/var-capability-wgsl-2.slang",
+          "tests/language-feature/capability/var-capability-wgsl.slang",
+          "tests/language-feature/capability/var-capability-wgsl.slang.1",
+          "tests/language-feature/capability/var-implicit-capability-wgsl.slang",
+          "tests/language-feature/capability/var-implicit-capability-wgsl.slang.1",
+          "tests/language-feature/capability/intrinsic-texture-ignore-capability.slang.1"
+        ]
+      },
+      "runtime": {
+        "fresh_passed": 40,
+        "reused_passed": 4,
+        "logical_total": 44,
+        "record": {
+          "path": "build/nvvm-integration/run-1/runtime-selection.json",
+          "sha256": "25f8c6d08e290056e688607479701ffdf3919e03961a71744881465fd24a2721",
+          "return_code": 0,
+          "elapsed_seconds": 32.240009784698486
+        },
+        "fresh_outcomes": [
+          "tests/bugs/frexp-double.slang.6 (cuda)",
+          "tests/bugs/frexp-double.slang.7 (cuda)",
+          "tests/bugs/frexp.slang.6 (cuda)",
+          "tests/bugs/frexp.slang.7 (cuda)",
+          "tests/cuda/cuda-array-layout.slang (cuda)",
+          "tests/cuda/cuda-array-layout.slang.1 (cuda)",
+          "tests/cuda/cuda-texture.slang.2 (cuda)",
+          "tests/cuda/cuda-texture.slang.3 (cuda)",
+          "tests/cuda/nvvm-bf16-cuda-layout.slang.1 (cuda)",
+          "tests/cuda/nvvm-bf16-cuda-layout.slang.2 (cuda)",
+          "tests/cuda/nvvm-bf16-dot.slang.1 (cuda)",
+          "tests/cuda/nvvm-bf16-dot.slang.2 (cuda)",
+          "tests/cuda/nvvm-core-bits.slang.1 (cuda)",
+          "tests/cuda/nvvm-core-bits.slang.2 (cuda)",
+          "tests/cuda/nvvm-core-math-composition.slang (cuda)",
+          "tests/cuda/nvvm-core-math-composition.slang.1 (cuda)",
+          "tests/cuda/nvvm-core-waves.slang.1 (cuda)",
+          "tests/cuda/nvvm-core-waves.slang.2 (cuda)",
+          "tests/cuda/nvvm-fp64-masked-wave.slang.1 (cuda)",
+          "tests/cuda/nvvm-fp64-masked-wave.slang.2 (cuda)",
+          "tests/cuda/nvvm-fp64-prefix-minmax-order.slang.1 (cuda)",
+          "tests/cuda/nvvm-fp64-prefix-minmax-order.slang.2 (cuda)",
+          "tests/cuda/nvvm-half-narrow-conversion.slang.1 (cuda)",
+          "tests/cuda/nvvm-half-narrow-conversion.slang.2 (cuda)",
+          "tests/cuda/nvvm-narrow-masked-minmax.slang.1 (cuda)",
+          "tests/cuda/nvvm-narrow-masked-minmax.slang.2 (cuda)",
+          "tests/cuda/nvvm-texture-descriptor-conversion.slang.1 (cuda)",
+          "tests/cuda/nvvm-texture-descriptor-conversion.slang.2 (cuda)",
+          "tests/cuda/nvvm-texture-dimensions.slang.1 (cuda)",
+          "tests/cuda/nvvm-texture-dimensions.slang.2 (cuda)",
+          "tests/cuda/nvvm-wave-shuffle-widths.slang.1 (cuda)",
+          "tests/cuda/nvvm-wave-shuffle-widths.slang.2 (cuda)",
+          "tests/cuda/param-block-alignment.slang (cuda)",
+          "tests/cuda/param-block-alignment.slang.1 (cuda)",
+          "tests/hlsl-intrinsic/atomic/atomic-reduce-half-cuda.slang.1 (cuda)",
+          "tests/hlsl-intrinsic/atomic/atomic-reduce-half-cuda.slang.2 (cuda)",
+          "tests/hlsl-intrinsic/atomic/atomic-reduce-intrinsics.slang.1 (cuda)",
+          "tests/hlsl-intrinsic/atomic/atomic-reduce-intrinsics.slang.2 (cuda)",
+          "tests/hlsl-intrinsic/scalar-half.slang.3 (cuda)",
+          "tests/hlsl-intrinsic/scalar-half.slang.4 (cuda)"
+        ],
+        "reused_outcomes": [
+          "tests/cuda/nvvm-core-values.slang (cuda)",
+          "tests/cuda/nvvm-core-values.slang.1 (cuda)",
+          "tests/cuda/nvvm-narrow-integer-semantics.slang (cuda)",
+          "tests/cuda/nvvm-narrow-integer-semantics.slang.1 (cuda)"
+        ],
+        "reuse_feature": "nvvm-integer16-normalization",
+        "policy": "Reuse exact same production/runner identity for signed16 O0/O3 cells; other pairs retain actual default/O3 versus O0/O3 settings. Native GPU4 already covered above; no separate duplicate runtime validator."
+      },
+      "toolkit": {
+        "passed": 18,
+        "record": {
+          "path": "build/nvvm-integration/run-1/toolkit-gate.json",
+          "sha256": "250aec526b818624de276213dd7327421b69556eb96639d3390b1e4f017d34b1",
+          "return_code": 0,
+          "elapsed_seconds": 6.476799488067627
+        },
+        "results": {
+          "path": "build/nvvm-integration/run-1/toolkit/results.json",
+          "sha256": "c642f94bf8bac770c1f165a3eae1e073c3b0f187a00f21593c068ff4cd99ee3f"
+        },
+        "outcomes": {
+          "core-execution-sm80-o0": "passed",
+          "core-execution-sm80-o3": "passed",
+          "mixed-numeric-sm80-o0": "passed",
+          "mixed-numeric-sm80-o3": "passed",
+          "native-float-surface-sm80-o0": "passed",
+          "native-float-surface-sm80-o3": "passed",
+          "float64-values-sm80-o0": "passed",
+          "float64-values-sm80-o3": "passed",
+          "thread-local-global-context-sm80-o0": "passed",
+          "thread-local-global-context-sm80-o3": "passed",
+          "half-values-sm80-o0": "passed",
+          "half-values-sm80-o3": "passed",
+          "float-matrix-values-sm80-o0": "passed",
+          "float-matrix-values-sm80-o3": "passed",
+          "helper-copyable-values-sm80-o0": "passed",
+          "helper-copyable-values-sm80-o3": "passed",
+          "conventional-global-multi-resource-sm80-o0": "passed",
+          "conventional-global-multi-resource-sm80-o3": "passed"
+        },
+        "gpu_execution": false
+      },
+      "surfaces": {
+        "passed": 4,
+        "record": {
+          "path": "build/nvvm-integration/run-1/surface-gate.json",
+          "sha256": "e3a90e0f1dff2928ec56ee0557f95fea9c835836af2285f6c0aa018bdb281e8f",
+          "return_code": 0,
+          "elapsed_seconds": 5.513137340545654
+        },
+        "results": {
+          "path": "build/nvvm-integration/run-1/surfaces/results.json",
+          "sha256": "99101615005535e33fc24e65230b355aed66e54649bbc8122769627a27946758"
+        },
+        "cases": [
+          {
+            "case": "float32-2d-4-wholeStore",
+            "mode": "nvvm-o0",
+            "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+            "oracle_sha256": "65901d3329304a01758a4bd5e1740fe1146b491f7edadf896c1dea2b15c74e68"
+          },
+          {
+            "case": "float32-2d-4-wholeStore",
+            "mode": "nvvm-o3",
+            "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+            "oracle_sha256": "65901d3329304a01758a4bd5e1740fe1146b491f7edadf896c1dea2b15c74e68"
+          },
+          {
+            "case": "half-2d-4-componentStore",
+            "mode": "nvvm-o0",
+            "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+            "oracle_sha256": "37b0e07d82a86d419e0cc1dd215c5c52fb4dd8cf13345dd8ebc82c9f86548c53"
+          },
+          {
+            "case": "half-2d-4-componentStore",
+            "mode": "nvvm-o3",
+            "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+            "oracle_sha256": "37b0e07d82a86d419e0cc1dd215c5c52fb4dd8cf13345dd8ebc82c9f86548c53"
+          }
+        ],
+        "semantic_contract": "RN-even finite Half conversions; converted NaN class only; untouched bits exact"
+      },
+      "validation_incidents": [
+        {
+          "id": "migration-expectations",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-integration/run-1/native.json",
+            "sha256": "7fd76ca943b0a32910cce5cb1af7f66f3265efcc43a36a3774f2dd51d76802b5",
+            "return_code": 1,
+            "elapsed_seconds": 173.87182068824768
+          },
+          "failed_outcomes": [
+            "slang-unit-test-tool/nvvmSlangConventionalScalarParameterBlockUsesDirectPipeline.internal",
+            "slang-unit-test-tool/nvvmSlangRealWaveActiveAllEqualFloatDifferentialPTX.internal",
+            "slang-unit-test-tool/nvvmSlangRealWaveActiveAllEqualIntDifferentialPTX.internal",
+            "slang-unit-test-tool/nvvmSlangRealWaveActiveAllEqualUIntDifferentialPTX.internal",
+            "slang-unit-test-tool/nvvmSlangResourceStructsCrossLocalAndHelperBoundaries.internal"
+          ],
+          "resolution": {
+            "path": "build/nvvm-integration/run-1/native-retry.json",
+            "sha256": "6356776c7519e6294f4d2320d951ce067e1a2640302d24539650e995dcb90ec3",
+            "return_code": 0,
+            "elapsed_seconds": 2.418630361557007
+          },
+          "changes": [
+            "Size/Align constants fold before their output conversions; retain exact0/8/16/8 and separate late OffsetOf conversion checks.",
+            "Typed SampleLevel removes its helper call; require exactly one preserveResource and one sampleResource call plus unchanged texture/ABI/storage contracts.",
+            "NVVM AllEqual composition requires match.any1/ballot3/eq1; CUDA retains match.all1/ballot2. Check exact method-specific shapes and absence of opposite mnemonic, with prior memory/signature checks."
+          ],
+          "diagnostic_artifacts": [
+            {
+              "path": "build/nvvm-integration/diagnose/resource-helper-ir-1.llvm-ir-asm",
+              "sha256": "cae796187f537a4e37dd3ac6450d077a9516200b5f51e6d8213dd49854b45132"
+            },
+            {
+              "path": "build/nvvm-integration/diagnose/parameter-layout-ir-1.llvm-ir-asm",
+              "sha256": "2aa572fb66471be6e24aeb340549f63187d084c2ea1adaa0afec50c50de5ae8c"
+            },
+            {
+              "path": "build/nvvm-integration/diagnose/all-equal-nvvm.ptx",
+              "sha256": "cc1582ad63bdb64cac763df889e3a52b897d9249738858653b71c00650ee4e5f"
+            },
+            {
+              "path": "build/nvvm-integration/diagnose/all-equal-nvrtc.ptx",
+              "sha256": "47c62b3e498505d5a59174c5339d23a14f2f15dfc0baf127539ebf1cc97342c9"
+            }
+          ]
+        }
+      ],
+      "build": {
+        "path": "build/nvvm-integration/run-1/build-tests.json",
+        "sha256": "feb024c6b674dd6fa043ac92c8736e1ac488477c4d91bd8372e995cb1ccfc345",
+        "return_code": 0,
+        "elapsed_seconds": 19.797747373580933
+      },
+      "limitations": [
+        "This is a bounded integration campaign, not a replacement full checkpoint or publication/CI readiness. Full1740/surface249/material/numerical/performance campaigns not repeated.",
+        "All36 earlier feature objects and full baseline/identity retained, including historical failures superseded by explicit resolution records.",
+        "CUDA C++ PTX is comparison evidence; differing implementation structures are accepted only with explicit semantic contracts. WaveMaskMatch differing-value mask semantics remain separately qualified."
+      ]
     }
   }
 }

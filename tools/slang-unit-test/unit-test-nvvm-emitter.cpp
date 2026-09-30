@@ -1826,17 +1826,25 @@ SLANG_UNIT_TEST(nvvmSlangConventionalScalarParameterBlockUsesDirectPipeline)
         const int64_t expectedLayoutValues[] = {0, 8, 16, 8};
         for (Index storeIndex = 0; storeIndex < SLANG_COUNT_OF(expectedLayoutValues); ++storeIndex)
         {
-            const FakeNVVMBuilderValueRef storedValue = gFakeNVVMBuilder.storeValueRefs[storeIndex];
-            SLANG_CHECK(storedValue.kind == FakeNVVMBuilderValueKind::ScalarOperation);
-            SLANG_CHECK(storedValue.index >= 0);
-            SLANG_CHECK(storedValue.index < gFakeNVVMBuilder.scalarOperations.getCount());
-            const FakeNVVMBuilderScalarOperation& conversion =
-                gFakeNVVMBuilder.scalarOperations[storedValue.index];
-            SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
-            SLANG_CHECK(conversion.operandCount == 1);
-            SLANG_CHECK(conversion.operands[0].kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            FakeNVVMBuilderValueRef storedValue = gFakeNVVMBuilder.storeValueRefs[storeIndex];
+            // Offset queries fold during NVVM legalization, leaving their output conversion.
+            // Size/Align fold earlier, so ordinary constant folding also removes that conversion.
+            if (storeIndex < 2)
+            {
+                SLANG_CHECK_ABORT(storedValue.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                SLANG_CHECK_ABORT(storedValue.index >= 0);
+                SLANG_CHECK_ABORT(storedValue.index < gFakeNVVMBuilder.scalarOperations.getCount());
+                const auto& conversion = gFakeNVVMBuilder.scalarOperations[storedValue.index];
+                SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
+                SLANG_CHECK_ABORT(conversion.operandCount == 1);
+                storedValue = conversion.operands[0];
+            }
+            SLANG_CHECK_ABORT(storedValue.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK_ABORT(storedValue.index >= 0);
+            SLANG_CHECK_ABORT(
+                storedValue.index < gFakeNVVMBuilder.integerConstantValues.getCount());
             SLANG_CHECK(
-                gFakeNVVMBuilder.integerConstantValues[conversion.operands[0].index] ==
+                gFakeNVVMBuilder.integerConstantValues[storedValue.index] ==
                 expectedLayoutValues[storeIndex]);
         }
         SLANG_CHECK(gFakeNVVMBuilder.storeValueRefs[4].kind == FakeNVVMBuilderValueKind::Load);
@@ -3846,7 +3854,16 @@ SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
         SLANG_CHECK(gFakeNVVMBuilder.localStorageAlignments[0] == 8);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 4);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount >= 4);
-        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 3);
+        // SampleLevel is a canonical texture operation. Only the two source helpers cross a
+        // function boundary; keep their individual calls visible instead of counting intrinsics.
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        for (const char* helperName : {"preserveResource", "sampleResource"})
+        {
+            Index callCount = 0;
+            for (Index callee : gFakeNVVMBuilder.callCalleeFunctionIndices)
+                callCount += gFakeNVVMBuilder.functionNames[callee].indexOf(helperName) >= 0;
+            SLANG_CHECK(callCount == 1);
+        }
         SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 1);
         const SlangNVVMTextureOperationDesc& textureOperation =
             gFakeNVVMBuilder.textureOperations[0];

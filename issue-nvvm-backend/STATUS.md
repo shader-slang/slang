@@ -5,7 +5,8 @@ infers operations from CUDA assembly-body strings or active semantic tags. The f
 recognizer is replaced by a typed query that preserves the exact field key before optimization.
 Explicit LLVM/libdevice names and genuine primitive PTX remain intentional backend interfaces.
 Module43, ABI46 and container2 are unchanged. The signed16 O3 failure is corrected by provider-side
-normalization at exact-width integer consumers; consolidated integration is now in progress.
+normalization at exact-width integer consumers. The consolidated integration checkpoint is accepted;
+operation-dispatch cleanup is next.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -23,22 +24,29 @@ Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 
 ## Latest focused acceptance
 
-| Evidence                                          | Result                                                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Build                                             | Provider-only eight-job build passed in 8 seconds; compiler and test tools unchanged                         |
-| Focused units                                     | Numeric type-family and invalid-scalar provider units passed inside the consolidated native run              |
-| Runtime                                           | 4 NVVM O0/O3 cases pass: existing core-values and new narrow-integer consumer regression                     |
-| Primitive probes                                  | Signed and unsigned widen/narrow normalization survive libNVVM O3 and GPU execution                          |
-| Scope                                             | Integer comparisons, widening, float conversion, division/remainder and right-shift consumers; ABI unchanged |
-| Last full / targeted / implementations since full | log-family / signed16 / 9                                                                                    |
-| Historical evidence                               | Full baseline/identity and all 35 earlier feature objects retained                                           |
+| Evidence                                          | Result                                                                             |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Native units                                      | 1,172 pass, 12 inherited skips; only five stale assertions rerun after correction  |
+| Shared semantics                                  | 1,171 pass, 78 inherited skips; one expected new diagnostic test                   |
+| Capability                                        | 106 pass                                                                           |
+| Runtime                                           | 40 fresh migration cells plus 4 reused signed16 O0/O3 cells; native GPU4 also pass |
+| Toolkit / surfaces                                | 18 compile/assembly cells and 4 physical surface cells pass                        |
+| Exact inventory                                   | 29 added / 34 retired native tests explained from Git; unchanged retained statuses |
+| Build                                             | Test-only rebuild in 20 seconds; production binaries unchanged                     |
+| Last full / targeted / implementations since full | log-family / post-migration integration / 9                                        |
+| Historical evidence                               | Full baseline/identity and all 36 earlier feature objects retained                 |
 
-The consolidated integration run is a bounded checkpoint, not a new full corpus/numerical/material
-baseline. Its native gate has five expectation failures under investigation (layout constants,
-resource-helper call count and three AllEqual PTX checks); no pass claim is made for that run. Earlier core-tail qualifications remain, including Float64 modf's lack of fresh
-numerical qualification. Unsized CUDA arrays remain 16-byte pointer/count wrappers aligned to 8.
+The bounded integration checkpoint is accepted in `features.nvvm-post-migration-integration`.
+Five native failures were outdated migration assertions: early-folded size/alignment constants,
+removed SampleLevel helper call, and three AllEqual checks requiring CUDA's instruction sequence.
+Exact values, helper ABI/storage/texture checks and backend-specific PTX assertions now pass; the
+initial failures remain recorded. The other 1,167 native passes were reused without a second full
+run. Full corpus, numerical, material and performance campaigns were not repeated.
 
-This is not an all-pass repository checkpoint or publication/CI readiness. The inherited
+Earlier core-tail qualifications remain, including Float64 modf's lack of fresh numerical
+qualification. Unsized CUDA arrays remain 16-byte pointer/count wrappers aligned to 8.
+
+This bounded checkpoint does not establish full-repository or publication/CI readiness. The inherited
 `nvvm-core-values.slang.1` O3 failure now passes with its exact original expectation. The former
 failure returned correct low16 bits but compared/widened as +32768. Canonical LLVM i16 was correct;
 the provider now enforces signed/unsigned interpretation at consumers through an explicit PTX
@@ -56,7 +64,8 @@ Compiler SHA-256: `1378468640c4b444809566aade1257d2cb77682faf1d0a120c19439e96ddc
 Provider SHA-256: `ce0c6bf613372977c4f985b8d6853fe36aa24f8e83181392091859555e66589c`.
 The later commit does not relabel these binaries. Source/runtime hashes and exact outcomes live in
 `focused-evidence.json` under `features.nvvm-integer16-normalization`; earlier identities and failure histories remain
-in their original feature objects.
+in their original feature objects. The integration test-only patch and updated unit-plugin identity
+are recorded separately in `features.nvvm-post-migration-integration`.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -74,7 +83,7 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 ## Next action
 
 The agreed migration and residual-text audit are finished. The maintainer authorized this sequence
-on 2026-09-30; signed16 correction is complete and the integration checkpoint is active:
+on 2026-09-30. Steps 1 and 2 are complete; step 3 is next:
 
 1. Fix the known signed16 O3 normalization failure at its responsible layer, retaining its failure
    history and avoiding an abs-specific workaround.

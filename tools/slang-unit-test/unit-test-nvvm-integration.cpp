@@ -1516,7 +1516,8 @@ static void _runNVVMSlangWavePredicateDifferentialPTX(
     const char* source,
     const char* unavailableMessage,
     const UnownedStringSlice& intrinsicMnemonic,
-    Index expectedSignedNotEqualCount)
+    Index expectedSignedNotEqualCount,
+    bool isAllEqual = false)
 {
     NVVMIRBuilder preflightBuilder;
     _requireRealNVVMBuilder(unitTestContext, preflightBuilder);
@@ -1528,15 +1529,32 @@ static void _runNVVMSlangWavePredicateDifferentialPTX(
         kParameterWidths,
         SLANG_COUNT_OF(kParameterWidths),
         true,
-        [intrinsicMnemonic, expectedSignedNotEqualCount](SlangEmitCUDAMethod, const String& ptx)
+        [intrinsicMnemonic,
+         expectedSignedNotEqualCount,
+         isAllEqual](SlangEmitCUDAMethod method, const String& ptx)
         {
             String signature;
             String body;
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
                 _extractPTXEntry(ptx.getUnownedSlice(), toSlice("computeMain"), signature, body)));
             const UnownedStringSlice bodySlice = body.getUnownedSlice();
-            SLANG_CHECK(_countOccurrences(bodySlice, toSlice("vote.sync.ballot.b32")) == 2);
-            SLANG_CHECK(_countOccurrences(bodySlice, intrinsicMnemonic) == 1);
+            if (isAllEqual && method == SLANG_EMIT_CUDA_VIA_NVVM)
+            {
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("vote.sync.ballot.b32")) == 3);
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("match.any.sync.b32")) == 1);
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("match.all.sync.b32")) == 0);
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("setp.eq.s32")) == 1);
+            }
+            else
+            {
+                SLANG_CHECK(_countOccurrences(bodySlice, toSlice("vote.sync.ballot.b32")) == 2);
+                SLANG_CHECK(_countOccurrences(bodySlice, intrinsicMnemonic) == 1);
+                if (isAllEqual)
+                {
+                    SLANG_CHECK(_countOccurrences(bodySlice, toSlice("match.any.sync.b32")) == 0);
+                    SLANG_CHECK(_countOccurrences(bodySlice, toSlice("setp.eq.s32")) == 0);
+                }
+            }
             SLANG_CHECK(_countOccurrences(bodySlice, toSlice("ld.global.u32")) == 1);
             SLANG_CHECK(
                 _countOccurrences(bodySlice, toSlice("setp.ne.s32")) ==
@@ -1573,7 +1591,8 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualIntDifferentialPTX)
         "Ignoring signed-i32 wave-active-all-equal PTX differential because libNVVM or NVRTC was "
         "not found.",
         toSlice("match.all.sync.b32"),
-        0);
+        0,
+        true);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualUIntDifferentialPTX)
@@ -1584,7 +1603,8 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualUIntDifferentialPTX)
         "Ignoring unsigned-i32 wave-active-all-equal PTX differential because libNVVM or NVRTC "
         "was not found.",
         toSlice("match.all.sync.b32"),
-        0);
+        0,
+        true);
 }
 
 SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualFloatDifferentialPTX)
@@ -1595,7 +1615,8 @@ SLANG_UNIT_TEST(nvvmSlangRealWaveActiveAllEqualFloatDifferentialPTX)
         "Ignoring float32 wave-active-all-equal PTX differential because libNVVM or NVRTC was "
         "not found.",
         toSlice("match.all.sync.b32"),
-        0);
+        0,
+        true);
 }
 
 static void _runNVVMScalarDifferentialPTX(
