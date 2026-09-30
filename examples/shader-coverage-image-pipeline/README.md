@@ -23,16 +23,15 @@ a **full** run sweeps the full 4×4×3 = 48 configuration matrix.
 The coverage delta between the two runs is the demo's headline.
 
 Both modes default to **320x180 pixels** to keep execution counting practical.
-`--large` restores **1920x1080** for performance experiments without changing
-the 48-configuration matrix. The large counting sweep can exceed process
-timeouts even when individual GPU submissions are tiled.
+`--width=1920 --height=1080` selects **1920x1080** for performance experiments
+without changing the 48-configuration matrix. The large counting sweep can
+exceed process timeouts even when individual GPU submissions are tiled.
 
 ## Workload and dispatch sizing
 
 Set `--width=N` and `--height=N` to choose the image dimensions independently
 (defaults: 320 and 180; each must be 1–65535, with at most INT32_MAX pixels
-total). Options apply left to right,
-so `--large --width=640 --height=360` overrides the large preset.
+total). For example, `--width=640 --height=360` selects a 640x360 image.
 
 `--tile-rows=N` controls rows per submission, not image size. It must be 0
 (whole image) or a multiple of the shader's 8-row thread-group height, so
@@ -57,7 +56,7 @@ reduce total runtime. Very small images may exercise fewer coverage paths.
 ./shader-coverage-image-pipeline --mode=full --width=160 --height=90 --tile-rows=32
 
 # Restore the original benchmark size:
-./shader-coverage-image-pipeline --mode=full --large --no-coverage
+./shader-coverage-image-pipeline --mode=full --width=1920 --height=1080 --no-coverage
 
 # Tune the tile height (full mode already tiles into 128-row bands by
 # default to avoid GPU watchdog resets under count mode on the hot

@@ -2,7 +2,7 @@
 //
 // Build a BVH over a procedural mesh on CPU, upload to GPU, trace
 // 256x256 rays through it via compute shader, read back coverage.
-// Pass --large to restore the original 4096x4096 ray grid.
+// Pass --ray-grid-size=N to select a different NxN ray grid.
 // Smoke mode uses a clean icosphere with one material; full mode adds
 // extra material kinds + degenerate triangles + a packed cluster.
 // Pass `--batch-size=N` to split the dispatch into fixed-size batches
@@ -737,7 +737,7 @@ int main(int argc, char** argv)
         // submissions short to avoid OS watchdog resets (Windows TDR /
         // VK_ERROR_DEVICE_LOST) under coverage instrumentation. Full mode
         // defaults to at most 262144 rays per batch. This mainly matters
-        // with --large, where a single 16M-ray instrumented dispatch
+        // with large grids, where a single 16M-ray instrumented dispatch
         // can run long enough to trip the watchdog.
         // Smoke mode is quick and defaults to a single dispatch. Pass an
         // explicit value to tune (smaller if you still observe TDR, larger
@@ -756,8 +756,6 @@ int main(int argc, char** argv)
                 mode = "smoke";
             else if (a == "--mode=full")
                 mode = "full";
-            else if (a == "--large")
-                rayGridDim = 4096;
             else if (a.substr(0, 16) == "--ray-grid-size=")
                 rayGridDim = parseUnsigned(a.substr(16), "--ray-grid-size");
             else if (a == "--no-coverage")

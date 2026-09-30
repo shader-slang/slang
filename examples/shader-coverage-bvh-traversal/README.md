@@ -28,7 +28,7 @@ The traversal kernel has several rarely-fired branches:
 ## Run
 
 The host generates the same procedural mesh and BVH, but defaults to
-**256x256 = 65,536 rays**. Pass **`--large`** to restore the original
+**256x256 = 65,536 rays**. Pass **`--ray-grid-size=4096`** to select
 **4096x4096 = 16,777,216 rays** for benchmarking. Scene complexity, materials,
 and the smoke/full distinctions remain unchanged.
 
@@ -39,7 +39,7 @@ watchdog limits; it does not reduce total work or guarantee that large runs
 finish before a process timeout.
 
 Set `--ray-grid-size=N` to choose an N×N grid (default: 256; range: 2–65535).
-Options apply left to right, so `--large --ray-grid-size=128` uses 128×128 rays.
+For example, `--ray-grid-size=128` uses 128×128 rays.
 Halving the grid dimension quarters the ray count without changing the scene.
 Very small grids may miss scene features and exercise fewer coverage paths.
 
@@ -62,7 +62,7 @@ limits.
 ./shader-coverage-bvh-traversal --mode=full --ray-grid-size=128 --batch-size=4096
 
 # Restore the original ray grid for benchmarking:
-./shader-coverage-bvh-traversal --mode=full --large --no-coverage
+./shader-coverage-bvh-traversal --mode=full --ray-grid-size=4096 --no-coverage
 
 # Hit/miss mode — non-atomic, no execution counts but same coverage map:
 ./shader-coverage-bvh-traversal --mode=full --coverage-mode=boolean

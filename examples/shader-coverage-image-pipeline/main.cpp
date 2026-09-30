@@ -1,10 +1,10 @@
 // Image-pipeline coverage demo — raw-Vulkan host driver.
 //
 // Single-dispatch compute pipeline: denoise → tonemap → gamma applied
-// to a synthetic 320x180 test image (--large restores 1080p). Runs in
+// to a synthetic test image (320x180 by default). Runs in
 // "smoke" mode (single operator/boundary/gamma) or "full" mode (full
-// parameter sweep). The
-// coverage delta between the two runs is the demo's headline.
+// parameter sweep). The coverage delta between the two runs is the
+// demo's headline.
 //
 // All GPU-runtime calls go through `vk_compute_demo.h` so the entire
 // raw-Vulkan path is isolated to one file. When slang-rhi PR #739
@@ -659,7 +659,7 @@ int main(int argc, char** argv)
         // of N rows to avoid OS watchdog resets (Windows TDR /
         // VK_ERROR_DEVICE_LOST) on coverage-instrumented runs. The
         // bilateral filter's inner loop creates heavy atomic contention on
-        // a few counters, especially with --large. Full mode defaults to
+        // a few counters, especially with large images. Full mode defaults to
         // 128-row tiles to limit work per submission. Smoke mode defaults
         // to whole-image dispatch. Pass an explicit value to
         // tune (smaller if you still observe TDR), or `--tile-rows=0` to
@@ -693,11 +693,6 @@ int main(int argc, char** argv)
                 mode = "smoke";
             else if (a == "--mode=full")
                 mode = "full";
-            else if (a == "--large")
-            {
-                imageWidth = 1920;
-                imageHeight = 1080;
-            }
             else if (a.substr(0, 8) == "--width=")
                 imageWidth = parseUnsigned(a.substr(8), "--width");
             else if (a.substr(0, 9) == "--height=")
