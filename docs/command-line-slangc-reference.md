@@ -266,7 +266,7 @@ Disable specific warnings, given by numeric id or name. A numeric id that this c
 
 **-notes-disable &lt;id&gt;\[,&lt;id&gt;...\]**
 
-Disable specific notes, given by numeric id or name. Numeric IDs are silently ignored when they are not defined by this compiler version.
+Disable specific notes, given by numeric id or name. 
 
 
 <a id="wall"></a>
