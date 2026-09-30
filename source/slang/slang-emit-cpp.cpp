@@ -236,6 +236,21 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->getOp())
     {
+    case kIROp_TensorViewType:
+        {
+            auto offsetType = cast<IRTensorViewType>(type)->getOffsetType();
+            if (offsetType->getOp() == kIROp_UIntType)
+            {
+                out << "TensorView";
+            }
+            else
+            {
+                out << "TensorViewT<";
+                SLANG_RETURN_ON_FAIL(calcTypeName(offsetType, target, out));
+                out << ">";
+            }
+            return SLANG_OK;
+        }
     case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);

@@ -112,7 +112,15 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
         }
     case kIROp_MakeTensorView:
         {
-            m_writer->emit("make_tensor_view(");
+            auto tensorViewType = as<IRTensorViewType>(inst->getDataType());
+            m_writer->emit("make_tensor_view");
+            if (tensorViewType->getOffsetType()->getOp() != kIROp_UIntType)
+            {
+                m_writer->emit("<");
+                emitType(tensorViewType->getOffsetType());
+                m_writer->emit(">");
+            }
+            m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitStringLiteral(getUnmangledName(inst->getOperand(0)));
@@ -120,7 +128,6 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
             emitTorchScalarTypeName(m_writer, inst->getOperand(0)->getDataType());
             m_writer->emit(", ");
 
-            auto tensorViewType = as<IRTensorViewType>(inst->getDataType());
             if (as<IRVectorType>(tensorViewType->getElementType()))
                 m_writer->emit("true");
             else
@@ -195,11 +202,6 @@ SlangResult TorchCppSourceEmitter::calcTypeName(
     {
     default:
         return Super::calcTypeName(type, target, out);
-    case kIROp_TensorViewType:
-        {
-            out << "TensorView";
-            return SLANG_OK;
-        }
     case kIROp_TorchTensorType:
         {
             out << "torch::Tensor";

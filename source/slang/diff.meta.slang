@@ -192,8 +192,16 @@ struct NullDifferential : IDifferentiable
     static Differential dadd(Differential, Differential) { return { 0.0f }; }
 };
 
+[sealed]
+[builtin]
+interface __TensorViewOffsetType : __BuiltinIntegerType {}
+
+extension uint : __TensorViewOffsetType {}
+extension uint64_t : __TensorViewOffsetType {}
+
 /// Represents a GPU view of a tensor.
-__generic<T>
+/// Offset controls byte strides and address arithmetic. Use uint64_t for offsets beyond 4 GiB.
+__generic<T, Offset : __TensorViewOffsetType = uint>
 __magic_type(TensorViewType)
 __intrinsic_type($(kIROp_TensorViewType))
 struct TensorView
@@ -405,7 +413,7 @@ struct TensorView
 
     [__readNone]
     [require(cuda)]
-    uint stride(uint i)
+    Offset stride(uint i)
     {
         __target_switch
         {
@@ -593,7 +601,7 @@ ${
 for (auto atomicIntegerTypeName : kCudaAtomicIntegerTypes)
 {
 $}
-extension TensorView<$(atomicIntegerTypeName)>
+extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), Offset>
 {
     typealias __Element = $(atomicIntegerTypeName);
 
@@ -735,7 +743,7 @@ ${
 } // end for atomicIntegerTypeName
 $}
 
-extension TensorView<float>
+extension<Offset : __TensorViewOffsetType> TensorView<float, Offset>
 {
     [require(cuda)]
     float InterlockedExchange(uint index, float val, out float oldVal)

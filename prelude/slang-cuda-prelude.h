@@ -6035,10 +6035,11 @@ static const int kSlangTorchTensorMaxDim = 5;
 // TensorView
 // NOTE: If you change this struct's layout, also update the hard-coded size/alignment
 // in _createTypeLayout() in slang-type-layout.cpp.
-struct TensorView
+template<typename Offset>
+struct TensorViewT
 {
     uint8_t* data;
-    uint32_t strides[kSlangTorchTensorMaxDim];
+    Offset strides[kSlangTorchTensorMaxDim];
     uint32_t sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 
@@ -6048,46 +6049,44 @@ struct TensorView
         return reinterpret_cast<T*>(data);
     }
 
-    // Compute byte offsets in 64 bits while keeping strides and indices 32-bit. For example,
-    // element 2^30 of a contiguous float tensor is 4 GiB from its base. Widen each stride before
-    // multiplying so that the product does not wrap before it reaches the 64-bit offset.
+    // Compute in the selected offset type. For example, element 2^30 of a contiguous float
+    // tensor requires a uint64_t view because its byte offset is 4 GiB.
     template<typename T>
     __device__ T* data_ptr_at(uint32_t index)
     {
-        uint64_t offset = uint64_t(strides[0]) * index;
+        Offset offset = strides[0] * index;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
     __device__ T* data_ptr_at(uint2 index)
     {
-        uint64_t offset = uint64_t(strides[0]) * index.x + uint64_t(strides[1]) * index.y;
+        Offset offset = strides[0] * index.x + strides[1] * index.y;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
     __device__ T* data_ptr_at(uint3 index)
     {
-        uint64_t offset = uint64_t(strides[0]) * index.x + uint64_t(strides[1]) * index.y +
-                          uint64_t(strides[2]) * index.z;
+        Offset offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
     __device__ T* data_ptr_at(uint4 index)
     {
-        uint64_t offset = uint64_t(strides[0]) * index.x + uint64_t(strides[1]) * index.y +
-                          uint64_t(strides[2]) * index.z + uint64_t(strides[3]) * index.w;
+        Offset offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z +
+                        strides[3] * index.w;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T, unsigned int N>
     __device__ T* data_ptr_at(uint index[N])
     {
-        uint64_t offset = 0;
+        Offset offset = 0;
         for (unsigned int i = 0; i < N; ++i)
         {
-            offset += uint64_t(strides[i]) * index[i];
+            offset += strides[i] * index[i];
         }
         return reinterpret_cast<T*>(data + offset);
     }
@@ -6188,6 +6187,11 @@ struct TensorView
     {
         load<T, N>(index) = val;
     }
+};
+
+// Retain the original native type name as well as its layout for existing kernel signatures.
+struct TensorView : TensorViewT<uint32_t>
+{
 };
 
 // Implementations for texture fetch/load functions using tex PTX intrinsics

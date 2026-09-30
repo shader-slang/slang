@@ -6,6 +6,8 @@ struct MyParams
 {
     TensorView<float> tensor;
     int count;
+    TensorView<float, uint64_t> wideTensor;
+    int wideCount;
 }
 
 [shader("compute")]
@@ -19,3 +21,7 @@ void computeMain(uniform MyParams params)
 // CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 56
 // CHECK: "name": "count",
 // CHECK: "binding": {"kind": "uniform", "offset": 56, "size": 4
+// CHECK: "name": "wideTensor",
+// CHECK: "binding": {"kind": "uniform", "offset": 64, "size": 72
+// CHECK: "name": "wideCount",
+// CHECK: "binding": {"kind": "uniform", "offset": 136, "size": 4
