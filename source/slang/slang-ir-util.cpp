@@ -3486,22 +3486,18 @@ bool isReadNoneCalleeAndAllDerivatives(IRInst* callee)
         return false;
 
     // Look annotations up on the resolved inner function rather than on the
-    // unresolved callee. This is intentionally conservative: stdlib generics
-    // (e.g. `sqrt`) attach `[ForwardDerivativeOf]` / `[BackwardDerivativeOf]`
-    // annotations on the `IRSpecialize` wrapper, and not all of those
-    // derivatives are marked `[__readNone]` even though they are pure (e.g.
-    // `__d_reflect`). Looking them up on the unresolved callee would find
-    // them and force a non-readNone verdict on every call site to such a
-    // stdlib math function, regressing the false-positive fixes from #11286.
+    // unresolved callee. A generic's derivative annotations live on its
+    // `IRSpecialize`, and two kinds found there would make calls carry that
+    // should not, regressing the false-positive fixes from #11286: built-in
+    // derivatives that are pure but not marked `[__readNone]` (e.g.
+    // `__d_reflect`), and the synthesized `BackwardDifferentiatePropagate` of a
+    // generic `[__readNone][Differentiable]` function, which `isReadNoneCallee`
+    // does not treat as read-none.
     //
-    // The trade-off is that user-defined generic primaries (whose
-    // `[ForwardDerivative]` / `[BackwardDerivative]` annotations also live
-    // on the `IRSpecialize`) bypass this gate. That's an under-approximation
-    // — a generic `[__readNone]` primary with a side-effecting user-supplied
-    // derivative is not currently caught. A more accurate fix would
-    // distinguish "stdlib-style pure derivative not explicitly annotated"
-    // from "user-supplied derivative with possible side effects" without
-    // requiring stdlib annotation churn; see follow-up tracking.
+    // The trade-off is that the derivatives of a generic primary are never
+    // checked: a generic `[__readNone]` primary whose user-supplied
+    // `[ForwardDerivative]` / `[BackwardDerivative]` has side effects is not
+    // caught.
     IRInst* annotated = getResolvedInstForDecorations(callee);
     if (!annotated)
         return true;
