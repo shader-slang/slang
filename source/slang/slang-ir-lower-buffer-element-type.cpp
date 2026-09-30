@@ -2451,7 +2451,6 @@ static IROp getStorageLayoutOpForRule(TargetProgram* target, IRTypeLayoutRuleNam
     return op;
 }
 
-// Return the data-layout op of `ptrType`, or `kIROp_DefaultBufferLayoutType` if it has none.
 static IROp getPtrDataLayoutOp(IRPtrTypeBase* ptrType)
 {
     auto dataLayout = ptrType->getDataLayout();

@@ -1,4 +1,4 @@
-// Under `-layout-rules-version 202c`, `sizeof` and `ByteAddressBuffer` `Load<T>` keep natural
+// Under `-layout-rules-version 202c`, `sizeof` and `ByteAddressBuffer` `Load<T>`/`Store<T>` keep natural
 // layout rather than following the rounded scalar layout of buffers, because `sizeof` is folded
 // to a constant before the target is known and byte-address loads are lowered with natural
 // offsets. This is provisional: whether they should round is an open question on #12714. DXC
@@ -22,6 +22,7 @@ struct U
 };
 
 ByteAddressBuffer bab;
+RWByteAddressBuffer rwbab;
 RWStructuredBuffer<U> sb;
 RWStructuredBuffer<uint> output;
 
@@ -31,6 +32,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
     output[0] = sizeof(U) + 1000;
     output[1] = asuint(bab.Load<U>(0).w);
     output[2] = asuint(sb[tid.x].w);
+    rwbab.Store<U>(0, sb[tid.x]);
 }
 
 // For contrast, the structured buffer rounds: `U.w` is at 16 and `U` has a 24-byte stride.
@@ -42,3 +44,6 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 // `bab.Load<U>(0).w` reads 32-bit word 3, which is byte 12, not word 4.
 // CHECK: OpAccessChain %_ptr_StorageBuffer_float %bab %int_0 %uint_3
+
+// `rwbab.Store<U>(0, ...)` writes `w` to 32-bit word 3 as well.
+// CHECK: OpAccessChain %_ptr_StorageBuffer_float %rwbab{{(_[0-9]+)?}} %int_0 %uint_3
