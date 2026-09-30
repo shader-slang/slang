@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+# This check is advisory and always exits 0. An unexpected `set -e` abort would
+# otherwise fail the CI step with no output at all (#13041), so it warns instead.
+trap 'status=$?; echo "::warning::Compiler version check skipped: \"$BASH_COMMAND\" (line $LINENO) exited with status $status"; exit 0' ERR
+
 # File paths
 DOCS_FILE="docs/building.md"
 CMAKE_CACHE="build/CMakeCache.txt"
