@@ -2,8 +2,11 @@
 
 set -euo pipefail
 
-# This check is advisory and always exits 0. An unexpected `set -e` abort would
-# otherwise fail the CI step with no output at all (#13041), so it warns instead.
+# The documented-compiler-version check is advisory: every path exits 0. The ERR
+# trap turns an unexpected top-level `set -e` abort, which would otherwise fail the
+# CI step with no output (#13041), into a warning that names the failing command.
+# We leave out `set -E` on purpose: `extract_versions` expects `grep` no-matches
+# inside `$(...)`, and an inherited trap would fire on them.
 trap 'status=$?; echo "::warning::Compiler version check skipped: \"$BASH_COMMAND\" (line $LINENO) exited with status $status"; exit 0' ERR
 
 # File paths
