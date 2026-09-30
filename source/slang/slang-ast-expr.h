@@ -51,13 +51,15 @@ class DefaultConstructExpr : public Expr
     FIDDLE(...)
 };
 
-// An expression that references an overloaded set of declarations
-// having the same name.
+// An expression that references the declarations found by looking up a name.
+// Ordinary name lookup creates one only when several declarations share the name,
+// but other producers may create one with a single candidate: method, constructor and
+// subscript witness synthesis do so to check the synthesized call without repeating
+// the lookup. A single-candidate `OverloadedExpr` is valid and is not ambiguous.
 FIDDLE()
 class OverloadedExpr : public Expr
 {
     FIDDLE(...)
-    // The name that was looked up and found to be overloaded
     Name* name = nullptr;
 
     // Optional: the base expression is this overloaded result
@@ -66,7 +68,6 @@ class OverloadedExpr : public Expr
 
     Expr* originalExpr = nullptr;
 
-    // The lookup result that was ambiguous
     LookupResult lookupResult2;
 };
 

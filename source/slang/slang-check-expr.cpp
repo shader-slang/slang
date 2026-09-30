@@ -1488,7 +1488,7 @@ bool SemanticsVisitor::maybeDiagnoseAmbiguousReference(Expr* expr)
 {
     if (auto overloadExpr = as<OverloadedExpr>(expr))
     {
-        if (overloadExpr->lookupResult2.isValid() &&
+        if (overloadExpr->lookupResult2.isOverloaded() &&
             !as<NamespaceDecl>(overloadExpr->lookupResult2.item.declRef.getDecl()))
         {
             diagnoseAmbiguousReference(overloadExpr);
@@ -1502,6 +1502,7 @@ void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
 {
+    SLANG_ASSERT(lookupResult.isOverloaded());
     getSink()->diagnose(Diagnostics::AmbiguousReference{
         .name = getText(lookupResult.getName()),
         .location = overloadedExpr->loc});

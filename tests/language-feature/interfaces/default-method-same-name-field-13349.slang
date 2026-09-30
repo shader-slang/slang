@@ -1,7 +1,9 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 // A same-named field does not satisfy a defaulted interface method requirement, so
-// conformance currently falls back to the default implementation (gh-13349).
+// conformance falls back to the default, as it does for a same-named method with a
+// mismatched signature. This pins current behavior: whether such a member should instead be
+// an error is an open question (gh-13353).
 
 interface IFoo
 {
