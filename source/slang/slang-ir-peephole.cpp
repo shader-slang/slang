@@ -1883,16 +1883,12 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsVector:
         case kIROp_IsBindlessTextureNVEncodable:
             {
-                // `__isVector<T>()` asks about the operand type itself (a scalar and a matrix both
-                // classify as not-a-vector). The other predicates here describe the element type
-                // of a vector or matrix.
-                auto operandType = inst->getOperand(0)->getDataType();
-                auto elementType = operandType;
-                if (auto vectorType = as<IRVectorType>(elementType))
-                    elementType = vectorType->getElementType();
-                if (auto matType = as<IRMatrixType>(elementType))
-                    elementType = matType->getElementType();
-                if (isConcreteType(elementType))
+                auto type = inst->getOperand(0)->getDataType();
+                if (auto vectorType = as<IRVectorType>(type))
+                    type = vectorType->getElementType();
+                if (auto matType = as<IRMatrixType>(type))
+                    type = matType->getElementType();
+                if (isConcreteType(type))
                 {
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
@@ -1902,28 +1898,28 @@ struct PeepholeContext : InstPassBase
                     switch (inst->getOp())
                     {
                     case kIROp_IsInt:
-                        result = isIntegralType(elementType);
+                        result = isIntegralType(type);
                         break;
                     case kIROp_IsBool:
-                        result = elementType->getOp() == kIROp_BoolType;
+                        result = type->getOp() == kIROp_BoolType;
                         break;
                     case kIROp_IsFloat:
-                        result = isFloatingType(elementType);
+                        result = isFloatingType(type);
                         break;
                     case kIROp_IsHalf:
-                        result = elementType->getOp() == kIROp_HalfType;
+                        result = type->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(elementType) && !getIntTypeSigned(elementType);
+                        result = isIntegralType(type) && !getIntTypeSigned(type);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(elementType) && getIntTypeSigned(elementType);
+                        result = isIntegralType(type) && getIntTypeSigned(type);
                         break;
                     case kIROp_IsVector:
-                        result = as<IRVectorType>(operandType) != nullptr;
+                        result = as<IRVectorType>(type);
                         break;
                     case kIROp_IsBindlessTextureNVEncodable:
-                        result = isBindlessTextureNVEncodableResourceType(elementType);
+                        result = isBindlessTextureNVEncodableResourceType(type);
                         break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));
