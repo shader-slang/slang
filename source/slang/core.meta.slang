@@ -115,10 +115,11 @@ interface IComparable
 // A generic `min(x, y)` binds once, against the abstract `T`, and specialization does not revisit
 // that choice, so on its own it cannot reach the concrete `vector<T, N>` overload. The core
 // `min`/`max` overloads for `IFloat` and `IInteger` therefore call `x.__min(y)` / `x.__max(y)`, and
-// the builtin scalar, vector and float matrix conformances implement these as `min(this, other)` /
-// `max(this, other)`. That call is resolved when the conformance is checked, where `This` is
-// concrete, so it binds the concrete overload, which ranks above the generic ones that would call
-// back into `__min`/`__max` without end. Each target then gets its native vector operation where
+// the builtin scalar, vector and float matrix conformances implement these by calling `min`/`max`
+// on their own operands (the matrix conformance converts them to the default layout first). That
+// call is resolved when the conformance is checked, where `This` is concrete, so it binds the
+// concrete overload, which ranks above the generic ones that would call back into `__min`/`__max`
+// without end. Each target then gets its native vector operation where
 // it has one, and the same per-element code as a direct call on cpp/cuda.
 //
 // The defaults order whole values with `lessThan`, as the `IComparable` overloads do, so a user
