@@ -1341,13 +1341,12 @@ typedef uint32_t SlangSizeT;
                  //   struct up to a multiple of its alignment under scalar layout, as DXC's
                  //   `-fvk-use-scalar-layout` does, which can move the offsets of fields that
                  //   follow a nested struct. This covers buffers under global scalar layout,
-                 //   `ScalarDataLayout` buffers, and the pointees of user pointers (`T*`) that
-                 //   have the default data layout or of pointers into scalar-layout buffers. It
-                 //   takes effect when SPIR-V is emitted directly; generating GLSL (or SPIR-V via
-                 //   GLSL) with 202c or later is an error, and other targets ignore it.
-                 //   `sizeof`/`alignof` and ByteAddressBuffer `Load<T>`/`Store<T>` keep natural
-                 //   layout; for ByteAddressBuffer this differs from DXC (checked against
-                 //   v1.9.2602), which uses the rounded layout there as well.
+                 //   `ScalarDataLayout` buffers, structs accessed with ByteAddressBuffer
+                 //   `Load<T>`/`Store<T>`, and the pointees of user pointers (`T*`) that have the
+                 //   default data layout or of pointers into scalar-layout buffers. It takes
+                 //   effect when SPIR-V is emitted directly; generating GLSL (or SPIR-V via GLSL)
+                 //   with 202c or later is an error, and other targets ignore it.
+                 //   `sizeof`/`alignof` keep natural layout.
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

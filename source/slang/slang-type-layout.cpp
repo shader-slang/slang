@@ -1881,8 +1881,6 @@ LayoutRulesImpl kScalarRoundedLayoutRulesImpl_ = {
     &kGLSLObjectLayoutRulesImpl,
 };
 
-// Return the rules that scalar layout uses for the target described by `options`, which depend on
-// the layout rules version (see `isScalarLayoutRoundedUpToAlignment`).
 static LayoutRulesImpl* getScalarLayoutRules(CompilerOptionSet& options)
 {
     return isScalarLayoutRoundedUpToAlignment(options) ? &kScalarRoundedLayoutRulesImpl_

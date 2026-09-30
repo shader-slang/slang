@@ -376,6 +376,31 @@ struct ByteAddressBufferLegalizationContext
                                                     : kIROp_CastUInt2ToDescriptorHandle;
     }
 
+    // Return the layout rules for data in a byte-address buffer on `target`: natural layout, or,
+    // where layout rules version 202c applies (`isScalarLayoutRoundedUpToAlignment`), natural
+    // layout with struct sizes rounded up to their alignment. DXC lays out the struct of a
+    // templated `Load<T>`/`Store<T>` with its structured-buffer rule, which rounds struct sizes, so
+    // with 202c `bab.Load<T>` reads what a scalar-layout buffer of `T` holds.
+    IRTypeLayoutRules* getByteAddressLayoutRules(TargetProgram* target)
+    {
+        return isScalarLayoutRoundedUpToAlignment(target->getOptionSet())
+                   ? IRTypeLayoutRules::getScalarRounded()
+                   : IRTypeLayoutRules::getNatural();
+    }
+
+    // Compute the size and alignment of `type` as an element of a byte-address buffer, which
+    // gives the stride between array elements and the extent of an aligned wide access.
+    SlangResult getByteAddressElementSizeAndAlignment(
+        IRType* type,
+        IRSizeAndAlignment* outSizeAlignment)
+    {
+        return Slang::getSizeAndAlignment(
+            m_target,
+            getByteAddressLayoutRules(m_targetProgram),
+            type,
+            outSizeAlignment);
+    }
+
     SlangResult getOffset(TargetProgram* target, IRStructField* field, IRIntegerValue* outOffset)
     {
         if (target->getHLSLToVulkanLayoutOptions() &&
@@ -383,7 +408,11 @@ struct ByteAddressBufferLegalizationContext
         {
             return getStd430Offset(target->getTargetReq(), field, outOffset);
         }
-        return getNaturalOffset(target->getTargetReq(), field, outOffset);
+        return Slang::getOffset(
+            target->getTargetReq(),
+            getByteAddressLayoutRules(target),
+            field,
+            outOffset);
     }
 
     SlangResult getSizeAndAlignment(
@@ -396,7 +425,11 @@ struct ByteAddressBufferLegalizationContext
         {
             return getStd430SizeAndAlignment(target->getTargetReq(), type, outSizeAlignment);
         }
-        return getNaturalSizeAndAlignment(target->getTargetReq(), type, outSizeAlignment);
+        return Slang::getSizeAndAlignment(
+            target->getTargetReq(),
+            getByteAddressLayoutRules(target),
+            type,
+            outSizeAlignment);
     }
 
     // The core workhorse routine for the load case is `emitLegalLoad`,
@@ -503,8 +536,7 @@ struct ByteAddressBufferLegalizationContext
                 // Emit an aligned load operation on an array when using a LoadAligned inst.
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
-                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_target,
+                SLANG_RELEASE_ASSERT(!getByteAddressElementSizeAndAlignment(
                     arrayType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -758,7 +790,7 @@ struct ByteAddressBufferLegalizationContext
         //
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_NULL_ON_FAIL(
-            getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
+            getByteAddressElementSizeAndAlignment(elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         // We will collect all the element values into an array so
@@ -1464,8 +1496,7 @@ struct ByteAddressBufferLegalizationContext
                 // Emit an aligned store operation on an array when using a StoreAligned inst.
                 // Else, fallback to scalarizing the stores.
                 IRSizeAndAlignment elementLayout;
-                SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_target,
+                SLANG_RELEASE_ASSERT(!getByteAddressElementSizeAndAlignment(
                     arrayType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -1824,7 +1855,7 @@ struct ByteAddressBufferLegalizationContext
         // We iterate over the elements and fetch then store each one.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
+        SLANG_RETURN_ON_FAIL(getByteAddressElementSizeAndAlignment(elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto indexType = m_builder.getIntType();

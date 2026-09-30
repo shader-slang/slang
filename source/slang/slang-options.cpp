@@ -586,15 +586,13 @@ void initCommandOptions(CommandOptions& options)
          "layout rules are used. From 202c on, scalar layout rounds the size of every struct up "
          "to a multiple of its alignment, as DXC's scalar layout does, so a field that follows "
          "a nested struct can move to a higher offset. This applies to buffers when scalar "
-         "layout is enabled globally, to buffers declared with ScalarDataLayout, and to the data "
-         "that a user pointer (T*) with the default data layout points at, or that a pointer "
-         "into a scalar-layout buffer points at. It takes effect when SPIR-V is emitted directly. "
-         "Generating "
-         "GLSL, or SPIR-V via GLSL, with 202c or later is an error, and other targets ignore "
-         "it. sizeof, alignof and ByteAddressBuffer Load<T>/Store<T> keep natural layout, so "
-         "sizeof(T) can be smaller than the stride of T in a rounded scalar buffer. For "
-         "ByteAddressBuffer this differs from DXC (checked against v1.9.2602), which uses the "
-         "rounded layout there as well."},
+         "layout is enabled globally, to buffers declared with ScalarDataLayout, to structs "
+         "accessed with ByteAddressBuffer Load<T>/Store<T>, and to the data that a user pointer "
+         "(T*) with the default data layout points at, or that a pointer into a scalar-layout "
+         "buffer points at. It takes effect when SPIR-V is emitted directly. Generating GLSL, or "
+         "SPIR-V via GLSL, with 202c or later is an error, and other targets ignore it. sizeof "
+         "and alignof keep natural layout, so sizeof(T) can be smaller than the stride of T in a "
+         "rounded buffer."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
          "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]",

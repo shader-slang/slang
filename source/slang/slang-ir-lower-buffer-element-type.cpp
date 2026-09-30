@@ -2399,8 +2399,6 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
-// Return the IR layout rule that scalar layout uses on `target`, which depends on the target's
-// layout rules version (see `isScalarLayoutRoundedUpToAlignment`).
 static IRTypeLayoutRuleName getScalarLayoutRuleName(TargetProgram* target)
 {
     return isScalarLayoutRoundedUpToAlignment(target->getOptionSet())
