@@ -6,6 +6,7 @@
 // The ordinary-function copy of `innerMain` that `outerMain` calls must keep its `id` parameter;
 // CUDA drops system-value parameters only from entry-point signatures.
 // CUDA: innerMain_{{[0-9]+}}(int{{[^)]*}}id{{[^)]*}}){{$}}
+// CUDA: innerMain_{{[0-9]+}}(&{{[^)]+}});
 
 RWStructuredBuffer<int> output;
 

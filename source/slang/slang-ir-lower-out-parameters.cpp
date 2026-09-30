@@ -407,10 +407,9 @@ static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
         });
 }
 
-// Inline the original entry point `func` into the wrapper through `call`, then delete `func`.
-// `call` must be the only remaining use of `func`: fixEntryPointCallsites has already moved every
-// other call to a separate ordinary-function copy, and retargetEntryPointParamDecorations has moved
-// the hoisted uniforms' tags to the wrapper.
+// `call`, the wrapper's call to the original entry point `func`, must be the only remaining use of
+// `func`: fixEntryPointCallsites has already moved every other call to a separate ordinary-function
+// copy, and retargetEntryPointParamDecorations has moved the hoisted uniforms' tags to the wrapper.
 static void inlineOriginalFunction(IRFunc* func, IRCall* call)
 {
     SLANG_RELEASE_ASSERT(
