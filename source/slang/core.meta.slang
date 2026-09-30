@@ -112,10 +112,11 @@ interface IComparable
 }
 
 //@hidden:
-// The builtin scalar, vector and matrix conformances override `__min`/`__max` with calls to
-// their concrete `min`/`max` overloads. Those calls are resolved against the concrete shape when
-// the conformance is checked, so a generic `min`/`max` specialized on, say, `float3` reaches the
-// element-wise vector overload instead of a scalar-only target intrinsic.
+// The builtin scalar and vector conformances override `__min`/`__max` with calls to their concrete
+// `min`/`max` overloads, and the matrix conformance calls the vector overloads row by row. Those
+// calls are resolved against the concrete shape when the conformance is checked, so a generic
+// `min`/`max` specialized on, say, `float3` reaches the element-wise vector overload instead of a
+// scalar-only target intrinsic.
 interface __IMinMax : IComparable
 {
     This __min(This other)

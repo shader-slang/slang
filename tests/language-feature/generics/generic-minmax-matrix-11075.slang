@@ -3,8 +3,8 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 
 // Regression test for shader-slang/slang#11075: a generic `min`/`max` constrained by `IFloat` and
-// specialized on a matrix reaches the concrete per-row vector overloads (it used to abort the
-// cpp/cuda emitter), without recursing back into the generic overload.
+// specialized on a matrix reaches the concrete per-row vector overloads without recursing back into
+// the generic overload.
 
 T genMin<T : IFloat>(T a, T b)
 {

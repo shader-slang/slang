@@ -2,8 +2,7 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11075: on cpp/cuda a generic `IFloat` `min`/`max` on a
-// vector lowers to per-element scalar calls, the same code the concrete vector overload emits,
-// instead of aborting in the target-intrinsic expander.
+// vector lowers to per-element scalar calls, the same code the concrete vector overload emits.
 
 T genMin<T : IFloat>(T a, T b)
 {

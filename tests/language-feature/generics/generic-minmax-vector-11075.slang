@@ -6,9 +6,9 @@
 // Regression test for shader-slang/slang#11075.
 //
 // A generic `min`/`max` constrained by `IFloat` or `IInteger` and specialized on a builtin
-// vector must reach the concrete element-wise vector overload (it used to abort the cpp/cuda
-// emitter) and produce the same componentwise result on every backend. The shared CHECK
-// buffer across cpu/cuda/vk/mtl is the cross-target parity gate.
+// vector must reach the concrete element-wise vector overload and produce the same componentwise
+// result on every backend. The shared CHECK buffer across cpu/cuda/vk/mtl is the cross-target
+// parity gate.
 
 T genMin<T : IFloat>(T a, T b)
 {
@@ -89,7 +89,6 @@ void computeMain()
     outputBuffer[i++] = float(mnl.x); // CHECK: 3.0
     outputBuffer[i++] = float(mnl.y); // CHECK: 2.0
 
-    // vector → true; scalar and matrix → false.
     outputBuffer[i++] = __isVector<float3>() ? 1.0 : 0.0;   // CHECK: 1.0
     outputBuffer[i++] = __isVector<float>() ? 1.0 : 0.0;    // CHECK: 0.0
     outputBuffer[i++] = __isVector<float3x3>() ? 1.0 : 0.0; // CHECK: 0.0
