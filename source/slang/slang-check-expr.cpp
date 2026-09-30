@@ -7676,6 +7676,18 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
     }
 }
 
+// Return whether `arg` is one of the type-only placeholder arguments that
+// `Linkage::specializeWithArgTypes` builds to resolve a call from reflected types: a bare `VarExpr`
+// with a checked type but neither a name nor a declaration. A placeholder stands for some l-value
+// of its type and names no storage, so a check about which storage an argument names has no answer
+// for it. Any other expression without a declaration is malformed and is not exempted here.
+static bool isTypeOnlyPlaceholderArg(Expr* arg)
+{
+    auto varExpr = as<VarExpr>(arg);
+    return varExpr && varExpr->astNodeType == ASTNodeType::VarExpr && !varExpr->name &&
+           !varExpr->declRef && varExpr->type.type && varExpr->type.isLeftValue;
+}
+
 // Return whether `arg` names thread-group-shared storage: strip the projections that read a part of
 // an object to reach the addressed object, then ask `getValidTypeForAddressOf` for its addressable
 // pointer type and inspect that pointer's address space. `getValidTypeForAddressOf` already
@@ -7684,6 +7696,9 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
 bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 {
     if (!arg)
+        return false;
+
+    if (isTypeOnlyPlaceholderArg(arg))
         return false;
 
     auto addressedExpr = getBaseObjectOfProjection(arg);
@@ -7706,7 +7721,8 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 // semantics HLSL requires (DXC rejects it outright with error 0043).
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
-    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
+    if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>() ||
+        isTypeOnlyPlaceholderArg(argIn))
         return;
 
     if (!argumentNamesGroupSharedStorage(argIn))
