@@ -20,6 +20,15 @@ regression/design decision needs maintainer input. No push, publication, system 
 driver change or reboot is implied. Skip Slack notifications. The already-running log-family full
 checkpoint may finish and be reused; do not repeat it under the new workflow.
 
+After completion of the text-route migration, the maintainer explicitly resumed on 2026-09-30:
+fix signed16 O3 correctness, run one consolidated integration checkpoint, then consolidate operation
+dispatch/fakes, role-specific type admission and one complete resource/address/storage planning
+family, reduce fake maintenance, refresh architecture, and address Float16 instruction selection.
+STATUS holds the ordered work and semantic questions. Continue this authorized sequence in bounded
+reviewed commits; stop only when human judgment is actually required. This supersedes the migration
+completion stopping condition above. CUDA C++ is comparison evidence, not the universal oracle;
+verify Slang semantics against Vulkan/D3D12 contracts and document intentional differences.
+
 Use one implementation owner and an independent reviewer when available. The lead owns scope,
 acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight
 build jobs** on the upgraded eight-CPU host. Use focused test selections and existing runners;

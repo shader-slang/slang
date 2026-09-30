@@ -1199,6 +1199,40 @@ static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     return SLANG_OK;
 }
 
+// Normalizes a semantic 16-bit integer before an operation observes more than its low bits.
+// Consider abs(int16_t(-32768)): LLVM's wrapping i16 result is still -32768, but PTX may
+// implement abs.s16 on a 32-bit datapath and retain +32768 in the register. An explicit
+// widen/narrow pair restores the signed or unsigned interpretation. Keep the pair in inline
+// assembly so LLVM cannot fold it to an identity before PTX lowering. Half and BF16 storage
+// also use i16; callers select this operation by integer semantics, never storage type alone.
+static llvm::Value* _normalizeNVVMInteger16Operand(
+    ModuleState* state,
+    llvm::Value* value,
+    bool isSigned)
+{
+    auto type = value->getType();
+    if (!type->getScalarType()->isIntegerTy(16))
+        return value;
+    if (auto vectorType = llvm::dyn_cast<llvm::FixedVectorType>(type))
+    {
+        llvm::Value* result = llvm::UndefValue::get(vectorType);
+        for (uint32_t lane = 0; lane < vectorType->getNumElements(); ++lane)
+        {
+            auto element = state->builder.CreateExtractElement(value, lane);
+            auto normalized = _normalizeNVVMInteger16Operand(state, element, isSigned);
+            result = state->builder.CreateInsertElement(result, normalized, lane);
+        }
+        return result;
+    }
+    auto signature = llvm::FunctionType::get(type, {type}, false);
+    const char* assembly = isSigned ? "{ .reg .b32 narrow_tmp; cvt.s32.s16 narrow_tmp, $1; "
+                                      "cvt.s16.s32 $0, narrow_tmp; }"
+                                    : "{ .reg .b32 narrow_tmp; cvt.u32.u16 narrow_tmp, $1; "
+                                      "cvt.u16.u32 $0, narrow_tmp; }";
+    auto normalization = llvm::InlineAsm::get(signature, assembly, "=h,h", false);
+    return state->builder.CreateCall(normalization, {value});
+}
+
 // Emits one scalar-integer comparison after applying the shared ownership and dominance contract.
 static SlangResult _emitIntegerComparison(
     SlangNVVMModuleHandle module,
@@ -1220,6 +1254,9 @@ static SlangResult _emitIntegerComparison(
         return SLANG_E_INVALID_ARG;
     }
 
+    llvmLeft = _normalizeNVVMInteger16Operand(state, llvmLeft, llvm::CmpInst::isSigned(predicate));
+    llvmRight =
+        _normalizeNVVMInteger16Operand(state, llvmRight, llvm::CmpInst::isSigned(predicate));
     llvm::Value* result = state->builder.CreateICmp(predicate, llvmLeft, llvmRight);
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
@@ -3953,15 +3990,48 @@ static SlangResult _emitValueOperationFamily(
         }
     }
 
-    if (family == Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary &&
+    const bool isIntegerShift =
+        family == Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary &&
         (operation.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
-         operation.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT) &&
-        llvmOperands[1]->getType() != resultType)
+         operation.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT);
+    if (isIntegerShift)
     {
         // Slang preserves the source shift-count width independently from the shifted value. LLVM
         // requires both operands to have the same physical type, so normalize the already-checked
         // scalar or component-wise count without changing the source operation's signedness.
-        llvmOperands[1] = state->builder.CreateZExtOrTrunc(llvmOperands[1], resultType);
+        llvmOperands[1] = _normalizeNVVMInteger16Operand(state, llvmOperands[1], false);
+        if (llvmOperands[1]->getType() != resultType)
+        {
+            llvmOperands[1] = state->builder.CreateZExtOrTrunc(llvmOperands[1], resultType);
+            llvmOperands[1] = _normalizeNVVMInteger16Operand(state, llvmOperands[1], false);
+        }
+    }
+
+    // Low-bit arithmetic, storage, selects and same-width casts preserve modular bits directly.
+    // Comparisons, division, right shifts and widening instead consume the represented value.
+    // Normalize at those consumers so a signed-to-unsigned reinterpretation uses its new role,
+    // including values arriving through loads, parameters, helper results and vector lanes.
+    const bool normalizeIntegerOperands =
+        family == Slang::NVVMSemantics::ValueOperationFamily::IntegerCompare ||
+        (family == Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary &&
+         (operation.operation == SLANG_NVVM_VALUE_OP_DIVIDE ||
+          operation.operation == SLANG_NVVM_VALUE_OP_REMAINDER ||
+          operation.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT));
+    const bool normalizeIntegerConversion =
+        family == Slang::NVVMSemantics::ValueOperationFamily::IntegerToFloat ||
+        (family == Slang::NVVMSemantics::ValueOperationFamily::IntegerConvert &&
+         operation.resultType.bitWidth > operation.operandTypes[0].bitWidth);
+    if (normalizeIntegerOperands || normalizeIntegerConversion)
+    {
+        const size_t operandCount =
+            normalizeIntegerConversion || isIntegerShift ? 1 : operation.operandCount;
+        for (size_t i = 0; i < operandCount; ++i)
+        {
+            llvmOperands[i] = _normalizeNVVMInteger16Operand(
+                state,
+                llvmOperands[i],
+                operation.operandTypes[i].kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER);
+        }
     }
 
     llvm::Value* result = nullptr;

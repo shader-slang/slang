@@ -76346,6 +76346,260 @@
         "Module43/ABI46/container2 unchanged; stale same-version prototype modules may require rebuilding.",
         "Inherited signed16 abs INT_MIN O3 normalization failure remains active under nvvm-core-values-and-atomics and was not rerun. This is not an all-pass repository checkpoint."
       ]
+    },
+    "nvvm-integer16-normalization": {
+      "status": "accepted-focused",
+      "scope": "Preserve exact semantic Int16/UInt16 interpretation at comparisons, widening, integer-to-float, division/remainder and right-shift consumers. A pure inline PTX widen/narrow pair prevents premature LLVM identity folding, including vector lanes and mixed-width shift counts. Low-bit arithmetic/storage/select/reinterpretation and Half/BF16 transport remain unchanged; no abs-specific producer workaround.",
+      "compiler_identity": {
+        "revision": "de493da9e0951bfcd3ecba6848ae0f433f741c0e",
+        "compiler_patch_sha256": "3a315d340ae07051989244793e948e78b7e6e519d9f69db8f36f37532095bd06",
+        "files": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "0a045c6ecccb4e57f9407b5c0b76e02bd084d320c2bfb35da2846c3349830540",
+          "tests/cuda/nvvm-core-values.slang": "6a988bae1178f0f21e6263762244f7d6c0f2c04c92146de4934a0ac3c9f11dae",
+          "tests/cuda/nvvm-narrow-integer-semantics.slang": "c04e641bf9e54ed02c3564ed967e59168d2fc2b3c2ea9ccfb10d32f62ba85ed2"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "1378468640c4b444809566aade1257d2cb77682faf1d0a120c19439e96ddc528",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "c7af03ee23968cf545b810d4ac90d22a49ea2400afa6fbf48ea58cd1d5b9dd51",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ce0c6bf613372977c4f985b8d6853fe36aa24f8e83181392091859555e66589c",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "container_version": 2,
+        "tested_identity": {
+          "path": "build/nvvm-signed16/tested-identity.json",
+          "sha256": "60da5f5cef04e3c98c2bdbcf7c55c17fed4e3dbd1b4aaefdc7c691d00736f4bb"
+        },
+        "policy": "Provider-only build; compiler and test binaries byte-identical to accepted offset migration. Source and fixture formatted before validation."
+      },
+      "validation": {
+        "builds": [
+          {
+            "path": "build/nvvm-signed16/build-provider.json",
+            "sha256": "62f4818f929fce5dc0552b3dd92ea8a7cbc4fabdfec16870db1759f715fc674c",
+            "return_code": 1,
+            "elapsed_seconds": 0.12752962112426758
+          },
+          {
+            "path": "build/nvvm-signed16/build-provider-corrected.json",
+            "sha256": "7f0a135dce27b965d5b5bd61815d534fad11b1ca2e2862b89d11609f87c6793c",
+            "return_code": 0,
+            "elapsed_seconds": 8.205958127975464
+          }
+        ],
+        "units": {
+          "passed": 2,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies.internal",
+            "slang-unit-test-tool/nvvmIRBuilderRejectsInvalidScalarOperations.internal"
+          ],
+          "record": {
+            "path": "build/nvvm-integration/run-1/native.json",
+            "sha256": "7fd76ca943b0a32910cce5cb1af7f66f3265efcc43a36a3774f2dd51d76802b5"
+          },
+          "source_run_return_code": 1,
+          "reuse": "Required real-provider units passed within the single consolidated native run. That broader run has five separately investigated integration expectation failures; it is not relabeled passed here."
+        },
+        "runtime": {
+          "passed": 4,
+          "outcomes": [
+            "tests/cuda/nvvm-core-values.slang (cuda)",
+            "tests/cuda/nvvm-core-values.slang.1 (cuda)",
+            "tests/cuda/nvvm-narrow-integer-semantics.slang (cuda)",
+            "tests/cuda/nvvm-narrow-integer-semantics.slang.1 (cuda)"
+          ],
+          "record": {
+            "path": "build/nvvm-signed16/runtime.json",
+            "sha256": "b3eebf3c2331faf6c26e0792842ab5e153e5bf23fc2dbde3ab5880b5b5d7812a",
+            "return_code": 0,
+            "elapsed_seconds": 3.90370774269104
+          },
+          "contracts": "Original core-values and compact narrow-integer regression at O0/O3. Exact output/guards retained; signed/unsigned arithmetic consumers, vectors, helper return, mixed shift counts, named bit intrinsics and wrapped-zero vector index."
+        },
+        "primitive_probes": {
+          "records": [
+            {
+              "path": "build/nvvm-signed16/ptx-probe-results.json",
+              "sha256": "5d3280a84ed8e067253fa4cbdeeb89825f46db8f72b8fcfb5ce17fea940f72ed"
+            },
+            {
+              "path": "build/nvvm-signed16/ptx-probe-shift-results.json",
+              "sha256": "8e49131ffb16fbf1096d38ed558e1573605149568fee8e14051d74f02517efc2"
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-probe-results.json",
+              "sha256": "015701de6f2dd4381a8b66a79d3634da5016d130363280ecd0e0dbb3060ea5b4"
+            },
+            {
+              "path": "build/nvvm-signed16/unsigned-probe-results.json",
+              "sha256": "ef5a7331d135f9f2d25ff5ff0da015f6e2e149000b149e09e84528585a07ec89"
+            }
+          ],
+          "llvm_sources": [
+            {
+              "path": "build/nvvm-signed16/abs-roundtrip-i16.ll",
+              "sha256": "7403fb197dc2248b540f4afb24ac9e9ae6d6739ba6fd7c41cc72fbf6d3ac62ce"
+            },
+            {
+              "path": "build/nvvm-signed16/abs-shift-consumer.ll",
+              "sha256": "4d431e959649aa1ce9281629b2166c16af03813b7220004d18d0768056edc2f8"
+            },
+            {
+              "path": "build/nvvm-signed16/unsigned-roundtrip-i16.ll",
+              "sha256": "86a037de3c49ecae1bbaba6d708ecf26cbf9c51cdae61bb8ab5d8c28e3966c95"
+            }
+          ],
+          "compiler_records": [
+            {
+              "path": "build/nvvm-signed16/llvm-abs-roundtrip-i16-v3/result.json",
+              "sha256": "a7e6ff405097fc80b0f88a6dfcd966fe7904e1f22e217cc3d7a8a3d889820630"
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-abs-shift-consumer-v3/result.json",
+              "sha256": "0076659cc26145fad61d60ab1d30795e1d3c638eb5d34190edee2675312ea717"
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-unsigned-roundtrip-i16/result.json",
+              "sha256": "ea1f9cf8ede1c981255585fe170c388cef7aca25661aee0b0dc715a0aacb2816"
+            }
+          ],
+          "outcome": "Plain/same-width/direct-wide cvt abs controls fail equality/widening; explicit roundtrip and shifts pass. Signed and unsigned roundtrip survives libNVVM O3 and GPU execution. Add controls pass before normalization; no claim that every narrow operation previously failed."
+        }
+      },
+      "resolved_failure": {
+        "feature": "nvvm-core-values-and-atomics",
+        "id": "signed16-int-min-o3-normalization",
+        "status": "resolved",
+        "historical_policy": "Supersedes that feature's historical unresolved status without rewriting its evidence or other failure histories.",
+        "before": [
+          {
+            "path": "build/nvvm-signed16/before-core-values.json",
+            "sha256": "c02fbf17122d98e3d391c9c3ab9794717a1d7f9be00fa335d172e44dccc8288c",
+            "return_code": 1,
+            "elapsed_seconds": 2.6404449939727783
+          },
+          {
+            "path": "build/nvvm-signed16/before-narrow.json",
+            "sha256": "eecca2c9d7ea470e8230b51f9c78301d741274c646b7684631e01c9904134d43",
+            "return_code": 1,
+            "elapsed_seconds": 2.738184690475464
+          },
+          {
+            "path": "build/nvvm-signed16/before-narrow-final-o3.json",
+            "sha256": "9b0108741a5c94c5727dccf5428abb96a6eebc66ff2b3112a7eb6ff908c1e524",
+            "return_code": 1,
+            "elapsed_seconds": 2.1176421642303467
+          }
+        ],
+        "before_identity": {
+          "path": "build/nvvm-signed16/before-identity.json",
+          "sha256": "cfaf344942f42e9f400c8447500955e12708cc9b35c54bd47c1dda8033830175"
+        },
+        "before_outputs": [
+          {
+            "path": "build/nvvm-signed16/before-nvvm-core-values.slang.1.actual.txt",
+            "sha256": "0512230f97161d3f5f9e67c1679e3ae5785c83a6c83b697b55a9415b0ae57cd7"
+          },
+          {
+            "path": "build/nvvm-signed16/before-nvvm-narrow-integer-semantics.slang.1.actual.txt",
+            "sha256": "6585a21d2df5fa13e966c3cb484e03f8f260fb3382736f7c2706b262ffdd976b"
+          },
+          {
+            "path": "build/nvvm-signed16/before-narrow-final-o3.actual.txt",
+            "sha256": "a10615d284d3c3f6fae740baee9c8de084366a70d286cf24fbe1278ef2133d66"
+          }
+        ],
+        "before_fixture": {
+          "path": "build/nvvm-signed16/before-narrow-final.slang",
+          "sha256": "3f5e672672224c867cb3984423cec41a46f0521f4a05cc0f01aa17bfe46c638d"
+        },
+        "transition": "Original O3 core-values error32 becomes0; compact O3 regression errors452/588 become0/0. A final wrapped-zero index assertion was added after the captured before source and passes after; its prior failure is not claimed.",
+        "after": {
+          "path": "build/nvvm-signed16/runtime.json",
+          "sha256": "b3eebf3c2331faf6c26e0792842ab5e153e5bf23fc2dbde3ab5880b5b5d7812a",
+          "return_code": 0,
+          "elapsed_seconds": 3.90370774269104
+        }
+      },
+      "validation_incidents": [
+        {
+          "id": "probe-input-setup",
+          "status": "resolved",
+          "cause": "Initial PTX float conversion lacked required .rn; initial LLVM inputs lacked NVVM IR2 metadata then exact data layout. No production semantics inferred from rejected inputs.",
+          "records": [
+            {
+              "path": "build/nvvm-signed16/ptx-probes.json",
+              "sha256": "1d9d8842734bda232856d58f2290c9fb3085186467d33d26bf7a595a71d59e96",
+              "return_code": 1,
+              "elapsed_seconds": 0.4296708106994629
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-abs-roundtrip-i16/result.json",
+              "sha256": "59c681f80ea1302f8b402caefbc141ce13d5e3ce8e649613cf8fa50a52f8e20f"
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-abs-shift-consumer/result.json",
+              "sha256": "38e042a85bb5b1d4aa35c2ba8e93fa46382c8cd747f160f7ffb3d5ed49c14de3"
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-abs-roundtrip-i16-v2/result.json",
+              "sha256": "5778535207cc4457fc0f7dc6fb63e21edac9b687c5f47280b8d69c51e00e82c3"
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-abs-shift-consumer-v2/result.json",
+              "sha256": "886cfa4719e8369df8893bcb5b72f5bde975c41346f595d689178fa2f0d874b9"
+            }
+          ],
+          "resolution": [
+            {
+              "path": "build/nvvm-signed16/ptx-probes-corrected.json",
+              "sha256": "21f670eecec862869dfd184789b2943b9d6c7e9dcae70f5741eb73845df4cb8c",
+              "return_code": 0,
+              "elapsed_seconds": 0.40224146842956543
+            },
+            {
+              "path": "build/nvvm-signed16/llvm-probes.json",
+              "sha256": "de4476ad69b0fc415a923d31f0de9e815c22dbe2dee2f675359d48310b74279e",
+              "return_code": 0,
+              "elapsed_seconds": 0.3828425407409668
+            },
+            {
+              "path": "build/nvvm-signed16/unsigned-probe.json",
+              "sha256": "e91113169950f2a76f39babf2b0b39faac04c10f12dc7b2993afa108f3bf955a",
+              "return_code": 0,
+              "elapsed_seconds": 0.36687707901000977
+            }
+          ]
+        },
+        {
+          "id": "provider-target-name",
+          "status": "resolved",
+          "cause": "Main build target is slang-nvvm-provider, not the output-library name slang-llvm-nvvm. Initial command rejected before compiling.",
+          "failure": {
+            "path": "build/nvvm-signed16/build-provider.json",
+            "sha256": "62f4818f929fce5dc0552b3dd92ea8a7cbc4fabdfec16870db1759f715fc674c",
+            "return_code": 1,
+            "elapsed_seconds": 0.12752962112426758
+          },
+          "resolution": {
+            "path": "build/nvvm-signed16/build-provider-corrected.json",
+            "sha256": "7f0a135dce27b965d5b5bd61815d534fad11b1ca2e2862b89d11609f87c6793c",
+            "return_code": 0,
+            "elapsed_seconds": 8.205958127975464
+          }
+        }
+      ],
+      "limitations": [
+        "Focused correction acceptance is not an all-pass integration/full checkpoint. Five native integration expectation failures are recorded separately and remain under investigation.",
+        "PTX permits excess precision in 16-bit operations; correction is keyed by integer semantic role, not physical i16 storage. No general type/storage legalization or numerical/performance campaign.",
+        "Module43/ABI46/container2 unchanged. All earlier full and focused evidence keeps its actual identity."
+      ]
     }
   }
 }

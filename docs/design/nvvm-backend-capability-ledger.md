@@ -232,13 +232,18 @@ library calls. Half abs preserves raw NaN payloads, signed abs emits wrapping IN
 maps NaNs and both zeros to zero. Unsigned abs and signed integer sign are new support. The compact
 [core values fixture](../../tests/cuda/nvvm-core-values.slang) checks runtime-loaded integer edges,
 Half quiet/signaling NaN abs, zero and NaN sign, shared integer reductions and shared/global 64-bit
-inc/dec wrap under NVVM O0/O3. Its O0 cell passes; its active O3 cell fails the signed16 INT_MIN
-abs comparison on CUDA 12.9. Correct i16 LLVM and an old-style select control both lower to an
-`abs.s16` result whose subsequent wide machine comparison lacks signed16 normalization. The exact
-expected result and failure remain active; this migration is accepted with that known downstream
-limitation, not qualified as fully passing or CI-ready. Named provider units cover all six library
-signatures; raw IDs 49/68
-and 80/81 and retired source routes reject. Numeric MIN/MAX remains for canonical wave consumers.
+inc/dec wrap under NVVM O0/O3. Both cells now pass with the original wrapping expectations. The
+previous O3 signed16 INT_MIN failure is resolved by provider normalization at semantic integer
+consumers: comparison, division/remainder, right shift, widening and integer-to-float conversion.
+An explicit signed/unsigned widen/narrow pair prevents PTX's excess high bits from changing those
+observations. Shift counts normalize around width conversion; scalar and vector lanes retain their
+original LLVM types. Half/BF16 transport is unchanged. The
+[narrow integer fixture](../../tests/cuda/nvvm-narrow-integer-semantics.slang) passes O0/O3 and covers
+overflow/underflow, signedness reinterpretation, helper/vector paths, mixed-width shifts, named bit
+intrinsics and a wrapped-zero vector index. Historical failures and primitive experiments remain in
+accepted evidence; this does not claim arbitrary raw pointer arithmetic qualification. Named provider
+units cover all six library signatures; raw IDs 49/68 and 80/81 and retired source routes reject.
+Numeric MIN/MAX is also retired after canonical wave consumers moved to core.
 
 Both public atomic reduction APIs now produce canonical Atomic IR. Their existing Relaxed-only
 memory-order and pointer admission is unchanged; HLSL inc/dec explicitly forwards order and rejects

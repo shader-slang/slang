@@ -92,11 +92,16 @@ lowering, which has a real backend consumer independent of the public `fmod` bod
 Half bit transport, packed Half conversion and double word conversion also belong to the core.
 Core scalar `abs`, `min`, `max` and `sign` now own their compositions. Integer abs uses an
 ordinary comparison and wrapping negate, including INT_MIN in the emitted LLVM semantics;
-unsigned abs is identity. CUDA 12.9 O3 has an observed signed16 INT_MIN normalization failure: the
-correct i16 result is compared as a wider positive value after PTX `abs.s16`. The active core-values
-O3 test retains its exact expected wrapping result and fails; O0 passes. An equivalent old-style
-select control fails identically. This downstream narrow-integer limitation is not repaired by
-this producer migration. Half abs
+unsigned abs is identity. The provider normalizes semantic 16-bit integer operands before
+comparisons, division/remainder, right shifts, widening and integer-to-float conversion. PTX can
+retain excess high bits in promoted 16-bit arithmetic; an explicit signed or unsigned widen/narrow
+pair restores the low bits' intended interpretation. Inline assembly prevents LLVM from folding
+that pair away. Shift counts normalize around their existing width conversion, and vector lanes
+follow the same rule. Low-bit arithmetic, storage and same-width casts remain unchanged; the
+consumer's descriptor determines signedness. This resolves the retained CUDA 12.9 O3 signed16
+INT_MIN comparison/widening failure without an abs-specific workaround. Both original core-values
+cells and the focused narrow-integer regression now pass; historical failures remain in accepted
+evidence. Physical Half/BF16 transport is not treated as semantic integer arithmetic. Half abs
 clears bit 15 directly, preserving NaN payload bits. Float32/64 abs and min/max use the selected
 libdevice definitions; Half min/max widens both inputs and narrows the selected Float32 result
 once. Floating min/max is not replaced by a ternary comparison. Integer min/max uses ordinary
