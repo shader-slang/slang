@@ -291,6 +291,16 @@ considered lost only when set bits are dropped. This allows expressions such as 
 the literal value is technically out of range but only unset bits are dropped in truncation. (After GitHub
 issue [#10516](https://github.com/shader-slang/slang/issues/10516).)
 
+Finally, one implicit conversion exists **only as a source-compatibility feature for the HLSL-flavored
+dialect** and is intentionally kept out of the lists above. It is more restricted than the not-recommended
+cases: it is unavailable in Slang-dialect code entirely, and is provided only so that existing HLSL shaders
+that rely on an enum decaying to an arithmetic value continue to compile.
+
+- An **unscoped** `enum` (one made unscoped by `-unscoped-enum` or an explicit `[UnscopedEnum]`), in a `.hlsl`
+  translation unit, implicitly converts to any builtin scalar type other than `bool` that its tag type can
+  convert to, performed as `enum` &rarr; tag type &rarr; destination. This does not apply to scoped enums, to
+  `enum class`, or to any enum in a Slang-dialect translation unit.
+
 > 📝 **Remark:** Some common contexts for implicit type conversions:
 >
 > - Assigning a value of one type to a variable of another type

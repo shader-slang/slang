@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#runtime-type-information
-//META: doc_section_digest=10ae9cc79d86ded1f6703277629437a1410db2756cb171fadd23944d8b2ba02f
+//META: doc_section_digest=112d0fd617dabf9645fb61aab20200af19e655a7b95509d8501289ff25a1abb0
 //META: purpose=The dynamic-resource-heap intrinsic lowers to GetDynamicResourceHeap(bindingIndex) whose result type is an unsized array of the descriptor type.
 //META: intent=functional
 //META: pipeline_stage=lower

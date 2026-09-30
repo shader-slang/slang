@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:52:50Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 396e0b48eea2e029e35c85ee79eaca167a473a86531b56f3787837912eb5a15e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -45,7 +45,7 @@ key survives as the *mnemonic* printed by `-dump-ir`. Second, the
 C++ wrapper is `IR` plus the same `struct_name`; where `struct_name`
 is omitted, `process` in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
-(line 3448) derives it from the key with `to_pascal_case`.
+(line 3452) derives it from the key with `to_pascal_case`.
 
 **Every** type opcode has a C++ wrapper. Sixteen leaf wrappers in this
 family are hand-written — `IRSubpassInputType`,
@@ -68,7 +68,7 @@ are split across two headers: the intermediates and the historically
 hand-tuned leaves live in `slang-ir.h`, not in `slang-ir-insts.h`.
 
 Builder helpers follow the same pattern. A second FIDDLE template
-(same header, line 3313) generates `IRBuilder::get<StructName>(...)`
+(same header, line 3322) generates `IRBuilder::get<StructName>(...)`
 for every leaf type opcode — `getVectorType`, `getArrayType`,
 `getMetalPackedVectorType`, `getSetTagType`, and so on — driven by
 `getBasicTypesForBuilderMethods` in
@@ -87,20 +87,20 @@ identity-semantics types `StructType` and `ClassType`, which use
 Lowering from AST types is in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 The type visitor there has a small number of hand-written cases
-(`visitBasicExpressionType` line 2839, `visitVectorExpressionType`
-line 2844, `visitMatrixExpressionType` line 2852,
-`visitArrayExpressionType` line 2861, `visitPtrType` line 2760,
-`visitTupleType` line 2817, `visitValuePackType` line 2811,
-`visitDifferentialPairType` line 2682) and one general mechanism that
-covers most of the rest: `visitDeclRefType` (line 2796) checks for an
+(`visitBasicExpressionType` line 2852, `visitVectorExpressionType`
+line 2857, `visitMatrixExpressionType` line 2865,
+`visitArrayExpressionType` line 2874, `visitPtrType` line 2773,
+`visitTupleType` line 2830, `visitValuePackType` line 2824,
+`visitDifferentialPairType` line 2695) and one general mechanism that
+covers most of the rest: `visitDeclRefType` (line 2809) checks for an
 `IntrinsicTypeModifier` — the `__intrinsic_type(...)` attribute in the
 core-module sources — and routes such a type to
-`lowerSimpleIntrinsicType` (line 2879), which takes the opcode straight
+`lowerSimpleIntrinsicType` (line 2892), which takes the opcode straight
 out of the modifier and turns each generic argument of the `DeclRef`
 into an operand of the IR type, in declaration order.
 `visitResourceType`, `visitSamplerStateType`, `visitBuiltinGenericType`,
 `visitUntypedBufferResourceType`, `visitHLSLPatchType` and
-`visitMeshOutputType` (lines 2904-2921) all just delegate to it. The
+`visitMeshOutputType` (lines 2917-2921) all just delegate to it. The
 AST-side classes these come from are catalogued in
 [../ast-reference/types.md](../ast-reference/types.md).
 
@@ -177,7 +177,7 @@ One rule governs how every opcode below appears in `-dump-ir`.
 `shouldFoldInstIntoUses`
 ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines
 7822-7859) folds *all* types into their use sites, and `dumpInstExpr`
-(line 8275) prints a folded inst as its mnemonic followed by its
+(line 8337) prints a folded inst as its mnemonic followed by its
 operand list — so a type reads as `Mnemonic(operand, ...)` at each
 use (`Enum(Int)`, `StructuredBuffer(Float, Std140Layout, ...)`) and a
 nullary type as the bare mnemonic (`Float`, `UntypedResourceHandle`).
@@ -186,7 +186,7 @@ The exceptions are the four *nominal* type opcodes `struct`, `class`,
 folding and instead get their own top-level definition line that use
 sites refer to by `%id`. Of those four only the first three are also
 printed with their children in braces by `dumpIRParentInst` (the
-special-case switch at line 8296); `interface` takes the ordinary path,
+special-case switch at line 8358); `interface` takes the ordinary path,
 so it prints as `let %I : Type = interface(...)` with its requirement
 entries in the operand list.
 
@@ -199,7 +199,7 @@ to the right opcode, and the generated per-type helpers
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Void` | `IRVoidType` | — | H | `BasicExpressionType(Void)` (`visitBasicExpressionType`, line 2839, which calls `IRBuilder::getBasicType`) | The `void` type. |
+| `Void` | `IRVoidType` | — | H | `BasicExpressionType(Void)` (`visitBasicExpressionType`, line 2852, which calls `IRBuilder::getBasicType`) | The `void` type. |
 | `Bool` | `IRBoolType` | — | H | `BasicExpressionType(Bool)` | `bool`. |
 | `Int8` | `IRInt8Type` | — | H | `BasicExpressionType(Int8)` | 8-bit signed integer. |
 | `Int16` | `IRInt16Type` | — | H | `BasicExpressionType(Int16)` | 16-bit signed integer. |
@@ -235,7 +235,7 @@ forms, `spvBFloat16KHR` / `cuda_sm_8_0` for `BFloat16`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `FloatE4M3Type` | `IRFloatE4M3Type` | — | H | core-module `FloatE4M3` (`lowerSimpleIntrinsicType`, line 2879) | 8-bit float (E4M3 layout); storage-only. |
+| `FloatE4M3Type` | `IRFloatE4M3Type` | — | H | core-module `FloatE4M3` (`lowerSimpleIntrinsicType`, line 2892) | 8-bit float (E4M3 layout); storage-only. |
 | `FloatE5M2Type` | `IRFloatE5M2Type` | — | H | core-module `FloatE5M2` | 8-bit float (E5M2 layout); storage-only. |
 | `BFloat16Type` | `IRBFloat16Type` | — | H | core-module `BFloat16` | bfloat16; storage-only on most targets. |
 
@@ -243,17 +243,17 @@ forms, `spvBFloat16KHR` / `cuda_sm_8_0` for `BFloat16`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `String` | `IRStringType` | — | H | core-module `String` (`lowerSimpleIntrinsicType`, line 2879) | Slang-language string. |
+| `String` | `IRStringType` | — | H | core-module `String` (`lowerSimpleIntrinsicType`, line 2892) | Slang-language string. |
 | `NativeString` | `IRNativeStringType` | — | H | core-module `NativeString` | Unowned raw C-style string. |
 | `DynamicType` | `IRDynamicType` | — | H | (synthesized) | Type of values whose static type cannot be determined; consumed by the existential pass. |
 | `AnyValueType` | `IRAnyValueType` | `size` | H | (synthesized) | Type-erased value blob of a given size, used to marshal existential values across boundaries. |
-| `CapabilitySet` | `IRCapabilitySetType` | — | H | (synthesized) | Type of a capability-set value; produced by `IRBuilder::getCapabilityValue` in [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 2672). |
+| `CapabilitySet` | `IRCapabilitySetType` | — | H | (synthesized) | Type of a capability-set value; produced by `IRBuilder::getCapabilityValue` in [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 2673). |
 
 ### Raw and RTTI pointers
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `RawPointerType` | `IRRawPointerType` | — | H | core-module `NullPtr` (`lowerSimpleIntrinsicType`, line 2879) | Untyped pointer; also the lowered form of `nullptr`'s type, whose core-module declaration carries both `__magic_type(NullPtrType)` and this opcode. |
+| `RawPointerType` | `IRRawPointerType` | — | H | core-module `NullPtr` (`lowerSimpleIntrinsicType`, line 2892) | Untyped pointer; also the lowered form of `nullptr`'s type, whose core-module declaration carries both `__magic_type(NullPtrType)` and this opcode. |
 | `RTTIPointerType` | `IRRTTIPointerType` | `rTTIOperand` | H | (synthesized) | Pointer to a runtime type-info object; see [generics-and-existentials.md](generics-and-existentials.md). |
 | `AfterRawPointerTypeBase` | `IRAfterRawPointerTypeBase` | — | H | — | Sentinel opcode just past the `RawPointerTypeBase` range; never created. |
 
@@ -265,14 +265,14 @@ Both are built by `IRBuilder::getArrayTypeBase`
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Array` | `IRArrayType` | `elementType, elementCount, stride?` | H | `ArrayExpressionType` (with extent) (`visitArrayExpressionType`, line 2861) | Fixed-size array. |
+| `Array` | `IRArrayType` | `elementType, elementCount, stride?` | H | `ArrayExpressionType` (with extent) (`visitArrayExpressionType`, line 2874) | Fixed-size array. |
 | `UnsizedArray` | `IRUnsizedArrayType` | `elementType, stride?` | H | `ArrayExpressionType` (extent unknown) | Runtime-sized array. |
 
 ### Functions and basic blocks
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Func` | `IRFuncType`‡ | `resultType, paramTypes...`, optional trailing `IRAttr`† | H | `FuncType` AST node (`visitFuncType`, line 2718) | Function type; result type first, then parameter types, then an optional attribute. |
+| `Func` | `IRFuncType`‡ | `resultType, paramTypes...`, optional trailing `IRAttr`† | H | `FuncType` AST node (`visitFuncType`, line 2731) | Function type; result type first, then parameter types, then an optional attribute. |
 | `BasicBlock` | `IRBasicBlockType` | — | H | (synthesized) | The type of an `IRBlock` value (i.e. of a branch target). |
 
 ### Vectors, matrices, and composite
@@ -283,11 +283,11 @@ Both are built by `IRBuilder::getArrayTypeBase`
 | `Mat` | `IRMatrixType` | `elementType, rowCount, columnCount, layout` | H | `MatrixExpressionType` | Fixed-shape matrix; `layout` is an int literal selecting row-major / column-major. |
 | `MetalPackedVec` | `IRMetalPackedVectorType` | `elementType, elementCount` | H | (synthesized) | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`. |
 | `Atomic` | `IRAtomicType` | `elementType` | H | core-module `Atomic<T>` | Atomic-typed view of an element type. |
-| `Result` | `IRResultType` | `valueType, errorType` | H | No AST type and no source spelling: a function's `throws E` clause lowers to `Func(T, params..., FuncThrowTypeAttr(E))` (`_lowerInfoFromFuncParameters`, line 4814), and the error-handling pass ([slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) lines 43 and 93) rewrites that into `Func(Result(T, E), params...)` | Sum of a success value type and an error type; `int f(int) throws MyErr` ends up as `Func(Result(Int, Enum(...)), Int)`. |
+| `Result` | `IRResultType` | `valueType, errorType` | H | No AST type and no source spelling: a function's `throws E` clause lowers to `Func(T, params..., FuncThrowTypeAttr(E))` (`_lowerInfoFromFuncParameters`, line 4824), and the error-handling pass ([slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) lines 43 and 93) rewrites that into `Func(Result(T, E), params...)` | Sum of a success value type and an error type; `int f(int) throws MyErr` ends up as `Func(Result(Int, Enum(...)), Int)`. |
 | `Optional` | `IROptionalType` | `valueType` | H | `OptionalType` (`Optional<T>`) | Value-or-none. |
 | `Conditional` | `IRConditionalType` | `valueType, hasValue` | H | (synthesized) | Static-condition-tagged optional; `hasValue` is an `IRInst`-valued condition. |
-| `Enum` | `IREnumType` | `tagType` | P | `EnumDecl` (`visitEnumDecl`, line 12352) | Enum type; the tag type is its only content — flagged `parent`, but nothing puts the cases inside it. |
-| `Conjunction` | `IRConjunctionType`‡ | `caseTypes...`† | H | `AndType` AST node — the `&` type operator, e.g. the generic constraint `T : IA & IB` (`visitAndType`, line 2997) | Logical AND of types; `getCaseCount()` / `getCaseType(i)` read all operands. Rarely visible: `emitGenericConstraintValue` (line 12789) decomposes a conjunction used as a generic constraint into one `witness_table` parameter per case plus a `MakeTuple` of the witnesses, so the lowered generic's signature holds the separate constraints, not the `Conjunction`. |
+| `Enum` | `IREnumType` | `tagType` | P | `EnumDecl` (`visitEnumDecl`, line 12649) | Enum type; the tag type is its only content — flagged `parent`, but nothing puts the cases inside it. |
+| `Conjunction` | `IRConjunctionType`‡ | `caseTypes...`† | H | `AndType` AST node — the `&` type operator, e.g. the generic constraint `T : IA & IB` (`visitAndType`, line 3004) | Logical AND of types; `getCaseCount()` / `getCaseType(i)` read all operands. Rarely visible: `emitGenericConstraintValue` (line 13075) decomposes a conjunction used as a generic constraint into one `witness_table` parameter per case plus a `MakeTuple` of the witnesses, so the lowered generic's signature holds the separate constraints, not the `Conjunction`. |
 | `Attributed` | `IRAttributedType` | `baseType, attrs...`† | H | `unorm` / `snorm` / `Aligned` and other type modifiers | A base type with one or more attached `Attr` opcodes (see [metadata.md](metadata.md)); built by `getAttributedType(baseType, count, attributes)`. |
 
 ### Work-graph record types
@@ -311,7 +311,7 @@ see [decorations.md](decorations.md).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `DispatchNodeInputRecord` | `IRDispatchNodeInputRecordType` | `elementType` | H | core-module `DispatchNodeInputRecord<T>` (`lowerSimpleIntrinsicType`, line 2879) | Read-only input record shared by a broadcasting node's whole dispatch grid. |
+| `DispatchNodeInputRecord` | `IRDispatchNodeInputRecordType` | `elementType` | H | core-module `DispatchNodeInputRecord<T>` (`lowerSimpleIntrinsicType`, line 2892) | Read-only input record shared by a broadcasting node's whole dispatch grid. |
 | `ThreadNodeInputRecord` | `IRThreadNodeInputRecordType` | `elementType` | H | core-module `ThreadNodeInputRecord<T>` | Per-thread input record of a thread-launch node. |
 | `GroupNodeInputRecords` | `IRGroupNodeInputRecordsType` | `elementType` | H | core-module `GroupNodeInputRecords<T>` | Indexable array of input records for a coalescing node's group. |
 | `EmptyNodeInput` | `IREmptyNodeInputType` | — | H | core-module `EmptyNodeInput` | Input declaration for a node whose records carry no payload. |
@@ -336,7 +336,7 @@ the primal function. Each arm of the checker's
 two structs it synthesizes — `BwdCallable` and `MinimalContext` —
 directly
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 15142-15183, 15227-15268 and 19210-19277):
+lines 15153-15183, 15227-15268 and 19210-19277):
 
 | Attribute on the primal function | `BwdCallable` opcode | `MinimalContext` opcode |
 | --- | --- | --- |
@@ -374,17 +374,17 @@ and the propagate function takes the full one.
 | `BackwardDiffMinimalContextType` | `IRBackwardDiffMinimalContextType` | `func` | H | (synthesized) | Minimal context channel used when only adjoints flow back. |
 | `TrivialBackwardDiffMinimalContextType` | `IRTrivialBackwardDiffMinimalContextType` | `func` | H | (synthesized) | Trivial-minimal-context variant. |
 | `BackwardMinimalContextFromLegacyBwdDiffFunc` | `IRBackwardMinimalContextFromLegacyBwdDiffFunc` | `func, legacyBwdDiffFunc` | H | (synthesized) | Bridges a legacy function to the minimal-context channel. |
-| `ForwardDiffFuncType` | `IRForwardDiffFuncType` | `baseFuncType`† | H | `FwdDiffFuncType` (`visitFwdDiffFuncType`, line 2515) | Type of a forward-mode derivative function, derived from the base function type. |
-| `BackwardDiffFuncType` | `IRBackwardDiffFuncType` | `baseFuncType`† | H | `BwdDiffFuncType` (`visitBwdDiffFuncType`, line 2522) | Type of a reverse-mode adjoint function. |
-| `ApplyForBwdFuncType` | `IRApplyForBwdFuncType` | `baseFuncType, contextType`† | H | `ApplyForBwdFuncType` (`visitApplyForBwdFuncType`, line 2529) | Type of a closure for reverse-mode application. |
-| `BwdCallableFuncType` | `IRBwdCallableFuncType` | `baseFuncType, contextType`† | H | `BwdCallableFuncType` (`visitBwdCallableFuncType`, line 2540) | Callable-via-reverse-mode function type. |
-| `RematFuncType` | `IRRematFuncType` | `baseFuncType, minimalContextType, fullContextType`† | H | core-module `RematFuncType<FType, MinimalCtxType, FullCtxType>` | Rematerialization function type: the primal function plus the two checkpoint-context types reverse-mode autodiff threads through it. Built directly by the autodiff passes (`slang-ir-autodiff-unzip.cpp` line 914 emits it with three arguments), not by AST lowering. |
+| `ForwardDiffFuncType` | `IRForwardDiffFuncType` | `baseFuncType`† | H | `FwdDiffFuncType` (`visitFwdDiffFuncType`, line 2528) | Type of a forward-mode derivative function, derived from the base function type. |
+| `BackwardDiffFuncType` | `IRBackwardDiffFuncType` | `baseFuncType`† | H | `BwdDiffFuncType` (`visitBwdDiffFuncType`, line 2535) | Type of a reverse-mode adjoint function. |
+| `ApplyForBwdFuncType` | `IRApplyForBwdFuncType` | `baseFuncType, contextType`† | H | `ApplyForBwdFuncType` (`visitApplyForBwdFuncType`, line 2542) | Type of a closure for reverse-mode application. |
+| `BwdCallableFuncType` | `IRBwdCallableFuncType` | `baseFuncType, contextType`† | H | `BwdCallableFuncType` (`visitBwdCallableFuncType`, line 2553) | Callable-via-reverse-mode function type. |
+| `RematFuncType` | `IRRematFuncType` | `baseFuncType, minimalContextType, fullContextType`† | H | core-module `RematFuncType<FType, MinimalCtxType, FullCtxType>` | Rematerialization function type: the primal function plus the two checkpoint-context types reverse-mode autodiff threads through it. Built directly by the autodiff passes (`slang-ir-autodiff-unzip.cpp` line 918 emits it with three arguments), not by AST lowering. |
 
 ### Tensor and torch-tensor types
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `TensorView` | `IRTensorViewType` | `elementType` | H | core-module `TensorView<T>` (`lowerSimpleIntrinsicType`, line 2879) | GPU view of a tensor. |
+| `TensorView` | `IRTensorViewType` | `elementType` | H | core-module `TensorView<T>` (`lowerSimpleIntrinsicType`, line 2892) | GPU view of a tensor. |
 | `TorchTensor` | `IRTorchTensorType` | `elementType`† | H | core-module `TorchTensor<T>` | PyTorch tensor handle; the generic argument becomes operand 0 even though the Lua entry declares no operands. |
 | `ArrayListVector` | `IRArrayListType` | `elementType` | H | — | Declared but inert: nothing in `source/` creates, consumes or names this opcode at `source_commit`. |
 | `TensorAddressingTensorLayoutType` | `IRTensorAddressingTensorLayoutType` | `dimension, clampMode` | H | (synthesized) | Tensor-addressing layout descriptor. |
@@ -399,7 +399,7 @@ dump. Being nominal it is never folded into its uses, and
 `visitInterfaceDecl` allocates it with one operand per requirement and
 then emits the entries immediately *before* it
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-lines 12124-12130), so the entries print as their own top-level
+lines 12399-12405), so the entries print as their own top-level
 `interface_req_entry(<requirement key>, <requirement type>)` lines and
 the `interface` line lists them by `%id`. For `interface IShape { float
 area(); }` the entry for `area` is
@@ -409,7 +409,7 @@ area(); }` the entry for `area` is
 | --- | --- | --- | --- | --- | --- |
 | `BindExistentials` | `IRBindExistentialsType` | `baseType, (type, witness) pairs...`† | H | (synthesized) | `BindExistentials<B, T0, w0, ...>`; binds each of `B`'s existential parameters. |
 | `BoundInterface` | `IRBoundInterfaceType`‡ | `interfaceType, concreteType, witnessTable`† (`min_operands = 3`) | H | (synthesized) | Specialization of `BindExistentials` where the base is known to be an interface. |
-| `interface` | `IRInterfaceType`‡ | `requirements: interface_req_entry...`† | G | `InterfaceDecl` (`visitInterfaceDecl`, line 12061) | Interface type; requirements are operands (`getRequirementCount()` is `getOperandCount()`), not children — see [structure.md](structure.md) for the contrast with `witness_table` children. |
+| `interface` | `IRInterfaceType`‡ | `requirements: interface_req_entry...`† | G | `InterfaceDecl` (`visitInterfaceDecl`, line 12330) | Interface type; requirements are operands (`getRequirementCount()` is `getOperandCount()`), not children — see [structure.md](structure.md) for the contrast with `witness_table` children. |
 | `associated_type` | `IRAssociatedType` | `constraintTypes...` | H | `AssocTypeDecl` lowering | Associated type of an interface. |
 | `this_type` | `IRThisType`‡ | `interfaceType` | H | `ThisType` AST node | The "self" type of an interface or extension; the accessor is spelled `getConstraintType()`. |
 | `rtti_type` | `IRRTTIType` | — | H | (synthesized) | Type of `IRRTTIObject` values. |
@@ -421,7 +421,7 @@ Both are built by `IRBuilder::getWitnessTableType`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `witness_table_t` | `IRWitnessTableType`‡ | `baseType` | H | `SubtypeWitness` lowering (`IRBuilder::getWitnessTableType`, line 2395) | Type of a `witness_table` value parameterized by the interface it conforms to; the accessor is `getConformanceType()`. |
+| `witness_table_t` | `IRWitnessTableType`‡ | `baseType` | H | `SubtypeWitness` lowering (`IRBuilder::getWitnessTableType`, line 2408) | Type of a `witness_table` value parameterized by the interface it conforms to; the accessor is `getConformanceType()`. |
 | `witness_table_id_t` | `IRWitnessTableIDType` | `baseType` | H | (synthesized) | Integer-id form of a witness-table type; used during dynamic-dispatch lowering before being replaced with `uint`. |
 
 ### Pointer types
@@ -436,11 +436,11 @@ four parameter-mode variants are not chosen from a dedicated AST type
 alone: `lowerFuncType`-style parameter lowering switches on
 `paramInfo.actualParamPassingModeToUse` at
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 4727 and wraps the parameter's lowered type accordingly.
+line 4740 and wraps the parameter's lowered type accordingly.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `Ptr` | `IRPtrType` | `valueType, accessQualifierOperand?, addressSpaceOperand?, dataLayout?` | H | `PtrType` AST node (`visitPtrType`, line 2760) | Pointer to a value of `valueType`. |
+| `Ptr` | `IRPtrType` | `valueType, accessQualifierOperand?, addressSpaceOperand?, dataLayout?` | H | `PtrType` AST node (`visitPtrType`, line 2773) | Pointer to a value of `valueType`. |
 | `RefParam` | `IRRefParamType` | (same as `Ptr`) | H | `RefParamType` (`ParamPassingMode::Ref`) | `ref` parameter type. |
 | `BorrowInParam` | `IRBorrowInParamType` | (same as `Ptr`) | H | `BorrowInParamType` (`ParamPassingMode::BorrowIn`) | Read-only borrowed `in` parameter type. |
 | `PseudoPtr` | `IRPseudoPtrType` | (same as `Ptr`) | H | (synthesized) | Logical pointer on targets that cannot represent real pointers; legalized away by the buffer-element-type passes. |
@@ -461,7 +461,7 @@ satisfy `IBufferDataLayout`
 23-71) and reach the IR through `lowerSimpleIntrinsicType`; the other
 four are chosen by the target layout logic in
 [slang-ir-layout.cpp](../../../../source/slang/slang-ir-layout.cpp)
-(lines 1030-1061) and have no source spelling.
+(lines 1051-1061) and have no source spelling.
 
 Where a named marker lands is the buffer type's data-layout operand,
 not a different buffer opcode: `L` is the second generic parameter of
@@ -475,7 +475,7 @@ themselves capability-gated — `Std140DataLayout` and
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `SamplerState` | `IRSamplerStateType` | — | H | core-module `SamplerState` (`lowerSimpleIntrinsicType`, line 2879) | Sampler state. |
+| `SamplerState` | `IRSamplerStateType` | — | H | core-module `SamplerState` (`lowerSimpleIntrinsicType`, line 2892) | Sampler state. |
 | `SamplerComparisonState` | `IRSamplerComparisonStateType` | — | H | core-module `SamplerComparisonState` | Comparison-style sampler state. |
 | `GLSLAtomicUint` | `IRGLSLAtomicUintType` | — | H | GLSL-module `atomic_uint` | GLSL atomic-counter placeholder; mangled during compilation. |
 | `DefaultLayout` | `IRDefaultBufferLayoutType` | — | H | core-module `DefaultDataLayout` | Default buffer-layout marker. |
@@ -504,7 +504,7 @@ present), `IRHLSLPatchType` adds `getElementCount()`, and
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `SubpassInputType` | `IRSubpassInputType`‡ | `elementType, isMultisampleInst` | H | core-module `SubpassInput` / `SubpassInputMS` | Vulkan subpass input type. |
-| `TextureFootprintType` | `IRTextureFootprintType` | `elementType` | H | core-module `__TextureFootprintData<let ND : int>` (`hlsl.meta.slang` line 26462) | Texture-footprint query result type. The Lua operand is *named* `elementType`, but the single generic argument `lowerSimpleIntrinsicType` puts there is the dimension count `ND`, an `IRIntLit` — so `getElementType()` returns the dimensionality, not an element type. |
+| `TextureFootprintType` | `IRTextureFootprintType` | `elementType` | H | core-module `__TextureFootprintData<let ND : int>` (`hlsl.meta.slang` line 26651) | Texture-footprint query result type. The Lua operand is *named* `elementType`, but the single generic argument `lowerSimpleIntrinsicType` puts there is the dimension count `ND`, an `IRIntLit` — so `getElementType()` returns the dimensionality, not an element type. |
 | `TextureShape1DType` | `IRTextureShape1DType` | — | H | (synthesized) | Shape marker used as `TextureType`'s `shape` operand for `Texture1D`. |
 | `TextureShape2DType` | `IRTextureShape2DType` | — | H | (synthesized) | Shape marker for `Texture2D`. |
 | `TextureShape3DType` | `IRTextureShape3DType` | — | H | (synthesized) | Shape marker for `Texture3D`. |
@@ -522,10 +522,10 @@ present), `IRHLSLPatchType` adds `getElementCount()`, and
 | `PointStream` | `IRHLSLPointStreamType` | `elementType` | H | core-module `PointStream<T>` | HLSL geometry-shader point stream. |
 | `LineStream` | `IRHLSLLineStreamType` | `elementType` | H | core-module `LineStream<T>` | HLSL geometry-shader line stream. |
 | `TriangleStream` | `IRHLSLTriangleStreamType` | `elementType` | H | core-module `TriangleStream<T>` | HLSL geometry-shader triangle stream. |
-| `Vertices` | `IRVerticesType` | `elementType, maxVertices` | H | core-module `OutputVertices<T, N>` (`core.meta.slang` line 2647) | Mesh-shader vertex output array. |
-| `Indices` | `IRIndicesType` | `elementType, maxIndices` | H | core-module `OutputIndices<T, N>` (`core.meta.slang` line 2687) | Mesh-shader index output array. |
-| `Primitives` | `IRPrimitivesType` | `elementType, maxPrimitives` | H | core-module `OutputPrimitives<T, N>` (`core.meta.slang` line 2725) | Mesh-shader primitive output array. |
-| `metal::mesh` | `IRMetalMeshType` | `verticesType, primitivesType, numVertices, numPrimitives, topology` | H | (synthesized) | Metal mesh-shader mesh-output type, built by varying-param legalization ([slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) line 4718) when it rewrites the three mesh output arrays above into one Metal `mesh` parameter. |
+| `Vertices` | `IRVerticesType` | `elementType, maxVertices` | H | core-module `OutputVertices<T, N>` (`core.meta.slang` line 2654) | Mesh-shader vertex output array. |
+| `Indices` | `IRIndicesType` | `elementType, maxIndices` | H | core-module `OutputIndices<T, N>` (`core.meta.slang` line 2694) | Mesh-shader index output array. |
+| `Primitives` | `IRPrimitivesType` | `elementType, maxPrimitives` | H | core-module `OutputPrimitives<T, N>` (`core.meta.slang` line 2732) | Mesh-shader primitive output array. |
+| `metal::mesh` | `IRMetalMeshType` | `verticesType, primitivesType, numVertices, numPrimitives, topology` | H | (synthesized) | Metal mesh-shader mesh-output type, built by varying-param legalization ([slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) line 4869) when it rewrites the three mesh output arrays above into one Metal `mesh` parameter. |
 | `mesh_grid_properties` | `IRMetalMeshGridPropertiesType` | — | H | (synthesized) | Metal mesh-grid-properties type, built by the same pass (line 4590). |
 | `StructuredBuffer` | `IRHLSLStructuredBufferType` | `elementType, dataLayout?`† | H | core-module `StructuredBuffer<T, L>` | HLSL `StructuredBuffer<T>`; `L` is the SPIR-V data layout. |
 | `RWStructuredBuffer` | `IRHLSLRWStructuredBufferType` | `elementType, dataLayout?`† | H | core-module `RWStructuredBuffer<T, L>` | HLSL `RWStructuredBuffer<T>`. |
@@ -536,7 +536,7 @@ present), `IRHLSLPatchType` adds `getElementCount()`, and
 | `TextureBuffer` | `IRTextureBufferType` | `elementType` | H | core-module `TextureBuffer<T>` | `TextureBuffer<T>`. |
 | `ParameterBlock` | `IRParameterBlockType` | `elementType, dataLayout?`† (`min_operands = 1`) | H | core-module `ParameterBlock<T>` | `ParameterBlock<T>`. |
 | `GLSLInputParameterGroup` | `IRGLSLInputParameterGroupType` | `elementType`† | H | — | GLSL input parameter group. No producer was found in the watched paths at `source_commit`; only the `ParameterGroupType` base class relies on it. |
-| `GLSLOutputParameterGroup` | `IRGLSLOutputParameterGroupType` | `elementType`† | H | (synthesized) | GLSL output parameter group, built by the hand-written `IRBuilder::getGLSLOutputParameterGroupType` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3023) during GLSL varying-output legalization. |
+| `GLSLOutputParameterGroup` | `IRGLSLOutputParameterGroupType` | `elementType`† | H | (synthesized) | GLSL output parameter group, built by the hand-written `IRBuilder::getGLSLOutputParameterGroupType` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3024) during GLSL varying-output legalization. |
 | `GLSLShaderStorageBuffer` | `IRGLSLShaderStorageBufferType`‡ | `valueType, dataLayout?` | H | core-module `GLSLShaderStorageBuffer` (`hlsl.meta.slang` line 77) | GLSL shader storage buffer. |
 | `RayQuery` | `IRRayQueryType` | `rayFlags`† (`min_operands = 1`) | H | core-module `RayQuery<let rayFlagsGeneric>` | Raytracing query state; the operand is the compile-time ray-flags value. |
 | `HitObject` | `IRHitObjectType` | — | H | core-module `HitObject` | Raytracing hit object. |
@@ -558,19 +558,19 @@ builders.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `struct` | `IRStructType`‡ | (children: `field`) | P | `AggTypeDecl` (`visitAggTypeDecl`, line 12381) | User-defined struct type; `getFields()` filters the children. |
+| `struct` | `IRStructType`‡ | (children: `field`) | P | `AggTypeDecl` (`visitAggTypeDecl`, line 12690) | User-defined struct type; `getFields()` filters the children. |
 | `class` | `IRClassType`‡ | (children: `field`) | P | `AggTypeDecl` for a `class` | User-defined class type. |
 
 ### Tuples, packs, and target tuples
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `tuple_type` | `IRTupleType` | `types...` | H | `TupleType` AST node (`visitTupleType`, line 2817) | Heterogeneous tuple; elements are read with `GetTupleElement`. |
+| `tuple_type` | `IRTupleType` | `types...` | H | `TupleType` AST node (`visitTupleType`, line 2830) | Heterogeneous tuple; elements are read with `GetTupleElement`. |
 | `TypePack` | `IRTypePack` | `types...` | H | `ConcreteTypePack` / `TypePack` | Variadic-generic type pack; satisfies a flattening identity. |
 | `TargetTuple` | `IRTargetTupleType` | `types...` | H | (synthesized) | Tuple type that survives target-tuple lowering instead of being expanded to a struct. |
 | `TupleName` | `IRTupleNameType` | `name` | H | (synthesized) | Sentinel last operand of a `tuple_type` carrying a custom struct name for lowering; created by the autodiff unzip pass. |
-| `ValuePackType` | `IRValuePackType` | `elementType` | H | `ValuePackType` AST node (`visitValuePackType`, line 2811) | Type of a variadic-generic value-pack parameter; see also [misc.md](misc.md). |
-| `ExpandTypeOrVal` | `IRExpandTypeOrVal`‡ | `patternType, capturedPacks...`† | H | `ExpandType` / expand `Val` lowering (lines 2186, 2220) | Type-side representation of an `expand T` over one or more captured packs; `getPatternType()`, `getCaptureCount()`, `getCaptureType(i)`. |
+| `ValuePackType` | `IRValuePackType` | `elementType` | H | `ValuePackType` AST node (`visitValuePackType`, line 2824) | Type of a variadic-generic value-pack parameter; see also [misc.md](misc.md). |
+| `ExpandTypeOrVal` | `IRExpandTypeOrVal`‡ | `patternType, capturedPacks...`† | H | `ExpandType` / expand `Val` lowering (lines 2276, 2220) | Type-side representation of an `expand T` over one or more captured packs; `getPatternType()`, `getCaptureCount()`, `getCaptureType(i)`. |
 
 ### SPIR-V literals and kinds
 
@@ -629,7 +629,7 @@ column-major, the same three values the core module splices into
 ([core.meta.slang](../../../../source/slang/core.meta.slang) lines
 2295-2296). The fourth generic parameter of `matrix<T, R, C, L>`
 defaults to *unknown* (line 2301) and `visitMatrixExpressionType`
-(line 2858) lowers whatever the AST holds straight into operand 3, so
+(line 2865) lowers whatever the AST holds straight into operand 3, so
 a plain `float4x4` lowers with `0`; a `row_major` / `column_major`
 modifier pins `1` / `2` at check time, and `specializeMatrixLayout`
 rewrites a surviving `0` to the target's `-matrix-layout-row-major` /
@@ -691,11 +691,11 @@ is the `tagType` — the underlying integer type that stores the
 enum's value — and it is built by `IRBuilder::createEnumType` from
 that tag type during `EnumDecl` lowering
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 12364). The cases are neither operands nor children. The `P` flag
+line 12673). The cases are neither operands nor children. The `P` flag
 only means the opcode *can* hold children; `createEnumType`
-([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5337)
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5346)
 creates the inst with the tag-type operand alone, and
-`visitEnumCaseDecl` (line 12334) lowers each case to the value of its
+`visitEnumCaseDecl` (line 12631) lowers each case to the value of its
 tag expression — an ordinary constant whose *type* is the `Enum`, not a
 member of it. So there is nothing to enumerate on the inst, and because
 `Enum` is not one of the nominal opcodes it is folded into its uses:
@@ -727,7 +727,7 @@ through `OpUntypedAccessChainKHR`
 ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)).
 It is never produced by lowering:
 `processConstantBufferDescriptorHeapLoad` in
-`slang-ir-spirv-legalize.cpp` (lines 1301-1337) retypes a
+`slang-ir-spirv-legalize.cpp` (lines 1307-1337) retypes a
 `ConstantBuffer<T>` fetched from a descriptor heap to a Uniform
 `SPIRVUntypedPtr` so the uniform-buffer descriptor kind survives while
 nested arrays are still addressed logically, without a pointer-type
@@ -795,7 +795,7 @@ four things together: `import experimental.workgraph;`, the
 `-experimental-feature` option (the module is declared
 `[ExperimentalModule]`, which
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 15449 turns into an `ExperimentalModuleDecoration` and the module
+line 15775 turns into an `ExperimentalModuleDecoration` and the module
 loader rejects without the option), a `[shader("node")]` entry point
 compiled with `-stage node`, and a profile of SM 6.8 or later —
 `-profile lib_6_8` — because the `node` stage capability is defined as
@@ -861,7 +861,7 @@ order is the reverse. `IRBuilder::getTaggedUnionType(IRWitnessTableSet*
 tables, IRTypeSet* types)`
 ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
 4579) stores `tables` at operand 0 and `types` at operand 1, and
-`IRTaggedUnionType::getWitnessTableSet()` / `getTypeSet()` (line 3058)
+`IRTaggedUnionType::getWitnessTableSet()` / `getTypeSet()` (line 3067)
 read them back that way. Use the accessors; positional reads based on
 the comment will swap the two sets.
 
@@ -878,7 +878,7 @@ only the *contents*. `MinimalContext` "will hold the same data as
 diff translation pass will later determine exactly what goes in the
 minimal context"
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
-lines 3727-3728).
+lines 3731-3732).
 
 ## See also
 

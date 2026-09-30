@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#barriers-and-synchronization
-//META: doc_section_digest=46f99bd5a35473a9163ccbd42c4c906fa8dad92dac17c85d7c15483893456718
+//META: doc_section_digest=931865ab828ea4bf86b75e2e0a29cc458fac0ca8d3b216802e8173152dd6a088
 //META: purpose=`beginInvocationInterlock()` and `endInvocationInterlock()` are the Slang spellings that produce the nullary `BeginFragmentShaderInterlock` and `EndFragmentShaderInterlock` opcodes, which appear directly in a `fragment` entry point's `func %main` and reach SPIR-V as `OpBeginInvocationInterlockEXT` / `OpEndInvocationInterlockEXT` and GLSL as `beginInvocationInterlockARB()` / `endInvocationInterlockARB()`.
 //META: intent=functional
 //META: pipeline_stage=lower

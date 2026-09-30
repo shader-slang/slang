@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#debug-info-gating
-//META: doc_section_digest=62ea8db2784ef3877410b92997d96e0414adfc1ab018c13cd6fdcaff541c61de
+//META: doc_section_digest=429220b334f4d96169ad9c9953243ea47e493ffd5500ab21c8c1829bc387ee12
 //META: purpose=A Slang-synthesized member-wise initializer gets no debug-line instructions or debug-location decoration, even when debug information is requested for the module.
 //META: intent=functional
 //META: pipeline_stage=lower

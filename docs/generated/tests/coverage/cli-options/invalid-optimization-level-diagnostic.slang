@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-code-namespace
-//META: doc_section_digest=f4e4743214fa16b25679c231bf78519febf5f40d591d803e8822ade1f048c8fc
+//META: doc_section_digest=5ef206950ef0e6ecfe2a9d8abf02d78b471d242f0a4a1fb9094dec1de2c240ba
 //META: purpose=Verifies an out-of-range optimization level (-O9) is rejected with E00062 listing the accepted -O values.
 //META: intent=characterization
 //META: covers=source/slang/slang-options.cpp

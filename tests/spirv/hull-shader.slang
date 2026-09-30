@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull
 
 // SPIRV: OpDecorate %entryPointParam_hullMain_pos Location 0
 // SPIRV: OpDecorate %entryPointParam_hullMain_hm Location 1

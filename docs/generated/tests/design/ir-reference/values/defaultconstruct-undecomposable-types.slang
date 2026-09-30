@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/values.md#defaultconstruct
-//META: doc_section_digest=6c9e23cc7f3c01023f15f82c811288b4c32f6278bb00c875134897b51fe05502
+//META: doc_section_digest=4df637a420e20a9809c679bd1353de4587a5558bbbab7fdfbd1d02ac4c82b3f2
 //META: purpose=The `defaultConstruct` opcode does survive for the types lowering cannot decompose: an interface-typed value and an unspecialized generic type parameter both default-initialize to the nullary opcode.
 //META: intent=functional
 //META: pipeline_stage=lower

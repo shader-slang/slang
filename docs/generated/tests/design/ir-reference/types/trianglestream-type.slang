@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#resource-and-texture-types
-//META: doc_section_digest=9bc7cd21838a70254771d6cf744cc574fc1ff6d4c25215b75c1badb8cf87e771
+//META: doc_section_digest=18390b63de1003330aaf1c938cc3b9a195ccaebbb584bbb2edb3db5df8f75c02
 //META: purpose=A TriangleStream<T> geometry-shader output parameter surfaces the TriangleStream opcode parameterised by its element type in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

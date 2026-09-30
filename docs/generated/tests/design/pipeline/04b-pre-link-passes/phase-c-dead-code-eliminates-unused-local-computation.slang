@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-c-mandatory-optimization-passes
-//META: doc_section_digest=49feefd921e3cd705ce44340fcdfa68e653acc4e8992a6e7baac1b7332480921
+//META: doc_section_digest=339aa1f99eee344569651cc325281f522a4a1b164a14ae41c68d88b02639a221
 //META: purpose=Phase C's per-function eliminateDeadCode sweep (C5) removes instructions whose results are never used, while keepExportsAlive leaves the entry point itself in place.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

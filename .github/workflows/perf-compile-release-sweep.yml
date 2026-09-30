@@ -38,6 +38,21 @@ on:
         description: "include patch releases (vYYYY.N.M) in the since/until window"
         type: boolean
         default: false
+      only:
+        # Empty by default, which keeps the documented backfill path intact:
+        # sweep.py then computes the workload set itself and applies its own
+        # exclusions (downstream_required, the --api gate, the platform gate).
+        # Naming workloads here BYPASSES those exclusions, so a list must not
+        # contain a workload the runner cannot execute.
+        #
+        # Exists for the case where one workload cannot run against part of the
+        # window while the rest can: backend_matrix_metal ICEs on v2026.1..v2026.10
+        # ("Unknown addressspace encountered"), and because sweep.py exits
+        # non-zero when any workload fails on any release, that single failure
+        # skips the push step and discards the whole sweep. Without a way to
+        # narrow the set, those nine releases cannot be backfilled at all.
+        description: "comma-separated workloads to sweep (default: all eligible)"
+        default: ""
 
 concurrency:
   group: perf-compile-release-sweep
@@ -126,6 +141,7 @@ jobs:
           FORCE_ENABLED: ${{ github.event.inputs.force || 'false' }}
           INCLUDE_PATCHES: ${{ github.event.inputs.include-patches || 'false' }}
           SWEEP: ${{ github.event.inputs.sweep || 'false' }}
+          ONLY: ${{ github.event.inputs.only || '' }}
         run: |
           set -euo pipefail
           SUITE="$GITHUB_WORKSPACE/tools/compile-perf"
@@ -148,8 +164,12 @@ jobs:
           # dispatch — that IS the backfill path; no force needed.
           sweepflag=()
           [ "$SWEEP" = "true" ] && sweepflag=(--sweep)
+          # Unset by default, so sweep.py keeps computing the set itself; see the
+          # `only` input's comment for why naming workloads bypasses its exclusions.
+          only=()
+          [ -n "$ONLY" ] && only=(--only "$ONLY")
           python3 sweep.py --index releases/index.json --results "$RESULTS" \
-            --samples "$SAMPLES" --api "${force[@]}" "${sweepflag[@]}"
+            --samples "$SAMPLES" --api "${force[@]}" "${sweepflag[@]}" "${only[@]}"
           # Merge newly swept releases into the full index (not overwrite) so
           # report.py uses all historical data, not just the swept window.
           python3 track.py merge-index --results "$RESULTS" --index releases/index.json

@@ -241,11 +241,30 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     # debugger. Build libspvdb here and link it into slang-test so that
     # .slang test files under tests/debuginfo can drive the debugger
     # in-process and validate its output with FileCheck.
+    #
+    # slang-test-main.cpp is the translation unit that compiles the stb_image
+    # implementation, so spvdb normally reuses those symbols instead of
+    # compiling a second copy. In a static-library build, though, Slang also
+    # defines STB_IMAGE_STATIC (see cmake/CompilerFlags.cmake), which makes
+    # every stbi_* function internal to slang-test-main.cpp and therefore
+    # unreachable from spvdb — there, spvdb has to compile its own copy.
+    if(SLANG_LIB_TYPE STREQUAL "STATIC")
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE FALSE)
+    else()
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
+    endif()
     add_subdirectory(
         "${slang_SOURCE_DIR}/tests/spvdb"
         "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
         EXCLUDE_FROM_ALL
     )
+
+    # spvdb is a vendored library that brings its own warning configuration, so
+    # it deliberately does not go through slang_add_target /
+    # set_default_compile_options. It is linked into slang-test, though, and
+    # sanitizer settings have to match across a whole binary, so apply just the
+    # sanitizer flags to it.
+    add_sanitizer_options(spvdb)
 
     # The test executables and runtime-loaded modules
     slang_add_target(
@@ -410,6 +429,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
+            # The record-replay unit tests call into the record-replay subsystem, which is compiled
+            # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
+            SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -433,6 +455,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )
