@@ -907,7 +907,8 @@ struct FakeNVVMBuilderState
     static constexpr Index kFunctionCapacity = 64;
     FakeNVVMBuilderFunctionTypeStorage functionTypeStorage[kFunctionCapacity];
     FakeNVVMBuilderFunctionStorage functionStorage[kFunctionCapacity];
-    FakeNVVMBuilderBlockStorage blockStorage[kFunctionCapacity * 2];
+    // Core wave folds contain several control-flow blocks per instantiated function.
+    FakeNVVMBuilderBlockStorage blockStorage[kFunctionCapacity * 8];
     FakeNVVMBuilderIntegerTypeStorage integerTypeStorage;
     FakeNVVMBuilderBooleanTypeStorage booleanTypeStorage;
     FakeNVVMBuilderHalfTypeStorage halfTypeStorage;
@@ -934,7 +935,7 @@ struct FakeNVVMBuilderState
     FakeNVVMBuilderTextureOperationStorage textureOperationStorage[16];
     FakeNVVMBuilderIntegerConstantStorage integerConstantStorage[64];
     FakeNVVMBuilderFloatingPointConstantStorage floatingPointConstantStorage[64];
-    FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[32];
+    FakeNVVMBuilderScalarPhiStorage scalarPhiStorage[kFunctionCapacity * 2];
     FakeNVVMBuilderCallStorage callStorage[kFunctionCapacity * 2];
     // Aggregate tests keep scalar/vector/matrix results live, including split Float64 words.
     // Reserve enough stable handles for those addresses without changing pointer validation.
@@ -5907,7 +5908,6 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitOperation(
             operation->operandTypes);
     }
     if (resolution.family == NVVMSemantics::ValueOperationFamily::IntegerUnary ||
-        resolution.family == NVVMSemantics::ValueOperationFamily::IntegerBit ||
         resolution.family == NVVMSemantics::ValueOperationFamily::BooleanUnary)
     {
         gFakeNVVMBuilder.emittedValueOperations.add(
@@ -8418,14 +8418,6 @@ static SlangResult _emitNVVMTestIntrinsic(
     SlangNVVMValueTypeDesc resultType = valueType;
     switch (operation)
     {
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
-        resultType = NVVMSemantics::kUnsignedI32;
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT:
-        operandTypes[0] = NVVMSemantics::kUnsignedI32;
-        operandTypes[1] = valueType;
-        operandTypes[2] = NVVMSemantics::kSignedI32;
-        break;
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT:
         resultType = operation == SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT ? NVVMSemantics::kUnsignedI32
                                                                        : NVVMSemantics::kBool;
@@ -8535,13 +8527,10 @@ static SlangResult _populateWaveIntrinsicKernel(
 
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, laneIndexHelperBlock));
     SlangNVVMValueHandle laneIndex = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
-        nullptr,
-        0,
-        laneIndex));
+    const char* laneName = "llvm.nvvm.read.ptx.sreg.laneid";
+    const SlangNVVMNamedIntrinsicDesc laneDesc =
+        {laneName, strlen(laneName), NVVMSemantics::kUnsignedI32, nullptr, 0};
+    SLANG_RETURN_ON_FAIL(builder.emitNamedIntrinsic(module, laneDesc, nullptr, 0, laneIndex));
     SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, laneIndex));
 
     if (laneCountHelper)
@@ -8596,320 +8585,6 @@ static SlangResult _populateWaveLaneCountKernel(
         &laneCountHelperName);
 }
 
-static SlangResult _populateWaveReadLaneAtUIntKernel(
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& laneIndexHelperName,
-    const UnownedStringSlice& readLaneHelperName)
-{
-    SlangNVVMTypeHandle voidType = nullptr;
-    SlangNVVMTypeHandle integerType = nullptr;
-    SlangNVVMTypeHandle globalIntegerPointerType = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
-    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
-    SLANG_RETURN_ON_FAIL(builder.getPointerType(
-        module,
-        integerType,
-        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-        globalIntegerPointerType));
-
-    SlangNVVMTypeHandle laneIndexHelperType = nullptr;
-    SlangNVVMValueHandle laneIndexHelper = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.getFunctionType(module, integerType, nullptr, 0, laneIndexHelperType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(
-        module,
-        laneIndexHelperType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        laneIndexHelperName,
-        laneIndexHelper));
-
-    SlangNVVMTypeHandle readLaneHelperType = nullptr;
-    SlangNVVMValueHandle readLaneHelper = nullptr;
-    SlangNVVMTypeHandle readLaneParameterTypes[] = {integerType, integerType, integerType};
-    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
-        module,
-        integerType,
-        readLaneParameterTypes,
-        SLANG_COUNT_OF(readLaneParameterTypes),
-        readLaneHelperType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(
-        module,
-        readLaneHelperType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        readLaneHelperName,
-        readLaneHelper));
-
-    SlangNVVMTypeHandle kernelType = nullptr;
-    SlangNVVMValueHandle kernel = nullptr;
-    SlangNVVMTypeHandle kernelParameterTypes[] = {
-        globalIntegerPointerType,
-        integerType,
-        integerType};
-    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
-        module,
-        voidType,
-        kernelParameterTypes,
-        SLANG_COUNT_OF(kernelParameterTypes),
-        kernelType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(
-        module,
-        kernelType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        kernelName,
-        kernel));
-
-    SlangNVVMValueHandle destination = nullptr;
-    SlangNVVMValueHandle mask = nullptr;
-    SlangNVVMValueHandle sourceLane = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 0, destination));
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 1, mask));
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 2, sourceLane));
-
-    SlangNVVMBlockHandle laneIndexBlock = nullptr;
-    SlangNVVMBlockHandle readLaneBlock = nullptr;
-    SlangNVVMBlockHandle kernelBlock = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.createBlock(module, laneIndexHelper, toSlice("entry"), laneIndexBlock));
-    SLANG_RETURN_ON_FAIL(
-        builder.createBlock(module, readLaneHelper, toSlice("entry"), readLaneBlock));
-    SLANG_RETURN_ON_FAIL(builder.createBlock(module, kernel, toSlice("entry"), kernelBlock));
-
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, laneIndexBlock));
-    SlangNVVMValueHandle laneIndex = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
-        nullptr,
-        0,
-        laneIndex));
-    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, laneIndex));
-
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, readLaneBlock));
-    SlangNVVMValueHandle readLaneArguments[3] = {};
-    for (Index i = 0; i < SLANG_COUNT_OF(readLaneArguments); ++i)
-    {
-        SLANG_RETURN_ON_FAIL(
-            builder.getFunctionParameter(module, readLaneHelper, size_t(i), readLaneArguments[i]));
-    }
-    SlangNVVMValueHandle readLaneValue = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        NVVMSemantics::kUnsignedI32,
-        readLaneArguments,
-        SLANG_COUNT_OF(readLaneArguments),
-        readLaneValue));
-    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, readLaneValue));
-
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
-    SlangNVVMValueHandle laneIndexResult = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitCall(module, laneIndexHelper, nullptr, 0, laneIndexResult));
-    SlangNVVMValueHandle kernelReadLaneArguments[] = {mask, laneIndexResult, sourceLane};
-    SlangNVVMValueHandle storedValue = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitCall(
-        module,
-        readLaneHelper,
-        kernelReadLaneArguments,
-        SLANG_COUNT_OF(kernelReadLaneArguments),
-        storedValue));
-    SlangNVVMValueHandle storePointer = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitPointerOffset(module, destination, laneIndexResult, storePointer));
-    SLANG_RETURN_ON_FAIL(builder.emitStore(module, storedValue, storePointer, 4));
-    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
-    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));
-    return SLANG_OK;
-}
-
-static SlangResult _populateWaveReadLaneAtLoadedScalarKernel(
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& laneIndexHelperName,
-    const UnownedStringSlice& readLaneHelperName,
-    SlangNVVMTypeHandle integerType,
-    SlangNVVMTypeHandle payloadType,
-    const SlangNVVMValueTypeDesc& payloadSemanticType,
-    SlangNVVMValueOperation operation)
-{
-    SlangNVVMTypeHandle voidType = nullptr;
-    SlangNVVMTypeHandle globalPayloadPointerType = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getVoidType(module, voidType));
-    SLANG_RETURN_ON_FAIL(builder.getPointerType(
-        module,
-        payloadType,
-        SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
-        globalPayloadPointerType));
-
-    SlangNVVMTypeHandle laneIndexHelperType = nullptr;
-    SlangNVVMValueHandle laneIndexHelper = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.getFunctionType(module, integerType, nullptr, 0, laneIndexHelperType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(
-        module,
-        laneIndexHelperType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        laneIndexHelperName,
-        laneIndexHelper));
-
-    SlangNVVMTypeHandle readLaneHelperType = nullptr;
-    SlangNVVMValueHandle readLaneHelper = nullptr;
-    SlangNVVMTypeHandle readLaneParameterTypes[] = {integerType, payloadType, integerType};
-    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
-        module,
-        payloadType,
-        readLaneParameterTypes,
-        SLANG_COUNT_OF(readLaneParameterTypes),
-        readLaneHelperType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(
-        module,
-        readLaneHelperType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        readLaneHelperName,
-        readLaneHelper));
-
-    SlangNVVMTypeHandle kernelType = nullptr;
-    SlangNVVMValueHandle kernel = nullptr;
-    SlangNVVMTypeHandle kernelParameterTypes[] =
-        {globalPayloadPointerType, globalPayloadPointerType, integerType, integerType};
-    SLANG_RETURN_ON_FAIL(builder.getFunctionType(
-        module,
-        voidType,
-        kernelParameterTypes,
-        SLANG_COUNT_OF(kernelParameterTypes),
-        kernelType));
-    SLANG_RETURN_ON_FAIL(builder.declareFunction(
-        module,
-        kernelType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        kernelName,
-        kernel));
-
-    SlangNVVMValueHandle destination = nullptr;
-    SlangNVVMValueHandle source = nullptr;
-    SlangNVVMValueHandle mask = nullptr;
-    SlangNVVMValueHandle sourceLane = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 0, destination));
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 1, source));
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 2, mask));
-    SLANG_RETURN_ON_FAIL(builder.getFunctionParameter(module, kernel, 3, sourceLane));
-
-    SlangNVVMBlockHandle laneIndexBlock = nullptr;
-    SlangNVVMBlockHandle readLaneBlock = nullptr;
-    SlangNVVMBlockHandle kernelBlock = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.createBlock(module, laneIndexHelper, toSlice("entry"), laneIndexBlock));
-    SLANG_RETURN_ON_FAIL(
-        builder.createBlock(module, readLaneHelper, toSlice("entry"), readLaneBlock));
-    SLANG_RETURN_ON_FAIL(builder.createBlock(module, kernel, toSlice("entry"), kernelBlock));
-
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, laneIndexBlock));
-    SlangNVVMValueHandle laneIndex = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
-        nullptr,
-        0,
-        laneIndex));
-    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, laneIndex));
-
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, readLaneBlock));
-    SlangNVVMValueHandle readLaneArguments[3] = {};
-    for (Index i = 0; i < SLANG_COUNT_OF(readLaneArguments); ++i)
-    {
-        SLANG_RETURN_ON_FAIL(
-            builder.getFunctionParameter(module, readLaneHelper, size_t(i), readLaneArguments[i]));
-    }
-    SlangNVVMValueHandle readLaneValue = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        operation,
-        payloadSemanticType,
-        readLaneArguments,
-        SLANG_COUNT_OF(readLaneArguments),
-        readLaneValue));
-    SLANG_RETURN_ON_FAIL(builder.emitValueReturn(module, readLaneValue));
-
-    SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
-    SlangNVVMValueHandle laneIndexResult = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitCall(module, laneIndexHelper, nullptr, 0, laneIndexResult));
-    SlangNVVMValueHandle sourcePointer = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitPointerOffset(module, source, laneIndexResult, sourcePointer));
-    SlangNVVMValueHandle sourceValue = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitLoad(module, sourcePointer, 4, SLANG_NVVM_LOAD_FLAG_NONE, sourceValue));
-    SlangNVVMValueHandle kernelReadLaneArguments[] = {mask, sourceValue, sourceLane};
-    SlangNVVMValueHandle storedValue = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.emitCall(
-        module,
-        readLaneHelper,
-        kernelReadLaneArguments,
-        SLANG_COUNT_OF(kernelReadLaneArguments),
-        storedValue));
-    SlangNVVMValueHandle storePointer = nullptr;
-    SLANG_RETURN_ON_FAIL(
-        builder.emitPointerOffset(module, destination, laneIndexResult, storePointer));
-    SLANG_RETURN_ON_FAIL(builder.emitStore(module, storedValue, storePointer, 4));
-    SLANG_RETURN_ON_FAIL(builder.emitReturnVoid(module));
-    SLANG_RETURN_ON_FAIL(builder.markFunctionAsKernel(module, kernel));
-    return SLANG_OK;
-}
-
-static SlangResult _populateWaveReadLaneAtIntKernel(
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& laneIndexHelperName,
-    const UnownedStringSlice& readLaneHelperName)
-{
-    SlangNVVMTypeHandle integerType = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
-    return _populateWaveReadLaneAtLoadedScalarKernel(
-        builder,
-        module,
-        kernelName,
-        laneIndexHelperName,
-        readLaneHelperName,
-        integerType,
-        integerType,
-        NVVMSemantics::kSignedI32,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT);
-}
-
-static SlangResult _populateWaveReadLaneAtFloatKernel(
-    const NVVMIRBuilder& builder,
-    SlangNVVMModuleHandle module,
-    const UnownedStringSlice& kernelName,
-    const UnownedStringSlice& laneIndexHelperName,
-    const UnownedStringSlice& readLaneHelperName)
-{
-    SlangNVVMTypeHandle integerType = nullptr;
-    SlangNVVMTypeHandle floatType = nullptr;
-    SLANG_RETURN_ON_FAIL(builder.getIntegerType(module, 32, integerType));
-    SLANG_RETURN_ON_FAIL(builder.getFloatingPointType(module, 32, floatType));
-    return _populateWaveReadLaneAtLoadedScalarKernel(
-        builder,
-        module,
-        kernelName,
-        laneIndexHelperName,
-        readLaneHelperName,
-        integerType,
-        floatType,
-        NVVMSemantics::kFloat32,
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT);
-}
 
 static SlangResult _populateWaveActiveMaskKernel(
     const NVVMIRBuilder& builder,
@@ -8948,13 +8623,10 @@ static SlangResult _populateWaveActiveMaskKernel(
     SLANG_RETURN_ON_FAIL(builder.setInsertBlock(module, kernelBlock));
 
     SlangNVVMValueHandle laneIndex = nullptr;
-    SLANG_RETURN_ON_FAIL(_emitNVVMTestIntrinsic(
-        builder,
-        module,
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
-        nullptr,
-        0,
-        laneIndex));
+    const char* laneName = "llvm.nvvm.read.ptx.sreg.laneid";
+    const SlangNVVMNamedIntrinsicDesc laneDesc =
+        {laneName, strlen(laneName), NVVMSemantics::kUnsignedI32, nullptr, 0};
+    SLANG_RETURN_ON_FAIL(builder.emitNamedIntrinsic(module, laneDesc, nullptr, 0, laneIndex));
     SlangNVVMValueHandle storePointer = nullptr;
     SLANG_RETURN_ON_FAIL(builder.emitPointerOffset(module, destination, laneIndex, storePointer));
 
@@ -9903,8 +9575,6 @@ static SlangResult _populateNumericFamilyFunction(
         emitOperation(SLANG_NVVM_VALUE_OP_ADD, signedI8, operandTypes, operands, 2, ignored));
     SLANG_RETURN_ON_FAIL(
         emitOperation(SLANG_NVVM_VALUE_OP_LESS_THAN, boolType, operandTypes, operands, 2, ignored));
-    SLANG_RETURN_ON_FAIL(
-        emitOperation(SLANG_NVVM_VALUE_OP_MIN, signedI8, operandTypes, operands, 2, ignored));
     operandTypes[0] = unsignedI8;
     operandTypes[1] = unsignedI8;
     SLANG_RETURN_ON_FAIL(emitOperation(
@@ -9914,21 +9584,15 @@ static SlangResult _populateNumericFamilyFunction(
         operands,
         2,
         ignored));
-    SLANG_RETURN_ON_FAIL(
-        emitOperation(SLANG_NVVM_VALUE_OP_MAX, unsignedI8, operandTypes, operands, 2, ignored));
 
     operandTypes[0] = float32;
     operandTypes[1] = float32;
     operands[0] = parameters[2];
     operands[1] = parameters[2];
-    SLANG_RETURN_ON_FAIL(
-        emitOperation(SLANG_NVVM_VALUE_OP_MIN, float32, operandTypes, operands, 2, ignored));
     operandTypes[0] = float64;
     operandTypes[1] = float64;
     operands[0] = parameters[11];
     operands[1] = parameters[12];
-    SLANG_RETURN_ON_FAIL(
-        emitOperation(SLANG_NVVM_VALUE_OP_MAX, float64, operandTypes, operands, 2, ignored));
 
     operandTypes[0] = signedI8;
     operands[0] = parameters[0];

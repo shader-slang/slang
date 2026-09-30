@@ -134,9 +134,9 @@ extern "C"
 #define SLANG_NVVM_VALUE_OP_GREATER_THAN ((SlangNVVMValueOperation)12u)
 #define SLANG_NVVM_VALUE_OP_LESS_EQUAL ((SlangNVVMValueOperation)13u)
 #define SLANG_NVVM_VALUE_OP_GREATER_EQUAL ((SlangNVVMValueOperation)14u)
-#define SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX ((SlangNVVMValueOperation)15u)
+// Value operation 15 is reserved after moving its final wave consumers to core.
 // Value operation 16 is reserved after moving its public wave composition to core.
-#define SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT ((SlangNVVMValueOperation)17u)
+// Value operation 17 is reserved after moving its final wave consumers to core.
 #define SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT ((SlangNVVMValueOperation)18u)
 // Value operation 19 is reserved after moving its public wave composition to core.
 // Value operation 20 is reserved after moving its public wave composition to core.
@@ -159,11 +159,11 @@ extern "C"
 /* Value 40 is retired; core math uses named calls and ordinary composition. */
 /* Value 41 is retired; core math uses named calls and ordinary composition. */
 /* Value 42 is retired; trunc uses named selected-libdevice functions. */
-#define SLANG_NVVM_VALUE_OP_MIN ((SlangNVVMValueOperation)43u)
-#define SLANG_NVVM_VALUE_OP_MAX ((SlangNVVMValueOperation)44u)
-#define SLANG_NVVM_VALUE_OP_COUNT_BITS ((SlangNVVMValueOperation)45u)
+// Value operation 43 is reserved after moving its final wave consumers to core.
+// Value operation 44 is reserved after moving its final wave consumers to core.
+// Value operation 45 is reserved after moving its final wave consumers to core.
 /* Values 46-47 are retired; public integer-bit operations use named LLVM intrinsics. */
-#define SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW ((SlangNVVMValueOperation)48u)
+// Value operation 48 is reserved after moving its final wave consumers to core.
 // 49 is reserved (retired abs operation).
 /* Value 50 is retired; core math uses named calls and ordinary composition. */
 /* Value 51 is retired; core math uses named calls and ordinary composition. */

@@ -102,7 +102,7 @@ libdevice definitions; Half min/max widens both inputs and narrows the selected 
 once. Floating min/max is not replaced by a ternary comparison. Integer min/max uses ordinary
 comparison/selection. Sign subtracts the two ordered comparisons, so NaN and either zero return
 zero; signed integer sign is also supported. Numeric IDs 49/68 and their scalar tags/text are
-retired. MIN 43/MAX 44 remain for canonical masked-wave consumers.
+retired. MIN 43/MAX 44 are also retired after their final masked-wave consumers moved to core.
 
 The nine atomic reduction families in both `Atomic<T>` methods and HLSL helpers select existing
 canonical Atomic IR operations. Their discarded result does not need a tagged CUDA helper body.
@@ -228,8 +228,8 @@ of 8-bit inputs to uint32 remains, including sign extension for negative int8 va
 returns the same-width primitive result. `firstbithigh` complements negative signed values, then
 subtracts the leading-zero count from width minus one. Both scan primitives receive literal false,
 so zero has a defined width result; the public APIs preserve the uint(-1) sentinel. Existing vector
-mappings call the scalar bodies. Numeric semantic IDs46/47 are retired; COUNT_BITS45 and
-FIRST_BIT_LOW48 remain for compound wave recipes that have not migrated.
+mappings call the scalar bodies. Numeric semantic IDs 45/46/47/48 are retired; both public bit
+operations and masked-wave algorithms use the named LLVM primitives.
 
 Public lane indices/counts, indexed shuffles, ballot/votes and raw-bit matching use eight named
 NVVM registry intrinsics. Registry matching owns the complete signature and attributes; indexed
@@ -251,9 +251,33 @@ Hardware and logical masks have distinct IR identities. `WaveGetConvergedMask` i
 IR opcode 909, lowered through existing numeric operation 79 to convergent, side-effecting PTX
 `activemask`. It is not eligible for CSE or hoisting. `WaveGetActiveMask` retains its logical
 active-mask synthesis. Implicit matrix lane transport captures one hardware mask, ballots its
-participants and reuses that ballot for all components. Numeric 15/17/18/71/79 remain for genuine
-canonical, masked-scan, quad or rotation consumers. Ordered masked reductions/scans and their
-floating NaN/signed-zero behavior are unchanged.
+participants and reuses that ballot for all components. Numeric 18/71/79 remain for genuine
+canonical ballot/match/hardware-mask IR. Numeric 15/17 are retired after the final algorithm
+consumers switched to named lane and shuffle primitives.
+
+Masked reductions and prefixes now use one core `__nvvmWaveFold<T, Op, mode>` algorithm. Seven
+small typed algebras provide identity and combination, with arithmetic or logical generic bounds;
+`__NVVMWaveMode` distinguishes reduction, exclusive prefix and inclusive prefix. Scalar admission
+is unchanged: sum/product admit Int32/UInt32/Float32/Float64, bitwise operations Int32/UInt32,
+and min/max integer 8/16/32/64 plus Half/Float32/Float64. Aggregate bodies map to scalar components.
+The old CUDA-text table, scalar/aggregate recipes and deferred-phi graph construction are removed.
+
+Ordinary folds visit partition bits in increasing lane order. Floating min/max reductions retain
+ordered compare/select with the right operand winning ties and NaNs. Low-bit contiguous masks with
+power-of-two population retain their XOR butterfly; shifted contiguous masks use the sparse path.
+Half/Double min/max prefixes retain ascending offsets and separate inclusive transmitted state
+from the returned accumulator. Half exclusive seeds remain finite ±65504; Float32 prefixes keep
+numeric fmin/fmax. Double arithmetic reductions preserve the original singleton operand, and Double
+sum retains its mask-dependent negative-zero seed. This is the existing NVVM algorithm, whose
+ordinary arithmetic fold need not equal CUDA's general butterfly evaluation order.
+
+QuadAny/QuadAll core bodies perform four unconditional indexed reads and bitwise accumulation.
+Their SPIR-V requirement markers are constructed only for other target arms; arbitrary standalone
+markers still reject on NVVM. Rotation selects its existing SM7 core lane formula explicitly.
+Scalar all/any select canonical Boolean casts, including floating NaN=true and either zero=false;
+the `bool($0)` text recognizer is removed, while ordinary language numeric-to-Boolean planning remains.
+Numeric IDs 43/44/45/48 are reserved alongside 15/17. Named LLVM/libdevice calls and provider ABI 46
+remain unchanged.
 
 Target-switch specialization selects available branches across the linked module before diagnosing
 compatible but unavailable cases. A helper referenced only by an unselected NVVM arm is valid IR
@@ -303,7 +327,7 @@ does not preprocess the CUDA prelude. It preserves each access's own resource ex
 Remaining fixed standard-library producers carry typed NVVM intrinsic identities, which legalization consumes
 as `IRNVVMIntrinsic`. The catalog does not infer these semantics from arbitrary CUDA source text.
 Surface helpers carry load/store semantic tags and are rewritten per call while static field formats
-and component masks are available. Some richer texture, scalar-out-parameter and compound-wave helpers still have exact
+and component masks are available. Some richer texture and scalar-out-parameter helpers still have exact
 whole-body/signature recognizers. `RequirePrelude`, arbitrary GenericAsm and standalone execution
 requirements are not general no-ops; their meaning must be owned before they can be removed.
 

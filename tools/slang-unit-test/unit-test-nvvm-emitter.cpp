@@ -3485,7 +3485,19 @@ SLANG_UNIT_TEST(nvvmSlangSelectedScalarTruthinessUsesTypedInequality)
         SLANG_CHECK(sawUnsignedInteger);
         SLANG_CHECK(sawFloat16);
         SLANG_CHECK(sawFloat32);
-        SLANG_CHECK(sawBool);
+        SLANG_CHECK(!sawBool);
+        bool returnedBoolParameter = false;
+        for (Index i = 0; i < gFakeNVVMBuilder.scalarReturnValueRefs.getCount(); ++i)
+        {
+            const auto ref = gFakeNVVMBuilder.scalarReturnValueRefs[i];
+            const auto function =
+                gFakeNVVMBuilder.blockFunctionIndices[gFakeNVVMBuilder.scalarReturnBlockIndices[i]];
+            const auto type = gFakeNVVMBuilder.functionTypeIndices[function];
+            returnedBoolParameter |=
+                ref.kind == FakeNVVMBuilderValueKind::Parameter &&
+                gFakeNVVMBuilder.functionTypeResultTypes[type] == _getFakeNVVMBuilderBooleanType();
+        }
+        SLANG_CHECK(returnedBoolParameter);
         SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
@@ -7698,8 +7710,8 @@ SLANG_UNIT_TEST(nvvmSlangLibdeviceAndMinMaxOperationsRequestTypedOperations)
         bool sawIntegerCompare = false;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
-            SLANG_CHECK(operation.key.operation != SLANG_NVVM_VALUE_OP_MIN);
-            SLANG_CHECK(operation.key.operation != SLANG_NVVM_VALUE_OP_MAX);
+            SLANG_CHECK(operation.key.operation != SlangNVVMValueOperation(43));
+            SLANG_CHECK(operation.key.operation != SlangNVVMValueOperation(44));
             sawIntegerCompare |=
                 operation.key.family == FakeNVVMBuilderScalarFamily::Compare &&
                 NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kSignedI32);
@@ -8101,10 +8113,10 @@ SLANG_UNIT_TEST(nvvmSlangScalarIntrinsicHelpersUseTypedRecipes)
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FREXP_EXPONENT] == 3);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MODF_FRACTION] == 1);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MODF_INTEGRAL] == 1);
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MIN] == 0);
+        SLANG_CHECK(operationCounts[SlangNVVMValueOperation(43)] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fminf"));
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmaxf"));
-        SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_MAX] == 0);
+        SLANG_CHECK(operationCounts[SlangNVVMValueOperation(44)] == 0);
         SLANG_CHECK(operationCounts[68] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_sinhf"));
         SLANG_CHECK(operationCounts[73] == 0);
@@ -8201,34 +8213,12 @@ SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarHelpersUseGenericLoops)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        uint32_t readLaneAtCount = 0;
-        uint32_t laneIndexCount = 0;
-        for (SlangNVVMValueOperation operation : gFakeNVVMBuilder.intrinsicOperations)
-        {
-            if (operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
-                ++readLaneAtCount;
-            else if (operation == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX)
-                ++laneIndexCount;
-        }
-        SLANG_CHECK(readLaneAtCount == 2);
-        SLANG_CHECK(laneIndexCount == 1);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.shfl.sync.idx.i32"));
         SLANG_CHECK(
             gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.read.ptx.sreg.laneid"));
-
-        uint32_t firstBitLowCount = 0;
-        uint32_t negateCount = 0;
-        uint32_t selectCount = 0;
-        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
-        {
-            firstBitLowCount += operation.key.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW;
-            negateCount += operation.key.operation == SLANG_NVVM_VALUE_OP_NEGATE;
-            selectCount += operation.key.operation == SLANG_NVVM_VALUE_OP_SELECT;
-        }
-        SLANG_CHECK(firstBitLowCount == 2);
-        SLANG_CHECK(negateCount == 2);
-        SLANG_CHECK(selectCount == 1);
-        SLANG_CHECK(gFakeNVVMBuilder.scalarPhiTargetBlockIndices.getCount() == 4);
-        SLANG_CHECK(gFakeNVVMBuilder.addPhiIncomingCallCount == 8);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.cttz"));
+        SLANG_CHECK(gFakeNVVMBuilder.scalarPhiTargetBlockIndices.getCount() >= 4);
+        SLANG_CHECK(gFakeNVVMBuilder.addPhiIncomingCallCount >= 8);
         SLANG_CHECK(gFakeNVVMBuilder.emitConditionalBranchCallCount >= 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitBranchCallCount >= 4);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 0);
@@ -8285,100 +8275,26 @@ SLANG_UNIT_TEST(nvvmSlangSingletonReductionsPreserveTypedOperands)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        // Float32/Float64 min/max seeds its source algorithm with the original operand and uses
-        // ordered comparison/selection. Float64 arithmetic retains its singleton passthrough and
-        // sum seed.
-        uint32_t float32CompareSelectCount = 0;
-        uint32_t float64CompareSelectCount = 0;
-        uint32_t callerSeedCount = 0;
-        uint32_t float64PassthroughCount = 0;
-        uint32_t float64SeedCount = 0;
-        uint32_t float64ShuffleInputSelectCount = 0;
+        uint32_t orderedFloat32 = 0, orderedFloat64 = 0;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
         {
-            if (operation.key.operation != SLANG_NVVM_VALUE_OP_SELECT ||
-                operation.resultType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
-                continue;
-            if (operation.operands[1].kind == FakeNVVMBuilderValueKind::Parameter)
+            if ((operation.key.operation == SLANG_NVVM_VALUE_OP_LESS_THAN ||
+                 operation.key.operation == SLANG_NVVM_VALUE_OP_GREATER_THAN) &&
+                operation.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
             {
-                SLANG_CHECK(operation.operands[2].kind == FakeNVVMBuilderValueKind::ScalarPhi);
-                SLANG_CHECK_ABORT(
-                    operation.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
-                SLANG_CHECK_ABORT(operation.operands[0].index >= 0);
-                SLANG_CHECK_ABORT(
-                    operation.operands[0].index < gFakeNVVMBuilder.scalarOperations.getCount());
-                const auto& predicate =
-                    gFakeNVVMBuilder.scalarOperations[operation.operands[0].index];
-                SLANG_CHECK(predicate.key.operation == SLANG_NVVM_VALUE_OP_EQUAL);
-                SLANG_CHECK(
-                    predicate.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
-                SLANG_CHECK(predicate.operandTypes[0].bitWidth == 32);
-                SLANG_CHECK(operation.resultType.bitWidth == 64);
-                ++float64PassthroughCount;
-            }
-            else
-            {
-                SLANG_CHECK_ABORT(
-                    operation.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
-                SLANG_CHECK_ABORT(operation.operands[0].index >= 0);
-                SLANG_CHECK_ABORT(
-                    operation.operands[0].index < gFakeNVVMBuilder.scalarOperations.getCount());
-                const auto& predicate =
-                    gFakeNVVMBuilder.scalarOperations[operation.operands[0].index];
-                if (predicate.key.operation == SLANG_NVVM_VALUE_OP_LESS_THAN ||
-                    predicate.key.operation == SLANG_NVVM_VALUE_OP_GREATER_THAN)
-                {
-                    SLANG_CHECK(
-                        predicate.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
-                    SLANG_CHECK(
-                        predicate.operandTypes[0].bitWidth == operation.resultType.bitWidth);
-                    SLANG_CHECK(operation.operands[1].kind == FakeNVVMBuilderValueKind::ScalarPhi);
-                    float32CompareSelectCount += operation.resultType.bitWidth == 32;
-                    float64CompareSelectCount += operation.resultType.bitWidth == 64;
-                }
-                else if (operation.resultType.bitWidth == 64)
-                {
-                    if (operation.operands[1].kind ==
-                        FakeNVVMBuilderValueKind::FloatingPointConstant)
-                    {
-                        SLANG_CHECK(
-                            operation.operands[2].kind ==
-                            FakeNVVMBuilderValueKind::FloatingPointConstant);
-                        ++float64SeedCount;
-                    }
-                    else
-                    {
-                        SLANG_CHECK(
-                            operation.operands[1].kind == FakeNVVMBuilderValueKind::ScalarPhi);
-                        SLANG_CHECK(
-                            operation.operands[2].kind == FakeNVVMBuilderValueKind::Parameter);
-                        ++float64ShuffleInputSelectCount;
-                    }
-                }
+                orderedFloat32 += operation.operandTypes[0].bitWidth == 32;
+                orderedFloat64 += operation.operandTypes[0].bitWidth == 64;
             }
         }
-        for (const auto& incoming : gFakeNVVMBuilder.scalarPhiIncomingValueRefs)
-            callerSeedCount += incoming.kind == FakeNVVMBuilderValueKind::Parameter;
-        SLANG_CHECK(callerSeedCount == 4);
-        SLANG_CHECK(float32CompareSelectCount == 2);
-        SLANG_CHECK(float64CompareSelectCount == 2);
-        SLANG_CHECK(float64PassthroughCount == 2);
-        SLANG_CHECK(float64SeedCount == 1);
-        SLANG_CHECK(float64ShuffleInputSelectCount == 2);
-        bool sawFloat64NegativeZero = false;
-        for (Index i = 0; i < gFakeNVVMBuilder.floatingPointConstantBitPatterns.getCount(); ++i)
-        {
-            if (gFakeNVVMBuilder.floatingPointConstantBitWidths[i] == 32)
-            {
-                SLANG_CHECK(gFakeNVVMBuilder.floatingPointConstantBitPatterns[i] != 0x80000000u);
-            }
-            else
-            {
-                sawFloat64NegativeZero |=
-                    gFakeNVVMBuilder.floatingPointConstantBitPatterns[i] == 0x8000000000000000ull;
-            }
-        }
-        SLANG_CHECK(sawFloat64NegativeZero);
+        SLANG_CHECK(orderedFloat32 >= 2);
+        SLANG_CHECK(orderedFloat64 >= 2);
+        SLANG_CHECK(!gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fminf"));
+        SLANG_CHECK(!gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmax"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.shfl.sync.idx.i32"));
+        SLANG_CHECK(gFakeNVVMBuilder.scalarPhiTargetBlockIndices.getCount() >= 4);
+        // The core builds the Double seed through asdouble's integer-word bitcast. The exact
+        // fp64 wave runtime fixtures own its bits and singleton preservation independently of
+        // whether constant folding creates a floating constant or retains that construction.
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -8427,31 +8343,14 @@ SLANG_UNIT_TEST(nvvmSlangAggregateWaveHelpersUseRecursiveScalarRecipes)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK_ABORT(code != nullptr);
 
-        uint32_t readLaneAtCount = 0;
-        uint32_t laneIndexCount = 0;
-        uint32_t activeMaskCount = 0;
-        for (SlangNVVMValueOperation operation : gFakeNVVMBuilder.intrinsicOperations)
-        {
-            readLaneAtCount += operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT;
-            laneIndexCount += operation == SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX;
-            activeMaskCount += operation == SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK;
-        }
-        SLANG_CHECK(readLaneAtCount == 8);
-        SLANG_CHECK(laneIndexCount >= 1);
-        SLANG_CHECK(activeMaskCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.shfl.sync.idx.i32"));
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.nvvm.vote.ballot.sync"));
-        uint32_t floatMinimumCount = 0;
-        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
-        {
-            floatMinimumCount += operation.key.operation == SLANG_NVVM_VALUE_OP_MIN &&
-                                 operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
-        }
-        SLANG_CHECK(floatMinimumCount == 2);
-        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementExtractCallCount >= 20);
-        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 6);
-        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateConstructCallCount >= 2);
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.cttz"));
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fminf"));
+        SLANG_CHECK(gFakeNVVMBuilder.emitSequentialElementExtractCallCount >= 4);
+        SLANG_CHECK(gFakeNVVMBuilder.emitVectorConstructCallCount >= 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount >= 3);
+        SLANG_CHECK(gFakeNVVMBuilder.scalarPhiTargetBlockIndices.getCount() >= 4);
         SLANG_CHECK(gFakeNVVM.lazyAddModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds.getCount() == 2);
         SLANG_CHECK(gFakeNVVM.moduleAddKinds[1] == FakeModuleAddKind::Lazy);
@@ -9478,7 +9377,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
         {R"SLANG(
             uint64_t malformedShuffle(uint64_t mask, uint64_t value, int lane)
             {
-                __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+                __intrinsic_asm "__shfl_sync($0, $1, $2)";
             }
             RWStructuredBuffer<uint64_t> outputBuffer;
             [numthreads(32, 1, 1)]
@@ -9487,11 +9386,12 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
                 outputBuffer[tid.x] = malformedShuffle(uint64_t(0xFFFFFFFFu), uint64_t(tid.x), 0);
             }
         )SLANG",
-         "'nvvmIntrinsic'"},
+         "GenericAsm assembly=__shfl_sync($0, $1, $2), signature=uint64_t(uint64_t, uint64_t, "
+         "int)"},
         {R"SLANG(
             uint64_t malformedShuffle(uint mask, uint value, int lane)
             {
-                __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+                __intrinsic_asm "__shfl_sync($0, $1, $2)";
             }
             RWStructuredBuffer<uint64_t> outputBuffer;
             [numthreads(32, 1, 1)]
@@ -9500,11 +9400,11 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
                 outputBuffer[tid.x] = malformedShuffle(0xFFFFFFFFu, tid.x, 0);
             }
         )SLANG",
-         "'nvvmIntrinsic'"},
+         "GenericAsm assembly=__shfl_sync($0, $1, $2), signature=uint64_t(uint, uint, int)"},
         {R"SLANG(
             uint64_t malformedShuffle(uint mask, uint64_t value, float lane)
             {
-                __intrinsic_asm(nvvmWaveReadLaneAt) "__shfl_sync($0, $1, $2)";
+                __intrinsic_asm "__shfl_sync($0, $1, $2)";
             }
             RWStructuredBuffer<uint64_t> outputBuffer;
             [numthreads(32, 1, 1)]
@@ -9513,7 +9413,7 @@ SLANG_UNIT_TEST(nvvmSlangUnsupportedIRStopsBeforeEmission)
                 outputBuffer[tid.x] = malformedShuffle(0xFFFFFFFFu, uint64_t(tid.x), 0.0f);
             }
         )SLANG",
-         "'nvvmIntrinsic'"},
+         "GenericAsm assembly=__shfl_sync($0, $1, $2), signature=uint64_t(uint, uint64_t, float)"},
         // Local packed-vector legalization must not turn shared or external lane writes into
         // whole-vector read/modify/write operations: independent lanes may have different writers.
         {R"(
@@ -12911,6 +12811,113 @@ SLANG_UNIT_TEST(nvvmSlangCoreWaveLegacyRoutesRejectBeforeOutput)
         SLANG_CHECK(_getBlobText(diagnostics).contains(testCase.diagnostic));
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+// Exact legacy bodies must reject before provider creation, independently of module version.
+SLANG_UNIT_TEST(nvvmSlangMaskedWaveLegacyTextRejectsBeforeOutput)
+{
+    struct LegacyWaveCase
+    {
+        const char* scalar;
+        const char* aggregate;
+    };
+    const LegacyWaveCase cases[] = {
+        {"_waveSum($1.x, $0)", "_waveSumMultiple($1.x, $0)"},
+        {"_waveProduct($1.x, $0)", "_waveProductMultiple($1.x, $0)"},
+        {"_waveMin($1.x, $0)", "_waveMinMultiple($1.x, $0)"},
+        {"_waveMax($1.x, $0)", "_waveMaxMultiple($1.x, $0)"},
+        {"_waveAnd($1.x, $0)", "_waveAndMultiple($1.x, $0)"},
+        {"_waveOr($1.x, $0)", "_waveOrMultiple($1.x, $0)"},
+        {"_waveXor($1.x, $0)", "_waveXorMultiple($1.x, $0)"},
+        {"_wavePrefixSum($1.x, $0) ", "_wavePrefixSumMultiple($1.x, $0) "},
+        {"_wavePrefixProduct($1.x, $0) ", "_wavePrefixProductMultiple($1.x, $0) "},
+        {"_wavePrefixAnd($1.x, $0) ", "_wavePrefixAndMultiple($1.x, $0) "},
+        {"_wavePrefixOr($1.x, $0) ", "_wavePrefixOrMultiple($1.x, $0) "},
+        {"_wavePrefixXor($1.x, $0) ", "_wavePrefixXorMultiple($1.x, $0) "},
+        {"_wavePrefixSum($1.x, $0) + $0", "_wavePrefixSumMultiple($1.x, $0) + $0"},
+        {"_wavePrefixProduct($1.x, $0) * $0", "_wavePrefixProductMultiple($1.x, $0) * $0"},
+        {"_wavePrefixAnd($1.x, $0) & $0", "_wavePrefixAndMultiple($1.x, $0) & $0"},
+        {"_wavePrefixOr($1.x, $0) | $0", "_wavePrefixOrMultiple($1.x, $0) | $0"},
+        {"_wavePrefixXor($1.x, $0) ^ $0", "_wavePrefixXorMultiple($1.x, $0) ^ $0"},
+        {"_wavePrefixExclusiveMin(($1).x, $0)", "_wavePrefixExclusiveMinMultiple(($1).x, $0)"},
+        {"_wavePrefixExclusiveMax(($1).x, $0)", "_wavePrefixExclusiveMaxMultiple(($1).x, $0)"},
+        {"_wavePrefixInclusiveMin(($1).x, $0)", "_wavePrefixInclusiveMinMultiple(($1).x, $0)"},
+        {"_wavePrefixInclusiveMax(($1).x, $0)", "_wavePrefixInclusiveMaxMultiple(($1).x, $0)"},
+    };
+    List<String> sources;
+    for (const auto& testCase : cases)
+    {
+        for (bool aggregate : {false, true})
+        {
+            StringBuilder source;
+            source << (aggregate ? "int2" : "int") << " old(" << (aggregate ? "int2" : "int")
+                   << " value,uint4 mask) { __intrinsic_asm \""
+                   << (aggregate ? testCase.aggregate : testCase.scalar)
+                   << "\"; } [CUDAKernel] void computeMain(uniform "
+                      "Ptr<int,Access::ReadWrite,AddressSpace::Device> outp) { outp[1]="
+                   << (aggregate ? "old(int2(outp[0]),uint4(15,0,0,0)).x"
+                                 : "old(outp[0],uint4(15,0,0,0))")
+                   << "; }";
+            sources.add(source.produceString());
+        }
+    }
+    for (const char* text : {"_slang_quadAny", "_slang_quadAll", "bool($0)"})
+    {
+        StringBuilder source;
+        source << "bool old(bool value) { __intrinsic_asm \"" << text
+               << "\"; } [CUDAKernel] void computeMain(uniform "
+                  "Ptr<int,Access::ReadWrite,AddressSpace::Device> outp) { "
+                  "outp[1]=int(old(outp[0]!=0)); }";
+        sources.add(source.produceString());
+    }
+    for (const auto& source : sources)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(_getBlobText(diagnostics).contains("E52017"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+SLANG_UNIT_TEST(nvvmSlangMaskedWaveScalarAdmissionStaysBounded)
+{
+    const char* expressions[] = {
+        "WaveMultiSum(int64_t(outp[0]),mask)",
+        "WaveMultiProduct(half(outp[0]),mask)",
+        "WaveMultiBitAnd(uint64_t(outp[0]),mask)",
+    };
+    for (const char* expression : expressions)
+    {
+        StringBuilder source;
+        source << "[CUDAKernel] void computeMain(uniform "
+                  "Ptr<int,Access::ReadWrite,AddressSpace::Device> outp) { uint4 "
+                  "mask=uint4(15,0,0,0); outp[1]=int("
+               << expression << "); }";
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics)));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(
+            _getBlobText(diagnostics).contains("Unsupported NVVM partition operation scalar type"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
 }

@@ -75324,6 +75324,262 @@
         "CUDA WaveMaskMatch historically uses match-all while NVVM uses match-any. Shared fixture covers AllEqual and does not claim differing-value Match masks agree.",
         "Module43/providerABI46/container2 unchanged; stale same-version prototype modules may require recompilation."
       ]
+    },
+    "nvvm-masked-waves": {
+      "status": "accepted-focused",
+      "scope": "Twenty-one masked reduction/prefix modes share typed core algebras and one ordered fold. Quad votes, rotation and scalar all/any use core bodies. Six numeric IDs15/17/43/44/45/48 and obsolete wave/truthiness text reconstructors are removed; module43/ABI46/container2 unchanged.",
+      "compiler_identity": {
+        "revision": "eb587784f56907d2fca32fb2d8fa3c930d1b1faa",
+        "compiler_patch_sha256": "7005f8bf609c95a8fc37fa5ee50e7a53be0c14adf21895adc024352492d7c59f",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "50ecf188cf7dea88581de09506692d5962e83aa19b562196970c47006cb4bb2e",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "f6f84f4be95e482f0f090f14ef2177c59b2e18a3a0b9998b4840fead5943622d",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "5f6d3488d34fa8d3d8e19c907a5b0a7e49a6e52f599ecc61d515c31c8e62f289",
+          "source/slang/hlsl.meta.slang": "436c28e478369411695496c1ffcf55b66da9eb8a21fcc178205d8a5c731ce7c5",
+          "source/slang/slang-emit-nvvm.cpp": "306bab30de5848e9b3fb042f27933a4b20ef65a9e166738d3236114e3aa1f4c5"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "7a09f238bd7e4499e7571c64499b43fe774acdf687c4f8903e0e05373c87101f",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "331775d576c5fefd67ae89243169248abcccb8d7cb35457b3c436c4cb2533865",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "a8fd827876dc5995e82b29d638e0c3e7fb83dc901b23eefd3e690bd5f52498fe",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b"
+        }
+      },
+      "validation": {
+        "units": {
+          "passed": 10,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmIRBuilderMaskedWavesRejectRetiredOperations.internal",
+            "slang-unit-test-tool/nvvmIRBuilderBuildsNumericTypeFamilies.internal",
+            "slang-unit-test-tool/nvvmSlangFloatingTruthinessUsesTypedComparisons.internal",
+            "slang-unit-test-tool/nvvmSlangSelectedScalarTruthinessUsesTypedInequality.internal",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveScalarHelpersUseGenericLoops.internal",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveLegacyTextRejectsBeforeOutput.internal",
+            "slang-unit-test-tool/nvvmSlangMaskedWaveScalarAdmissionStaysBounded.internal",
+            "slang-unit-test-tool/nvvmSlangAggregateWaveHelpersUseRecursiveScalarRecipes.internal",
+            "slang-unit-test-tool/nvvmSlangUnsupportedIRStopsBeforeEmission.internal",
+            "slang-unit-test-tool/nvvmSlangSingletonReductionsPreserveTypedOperands.internal"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-masked-waves/units.json",
+              "sha256": "70765c1096d2f94facd60e899115459f5b51b9612144b0047b91b3733b50f2eb",
+              "return_code": 1,
+              "elapsed_seconds": 14.339015245437622
+            },
+            {
+              "path": "build/nvvm-masked-waves/units-retry.json",
+              "sha256": "c4bf6dba6ef9387c239d419eed4e15a4c823e502a7d1bce82a426fb73ad61949",
+              "return_code": 1,
+              "elapsed_seconds": 13.722760438919067
+            },
+            {
+              "path": "build/nvvm-masked-waves/units-final.json",
+              "sha256": "99ab694f1cdbedd3fafcf75200f7ba3bb2e6ad38d32bc6661359447027d97115",
+              "return_code": 1,
+              "elapsed_seconds": 1.6965134143829346
+            },
+            {
+              "path": "build/nvvm-masked-waves/units-closeout.json",
+              "sha256": "545eb3e53dd22972677e7a5df423a430f0f8ad0bd9bc93e9939302dba974358c",
+              "return_code": 0,
+              "elapsed_seconds": 1.6808674335479736
+            }
+          ],
+          "reuse": "Seven initial passes and two first-retry passes reused; only the remaining singleton unit rerun.",
+          "initial_unit_module_sha256": "ed901a3b2709b352be66101df9dd422edcdd9f0fc31a91aba0072c9af5792891",
+          "first_retry_unit_module_sha256": "5bb35648e5185d297ac39507e73968452f146954807f95003a2bd7a9bc233972",
+          "tested_source_sha256": {
+            "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "4b5f1eed7efc319e1cf302dbcc59e431a050a387d32ee9aebfa24bcb8eee8055",
+            "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "28114b3671e64084730309eb7e7d8f9dfdfade4065ab379347f90e22c5ff3399",
+            "tools/slang-unit-test/unit-test-nvvm-support.h": "bbf04b4850f11befbb912e495e651d51e6974ec552c732bdea7b624e930fb0bd"
+          },
+          "current_source_sha256": {
+            "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "4b5f1eed7efc319e1cf302dbcc59e431a050a387d32ee9aebfa24bcb8eee8055",
+            "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "28114b3671e64084730309eb7e7d8f9dfdfade4065ab379347f90e22c5ff3399",
+            "tools/slang-unit-test/unit-test-nvvm-support.h": "bbf04b4850f11befbb912e495e651d51e6974ec552c732bdea7b624e930fb0bd"
+          },
+          "post_validation_change": "Temporary count reporting and the obsolete direct-floating-constant assertion removed before final singleton validation."
+        },
+        "cuda_smoke": {
+          "nvvm_passed": 22,
+          "nvrtc_control_passed": 1,
+          "failed": 0,
+          "nvvm_outcomes": [
+            "tests/cuda/nvvm-fp32-minmax-order.slang.1 (cuda)",
+            "tests/cuda/nvvm-fp32-minmax-order.slang.2 (cuda)",
+            "tests/cuda/nvvm-fp16-masked-minmax.slang.1 (cuda)",
+            "tests/cuda/nvvm-fp64-masked-wave.slang.1 (cuda)",
+            "tests/cuda/nvvm-fp16-masked-minmax.slang.2 (cuda)",
+            "tests/cuda/nvvm-fp64-prefix-minmax-order.slang.1 (cuda)",
+            "tests/cuda/nvvm-fp64-prefix-minmax-order.slang.2 (cuda)",
+            "tests/cuda/nvvm-fp64-wave-edges.slang.1 (cuda)",
+            "tests/cuda/nvvm-fp64-wave-edges.slang.2 (cuda)",
+            "tests/cuda/nvvm-i64-masked-minmax.slang.1 (cuda)",
+            "tests/cuda/nvvm-i64-masked-minmax.slang.2 (cuda)",
+            "tests/cuda/nvvm-narrow-masked-minmax.slang.1 (cuda)",
+            "tests/cuda/nvvm-narrow-masked-minmax.slang.2 (cuda)",
+            "tests/cuda/nvvm-quad-votes.slang.1 (cuda)",
+            "tests/cuda/nvvm-quad-votes.slang.2 (cuda)",
+            "tests/cuda/nvvm-wave-rotation.slang.1 (cuda)",
+            "tests/cuda/nvvm-wave-rotation.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/wave-multi/wave-multi-bitwise.slang.3 (cuda)",
+            "tests/hlsl-intrinsic/wave-multi/wave-multi-bitwise.slang.4 (cuda)",
+            "tests/cuda/nvvm-fp64-masked-wave.slang.2 (cuda)",
+            "tests/hlsl-intrinsic/wave-multi/wave-multi-prefix-scalar-functional.slang.5 (cuda)",
+            "tests/hlsl-intrinsic/wave-multi/wave-multi-prefix-scalar-functional.slang.6 (cuda)"
+          ],
+          "nvrtc_outcome": "tests/hlsl-intrinsic/wave-multi/wave-multi-prefix-scalar-functional.slang.4 (cuda)",
+          "excluded_non_cuda_subtests": 1,
+          "records": [
+            {
+              "path": "build/nvvm-masked-waves/smoke.json",
+              "sha256": "93123d03cd77b6df0eed24f7d2f6c72e935a664b6f9974280cb877cb3fb48ec4",
+              "return_code": 0,
+              "elapsed_seconds": 47.24357080459595
+            },
+            {
+              "path": "build/nvvm-masked-waves/prefix-smoke.json",
+              "sha256": "7a6c5b908b12cde10954326748118064e704a40632092c89a1054555d1fe9197",
+              "return_code": 0,
+              "elapsed_seconds": 2.8292160034179688
+            }
+          ],
+          "runtime_sha256": {
+            "build/RelWithDebInfo/lib/libslang-compiler.so": "7a09f238bd7e4499e7571c64499b43fe774acdf687c4f8903e0e05373c87101f",
+            "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "890acdf1e5948d632daeb67ca841a9d1496571945690f94804da25d354d410f2",
+            "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+            "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "a8fd827876dc5995e82b29d638e0c3e7fb83dc901b23eefd3e690bd5f52498fe",
+            "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+            "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+            "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+          },
+          "policy": "Reuse unchanged accepted NVRTC controls; accidental one control rerun separately identified. Prefix .5 uses default optimization, .6 O3; remaining selected NVVM cases use O0/O3."
+        },
+        "builds": [
+          {
+            "path": "build/nvvm-masked-waves/build-production.json",
+            "sha256": "cbbebb9c3ba3c4afa60f95c5e863cd01eabacdf5c7c8d30f666a809da889b21b",
+            "return_code": 1,
+            "elapsed_seconds": 289.84246587753296
+          },
+          {
+            "path": "build/nvvm-masked-waves/build-production-retry.json",
+            "sha256": "159cae95e9552b84add5b8137d59ce2ef1170b585aeea9d36a986951fd710f30",
+            "return_code": 0,
+            "elapsed_seconds": 83.36421585083008
+          },
+          {
+            "path": "build/nvvm-masked-waves/build-tests.json",
+            "sha256": "bdac2eae095c0901ea59995c5ea379c774dfd5fe8783d4562b772aee9a673fcc",
+            "return_code": 0,
+            "elapsed_seconds": 22.511882543563843
+          },
+          {
+            "path": "build/nvvm-masked-waves/build-test-fix.json",
+            "sha256": "62af5e1fb92d84e71129ce07c4a487d3a3e6d96c00bcea23ba46abbc719bcb10",
+            "return_code": 0,
+            "elapsed_seconds": 19.550782680511475
+          },
+          {
+            "path": "build/nvvm-masked-waves/build-test-phi.json",
+            "sha256": "0fa3648b79ed31725858b3a249638e1da8c5aa7f473fc8ed4de03bd65847fd06",
+            "return_code": 0,
+            "elapsed_seconds": 19.629455089569092
+          },
+          {
+            "path": "build/nvvm-masked-waves/build-test-expectation.json",
+            "sha256": "517f1cef0727e6b5286b2192e4a2c59efa33bfd5816eb7af866b111fcb0926c0",
+            "return_code": 0,
+            "elapsed_seconds": 18.818750619888306
+          }
+        ]
+      },
+      "validation_incidents": [
+        {
+          "id": "core-capability-declarations",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-masked-waves/build-production.json",
+            "sha256": "cbbebb9c3ba3c4afa60f95c5e863cd01eabacdf5c7c8d30f666a809da889b21b",
+            "return_code": 1,
+            "elapsed_seconds": 289.84246587753296
+          },
+          "resolution": {
+            "path": "build/nvvm-masked-waves/build-production-retry.json",
+            "sha256": "159cae95e9552b84add5b8137d59ce2ef1170b585aeea9d36a986951fd710f30",
+            "return_code": 0,
+            "elapsed_seconds": 83.36421585083008
+          },
+          "cause": "E36104 from nvvm branches whose CUDA parent body existed only in default; fold omitted its SM7 primitive requirement.",
+          "fix": "Explicit cuda labels share unchanged default bodies; private fold requires nvvm+cuda_sm_7_0. Public requirements and unsupported matrix min/max prefixes unchanged."
+        },
+        {
+          "id": "runtime-subtest-numbering",
+          "status": "resolved",
+          "initial": {
+            "path": "build/nvvm-masked-waves/smoke.json",
+            "sha256": "93123d03cd77b6df0eed24f7d2f6c72e935a664b6f9974280cb877cb3fb48ec4",
+            "return_code": 0,
+            "elapsed_seconds": 47.24357080459595
+          },
+          "resolution": {
+            "path": "build/nvvm-masked-waves/prefix-smoke.json",
+            "sha256": "7a6c5b908b12cde10954326748118064e704a40632092c89a1054555d1fe9197",
+            "return_code": 0,
+            "elapsed_seconds": 2.8292160034179688
+          },
+          "cause": "Disabled directives consume subtest indices: prefix .3 is excluded Vulkan and .4 is NVRTC.",
+          "fix": "Ran only missing NVVM .5/.6; retained initial20NVVM+1NVRTC passes and one exclusion."
+        },
+        {
+          "id": "mock-cfg-capacity-and-diagnostic-labels",
+          "status": "resolved",
+          "failures": [
+            {
+              "path": "build/nvvm-masked-waves/units.json",
+              "sha256": "70765c1096d2f94facd60e899115459f5b51b9612144b0047b91b3733b50f2eb",
+              "return_code": 1,
+              "elapsed_seconds": 14.339015245437622
+            },
+            {
+              "path": "build/nvvm-masked-waves/units-retry.json",
+              "sha256": "c4bf6dba6ef9387c239d419eed4e15a4c823e502a7d1bce82a426fb73ad61949",
+              "return_code": 1,
+              "elapsed_seconds": 13.722760438919067
+            },
+            {
+              "path": "build/nvvm-masked-waves/units-final.json",
+              "sha256": "99ab694f1cdbedd3fafcf75200f7ba3bb2e6ad38d32bc6661359447027d97115",
+              "return_code": 1,
+              "elapsed_seconds": 1.6965134143829346
+            }
+          ],
+          "resolution": {
+            "path": "build/nvvm-masked-waves/units-closeout.json",
+            "sha256": "545eb3e53dd22972677e7a5df423a430f0f8ad0bd9bc93e9939302dba974358c",
+            "return_code": 0,
+            "elapsed_seconds": 1.6808674335479736
+          },
+          "cause": "Core folds exceed fake block128 and phi32 capacities; untagged malformed shuffle negatives still expected old nvvmIntrinsic labels.",
+          "fix": "Increase only block/phi storage; keep all guards. Exact GenericAsm assembly/signature expectations retained. Singleton progressed past151 blocks after block fix and compiled with162 blocks/41 phis after phi fix. Core now builds negative zero from bits; remove obsolete direct-floating-constant assertion, retaining exact runtime semantics and typed operation/CFG checks. Three corrected units then one remaining unit rerun; all real GPU results reused."
+        }
+      ],
+      "limitations": [
+        "No full campaign, fresh numerical oracle, material run or separate PTX assembly campaign. Existing runtime fixtures establish affected ordering/seed/NaN/zero/quad/rotation contracts.",
+        "The inherited signed16 abs INT_MIN O3 normalization failure remains active and unchanged under nvvm-core-values-and-atomics; this is not an all-pass repository checkpoint.",
+        "Current NVVM arithmetic fold order is preserved; no general numerical agreement with a different CUDA reduction tree is claimed.",
+        "Module43/providerABI46/container2 unchanged; stale prototype modules may require rebuilding."
+      ]
     }
   }
 }

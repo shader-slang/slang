@@ -7897,6 +7897,10 @@ bool all(T x)
 {
     __target_switch
     {
+    case nvvm:
+        static_assert(T is bool || __isInt<T>() || T is half || T is float || T is double,
+            "NVVM scalar truthiness requires a builtin numeric value.");
+        return __builtin_cast<bool>(x);
     case hlsl:
         __intrinsic_asm "all";
     case metal:
@@ -7926,6 +7930,7 @@ bool all(T x)
             __intrinsic_asm "ret $0";
         else
             return false;
+    case cuda:
     default:
         __intrinsic_asm "bool($0)";
     }
@@ -8081,6 +8086,11 @@ bool any(T x)
 {
     __target_switch
     {
+    case nvvm:
+        static_assert(T is bool || __isInt<T>() || T is half || T is float || T is double,
+            "NVVM scalar truthiness requires a builtin numeric value.");
+        return __builtin_cast<bool>(x);
+    case cuda:
     default:
         __intrinsic_asm "bool($0)";
     case hlsl:
@@ -19389,6 +19399,7 @@ T WaveRotate(T value, uint delta)
         __intrinsic_asm "subgroupRotate";
     case cuda:
         __intrinsic_asm "__shfl_sync(0xFFFFFFFF, $0, (_getLaneId() + $1) % 32)";
+    case nvvm:
     case _cuda_sm_7_0:
         // Preserve CUDA's full-wave participation contract while expressing rotation through
         // the same typed indexed shuffle used by WaveMaskReadLaneAt.
@@ -19417,6 +19428,7 @@ vector<T, N> WaveRotate(vector<T, N> value, uint delta)
         __intrinsic_asm "subgroupRotate";
     case cuda:
         __intrinsic_asm "_slang_waveRotate($0, $1)";
+    case nvvm:
     case _cuda_sm_7_0:
         vector<T, N> result;
         [ForceUnroll]
@@ -19447,6 +19459,7 @@ T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
         __intrinsic_asm "subgroupClusteredRotate";
     case cuda:
         __intrinsic_asm "_slang_waveClusteredRotate($0, $1, $2)";
+    case nvvm:
     case _cuda_sm_7_0:
         uint lane = WaveGetLaneIndex();
         uint clusterStart = (lane / clusterSize) * clusterSize;
@@ -19474,6 +19487,7 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
         __intrinsic_asm "subgroupClusteredRotate";
     case cuda:
         __intrinsic_asm "_slang_waveClusteredRotate($0, $1, $2)";
+    case nvvm:
     case _cuda_sm_7_0:
         vector<T, N> result;
         [ForceUnroll]
@@ -19520,6 +19534,256 @@ void __shaderSubgroupPartitionedPreamble()
     }
 }
 
+// NVVM partition operations share control flow but retain different scalar algebras.
+// The operator owns only its typed identity and combination; the fold owns lane participation.
+__generic<T : __BuiltinType>
+interface __INVVMWaveAlgebra
+{
+    static const bool isMinMax;
+    static const bool isSum;
+    static const bool isBitwise;
+    static T identity();
+    static T combine(T left, T right, bool sourceOrder);
+}
+
+__generic<T : __BuiltinArithmeticType>
+struct __NVVMWaveSum : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = false;
+    static const bool isSum = true;
+    static const bool isBitwise = false;
+    [ForceInline]
+    static T identity()
+    {
+        return __builtin_cast<T>(0);
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        return left + right;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType>
+struct __NVVMWaveProduct : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = false;
+    static const bool isSum = false;
+    static const bool isBitwise = false;
+    [ForceInline]
+    static T identity()
+    {
+        return __builtin_cast<T>(1);
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        return left * right;
+    }
+}
+
+__generic<T : __BuiltinLogicalType>
+struct __NVVMWaveAnd : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = false;
+    static const bool isSum = false;
+    static const bool isBitwise = true;
+    [ForceInline]
+    static T identity()
+    {
+        return __builtin_cast<T>(-1);
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        return left & right;
+    }
+}
+
+__generic<T : __BuiltinLogicalType>
+struct __NVVMWaveOr : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = false;
+    static const bool isSum = false;
+    static const bool isBitwise = true;
+    [ForceInline]
+    static T identity()
+    {
+        return __builtin_cast<T>(0);
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        return left | right;
+    }
+}
+
+__generic<T : __BuiltinLogicalType>
+struct __NVVMWaveXor : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = false;
+    static const bool isSum = false;
+    static const bool isBitwise = true;
+    [ForceInline]
+    static T identity()
+    {
+        return __builtin_cast<T>(0);
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        return left ^ right;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType>
+struct __NVVMWaveMin : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = true;
+    static const bool isSum = false;
+    static const bool isBitwise = false;
+    [ForceInline]
+    static T identity()
+    {
+        if (T is half)
+            return __builtin_cast<T>(half(65504));
+        else if (T is float || T is double)
+            return __builtin_cast<T>(asfloat(0x7f800000u));
+        else
+        {
+            uint64_t bits = ~uint64_t(0) >> (64 - 8 * sizeof(T));
+            if (!__isUnsignedInt<T>()) bits >>= 1;
+            return __builtin_cast<T>(bits);
+        }
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        // Ordered source selection keeps the original right operand for ties and NaNs.
+        if (sourceOrder)
+            return left < right ? left : right;
+        return min(left, right);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType>
+struct __NVVMWaveMax : __INVVMWaveAlgebra<T>
+{
+    static const bool isMinMax = true;
+    static const bool isSum = false;
+    static const bool isBitwise = false;
+    [ForceInline]
+    static T identity()
+    {
+        if (T is half)
+            return __builtin_cast<T>(half(-65504));
+        else if (T is float || T is double)
+            return __builtin_cast<T>(asfloat(0xff800000u));
+        else
+        {
+            uint64_t bits = __isUnsignedInt<T>() ? uint64_t(0) : uint64_t(1) << (8 * sizeof(T) - 1);
+            return __builtin_cast<T>(bits);
+        }
+    }
+    [ForceInline]
+    static T combine(T left, T right, bool sourceOrder)
+    {
+        // Ordered source selection keeps the original right operand for ties and NaNs.
+        if (sourceOrder)
+            return left > right ? left : right;
+        return max(left, right);
+    }
+}
+
+enum __NVVMWaveMode
+{
+    Reduction,
+    ExclusivePrefix,
+    InclusivePrefix,
+}
+
+// One fold preserves both partition reductions and the two prefix result conventions.
+// Consider a sparse partition: every lane reads each set bit in increasing order, even when
+// its prefix excludes that source. Selecting the accumulator must never skip the shuffle.
+__generic<T : __BuiltinType, Op : __INVVMWaveAlgebra<T>, let mode : __NVVMWaveMode>
+[ForceInline]
+[require(nvvm, cuda_sm_7_0)]
+T __nvvmWaveFold(T value, uint mask)
+{
+    static_assert(Op.isMinMax
+        ? (__isInt<T>() || T is half || T is float || T is double)
+        : Op.isBitwise ? (T is int || T is uint)
+        : (T is int || T is uint || T is float || T is double),
+        "Unsupported NVVM partition operation scalar type.");
+    static const bool sourceOrder = Op.isMinMax &&
+        (mode == __NVVMWaveMode.Reduction || T is half || T is double) && !__isInt<T>();
+    static const bool sourcePrefix = sourceOrder && mode != __NVVMWaveMode.Reduction;
+    uint count = countbits(mask);
+    bool butterfly = (mask & (mask + 1u)) == 0 && (count & (0u - count)) == count;
+    T result = Op.identity();
+    if (sourceOrder && mode != __NVVMWaveMode.ExclusivePrefix)
+        result = value;
+    if (T is double && Op.isSum && mode == __NVVMWaveMode.Reduction)
+        result = butterfly ? __builtin_cast<T>(asdouble(0u, 0x80000000u)) : result;
+    T transmitted = value;
+    uint remaining = mask;
+    if (sourceOrder && butterfly)
+        remaining = sourcePrefix ? (count > 1 ? 1u : 0u) : count >> 1;
+    uint lane = 0;
+    if (mode != __NVVMWaveMode.Reduction || sourceOrder)
+        lane = WaveGetLaneIndex();
+    while (remaining != 0)
+    {
+        uint bit = remaining & (0u - remaining);
+        uint source = firstbitlow(bit);
+        T input = value;
+        if (sourceOrder && butterfly)
+        {
+            if (sourcePrefix)
+            {
+                uint predecessor = lane - remaining;
+                source = lane > predecessor ? predecessor : lane;
+                input = transmitted;
+            }
+            else
+            {
+                source = lane ^ remaining;
+                input = result;
+            }
+        }
+        T read = WaveMaskReadLaneAt(mask, input, int(source));
+        T combined = Op.combine(result, read, sourceOrder);
+        if (mode == __NVVMWaveMode.Reduction)
+            result = combined;
+        else
+        {
+            bool participates = mode == __NVVMWaveMode.InclusivePrefix && !sourcePrefix ? lane >= source : lane > source;
+            if (sourcePrefix)
+            {
+                T nextTransmitted = Op.combine(transmitted, read, sourceOrder);
+                transmitted = participates ? nextTransmitted : transmitted;
+            }
+            result = participates ? combined : result;
+        }
+        uint next = remaining & ~bit;
+        if (sourceOrder && butterfly)
+        {
+            if (sourcePrefix)
+            {
+                uint offset = remaining << 1;
+                next = count > offset ? offset : 0;
+            }
+            else
+                next = remaining >> 1;
+        }
+        remaining = next;
+    }
+    // Singleton Double reductions preserve even signaling NaN payloads without arithmetic.
+    if (T is double && mode == __NVVMWaveMode.Reduction && !sourceOrder)
+        return mask == (mask & (0u - mask)) ? value : result;
+    return result;
+}
+
 //
 // WaveMultiSum/WaveMultiProduct.
 //
@@ -19538,6 +19802,8 @@ T WaveMulti$(opName.name)(T value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        return __nvvmWaveFold<T, __NVVMWave$(opName.name)<T>, __NVVMWaveMode.Reduction>(value, mask.x);
     case cuda:
         __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
     case glsl:
@@ -19561,6 +19827,12 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     case glsl:
@@ -19581,6 +19853,12 @@ matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
@@ -19643,6 +19921,8 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        return __nvvmWaveFold<T, __NVVMWave$(opName.cudaName)<T>, __NVVMWaveMode.$(opName.cudaExtraOperation[0] ? "InclusivePrefix" : "ExclusivePrefix")>(value, mask.x);
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -19668,6 +19948,12 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -19690,9 +19976,18 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
     ${ if(opName.cudaMatrixVariantSupport) { $}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    ${ } $}
+    ${ if(!opName.cudaMatrixVariantSupport) { $}
+    case cuda:
     ${ } $}
     default:
         matrix<T, N, M> result;
@@ -19728,6 +20023,8 @@ T WaveMulti$(opName.name)(T value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        return __nvvmWaveFold<T, __NVVMWave$(opName.name)<T>, __NVVMWaveMode.Reduction>(value, mask.x);
     case cuda:
         __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
     case glsl:
@@ -19753,6 +20050,12 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     case glsl:
@@ -19775,6 +20078,12 @@ matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
@@ -19825,6 +20134,8 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        return __nvvmWaveFold<T, __NVVMWave$(opName.spirvName)<T>, __NVVMWaveMode.$(opName.name[0] == 'I' ? "InclusivePrefix" : "ExclusivePrefix")>(value, mask.x);
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
     case cuda:
@@ -19850,6 +20161,12 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
     case cuda:
@@ -19902,6 +20219,8 @@ T WaveMultiBit$(opName.name)(T value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        return __nvvmWaveFold<T, __NVVMWave$(opName.name)<T>, __NVVMWaveMode.Reduction>(value, mask.x);
     case cuda:
         __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
     case glsl:
@@ -19923,6 +20242,12 @@ vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiBit$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     case glsl:
@@ -19941,6 +20266,12 @@ matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiBit$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
@@ -20003,6 +20334,8 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        return __nvvmWaveFold<T, __NVVMWave$(opName.spirvName)<T>, __NVVMWaveMode.$(opName.cudaExtraOperation[0] ? "InclusivePrefix" : "ExclusivePrefix")>(value, mask.x);
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20026,6 +20359,12 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     __shaderSubgroupPartitionedPreamble<T>();
     __target_switch
     {
+    case nvvm:
+        vector<T, N> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
@@ -20046,6 +20385,12 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
     {
+    case nvvm:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
 ${
     if (opName.cudaMatrixVariantSupport) {
 $}
@@ -20054,6 +20399,9 @@ $}
 ${
     }
 $}
+    ${ if(!opName.cudaMatrixVariantSupport) { $}
+    case cuda:
+    ${ } $}
     default:
         matrix<T,N,M> result;
         [ForceUnroll]
@@ -20089,10 +20437,26 @@ __spirv_version(1.3)
 [require(cuda_glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAny(bool expr)
 {
-    __requireMaximallyReconverges();
-    __requireQuadDerivatives();
     __target_switch
     {
+    case nvvm: break;
+    case cuda:
+    default:
+        __requireMaximallyReconverges();
+        __requireQuadDerivatives();
+    }
+    __target_switch
+    {
+    case nvvm:
+        uint base = WaveGetLaneIndex() & ~3u;
+        uint combined = 0u;
+        [ForceUnroll]
+        for (uint i = 0; i < 4; ++i)
+        {
+            uint read = WaveMaskReadLaneAt(0xffffffffu, uint(expr), int(base + i));
+            combined = combined | read;
+        }
+        return combined != 0;
     case hlsl: __intrinsic_asm "QuadAny";
     case glsl: __intrinsic_asm "subgroupQuadAny";
     case metal: __intrinsic_asm "quad_any";
@@ -20115,10 +20479,26 @@ __spirv_version(1.3)
 [require(cuda_glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAll(bool expr)
 {
-    __requireMaximallyReconverges();
-    __requireQuadDerivatives();
     __target_switch
     {
+    case nvvm: break;
+    case cuda:
+    default:
+        __requireMaximallyReconverges();
+        __requireQuadDerivatives();
+    }
+    __target_switch
+    {
+    case nvvm:
+        uint base = WaveGetLaneIndex() & ~3u;
+        uint combined = 1u;
+        [ForceUnroll]
+        for (uint i = 0; i < 4; ++i)
+        {
+            uint read = WaveMaskReadLaneAt(0xffffffffu, uint(expr), int(base + i));
+            combined = combined & read;
+        }
+        return combined != 0;
     case hlsl: __intrinsic_asm "QuadAll";
     case glsl: __intrinsic_asm "subgroupQuadAll";
     case metal: __intrinsic_asm "quad_all";

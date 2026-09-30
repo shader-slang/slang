@@ -1925,7 +1925,6 @@ static SlangResult _emitIntrinsic(
     size_t expectedArgumentCount = 0;
     llvm::Type* int32Type = llvm::Type::getInt32Ty(state->context);
     llvm::Type* expectedArgumentTypes[] = {int32Type, int32Type, int32Type};
-    bool appendsShuffleClamp = false;
     bool bitcastsMatchFloatValue = false;
     const bool hasFloatingValue =
         operation.operandCount > 1 &&
@@ -1948,17 +1947,6 @@ static SlangResult _emitIntrinsic(
             *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
             return SLANG_OK;
         }
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
-        intrinsicID = llvm::Intrinsic::nvvm_read_ptx_sreg_laneid;
-        break;
-    case SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT:
-        intrinsicID = hasFloatingValue ? llvm::Intrinsic::nvvm_shfl_sync_idx_f32
-                                       : llvm::Intrinsic::nvvm_shfl_sync_idx_i32;
-        expectedArgumentCount = 3;
-        if (hasFloatingValue)
-            expectedArgumentTypes[1] = llvm::Type::getFloatTy(state->context);
-        appendsShuffleClamp = true;
-        break;
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT:
         intrinsicID = llvm::Intrinsic::nvvm_vote_ballot_sync;
         expectedArgumentCount = 2;
@@ -1991,79 +1979,11 @@ static SlangResult _emitIntrinsic(
     }
     if (bitcastsMatchFloatValue)
         llvmArguments[1] = state->builder.CreateBitCast(llvmArguments[1], int32Type);
-    if (appendsShuffleClamp)
-    {
-        llvmArguments.push_back(llvm::ConstantInt::get(int32Type, 31));
-    }
 
     llvm::Function* intrinsic = llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID);
     llvm::CallInst* call = state->builder.CreateCall(intrinsic, llvmArguments);
     llvm::Value* result = call;
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
-    return SLANG_OK;
-}
-
-// Transports a scalar through indexed 32-bit shuffles without changing its payload bits.
-// Consider WaveMaskReadLaneAt(mask, uint64_t(value), lane): both halves must come from the
-// same source invocation. Each shuffle therefore uses the original mask, lane and full-warp
-// clamp. Narrow integers and Boolean values retain their low bits; floating-point values are
-// bitcast rather than converted so signed zero and NaN payloads survive the transport.
-static SlangResult _emitWaveReadLaneAt(
-    SlangNVVMModuleHandle module,
-    const SlangNVVMValueOperationDesc& operation,
-    const SlangNVVMValueHandle* operands,
-    SlangNVVMValueHandle* outValue)
-{
-    if (operation.resultType.bitWidth == 32)
-        return _emitIntrinsic(module, operation, operands, operation.operandCount, outValue);
-
-    ModuleState* state = _getModule(module);
-    llvm::BasicBlock* insertionBlock = _getValidInsertionBlock(state);
-    if (!state || !insertionBlock || !operands || !outValue)
-        return SLANG_E_INVALID_ARG;
-
-    const uint32_t bitWidth = operation.resultType.bitWidth;
-    llvm::Type* integerType = llvm::IntegerType::get(state->context, bitWidth);
-    llvm::Type* valueType = integerType;
-    if (operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
-        valueType = bitWidth == 16 ? llvm::Type::getHalfTy(state->context)
-                                   : llvm::Type::getDoubleTy(state->context);
-    llvm::Type* wordType = llvm::Type::getInt32Ty(state->context);
-    llvm::Type* expectedTypes[] = {wordType, valueType, wordType};
-    llvm::Value* arguments[3] = {};
-    for (size_t i = 0; i < SLANG_COUNT_OF(arguments); ++i)
-    {
-        arguments[i] = _getValue(operands[i]);
-        if (!arguments[i] || arguments[i]->getType() != expectedTypes[i] ||
-            !_isValueUsableAtInsertionPoint(state, insertionBlock, arguments[i]))
-        {
-            return SLANG_E_INVALID_ARG;
-        }
-    }
-
-    llvm::Value* bits = state->builder.CreateBitCast(arguments[1], integerType);
-    llvm::Value* low = state->builder.CreateZExtOrTrunc(bits, wordType);
-    llvm::Function* shuffle = llvm::Intrinsic::getDeclaration(
-        state->module.get(),
-        llvm::Intrinsic::nvvm_shfl_sync_idx_i32);
-    llvm::Value* clamp = llvm::ConstantInt::get(wordType, 31);
-    llvm::Value* shuffledLow =
-        state->builder.CreateCall(shuffle, {arguments[0], low, arguments[2], clamp});
-    llvm::Value* result = state->builder.CreateZExtOrTrunc(shuffledLow, integerType);
-    if (bitWidth == 64)
-    {
-        llvm::Value* high = state->builder.CreateTrunc(
-            state->builder.CreateLShr(bits, llvm::ConstantInt::get(integerType, 32)),
-            wordType);
-        llvm::Value* shuffledHigh =
-            state->builder.CreateCall(shuffle, {arguments[0], high, arguments[2], clamp});
-        llvm::Value* highBits = state->builder.CreateShl(
-            state->builder.CreateZExt(shuffledHigh, integerType),
-            llvm::ConstantInt::get(integerType, 32));
-        result = state->builder.CreateOr(result, highBits);
-    }
-    *outValue =
-        reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateBitCast(result, valueType));
     return SLANG_OK;
 }
 
@@ -3654,10 +3574,6 @@ static const char* _getLibdeviceFunctionName(
         {
         case SLANG_NVVM_VALUE_OP_FMOD:
             return isFloat32 ? "__nv_fmodf" : "__nv_fmod";
-        case SLANG_NVVM_VALUE_OP_MAX:
-            return isFloat32 ? "__nv_fmaxf" : "__nv_fmax";
-        case SLANG_NVVM_VALUE_OP_MIN:
-            return isFloat32 ? "__nv_fminf" : "__nv_fmin";
         default:
             return nullptr;
         }
@@ -3884,8 +3800,6 @@ static SlangResult _emitCatalogOperation(
     SlangNVVMValueHandle* outValue)
 {
     const SlangNVVMValueOperationDesc operation = Slang::NVVMSemantics::getOperationDesc(entry);
-    if (entry.operation == SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT)
-        return _emitWaveReadLaneAt(module, operation, operands, outValue);
     if (entry.operation == SLANG_NVVM_VALUE_OP_FREXP_FRACTION ||
         entry.operation == SLANG_NVVM_VALUE_OP_FREXP_EXPONENT)
     {
@@ -3916,7 +3830,6 @@ static SlangResult _emitCatalogOperation(
     switch (entry.operation)
     {
     case SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK:
-    case SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_BALLOT:
     case SLANG_NVVM_VALUE_OP_WAVE_MASK_MATCH:
         return _emitIntrinsic(module, operation, operands, entry.operandCount, outValue);
@@ -4221,56 +4134,6 @@ static SlangResult _emitValueOperationFamily(
                      ? state->builder.CreateNot(llvmOperands[0])
                      : state->builder.CreateNeg(llvmOperands[0]);
         break;
-    case Slang::NVVMSemantics::ValueOperationFamily::IntegerBit:
-        {
-            llvm::IntegerType* operandType =
-                llvm::dyn_cast<llvm::IntegerType>(llvmOperands[0]->getType());
-            llvm::IntegerType* int32Type = llvm::Type::getInt32Ty(state->context);
-            if (!operandType || !resultType->isIntegerTy())
-                return SLANG_E_INVALID_ARG;
-
-            llvm::Intrinsic::ID intrinsicID = llvm::Intrinsic::not_intrinsic;
-            switch (operation.operation)
-            {
-            case SLANG_NVVM_VALUE_OP_COUNT_BITS:
-                intrinsicID = llvm::Intrinsic::ctpop;
-                break;
-            case SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW:
-                intrinsicID = llvm::Intrinsic::cttz;
-                break;
-            default:
-                return SLANG_E_INVALID_ARG;
-            }
-
-            llvm::Function* intrinsic =
-                llvm::Intrinsic::getDeclaration(state->module.get(), intrinsicID, {operandType});
-            llvm::Value* intrinsicResult = nullptr;
-            if (intrinsicID == llvm::Intrinsic::cttz)
-            {
-                intrinsicResult = state->builder.CreateCall(
-                    intrinsic,
-                    {llvmOperands[0], llvm::ConstantInt::getFalse(state->context)});
-            }
-            else
-            {
-                intrinsicResult = state->builder.CreateCall(intrinsic, {llvmOperands[0]});
-            }
-
-            llvm::Value* count = state->builder.CreateZExtOrTrunc(intrinsicResult, int32Type);
-            if (operation.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS)
-            {
-                result = count;
-                break;
-            }
-            llvm::Value* isZero = state->builder.CreateICmpEQ(
-                llvmOperands[0],
-                llvm::ConstantInt::get(operandType, 0));
-            result = state->builder.CreateSelect(
-                isZero,
-                llvm::ConstantInt::getAllOnesValue(int32Type),
-                count);
-        }
-        break;
     case Slang::NVVMSemantics::ValueOperationFamily::IntegerBinary:
         switch (operation.operation)
         {
@@ -4310,20 +4173,6 @@ static SlangResult _emitValueOperationFamily(
                          ? state->builder.CreateAShr(llvmOperands[0], llvmOperands[1])
                          : state->builder.CreateLShr(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_MIN:
-        case SLANG_NVVM_VALUE_OP_MAX:
-            {
-                const bool isSigned =
-                    operation.resultType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
-                const bool isMinimum = operation.operation == SLANG_NVVM_VALUE_OP_MIN;
-                const llvm::CmpInst::Predicate predicate =
-                    isMinimum ? (isSigned ? llvm::CmpInst::ICMP_SLT : llvm::CmpInst::ICMP_ULT)
-                              : (isSigned ? llvm::CmpInst::ICMP_SGT : llvm::CmpInst::ICMP_UGT);
-                llvm::Value* condition =
-                    state->builder.CreateICmp(predicate, llvmOperands[0], llvmOperands[1]);
-                result = state->builder.CreateSelect(condition, llvmOperands[0], llvmOperands[1]);
-            }
-            break;
         default:
             return SLANG_E_INVALID_ARG;
         }
@@ -4352,8 +4201,6 @@ static SlangResult _emitValueOperationFamily(
         case SLANG_NVVM_VALUE_OP_REMAINDER:
             result = state->builder.CreateFRem(llvmOperands[0], llvmOperands[1]);
             break;
-        case SLANG_NVVM_VALUE_OP_MIN:
-        case SLANG_NVVM_VALUE_OP_MAX:
         case SLANG_NVVM_VALUE_OP_FMOD:
             return _emitLibdeviceOperation(module, operation, operands, outValue);
         default:

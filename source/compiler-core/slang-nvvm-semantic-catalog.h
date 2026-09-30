@@ -12,7 +12,6 @@ enum class ValueOperationFamily : uint32_t
 {
     None,
     IntegerUnary,
-    IntegerBit,
     IntegerBinary,
     IntegerCompare,
     FloatUnary,
@@ -425,97 +424,6 @@ inline constexpr CatalogEntry kCatalog[] = {
         true,
     },
     {
-        SLANG_NVVM_VALUE_OP_WAVE_LANE_INDEX,
-        kUnsignedI32,
-        {kNoType, kNoType, kNoType},
-        0,
-        "wave lane index intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kUnsignedI32,
-        {kUnsignedI32, kUnsignedI32, kSignedI32},
-        3,
-        "UInt wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kSignedI32,
-        {kUnsignedI32, kSignedI32, kSignedI32},
-        3,
-        "Int wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kFloat32,
-        {kUnsignedI32, kFloat32, kSignedI32},
-        3,
-        "Float wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kBool,
-        {kUnsignedI32, kBool, kSignedI32},
-        3,
-        "Bool wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kSignedI8,
-        {kUnsignedI32, kSignedI8, kSignedI32},
-        3,
-        "SignedI8 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kUnsignedI8,
-        {kUnsignedI32, kUnsignedI8, kSignedI32},
-        3,
-        "UnsignedI8 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kSignedI16,
-        {kUnsignedI32, kSignedI16, kSignedI32},
-        3,
-        "SignedI16 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kUnsignedI16,
-        {kUnsignedI32, kUnsignedI16, kSignedI32},
-        3,
-        "UnsignedI16 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kSignedI64,
-        {kUnsignedI32, kSignedI64, kSignedI32},
-        3,
-        "SignedI64 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kUnsignedI64,
-        {kUnsignedI32, kUnsignedI64, kSignedI32},
-        3,
-        "UnsignedI64 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kFloat16,
-        {kUnsignedI32, kFloat16, kSignedI32},
-        3,
-        "Float16 wave read-lane-at intrinsic",
-    },
-    {
-        SLANG_NVVM_VALUE_OP_WAVE_READ_LANE_AT,
-        kFloat64,
-        {kUnsignedI32, kFloat64, kSignedI32},
-        3,
-        "Float64 wave read-lane-at intrinsic",
-    },
-    {
         SLANG_NVVM_VALUE_OP_WAVE_ACTIVE_MASK,
         kUnsignedI32,
         {kNoType, kNoType, kNoType},
@@ -682,19 +590,6 @@ inline bool resolveValueOperationFamily(
         return true;
     }
 
-    const bool isIntegerBitOperand =
-        desc.operandCount == 1 && isSelectedScalarInteger(desc.operandTypes[0]);
-    const bool isUnsignedI32BitResult =
-        isIntegerBitOperand && areSameType(desc.resultType, kUnsignedI32);
-    // Compound wave recipes still use population count and first-lane selection. Public bit
-    // APIs now compose named LLVM primitives in the core module.
-    if (isUnsignedI32BitResult && (desc.operation == SLANG_NVVM_VALUE_OP_COUNT_BITS ||
-                                   desc.operation == SLANG_NVVM_VALUE_OP_FIRST_BIT_LOW))
-    {
-        outResolution = {ValueOperationFamily::IntegerBit, "scalar integer bit operation"};
-        return true;
-    }
-
     const bool isOrdinaryBinaryInteger =
         desc.operandCount == 2 && isSelectedIntegerValue(desc.resultType) &&
         isSelectedIntegerValue(desc.operandTypes[0]) &&
@@ -705,10 +600,6 @@ inline bool resolveValueOperationFamily(
                                 isSelectedIntegerValue(desc.operandTypes[1]) &&
                                 areSameType(desc.resultType, desc.operandTypes[0]) &&
                                 hasComponentWiseLanes(desc.resultType, desc.operandTypes[1]);
-    const bool isScalarIntegerMinMax = desc.operandCount == 2 &&
-                                       isSelectedScalarInteger(desc.resultType) &&
-                                       areSameType(desc.resultType, desc.operandTypes[0]) &&
-                                       areSameType(desc.resultType, desc.operandTypes[1]);
     if ((isOrdinaryBinaryInteger && (desc.operation == SLANG_NVVM_VALUE_OP_ADD ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_SUBTRACT ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_MULTIPLY ||
@@ -717,8 +608,6 @@ inline bool resolveValueOperationFamily(
                                      desc.operation == SLANG_NVVM_VALUE_OP_BIT_OR ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_BIT_XOR ||
                                      desc.operation == SLANG_NVVM_VALUE_OP_REMAINDER)) ||
-        (isScalarIntegerMinMax && (desc.operation == SLANG_NVVM_VALUE_OP_MIN ||
-                                   desc.operation == SLANG_NVVM_VALUE_OP_MAX)) ||
         (isIntegerShift && (desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT ||
                             desc.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT)))
     {
@@ -806,22 +695,6 @@ inline bool resolveValueOperationFamily(
         outResolution = {
             ValueOperationFamily::FloatBinary,
             "scalar floating-point math operation",
-            true,
-        };
-        return true;
-    }
-
-    const bool isLibdeviceBinaryFloat =
-        desc.operandCount == 2 && desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-        (desc.resultType.bitWidth == 32 || desc.resultType.bitWidth == 64) &&
-        desc.resultType.laneCount == 1 && areSameType(desc.resultType, desc.operandTypes[0]) &&
-        areSameType(desc.resultType, desc.operandTypes[1]);
-    if (isLibdeviceBinaryFloat &&
-        (desc.operation == SLANG_NVVM_VALUE_OP_MIN || desc.operation == SLANG_NVVM_VALUE_OP_MAX))
-    {
-        outResolution = {
-            ValueOperationFamily::FloatBinary,
-            "scalar floating-point minimum or maximum",
             true,
         };
         return true;
