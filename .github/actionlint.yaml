@@ -14,6 +14,8 @@ self-hosted-runner:
     - regression-test
     - SM80Plus
     - vulkancts
+    # Hosted Ubuntu 26.04 is GA, but actionlint 1.7.12 predates the label.
+    - ubuntu-26.04
     # Hosted GitHub partner-runner label for the Windows 11 ARM64 with
     # Visual Studio 2026 image, GA since 2026-08-19 (used by the native
     # Windows ARM64 build/test jobs in ci.yml). Not yet in actionlint's

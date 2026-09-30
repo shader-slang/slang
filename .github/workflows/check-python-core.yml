@@ -16,7 +16,7 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     strategy:
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
     runs-on: ${{ matrix.os }}
     name: Parse Python with core Python (${{ matrix.os }})
     steps:

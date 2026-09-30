@@ -13,7 +13,7 @@ concurrency:
 jobs:
   filter:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       should-run: ${{ steps.filter.outputs.should-run }}
     steps:
@@ -452,7 +452,7 @@ jobs:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true' && github.event_name != 'merge_group'
     environment: falcor-ci
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     # Only runs `echo`; no GITHUB_TOKEN scopes are needed.
     permissions: {}
@@ -813,7 +813,7 @@ jobs:
   check-cmdline-ref:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       actions: read
@@ -856,7 +856,7 @@ jobs:
   check-capability-atoms-ref:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       actions: read
@@ -1002,7 +1002,7 @@ jobs:
         test-benchmark,
         wait-for-human-priority,
       ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     steps:
       - name: Check CI Results
