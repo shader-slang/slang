@@ -6038,9 +6038,11 @@ static const int kSlangTorchTensorMaxDim = 5;
 template<typename Offset>
 struct TensorViewT
 {
+    using OffsetType = Offset;
+
     uint8_t* data;
     Offset strides[kSlangTorchTensorMaxDim];
-    uint32_t sizes[kSlangTorchTensorMaxDim];
+    Offset sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 
     template<typename T>
@@ -6052,28 +6054,28 @@ struct TensorViewT
     // Compute in the selected offset type. For example, element 2^30 of a contiguous float
     // tensor requires a uint64_t view because its byte offset is 4 GiB.
     template<typename T>
-    __device__ T* data_ptr_at(uint32_t index)
+    __device__ T* data_ptr_at(Offset index)
     {
         Offset offset = strides[0] * index;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
-    __device__ T* data_ptr_at(uint2 index)
+    __device__ T* data_ptr_at(Vector<Offset, 2> index)
     {
         Offset offset = strides[0] * index.x + strides[1] * index.y;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
-    __device__ T* data_ptr_at(uint3 index)
+    __device__ T* data_ptr_at(Vector<Offset, 3> index)
     {
         Offset offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z;
         return reinterpret_cast<T*>(data + offset);
     }
 
     template<typename T>
-    __device__ T* data_ptr_at(uint4 index)
+    __device__ T* data_ptr_at(Vector<Offset, 4> index)
     {
         Offset offset = strides[0] * index.x + strides[1] * index.y + strides[2] * index.z +
                         strides[3] * index.w;
@@ -6081,7 +6083,7 @@ struct TensorViewT
     }
 
     template<typename T, unsigned int N>
-    __device__ T* data_ptr_at(uint index[N])
+    __device__ T* data_ptr_at(Offset index[N])
     {
         Offset offset = 0;
         for (unsigned int i = 0; i < N; ++i)
@@ -6092,98 +6094,98 @@ struct TensorViewT
     }
 
     template<typename T>
-    __device__ T& load(uint32_t x)
+    __device__ T& load(Offset x)
     {
         return *data_ptr_at<T>(x);
     }
     template<typename T>
-    __device__ T& load(uint32_t x, uint32_t y)
+    __device__ T& load(Offset x, Offset y)
     {
-        return *data_ptr_at<T>(make_uint2(x, y));
+        return *data_ptr_at<T>(Vector<Offset, 2>{x, y});
     }
     template<typename T>
-    __device__ T& load(uint2 index)
+    __device__ T& load(Vector<Offset, 2> index)
     {
         return *data_ptr_at<T>(index);
     }
     template<typename T>
-    __device__ T& load(uint32_t x, uint32_t y, uint32_t z)
+    __device__ T& load(Offset x, Offset y, Offset z)
     {
-        return *data_ptr_at<T>(make_uint3(x, y, z));
+        return *data_ptr_at<T>(Vector<Offset, 3>{x, y, z});
     }
     template<typename T>
-    __device__ T& load(uint3 index)
+    __device__ T& load(Vector<Offset, 3> index)
     {
         return *data_ptr_at<T>(index);
     }
     template<typename T>
-    __device__ T& load(uint32_t x, uint32_t y, uint32_t z, uint32_t w)
+    __device__ T& load(Offset x, Offset y, Offset z, Offset w)
     {
-        return *data_ptr_at<T>(make_uint4(x, y, z, w));
+        return *data_ptr_at<T>(Vector<Offset, 4>{x, y, z, w});
     }
     template<typename T>
-    __device__ T& load(uint4 index)
+    __device__ T& load(Vector<Offset, 4> index)
     {
         return *data_ptr_at<T>(index);
     }
     template<typename T>
-    __device__ T& load(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4)
+    __device__ T& load(Offset i0, Offset i1, Offset i2, Offset i3, Offset i4)
     {
-        uint indices[] = {i0, i1, i2, i3, i4};
+        Offset indices[] = {i0, i1, i2, i3, i4};
         return *data_ptr_at<T, 5>(indices);
     }
 
     // Generic version of load
     template<typename T, unsigned int N>
-    __device__ T& load(uint index[N])
+    __device__ T& load(Offset index[N])
     {
         return *data_ptr_at<T, N>(index);
     }
 
     template<typename T>
-    __device__ void store(uint32_t x, T val)
+    __device__ void store(Offset x, T val)
     {
         load<T>(x) = val;
     }
     template<typename T>
-    __device__ void store(uint32_t x, uint32_t y, T val)
+    __device__ void store(Offset x, Offset y, T val)
     {
         load<T>(x, y) = val;
     }
     template<typename T>
-    __device__ void store(uint2 index, T val)
+    __device__ void store(Vector<Offset, 2> index, T val)
     {
         load<T>(index) = val;
     }
     template<typename T>
-    __device__ void store(uint32_t x, uint32_t y, uint32_t z, T val)
+    __device__ void store(Offset x, Offset y, Offset z, T val)
     {
         load<T>(x, y, z) = val;
     }
     template<typename T>
-    __device__ void store(uint3 index, T val)
+    __device__ void store(Vector<Offset, 3> index, T val)
     {
         load<T>(index) = val;
     }
     template<typename T>
-    __device__ void store(uint32_t x, uint32_t y, uint32_t z, uint32_t w, T val)
+    __device__ void store(Offset x, Offset y, Offset z, Offset w, T val)
     {
         load<T>(x, y, z, w) = val;
     }
     template<typename T>
-    __device__ void store(uint4 index, T val)
+    __device__ void store(Vector<Offset, 4> index, T val)
     {
         load<T>(index) = val;
     }
     template<typename T>
-    __device__ void store(uint32_t i0, uint32_t i1, uint32_t i2, uint32_t i3, uint32_t i4, T val)
+    __device__ void store(Offset i0, Offset i1, Offset i2, Offset i3, Offset i4, T val)
     {
         load<T>(i0, i1, i2, i3, i4) = val;
     }
 
     // Generic version
     template<typename T, unsigned int N>
-    __device__ void store(uint index[N], T val)
+    __device__ void store(Offset index[N], T val)
     {
         load<T, N>(index) = val;
     }

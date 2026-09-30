@@ -117,8 +117,8 @@ bool TorchCppSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& 
             if (tensorViewType->getOffsetType()->getOp() != kIROp_UIntType)
             {
                 m_writer->emit("<");
-                emitType(tensorViewType->getOffsetType());
-                m_writer->emit(">");
+                emitType(tensorViewType);
+                m_writer->emit("::OffsetType>");
             }
             m_writer->emit("(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));

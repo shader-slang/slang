@@ -245,9 +245,9 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             }
             else
             {
-                out << "TensorViewT<";
-                SLANG_RETURN_ON_FAIL(calcTypeName(offsetType, target, out));
-                out << ">";
+                // CUDA's uint64 vectors use unsigned long long. Match that specialization
+                // on the host even on platforms where uint64_t aliases unsigned long.
+                out << "TensorViewT<unsigned long long>";
             }
             return SLANG_OK;
         }

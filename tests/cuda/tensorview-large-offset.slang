@@ -3,13 +3,13 @@
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=storage
 RWStructuredBuffer<uint> storage;
 
-// Wide TensorView layout: data pointer, five uint64 byte strides, five uint sizes, rank.
-//TEST_INPUT:ubuffer(data=[storage 4 0 0 0 0 0 0 0 0 0 1073741826 0 0 0 0 1], stride=72):name=linear
+// Wide TensorView layout: data pointer, five uint64 byte strides, five uint64 sizes, rank, padding.
+//TEST_INPUT:ubuffer(data=[storage 4 0 0 0 0 0 0 0 0 0 1073741826 0 0 0 0 0 0 0 0 0 1 0], stride=96):name=linear
 uniform TensorView<uint, uint64_t>* linear;
-//TEST_INPUT:ubuffer(data=[storage 3221225472 0 1073741824 0 8 0 4 0 0 0 2 2 2 2 0 4], stride=72):name=strided
+//TEST_INPUT:ubuffer(data=[storage 3221225472 0 1073741824 0 8 0 4 0 0 0 2 0 2 0 2 0 2 0 0 0 4 0], stride=96):name=strided
 uniform TensorView<uint, uint64_t>* strided;
 // A byte stride of 4 GiB + 4 itself requires 64 bits.
-//TEST_INPUT:ubuffer(data=[storage 4 1 0 0 0 0 0 0 0 0 2 0 0 0 0 1], stride=72):name=wideStride
+//TEST_INPUT:ubuffer(data=[storage 4 1 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 1 0], stride=96):name=wideStride
 uniform TensorView<uint, uint64_t>* wideStride;
 
 //TEST_INPUT:ubuffer(count=9, stride=8):out,name=outputBuffer

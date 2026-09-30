@@ -200,7 +200,8 @@ extension uint : __TensorViewOffsetType {}
 extension uint64_t : __TensorViewOffsetType {}
 
 /// Represents a GPU view of a tensor.
-/// Offset controls byte strides and address arithmetic. Use uint64_t for offsets beyond 4 GiB.
+/// Offset controls sizes, byte strides, indices, and address arithmetic.
+/// Use uint64_t for dimensions, coordinates, or byte offsets that exceed 32 bits.
 __generic<T, Offset : __TensorViewOffsetType = uint>
 __magic_type(TensorViewType)
 __intrinsic_type($(kIROp_TensorViewType))
@@ -219,7 +220,7 @@ struct TensorView
 
     [__NoSideEffect]
     [require(cuda)]
-    Ptr<T> data_ptr_at(uint index)
+    Ptr<T> data_ptr_at(Offset index)
     {
         __target_switch
         {
@@ -231,7 +232,7 @@ struct TensorView
     __generic<let N : int>
     [__NoSideEffect]
     [require(cuda)]
-    Ptr<T> data_ptr_at(vector<uint, N> index)
+    Ptr<T> data_ptr_at(vector<Offset, N> index)
     {
         __target_switch
         {
@@ -246,7 +247,7 @@ struct TensorView
 
     [__NoSideEffect]
     [require(cuda)]
-    T load(uint x)
+    T load(Offset x)
     {
         __target_switch
         {
@@ -257,7 +258,7 @@ struct TensorView
 
     [__NoSideEffect]
     [require(cuda)]
-    T load(uint x, uint y)
+    T load(Offset x, Offset y)
     {
         __target_switch
         {
@@ -268,7 +269,7 @@ struct TensorView
 
     [__NoSideEffect]
     [require(cuda)]
-    T load(uint x, uint y, uint z)
+    T load(Offset x, Offset y, Offset z)
     {
         __target_switch
         {
@@ -279,7 +280,7 @@ struct TensorView
 
     [__NoSideEffect]
     [require(cuda)]
-    T load(uint x, uint y, uint z, uint w)
+    T load(Offset x, Offset y, Offset z, Offset w)
     {
         __target_switch
         {
@@ -290,7 +291,7 @@ struct TensorView
 
     [__NoSideEffect]
     [require(cuda)]
-    T load(uint i0, uint i1, uint i2, uint i3, uint i4)
+    T load(Offset i0, Offset i1, Offset i2, Offset i3, Offset i4)
     {
         __target_switch
         {
@@ -302,7 +303,7 @@ struct TensorView
     __generic<let N : int>
     [__NoSideEffect]
     [require(cuda)]
-    T load(vector<uint, N> index)
+    T load(vector<Offset, N> index)
     {
         __target_switch
         {
@@ -312,7 +313,7 @@ struct TensorView
     }
 
     [require(cuda)]
-    void store(uint x, T val)
+    void store(Offset x, T val)
     {
         __target_switch
         {
@@ -322,7 +323,7 @@ struct TensorView
     }
 
     [require(cuda)]
-    void store(uint x, uint y, T val)
+    void store(Offset x, Offset y, T val)
     {
         __target_switch
         {
@@ -332,7 +333,7 @@ struct TensorView
     }
 
     [require(cuda)]
-    void store(uint x, uint y, uint z, T val)
+    void store(Offset x, Offset y, Offset z, T val)
     {
         __target_switch
         {
@@ -342,7 +343,7 @@ struct TensorView
     }
 
     [require(cuda)]
-    void store(uint x, uint y, uint z, uint w, T val)
+    void store(Offset x, Offset y, Offset z, Offset w, T val)
     {
         __target_switch
         {
@@ -352,7 +353,7 @@ struct TensorView
     }
 
     [require(cuda)]
-    void store(uint i0, uint i1, uint i2, uint i3, uint i4, T val)
+    void store(Offset i0, Offset i1, Offset i2, Offset i3, Offset i4, T val)
     {
         __target_switch
         {
@@ -363,7 +364,7 @@ struct TensorView
 
     __generic<let N : int>
     [require(cuda)]
-    void store(vector<uint, N> index, T val)
+    void store(vector<Offset, N> index, T val)
     {
         __target_switch
         {
@@ -373,7 +374,7 @@ struct TensorView
     }
 
     [require(cuda)]
-    void InterlockedAdd(uint index, T val, out T oldVal)
+    void InterlockedAdd(Offset index, T val, out T oldVal)
     {
         __target_switch
         {
@@ -383,7 +384,7 @@ struct TensorView
 
     __generic<let N:int>
     [require(cuda)]
-    void InterlockedAdd(vector<uint, N> index, T val, out T oldVal)
+    void InterlockedAdd(vector<Offset, N> index, T val, out T oldVal)
     {
         __target_switch
         {
@@ -403,7 +404,7 @@ struct TensorView
 
     [__readNone]
     [require(cuda)]
-    uint size(uint i)
+    Offset size(uint i)
     {
         __target_switch
         {
@@ -421,7 +422,8 @@ struct TensorView
         }
     }
 
-    __subscript(uint index) -> T
+    // Ref accessors return pointers in generated CUDA, so take the address of load's reference.
+    __subscript(Offset index) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(index); }
 
@@ -438,11 +440,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1)", T;
             }
         }
     }
-    __subscript(uint i1, uint i2) -> T
+    __subscript(Offset i1, Offset i2) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2); }
 
@@ -459,11 +461,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1, $2)", T;
             }
         }
     }
-    __subscript(uint2 i) -> T
+    __subscript(vector<Offset, 2> i) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i.x, i.y); }
 
@@ -481,11 +483,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1.x, $1.y)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1.x, $1.y)", T;
             }
         }
     }
-    __subscript(uint i1, uint i2, uint i3) -> T
+    __subscript(Offset i1, Offset i2, Offset i3) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3); }
 
@@ -503,11 +505,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2, $3)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1, $2, $3)", T;
             }
         }
     }
-    __subscript(uint3 i) -> T
+    __subscript(vector<Offset, 3> i) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i.x, i.y, i.z); }
 
@@ -525,11 +527,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1.x, $1.y, $1.z)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1.x, $1.y, $1.z)", T;
             }
         }
     }
-    __subscript(uint i1, uint i2, uint i3, uint i4) -> T
+    __subscript(Offset i1, Offset i2, Offset i3, Offset i4) -> T
     {
         [ForceInline]
         [__NoSideEffect]
@@ -548,11 +550,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2, $3, $4)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1, $2, $3, $4)", T;
             }
         }
     }
-    __subscript(uint4 i) -> T
+    __subscript(vector<Offset, 4> i) -> T
     {
         [__NoSideEffect][ForceInline] get { return load(i.x, i.y, i.z, i.w); }
 
@@ -569,11 +571,11 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1.x, $1.y, $1.z, $1.w)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1.x, $1.y, $1.z, $1.w)", T;
             }
         }
     }
-    __subscript(uint i1, uint i2, uint i3, uint i4, uint i5) -> T
+    __subscript(Offset i1, Offset i2, Offset i3, Offset i4, Offset i5) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(i1, i2, i3, i4, i5); }
 
@@ -591,7 +593,7 @@ struct TensorView
             __target_switch
             {
             case cuda:
-                __intrinsic_asm "$0.load<$[0]>($1, $2, $3, $4, $5)", T;
+                __intrinsic_asm "&$0.load<$[0]>($1, $2, $3, $4, $5)", T;
             }
         }
     }
@@ -606,7 +608,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     typealias __Element = $(atomicIntegerTypeName);
 
     [require(cuda)]
-    void InterlockedMin(uint index, __Element val, out __Element oldVal)
+    void InterlockedMin(Offset index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -616,7 +618,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N : int>
     [require(cuda)]
-    void InterlockedMin(vector<uint, N> index, __Element val, out __Element oldVal)
+    void InterlockedMin(vector<Offset, N> index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -625,7 +627,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     }
 
     [require(cuda)]
-    void InterlockedMax<T>(uint index, __Element val, out __Element oldVal)
+    void InterlockedMax<T>(Offset index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -635,7 +637,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N : int>
     [require(cuda)]
-    void InterlockedMax(vector<uint, N> index, __Element val, out __Element oldVal)
+    void InterlockedMax(vector<Offset, N> index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -644,7 +646,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     }
 
     [require(cuda)]
-    void InterlockedAnd<T>(uint index, __Element val, out __Element oldVal)
+    void InterlockedAnd<T>(Offset index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -654,7 +656,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N : int>
     [require(cuda)]
-    void InterlockedAnd(vector<uint, N> index, __Element val, out __Element oldVal)
+    void InterlockedAnd(vector<Offset, N> index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -663,7 +665,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     }
 
     [require(cuda)]
-    void InterlockedOr<T>(uint index, __Element val, out __Element oldVal)
+    void InterlockedOr<T>(Offset index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -673,7 +675,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N : int>
     [require(cuda)]
-    void InterlockedOr(vector<uint, N> index, __Element val, out __Element oldVal)
+    void InterlockedOr(vector<Offset, N> index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -682,7 +684,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     }
 
     [require(cuda)]
-    void InterlockedXor<T>(uint index, __Element val, out __Element oldVal)
+    void InterlockedXor<T>(Offset index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -692,7 +694,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N : int>
     [require(cuda)]
-    void InterlockedXor(vector<uint, N> index, __Element val, out __Element oldVal)
+    void InterlockedXor(vector<Offset, N> index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -701,7 +703,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     }
 
     [require(cuda)]
-    void InterlockedExchange(uint index, __Element va, out __Element oldVall)
+    void InterlockedExchange(Offset index, __Element va, out __Element oldVall)
     {
         __target_switch
         {
@@ -711,7 +713,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N:int>
     [require(cuda)]
-    void InterlockedExchange(vector<uint, N> index, __Element val, out __Element oldVal)
+    void InterlockedExchange(vector<Offset, N> index, __Element val, out __Element oldVal)
     {
         __target_switch
         {
@@ -720,7 +722,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
     }
 
     [require(cuda)]
-    void InterlockedCompareExchange(uint index, __Element compare, __Element val)
+    void InterlockedCompareExchange(Offset index, __Element compare, __Element val)
     {
         __target_switch
         {
@@ -730,7 +732,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<$(atomicIntegerTypeName), 
 
     __generic<let N:int>
     [require(cuda)]
-    void InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val)
+    void InterlockedCompareExchange(vector<Offset, N> index, __Element compare, __Element val)
     {
         __target_switch
         {
@@ -746,7 +748,7 @@ $}
 extension<Offset : __TensorViewOffsetType> TensorView<float, Offset>
 {
     [require(cuda)]
-    float InterlockedExchange(uint index, float val, out float oldVal)
+    float InterlockedExchange(Offset index, float val, out float oldVal)
     {
         __target_switch
         {
@@ -756,7 +758,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<float, Offset>
 
     __generic<let N:int>
     [require(cuda)]
-    float InterlockedExchange(vector<uint, N> index, float val, out float oldVal)
+    float InterlockedExchange(vector<Offset, N> index, float val, out float oldVal)
     {
         __target_switch
         {
@@ -765,7 +767,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<float, Offset>
     }
 
     [require(cuda)]
-    void InterlockedCompareExchange(uint index, float compare, float val)
+    void InterlockedCompareExchange(Offset index, float compare, float val)
     {
         __target_switch
         {
@@ -775,7 +777,7 @@ extension<Offset : __TensorViewOffsetType> TensorView<float, Offset>
 
     __generic<let N : int>
     [require(cuda)]
-    void InterlockedCompareExchange(vector<uint, N> index, float compare, float val)
+    void InterlockedCompareExchange(vector<Offset, N> index, float compare, float val)
     {
         __target_switch
         {

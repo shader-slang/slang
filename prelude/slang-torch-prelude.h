@@ -75,9 +75,11 @@ static const int kSlangTorchTensorMaxDim = 5;
 template<typename Offset>
 struct TensorViewT
 {
+    using OffsetType = Offset;
+
     uint8_t* data;
     Offset strides[kSlangTorchTensorMaxDim];
-    uint32_t sizes[kSlangTorchTensorMaxDim];
+    Offset sizes[kSlangTorchTensorMaxDim];
     uint32_t dimensionCount;
 };
 
@@ -172,11 +174,11 @@ TensorViewT<Offset> make_tensor_view(
     uint64_t maxByteOffset = 0;
     for (int i = 0; i < val.dim(); ++i)
     {
-        // Sizes remain 32-bit. Check strides before multiplying so that the conversion
-        // itself cannot overflow the selected offset type.
-        if (uint64_t(val.size(i)) > UINT32_MAX)
+        // Check sizes before narrowing and strides before multiplying so that conversion
+        // cannot overflow the selected offset type.
+        if (uint64_t(val.size(i)) > maxOffset)
             throw std::runtime_error(
-                std::string(name).append(": tensor dimension size exceeds 32-bit limit."));
+                std::string(name).append(": tensor dimension size exceeds offset type limit."));
         if (uint64_t(val.stride(i)) > maxOffset / elementSize)
             throw std::runtime_error(
                 std::string(name).append(": tensor byte stride exceeds offset type limit."));

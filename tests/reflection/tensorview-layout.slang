@@ -1,4 +1,4 @@
-// Test that TensorView reports correct size (56 bytes) and alignment (8 bytes) in reflection.
+// Test TensorView's default (56-byte) and wide (96-byte) layouts, both aligned to eight bytes.
 
 //TEST:REFLECTION(filecheck=CHECK):-stage compute -entry computeMain -target cuda -no-codegen
 
@@ -22,6 +22,6 @@ void computeMain(uniform MyParams params)
 // CHECK: "name": "count",
 // CHECK: "binding": {"kind": "uniform", "offset": 56, "size": 4
 // CHECK: "name": "wideTensor",
-// CHECK: "binding": {"kind": "uniform", "offset": 64, "size": 72
+// CHECK: "binding": {"kind": "uniform", "offset": 64, "size": 96
 // CHECK: "name": "wideCount",
-// CHECK: "binding": {"kind": "uniform", "offset": 136, "size": 4
+// CHECK: "binding": {"kind": "uniform", "offset": 160, "size": 4

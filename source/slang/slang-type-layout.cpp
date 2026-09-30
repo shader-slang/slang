@@ -5567,10 +5567,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto tensorViewType = as<TensorViewType>(type))
     {
         // The CUDA and Torch preludes store a pointer, five Offset byte strides,
-        // five uint32 sizes, and a uint32 rank, with 8-byte alignment.
+        // five Offset sizes, and a uint32 rank, with 8-byte alignment.
         auto offsetLayout = _createTypeLayout(context, tensorViewType->getOffsetType());
         auto strideSize = offsetLayout.info.size.getFiniteValue().getValidValue();
-        auto size = _roundToAlignment(size_t(8 + 5 * strideSize + 5 * 4 + 4), size_t(8));
+        auto size = _roundToAlignment(size_t(8 + 10 * strideSize + 4), size_t(8));
         return createSimpleTypeLayout(
             SimpleLayoutInfo(LayoutResourceKind::Uniform, size, 8),
             type,
