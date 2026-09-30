@@ -2,6 +2,9 @@
 // constructor's operands, including operands that are themselves vectors.
 // For example, `uint3(a, 0).xy` is just `a`, so no wider vector is built.
 // Related to #13263.
+//
+// The SPIR-V check runs at -O0, which skips the bundled spirv-opt and inlining, so each helper
+// stays a separate function and the checked bodies show only what Slang's own IR passes did.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry computeMain -stage compute -emit-spirv-directly -O0
 //TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
@@ -10,7 +13,7 @@
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 // CHECK-LABEL: %wholeOperand = OpFunction
@@ -104,6 +107,39 @@ uint2 nestedOperand(uint2 a, uint s, uint t)
     return uint4(uint3(a, s), t).yx;
 }
 
+// The two leading elements of a wider operand are a swizzle of it, not the operand itself.
+// CHECK-LABEL: %prefixOfWider = OpFunction
+// CHECK-NEXT: %[[V:[A-Za-z0-9_]+]] = OpFunctionParameter %v3uint
+// CHECK-NEXT: OpFunctionParameter %uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: %[[R:[0-9]+]] = OpVectorShuffle %v2uint %[[V]] %[[V]] 0 1
+// CHECK-NEXT: OpReturnValue %[[R]]
+uint2 prefixOfWider(uint3 v, uint s)
+{
+    return uint4(v, s).xy;
+}
+
+// CHECK-LABEL: %scalarLane = OpFunction
+// CHECK-NEXT: OpFunctionParameter %v2uint
+// CHECK-NEXT: %[[S:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: OpReturnValue %[[S]]
+uint scalarLane(uint2 a, uint s)
+{
+    return uint3(a, s).z;
+}
+
+// CHECK-LABEL: %middleWindow = OpFunction
+// CHECK-NEXT: OpFunctionParameter %uint
+// CHECK-NEXT: %[[V:[A-Za-z0-9_]+]] = OpFunctionParameter %v3uint
+// CHECK-NEXT: OpLabel
+// CHECK-NEXT: %[[R:[0-9]+]] = OpVectorShuffle %v2uint %[[V]] %[[V]] 0 1
+// CHECK-NEXT: OpReturnValue %[[R]]
+uint2 middleWindow(uint s, uint3 v)
+{
+    return uint4(s, v).yz;
+}
+
 void store(uint index, uint2 value)
 {
     outputBuffer[index] = value.x;
@@ -144,4 +180,13 @@ void computeMain()
     // BUF-NEXT: 2
     // BUF-NEXT: 1
     store(14, nestedOperand(a, s, b.x));
+    uint3 v = uint3(inputBuffer[0], inputBuffer[1], inputBuffer[2]);
+    // BUF-NEXT: 1
+    // BUF-NEXT: 2
+    store(16, prefixOfWider(v, s));
+    // BUF-NEXT: 5
+    outputBuffer[18] = scalarLane(a, s);
+    // BUF-NEXT: 1
+    // BUF-NEXT: 2
+    store(19, middleWindow(s, v));
 }
