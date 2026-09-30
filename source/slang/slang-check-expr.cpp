@@ -7402,6 +7402,11 @@ static PtrType* getValidTypeForAddressOf(
     // block of memory we allow getting the address of.
     if (auto declRefExpr = as<DeclRefExpr>(baseExpr))
     {
+        // Error recovery for an undefined name, and the type-only arguments that
+        // `Linkage::specializeWithArgTypes` builds, are `DeclRefExpr`s that refer to no
+        // declaration. Such an expression names no storage, so it has no address.
+        if (!declRefExpr->declRef)
+            return nullptr;
         visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::DefinitionChecked);
         if (auto varDeclRef = as<VarDeclBase>(declRefExpr->declRef))
         {
@@ -7601,20 +7606,6 @@ static PtrType* getValidTypeForAddressOf(
         // Check if the base expression is something we can get the address-of.
         return getValidTypeForAddressOf(visitor, m_astBuilder, swizzleExpr->base, targetType);
     }
-    else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(baseExpr))
-    {
-        // As with vector swizzles, only a single matrix component (e.g. `m._m00`) is a
-        // contiguous, addressable location; a multi-element matrix swizzle is not.
-        if (matrixSwizzleExpr->elementCount > 1)
-            return nullptr;
-
-        return getValidTypeForAddressOf(visitor, m_astBuilder, matrixSwizzleExpr->base, targetType);
-    }
-    else if (auto parenExpr = as<ParenExpr>(baseExpr))
-    {
-        // Parentheses are value-preserving, so `(x)` is addressable exactly when `x` is.
-        return getValidTypeForAddressOf(visitor, m_astBuilder, parenExpr->base, targetType);
-    }
     return nullptr;
 }
 
@@ -7634,8 +7625,9 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
     return expr;
 }
 
-// Strip the projections that read a part of an object -- `.field`, `[i]`, `.xy`, `._m00`, `(...)`
-// -- to reach the object whose declaration carries the address space. `groupshared` sits on that
+// Strip the projections that read a part of an object -- `.field`, `[i]`, a single-component
+// swizzle such as `.x` or `._m00`, and `(...)` -- to reach the object whose declaration carries the
+// address space. `groupshared` sits on that
 // object, never on the part.
 //
 // Anything reached through a pointer stops the walk, because there the pointer's own type carries
@@ -7698,9 +7690,6 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
     if (!arg)
         return false;
 
-    if (isTypeOnlyPlaceholderArg(arg))
-        return false;
-
     auto addressedExpr = getBaseObjectOfProjection(arg);
 
     if (auto ptrType = getValidTypeForAddressOf(
@@ -7722,7 +7711,7 @@ bool SemanticsVisitor::argumentNamesGroupSharedStorage(Expr* arg)
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
     if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>() ||
-        isTypeOnlyPlaceholderArg(argIn))
+        isTypeOnlyPlaceholderArg(argIn) || as<ErrorType>(argIn->type))
         return;
 
     if (!argumentNamesGroupSharedStorage(argIn))
@@ -7768,6 +7757,8 @@ void SemanticsVisitor::checkGroupSharedArgumentsOfCopiedParams(
             continue;
 
         auto argExpr = invoke->arguments[i];
+        if (as<ErrorType>(argExpr->type))
+            continue;
         auto addressedExpr = argExpr;
         if (auto lValueCast = as<LValueImplicitCastExpr>(argExpr))
             addressedExpr = lValueCast->arguments[0];
