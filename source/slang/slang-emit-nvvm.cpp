@@ -15,7 +15,6 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-nvvm-intrinsic-semantics.h"
 
 namespace Slang
 {
@@ -2807,493 +2806,123 @@ void _requireSurfaceOperation(
     requirements.add({source, desc, diagnosticName});
 }
 
-bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function);
-
-struct NVVMResolvedTextureOperation
-{
-    SlangNVVMTextureOperationDesc operations[3] = {};
-    uint32_t operationCount = 0;
-    uint32_t outputParameterCount = 0;
-    bool writesTrailingZero = false;
-    IRParam* texture = nullptr;
-    IRParam* coordinate = nullptr;
-    IRParam* level = nullptr;
-};
-
-// Maps one producer-tagged implicit Sample helper to a unified texture operation. The selected
-// texture type is the canonical source of shape and arrayness; the tag supplies operation identity
-// and the exact helper signature proves the ordinary texture/sampler producer contract. CUDA's
-// texture handle already owns sampler state, so the provider consumes only texture and coordinate.
-bool _resolveNVVMTaggedTextureSample(
-    IRNVVMIntrinsic* intrinsic,
-    IRFunc* function,
-    NVVMResolvedTextureOperation& outOperation)
+// Resolves logical texture instructions while resource types still carry shape and access.
+// Consider `texture.Load(int3(x, y, mip))`: core splits the packed location into an integer
+// coordinate and a level before constructing TextureFetch. This boundary validates that typed
+// contract once; the provider receives the same descriptors used by sampling and queries.
+bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement& outOperation)
 {
     outOperation = {};
-    if (!_isCanonicalNVVMIntrinsicValueHelper(intrinsic, function) ||
-        intrinsic->getOperandCount() != 1 || function->getParamCount() != 3)
-    {
-        return false;
-    }
-
-    auto semantic = as<IRIntLit>(intrinsic->getOperand(0));
-    if (!semantic || semantic->getValue() != kNVVMIntrinsicSemanticTextureSample)
-        return false;
-
-    IRParam* texture = function->getFirstParam();
-    IRParam* sampler = texture->getNextParam();
-    IRParam* coordinate = sampler->getNextParam();
-    if (!asNVVMSupportedSamplerValueType(sampler->getDataType()))
+    const IROp op = inst->getOp();
+    const bool isQuery = op == kIROp_TextureQuerySize;
+    const bool isFetch = op == kIROp_TextureFetch;
+    const bool isGather = op == kIROp_TextureGather;
+    const bool isLevel = op == kIROp_SampleLevel;
+    const UInt operandCount = isQuery ? 1 : (isFetch || op == kIROp_Sample) ? 3 : 4;
+    if (inst->getOperandCount() != operandCount)
         return false;
 
-    NVVMReadOnlyTextureType textureType;
-    if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType) ||
-        textureType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
-        textureType.elementType.bitWidth != 32 ||
-        (textureType.elementType.laneCount != 1 && textureType.elementType.laneCount != 2 &&
-         textureType.elementType.laneCount != 4) ||
-        !isTypeEqual(function->getResultType(), textureType.textureType->getElementType()))
-    {
-        return false;
-    }
-
-    if (textureType.coordinateLaneCount == 1)
-    {
-        if (!isNVVMFloat32Type(coordinate->getDataType()))
-            return false;
-    }
-    else
-    {
-        auto coordinateType = as<IRVectorType>(coordinate->getDataType());
-        auto laneCount = coordinateType ? as<IRIntLit>(coordinateType->getElementCount()) : nullptr;
-        if (!coordinateType || !isNVVMFloat32Type(coordinateType->getElementType()) || !laneCount ||
-            laneCount->getValue() != textureType.coordinateLaneCount)
-        {
-            return false;
-        }
-    }
-
-    outOperation.operations[0] = {
-        SLANG_NVVM_TEXTURE_OP_SAMPLE,
-        textureType.shape,
-        textureType.isArray ? 1u : 0u,
-        textureType.elementType,
-    };
-    outOperation.operationCount = 1;
-    outOperation.texture = texture;
-    outOperation.coordinate = coordinate;
-    return true;
-}
-
-// Maps one complete canonical CUDA-prelude SampleLevel helper to a unified texture-level
-// operation. A CUDA texture object already owns its sampling state, so the sampler parameter is
-// part of the checked Slang helper ABI but is intentionally absent from the provider operation.
-bool _resolveNVVMTextureGenericAsm(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMResolvedTextureOperation& outOperation)
-{
-    outOperation = {};
-    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
-        function->getParamCount() != 4)
-    {
-        return false;
-    }
-
-    SlangNVVMTextureShape shape = 0;
-    bool isArray = false;
-    const UnownedStringSlice assembly = genericAsm->getAsm();
-    if (assembly == toSlice("tex1DLod<$T0>($0, ($2), ($3))"))
-        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
-    else if (assembly == toSlice("tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))"))
-        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
-    else if (assembly == toSlice("tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))"))
-        shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
-    else if (assembly == toSlice("texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))"))
-        shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
-    else if (assembly == toSlice("tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))"))
-    {
-        shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
-        isArray = true;
-    }
-    else if (assembly == toSlice("tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))"))
-    {
-        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
-        isArray = true;
-    }
-    else if (
-        assembly == toSlice("texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, "
-                            "int(($2).w), ($3))"))
-    {
-        shape = SLANG_NVVM_TEXTURE_SHAPE_CUBE;
-        isArray = true;
-    }
-    else
-        return false;
-
-    IRParam* texture = function->getFirstParam();
-    IRParam* sampler = texture->getNextParam();
-    IRParam* coordinate = sampler->getNextParam();
-    IRParam* level = coordinate->getNextParam();
-    NVVMReadOnlyTextureType textureType;
-    if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType) ||
-        textureType.shape != shape || textureType.isArray != isArray ||
-        textureType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
-        textureType.elementType.bitWidth != 32 ||
-        (textureType.elementType.laneCount != 1 && textureType.elementType.laneCount != 2 &&
-         textureType.elementType.laneCount != 4) ||
-        !isTypeEqual(function->getResultType(), textureType.textureType->getElementType()) ||
-        !asNVVMSupportedSamplerValueType(sampler->getDataType()) ||
-        !isNVVMFloat32Type(level->getDataType()))
-    {
-        return false;
-    }
-
-    if (textureType.coordinateLaneCount == 1)
-    {
-        if (!isNVVMFloat32Type(coordinate->getDataType()))
-            return false;
-    }
-    else
-    {
-        auto coordinateType = as<IRVectorType>(coordinate->getDataType());
-        auto laneCount = coordinateType ? as<IRIntLit>(coordinateType->getElementCount()) : nullptr;
-        if (!coordinateType || !isNVVMFloat32Type(coordinateType->getElementType()) || !laneCount ||
-            laneCount->getValue() != textureType.coordinateLaneCount)
-        {
-            return false;
-        }
-    }
-
-    outOperation.operations[0] = {
-        SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL,
-        shape,
-        isArray ? 1u : 0u,
-        textureType.elementType,
-    };
-    outOperation.operationCount = 1;
-    outOperation.texture = texture;
-    outOperation.coordinate = coordinate;
-    outOperation.level = level;
-    return true;
-}
-
-// Maps one complete CUDA-prelude Texture.Load helper to an integer-coordinate fetch with an
-// explicit mip level. The helper packs mip into the final location lane; the typed provider
-// operation keeps coordinate and level separate.
-bool _resolveNVVMTextureFetchGenericAsm(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMResolvedTextureOperation& outOperation)
-{
-    outOperation = {};
-    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
-        function->getParamCount() != 2)
-    {
-        return false;
-    }
-
-    SlangNVVMTextureShape shape = 0;
-    bool isArray = false;
-    const UnownedStringSlice assembly = genericAsm->getAsm();
-    if (assembly == toSlice("tex2Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)"))
-        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
-    else if (assembly == toSlice("tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)"))
-        shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
-    else if (assembly == toSlice("tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z, ($1).w)"))
-    {
-        shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
-        isArray = true;
-    }
-    else
-        return false;
-
-    IRParam* texture = function->getFirstParam();
-    IRParam* location = texture->getNextParam();
-    NVVMReadOnlyTextureType textureType;
-    bool locationIsSigned = false;
-    uint32_t locationLaneCount = 0;
-    if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType) ||
-        textureType.shape != shape || textureType.isArray != isArray ||
-        !isTypeEqual(function->getResultType(), textureType.textureType->getElementType()) ||
-        !asNVVMSupportedI32VectorType(
-            location->getDataType(),
-            &locationIsSigned,
-            &locationLaneCount) ||
-        !locationIsSigned || locationLaneCount != textureType.coordinateLaneCount + 1)
-    {
-        return false;
-    }
-
-    outOperation.operations[0] = {
-        SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL,
-        shape,
-        isArray ? 1u : 0u,
-        textureType.elementType,
-    };
-    outOperation.operationCount = 1;
-    outOperation.texture = texture;
-    outOperation.coordinate = location;
-    return true;
-}
-
-// Maps one complete ordinary CUDA-prelude Texture2D Gather helper to a typed four-lane gather.
-// Consider `Texture2D<float3>.GatherGreen(s, uv)`: the producer emits a float4-result helper with
-// component one even though the texture declares three lanes. CUDA has no offset form, so the
-// generated offset overload deliberately shares the same assembly; this resolver still proves its
-// otherwise-ignored signed int2 parameter.
-bool _resolveNVVMTextureGatherGenericAsm(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMResolvedTextureOperation& outOperation)
-{
-    outOperation = {};
-    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
-        (function->getParamCount() != 3 && function->getParamCount() != 4))
-    {
-        return false;
-    }
-
-    uint32_t component = 0;
-    const UnownedStringSlice assembly = genericAsm->getAsm();
-    if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 0)"))
-        component = 0;
-    else if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 1)"))
-        component = 1;
-    else if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 2)"))
-        component = 2;
-    else if (assembly == toSlice("tex2Dgather<$TR>($0, ($2).x, ($2).y, 3)"))
-        component = 3;
-    else
-        return false;
-
-    IRParam* texture = function->getFirstParam();
-    IRParam* sampler = texture->getNextParam();
-    IRParam* coordinate = sampler->getNextParam();
-    NVVMReadOnlyTextureType textureType;
-    auto resultType = as<IRVectorType>(function->getResultType());
-    auto resultLaneCount = resultType ? as<IRIntLit>(resultType->getElementCount()) : nullptr;
-    auto coordinateType = as<IRVectorType>(coordinate->getDataType());
-    auto coordinateLaneCount =
-        coordinateType ? as<IRIntLit>(coordinateType->getElementCount()) : nullptr;
-    IRType* textureScalarType = nullptr;
-    if (getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType))
-    {
-        textureScalarType = textureType.textureType->getElementType();
-        if (auto textureVectorType = as<IRVectorType>(textureScalarType))
-            textureScalarType = textureVectorType->getElementType();
-    }
-    if (!textureScalarType || textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D ||
-        textureType.isArray || !resultType || !resultLaneCount ||
-        resultLaneCount->getValue() != 4 ||
-        !isTypeEqual(resultType->getElementType(), textureScalarType) ||
-        !asNVVMSupportedSamplerValueType(sampler->getDataType()) || !coordinateType ||
-        !coordinateLaneCount || coordinateLaneCount->getValue() != 2 ||
-        !isNVVMFloat32Type(coordinateType->getElementType()))
-    {
-        return false;
-    }
-
-    if (IRParam* offset = coordinate->getNextParam())
-    {
-        bool offsetIsSigned = false;
-        uint32_t offsetLaneCount = 0;
-        if (offset->getNextParam() ||
-            !asNVVMSupportedI32VectorType(
-                offset->getDataType(),
-                &offsetIsSigned,
-                &offsetLaneCount) ||
-            !offsetIsSigned || offsetLaneCount != 2)
-        {
-            return false;
-        }
-    }
-
-    SlangNVVMValueTypeDesc resultElementType = textureType.elementType;
-    resultElementType.laneCount = 4;
-    outOperation.operations[0] = {
-        SLANG_NVVM_TEXTURE_OP_GATHER,
-        SLANG_NVVM_TEXTURE_SHAPE_2D,
-        0,
-        resultElementType,
-        component,
-    };
-    outOperation.operationCount = 1;
-    outOperation.texture = texture;
-    outOperation.coordinate = coordinate;
-    return true;
-}
-
-// Resolves the finalized CUDA texture dimension helpers. Array helpers deliberately write zero to
-// their final element-count output because that is the behavior encoded by the CUDA prelude.
-// Consider this example:
-//
-//     Texture2D<uint> texture;
-//     int2 size;
-//     texture.GetDimensions(size.x, size.y);
-//
-// The prelude produces the same handle query as for float texels and uint outputs: txq returns
-// an i32 dimension, independent of texel type. The provider's query result can therefore be
-// stored through either integer output pointer without conversion.
-bool _resolveNVVMTextureDimensionsGenericAsm(
-    IRGenericAsm* genericAsm,
-    IRFunc* function,
-    NVVMResolvedTextureOperation& outOperation)
-{
-    outOperation = {};
-    if (!genericAsm || !function || genericAsm->getOperandCount() != 1 ||
-        !as<IRVoidType>(function->getResultType()) || function->getParamCount() < 2 ||
-        function->getParamCount() > 4)
-    {
-        return false;
-    }
-
-    IRParam* texture = function->getFirstParam();
+    IRInst* texture = inst->getOperand(0);
     NVVMReadOnlyTextureType textureType;
     if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType))
         return false;
-
-    uint32_t outputParameterCount = 0;
-    uint32_t operationCount = 0;
-    bool writesTrailingZero = false;
-    const UnownedStringSlice assembly = genericAsm->getAsm();
-    if (assembly == toSlice("{uint32_t width; asm(\"txq.width.b32 %0, [%1];\" : \"=r\"(width) : "
-                            "\"l\"($0)); *($1) = width;}"))
-    {
-        if (textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_1D || textureType.isArray)
-            return false;
-        outputParameterCount = 1;
-        operationCount = 1;
-    }
-    else if (
-        assembly == toSlice("{uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
-                            "[%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}"))
-    {
-        if ((textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D &&
-             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_CUBE) ||
-            textureType.isArray)
-        {
-            return false;
-        }
-        outputParameterCount = 2;
-        operationCount = 2;
-    }
-    else if (
-        assembly == toSlice("{uint32_t w, h, d; asm(\"txq.width.b32 %0, [%3]; txq.height.b32 "
-                            "%1, [%3]; txq.depth.b32 %2, [%3];\" : \"=r\"(w), \"=r\"(h), "
-                            "\"=r\"(d) : \"l\"($0)); *($1) = w;*($2) = h;*($3) = d;}"))
-    {
-        if (textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_3D || textureType.isArray)
-            return false;
-        outputParameterCount = 3;
-        operationCount = 3;
-    }
-    else if (
-        assembly == toSlice("{uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
-                            "[%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = "
-                            "h;/* txq.array_size not available in CUDA */ *($3) = 0;}"))
-    {
-        if ((textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D &&
-             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_CUBE) ||
-            !textureType.isArray)
-        {
-            return false;
-        }
-        outputParameterCount = 3;
-        operationCount = 2;
-        writesTrailingZero = true;
-    }
-    else
-        return false;
-
-    if (function->getParamCount() != outputParameterCount + 1)
-        return false;
-    IRParam* output = texture->getNextParam();
-    for (uint32_t i = 0; i < outputParameterCount; ++i, output = output->getNextParam())
-    {
-        IRType* valueType = nullptr;
-        auto pointerType =
-            asNVVMSupportedLocalNumericPointerType(output->getDataType(), &valueType);
-        if (!pointerType || pointerType->getOp() != kIROp_OutParamType ||
-            (!isNVVMUnsignedI32Type(valueType) && !isNVVMSignedI32Type(valueType)))
-        {
-            return false;
-        }
-    }
-
-    const SlangNVVMTextureOperation queryOperations[] = {
-        SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
-        SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
-        SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH,
-    };
-    for (uint32_t i = 0; i < operationCount; ++i)
-    {
-        outOperation.operations[i] = {
-            queryOperations[i],
-            textureType.shape,
-            textureType.isArray ? 1u : 0u,
-            textureType.elementType,
-        };
-    }
-    outOperation.operationCount = operationCount;
-    outOperation.outputParameterCount = outputParameterCount;
-    outOperation.writesTrailingZero = writesTrailingZero;
+    outOperation.source = inst;
     outOperation.texture = texture;
-    return true;
-}
+    outOperation.operationCount = 1;
+    auto& operation = outOperation.operations[0];
+    operation.shape = textureType.shape;
+    operation.isArray = textureType.isArray ? 1u : 0u;
+    operation.elementType = textureType.elementType;
 
-void _requireTextureOperations(
-    List<NVVMTextureOperationRequirement>& requirements,
-    IRFunc* function,
-    const NVVMResolvedTextureOperation& operations,
-    const char* diagnosticName)
-{
-    for (const auto& requirement : requirements)
+    if (isQuery)
     {
-        if (requirement.function != function)
-            continue;
-        SLANG_RELEASE_ASSERT(
-            requirement.operationCount == operations.operationCount &&
-            requirement.outputParameterCount == operations.outputParameterCount &&
-            requirement.writesTrailingZero == operations.writesTrailingZero &&
-            requirement.texture == operations.texture &&
-            requirement.coordinate == operations.coordinate &&
-            requirement.level == operations.level);
-        for (uint32_t i = 0; i < operations.operationCount; ++i)
+        if (textureType.isArray && textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D)
+            return false;
+        const UInt rank = textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D   ? 1
+                          : textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ? 3
+                                                                             : 2;
+        if (!isNVVMUnsignedI32Type(getIRVectorBaseType(inst->getDataType())) ||
+            UInt(getIRVectorElementSize(inst->getDataType())) != rank)
+            return false;
+        const SlangNVVMTextureOperation queryOperations[] = {
+            SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
+            SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
+            SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH,
+        };
+        outOperation.operationCount = uint32_t(rank);
+        outOperation.diagnosticName = "sampled texture dimension query";
+        for (UInt i = 0; i < rank; ++i)
         {
-            const auto& existing = requirement.operations[i];
-            const auto& operation = operations.operations[i];
-            SLANG_RELEASE_ASSERT(
-                existing.operation == operation.operation && existing.shape == operation.shape &&
-                existing.isArray == operation.isArray &&
-                existing.component == operation.component &&
-                NVVMSemantics::areSameType(existing.elementType, operation.elementType));
+            outOperation.operations[i] = operation;
+            outOperation.operations[i].operation = queryOperations[i];
         }
-        return;
+        return true;
     }
-    NVVMTextureOperationRequirement requirement;
-    requirement.function = function;
-    requirement.texture = operations.texture;
-    requirement.coordinate = operations.coordinate;
-    requirement.level = operations.level;
-    requirement.operationCount = operations.operationCount;
-    requirement.outputParameterCount = operations.outputParameterCount;
-    requirement.writesTrailingZero = operations.writesTrailingZero;
-    requirement.diagnosticName = diagnosticName;
-    for (uint32_t i = 0; i < operations.operationCount; ++i)
-        requirement.operations[i] = operations.operations[i];
-    requirements.add(requirement);
+
+    if (!isFetch && !asNVVMSupportedSamplerValueType(inst->getOperand(1)->getDataType()))
+        return false;
+    IRInst* coordinate = inst->getOperand(isFetch ? 1 : 2);
+    if (UInt(getIRVectorElementSize(coordinate->getDataType())) != textureType.coordinateLaneCount)
+        return false;
+    IRType* coordinateScalar = getIRVectorBaseType(coordinate->getDataType());
+    if (isFetch ? !isNVVMSignedI32Type(coordinateScalar) : !isNVVMFloat32Type(coordinateScalar))
+        return false;
+    outOperation.coordinate = coordinate;
+
+    if (isGather)
+    {
+        auto component = as<IRIntLit>(inst->getOperand(3));
+        IRType* scalarType = getIRVectorBaseType(textureType.textureType->getElementType());
+        if (textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D || textureType.isArray || !component ||
+            component->getValue() < 0 || component->getValue() > 3 ||
+            !isNVVMSignedI32Type(component->getDataType()) ||
+            getIRVectorElementSize(inst->getDataType()) != 4 ||
+            !isTypeEqual(getIRVectorBaseType(inst->getDataType()), scalarType))
+            return false;
+        operation.operation = SLANG_NVVM_TEXTURE_OP_GATHER;
+        operation.component = uint32_t(component->getValue());
+        operation.elementType.laneCount = 4;
+        outOperation.diagnosticName = "ordinary Texture2D gather";
+        return true;
+    }
+    if (!isTypeEqual(inst->getDataType(), textureType.textureType->getElementType()))
+        return false;
+    if (isFetch)
+    {
+        if ((textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D &&
+             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_3D) ||
+            !isNVVMSignedI32Type(inst->getOperand(2)->getDataType()))
+            return false;
+        operation.operation = SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
+        outOperation.level = inst->getOperand(2);
+        outOperation.diagnosticName = "integer-coordinate sampled texture fetch";
+        return true;
+    }
+    if (textureType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ||
+        textureType.elementType.bitWidth != 32 ||
+        (textureType.elementType.laneCount != 1 && textureType.elementType.laneCount != 2 &&
+         textureType.elementType.laneCount != 4))
+        return false;
+    if (isLevel)
+    {
+        if (!isNVVMFloat32Type(inst->getOperand(3)->getDataType()))
+            return false;
+        outOperation.level = inst->getOperand(3);
+    }
+    operation.operation =
+        isLevel ? SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL : SLANG_NVVM_TEXTURE_OP_SAMPLE;
+    outOperation.diagnosticName =
+        isLevel ? "sampled texture level operation" : "implicit sampled texture operation";
+    return true;
 }
 
 const NVVMTextureOperationRequirement* _findTextureOperationRequirement(
     const List<NVVMTextureOperationRequirement>& requirements,
-    IRFunc* function)
+    IRInst* source)
 {
     for (const auto& requirement : requirements)
-    {
-        if (requirement.function == function)
+        if (requirement.source == source)
             return &requirement;
-    }
     return nullptr;
 }
 
@@ -3520,25 +3149,6 @@ bool _resolveNVVMGenericAsmValueOperation(
         function,
         spelling->operation,
         spelling->operandCount,
-        outOperation);
-}
-
-bool _resolveNVVMTaggedValueOperation(
-    IRNVVMIntrinsic* intrinsic,
-    IRFunc* function,
-    NVVMGenericAsmValueOperation& outOperation)
-{
-    if (!intrinsic || intrinsic->getOperandCount() != 1)
-        return false;
-    auto semantic = as<IRIntLit>(intrinsic->getOperand(0));
-    if (!semantic || semantic->getValue() < 0 ||
-        semantic->getValue() >= SLANG_NVVM_VALUE_OPERATION_COUNT || function->getParamCount() > 3)
-        return false;
-    return _resolveNVVMSemanticValueOperation(
-        intrinsic,
-        function,
-        SlangNVVMValueOperation(semantic->getValue()),
-        uint32_t(function->getParamCount()),
         outOperation);
 }
 
@@ -7006,43 +6616,26 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
-            case kIROp_NVVMIntrinsic:
+            case kIROp_Sample:
+            case kIROp_SampleLevel:
+            case kIROp_TextureFetch:
+            case kIROp_TextureGather:
+            case kIROp_TextureQuerySize:
                 {
-                    auto intrinsic = as<IRNVVMIntrinsic>(inst);
-                    NVVMGenericAsmValueOperation valueOperation;
-                    NVVMResolvedTextureOperation textureOperation;
-                    if (isEntryPoint || intrinsic != terminator)
-                    {
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("nvvmIntrinsic"));
-                    }
-                    if (_resolveNVVMTaggedTextureSample(intrinsic, function, textureOperation))
-                    {
-                        _requireTextureOperations(
-                            requirements.textureOperations,
-                            function,
-                            textureOperation,
-                            "implicit sampled texture operation");
-                    }
-                    else if (_resolveNVVMTaggedValueOperation(intrinsic, function, valueOperation))
-                    {
-                        _requireValueOperation(
-                            requirements.valueOperations,
-                            valueOperation.getOperationDesc(),
-                            valueOperation.diagnosticName);
-                        requirements.requiresCUDADeviceLibrary |=
-                            valueOperation.requiresCUDADeviceLibrary;
-                    }
-                    else
-                    {
-                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("nvvmIntrinsic"));
-                    }
+                    NVVMTextureOperationRequirement operation;
+                    if (!_resolveNVVMTextureOperation(inst, operation))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            UnownedStringSlice(getIROpInfo(inst->getOp()).name));
+                    requirements.textureOperations.add(operation);
                 }
                 break;
 
             case kIROp_GenericAsm:
                 {
                     auto genericAsm = as<IRGenericAsm>(inst);
-                    if (isEntryPoint || genericAsm != terminator)
+                    if (isEntryPoint || genericAsm != terminator ||
+                        genericAsm->findDecoration<IRNVVMSemanticDecoration>())
                     {
                         return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
                     }
@@ -7056,7 +6649,6 @@ SlangResult _validateNVVMFunction(
                     }
                     NVVMGenericAsmValueOperation valueOperation;
                     NVVMScalarIntrinsicRecipe scalarRecipe;
-                    NVVMResolvedTextureOperation textureOperation;
                     if (_resolveNVVMGenericAsmValueOperation(genericAsm, function, valueOperation))
                     {
                         _requireValueOperation(
@@ -7074,47 +6666,6 @@ SlangResult _validateNVVMFunction(
                             scalarRecipe);
                         requirements.requiresCUDADeviceLibrary |=
                             scalarRecipe.requiresCUDADeviceLibrary;
-                        break;
-                    }
-                    const char* textureDiagnosticName = nullptr;
-                    if (_resolveNVVMTextureGenericAsm(genericAsm, function, textureOperation))
-                        textureDiagnosticName = "scalar Float sampled texture level operation";
-                    else if (_resolveNVVMTextureFetchGenericAsm(
-                                 genericAsm,
-                                 function,
-                                 textureOperation))
-                        textureDiagnosticName = "integer-coordinate texture fetch level";
-                    else if (_resolveNVVMTextureGatherGenericAsm(
-                                 genericAsm,
-                                 function,
-                                 textureOperation))
-                        textureDiagnosticName = "ordinary Texture2D gather";
-                    else if (_resolveNVVMTextureDimensionsGenericAsm(
-                                 genericAsm,
-                                 function,
-                                 textureOperation))
-                        textureDiagnosticName = "sampled texture dimension query";
-                    if (textureDiagnosticName)
-                    {
-                        auto genericBlock = as<IRBlock>(genericAsm->getParent());
-                        auto entryBranch = as<IRUnconditionalBranch>(entryBlock->getTerminator());
-                        const bool hasCanonicalTextureBody =
-                            functionBlocks.getCount() == 1 ||
-                            (functionBlocks.getCount() == 2 && genericBlock != entryBlock &&
-                             entryBranch && entryBranch->getTargetBlock() == genericBlock &&
-                             entryBranch->getArgCount() == 0);
-                        if (!hasCanonicalTextureBody)
-                        {
-                            return _diagnoseUnsupportedGenericAsm(
-                                codeGenContext,
-                                genericAsm,
-                                function);
-                        }
-                        _requireTextureOperations(
-                            requirements.textureOperations,
-                            function,
-                            textureOperation,
-                            textureDiagnosticName);
                         break;
                     }
                     return _diagnoseUnsupportedGenericAsm(codeGenContext, genericAsm, function);
@@ -7833,10 +7384,25 @@ SlangResult _validateNVVMFunction(
                         availableValues,
                         dominatorTree));
                 }
-                [[fallthrough]];
-            case kIROp_NVVMIntrinsic:
                 SLANG_ASSERT(inst == terminator);
                 hasHelperReturn = true;
+                break;
+
+            case kIROp_Sample:
+            case kIROp_SampleLevel:
+            case kIROp_TextureFetch:
+            case kIROp_TextureGather:
+            case kIROp_TextureQuerySize:
+                for (UInt i = 0; i < inst->getOperandCount(); ++i)
+                {
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        inst->getOperand(i),
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                }
+                availableValues.add(inst);
                 break;
 
             case kIROp_WaveGetConvergedMask:
@@ -11923,100 +11489,66 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
-                case kIROp_NVVMIntrinsic:
+                case kIROp_Sample:
+                case kIROp_SampleLevel:
+                case kIROp_TextureFetch:
+                case kIROp_TextureGather:
+                case kIROp_TextureQuerySize:
                     {
-                        auto intrinsic = as<IRNVVMIntrinsic>(inst);
-                        if (auto textureRequirement = _findTextureOperationRequirement(
-                                requirements.textureOperations,
-                                function))
+                        const auto* operation =
+                            _findTextureOperationRequirement(requirements.textureOperations, inst);
+                        SLANG_RELEASE_ASSERT(operation);
+                        IRInst* operands[] = {
+                            operation->texture,
+                            operation->coordinate,
+                            operation->level};
+                        const UInt operandCount = operation->level        ? 3
+                                                  : operation->coordinate ? 2
+                                                                          : 1;
+                        SlangNVVMValueHandle loweredOperands[3] = {};
+                        for (UInt i = 0; i < operandCount; ++i)
                         {
-                            SLANG_RELEASE_ASSERT(
-                                textureRequirement->operationCount == 1 &&
-                                textureRequirement->operations[0].operation ==
-                                    SLANG_NVVM_TEXTURE_OP_SAMPLE &&
-                                textureRequirement->texture && textureRequirement->coordinate);
-                            SlangNVVMValueHandle loweredOperands[2] = {};
                             SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                                 codeGenContext,
                                 builder,
                                 moduleScope.module,
-                                textureRequirement->texture,
+                                operands[i],
                                 valueMap,
                                 typeContext,
-                                loweredOperands[0]));
-                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                textureRequirement->coordinate,
-                                valueMap,
-                                typeContext,
-                                loweredOperands[1]));
-                            SlangNVVMValueHandle loweredValue = nullptr;
+                                loweredOperands[i]));
+                        }
+                        SlangNVVMValueHandle values[3] = {};
+                        for (UInt i = 0; i < operation->operationCount; ++i)
+                        {
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                textureRequirement->diagnosticName,
+                                operation->diagnosticName,
                                 builder.emitTextureOperation(
                                     moduleScope.module,
-                                    textureRequirement->operations[0],
+                                    operation->operations[i],
                                     loweredOperands,
-                                    SLANG_COUNT_OF(loweredOperands),
-                                    loweredValue)));
-                            SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                function,
-                                "implicit sampled texture value return",
-                                loweredValue));
-                            break;
+                                    operandCount,
+                                    values[i])));
                         }
-                        NVVMGenericAsmValueOperation valueOperation;
-                        if (_resolveNVVMTaggedValueOperation(intrinsic, function, valueOperation))
+                        SlangNVVMValueHandle value = values[0];
+                        if (operation->operationCount > 1)
                         {
-                            SlangNVVMValueHandle loweredOperands[3] = {};
-                            for (uint32_t i = 0; i < valueOperation.operandCount; ++i)
-                            {
-                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    valueOperation.parameters[i],
-                                    valueMap,
-                                    typeContext,
-                                    loweredOperands[i]));
-                            }
-                            SlangNVVMValueHandle loweredValue = nullptr;
+                            SlangNVVMTypeHandle resultType = nullptr;
+                            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                                inst->getDataType(),
+                                NVVMTypeUse::Value,
+                                resultType));
                             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                                 codeGenContext,
-                                valueOperation.diagnosticName,
-                                builder.emitValueOperation(
+                                "texture spatial dimensions",
+                                builder.emitVectorConstruct(
                                     moduleScope.module,
-                                    valueOperation.getOperationDesc(),
-                                    loweredOperands,
-                                    valueOperation.operandCount,
-                                    loweredValue)));
-                            if (as<IRVoidType>(function->getResultType()))
-                            {
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    "semantic void return",
-                                    builder.emitReturnVoid(moduleScope.module)));
-                            }
-                            else
-                            {
-                                SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    function,
-                                    "semantic value operation return",
-                                    loweredValue));
-                            }
-                            break;
+                                    resultType,
+                                    values,
+                                    operation->operationCount,
+                                    value)));
                         }
-
-                        SLANG_UNEXPECTED("Unplanned NVVM semantic intrinsic");
+                        valueMap[inst] = value;
                     }
                     break;
 
@@ -12128,273 +11660,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 scalarRecipe,
                                 valueMap,
                                 typeContext));
-                            break;
-                        }
-
-                        if (auto textureRequirement = _findTextureOperationRequirement(
-                                requirements.textureOperations,
-                                function))
-                        {
-                            IRParam* texture = function->getFirstParam();
-                            SlangNVVMValueHandle loweredTexture = nullptr;
-                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                texture,
-                                valueMap,
-                                typeContext,
-                                loweredTexture));
-                            if (textureRequirement->outputParameterCount)
-                            {
-                                IRParam* output = texture->getNextParam();
-                                for (uint32_t i = 0; i < textureRequirement->operationCount;
-                                     ++i, output = output->getNextParam())
-                                {
-                                    SlangNVVMValueHandle loweredValue = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        textureRequirement->diagnosticName,
-                                        builder.emitTextureOperation(
-                                            moduleScope.module,
-                                            textureRequirement->operations[i],
-                                            &loweredTexture,
-                                            1,
-                                            loweredValue)));
-                                    SlangNVVMValueHandle loweredOutput = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                        codeGenContext,
-                                        builder,
-                                        moduleScope.module,
-                                        output,
-                                        valueMap,
-                                        typeContext,
-                                        loweredOutput));
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "texture dimension output store",
-                                        builder.emitStore(
-                                            moduleScope.module,
-                                            loweredValue,
-                                            loweredOutput,
-                                            4)));
-                                }
-                                if (textureRequirement->writesTrailingZero)
-                                {
-                                    SLANG_RELEASE_ASSERT(output);
-                                    SlangNVVMTypeHandle uintType = nullptr;
-                                    SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                                        cast<IRPtrTypeBase>(output->getDataType())->getValueType(),
-                                        NVVMTypeUse::Value,
-                                        uintType));
-                                    SlangNVVMValueHandle zero = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "texture array-size zero",
-                                        builder.getIntegerConstant(
-                                            moduleScope.module,
-                                            uintType,
-                                            0,
-                                            zero)));
-                                    SlangNVVMValueHandle loweredOutput = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                        codeGenContext,
-                                        builder,
-                                        moduleScope.module,
-                                        output,
-                                        valueMap,
-                                        typeContext,
-                                        loweredOutput));
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "texture array-size zero store",
-                                        builder.emitStore(
-                                            moduleScope.module,
-                                            zero,
-                                            loweredOutput,
-                                            4)));
-                                }
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    "void return",
-                                    builder.emitReturnVoid(moduleScope.module)));
-                                break;
-                            }
-
-                            if (textureRequirement->operations[0].operation ==
-                                SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL)
-                            {
-                                IRParam* location = texture->getNextParam();
-                                SlangNVVMValueHandle loweredLocation = nullptr;
-                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    location,
-                                    valueMap,
-                                    typeContext,
-                                    loweredLocation));
-
-                                const auto& operation = textureRequirement->operations[0];
-                                const uint32_t coordinateLaneCount =
-                                    (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ? 3u : 2u) +
-                                    operation.isArray;
-                                auto locationType = cast<IRVectorType>(location->getDataType());
-                                SlangNVVMTypeHandle intType = nullptr;
-                                SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                                    locationType->getElementType(),
-                                    NVVMTypeUse::Value,
-                                    intType));
-
-                                SlangNVVMValueHandle coordinateElements[3] = {};
-                                SlangNVVMValueHandle loweredLevel = nullptr;
-                                for (uint32_t lane = 0; lane <= coordinateLaneCount; ++lane)
-                                {
-                                    SlangNVVMValueHandle index = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "texture fetch location lane",
-                                        builder.getIntegerConstant(
-                                            moduleScope.module,
-                                            intType,
-                                            lane,
-                                            index)));
-                                    SlangNVVMValueHandle element = nullptr;
-                                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                        codeGenContext,
-                                        "texture fetch location extraction",
-                                        builder.emitSequentialElementExtract(
-                                            moduleScope.module,
-                                            loweredLocation,
-                                            index,
-                                            element)));
-                                    if (lane == coordinateLaneCount)
-                                        loweredLevel = element;
-                                    else
-                                        coordinateElements[lane] = element;
-                                }
-
-                                SlangNVVMTypeHandle coordinateType = nullptr;
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    "texture fetch coordinate type",
-                                    builder.getVectorType(
-                                        moduleScope.module,
-                                        intType,
-                                        coordinateLaneCount,
-                                        coordinateType)));
-                                SlangNVVMValueHandle loweredCoordinate = nullptr;
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    "texture fetch coordinate",
-                                    builder.emitVectorConstruct(
-                                        moduleScope.module,
-                                        coordinateType,
-                                        coordinateElements,
-                                        coordinateLaneCount,
-                                        loweredCoordinate)));
-
-                                SlangNVVMValueHandle loweredOperands[] = {
-                                    loweredTexture,
-                                    loweredCoordinate,
-                                    loweredLevel,
-                                };
-                                SlangNVVMValueHandle loweredValue = nullptr;
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    textureRequirement->diagnosticName,
-                                    builder.emitTextureOperation(
-                                        moduleScope.module,
-                                        operation,
-                                        loweredOperands,
-                                        SLANG_COUNT_OF(loweredOperands),
-                                        loweredValue)));
-                                SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    function,
-                                    "texture fetch value return",
-                                    loweredValue));
-                                break;
-                            }
-
-                            if (textureRequirement->operations[0].operation ==
-                                SLANG_NVVM_TEXTURE_OP_GATHER)
-                            {
-                                IRParam* coordinate = texture->getNextParam()->getNextParam();
-                                SlangNVVMValueHandle loweredCoordinate = nullptr;
-                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    coordinate,
-                                    valueMap,
-                                    typeContext,
-                                    loweredCoordinate));
-                                SlangNVVMValueHandle loweredOperands[] = {
-                                    loweredTexture,
-                                    loweredCoordinate,
-                                };
-                                SlangNVVMValueHandle loweredValue = nullptr;
-                                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                    codeGenContext,
-                                    textureRequirement->diagnosticName,
-                                    builder.emitTextureOperation(
-                                        moduleScope.module,
-                                        textureRequirement->operations[0],
-                                        loweredOperands,
-                                        SLANG_COUNT_OF(loweredOperands),
-                                        loweredValue)));
-                                SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    function,
-                                    "texture gather value return",
-                                    loweredValue));
-                                break;
-                            }
-
-                            IRParam* coordinate = texture->getNextParam()->getNextParam();
-                            IRInst* semanticOperands[] = {
-                                texture,
-                                coordinate,
-                                coordinate->getNextParam(),
-                            };
-                            SlangNVVMValueHandle loweredOperands[] = {
-                                loweredTexture,
-                                nullptr,
-                                nullptr,
-                            };
-                            for (size_t i = 1; i < SLANG_COUNT_OF(semanticOperands); ++i)
-                            {
-                                SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                                    codeGenContext,
-                                    builder,
-                                    moduleScope.module,
-                                    semanticOperands[i],
-                                    valueMap,
-                                    typeContext,
-                                    loweredOperands[i]));
-                            }
-                            SlangNVVMValueHandle loweredValue = nullptr;
-                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                                codeGenContext,
-                                textureRequirement->diagnosticName,
-                                builder.emitTextureOperation(
-                                    moduleScope.module,
-                                    textureRequirement->operations[0],
-                                    loweredOperands,
-                                    SLANG_COUNT_OF(loweredOperands),
-                                    loweredValue)));
-                            SLANG_RETURN_ON_FAIL(_emitNVVMFunctionValueReturn(
-                                codeGenContext,
-                                builder,
-                                moduleScope.module,
-                                function,
-                                "sampled texture value return",
-                                loweredValue));
                             break;
                         }
 

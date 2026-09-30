@@ -2396,6 +2396,49 @@ vector<T.Element,4> __spirvImageGatherOffset(
     int component,
     vector<int, Shape.planeDimensions> offset);
 
+// Typed resource identities keep texture provenance and coordinates intact until legalization.
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_Sample))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+T __nvvmTextureSample(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, SamplerState sampler, vector<float, Shape.dimensions+isArray> coordinate);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_SampleLevel))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+T __nvvmTextureSampleLevel(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, SamplerState sampler, vector<float, Shape.dimensions+isArray> coordinate, float level);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_TextureFetch))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+T __nvvmTextureFetch(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, vector<int, Shape.dimensions+isArray> coordinate, int level);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_TextureGather))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+vector<T.Element,4> __nvvmTextureGather(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, SamplerState sampler, vector<float, Shape.dimensions+isArray> coordinate, int component);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_TextureQuerySize))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+vector<uint,Shape.planeDimensions> __nvvmTextureQuerySize(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_ImageLoad))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+T __nvvmImageLoad(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, vector<int, Shape.dimensions+isArray> coordinate);
+
+//@hidden:
+[require(nvvm)]
+__intrinsic_op($(kIROp_ImageStore))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+void __nvvmImageStore(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture, vector<uint, Shape.dimensions+isArray> coordinate, T value);
+
 // Non-combined texture types specific functions
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
@@ -2611,6 +2654,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __requireComputeDerivative();
         __target_switch
         {
+            case nvvm:
+                return __nvvmTextureSample(this, s, location);
             case cpp:
                 __intrinsic_asm ".Sample";
             case hlsl:
@@ -2658,7 +2703,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1DLayered<int4>($0, ($2).x, int(($2).y)))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1DLayered<uint4>($0, ($2).x, int(($2).y)))";
-                        __intrinsic_asm(nvvmTextureSample) "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
+                        __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
                         if (T is float3)
                             __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2DLayered<float4>($0, ($2).x, ($2).y, int(($2).z)))";
@@ -2666,7 +2711,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2DLayered<int4>($0, ($2).x, ($2).y, int(($2).z)))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2DLayered<uint4>($0, ($2).x, ($2).y, int(($2).z)))";
-                        __intrinsic_asm(nvvmTextureSample) "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
+                        __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
                     case $(SLANG_TEXTURE_CUBE):
                         if (T is float3)
                             __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemapLayered<float4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
@@ -2674,7 +2719,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemapLayered<int4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemapLayered<uint4>($0, ($2).x, ($2).y, ($2).z, int(($2).w)))";
-                        __intrinsic_asm(nvvmTextureSample) "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
+                        __intrinsic_asm "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -2690,7 +2735,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex1D<int4>($0, ($2)))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex1D<uint4>($0, ($2)))";
-                        __intrinsic_asm(nvvmTextureSample) "tex1D<$T0>($0, ($2))";
+                        __intrinsic_asm "tex1D<$T0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
                         if (T is float3)
                             __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex2D<float4>($0, ($2).x, ($2).y))";
@@ -2698,7 +2743,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex2D<int4>($0, ($2).x, ($2).y))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex2D<uint4>($0, ($2).x, ($2).y))";
-                        __intrinsic_asm(nvvmTextureSample) "tex2D<$T0>($0, ($2).x, ($2).y)";
+                        __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
                         if (T is float3)
                             __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(tex3D<float4>($0, ($2).x, ($2).y, ($2).z))";
@@ -2706,7 +2751,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(tex3D<int4>($0, ($2).x, ($2).y, ($2).z))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(tex3D<uint4>($0, ($2).x, ($2).y, ($2).z))";
-                        __intrinsic_asm(nvvmTextureSample) "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                        __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
                         if (T is float3)
                             __intrinsic_asm "_slang_vector_reshape<float, 3, float, 4>(texCubemap<float4>($0, ($2).x, ($2).y, ($2).z))";
@@ -2714,7 +2759,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                             __intrinsic_asm "_slang_vector_reshape<int, 3, int, 4>(texCubemap<int4>($0, ($2).x, ($2).y, ($2).z))";
                         if (T is uint3)
                             __intrinsic_asm "_slang_vector_reshape<uint, 3, uint, 4>(texCubemap<uint4>($0, ($2).x, ($2).y, ($2).z))";
-                        __intrinsic_asm(nvvmTextureSample) "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                        __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -3787,6 +3832,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     {
         __target_switch
         {
+            case nvvm:
+                return __nvvmTextureSampleLevel(this, s, location, level);
             case cpp:
                 __intrinsic_asm ".SampleLevel";
             case hlsl:
@@ -4548,6 +4595,11 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow && !isCombined) { $}
+        case nvvm:
+            // CUDA's gather offset overload intentionally has the same operation as no offset.
+            return __nvvmTextureGather(this, s, location $(componentArg));
+        ${ } $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
@@ -4596,6 +4648,11 @@ $}
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
                 "Gather is supported only for 2D and 3D textures");
             __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
+        ${ if (!isShadow && !isCombined) { $}
+        case nvvm:
+            // CUDA's gather offset overload intentionally has the same operation as no offset.
+            return __nvvmTextureGather(this, s, location $(componentArg));
+        ${ } $}
         case cuda:
             // CUDA tex2Dgather doesn't support offset - ignore offset parameter
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
@@ -4712,6 +4769,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
+        case nvvm:
+            return __nvvmTextureFetch(this, __vectorReshape<Shape.dimensions+isArray>(location),
+                location[Shape.dimensions+isArray]);
         case cpp:
         case hlsl:
             __intrinsic_asm ".Load";
@@ -5244,6 +5304,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
     {
         __target_switch
         {
+            case nvvm:
+                return __nvvmImageLoad(this, location);
             case cpp:
             case hlsl:
                 __intrinsic_asm ".Load";
@@ -5257,7 +5319,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     case $(SLANG_TEXTURE_1D):
                         __intrinsic_asm "surf1DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm(nvvmSurfaceLoad) "surf2DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf2DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_3D):
                         __intrinsic_asm "surf3DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
                     default:
@@ -5269,11 +5331,11 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm(nvvmSurfaceLoad) "surf1Dread$C<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf1Dread$C<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm(nvvmSurfaceLoad) "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm(nvvmSurfaceLoad) "surf3Dread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf3Dread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -5425,6 +5487,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
     {
         __target_switch
         {
+            case nvvm:
+                __nvvmImageStore(this, location, newValue);
+                return;
             case cpp:
             case hlsl:
                 __intrinsic_asm ".operator[]";
@@ -5450,11 +5515,11 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm(nvvmSurfaceStore) "surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf1Dwrite$C<$T0>($2, $0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm(nvvmSurfaceStore) "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf2Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm(nvvmSurfaceStore) "surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                        __intrinsic_asm "surf3Dwrite$C<$T0>($2, $0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }

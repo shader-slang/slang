@@ -882,5 +882,9 @@ return {
 	["Decoration.nvvmSemantic"] = 906,
 	["NVVMSurfaceLoad"] = 907,
 	["NVVMSurfaceStore"] = 908,
-	["waveGetConvergedMask"] = 909
+	["waveGetConvergedMask"] = 909,
+	["sampleLevel"] = 910,
+	["textureFetch"] = 911,
+	["textureGather"] = 912,
+	["textureQuerySize"] = 913
 }

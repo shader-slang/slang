@@ -72,7 +72,8 @@ public:
         const String& spirvRWDefault,
         const String& spirvCombined,
         const String& metal,
-        const String& wgsl);
+        const String& wgsl,
+        const String& nvvm);
     void writeFuncWithSig(
         const char* funcName,
         const String& sig,
@@ -83,7 +84,8 @@ public:
         const String& cuda = String{},
         const String& metal = String{},
         const String& wgsl = String{},
-        const ReadNoneMode readNoneMode = ReadNoneMode::Never);
+        const ReadNoneMode readNoneMode = ReadNoneMode::Never,
+        const String& nvvm = String{});
     void writeFunc(
         const char* returnType,
         const char* funcName,
@@ -95,7 +97,8 @@ public:
         const String& cuda = String{},
         const String& metal = String{},
         const String& wgsl = String{},
-        const ReadNoneMode readNoneMode = ReadNoneMode::Never);
+        const ReadNoneMode readNoneMode = ReadNoneMode::Never,
+        const String& nvvm = String{});
 
     // A pointer to a string representing the current level of indentation
     const char* i;

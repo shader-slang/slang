@@ -14,4 +14,4 @@ void computeMain()
     outputBuffer[0] = inputTexture.SampleLevel(samplerState, float2(0.0f), 0.0f);
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=tex2DLod<$T0>($0, ($2).x, ($2).y, ($3)), signature=vector<float,3>(Texture2D, SamplerState, vector<float,2>, float)'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'sampleLevel'

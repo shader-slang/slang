@@ -1529,7 +1529,7 @@ local insts = {
 			{
 				nvvmIntrinsic = {
 					struct_name = "NVVMIntrinsic",
-					-- A legalized NVVM intrinsic carries a semantic ID followed by source operands.
+					-- Retired prototype slot retained for decoding; no new producer emits it.
 					min_operands = 1,
 				},
 			},
@@ -1652,6 +1652,12 @@ local insts = {
 	{ waveMaskMatch = { operands = { { "mask" }, { "value" } } } },
 	-- Texture sampling operation of the form `t.Sample(s,u)`
 	{ sample = { operands = { { "texture" }, { "sampler" }, { "coord" } } } },
+	-- Explicit mip sampling, integer texel fetch, and ordinary component gather.
+	{ sampleLevel = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "level" } } } },
+	{ textureFetch = { operands = { { "texture" }, { "coord" }, { "level" } } } },
+	{ textureGather = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "component" } } } },
+	-- Base spatial extents as uint/uint2/uint3; array layers are not part of this result.
+	{ textureQuerySize = { operands = { { "texture" } } } },
 	{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } },
 	{ GroupMemoryBarrierWithGroupSync = {} },
 	{ ControlBarrier = {} },
@@ -1809,6 +1815,7 @@ local insts = {
 			{
 				nvvmSemantic = {
 					struct_name = "NVVMSemanticDecoration",
+					-- Retired metadata slot retained to preserve serialized instruction layouts.
 					operands = { { "semanticOperand", "IRIntLit" } },
 				},
 			},

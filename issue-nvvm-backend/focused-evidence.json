@@ -75580,6 +75580,219 @@
         "Current NVVM arithmetic fold order is preserved; no general numerical agreement with a different CUDA reduction tree is claimed.",
         "Module43/providerABI46/container2 unchanged; stale prototype modules may require rebuilding."
       ]
+    },
+    "nvvm-core-resources": {
+      "status": "accepted-focused",
+      "scope": "Core sampling/fetch/gather/base-size and logical surface operations replace five CUDA-text texture recognizers and the final three semantic tags. Four genuine stable IR IDs910-913 appended. Active tag parser/lowering/legalizer routes and unused mapping header removed; serialized AST/IR slots preserved. Direct RWTexture2DArray.Store now reaches the same existing native32 surface path as subscripting.",
+      "compiler_identity": {
+        "revision": "4f25d04719c325883eb099fba40db913ea557d90",
+        "compiler_patch_sha256": "31cbb06b5c504bb7c82f8034151af68f4d502c9e06632c6db795c802a182a0e0",
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "module_version": 43,
+        "provider_abi": 46,
+        "container_version": 2,
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "8dd20910c265cef8c02be364502994d22e559b5d91de3928c96437273e5e4ff3",
+          "source/slang/slang-ast-stmt.h": "972b0ff9e8a9c4c9bf730712d883b7666d6922591adb79fd12fe5899a49652ff",
+          "source/slang/slang-core-module-textures.cpp": "88ee3b20b33fd76b9c4893d1c79caa722efb8c03e803081058933875ef53add0",
+          "source/slang/slang-core-module-textures.h": "b86c6b419014eca8493576dca4f8ef1d7c91748a50e82f611dfa663b7a556b1e",
+          "source/slang/slang-emit-nvvm-plan.h": "920f4d54c1f884eb30cbeea75c7aa8893af2f2921ee43bb4c19fd0c518f2d876",
+          "source/slang/slang-emit-nvvm.cpp": "0946f0a648e7e874c65844fc4483db1a2a2285cdfc7f14254301830483a33dfb",
+          "source/slang/slang-ir-insts-stable-names.cpp": "3dfc2039b82baf637593e8e41b0317e851bb70a843c4aef98d65492fa3b364d2",
+          "source/slang/slang-ir-insts-stable-names.lua": "7ec3d09673e4aa2ebebc490e1b74bc7d0f5d065ea8a2b90290c263a8d12849cc",
+          "source/slang/slang-ir-insts.lua": "50236a7c4dc685e699475a708497fdfbc7f9591d079e8efb02f0c1ecde7c3f75",
+          "source/slang/slang-ir-nvvm-legalize.cpp": "426fb2b51a364a1cc2de7f3792997fe9ee75d023dbb2bc2fd4363993a514bc4c",
+          "source/slang/slang-ir-nvvm-surface-legalize.cpp": "7c8fb107d44f17f81bcae6cf860d71684dd387bdc929910d446e64b007d1c23d",
+          "source/slang/slang-lower-to-ir.cpp": "f685ec3cb85e47e9b0263c645c959a00c673c1c1a674df78e098b8bf164cf877",
+          "source/slang/slang-nvvm-intrinsic-semantics.h": null,
+          "source/slang/slang-parser.cpp": "e36a83f8c35e84ba9b6cd4b001cd950d55608e1d9d855b573f42625953ccdbf2"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "9b38d177c52188f963504fc263083f99872252f766fe592d1ead45ff4a502426",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "2370ff698d2de3a3e326b716c6dbed157dc5f363bf7dd13ba17204488f9a5008",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "a8fd827876dc5995e82b29d638e0c3e7fb83dc901b23eefd3e690bd5f52498fe",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b"
+      },
+      "validation": {
+        "builds": [
+          {
+            "path": "build/nvvm-core-resources/build-production.json",
+            "sha256": "60b94275649433fc5fe675fe4e58cc9ec906fef777ff4f72760a614ddbf178d6",
+            "return_code": 0,
+            "elapsed_seconds": 323.27948474884033
+          },
+          {
+            "path": "build/nvvm-core-resources/build-tests.json",
+            "sha256": "2a89a5a78ae559db8acb43d487e5dd7172968a940b9bbf4e9f64aa5bf4691863",
+            "return_code": 0,
+            "elapsed_seconds": 22.48829746246338
+          }
+        ],
+        "units": {
+          "passed": 7,
+          "outcomes": [
+            "slang-unit-test-tool/nvvmSlangImplicitTextureSamplesUseProducerSemantics.internal",
+            "slang-unit-test-tool/nvvmSlangTexture2DGathersUseOneTypedOperationFamily.internal",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation.internal",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal",
+            "slang-unit-test-tool/nvvmSlangResourceOperationsUseTypedInstructions.internal",
+            "slang-unit-test-tool/nvvmSlangNamedIntegerIntrinsicsPreserveExplicitOperands.internal",
+            "slang-unit-test-tool/nvvmSlangResourceLegacyRoutesRejectBeforeOutput.internal"
+          ],
+          "record": {
+            "path": "build/nvvm-core-resources/units.json",
+            "sha256": "276b343a9f9ee33f990d54664db433bd0b171aa648a9dd155de4aff0d93b9624",
+            "return_code": 0,
+            "elapsed_seconds": 3.3987810611724854
+          }
+        },
+        "texture_runtime": {
+          "nvvm_passed": 7,
+          "outcomes": [
+            "tests/compute/texture-simple.slang.6 (cuda)",
+            "tests/cuda/cuda-texture.slang.2 (cuda)",
+            "tests/cuda/cuda-texture.slang.3 (cuda)",
+            "tests/cuda/nvvm-texture-descriptor-conversion.slang.1 (cuda)",
+            "tests/cuda/nvvm-texture-descriptor-conversion.slang.2 (cuda)",
+            "tests/cuda/nvvm-texture-dimensions.slang.1 (cuda)",
+            "tests/cuda/nvvm-texture-dimensions.slang.2 (cuda)"
+          ],
+          "record": {
+            "path": "build/nvvm-core-resources/smoke.json",
+            "sha256": "f229f700c1c06a3e8bfd8acaabcf3299ddccceff3eb95c451a395ef7efcedb47",
+            "return_code": 0,
+            "elapsed_seconds": 5.55150032043457
+          },
+          "policy": "Existing NVVM cells only; unchanged accepted NVRTC controls reused."
+        },
+        "compile": {
+          "gather_ptx_passed": 2,
+          "gather_ptx_outcomes": [
+            "tests/hlsl-intrinsic/texture-2d-gather-element-type.slang.2",
+            "tests/hlsl-intrinsic/texture-2d-gather-element-type.slang.3"
+          ],
+          "diagnostic_passed": 6,
+          "diagnostic_outcomes": [
+            "tests/cuda/nvvm-formatted-surface-provenance.slang",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang",
+            "tests/cuda/nvvm-native-float-surface-unsupported.slang",
+            "tests/cuda/nvvm-sampled-texture-unsupported.slang",
+            "tests/cuda/nvvm-texture-fetch-unsupported.slang",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang.1"
+          ],
+          "records": [
+            {
+              "path": "build/nvvm-core-resources/compile.json",
+              "sha256": "9ee795e6628aa73f1c5bab7e9bbe6e0d7c09a7d03a3abd2c27a00607d757e544",
+              "return_code": 1,
+              "elapsed_seconds": 1.6668221950531006
+            },
+            {
+              "path": "build/nvvm-core-resources/compile-retry.json",
+              "sha256": "dd48c029868343b7a4af86328b392ecb98637a7dc99230b2bdab64e45f9ca101",
+              "return_code": 0,
+              "elapsed_seconds": 1.4351387023925781
+            }
+          ],
+          "reuse": "All seven initial successes reused; only the stale array diagnostic expectation rerun."
+        },
+        "surfaces": {
+          "passed": 4,
+          "cells": [
+            {
+              "case": "float32-2d-4-wholeStore",
+              "mode": "nvvm-o0",
+              "status": "passed",
+              "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+              "ptx_sha256": "32d6297ecc4ffcedeb82e3b50b9fac419b82804ee01c13285d03da5a4a323370",
+              "oracle_sha256": "65901d3329304a01758a4bd5e1740fe1146b491f7edadf896c1dea2b15c74e68"
+            },
+            {
+              "case": "float32-2d-4-wholeStore",
+              "mode": "nvvm-o3",
+              "status": "passed",
+              "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+              "ptx_sha256": "1622e119ed969457551eba212e2f7a51e472ad00fb46cfba02d02438f37335e5",
+              "oracle_sha256": "65901d3329304a01758a4bd5e1740fe1146b491f7edadf896c1dea2b15c74e68"
+            },
+            {
+              "case": "half-2d-4-componentStore",
+              "mode": "nvvm-o0",
+              "status": "passed",
+              "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+              "ptx_sha256": "5d9f5dbb8253f18b3e57959cf2cca350433c16f1d19dcdeac243027823188d56",
+              "oracle_sha256": "37b0e07d82a86d419e0cc1dd215c5c52fb4dd8cf13345dd8ebc82c9f86548c53"
+            },
+            {
+              "case": "half-2d-4-componentStore",
+              "mode": "nvvm-o3",
+              "status": "passed",
+              "source_sha256": "ef6c31abe2f71232f19e27fc44c75399c1fd3ac1dde61d56fca59f714d2d6590",
+              "ptx_sha256": "9927bbd6a80da8096b893dd7212f0dca5f48aeaa0d100c7c84ab9776d6c6cc6e",
+              "oracle_sha256": "37b0e07d82a86d419e0cc1dd215c5c52fb4dd8cf13345dd8ebc82c9f86548c53"
+            }
+          ],
+          "record": {
+            "path": "build/nvvm-core-resources/surfaces.json",
+            "sha256": "4805795d6fa927db4ceb4c6c1bf0286a98ae5ec961563ded2087ac442a6af817",
+            "return_code": 0,
+            "elapsed_seconds": 5.479383707046509
+          },
+          "results_path": "build/nvvm-core-resources/surface-results/results.json",
+          "results_sha256": "2e9e768180572bdbf515cac74c2f8ea19a2d6dbd3ce69de5ca773b362b5d77b5",
+          "semantic_contract": "RN-even finite Half conversions; converted NaN class only; untouched bits exact"
+        },
+        "initial_test_source_sha256": {
+          "tests/cuda/nvvm-formatted-surface-provenance.slang": "b9af155037037155011e89869d023a1a83a6b1f8b99e1089c9153d9f92105354",
+          "tests/cuda/nvvm-native-float-surface-unsupported.slang": "2e926c6265d88e4f24e035c8270ad5a9b82763f8ef6f1df7205a8a550d119f5c",
+          "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "dd9f3c4af398a7c25f02e7f2d12d8fd78be5bda2f080563d1cd5f102f0329d47",
+          "tests/cuda/nvvm-sampled-texture-unsupported.slang": "314ce8fc696983d1a403ebdad71f51ffc17e5f0628acbe105a09a9f58ad0c27d",
+          "tests/cuda/nvvm-texture-fetch-unsupported.slang": "ebb3bf5973f9c77695def5b51574964cab435131b3a40f5b0e82fded49d1d637",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "0cf618d960420824b17cc67d7e0b49809dcb23724e97eaa8ab42b69e3fdc927c"
+        },
+        "final_test_source_sha256": {
+          "tests/cuda/nvvm-formatted-surface-provenance.slang": "b9af155037037155011e89869d023a1a83a6b1f8b99e1089c9153d9f92105354",
+          "tests/cuda/nvvm-native-float-surface-unsupported.slang": "2e926c6265d88e4f24e035c8270ad5a9b82763f8ef6f1df7205a8a550d119f5c",
+          "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "2897facb3a6ec14cfd6d12f138aa844d8987427d07be78cc1bae3e8e13f8587b",
+          "tests/cuda/nvvm-sampled-texture-unsupported.slang": "314ce8fc696983d1a403ebdad71f51ffc17e5f0628acbe105a09a9f58ad0c27d",
+          "tests/cuda/nvvm-texture-fetch-unsupported.slang": "ebb3bf5973f9c77695def5b51574964cab435131b3a40f5b0e82fded49d1d637",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "0cf618d960420824b17cc67d7e0b49809dcb23724e97eaa8ab42b69e3fdc927c"
+        }
+      },
+      "validation_incidents": [
+        {
+          "id": "unsupported-1d-array-diagnostic-location",
+          "status": "resolved",
+          "failure": {
+            "path": "build/nvvm-core-resources/compile.json",
+            "sha256": "9ee795e6628aa73f1c5bab7e9bbe6e0d7c09a7d03a3abd2c27a00607d757e544",
+            "return_code": 1,
+            "elapsed_seconds": 1.6668221950531006
+          },
+          "resolution": {
+            "path": "build/nvvm-core-resources/compile-retry.json",
+            "sha256": "dd48c029868343b7a4af86328b392ecb98637a7dc99230b2bdab64e45f9ca101",
+            "return_code": 0,
+            "elapsed_seconds": 1.4351387023925781
+          },
+          "failed_outcomes": [
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang.1"
+          ],
+          "cause": "Canonical ImageLoad inlines the old helper, so validation first rejects the unsupported collected Texture1DArray field address instead of a helper parameter.",
+          "fix": "Update exact full pointer-shape diagnostic only; retain rejection, production binaries and all successful checks."
+        }
+      ],
+      "limitations": [
+        "No full campaign, new oracle, broad surface matrix or fresh NVRTC control campaign. Gather evidence is compile/PTX only; surface execution covers exactly two existing cases at O0/O3.",
+        "Provider behavior/admission unchanged except the natural direct 2D-array Store API path; unsupported formats/shapes and surface provenance remain guarded.",
+        "The inherited signed16 abs INT_MIN O3 normalization failure remains active under nvvm-core-values-and-atomics; this is not an all-pass repository checkpoint.",
+        "Module43/ABI46/container2 unchanged; old same-version prototype modules may need recompilation."
+      ]
     }
   }
 }

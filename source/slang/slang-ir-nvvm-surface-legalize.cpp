@@ -3,7 +3,6 @@
 #include "slang-emit-nvvm-type-lowering.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
-#include "slang-nvvm-intrinsic-semantics.h"
 
 namespace Slang
 {
@@ -126,40 +125,6 @@ void emitPhysicalStore(
     builder.emitIntrinsicInst(builder.getVoidType(), kIROp_NVVMSurfaceStore, 3, operands);
 }
 
-// Accepts only the body owned by an intrinsic producer: parameters followed by its tagged
-// terminator, optionally reached through one empty entry branch. Replacing a helper call must not
-// discard additional instructions or effects merely because its last instruction carries a tag.
-NVVMIntrinsicSemantic getSurfaceHelperSemantic(IRFunc* function)
-{
-    if (!function)
-        return 0;
-    IRBlock* entry = function->getFirstBlock();
-    if (!entry)
-        return 0;
-    IRBlock* intrinsicBlock = entry;
-    if (auto branch = as<IRUnconditionalBranch>(entry->getTerminator()))
-    {
-        if (entry->getFirstOrdinaryInst() != branch || branch->getArgCount() != 0)
-            return 0;
-        intrinsicBlock = branch->getTargetBlock();
-        if (entry->getNextBlock() != intrinsicBlock || intrinsicBlock->getNextBlock())
-            return 0;
-    }
-    else if (entry->getNextBlock())
-        return 0;
-    auto assembly = as<IRGenericAsm>(intrinsicBlock->getTerminator());
-    if (!assembly || intrinsicBlock->getFirstOrdinaryInst() != assembly ||
-        assembly->getOperandCount() != 1)
-        return 0;
-    auto semantic = assembly->findDecoration<IRNVVMSemanticDecoration>();
-    if (!semantic)
-        return 0;
-    auto value = cast<IRIntLit>(semantic->getSemanticOperand())->getValue();
-    return value == kNVVMIntrinsicSemanticSurfaceLoad || value == kNVVMIntrinsicSemanticSurfaceStore
-               ? NVVMIntrinsicSemantic(value)
-               : 0;
-}
-
 // Rewrites a complete logical texel read or write at its use site, where the static format is
 // known. Two calls of the same intrinsic may therefore access differently formatted surfaces.
 bool legalizeWholeAccess(
@@ -275,39 +240,6 @@ void legalizeNVVMSurfaceOperations(IRModule* module)
                 IRInst* next = inst->getNextInst();
                 switch (inst->getOp())
                 {
-                case kIROp_Call:
-                    {
-                        auto call = cast<IRCall>(inst);
-                        auto callee = as<IRFunc>(call->getCallee());
-                        auto semantic = getSurfaceHelperSemantic(callee);
-                        bool isLoad = semantic == kNVVMIntrinsicSemanticSurfaceLoad;
-                        UInt expectedCount = isLoad ? 2 : 3;
-                        bool matchesSignature =
-                            semantic && call->getArgCount() == expectedCount &&
-                            callee->getParamCount() == expectedCount &&
-                            isTypeEqual(call->getDataType(), callee->getResultType()) &&
-                            (isLoad || as<IRVoidType>(callee->getResultType()));
-                        if (matchesSignature)
-                        {
-                            for (UInt i = 0; i < expectedCount; ++i)
-                                matchesSignature &= isTypeEqual(
-                                    call->getArg(i)->getDataType(),
-                                    callee->getParamType(i));
-                            IRType* coordinateScalar = getIRVectorBaseType(callee->getParamType(1));
-                            matchesSignature &= isLoad ? isNVVMSignedI32Type(coordinateScalar)
-                                                       : isNVVMUnsignedI32Type(coordinateScalar);
-                        }
-                        if (matchesSignature)
-                        {
-                            legalizeWholeAccess(
-                                builder,
-                                inst,
-                                call->getArg(0),
-                                call->getArg(1),
-                                isLoad ? nullptr : call->getArg(2));
-                        }
-                    }
-                    break;
                 case kIROp_ImageLoad:
                 case kIROp_ImageStore:
                     {

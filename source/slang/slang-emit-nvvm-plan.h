@@ -360,14 +360,12 @@ struct NVVMSurfaceOperationRequirement
 
 struct NVVMTextureOperationRequirement
 {
-    IRFunc* function = nullptr;
-    IRParam* texture = nullptr;
-    IRParam* coordinate = nullptr;
-    IRParam* level = nullptr;
+    IRInst* source = nullptr;
+    IRInst* texture = nullptr;
+    IRInst* coordinate = nullptr;
+    IRInst* level = nullptr;
     SlangNVVMTextureOperationDesc operations[3] = {};
     uint32_t operationCount = 0;
-    uint32_t outputParameterCount = 0;
-    bool writesTrailingZero = false;
     const char* diagnosticName = nullptr;
 };
 

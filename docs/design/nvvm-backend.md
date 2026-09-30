@@ -114,7 +114,7 @@ addition, without CUDA bounded atomicInc semantics. Private pointers and unsuppo
 reject before emission. Float32 ByteAddress add and UInt64 compare-exchange reuse existing typed
 structured views at naturally aligned offsets, retaining low-address calculation, expected/desired
 operand order and the old-result store. Nine old reduction tags and two ByteAddress text recipes
-are removed; reserved semantic holes keep the surviving surface operation identities stable.
+are removed; reserved semantic holes retain their historical numeric identity.
 
 NVVM `asfloat16`/`asuint16` use ordinary bit casts; `f16tof32` truncates to unsigned low 16 bits,
 decodes Half and widens, while `f32tof16` narrows once, reinterprets as uint16 and zero-extends.
@@ -303,18 +303,18 @@ not currently propagate transitive LLVM convergence metadata. Direct intrinsic a
 bounded helper behavior are distinct contracts; arbitrary control-flow transformations across
 nested helpers remain outside that qualification.
 
-| Boundary                               | Owner and responsibility                                                                                                                                                            |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                                |
-| Physical surface IR                    | [slang-ir-nvvm-surface-legalize.cpp](../../source/slang/slang-ir-nvvm-surface-legalize.cpp): static storage types, conversion, component masks and byte-X coordinates               |
-| NVVM-ready IR                          | [slang-ir-nvvm-legalize.cpp](../../source/slang/slang-ir-nvvm-legalize.cpp): `legalizeIRForNVVM`, typed intrinsic normalization, layout queries, selected bounds policy and cleanup |
-| Type and representation classification | [slang-emit-nvvm-type-lowering.cpp](../../source/slang/slang-emit-nvvm-type-lowering.cpp): `NVVMTypeInfo`, use-specific provider types and caches                                   |
-| Preflight and provider emission        | [slang-emit-nvvm.cpp](../../source/slang/slang-emit-nvvm.cpp): reachable functions, exact operations/signatures, addresses, layout proofs, diagnostics and emitted operations       |
-| Immutable plan                         | [slang-emit-nvvm-plan.h](../../source/slang/slang-emit-nvvm-plan.h): owned recipes and checked instruction index                                                                    |
-| Semantic operation authority           | [slang-nvvm-semantic-catalog.h](../../source/compiler-core/slang-nvvm-semantic-catalog.h): typed operation and overload contracts                                                   |
-| Provider interface                     | [slang-nvvm-ir-builder-api.h](../../source/compiler-core/slang-nvvm-ir-builder-api.h) and builder facade: exact version negotiation and opaque handles                              |
-| Physical LLVM construction             | [slang-llvm-nvvm.cpp](../../source/slang-llvm-nvvm/slang-llvm-nvvm.cpp): LLVM 14 typed pointers, NVVM metadata, generic instructions and qualified recipes                          |
-| Vendor compiler lifecycle              | [slang-nvvm-compiler.cpp](../../source/compiler-core/slang-nvvm-compiler.cpp): coherent toolkit discovery, verification, compilation and diagnostics                                |
+| Boundary                               | Owner and responsibility                                                                                                                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                          |
+| Physical surface IR                    | [slang-ir-nvvm-surface-legalize.cpp](../../source/slang/slang-ir-nvvm-surface-legalize.cpp): static storage types, conversion, component masks and byte-X coordinates         |
+| NVVM-ready IR                          | [slang-ir-nvvm-legalize.cpp](../../source/slang/slang-ir-nvvm-legalize.cpp): `legalizeIRForNVVM`, layout queries, selected bounds policy and cleanup                          |
+| Type and representation classification | [slang-emit-nvvm-type-lowering.cpp](../../source/slang/slang-emit-nvvm-type-lowering.cpp): `NVVMTypeInfo`, use-specific provider types and caches                             |
+| Preflight and provider emission        | [slang-emit-nvvm.cpp](../../source/slang/slang-emit-nvvm.cpp): reachable functions, exact operations/signatures, addresses, layout proofs, diagnostics and emitted operations |
+| Immutable plan                         | [slang-emit-nvvm-plan.h](../../source/slang/slang-emit-nvvm-plan.h): owned recipes and checked instruction index                                                              |
+| Semantic operation authority           | [slang-nvvm-semantic-catalog.h](../../source/compiler-core/slang-nvvm-semantic-catalog.h): typed operation and overload contracts                                             |
+| Provider interface                     | [slang-nvvm-ir-builder-api.h](../../source/compiler-core/slang-nvvm-ir-builder-api.h) and builder facade: exact version negotiation and opaque handles                        |
+| Physical LLVM construction             | [slang-llvm-nvvm.cpp](../../source/slang-llvm-nvvm/slang-llvm-nvvm.cpp): LLVM 14 typed pointers, NVVM metadata, generic instructions and qualified recipes                    |
+| Vendor compiler lifecycle              | [slang-nvvm-compiler.cpp](../../source/compiler-core/slang-nvvm-compiler.cpp): coherent toolkit discovery, verification, compilation and diagnostics                          |
 
 `legalizeIRForNVVM` runs after common linking and late bitcast normalization. It folds CUDA layout
 queries, removes the canonical read-none `unmodified` check, discharges the selected CUDA derivative
@@ -324,12 +324,19 @@ this does not authorize escaping lane references.
 `SLANG_ENABLE_BOUND_ZERO_INDEX` must become typed compare/select arithmetic because the direct route
 does not preprocess the CUDA prelude. It preserves each access's own resource extent and index type.
 
-Remaining fixed standard-library producers carry typed NVVM intrinsic identities, which legalization consumes
-as `IRNVVMIntrinsic`. The catalog does not infer these semantics from arbitrary CUDA source text.
-Surface helpers carry load/store semantic tags and are rewritten per call while static field formats
-and component masks are available. Some richer texture and scalar-out-parameter helpers still have exact
-whole-body/signature recognizers. `RequirePrelude`, arbitrary GenericAsm and standalone execution
-requirements are not general no-ops; their meaning must be owned before they can be removed.
+Core resource producers use existing `Sample`, `ImageLoad` and `ImageStore` operations plus
+`SampleLevel`, `TextureFetch`, `TextureGather` and `TextureQuerySize`. Texture preflight keys each
+requirement by its instruction and validates the resource, sampler, coordinates and result before
+using the existing provider descriptors. Core splits packed fetch coordinates, assigns dimension
+outputs in order and preserves CUDA's ignored gather offsets and zero array-count output. No
+resource operation depends on a CUDA spelling or whole-helper recognizer.
+
+The semantic-tag extension has no active producer, parser acceptance, lowering table or legalization
+route. Its serialized AST token field and stable IR terminator/decoration slots remain reserved so
+module 43 layout does not change; old tagged source or decoded tokens diagnose rather than revive
+those semantics. Ordinary comma-separated intrinsic-assembly arguments and named calls remain.
+Scalar pointer-output helpers and CUDA layout queries retain their separately bounded recognizers.
+`RequirePrelude`, arbitrary GenericAsm and standalone execution requirements are not general no-ops.
 
 A shared producer fix belongs before this boundary when its IR shape or semantics are wrong. For
 example, aggregate receiver snapshots must be established before deferred buffer loading. Flattening
@@ -660,9 +667,9 @@ RGBA32Sint bindings pass. Shader reads through the same access convention can co
 The original texture-subscript corpus result is a shader self-check, not packed-format qualification.
 
 `legalizeNVVMSurfaceOperations` runs only for direct NVVM, after specialization and global-parameter
-collection, before shared image-subscript expansion would discard component masks. It rewrites tagged
-standard-library helper calls at each use, using the format decoration on the canonical collected
-field. Equal logical types may therefore access different static formats in the same shader. Arbitrary
+collection, before shared image-subscript expansion would discard component masks. It rewrites logical
+image loads/stores and component updates at each use, using the format decoration on the canonical
+collected field. Equal logical types may therefore access different static formats in the same shader. Arbitrary
 user-helper resource parameters still lack authoritative format provenance and remain unsupported.
 
 `NVVMSurfaceLoad` and `NVVMSurfaceStore` carry physical payload types and byte-X coordinates; other
@@ -693,7 +700,18 @@ Static format annotations and matching runtime allocations are required. This pa
 formats from an opaque handle, test values, comments, or arbitrary caller graphs. Packed/normalized
 formats and generic runtime format conversion remain outside the current contract.
 
-**Texture queries.** Selected non-mip geometry has direct lowering. Full mip, array-count and
+**Typed texture operations.** Sample/SampleLevel preserve Float32 scalar/vector2/vector4 sampling
+and existing shape admission. Fetch retains 2D/3D/2D-array integer coordinates and a separate mip.
+Ordinary 2D gather retains constant component selection and four result lanes; its offset overload
+continues to ignore the offset as CUDA does. Samplers stay typed and validated even though CUDA
+texture objects own sampling state. Direct `RWTexture2DArray.Store` now reaches the same supported
+native32 physical operation already available through canonical image stores; no provider shape
+or Half-array admission changes.
+
+**Texture queries.** `TextureQuerySize` returns base spatial extents as uint/uint2/uint3; core
+GetDimensions assigns signed/unsigned output parameters and writes the existing array-count zero.
+Float-output, mip, MS and 1D-array query variants are not newly admitted. Selected non-mip geometry
+has direct lowering. Full mip, array-count and
 allocated/view-level-count semantics remain unresolved. CUDA source helpers ignore requested mip and
 write zero for some counts. A length-one declared cube array may bind a nonlayered cube. Texture and
 surface handles refer to different resources/mip contracts; opaque handle internals are not metadata.

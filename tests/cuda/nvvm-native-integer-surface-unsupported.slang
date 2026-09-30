@@ -12,7 +12,7 @@ void int3Main(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = int3Texture[int2(dispatchThreadID.xy)].x;
 }
 
-//INT3: direct NVVM lowering does not support Slang IR instruction or shape 'nvvmIntrinsic'
+//INT3: direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'
 
 // A 1D array has no selected NVVM surface row. Preflight must reject its resource type instead of
 // inferring an operation from the three-coordinate spelling used by unrelated shapes.
@@ -27,4 +27,4 @@ void arrayMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = arrayTexture[int2(dispatchThreadID.xy)].x;
 }
 
-//ARRAY: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Texture1DArray'
+//ARRAY: direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture1DArray, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'

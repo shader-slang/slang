@@ -21,4 +21,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = readThroughHelper(inputTexture, int2(dispatchThreadID.xy));
 }
 
-//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'nvvmIntrinsic'
+//CHECK: direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'

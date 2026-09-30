@@ -41,7 +41,6 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
-#include "slang-nvvm-intrinsic-semantics.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -52,40 +51,6 @@
 
 namespace Slang
 {
-
-namespace
-{
-
-struct NVVMIntrinsicAsmSemanticName
-{
-    const char* name;
-    NVVMIntrinsicSemantic semantic;
-};
-
-// These names are compiler-internal source-module vocabulary. They identify an operation rather
-// than a CUDA spelling, so target specialization may retain semantic intent independently of text.
-static const NVVMIntrinsicAsmSemanticName kNVVMIntrinsicAsmSemanticNames[] = {
-    {"nvvmTextureSample", kNVVMIntrinsicSemanticTextureSample},
-    {"nvvmSurfaceLoad", kNVVMIntrinsicSemanticSurfaceLoad},
-    {"nvvmSurfaceStore", kNVVMIntrinsicSemanticSurfaceStore},
-};
-
-bool _findNVVMIntrinsicAsmSemantic(
-    const UnownedStringSlice& name,
-    NVVMIntrinsicSemantic& outSemantic)
-{
-    for (const auto& entry : kNVVMIntrinsicAsmSemanticNames)
-    {
-        if (name == UnownedStringSlice(entry.name))
-        {
-            outSemantic = entry.semantic;
-            return true;
-        }
-    }
-    return false;
-}
-
-} // namespace
 
 // This file implements lowering of the Slang AST to a simpler SSA
 // intermediate representation.
@@ -9638,28 +9603,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 args.add(getSimpleVal(context, argVal));
             }
         }
-        IRInst* genericAsm = builder->emitIntrinsicInst(
+        if (stmt->semanticToken.type != TokenType::Unknown)
+        {
+            context->getSink()->diagnose(Diagnostics::UnknownIntrinsicAsmSemantic{
+                .semanticName = stmt->semanticToken.getContent(),
+                .location = stmt->semanticToken.loc});
+            return;
+        }
+        builder->emitIntrinsicInst(
             nullptr,
             kIROp_GenericAsm,
             args.getCount(),
             args.getArrayView().getBuffer());
-        if (stmt->semanticToken.type != TokenType::Unknown)
-        {
-            NVVMIntrinsicSemantic semantic = 0;
-            const bool hasKnownSemantic =
-                _findNVVMIntrinsicAsmSemantic(stmt->semanticToken.getContent(), semantic);
-            if (!hasKnownSemantic)
-            {
-                context->getSink()->diagnose(Diagnostics::UnknownIntrinsicAsmSemantic{
-                    .semanticName = stmt->semanticToken.getContent(),
-                    .location = stmt->semanticToken.loc});
-                return;
-            }
-            builder->addDecoration(
-                genericAsm,
-                kIROp_NVVMSemanticDecoration,
-                builder->getIntValue(builder->getIntType(), semantic));
-        }
     }
 
     void visitSwitchStmt(SwitchStmt* stmt)

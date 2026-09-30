@@ -10810,48 +10810,45 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCre
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
 
-SLANG_UNIT_TEST(nvvmSurfaceLegalizationRejectsMalformedTaggedHelpers)
+SLANG_UNIT_TEST(nvvmSlangResourceLegacyRoutesRejectBeforeOutput)
 {
-    static const char* sources[] = {
-        R"SLANG(
-            float malformed(RWTexture1D<float> image, int coordinate, int extra)
-            {
-                __target_switch
-                {
-                case cuda: __intrinsic_asm(nvvmSurfaceLoad) "unused";
-                default: return 0;
-                }
-            }
-            RWTexture1D<float> image;
-            RWStructuredBuffer<float> output;
-            [shader("compute")]
-            [numthreads(1,1,1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                output[tid.x] = malformed(image, int(tid.x), 0);
-            }
-        )SLANG",
-        R"SLANG(
-            RWStructuredBuffer<float> output;
-            float effectful(RWTexture1D<float> image, int coordinate)
-            {
-                output[0] = 17;
-                __target_switch
-                {
-                case cuda: __intrinsic_asm(nvvmSurfaceLoad) "unused";
-                default: return 0;
-                }
-            }
-            RWTexture1D<float> image;
-            [shader("compute")]
-            [numthreads(1,1,1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                output[tid.x] = effectful(image, int(tid.x));
-            }
-        )SLANG",
+    struct Case
+    {
+        const char* declaration;
+        const char* invocation;
+        bool isTag;
     };
-    for (const char* source : sources)
+    const Case cases[] = {
+        {R"SLANG(float4 legacy(Texture2D<float4> t, SamplerState s, float2 uv)
+            { __intrinsic_asm(nvvmTextureSample) "unused"; })SLANG",
+         "output[0] = legacy(texture, sampler, float2(0));",
+         true},
+        {R"SLANG(float legacy(RWTexture2D<float> t, int2 p)
+            { __intrinsic_asm(nvvmSurfaceLoad) "unused"; })SLANG",
+         "output[0] = legacy(image, int2(0));",
+         true},
+        {R"SLANG(void legacy(RWTexture2D<float> t, uint2 p, float value)
+            { __intrinsic_asm(nvvmSurfaceStore) "unused"; })SLANG",
+         "legacy(image, uint2(0), 1);",
+         true},
+        {R"SLANG(float4 legacy(Texture2D<float4> t, SamplerState s, float2 uv, float lod)
+            { __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))"; })SLANG",
+         "output[0] = legacy(texture, sampler, float2(0), 0);",
+         false},
+        {R"SLANG(float4 legacy(Texture2D<float4> t, int3 p)
+            { __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)"; })SLANG",
+         "output[0] = legacy(texture, int3(0));",
+         false},
+        {R"SLANG(float4 legacy(Texture2D<float4> t, SamplerState s, float2 uv)
+            { __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y, 1)"; })SLANG",
+         "output[0] = legacy(texture, sampler, float2(0));",
+         false},
+        {R"SLANG(void legacy(Texture2D<float4> t, out uint w, out uint h)
+            { __intrinsic_asm "{uint32_t w, h; asm(\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\" : \"=r\"(w), \"=r\"(h) : \"l\"($0)); *($1) = w;*($2) = h;}"; })SLANG",
+         "uint w, h; legacy(texture, w, h); output[0] = float4(w, h, 0, 0);",
+         false},
+    };
+    for (const auto& test : cases)
     {
         _resetDirectNVVMFakes();
         {
@@ -10860,23 +10857,91 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationRejectsMalformedTaggedHelpers)
                 slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
             ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
             globalSession->setSharedLibraryLoader(loader);
+            StringBuilder source;
+            source << test.declaration << R"SLANG(
+                Texture2D<float4> texture;
+                SamplerState sampler;
+                RWTexture2D<float> image;
+                RWStructuredBuffer<float4> output;
+                [numthreads(1,1,1)] void computeMain() {
+            )SLANG" << test.invocation
+                   << "}";
             ComPtr<slang::IBlob> code;
             ComPtr<slang::IBlob> diagnostics;
             SLANG_CHECK(SLANG_FAILED(
-                _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
+                _compileSlangWithDirectNVVM(globalSession, source.getBuffer(), code, diagnostics)));
             SLANG_CHECK(code == nullptr);
-            const String diagnosticText = _getBlobText(diagnostics);
-            if (!diagnosticText.contains("E52017") || !diagnosticText.contains("'nvvmIntrinsic'"))
-                getTestReporter()->message(TestMessageType::Info, diagnosticText.getBuffer());
-            SLANG_CHECK(diagnosticText.contains("E52017"));
-            SLANG_CHECK(diagnosticText.contains("'nvvmIntrinsic'"));
+            const String text = _getBlobText(diagnostics);
+            const char* expected = test.isTag ? "E36121" : "E52017";
+            if (!text.contains(expected))
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+            SLANG_CHECK(text.contains(expected));
+            if (!test.isTag)
+                SLANG_CHECK(text.contains("GenericAsm assembly="));
             SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
             SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
             SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-            SLANG_CHECK(gFakeNVVMBuilder.surfaceOperations.getCount() == 0);
         }
         SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     }
+}
+
+SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
+{
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> globalSession;
+        SLANG_CHECK_ABORT(
+            slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        globalSession->setSharedLibraryLoader(loader);
+        const char* source = R"SLANG(
+            Texture2D<float4> texture;
+            SamplerState sampler;
+            RWTexture2DArray<uint> arrayImage;
+            RWStructuredBuffer<float4> output;
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                uint width, height;
+                texture.GetDimensions(width, height);
+                output[0] = texture.SampleLevel(sampler, float2(tid.xy), float(tid.z));
+                output[1] = texture.Load(int3(tid));
+                arrayImage.Store(tid, width + height);
+            }
+        )SLANG";
+        ComPtr<slang::IBlob> code;
+        ComPtr<slang::IBlob> diagnostics;
+        SlangResult result = _compileSlangWithDirectNVVM(globalSession, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK_ABORT(code != nullptr);
+        SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 4);
+        bool sawWidth = false, sawHeight = false, sawLevel = false, sawFetch = false;
+        for (const auto& operation : gFakeNVVMBuilder.textureOperations)
+        {
+            SLANG_CHECK(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D);
+            SLANG_CHECK(operation.isArray == 0);
+            SLANG_CHECK(operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+            SLANG_CHECK(operation.elementType.bitWidth == 32);
+            SLANG_CHECK(operation.elementType.laneCount == 4);
+            sawWidth |= operation.operation == SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH;
+            sawHeight |= operation.operation == SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT;
+            sawLevel |= operation.operation == SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL;
+            sawFetch |= operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
+        }
+        SLANG_CHECK(sawWidth && sawHeight && sawLevel && sawFetch);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 1);
+        const auto& store = gFakeNVVMBuilder.surfaceOperations[0];
+        SLANG_CHECK(store.operation == SLANG_NVVM_SURFACE_OP_STORE);
+        SLANG_CHECK(store.shape == SLANG_NVVM_TEXTURE_SHAPE_2D);
+        SLANG_CHECK(store.isArray == 1);
+        SLANG_CHECK(store.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+        SLANG_CHECK(store.elementType.bitWidth == 32 && store.elementType.laneCount == 1);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
 
 SLANG_UNIT_TEST(nvvmSlangNamedIntrinsicsRejectBeforeModuleCreation)

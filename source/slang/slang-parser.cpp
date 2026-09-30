@@ -6818,13 +6818,15 @@ static Stmt* parseIntrinsicAsmStmt(Parser* parser)
     parser->FillPosition(stmt);
     parser->ReadToken();
 
-    // A semantic tag is optional so existing target text emitters retain their established
-    // `__intrinsic_asm "..."` representation. Direct NVVM uses the tagged form to preserve
-    // producer intent without recovering it from the CUDA spelling after specialization.
+    // Consume retired tag syntax only to give old source a precise diagnostic. Ordinary
+    // intrinsic assembly still accepts explicit comma-separated operands below.
     if (AdvanceIf(parser, TokenType::LParent))
     {
-        stmt->semanticToken = parser->ReadToken(TokenType::Identifier);
+        const auto semanticToken = parser->ReadToken(TokenType::Identifier);
         parser->ReadToken(TokenType::RParent);
+        parser->sink->diagnose(Diagnostics::UnknownIntrinsicAsmSemantic{
+            .semanticName = semanticToken.getContent(),
+            .location = semanticToken.loc});
     }
 
     stmt->asmText =

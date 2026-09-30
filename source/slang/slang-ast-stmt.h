@@ -160,8 +160,8 @@ FIDDLE()
 class IntrinsicAsmStmt : public Stmt
 {
     FIDDLE(...)
-    // Optional compiler-owned semantic identity for target-specific lowering. The textual body
-    // remains the source-emitter spelling, while this token survives as typed IR metadata.
+    // Retain this retired field to preserve the serialized AST layout. New source never sets it;
+    // lowering diagnoses a nonempty token decoded from an older prototype module.
     FIDDLE() Token semanticToken;
     FIDDLE() String asmText;
 

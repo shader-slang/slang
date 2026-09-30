@@ -72,7 +72,8 @@ void TextureTypeInfo::writeFuncBody(
     const String& spirvRWDefault,
     const String& spirvCombined,
     const String& metal,
-    const String& wgsl)
+    const String& wgsl,
+    const String& nvvm)
 {
     BraceScope funcScope{i, sb};
     {
@@ -88,6 +89,10 @@ void TextureTypeInfo::writeFuncBody(
                 sb << glsl;
             else
                 sb << i << "__intrinsic_asm \"" << glsl << "\";\n";
+        }
+        if (nvvm.getLength())
+        {
+            sb << i << "case nvvm:\n" << nvvm << "\n";
         }
         if (cuda.getLength())
         {
@@ -145,13 +150,23 @@ void TextureTypeInfo::writeFuncWithSig(
     const String& cuda,
     const String& metal,
     const String& wgsl,
-    const ReadNoneMode readNoneMode)
+    const ReadNoneMode readNoneMode,
+    const String& nvvm)
 {
     if (readNoneMode == ReadNoneMode::Always)
         sb << i << "[__readNone]\n";
     sb << i << "[ForceInline]\n";
     sb << i << sig << "\n";
-    writeFuncBody(funcName, glsl, cuda, spirvDefault, spirvRWDefault, spirvCombined, metal, wgsl);
+    writeFuncBody(
+        funcName,
+        glsl,
+        cuda,
+        spirvDefault,
+        spirvRWDefault,
+        spirvCombined,
+        metal,
+        wgsl,
+        nvvm);
     sb << "\n";
 }
 
@@ -166,7 +181,8 @@ void TextureTypeInfo::writeFunc(
     const String& cuda,
     const String& metal,
     const String& wgsl,
-    const ReadNoneMode readNoneMode)
+    const ReadNoneMode readNoneMode,
+    const String& nvvm)
 {
     writeFuncWithSig(
         funcName,
@@ -178,7 +194,8 @@ void TextureTypeInfo::writeFunc(
         cuda,
         metal,
         wgsl,
-        readNoneMode);
+        readNoneMode,
+        nvvm);
 }
 
 enum class DimType
@@ -642,6 +659,21 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
+            StringBuilder nvvm;
+            if (!includeMipInfo && !isMultisample && dimType != DimType::Float &&
+                !(isArray && baseShape == SLANG_TEXTURE_1D))
+            {
+                nvvm << "let size = __nvvmTextureQuerySize(this);\n";
+                nvvm << "width = " << rawT << "(size.x);\n";
+                if (baseShape != SLANG_TEXTURE_1D)
+                    nvvm << "height = " << rawT << "(size.y);\n";
+                if (baseShape == SLANG_TEXTURE_3D)
+                    nvvm << "depth = " << rawT << "(size.z);\n";
+                if (isArray)
+                    nvvm << "elements = " << rawT << "(0);\n";
+                nvvm << "return;";
+            }
+
             writeFunc(
                 "void",
                 "GetDimensions",
@@ -653,7 +685,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 cuda.produceString(),
                 metal,
                 wgsl,
-                ReadNoneMode::Always);
+                ReadNoneMode::Always,
+                nvvm);
         }
     }
 }
