@@ -300,7 +300,7 @@ works for any given binary.
 | `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
-| `SLANG_DISABLED_NOTE_IDS`             | Empty                         | Comma-separated note IDs to disable in runtime sessions and standard module builds, for example `88,102`                                 |
+| `SLANG_DISABLE_NOTE_IDS`              | Empty                         | Comma-separated note IDs to disable in runtime sessions and standard module builds, for example `88,102`                                 |
 | `SLANG_ENABLE_ASAN`                   | `FALSE`                       | Enable ASAN (address sanitizer)                                                                                                          |
 | `SLANG_ENABLE_TSAN`                   | `FALSE`                       | Enable TSAN (thread sanitizer); clang/gcc on non-Windows only, and mutually exclusive with `SLANG_ENABLE_ASAN`                           |
 | `SLANG_ENABLE_COVERAGE`               | `FALSE`                       | Enable code coverage instrumentation                                                                                                     |
