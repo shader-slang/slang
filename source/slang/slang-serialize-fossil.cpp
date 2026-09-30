@@ -1155,7 +1155,7 @@ SerialReader::SerialReader(
 {
     // We track the number of active `SerialReader`s that
     // are working with the same `ReadContext`, and will
-    // make use of this count in `flush()` below.
+    // make use of this count in `flush()` and the destructor.
     //
     context._readerCount++;
 
@@ -1198,32 +1198,12 @@ SerialReader::~SerialReader()
 
 void SerialReader::flush()
 {
-    // If an application is designed to perform something
-    // like on-demand deserialization, it may create
-    // additional `SerialReader`s attached to the same
-    // `ReadContext`, potentially even in the body of a
-    // callback that was invoked by an operation on another
-    // `SerialReader` further up the stack.
-    //
-    // If we were to track the deferred actions that get
-    // enqueued on a per-`SerialReader` basis, and have each
-    // `SerialReader` run only its own actions when flushed,
-    // it could potentially lead to very deep call stacks.
-    //
-    // Instead, we track a single list of deferred actions
-    // on the `ReadContext`, which means that we need to
-    // figure out when to actually flush that list.
-    //
-    // What is implemented here is a "last one out shuts the door"
-    // policy. Every `SerialReader` is flushed before it is destroyed,
-    // but only the outermost one on a `ReadContext` actually runs the
-    // deferred actions that were enqueued by *all* of the readers.
-    //
-    // Note that this reader is still counted while it flushes. Any
-    // nested `SerialReader`s that get created by the deferred actions
-    // therefore see a count above one, and leave their own actions to
-    // the loop in this reader's `_flush()` rather than starting one
-    // of their own, which could quickly lead to unbounded recursion.
+    // The actions enqueued by every reader on a `ReadContext` share one list,
+    // and only the outermost reader drains it, because letting each nested
+    // reader drain its own actions could lead to very deep call stacks. This
+    // reader is still counted while it flushes, so nested readers created by
+    // the deferred actions see a count above one and leave their actions to
+    // the loop in this reader's `_flush()`.
     //
     if (_context._readerCount == 1)
     {
