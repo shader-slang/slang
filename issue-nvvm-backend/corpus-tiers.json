@@ -150,6 +150,57 @@
         "tests/cuda/nvvm-texture-dimensions.slang"
       ],
       "rationale": "Current source and exact authored runtime mode qualified by the latest array-count control."
+    },
+    {
+      "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-working-corpus-integration",
+      "outcome_path": [
+        "validation",
+        "input_review",
+        "descriptor_outcomes",
+        "nvrtc-o3"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-texture-descriptor-conversion.slang"
+      ],
+      "rationale": "Exact fresh working cell plus reviewed authored/discovery mode equivalence; existing nvvm-texture-descriptor-words feature and runtime gate retained as context in input_review.previous_feature."
+    },
+    {
+      "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-working-corpus-integration",
+      "outcome_path": [
+        "validation",
+        "input_review",
+        "descriptor_outcomes",
+        "nvvm-o0"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-texture-descriptor-conversion.slang"
+      ],
+      "rationale": "Exact fresh working cell plus reviewed authored/discovery mode equivalence; existing nvvm-texture-descriptor-words feature and runtime gate retained as context in input_review.previous_feature."
+    },
+    {
+      "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-working-corpus-integration",
+      "outcome_path": [
+        "validation",
+        "input_review",
+        "descriptor_outcomes",
+        "nvvm-o3"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-texture-descriptor-conversion.slang"
+      ],
+      "rationale": "Exact fresh working cell plus reviewed authored/discovery mode equivalence; existing nvvm-texture-descriptor-words feature and runtime gate retained as context in input_review.previous_feature."
     }
   ],
   "smoke": [

@@ -137,6 +137,70 @@ SLANG_UNIT_TEST(nvvmHalfHelperABIClassifierUsesExactValueTypes)
     }
 }
 
+// BF3/BF4 records have qualified local storage, but their component-array memory representation
+// does not grant a whole-record value ABI. Preserve that distinction before and after caching.
+SLANG_UNIT_TEST(nvvmLocalBFloat16RecordStorageKeepsRolesSeparate)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    const NVVMTypeUse forbidden[] = {
+        NVVMTypeUse::Value,
+        NVVMTypeUse::HelperValue,
+        NVVMTypeUse::HelperParameter,
+        NVVMTypeUse::HelperResult,
+        NVVMTypeUse::ParameterGroupStorage,
+        NVVMTypeUse::StructuredBufferStorage,
+        NVVMTypeUse::EntryPointParameter,
+        NVVMTypeUse::EntryPointResult,
+    };
+    for (uint32_t width : {3u, 4u})
+    {
+        auto record = ir.createStructType();
+        ir.createStructField(record, ir.createStructKey(), ir.getType(kIROp_UInt16Type));
+        ir.createStructField(
+            record,
+            ir.createStructKey(),
+            ir.getVectorType(ir.getType(kIROp_BFloat16Type), width));
+        ir.createStructField(record, ir.createStructKey(), ir.getType(kIROp_UInt16Type));
+        SLANG_CHECK(asNVVMSupportedLocalBFloat16RecordType(record) == record);
+        SLANG_CHECK(asNVVMSupportedSubstandardRecordType(record) == nullptr);
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &provider;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            provider.createModule(toSlice("local-bfloat-record-storage-roles"), scope.module)));
+        NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+        SlangNVVMTypeHandle cachedStorage = nullptr;
+        for (Index pass = 0; pass < 2; ++pass)
+        {
+            for (auto use : forbidden)
+            {
+                SlangNVVMTypeHandle actual = cachedStorage;
+                const auto result = lowering.lowerType(record, use, actual);
+                if (SLANG_SUCCEEDED(result) || actual)
+                {
+                    StringBuilder message;
+                    message << "BF" << width << " record role " << int(use) << ", cache pass "
+                            << pass;
+                    getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+                }
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(actual == nullptr);
+            }
+            SlangNVVMTypeHandle storage = nullptr;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(lowering.lowerType(record, NVVMTypeUse::Storage, storage)));
+            SLANG_CHECK(storage != nullptr);
+            if (cachedStorage)
+                SLANG_CHECK(storage == cachedStorage);
+            cachedStorage = storage;
+        }
+    }
+}
+
 // Parameter-group storage may contain direct pointer fields without creating a value ABI for
 // their enclosing record. Cache order must not authorize ordinary storage or helper values.
 SLANG_UNIT_TEST(nvvmParameterGroupLayoutPointerStorageKeepsRolesSeparate)

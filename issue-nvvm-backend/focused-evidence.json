@@ -84187,6 +84187,501 @@
         }
       },
       "qualification": "CUDA12.9/SDK9,LLVM14,targetSM80,L4/driver595.71.05. Eight names/signatures independently asserted with both serializers and rejection/no-mutation; all8 through noinline helpers reject compute/raygen before provider creation. Effects preserve observation position. Module43/ABI46/container2 unchanged. No full tiled-brass graph, bindless handle integration, any-hit/intersection/callable/recursion/object-transform/performance/universal numerical or full-checkpoint claim."
+    },
+    "nvvm-working-corpus-integration": {
+      "status": "accepted-focused",
+      "scope": "Runtime COMPARE_COMPUTE union: accepted frozen/discovery plus eligible authored CUDA candidates. SIMPLE/PTX, rejection/unit gates, custom physical or allocated-address hosts, material performance and arbitrary repository sources remain separate.",
+      "identity": {
+        "revision": "b1722fdcece35273e811a2adb45df536f173bc61",
+        "full_provenance": {
+          "path": "build/nvvm-working-corpus/working-1/provenance.json",
+          "sha256": "deb6aa1c286dbbf798bbe7e0d8c914481347f3c68723e6fe96a2e6d6d88834ab"
+        },
+        "complete_artifact_count": 7339,
+        "runtime_sha256": {
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9bb095303845b795c9fbade9ce674cb8d869dae103331535788a2b3ea4298fba",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/slang-test.dwarf": "91c80ae6e8b75e98f7d3dbdd6090a7e593903a75ca18a6e567247aeafeebe588",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libdxcompiler.so": "f64b6a9cf32ecb6b456e3f492d736ce41c250845e2dba282f4fc1c4cbeaa0f04",
+          "build/RelWithDebInfo/lib/libdxil.so": "4a6a3e77b37b75e4d8cf44e430cc15e4e1ef96961c7cba35a0d6f14d7c1afda7",
+          "build/RelWithDebInfo/lib/libgfx-unit-test-tool.so": "6d6eb23100e8b18327fce26cd1e4886a1872be6a41d66f9a2834e75db2c72a2d",
+          "build/RelWithDebInfo/lib/libplatform.so": "e7f65b0699b2d3541ff2f3006425552062e3e7b48e913535332a0a5ee4de3ffa",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "b1a0d2909f2df9aca4f7f5b0a1aac23fb7dc1d62d2e277ed423c1f07d858b17e",
+          "build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.16": "715fe5fb5944be05087a668da7535c9fb7a1290ca86d5931186b286001408228",
+          "build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": "b1a0d2909f2df9aca4f7f5b0a1aac23fb7dc1d62d2e277ed423c1f07d858b17e",
+          "build/RelWithDebInfo/lib/libslang-glsl-module-2026.16.so": "645d4179329a09c238d2771d14114e3aca7c9b3ef74237a7f956842475ea3a8c",
+          "build/RelWithDebInfo/lib/libslang-glsl-module-2026.18.3.so": "21056f6b736c48d1523d9c90589a5df36484bd515be8ca563532f44123b61ba2",
+          "build/RelWithDebInfo/lib/libslang-glslang-2026.16.so": "842243121e2a166ede965d3222a3b85588fb4b1bc772c12fd06070dfda269704",
+          "build/RelWithDebInfo/lib/libslang-glslang-2026.18.3.so": "e26c68765a739c02899d421f5bf1ff725e70174f96f1c8649795cc3b4a9c22ad",
+          "build/RelWithDebInfo/lib/libslang-llvm.so": "4e59124097b6e78a0e3219383dda2ffd9d096fc2b46ad9223ebd184f647bc065",
+          "build/RelWithDebInfo/lib/libslang-reflection-test-tool.so": "f3241a8431b401854989115d7439fa83bf6369050ccbe6fd9da0294243f00629",
+          "build/RelWithDebInfo/lib/libslang-rt.so": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+          "build/RelWithDebInfo/lib/libslang-rt.so.0.2026.16": "d57288c2729f449a739f359f2dfab9c258916c3d68b273b7ff3157fa6a1520d1",
+          "build/RelWithDebInfo/lib/libslang-rt.so.0.2026.18.3": "2701322cc40bd8d71f768b57c1151ca77ff67828fa6a797c2c58ae273af4de1d",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "fc4a698273b05de7026f8de5ee6d023fe39e031a64f375d8c40d7c1e4f2460a5",
+          "build/RelWithDebInfo/lib/libslang.so": "b1a0d2909f2df9aca4f7f5b0a1aac23fb7dc1d62d2e277ed423c1f07d858b17e",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "01290e8ea65a48336f71cab1735a2e4c0286ba3fac011a9c3ca98db8b4f60a3b",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "extras/validate-nvvm-surfaces.py": "63b73ac3a945160ef68f0763f7c846d12dbecfca129f4a9691b44903629cbf86",
+          "issue-nvvm-backend/nvvm-results.py": "ad9d46485e5301cd0ea0d5477422d9b208e0daf2378fa19103b229045067b321",
+          "issue-nvvm-backend/nvvm-surface-results.py": "c1021de3bae8790a1aa92641cb0f7bd3f390d302dc7d3d5befbf1c3eeeea42bf",
+          "issue-nvvm-backend/run-complex-corpus.py": "d5db81e46b904308f3251351cae63918b77b690cfd4ef00e84c3c0b1b4528bed",
+          "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8",
+          "/usr/local/cuda-12.9/nvvm/libdevice/libdevice.10.bc": "9e84b504f25d26ec775ef91f7122e68dac77fa1f776f1044128f5028356265d8",
+          "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+        },
+        "source_sha256": {
+          "tests/cuda/nvvm-texture-descriptor-conversion.slang": "2613a2123679348da7f407954b47341e5c4ad578eb9ef73d5d4c41755f3c0813"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "name, uuid, driver_version, compute_cap\nNVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, 595.71.05, 8.9",
+        "meaning": "Original1708-cell failed working-run identity, including1706 retained passes. Repair identity is separate; these outcomes are never relabeled as fresh.",
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        }
+      },
+      "validation": {
+        "gate": {
+          "path": "build/nvvm-working-corpus/working.json",
+          "sha256": "340b61910eb136191fb78de30d42c52d001dcb47ae6b98270f482b46e5b4f4fc"
+        },
+        "selection": {
+          "path": "build/nvvm-working-corpus/working-1/selection.json",
+          "sha256": "ec425438f521e986c8e4df4bf18330d7482d1f2a16ab7f12977ba6bdccd91e9f"
+        },
+        "inventory": {
+          "path": "build/nvvm-working-corpus/working-1/inventory.json",
+          "sha256": "b0bbf021174ba6e276e299a99f975865145ce05c7b3bc3d93c48c842512cc3fc"
+        },
+        "origins": {
+          "frozen": {
+            "count": 1350,
+            "outcomes": {
+              "path": "build/nvvm-working-corpus/working-1/frozen/results.json",
+              "sha256": "a94144a7a3bb1aa375af55e99c27d7eabba8e239209675f3d5c49d9b202108f0"
+            },
+            "log": {
+              "path": "build/nvvm-working-corpus/working-1/frozen.log",
+              "sha256": "176f0b4188be95f22da8c9733229f112f949fb5ada43f9c42b6cbfd58b0312d4"
+            },
+            "selected_cells": {
+              "path": "build/nvvm-working-corpus/working-1/frozen-cells.json",
+              "sha256": "c8e195813a6b452747a0f210a2e8b4104f7bd85da90c11365a52cf673e8b473b"
+            }
+          },
+          "discovery": {
+            "count": 356,
+            "outcomes": {
+              "path": "build/nvvm-working-corpus/working-1/discovery/results.json",
+              "sha256": "43d1cf98b2bc4d3b75658e9692ba2d8050f5915a7e3d7aa86b4a79cb53479ac9"
+            },
+            "log": {
+              "path": "build/nvvm-working-corpus/working-1/discovery.log",
+              "sha256": "d172ae9f5ec81f7012c7afbed52c45de98efc05d93df8c7d5f785349e03a47a2"
+            },
+            "selected_cells": {
+              "path": "build/nvvm-working-corpus/working-1/discovery-cells.json",
+              "sha256": "898b923550c4b60f35af4c199e000ecfb8ea026038550cf115f535f617801cd4"
+            }
+          },
+          "candidate": {
+            "count": 2,
+            "outcomes": {
+              "path": "build/nvvm-working-corpus/working-1/candidate/results.json",
+              "sha256": "92aaa70f5baa988a48a4117396e067504cc167ddaa7f3b19c3e880347afe1b5c"
+            },
+            "log": {
+              "path": "build/nvvm-working-corpus/working-1/candidate.log",
+              "sha256": "948d8c420d8e575e229192444e380eeb773c576193ff4d18e12f865037f89e1e"
+            },
+            "selected_cells": {
+              "path": "build/nvvm-working-corpus/working-1/candidate-cells.json",
+              "sha256": "3b6b43b43712f6d2c750ade79ea11ba061c9f23223abd59177bd615cdd5a53d6"
+            }
+          }
+        },
+        "selected_count": 1708,
+        "initial_correct_count": 1706,
+        "repaired_cell_count": 2,
+        "counts_by_mode": {
+          "nvrtc-o3": 568,
+          "nvvm-o0": 570,
+          "nvvm-o3": 570
+        },
+        "initial_regressions": [
+          {
+            "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage type'",
+              "canonical_shape": "aggregate storage type"
+            }
+          },
+          {
+            "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage type'",
+              "canonical_shape": "aggregate storage type"
+            }
+          }
+        ],
+        "unresolved_regressions": [],
+        "original_runner_status": "failed",
+        "repair": {
+          "identity": {
+            "revision": "b1722fdcece35273e811a2adb45df536f173bc61",
+            "patch_sha256": "d2c762cddaebb4f869b20918f2c39f6d0264e22e3585708b6e64f7cec3050ad5",
+            "source_sha256": {
+              "source/slang/slang-emit-nvvm-type-lowering.cpp": "ae8628eecff03a9da1168885b9c7699241370fb787afe78fc88560af2a82fd53",
+              "tools/slang-static-unit-test/unit-test-nvvm-type-lowering.cpp": "4502b3eaf5248064d78ef9a5ea55e0ddd66b90b0d5b855e5a143a8656d102a5d",
+              "tests/cuda/nvvm-bf16-local-records.slang": "19c7db6eb12baa19e2afd91994e2da19a2b6fde61cdb95b106b2e558e4f2a683",
+              "tests/cuda/nvvm-texture-descriptor-conversion.slang": "2613a2123679348da7f407954b47341e5c4ad578eb9ef73d5d4c41755f3c0813"
+            },
+            "runtime_sha256": {
+              "build/RelWithDebInfo/lib/libslang-compiler.so": "ae57d78c8908efa7b8bd13eb7bac9232d8789d554881b507d40df1a39c547d52",
+              "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+              "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9bb095303845b795c9fbade9ce674cb8d869dae103331535788a2b3ea4298fba",
+              "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+              "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+              "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+              "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "fc4a698273b05de7026f8de5ee6d023fe39e031a64f375d8c40d7c1e4f2460a5",
+              "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+              "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+              "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+              "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+              "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+              "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+              "build/RelWithDebInfo/lib/slang-core-module.bin": "addc67f6f1754d30bc7b0c4ba5913ad66d9581387eacf74d4507662241ccf055"
+            },
+            "configuration_sha256": {
+              "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+              "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+            },
+            "compiler_version": "2026.18.3-350-gdc0a9acc3",
+            "optix_library_sha256": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+            "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05, targetSM80",
+            "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+            "meaning": "BF16 Storage family repair and matching shared/static artifacts. Original1706working passes retain originalmaterial identity; exact2BF16retries and15smoke are fresh with this repair.",
+            "static_sha256": {
+              "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "0e5d967aa1f0d3d23b447c74509ac95bbe099c5540d743070ab403f6a2d50c10",
+              "build/nvvm-local-record-arrays/static-unit-build/CMakeCache.txt": "e1fd59dbfc11ebed26c6c7b67a897c0cd2c9dab033b68a37f15e1ba415a8ad4e"
+            }
+          },
+          "identity_record": {
+            "path": "build/nvvm-working-corpus/repair-identity.json",
+            "sha256": "aef3a68ee6e2bb6e374a50cae2da8ffd3039fdbf0777d331f85d6c21838b1a6b"
+          },
+          "reviewed_patch": {
+            "path": "build/nvvm-working-corpus/bf16-storage-repair.patch",
+            "sha256": "d2c762cddaebb4f869b20918f2c39f6d0264e22e3585708b6e64f7cec3050ad5"
+          },
+          "source_map": {
+            "path": "build/nvvm-working-corpus/bf16-storage-source.json",
+            "sha256": "aebe6f86c08c8d4b0d7f8101be4466723dcd27f942943e1828f84c5bd5ff4846"
+          },
+          "explanation": {
+            "path": "build/nvvm-working-corpus/bf16-storage-repair.md",
+            "sha256": "a3ce3d5dbf6366a960578d33e3f6062ddb0e79201a545c6a089b4c98c678be82"
+          },
+          "retry_gate": {
+            "path": "build/nvvm-working-corpus/bf16-retry.json",
+            "sha256": "c1c1669595a81666fbcb9e8e1596e18908fdeb11a209c23251d3f956062d0ae4"
+          },
+          "retry_results": {
+            "path": "build/nvvm-working-corpus/bf16-retry-results/results.json",
+            "sha256": "a23cc58520d44c27af59295bc070919a45a2e6f55512d894e89c74d6c3416bf9"
+          },
+          "static_gate": {
+            "path": "build/nvvm-working-corpus/bf16-static.json",
+            "sha256": "17e6f7d54ee060d3b3df593680c761cf2047cecefa7e69f77e29713ec55152bb"
+          },
+          "shared_gate": {
+            "path": "build/nvvm-working-corpus/bf16-shared.json",
+            "sha256": "b59df85352556e09aedda21ade91e96112de94e8c1eb9e2255d8237a04a622e9"
+          },
+          "smoke_gate": {
+            "path": "build/nvvm-working-corpus/bf16-smoke.json",
+            "sha256": "4a87749e87b093d5af817c2e0266b977f494a3d0b91099bf38501ae7734ffd36"
+          },
+          "smoke_selection": {
+            "path": "build/nvvm-working-corpus/bf16-smoke-1/selection.json",
+            "sha256": "2acab9050678b19d1ef34d5f39990c462ec37fd666ab1289d66347f4a4cc820a"
+          },
+          "smoke_provenance": {
+            "path": "build/nvvm-working-corpus/bf16-smoke-1/provenance.json",
+            "sha256": "80dbfc8db0a164816d0fac762eaf359697e5233336e1443a84f81516cf4f7b46"
+          },
+          "initial_failures": [
+            {
+              "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage type'",
+                "canonical_shape": "aggregate storage type"
+              }
+            },
+            {
+              "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage type'",
+                "canonical_shape": "aggregate storage type"
+              }
+            }
+          ],
+          "resolutions": [
+            {
+              "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "before": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage type'",
+                "canonical_shape": "aggregate storage type"
+              },
+              "after": {
+                "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+                "mode": "nvvm-o0",
+                "classification": "correct",
+                "return_code": 0,
+                "execution_counts": {
+                  "passed": 1,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "",
+                "canonical_shape": ""
+              }
+            },
+            {
+              "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "before": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage type'",
+                "canonical_shape": "aggregate storage type"
+              },
+              "after": {
+                "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+                "mode": "nvvm-o3",
+                "classification": "correct",
+                "return_code": 0,
+                "execution_counts": {
+                  "passed": 1,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "",
+                "canonical_shape": ""
+              }
+            }
+          ],
+          "scope": "One omitted existing local-BF16-record Storage-family admission restored; no broader type or ABI expansion.",
+          "meaning": "Only these2 discovery cells plus explicit static/shared/smoke controls ran on the repaired identity;1706 original passes retain initial identity."
+        },
+        "reuse": {
+          "count": 1706,
+          "identity": "identity.full_provenance",
+          "exclusion": [
+            {
+              "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+              "mode": "nvvm-o0"
+            },
+            {
+              "id": "cuda/nvvm-bf16-local-records.slang#discovery-1",
+              "mode": "nvvm-o3"
+            }
+          ],
+          "meaning": "Original correct cells reused under their original identity; no fresh1708-pass claim."
+        },
+        "input_review": {
+          "status": "accepted-after-exact-runtime-and-source-review",
+          "review": {
+            "path": "build/nvvm-working-corpus/descriptor-input-review.md",
+            "sha256": "4d94852f653b7b402f45d89dae3ca44ea1c4952ccbf40b2bebaa7a738db33376"
+          },
+          "original_changes": [
+            {
+              "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+              "mode": "nvrtc-o3",
+              "changes": [
+                {
+                  "path": "tests/cuda/nvvm-texture-descriptor-conversion.slang",
+                  "accepted_sha256": "4b83edec23adf83e676303ee8e0f394ed96696452bf88ac6707b0b55892e0d22",
+                  "current_sha256": "2613a2123679348da7f407954b47341e5c4ad578eb9ef73d5d4c41755f3c0813"
+                }
+              ]
+            },
+            {
+              "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "changes": [
+                {
+                  "path": "tests/cuda/nvvm-texture-descriptor-conversion.slang",
+                  "accepted_sha256": "4b83edec23adf83e676303ee8e0f394ed96696452bf88ac6707b0b55892e0d22",
+                  "current_sha256": "2613a2123679348da7f407954b47341e5c4ad578eb9ef73d5d4c41755f3c0813"
+                }
+              ]
+            },
+            {
+              "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "changes": [
+                {
+                  "path": "tests/cuda/nvvm-texture-descriptor-conversion.slang",
+                  "accepted_sha256": "4b83edec23adf83e676303ee8e0f394ed96696452bf88ac6707b0b55892e0d22",
+                  "current_sha256": "2613a2123679348da7f407954b47341e5c4ad578eb9ef73d5d4c41755f3c0813"
+                }
+              ]
+            }
+          ],
+          "descriptor_outcomes": {
+            "nvrtc-o3": {
+              "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+              "mode": "nvrtc-o3",
+              "classification": "correct",
+              "return_code": 0,
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "",
+              "canonical_shape": ""
+            },
+            "nvvm-o0": {
+              "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "classification": "correct",
+              "return_code": 0,
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "",
+              "canonical_shape": ""
+            },
+            "nvvm-o3": {
+              "id": "cuda/nvvm-texture-descriptor-conversion.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "classification": "correct",
+              "return_code": 0,
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "",
+              "canonical_shape": ""
+            }
+          },
+          "previous_feature": {
+            "key": "nvvm-texture-descriptor-words",
+            "object_sha256": "86291fc75b427a46f04c627221e8f6610e9a70821a397383fdd83500e8612671",
+            "runtime": {
+              "path": "build/nvvm-texture-handle-words/runtime.json",
+              "sha256": "2ee8a9254ea1385310be8119a5c5843e338dfa80479460a6f8cb8bc771908b81"
+            },
+            "runtime_log": {
+              "path": "build/nvvm-texture-handle-words/runtime.log",
+              "sha256": "b12e4e874135e487d164b2368fb64c7f68e20925a62dd2d73bf412e5cfda8fd9"
+            },
+            "source_hash_path": [
+              "identity",
+              "source_sha256",
+              "tests/cuda/nvvm-texture-descriptor-conversion.slang"
+            ],
+            "authored_outcomes": {
+              "nvrtc-o3": "tests/cuda/nvvm-texture-descriptor-conversion.slang (cuda)",
+              "nvvm-o0": "tests/cuda/nvvm-texture-descriptor-conversion.slang.1 (cuda)",
+              "nvvm-o3": "tests/cuda/nvvm-texture-descriptor-conversion.slang.2 (cuda)"
+            }
+          },
+          "meaning": "Reviewed stronger source/oracle; CUDA remains UInt64 control. Previous baseline and feature evidence are retained unchanged."
+        },
+        "metadata_checks": {
+          "contracts": {
+            "path": "build/nvvm-working-corpus/contracts.json",
+            "sha256": "7f5d9ae6f7f498234913e342638eeb0bbafb952f659e44890e8d0fa71fddd51e"
+          },
+          "selector_contract_count": 8,
+          "admitted_list_only": {
+            "path": "build/nvvm-working-corpus/admitted-preview/selection.json",
+            "sha256": "ec318fa35c17d9972a045b0037b296995c4b64a83d807a53c5df28a712351c84"
+          },
+          "meaning": "Metadata-only review clears three descriptor input changes; unchanged1708working membership. Listing does not execute shaders."
+        }
+      },
+      "limitations": [
+        "Runtime working tier only; exploratory failures/untested cells remain separate.",
+        "No new numerical/material-performance/physical-surface/OptiX qualification is inferred from this corpus run."
+      ],
+      "cadence": {
+        "last_full_unchanged": true,
+        "meaning": "Working-tier integration does not replace the accepted full checkpoint."
+      }
     }
   }
 }

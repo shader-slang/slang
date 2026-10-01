@@ -77,7 +77,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Twenty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 68 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 69 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -97,8 +97,9 @@ The previous four-item stop is superseded. Approximate Half policies remain sepa
 
 The tier selector is implemented and reviewed: 1,708 working configurations, 455 exploratory
 configurations and a 15-cell smoke subset. Its 43 CPU contracts and all 15 smoke cells pass;
-the first smoke run took 22.16 seconds. This inventory does not claim a fresh full working run.
-Three working descriptor-conversion cells retain changed-input review status; none is in smoke.
+the first smoke run took 22.16 seconds. The integration run below now qualifies this inventory.
+The three descriptor-conversion input changes are reviewed: their stronger UInt2/guard oracle
+preserves the original UInt64 checks, and all three current configurations pass.
 OptiX raygen is accepted: O0/O3 each pass two changed launches with complete 170-word output,
 guards, reflected ABI and no skips. Provider signature/no-mutation, compute-stage rejection,
 static SBT stage/type/load checks and two PTX fixture cells pass. Initial test-only COM/CLI/output
@@ -114,7 +115,13 @@ Miss/ClosestHit-only admission, and a live texture/BSDF/payload path. All seven 
 host oracle. NVVM O0 differs from CUDA in 12 material words within the retained numerical budget;
 O3 matches every word for these finite inputs. The initial sampler warning-only failure is retained.
 No full generated-material, packed texture-handle or performance claim is made.
-The working-corpus integration run is due now after raygen, triangle and material iterations.
+The working-corpus integration is qualified with focused repairs: the 1,708-cell run took
+1,057.09s and returned 1,706 correct plus two BF16 local-record preflight regressions. An earlier
+storage-role tightening omitted the existing BF3/BF4 local-record family. Restoring that one
+Storage admission passes both exact discovery retries, the existing emission unit, a new
+role/cache boundary unit and all 15 smoke cells (22.18s). The original 1,706 passes retain their
+tested identity; only the two retries and smoke are fresh with the repair. Initial failures and
+input-change histories are preserved; this is not a new full multi-suite baseline.
 Active plans remain uncommitted.
 
 Current additions beyond the full checkpoint are:
@@ -176,11 +183,13 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-**Active work:** run the working corpus at this material integration checkpoint, review actual
-regressions and the three retained descriptor input changes, then use bounded exploratory failures
-to choose application-relevant work. Smoke has passed after every implementation iteration.
-The prior full baseline remains authoritative for its identity; the working tier is not another
-full multi-suite campaign.
+**Active work:** finish optional sibling `../slang-rhi` CUDA validation setup against this local
+Slang build, as requested by the maintainer. Preserve its existing `build-all`; the separate build
+is under `build/nvvm-rhi-cuda/rhi-build`. Full RHI runs are on demand, outside the automatic smoke/
+working cadence. The bounded triangle probe passes NVRTC but first rejects a conventional-global
+`uint2` field address in NVVM; `PrimitiveIndex` is another known missing operation behind it.
+Use those concrete application boundaries to select the next feature work after setup qualification.
+Smoke has passed after every implementation iteration. The prior full baseline retains its identity.
 
 ## Retained boundaries
 

@@ -2586,6 +2586,7 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
             // A parameter-group request may already have cached this exact struct. Prove its
             // ordinary storage role independently before any representation cache lookup.
             if (isHelperValue || resourceStructType || physicalArrayStructType ||
+                asNVVMSupportedLocalBFloat16RecordType(structType) ||
                 asNVVMSupportedAggregateStorageStructType(structType))
                 return true;
             // Collected globals have a distinct producer-owned field algebra, including physical
