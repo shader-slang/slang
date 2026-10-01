@@ -56,7 +56,48 @@ function(generator dir)
     endif()
 endfunction()
 
-if(NOT SLANG_OVERRIDE_LUA_PATH)
+if(SLANG_USE_SYSTEM_LUA)
+    if(SLANG_OVERRIDE_LUA_PATH)
+        message(
+            FATAL_ERROR
+            "SLANG_USE_SYSTEM_LUA and SLANG_OVERRIDE_LUA_PATH cannot be combined"
+        )
+    endif()
+    find_package(Lua 5.4 QUIET)
+    set(slang_fiddle_lua_include_args)
+    if(Lua_FOUND)
+        set(slang_fiddle_lua_library ${LUA_LIBRARIES})
+        # The system include path belongs only to this leaf generator, not its interface.
+        set(slang_fiddle_lua_include_args
+            INCLUDE_DIRECTORIES_PRIVATE
+            ${LUA_INCLUDE_DIR}
+        )
+    else()
+        # FindLua in CMake 3.22 does not search Lua 5.5. Its pkg-config file does.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SLANG_LUA55 REQUIRED IMPORTED_TARGET lua-5.5)
+        set(slang_fiddle_lua_library PkgConfig::SLANG_LUA55)
+        # The imported target supplies its own include directories.
+    endif()
+    # The bundled translation unit compiles Lua's private onelua.c source.
+    slang_glob_sources(slang_fiddle_sources slang-fiddle)
+    list(
+        REMOVE_ITEM
+        slang_fiddle_sources
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
+    )
+    generator(
+        slang-fiddle
+        EXPLICIT_SOURCE
+        ${slang_fiddle_sources}
+        LINK_WITH_PRIVATE
+        compiler-core
+        ${slang_fiddle_lua_library}
+        ${slang_fiddle_lua_include_args}
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        SLANG_USE_SYSTEM_LUA=1
+    )
+elseif(NOT SLANG_OVERRIDE_LUA_PATH)
     generator(
         slang-fiddle
         LINK_WITH_PRIVATE
@@ -429,6 +470,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
+            # The record-replay unit tests call into the record-replay subsystem, which is compiled
+            # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
+            SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -452,6 +496,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )

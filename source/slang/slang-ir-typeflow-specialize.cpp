@@ -7869,7 +7869,25 @@ struct TypeFlowSpecializationContext
         return replaceType(context, inst);
     }
 
-    bool handleDefaultStore(IRInst* context, IRStore* inst)
+    // Return the canonical form this pass uses for the pointee type `type` of a store
+    // destination.
+    //
+    // The pointee type is whatever the producer of the pointer happened to spell, which is not
+    // always the canonical lowered form this pass assigns to values. A one-element
+    // `UntaggedUnionType({S})` and a bare `S` denote the same type: `getLoweredType` collapses
+    // the former to the latter for every value it retypes, and `lowerUntaggedUnionTypes` later
+    // performs the same collapse on the type itself. Running the pointee type through
+    // `getLoweredType` makes the store rules speak the same spelling as `replaceType`, so the
+    // two cannot each undo the other's rewrite. `getLoweredType` yields null for the set types
+    // that have no lowered form of their own, in which case the type is already what we want.
+    IRType* getCanonicalPointeeType(IRType* type)
+    {
+        if (auto loweredType = (IRType*)getLoweredType(type))
+            return loweredType;
+        return type;
+    }
+
+    bool handleDefaultStore(IRStore* inst, IRType* destType)
     {
         // This handles a rare case in the compiler, where we
         // try to use default-construct to initialize a field.
@@ -7881,26 +7899,12 @@ struct TypeFlowSpecializationContext
         // modify the default-construct operand's type to
         // match the field.
         //
-        SLANG_UNUSED(context);
         SLANG_ASSERT(inst->getVal()->getOp() == kIROp_DefaultConstruct);
-        auto ptr = inst->getPtr();
-        // Mirror specializeLoad's element-type extraction: the pointer
-        // can be either an IRPtrTypeBase or an IRPointerLikeType
-        // (ConstantBuffer / ParameterBlock). Both store the element
-        // type as operand 0.
-        auto destPtrType = as<IRPtrTypeBase>(ptr->getDataType());
-        auto destPointerLikeType = as<IRPointerLikeType>(ptr->getDataType());
-        IRType* destInfo = destPtrType           ? destPtrType->getValueType()
-                           : destPointerLikeType ? destPointerLikeType->getElementType()
-                                                 : nullptr;
-        if (!destInfo)
-            return false;
-        auto valInfo = inst->getVal()->getDataType();
 
         // "Legalize" the store type.
-        if (destInfo != valInfo)
+        if (destType != inst->getVal()->getDataType())
         {
-            inst->getVal()->setFullType(destInfo);
+            inst->getVal()->setFullType(destType);
             return true;
         }
         else
@@ -7920,11 +7924,16 @@ struct TypeFlowSpecializationContext
         // element type via getElementType().
         auto storePtrType = as<IRPtrTypeBase>(ptr->getDataType());
         auto storePointerLikeType = as<IRPointerLikeType>(ptr->getDataType());
-        IRType* ptrInfo = storePtrType           ? storePtrType->getValueType()
-                          : storePointerLikeType ? storePointerLikeType->getElementType()
-                                                 : nullptr;
-        if (!ptrInfo)
+        IRType* rawPtrInfo = storePtrType           ? storePtrType->getValueType()
+                             : storePointerLikeType ? storePointerLikeType->getElementType()
+                                                    : nullptr;
+        if (!rawPtrInfo)
             return false;
+
+        // Both rewrites below retype or rebuild the stored value to agree with the destination,
+        // so they have to target the destination type in the canonical form `replaceType`
+        // assigns to values.
+        IRType* ptrInfo = getCanonicalPointeeType(rawPtrInfo);
 
         // Special case for default initialization:
         //
@@ -7933,7 +7942,7 @@ struct TypeFlowSpecializationContext
         // produce a store of default-constructed value.
         //
         if (as<IRDefaultConstruct>(inst->getVal()))
-            return handleDefaultStore(context, inst);
+            return handleDefaultStore(inst, ptrInfo);
 
         IRBuilder builder(context);
         builder.setInsertBefore(inst);

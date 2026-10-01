@@ -1103,6 +1103,7 @@ meanings of their `CompilerOptionValue` encodings.
 | Target             | Specifies the target format. Has same effect as setting TargetDesc::format. |
 | WarningsAsErrors   | Specifies a list of warnings to be treated as errors. `stringValue0` encodes a comma separated list of warning codes or names, or can be "all" to indicate all warnings. |
 | DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
+| DisableNotes       | Specifies a list of notes to disable. `stringValue0` encodes comma separated list of note codes or names. |
 | EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
 | DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
 | WarningLevel       | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`; `SLANG_WARNING_LEVEL_DEFAULT` is the always-on group and is a no-op here). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. The groups are independent (not nested): `extra` is on by default while `pedantic` is off by default, and warnings in the always-on default group are unaffected. |
@@ -1147,7 +1148,8 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| BitfieldPackingRules | Selects bitfield packing rules. `intValue0` encodes a `slang::BitfieldPackingRules` value. |
+| UseMSVCStyleBitfieldPacking | Deprecated. `intValue0` encodes a bool that selects MSB-first packing with a new storage unit when the underlying type size changes. If both this option and `BitfieldPackingRules` are set, the `BitfieldPackingRules` option takes precedence. Use `BitfieldPackingRules` instead. |
 
 ### Compiler Option ABI Stability
 

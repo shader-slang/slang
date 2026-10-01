@@ -132,7 +132,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
             return artifact;
     }
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         // If we haven't yet computed a layout for this target
         // program, we need to make sure that is done before
@@ -145,6 +145,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
 
         return _createEntryPointResult(entryPointIndex, sink);
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const Exception& e)
     {
         sink->diagnose(Diagnostics::CompilationAbortedDueToException{
@@ -152,6 +153,7 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
             .exceptionMessage = e.Message});
         return nullptr;
     }
+#endif
 }
 
 } // namespace Slang

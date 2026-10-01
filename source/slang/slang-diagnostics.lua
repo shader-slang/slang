@@ -378,6 +378,21 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "deprecated-msvc-style-bitfield-packing",
+    134,
+    "`-msvc-style-bitfield-packing` is deprecated: it packs bitfields MSB-first, unlike MSVC "
+        .. "on little-endian platforms. Use `-bitfield-packing-rules legacy-msb-first-msvc` "
+        .. "for the same packing behavior, or `-bitfield-packing-rules msvc` for MSVC bitfield "
+        .. "packing"
+)
+
+err(
+    "conflicting-bitfield-packing-rules-options",
+    135,
+    "`-msvc-style-bitfield-packing` cannot be combined with `-bitfield-packing-rules`"
+)
+
 err(
     "unknown-source-language",
     19,
@@ -534,6 +549,12 @@ err(
     "unable-to-set-default-downstream-compiler",
     87,
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
+)
+
+standalone_note(
+    "module-format-not-finalized",
+    88,
+    "the Slang module file format is not yet finalized and is not versioned across compiler releases; a compiled Slang module can only be loaded by the exact same Slang compiler version that produced it"
 )
 
 err("expecting-slang-riff-container", 89, "expecting a slang riff container")
@@ -4113,6 +4134,13 @@ err(
     span { loc = "location", message = "bit-field type (~type:Type) must be an integral type" }
 )
 
+err(
+    "zero-width-bit-field-unsupported-in-msvc-packing",
+    31302,
+    "zero-width bit fields are not supported by `-bitfield-packing-rules msvc`",
+    span { loc = "location", message = "this zero-width bit field has no defined MSVC packing behavior in Slang" }
+)
+
 --
 -- 314xx: declaration nesting validation
 --
@@ -5109,6 +5137,13 @@ err(
     40020,
     "loop unrolling failed",
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
+)
+
+err(
+    "conditional-has-value-not-constant",
+    40024,
+    "Conditional hasValue is not a compile-time constant",
+    span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
 )
 
 fatal(
