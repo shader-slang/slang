@@ -199,6 +199,12 @@ world-ray/range/flags/hit-identity queries and two triangle attributes inside An
 and FORCE_NON_OPAQUE rays. Use the same selector options for focused NVVM execution or an NVRTC
 control. Its exact barycentric qualification is limited to the maintained ray/triangle fixture.
 
+The focused `ray-tracing-array-payload-flat.cuda` and `ray-tracing-array-payload-nested.cuda`
+cases each run O0/O3 internally. They independently check 12-word and 32-word array payloads
+through caller, AnyHit, ClosestHit and miss, including complete output buffers and guards. Select
+both names with the same compiler/device options. Their local geometry prevents duplicate AnyHit
+invocations; they do not require matrix queries or a full-suite run.
+
 Only when the broader suite is requested, run the same command with `--test-case='*.cuda'`.
 Keep NVVM and NVRTC logs separate, retain initial failures, and inspect executed/failed/skipped
 counts and individual diagnostics. A zero-test filter or skipped test is not runtime qualification.

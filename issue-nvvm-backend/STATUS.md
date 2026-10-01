@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 76 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty-one feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 77 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -251,9 +251,20 @@ The affected unit retains 62 forbidden-stage/no-mutation cases and passes; all 1
 in 21.96s. The eight-job incremental build took 32.59s. No core/provider/static/API changes were
 needed, so unchanged contracts retain their earlier evidence. Raw evidence: build/nvvm-anyhit-state.
 
-**Next work:** probe the four existing RHI ObjectToWorld/WorldToObject matrix cases and audit their
-fixed-array payload and transform-composition boundaries. Raw SDK object-ray queries are AnyHit/
-Intersection-only, so ClosestHit needs a different implementation, not broader stage admission.
-GeometryIndex is not interchangeable with an SBT record index. Keep motion, procedural/callable ABI
-and recursive callback tracing separate. This is one implementation iteration after the 1,711-cell working
-checkpoint at 0762f003c; that checkpoint was not rerun or relabeled. Full RHI remains on demand.
+Fixed-array payload admission is accepted through the existing register-packing traversal. Dense
+positive literal arrays recursively total at most 32 words; explicit strides, padding and unsupported
+leaves remain rejected. The independent flat Float32[12] and nested mixed 32-word RHI oracles pass
+293 assertions at NVVM O0/O3, with matching prior-compiler NVRTC controls. All 23 static boundary
+cases and 15 smoke cells pass (21.65s). A test-only static build typo was corrected with the existing
+poison builder; production/runtime evidence is unchanged. Exact identities and retry history are
+in focused evidence; raw evidence is under build/nvvm-optix-array-payload.
+
+**Next work:** localize module-scope constant expressions through the existing shared IR pass.
+The unchanged four matrix tests now fail at vector `add`, after passing array payload admission;
+an isolated O3 raygen dump confirms the module expression. A separate closest-hit dump rejects
+the CUDA-only matrix wrapper, so transform-query support remains a subsequent contract. Their
+NVRTC control passes all four tests (162 assertions); no NVVM matrix execution is claimed.
+Raw SDK object-ray queries remain AnyHit/Intersection-only, and GeometryIndex is distinct from
+SBT record index. Motion, procedural/callable ABI and recursive callback tracing remain separate.
+This is two small iterations after the 1,711-cell working checkpoint at `0762f003c`; that checkpoint
+was not rerun or relabeled. Full RHI remains on demand.

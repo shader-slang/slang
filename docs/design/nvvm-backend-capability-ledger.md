@@ -45,15 +45,23 @@ Each of six cases checks four hits, four misses and all 34 output words, includi
 Both triangle attributes are consumed with unequal values (.125 and .25); Float4 lanes use independent
 exact IEEE bit expectations. The existing render-test scene provides real acceleration structures.
 
-Type admission is limited to padding-free Int32/UInt32/Float32 scalar/vector/record payloads of
-1..32 words; runtime numerical qualification is UInt and Float4. Opaque acceleration handles have
+Type admission is limited to padding-free Int32/UInt32/Float32 scalar/vector/record/fixed-array
+payloads of 1..32 words. The sibling RHI flat and nested array tests add runtime qualification for
+Float32[12] and nested records totaling exactly 32 words (Float2 arrays, signed and unsigned arrays).
+Both execute caller/AnyHit/ClosestHit/miss at NVVM O0/O3: 293 assertions pass, with all 26/66 output
+words and guards checked. A prior-compiler NVRTC control passes the same oracle. Stateful AnyHit
+arithmetic uses explicit no-duplicate geometry and forced nonopaque traversal. The expanded static
+unit checks 23 admission/preflight cases; all 15 smoke cells pass. Its initial test-only build error
+used an abstract IR opcode instead of the existing poison builder; the corrected static build and
+unit pass without changing production. UInt and Float4 retain their earlier runtime qualification. Opaque acceleration handles have
 value, local-storage and helper-parameter roles, without integer semantics or recursive resource
 aggregate admission. Provider tests cover 1/4/32 live words, exact SDK adaptation and rejection
 without mutation. Preflight enforces stages and rejects missing optional trace support before
 module creation. Static tests retain SBT layout/load and role/cache boundaries.
 
-Qualification is CUDA12.9/OptiX SDK9, target SM80 on the recorded L4/595.71.05 host. Pointer payloads,
-arrays/matrices, padded/subword payloads, procedural intersection, callables and recursive
+The original raygen/triangle fixtures target SM80 with CUDA12.9/OptiX SDK9 on the recorded
+L4/595.71.05 host; sibling RHI targets follow the CUDA device. Pointer payloads, matrices,
+explicitly strided/unsized arrays, padded/subword payloads, procedural intersection, callables and recursive
 callback tracing remain outside this contract. The shared payload-termination producer repair is separately
 qualified by nine CUDA/NVRTC modes at O0/O3 (231 assertions), a focused IR boundary unit and
 source regressions. A subsequent bounded AnyHit batch qualifies exact object-ray queries and
@@ -85,6 +93,12 @@ closest-hit/any-hit. RayFlags is qualified in miss/closest-hit/any-hit. The opti
 instances, distinct custom IDs, primitive indices 0/1/2, one miss and all 44 words at NVVM O0/O3;
 NVRTC controls use the same independent host oracle. Both triangle windings and incoming flags 0/1
 are checked, including nonzero flags in miss. The original RHI triangle test also passes.
+
+The four unchanged RHI ObjectToWorld/WorldToObject matrix tests pass their NVRTC control (162
+assertions) but remain unqualified on NVVM. Array admission advances their failure from
+`optixTraceRay` to module-scope vector `add`. Separate O3/SM80 CLI probes identify raygen global
+expression localization and the callback's CUDA-only matrix wrapper as distinct missing contracts.
+Neither diagnostic is a runtime matrix result.
 These application tests use RHI's actual-device target policy, separate from the SM80 fixtures above.
 Compute/raygen calls to ray state and compute/raygen/miss calls to hit-only helpers reject before
 provider module creation.

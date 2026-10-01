@@ -1124,6 +1124,19 @@ UInt getNVVMOptixPayloadRegisterCount(IRType* type)
             return 0;
         count = UInt(lanes->getValue());
     }
+    else if (auto arrayType = as<IRArrayType>(type))
+    {
+        // The shared payload traversal visits elements consecutively. Natural CUDA layout
+        // and the recursive size check below prove dense packing, but do not interpret an
+        // explicit array stride, even when it happens to equal the natural stride.
+        auto elements = as<IRIntLit>(arrayType->getElementCount());
+        if (arrayType->getArrayStride() || !elements || elements->getValue() <= 0)
+            return 0;
+        UInt elementWords = getNVVMOptixPayloadRegisterCount(arrayType->getElementType());
+        if (!elementWords || elements->getValue() > IRIntegerValue(32 / elementWords))
+            return 0;
+        count = UInt(elements->getValue()) * elementWords;
+    }
     else if (auto structType = as<IRStructType>(type))
     {
         for (auto field : structType->getFields())

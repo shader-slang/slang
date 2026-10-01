@@ -153,6 +153,21 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
     {
         Valid,
         Float4,
+        FloatArray12,
+        Float3Array,
+        NestedMixed32,
+        ZeroArray,
+        NegativeArray,
+        OversizeArray,
+        HugeArray,
+        NonliteralArray,
+        UnsizedArray,
+        NaturalStrideArray,
+        InflatedStrideArray,
+        PaddedRecordArray,
+        BoolArray,
+        HalfArray,
+        UInt64Array,
         Compute,
         CallbackTrace,
         AnyHitTrace,
@@ -163,6 +178,21 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
     for (auto testCase :
          {Case::Valid,
           Case::Float4,
+          Case::FloatArray12,
+          Case::Float3Array,
+          Case::NestedMixed32,
+          Case::ZeroArray,
+          Case::NegativeArray,
+          Case::OversizeArray,
+          Case::HugeArray,
+          Case::NonliteralArray,
+          Case::UnsizedArray,
+          Case::NaturalStrideArray,
+          Case::InflatedStrideArray,
+          Case::PaddedRecordArray,
+          Case::BoolArray,
+          Case::HalfArray,
+          Case::UInt64Array,
           Case::Compute,
           Case::CallbackTrace,
           Case::AnyHitTrace,
@@ -181,21 +211,123 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
         auto field = builder.createStructField(globals, builder.createStructKey(), handleType);
         auto global = builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
         auto payload = builder.createStructType();
-        IRType* leaf = testCase == Case::Float4
-                           ? static_cast<IRType*>(builder.getVectorType(builder.getFloatType(), 4))
-                       : testCase == Case::Bool ? static_cast<IRType*>(builder.getBoolType())
-                                                : builder.getUIntType();
+        IRType* leaf = builder.getUIntType();
+        UInt count = 1;
+        bool payloadValid = true;
+        switch (testCase)
+        {
+        case Case::Float4:
+            leaf = builder.getVectorType(builder.getFloatType(), 4);
+            count = 4;
+            break;
+        case Case::Bool:
+            leaf = builder.getBoolType();
+            payloadValid = false;
+            break;
+        case Case::Padding:
+            payloadValid = false;
+            break;
+        case Case::FloatArray12:
+        case Case::Float3Array:
+        case Case::NestedMixed32:
+        case Case::ZeroArray:
+        case Case::NegativeArray:
+        case Case::OversizeArray:
+        case Case::HugeArray:
+        case Case::NonliteralArray:
+        case Case::UnsizedArray:
+        case Case::NaturalStrideArray:
+        case Case::InflatedStrideArray:
+        case Case::PaddedRecordArray:
+        case Case::BoolArray:
+        case Case::HalfArray:
+        case Case::UInt64Array:
+            {
+                IRType* element = builder.getFloatType();
+                IRIntegerValue length = 12;
+                if (testCase == Case::Float3Array)
+                {
+                    element = builder.getVectorType(builder.getFloatType(), 3);
+                    length = 4;
+                }
+                else if (testCase == Case::NestedMixed32)
+                {
+                    // Each dense record has two signed words and two float3 values. Four
+                    // records exercise nested arrays and exactly the 32-register limit.
+                    auto record = builder.createStructType();
+                    builder.createStructField(
+                        record,
+                        builder.createStructKey(),
+                        builder.getVectorType(builder.getIntType(), 2));
+                    builder.createStructField(
+                        record,
+                        builder.createStructKey(),
+                        builder.getArrayTypeBase(
+                            kIROp_ArrayType,
+                            builder.getVectorType(builder.getFloatType(), 3),
+                            builder.getIntValue(builder.getIntType(), 2)));
+                    element = record;
+                    length = 4;
+                }
+                else if (testCase == Case::PaddedRecordArray)
+                {
+                    auto record = builder.createStructType();
+                    builder.createStructField(
+                        record,
+                        builder.createStructKey(),
+                        builder.getVectorType(builder.getFloatType(), 4));
+                    builder.createStructField(
+                        record,
+                        builder.createStructKey(),
+                        builder.getUIntType());
+                    element = record;
+                    length = 2;
+                }
+                else if (testCase == Case::BoolArray)
+                    element = builder.getBoolType();
+                else if (testCase == Case::HalfArray)
+                    element = builder.getHalfType();
+                else if (testCase == Case::UInt64Array)
+                    element = builder.getUInt64Type();
+                if (testCase == Case::ZeroArray)
+                    length = 0;
+                else if (testCase == Case::NegativeArray)
+                    length = -1;
+                else if (testCase == Case::OversizeArray)
+                    length = 33;
+                else if (testCase == Case::HugeArray)
+                    length = 0x100000000LL;
+                IRInst* arrayCount = builder.getIntValue(builder.getInt64Type(), length);
+                if (testCase == Case::NonliteralArray)
+                    arrayCount = builder.getPoison(builder.getIntType());
+                IRInst* stride = nullptr;
+                if (testCase == Case::NaturalStrideArray || testCase == Case::InflatedStrideArray)
+                    stride = builder.getIntValue(
+                        builder.getIntType(),
+                        testCase == Case::NaturalStrideArray ? 4 : 8);
+                leaf = builder.getArrayTypeBase(
+                    testCase == Case::UnsizedArray ? kIROp_UnsizedArrayType : kIROp_ArrayType,
+                    element,
+                    arrayCount,
+                    stride);
+                payloadValid = testCase == Case::FloatArray12 || testCase == Case::Float3Array ||
+                               testCase == Case::NestedMixed32;
+                count = testCase == Case::NestedMixed32 ? 32 : 12;
+                break;
+            }
+        default:
+            break;
+        }
         builder.createStructField(payload, builder.createStructKey(), leaf);
         if (testCase == Case::Padding)
             builder.createStructField(
                 payload,
                 builder.createStructKey(),
                 builder.getVectorType(builder.getFloatType(), 4));
-        UInt count = testCase == Case::Float4 ? 4 : 1;
-        const bool valid = testCase == Case::Valid || testCase == Case::Float4;
-        SLANG_CHECK(
-            getNVVMOptixPayloadRegisterCount(payload) ==
-            (testCase == Case::Bool || testCase == Case::Padding ? 0 : count));
+        const bool valid = payloadValid && testCase != Case::Compute &&
+                           testCase != Case::CallbackTrace && testCase != Case::AnyHitTrace &&
+                           testCase != Case::WrongOperand;
+        SLANG_CHECK(getNVVMOptixPayloadRegisterCount(payload) == (payloadValid ? count : 0));
         auto entry = builder.createFunc();
         entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
         builder.addEntryPointDecoration(

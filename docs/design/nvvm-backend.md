@@ -117,9 +117,13 @@ are readonly to shader stores, but loads are not invariant because hosts can cha
 launches. The shared immutable-location policy owns that distinction.
 
 `TraceRay` constructs a typed IR operation with explicit ray fields and the original payload type.
-Shared CUDA payload layout admits nonempty, padding-free Int32/UInt32/Float32 scalars, vectors and
-records totaling at most 32 words. Caller packing and callback unpacking reuse the same traversal;
-unsupported shapes retain an operation or pointer fallback that NVVM preflight rejects. The lowered
+Shared CUDA payload layout admits nonempty, padding-free Int32/UInt32/Float32 scalars, vectors,
+records and fixed arrays totaling at most 32 words. Array counts must be positive literals, checked
+against the remaining word bound before multiplication. Recursive CUDA size equality proves dense
+natural packing, including array elements; explicit array strides remain outside this contract
+because the shared layout query does not interpret them. Caller packing and callback unpacking
+reuse the same traversal; unsupported shapes retain an operation or pointer fallback that NVVM
+preflight rejects. The lowered
 trace keeps its original type and returns an ordinary UInt32 array. Checked plans validate this
 contract before provider mutation. The original payload type is an explicit type dependency even
 when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit/any-hit;
