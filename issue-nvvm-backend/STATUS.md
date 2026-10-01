@@ -9,7 +9,7 @@ normalization at exact-width integer consumers. The consolidated integration che
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
-below; the maintainer has resumed the four bounded items listed below.
+below; the four bounded items are complete and work is stopped for discussion.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -85,9 +85,9 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Twenty-one feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 63 feature objects, preserving all prior objects and the full baseline. Each feature's
+now contains 64 feature objects (including the latest bounded investigation), preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
-These batches used eight-job builds and focused validation. The newly authorized sequence is:
+These batches used eight-job builds and focused validation. The authorized sequence is complete:
 
 1. Unify pointer-to-UInt64 reinterpretation with the existing checked address-observation contract.
 2. Add explicit-layout record field loads and stores across Std430/Scalar/C in bounded batches.
@@ -96,7 +96,8 @@ These batches used eight-job builds and focused validation. The newly authorized
 4. Investigate restricted CubeArray binding and mip-query failures, implementing fixes supported
    by the findings and retaining unresolved external/semantic boundaries.
 
-Stop again after item 4. Approximate Half math and other feature work remain outside this sequence.
+**Stopped after item 4, as requested.** Approximate Half math and other feature work remain outside
+this sequence; a new resume request is required.
 
 Current additions beyond the full checkpoint are:
 
@@ -123,13 +124,18 @@ Current additions beyond the full checkpoint are:
   and AnyValue expansion remain excluded. CUDA rejects Std430 and uses 40 for
   Scalar/C; its three nonzero Scalar mismatches remain recorded.
 
-The latest batch is `features.nvvm-link-options-and-static-context`, raw evidence under
-`build/nvvm-link-options/`. Already compiled components can be relinked with different options
-without mutating original options, hashes, layouts or cached code. Six focused checks pass.
-The copyable-context fixture now explicitly initializes its static record; three same-context
-launches in each of NVRTC O3/NVVM O0/NVVM O3 produce all32 expected values. Bare static storage
-still has no implicit-zero promise. Initial route/hash failures and third-dispatch failure remain
-retained as resolved histories; the full baseline is unchanged.
+Items 1–3 are committed as `180094a4f`, `a4bb02c78` and `37675d632`: checked pointer
+reinterpretation, planned explicit-layout field memory, independent linked-option/cache ownership,
+and explicit initialization of the repeated-dispatch fixture. The latter passes six focused checks
+and three launches in each of NVRTC O3/NVVM O0/NVVM O3. Historical failures remain retained.
+
+The latest record is `features.nvvm-texture-dimension-investigation`, raw evidence under
+`build/nvvm-texture-dimension-investigation/`. Restricted CubeArray faces 6..23 select the intended
+three source cubes but report 18 as depth through both runtime and direct driver creation. Mip-width
+queries execute correctly through PTX JIT/cubin for full and restricted views. Mip-count/array-size
+queries fail with error 500 at lookup (default loading) or load (eager), despite successful assembly and present
+kernel symbols. The extra undefined descriptor-size symbol is a diagnostic lead, not a fix.
+No complete new public texture contract is established, so item 4 changes documentation/evidence only.
 
 The full checkpoint remains unchanged: its 36 main gaps and 249 surface cells retain their original
 identities. Focused records supersede specifically resolved texture-handle, dynamic-surface and
@@ -138,9 +144,10 @@ need reviewed adoption at the next deliberately selected full checkpoint. No aut
 
 Keep these open distinctions visible:
 
-- CubeArray restricted views reported a plausible count but selected faces shifted by one face;
-  full-view success does not qualify restricted binding. Mip-query linkage failures and the full
-  dimensions corpus fixture remain unresolved. Do not divide counts or guess view endpoints.
+- CubeArray endpoints 1..3 reported count 3 with shifted faces; face-aligned 6..23 now samples the
+  intended cubes but reports 18. Driver creation reproduces the mismatch. Mip-count materialization
+  failures and the full dimensions fixture remain unresolved. Do not divide counts or fabricate
+  reserved descriptor metadata.
 - The original three-layout pointer fixture now compiles through the shared checked pointer-to-UInt64
   conversion. Its unspecified pointer bindings are never executed, so this is a compile-only
   resolution. Broader conventional pointer storage and AnyValue roles remain separate work.
@@ -151,9 +158,7 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-The parameter-group slice is complete. **Resumed for the four items above, then stop again.**
-Items 1–2 are committed as `180094a4f` and `a4bb02c78`. Item 3 is complete; next: the
-restricted CubeArray and mip-query investigation, then stop.
+**All four authorized items are complete. Stopped for discussion; do not resume the general loop.**
 
 ## Retained boundaries
 

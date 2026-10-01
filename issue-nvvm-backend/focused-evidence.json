@@ -83079,6 +83079,143 @@
         "meaning": "Nonexistent bin/render-test identity path failed before GPU execution; corrected to existing lib/librender-test-tool.so and rerun with fresh output directory."
       },
       "qualification": "Six focused checks and three same-context/module launches in each of NVRTC O3/NVVM O0/NVVM O3. Reset256 input/output bytes before each launch; all32 expected values and later full-output equality checked. No full suite or performance claim. Module43/ABI46/container2 unchanged."
+    },
+    "nvvm-texture-dimension-investigation": {
+      "status": "accepted-bounded-investigation",
+      "scope": "Restricted CubeArray content/query discrepancy and mip-count driver loading failures isolated without Slang/NVVM code generation. No new public texture capability is admitted.",
+      "identity": {
+        "source_revision": "a4bb02c78ba77c4c64b32add3b5544e8429bda9a",
+        "meaning": "Raw CUDA/PTX investigation; current uncommitted shared linking fix does not participate in these standalone probes. No Slang codegen qualification.",
+        "target": "sm_80",
+        "files": {
+          "build/nvvm-texture-dimension-investigation/array-size.ptx": "13513824fef725f00807ad25b1f2ae07c4fc7bd2ef70093fd773831178274d06",
+          "build/nvvm-texture-dimension-investigation/levels.ptx": "3559e11a908fa2e9047788f074d163cddfc629d2aedfe772565ee54b6fd8b1fc",
+          "build/nvvm-texture-dimension-investigation/width.ptx": "5f1ba53d4ea75078ad59bcde69315bcc054f3a28d6454cb3228e487f1debf65d",
+          "build/nvvm-texture-dimension-investigation/levels.cubin": "cf6df5fe7f21681ee758ea3d8a58e438fb867ac3394275db608da6007350969c",
+          "build/nvvm-texture-dimension-investigation/width.cubin": "567170be58f180e291a95a073a3bb3440c1685b8774beea3a51ec3456b96bba7",
+          "build/nvvm-texture-dimension-investigation/array-size.cubin": "2bb27c5fe0753483f89ae3c38cf372fc5733e4f62b8ce9596608dc8fce474016",
+          "build/nvvm-texture-dimension-investigation/cube-content-probe.cu": "aefdcd13df99d8b63ce1c6140e8fcf33522435d23afda2ff0a37cedc142c04b0",
+          "build/nvvm-texture-dimension-investigation/cube-content-probe": "ef8577a8beb33c3a71971a5521b9476a51b7dbd3097496230df3289524492353",
+          "build/nvvm-texture-dimension-investigation/cube-driver-content-probe.cu": "87fe0ae53c01f63200b6f69c9f43425e39b2863093c4994c504ab50ea49ca7a6",
+          "build/nvvm-texture-dimension-investigation/cube-driver-content-probe": "101e5f48c4085cb6494e45627cb17ccf52fb43ab44b64f919746be75912dc419",
+          "build/nvvm-texture-dimension-investigation/mip-query-probe.cpp": "3f13c6a6f8b663540b2049a8ae70f071555525a07d21b0d84142bf65c78b7a92",
+          "build/nvvm-texture-dimension-investigation/mip-query-probe": "c7230a08c5206798fd50ed50727a039178fae3c22d3c515a2af842d9bdc4db3e",
+          "/usr/local/cuda-12.9/bin/nvcc": "df9974db233a0b7a6c6d59c0e5d74e011566104098bcb3553495ff1b95bdeaf6",
+          "/usr/local/cuda-12.9/bin/ptxas": "983b0e9283855979f42cebfd80d43f9b6e786eb84f03f7570bf941c4d3a3c461",
+          "/usr/bin/g++": "1353e9bdd29a7295c7226bf6c63abccce056d8cac31f112e5cdbecc3f28c2769",
+          "/usr/lib/x86_64-linux-gnu/libcuda.so.1": "76e0d9678d41cf6b6ae71d18549d88a963d3d434f08108baa12457eb53ca88d6",
+          "/usr/local/cuda-12.9/lib64/libcudart.so": "256e6409e4f06f618e1fb53d4844a6b81cdded1013afa8ade40c22f99eb133b7"
+        },
+        "gpu": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, 595.71.05"
+      },
+      "summary": {
+        "status": "investigation-complete-with-external-boundaries",
+        "cube": {
+          "creation_routes": ["runtime", "driver"],
+          "cases_per_route": 3,
+          "identical_outputs": true,
+          "controls": "Null-full and explicit0..4 count5 and all10 face samples pass.",
+          "restricted": {
+            "endpoints": [6, 23],
+            "expected_count": 3,
+            "actual_depth": 18,
+            "content": [100, 104, 200, 204, 300, 304],
+            "descriptor_content_guards": "passed"
+          },
+          "conclusion": "Correct sampled source cubes with wrong intended cube count persists through direct driver creation; not isolated to runtime descriptor translation. No universal divide-by-six rule."
+        },
+        "mip": {
+          "mip-runtime": {
+            "width_checks": 12,
+            "width_full": [8, 4, 2, 1],
+            "width_restricted": [4, 2],
+            "count_array_failures": 8,
+            "failure_stage": "lookup",
+            "error": 500,
+            "artifacts": ["PTX JIT", "ptxas cubin"],
+            "views": ["full", "mips1..2"],
+            "jit_logs": "empty",
+            "descriptor_checks": "passed"
+          },
+          "mip-eager-runtime": {
+            "width_checks": 12,
+            "width_full": [8, 4, 2, 1],
+            "width_restricted": [4, 2],
+            "count_array_failures": 8,
+            "failure_stage": "load",
+            "error": 500,
+            "artifacts": ["PTX JIT", "ptxas cubin"],
+            "views": ["full", "mips1..2"],
+            "jit_logs": "empty",
+            "descriptor_checks": "passed"
+          },
+          "conclusion": "Width mechanism qualified only. Full GetDimensions mip overload still needs an executable level-count mechanism. Count/array opcode failures occur without Slang/NVVM; assembly success alone is not execution support."
+        },
+        "elf": {
+          "global_probe_symbol_present": true,
+          "weak_undefined_only_in_failed_cubins": ".nv.unified.texrefDescSize",
+          "meaning": "Symbol difference is a diagnostic lead, not proof of the complete driver failure cause. No reserved-symbol substitution attempted."
+        }
+      },
+      "validation": {
+        "cube-build": {
+          "path": "build/nvvm-texture-dimension-investigation/cube-build.json",
+          "sha256": "a2d72d09f08848932bd6e48dac57fc0ae980c6616c7e4036a9b842b7e0714915"
+        },
+        "cube-runtime": {
+          "path": "build/nvvm-texture-dimension-investigation/cube-runtime.json",
+          "sha256": "474cc4259fbfd076814b68b437a88e2edf88cc254c2c18872cfac5a3e8465a9b"
+        },
+        "cube-driver-build": {
+          "path": "build/nvvm-texture-dimension-investigation/cube-driver-build.json",
+          "sha256": "0646ba8e7fa4f6e4130196ccc90be62d3418855c856f98aad2fa591f055464ec"
+        },
+        "cube-driver-runtime": {
+          "path": "build/nvvm-texture-dimension-investigation/cube-driver-runtime.json",
+          "sha256": "1f43d58be3a2fab84f0e36c734a33a8d29e92278a4a138f71be4e203430bcd64"
+        },
+        "mip-build": {
+          "path": "build/nvvm-texture-dimension-investigation/mip-build.json",
+          "sha256": "3180c10e4a24ea760b46b43abac89d86ab6c7b3d59dfa7064c43901b6b2bc2d3"
+        },
+        "width-assemble": {
+          "path": "build/nvvm-texture-dimension-investigation/width-assemble.json",
+          "sha256": "e5090b1590094f9afeed01f0279abe6748f910fcbaaa6ac5bd21a769a463d9c6"
+        },
+        "levels-assemble": {
+          "path": "build/nvvm-texture-dimension-investigation/levels-assemble.json",
+          "sha256": "ba7a03357459a3ecde7f78933cfbe793e895d154d7569ebf9f6732c56ae9fe03"
+        },
+        "array-size-assemble": {
+          "path": "build/nvvm-texture-dimension-investigation/array-size-assemble.json",
+          "sha256": "73bada0d0caa995de35dd64bd412f51d9e658790b5dbbbc13e567535f952005b"
+        },
+        "mip-runtime": {
+          "path": "build/nvvm-texture-dimension-investigation/mip-runtime.json",
+          "sha256": "fa90640f03cc3d983d09757bce5c78050787b8e9b7d7764c79aa64e54a93705d"
+        },
+        "mip-eager-runtime": {
+          "path": "build/nvvm-texture-dimension-investigation/mip-eager-runtime.json",
+          "sha256": "c2241a0cbcc3e206c30da3a55ce9ecd7d0bdedd331084dadc166caefecbc3785"
+        },
+        "cubin-symbols": {
+          "path": "build/nvvm-texture-dimension-investigation/cubin-symbols.json",
+          "sha256": "8e4a937f06d8465b4f8557854bcf2319532ba364719567801e50d91ca7c8036d"
+        }
+      },
+      "qualification": "CUDA12.9/L4 driver595.71.05/SM80 only. Four full CubeArray control cases pass across runtime/driver creation; two restricted cases select intended three source cubes but report18 instead of3. Both loading modes execute12 guarded mip-width checks each; eight count/array attempts per loading mode fail500. All mismatches/failures retained, not treated as passes. No compiler rebuild or full suite for this research.",
+      "prior_histories": {
+        "cube_content": {
+          "path": "build/nvvm-texture-cube-view-units/content-probe.cu",
+          "sha256": "4254b8f30a993fc90afefdb7b3aa4cd8623fd9063c03b244a56f530d0a56610a"
+        },
+        "meaning": "Earlier explicit1..3 returned count3 with one-face-shifted samples; earlier6..23 query18 lacked content evidence. Prior feature objects retain complete original logs/identities."
+      },
+      "contract_sources": [
+        "https://docs.nvidia.com/cuda/archive/12.9.1/parallel-thread-execution/index.html#texture-instructions-txq",
+        "https://docs.nvidia.com/cuda/archive/12.9.1/cuda-runtime-api/group__CUDART__TEXTURE__OBJECT.html"
+      ],
+      "remaining": "No documented complete count repair established. Do not divide every cube depth by6, fabricate descriptor-size symbols, infer allocated mip count from dimensions, or enable a partial public GetDimensions overload."
     }
   }
 }

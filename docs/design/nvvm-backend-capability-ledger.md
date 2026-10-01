@@ -495,11 +495,24 @@ observations do not justify a universal division by six. A subsequent content pr
 physical face with `100*cube+face`. Null-full and explicit 0..4 views returned count 5 and sampled
 all five source cubes correctly. Explicit 1..3 returned count 3, but +X/+Z samples were
 `1,5,101,105,201,205` instead of `100,104,200,204,300,304`. Guards and unused output slots survived.
-Thus matching query size does not establish correct cube selection. Restricted cube-view
-interpretation remains unresolved; both experiments and failed hypotheses are retained.
+Thus matching query size does not establish correct cube selection. A subsequent face-aligned
+6..23 content probe samples the intended three source cubes correctly (`100,104,200,204,300,304`),
+but still reports depth 18 instead of 3. Direct `cuTexObjectCreate` and runtime creation produce
+identical descriptor, query, content and guard results, including passing null/full controls.
+This rules out a discrepancy confined to runtime descriptor translation; it does not establish a
+portable restricted-cube count correction. Both earlier failed hypotheses remain recorded.
 
-The observed driver lookup failures for `txq.array_size` and `txq.num_mipmap_levels` are specific to
-the qualified stack; `txq.level.width` loaded and executed. No full API repair is implemented.
+A real 8×4 four-level mip allocation returns widths 8, 4, 2, 1 through `txq.level.width`; a checked view
+of mips 1..2 returns relative-LOD widths 4, 2. PTX JIT and preassembled cubin both execute all guarded
+width checks. Isolated `txq.array_size` and `txq.num_mipmap_levels` assemble successfully but fail
+with driver error 500 at kernel lookup under default lazy loading and at module load under eager loading,
+for both artifact paths and both views. Cubins contain the global kernel symbol; the failing ones
+also contain weak undefined `.nv.unified.texrefDescSize`, a diagnostic lead without an established
+repair. No reserved metadata value is fabricated. This is qualified-stack evidence, not a claim
+that the documented instructions are universally unavailable. The [PTX query contract](https://docs.nvidia.com/cuda/archive/12.9.1/parallel-thread-execution/index.html#texture-instructions-txq)
+and [CUDA view contract](https://docs.nvidia.com/cuda/archive/12.9.1/cuda-runtime-api/group__CUDART__TEXTURE__OBJECT.html)
+remain the external references. No full mip `GetDimensions` repair is implemented; a correct level
+count is still required.
 
 NVVM surface legalization supports the existing native 32-bit signed/unsigned/Float32 scalar, two-
 and four-channel transfers in 1D/2D/3D and 1DArray/2DArray shapes. Native Half and annotated Half
@@ -686,7 +699,9 @@ Complete three-mode comparisons cover 449 frozen and 117 discovery cases; 30,618
 span 3,402 measured mode-round cells. The 78 exclusions retain 72 instances of the existing 36 gaps
 and six new repeatability failures in the copyable-context fixture. The latter returns typed uint32
 failure sentinels, not aggregate padding; both backends leave its bare static aggregate uninitialized.
-The ordinary full checkpoint still has all 1,740 original outcomes unchanged.
+The ordinary full checkpoint still has all 1,740 original outcomes unchanged. A later focused
+fixture correction supplies `state = {};` and passes three launches in each mode; it does not
+retroactively accept these excluded timing samples.
 
 Of 566 complete cases, 557 are below the prespecified 0.1 ms ratio cutoff in at least one mode.
 Eight of the nine longer cases exercise wave/min/max and show 1.76–2.42× higher NVVM O3 intervals

@@ -43,6 +43,8 @@ reinterpretation; explicit-layout record field loads/stores; retained static-sta
 target-option relinking issues; restricted CubeArray/mip-query investigation. Work through those
 bounded items with focused validation and reviewed local commits, then stop again. This authorization
 does not resume the general feature loop or the remaining Half numerical-policy work.
+All four items have now completed with focused review. The requested stop is active; do not select
+or implement another slice without a new maintainer resume request.
 
 Use one implementation owner and an independent reviewer when available. The lead owns scope,
 acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight

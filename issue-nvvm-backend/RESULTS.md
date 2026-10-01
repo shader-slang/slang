@@ -1180,3 +1180,20 @@ For the retained third-dispatch failure, reuse the corpus driver's allocation re
 comparison with one reference, one warmup and one sample launch in each mode. The ignored
 `build/nvvm-link-options/repeat-static-context.py --output <fresh-directory>` adapter also checks
 the exact32 uint32 values6400..6431. Event fields are protocol evidence only, not accepted timing.
+
+### Restricted CubeArray and mip-query investigation
+
+The raw probes under `build/nvvm-texture-dimension-investigation/` use CUDA12.9, target SM80 and
+the recorded L4/driver identity. Compile the two cube probes with nvcc (`-lcuda` for the direct
+driver variant); both retain null/full controls, independent face markers, descriptor readback and
+guards. The restricted 6..23 case deliberately retains depth 18 versus expected 3 as a mismatch,
+even though its six content samples pass. No count correction is qualified.
+
+Assemble the three isolated query PTX files with ptxas and build the host with g++/cudart/cuda.
+The host tests both PTX and cubin against full 8×4 mip geometry and a checked mips 1..2 view. Run
+once normally and once with `CUDA_MODULE_LOADING=EAGER`; record module-load, kernel-lookup and
+execution outcomes separately. Width has 12 guarded successes per loading mode; the other two
+opcodes have 8 failed materialization attempts per mode (driver error 500), not skipped/passing executions.
+`readelf -sW` confirms kernel symbols and the failing cubins' extra weak undefined descriptor-size
+symbol. No private symbol value is supplied. These are standalone CUDA/PTX mechanism results,
+not fresh Slang capability or full-corpus acceptance. All earlier failures remain retained.

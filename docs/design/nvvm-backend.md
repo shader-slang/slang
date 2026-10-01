@@ -438,8 +438,12 @@ owns exact shapes, format admissions and retained exclusions.
 Texture operations use canonical sample/fetch/gather/query IR with typed resources, samplers,
 coordinates and results. Existing ignored gather offsets and zero array-count outputs are not full
 API repairs. Base geometry cannot determine allocated/view mip count. Opaque handles are not an
-undocumented metadata interface; research driver-lookup failures remain evidence, even where ptxas
-accepted the code. Texture/surface and length-one cube-array binding distinctions remain unresolved.
+undocumented metadata interface. Selected-mip width works, but count queries fail during driver
+kernel materialization even for preassembled cubins; assembly success does not establish execution.
+Restricted CubeArray content and query count disagree through both runtime and driver object
+creation. These external boundaries and length-one cube-array binding distinctions remain unresolved;
+no guessed count conversion or private descriptor metadata is used. The resource ledger owns exact
+probe results and preserved failures.
 
 Host packing is part of each test/application contract. For example, CUDA column-major float3x2 uses
 stride12/size24; graphics-packed inputs cannot silently be repacked to make a comparison pass.
