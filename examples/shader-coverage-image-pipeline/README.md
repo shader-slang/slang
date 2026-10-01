@@ -194,10 +194,13 @@ reflection-driven, so it cannot bind the buffer without extra support
 (slang-rhi PR #739). Raw Vulkan lets us bind it directly once we know
 its location.
 
-All raw-Vulkan code is isolated in `vk_compute_demo.h`. When slang-rhi
-PR #739 merges and the submodule is bumped, the migration replaces that
-header and its callers in `main.cpp`; the Slang shader sources stay
-unchanged.
+Vulkan runtime plumbing is shared in
+[`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
+and [its implementation](../shader-coverage-common/vk_compute_demo.cpp), also used
+by the BVH and selectable-backend examples. `main.cpp` still describes this
+example's resources and dispatches. When slang-rhi PR #739 merges and the
+submodule is bumped, those callers can migrate to slang-rhi; the Slang shader
+sources stay unchanged.
 
 ### Metadata-derived binding
 

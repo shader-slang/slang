@@ -56,8 +56,8 @@ set_target_properties(${_copy_target} PROPERTIES FOLDER "examples/copy_assets")
 add_executable(
     shader-coverage-image-pipeline
     main.cpp
-    vk_compute_demo.h
-    vk_compute_demo.cpp
+    ${slang_SOURCE_DIR}/examples/shader-coverage-common/vk_compute_demo.h
+    ${slang_SOURCE_DIR}/examples/shader-coverage-common/vk_compute_demo.cpp
 )
 # Apply the project-default compile/link options, as the bvh-traversal demo
 # does. In particular this adds the SLANG_ENABLE_ASAN sanitizer flags to the

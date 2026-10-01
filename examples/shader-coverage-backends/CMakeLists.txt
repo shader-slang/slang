@@ -6,7 +6,7 @@
 # the whole example — the CPU path (and Metal on Apple platforms)
 # stays available; the Vulkan path is compiled in only when a loader
 # is found. Like the siblings, this uses raw Vulkan rather than
-# slang-rhi until slang-rhi PR #739 lands (see vk_compute_demo.h).
+# slang-rhi until slang-rhi PR #739 lands (see shader-coverage-common/vk_compute_demo.h).
 
 set(_sources main.cpp)
 set(_defines "")
@@ -33,7 +33,12 @@ else()
     endif()
 endif()
 if(_vulkan_loader)
-    list(APPEND _sources vk_compute_demo.h vk_compute_demo.cpp)
+    list(
+        APPEND
+        _sources
+        ${slang_SOURCE_DIR}/examples/shader-coverage-common/vk_compute_demo.h
+        ${slang_SOURCE_DIR}/examples/shader-coverage-common/vk_compute_demo.cpp
+    )
     list(APPEND _defines SLANG_EXAMPLE_HAS_VULKAN=1)
     list(APPEND _libs ${_vulkan_loader} Vulkan::Headers)
 endif()

@@ -143,8 +143,10 @@ Same reason as `shader-coverage-image-pipeline`: Slang's
 parameter-binding layout pass, so it is invisible to ordinary
 `ProgramLayout` reflection and cannot be bound via slang-rhi's
 reflection-driven paths without additional support (slang-rhi PR
-#739). All raw-Vulkan code is isolated in `vk_compute_demo.h`; see
-the image-pipeline README for the full rationale and migration plan.
+#739). Vulkan runtime plumbing lives in the shared
+[`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
+and [its implementation](../shader-coverage-common/vk_compute_demo.cpp);
+see the image-pipeline README for the full rationale and migration plan.
 
 ### Explicit binding
 

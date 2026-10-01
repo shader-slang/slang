@@ -9,12 +9,12 @@
 // to keep each GPU submission short and avoid OS watchdog resets
 // (Windows TDR / VK_ERROR_DEVICE_LOST) under coverage instrumentation.
 //
-// All GPU-runtime calls go through `vk_compute_demo.h`. See its
-// file-level comment for the swap procedure when slang-rhi PR #739
+// GPU-runtime calls go through the shared shader-coverage-common/vk_compute_demo.h
+// helper. See its file-level comment for the swap procedure when slang-rhi PR #739
 // lands.
 
 #include "shader-coverage-common/coverage-counters.h"
-#include "vk_compute_demo.h"
+#include "shader-coverage-common/vk_compute_demo.h"
 
 #include <algorithm>
 #include <array>

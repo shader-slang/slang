@@ -23,6 +23,12 @@ For coverage-driven _analysis_ workflows on realistic kernels, see the
 sibling examples `shader-coverage-image-pipeline` and
 `shader-coverage-bvh-traversal`.
 
+The Vulkan path uses the shared
+[`shader-coverage-common/vk_compute_demo.h`](../shader-coverage-common/vk_compute_demo.h)
+and [implementation](../shader-coverage-common/vk_compute_demo.cpp), the same
+runtime helper as those two examples. It is compiled only when a Vulkan loader
+is found; the CPU, CUDA, and Metal paths do not depend on it.
+
 ## Running
 
 ```bash

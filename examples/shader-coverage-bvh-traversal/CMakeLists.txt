@@ -54,8 +54,8 @@ set_target_properties(${_copy_target} PROPERTIES FOLDER "examples/copy_assets")
 add_executable(
     shader-coverage-bvh-traversal
     main.cpp
-    vk_compute_demo.h
-    vk_compute_demo.cpp
+    ${slang_SOURCE_DIR}/examples/shader-coverage-common/vk_compute_demo.h
+    ${slang_SOURCE_DIR}/examples/shader-coverage-common/vk_compute_demo.cpp
 )
 set_default_compile_options(shader-coverage-bvh-traversal USE_FEWER_WARNINGS)
 add_dependencies(shader-coverage-bvh-traversal ${_copy_target})

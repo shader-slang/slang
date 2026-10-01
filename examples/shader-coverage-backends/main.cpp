@@ -58,7 +58,7 @@
 #include "slang.h"
 
 #if defined(SLANG_EXAMPLE_HAS_VULKAN)
-#include "vk_compute_demo.h"
+#include "shader-coverage-common/vk_compute_demo.h"
 #endif
 
 #if defined(SLANG_EXAMPLE_HAS_CUDA)
@@ -646,8 +646,8 @@ void runCuda(int counterByteWidth)
 // it in a fresh descriptor set after the shader's own sets, so the
 // pipeline layout below has one more set than the shader's reflection
 // alone would suggest. Uses the same raw-Vulkan helper as the other
-// coverage examples (see vk_compute_demo.h for why raw Vulkan rather
-// than slang-rhi, for now).
+// coverage examples (see shader-coverage-common/vk_compute_demo.h for why
+// raw Vulkan rather than slang-rhi, for now).
 
 #if defined(SLANG_EXAMPLE_HAS_VULKAN)
 void runVulkan(int counterByteWidth)
