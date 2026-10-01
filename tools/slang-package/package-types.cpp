@@ -62,6 +62,188 @@ SlangResult parseExactVersion(
     return SLANG_OK;
 }
 
+/// The same limits `SemanticVersion::parse` enforces: major and minor fit in 16 bits, and patch
+/// fits in a signed 31-bit value.
+static const int kMaxMajorMinorVersion = 0xffff;
+static const int kMaxPatchVersion = 0x7fffffff;
+
+struct PartialVersion
+{
+    int componentCount = 0;
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+};
+
+/// Parse a decimal version component that fits in `maxValue`.
+static SlangResult _parseVersionComponent(
+    const UnownedStringSlice& text,
+    int maxValue,
+    int& outValue)
+{
+    if (text.getLength() == 0)
+        return SLANG_FAIL;
+    for (auto character : text)
+    {
+        if (character < '0' || character > '9')
+            return SLANG_FAIL;
+    }
+    Int value = 0;
+    if (SLANG_FAILED(StringUtil::parseInt(text, value)) || value < 0 || value > maxValue)
+        return SLANG_FAIL;
+    outValue = int(value);
+    return SLANG_OK;
+}
+
+/// Parse one, two, or three decimal components. Omitted components stay zero.
+///
+/// `1`, `1.2`, and `1.2.3` are accepted. A fourth component, an empty component, or a non-digit
+/// is rejected because package versions are a major.minor.patch triple, and a missing component
+/// is shorthand for that triple rather than another version length.
+static SlangResult _parsePartialVersion(const UnownedStringSlice& text, PartialVersion& outVersion)
+{
+    List<UnownedStringSlice> components;
+    StringUtil::split(text, '.', components);
+    if (components.getCount() < 1 || components.getCount() > 3)
+        return SLANG_FAIL;
+    outVersion = PartialVersion();
+    outVersion.componentCount = int(components.getCount());
+    SLANG_RETURN_ON_FAIL(
+        _parseVersionComponent(components[0], kMaxMajorMinorVersion, outVersion.major));
+    if (components.getCount() >= 2)
+    {
+        SLANG_RETURN_ON_FAIL(
+            _parseVersionComponent(components[1], kMaxMajorMinorVersion, outVersion.minor));
+    }
+    if (components.getCount() == 3)
+    {
+        SLANG_RETURN_ON_FAIL(
+            _parseVersionComponent(components[2], kMaxPatchVersion, outVersion.patch));
+    }
+    return SLANG_OK;
+}
+
+static bool _incrementBoundedComponent(int& component, int maxValue)
+{
+    if (component >= maxValue)
+        return false;
+    ++component;
+    return true;
+}
+
+/// Expand a caret range into an inclusive lower bound and an exclusive upper bound.
+///
+/// When all three components are written, the upper bound advances the left-most non-zero
+/// component. An omitted component stays flexible even when the written components are zero.
+/// Consider `^0.0`: it means `>=0.0.0 <0.1.0`, while the explicit `^0.0.0` means
+/// `>=0.0.0 <0.0.1`. `^0` means `>=0.0.0 <1.0.0`.
+static SlangResult _caretUpperBound(
+    const PartialVersion& partial,
+    SemanticVersion& outUpper,
+    const UnownedStringSlice& term,
+    String& outError)
+{
+    int major = partial.major;
+    int minor = partial.minor;
+    int patch = partial.patch;
+    bool representable = false;
+    if (partial.componentCount == 1 || partial.major > 0)
+    {
+        representable = _incrementBoundedComponent(major, kMaxMajorMinorVersion);
+        minor = 0;
+        patch = 0;
+    }
+    else if (partial.componentCount == 2 || partial.minor > 0)
+    {
+        representable = _incrementBoundedComponent(minor, kMaxMajorMinorVersion);
+        patch = 0;
+    }
+    else
+    {
+        representable = _incrementBoundedComponent(patch, kMaxPatchVersion);
+    }
+    if (!representable)
+    {
+        outError = String("Version range has no representable upper bound: ") + String(term);
+        return SLANG_FAIL;
+    }
+    outUpper = SemanticVersion(major, minor, patch);
+    return SLANG_OK;
+}
+
+/// Expand a tilde range into an inclusive lower bound and an exclusive upper bound.
+///
+/// Three components allow later patches: `~1.2.3` means `>=1.2.3 <1.3.0`. Two components do the
+/// same from patch zero: `~1.2` means `>=1.2.0 <1.3.0`. One component allows any later minor:
+/// `~1` means `>=1.0.0 <2.0.0`.
+static SlangResult _tildeUpperBound(
+    const PartialVersion& partial,
+    SemanticVersion& outUpper,
+    const UnownedStringSlice& term,
+    String& outError)
+{
+    int major = partial.major;
+    int minor = partial.minor;
+    int patch = 0;
+    bool representable = false;
+    if (partial.componentCount == 1)
+    {
+        representable = _incrementBoundedComponent(major, kMaxMajorMinorVersion);
+        minor = 0;
+    }
+    else
+    {
+        representable = _incrementBoundedComponent(minor, kMaxMajorMinorVersion);
+    }
+    if (!representable)
+    {
+        outError = String("Version range has no representable upper bound: ") + String(term);
+        return SLANG_FAIL;
+    }
+    outUpper = SemanticVersion(major, minor, patch);
+    return SLANG_OK;
+}
+
+static void _addInclusiveExclusiveRange(
+    VersionClause& clause,
+    const PartialVersion& lower,
+    const SemanticVersion& upper)
+{
+    VersionPredicate lowerBound;
+    lowerBound.comparison = VersionComparison::GreaterEqual;
+    lowerBound.version = SemanticVersion(lower.major, lower.minor, lower.patch);
+    VersionPredicate upperBound;
+    upperBound.comparison = VersionComparison::Less;
+    upperBound.version = upper;
+    clause.predicates.add(lowerBound);
+    clause.predicates.add(upperBound);
+}
+
+/// Expand a `^` or `~` term into the ordinary comparison predicates.
+static SlangResult _parseCompatibilityRange(
+    const UnownedStringSlice& term,
+    VersionClause& clause,
+    String& outError)
+{
+    PartialVersion partial;
+    if (SLANG_FAILED(_parsePartialVersion(term.tail(1), partial)))
+    {
+        outError = String("Invalid semantic version in version constraint: ") + String(term);
+        return SLANG_FAIL;
+    }
+    SemanticVersion upper;
+    if (term[0] == '^')
+    {
+        SLANG_RETURN_ON_FAIL(_caretUpperBound(partial, upper, term, outError));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(_tildeUpperBound(partial, upper, term, outError));
+    }
+    _addInclusiveExclusiveRange(clause, partial, upper);
+    return SLANG_OK;
+}
+
 static bool _clauseMatches(const VersionClause& clause, const SemanticVersion& version)
 {
     for (const auto& predicate : clause.predicates)
@@ -133,6 +315,12 @@ static SlangResult _parseVersionClause(
 
     for (auto term : terms)
     {
+        if (term.startsWith("^") || term.startsWith("~"))
+        {
+            SLANG_RETURN_ON_FAIL(_parseCompatibilityRange(term, outClause, outError));
+            continue;
+        }
+
         VersionPredicate predicate;
         UnownedStringSlice versionText;
         if (term.startsWith(">="))

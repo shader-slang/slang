@@ -146,7 +146,10 @@ characters or quotes, or use Git's command-executing `ext::` transport.
 `--version <range>`
 : Select a compatible release tag. Versions are written without a `v` prefix. Whitespace joins
 comparisons with AND and `||` joins alternatives, for example
-`>=1.2.0 <2.0.0 !=1.4.0`.
+`>=1.2.0 <2.0.0 !=1.4.0`. `^1.2.3` means `>=1.2.3 <2.0.0` and `~1.2.3` means
+`>=1.2.3 <1.3.0`. Either operator may omit trailing components: `^1.2` means
+`>=1.2.0 <2.0.0`, `^0.0` means `>=0.0.0 <0.1.0`, and `~1` means `>=1.0.0 <2.0.0`. A bare
+version such as `1.4.0` remains exact and must include all three components.
 
 `--ref <ref>`
 : Select an opaque Git branch, tag, or commit instead of choosing a semantic-version release.

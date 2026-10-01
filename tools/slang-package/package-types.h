@@ -268,7 +268,9 @@ struct TagCandidate
 /// Consider this example: `>=1.2.0 !=1.3.0` matches 1.2.0 and 1.4.0 but not 1.3.0.
 /// `>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` matches either interval. Whitespace-separated
 /// comparisons in one clause are AND; `||` joins clauses as OR. A clause may be a single
-/// exact version such as `1.4.0`.
+/// exact three-component version such as `1.4.0`. `^1.2.3` means `>=1.2.3 <2.0.0` and
+/// `~1.2.3` means `>=1.2.3 <1.3.0`. Either operator may omit trailing components: `^1.2`
+/// means `>=1.2.0 <2.0.0`, `^0.0` means `>=0.0.0 <0.1.0`, and `~1` means `>=1.0.0 <2.0.0`.
 SlangResult parseVersionConstraint(
     const UnownedStringSlice& text,
     VersionConstraint& outConstraint,

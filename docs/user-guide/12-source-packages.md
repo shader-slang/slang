@@ -195,12 +195,17 @@ Each dependency entry has one of three shapes, matching `slang package dependenc
   reachable from that commit. Write `as` to claim a different identity.
 
 `git` may be a URL or a local Git repository path. A `version` is one or more clauses joined by
-`||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, and `!=` comparisons,
-or a single exact version. For example, `>=1.2.0 !=1.3.0` skips 1.3.0, and
-`>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` accepts either interval. Dependents still unify one version per
+`||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, `!=`, `^`, and `~`
+constraints, or a single exact version. `^1.2.3` means `>=1.2.3 <2.0.0`, while `^0.2.3` means
+`>=0.2.3 <0.3.0` and `^0.0.3` means `>=0.0.3 <0.0.4`. A missing component stays flexible, so
+`^1.2` means `>=1.2.0 <2.0.0`, `^0.0` means `>=0.0.0 <0.1.0`, and `^0` means `>=0.0.0 <1.0.0`.
+`~1.2.3` means `>=1.2.3 <1.3.0`, `~1.2` means `>=1.2.0 <1.3.0`, and `~1` means
+`>=1.0.0 <2.0.0`. For example, `^1.2 !=1.5.0` accepts later 1.x releases except 1.5.0, and
+`~1.2.3 || ^2` accepts either alternative. Dependents still unify one version per
 package name: every incoming constraint must match that version. Both `version` and `as` omit the
-release tag's `v` prefix. `ref` is a branch, tag, or full 40-character commit ID; the lock always
-records the exact commit.
+release tag's `v` prefix. A bare version and `as` still require all three components, so `1.2.3`
+matches only that release and `1.2` is not a version. `ref` is a branch, tag, or full
+40-character commit ID; the lock always records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it and must be paired with an
 exact `as` version. The target directory must contain its own `slang-package.json`, and its package
