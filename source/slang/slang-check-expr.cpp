@@ -9243,7 +9243,11 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
         }
         else if (const auto setterDecl = as<SetterDecl>(containerDecl); setterDecl)
         {
-            expr->type.isLeftValue = true;
+            // An ordinary setter can mutate its receiver, but `[nonmutating]` promises that the
+            // receiver storage itself is not writable. Recompute the same rule when a synthesized
+            // accessor body is checked instead of relying on the type initially assigned to its
+            // `ThisExpr` by the synthesis path.
+            expr->type.isLeftValue = !setterDecl->hasModifier<NonmutatingAttribute>();
         }
         else if (auto funcDeclBase = as<FunctionDeclBase>(containerDecl))
         {
