@@ -3898,6 +3898,8 @@ static bool _canLValueCoerce(Type* a, Type* b)
     // We can *assume* here that if they are coercable, that dimensions of vectors
     // and matrices match. We might want to assert to be sure...
     SLANG_ASSERT(a != b);
+    if (isMatrixLayoutConversion(b, a))
+        return true;
     if (a->astNodeType == b->astNodeType)
     {
         if (auto matA = as<MatrixExpressionType>(a))
@@ -4323,6 +4325,20 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                     {
                         if (!argExpr->type.isLeftValue)
                         {
+                            // We give a matrix-layout conversion the implicit-cast form, so that an
+                            // l-value argument is converted into a temporary and the result
+                            // converted back after the call, the same as an `int` argument to an
+                            // `inout uint` parameter.
+                            if (auto builtinCastExpr = as<BuiltinCastExpr>(argExpr);
+                                builtinCastExpr && isMatrixLayoutConversion(
+                                                       builtinCastExpr->type,
+                                                       builtinCastExpr->base->type))
+                            {
+                                argExpr = CreateImplicitCastExpr(
+                                    builtinCastExpr->type,
+                                    builtinCastExpr->base);
+                            }
+
                             auto implicitCastExpr = as<ImplicitCastExpr>(argExpr);
 
                             // NOTE:

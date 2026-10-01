@@ -1504,10 +1504,34 @@ struct PeepholeContext : InstPassBase
                             }
                         }
                     }
-                    // array -> vector
                     else if (auto fromArr = as<IRArrayTypeBase>(fromType))
                     {
-                        if (auto toVec = as<IRVectorType>(toType))
+                        auto toArr = as<IRArrayType>(toType);
+                        if (toArr && as<IRArrayType>(fromArr))
+                        {
+                            auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
+                            auto toCountLit = as<IRIntLit>(toArr->getElementCount());
+                            if (fromCountLit && toCountLit &&
+                                fromCountLit->getValue() == toCountLit->getValue())
+                            {
+                                List<IRInst*> elems;
+                                auto count = (UInt)toCountLit->getValue();
+                                elems.setCount((Index)count);
+                                for (UInt i = 0; i < count; ++i)
+                                {
+                                    elems[(Index)i] = builder.emitCast(
+                                        toArr->getElementType(),
+                                        builder.emitElementExtract(val, i));
+                                }
+                                auto newInst =
+                                    builder.emitMakeArray(toType, count, elems.getBuffer());
+                                inst->replaceUsesWith(newInst);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
+                        }
+                        // array -> vector
+                        else if (auto toVec = as<IRVectorType>(toType))
                         {
                             if (isTypeEqual(fromArr->getElementType(), toVec->getElementType()))
                             {

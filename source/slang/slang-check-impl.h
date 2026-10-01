@@ -4531,6 +4531,23 @@ QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase>
 
 bool isUnsizedArrayType(Type* type);
 
+/// Return whether a value of `fromType` converts to `toType` by changing only the layout of
+/// matrices: either two matrices that agree on element type, row count and column count, or two
+/// sized arrays of the same length whose element types are again convertible this way.
+///
+/// The array case exists because a layout modifier on an array declaration applies to its matrix
+/// element. Consider this example:
+///
+///     cbuffer Skin { row_major float4x4 bones[4]; }
+///     float3 skin(float4x4 b[4], uint i, float3 p);
+///     ... skin(bones, i, p) ...
+///
+/// `bones` has type `matrix<float,4,4,RowMajor>[4]` and the parameter has `matrix<float,4,4>[4]`.
+/// Layout only describes how a matrix is stored in memory, so these are the same values and the
+/// argument converts element by element. Only the element types are related; an `int[2]` does not
+/// convert to a `float[2]` through this rule.
+bool isMatrixLayoutConversion(Type* toType, Type* fromType);
+
 bool isInterfaceType(Type* type);
 
 bool isImmutableBufferType(Type* type);
