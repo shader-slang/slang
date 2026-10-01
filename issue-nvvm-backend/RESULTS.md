@@ -805,6 +805,7 @@ build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-re
   slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal \
   tests/cuda/nvvm-layout-pointer-transport.slang \
   tests/cuda/nvvm-std430-pointer-transport.slang \
+  tests/cuda/nvvm-layout-pointer-helpers.slang \
   tests/cuda/nvvm-layout-pointer-transport-unsupported.slang
 ```
 
@@ -827,9 +828,23 @@ storage lowering erases layout operands. CPP remains capability-rejected. Compil
 LLVM shader IR and Scalar/C CUDA controls preserve their exact outputs. The initial host-style
 LLVM target failure remains recorded separately from the corrected shader-IR control.
 
-The original three-layout corpus fixture remains unresolved: its generated helper parameter is
-outside entry-only transport. Its unspecified pointer bindings are not an allocated-address runtime
-oracle. Do not execute it or claim the corpus failure resolved from the dedicated positive fixture.
+Internal-helper qualification reuses those exact allocations and output expectations through
+`build/nvvm-layout-pointer-helpers/layout-pointer-helpers.slang` and its adapted host script.
+The caller offsets the pointer once; a noinline forwarder observes it and passes it to a second
+noinline helper that offsets it again. The moved word checks the caller offset, and the delta
+checks the nested helper's independent offset. Require the second-step address to remain interior
+and aligned. Both O0/O3 outputs must retain the six specialized helper bodies and their calls;
+`[noinline]` is the recognized attribute. The first probe's unknown `[__noinline]` warnings and
+corrected before capture are retained as a fixture incident.
+
+Run the direct static `nvvmLayoutPointerHelpersCheckEveryCallProducer` test in the existing isolated
+static build, alongside the two `nvvmLocalRecordArray` controls. It places a same-typed unapproved
+actual after a valid call to the same helper; no type-equality shortcut may admit the second call.
+Keep static executable/configuration identity separate from the shared compiler and unit plugin.
+The original three-layout corpus fixture has separate conventional pointer-storage and AnyValue
+roles; its exact compile-only result belongs in the focused record. Its unspecified bindings are
+not an allocated-address oracle. Do not execute it or declare its corpus failure resolved from the
+dedicated helper fixture.
 
 ## Physical surface correctness
 

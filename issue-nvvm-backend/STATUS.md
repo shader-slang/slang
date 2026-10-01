@@ -80,164 +80,68 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
-economical focused validation. No automatic full campaign follows each feature.
+Sixteen feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 58 feature objects, preserving all prior objects and the full baseline. Each feature's
+identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
+Continue bounded reviewed work with eight-job builds and economical focused validation.
 
-Fifteen bounded feature batches now pass focused validation after the full checkpoint:
+Current additions beyond the full checkpoint are:
 
-- UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
-  `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
-  buffer negatives and record layout checks pass. Unsupported resource roles remain excluded.
-- In-range dynamic surface-component stores resolve four NVVM physical cells. Eight physical
-  runtime cells, two distinct units and four existing negatives pass. The merge converts only the
-  replacement and preserves untouched physical lanes. A fake Float32/Boolean classification bug
-  and an overbroad call-count assertion were fixed; original attempts remain recorded.
-- Internal mutable and readonly references to existing local record arrays support nested forwarding
-  and source returns through canonical OutParam lowering. The mutable batch passes three shared,
-  two static and nine runtime cells; readonly passes four shared, two static and nine runtime cells.
-  Readonly access preserves caller mutation visibility and cannot grant writes. Native array/pointer
-  results, external roles and unproven pointer roots remain excluded.
-- Non-array, non-mip texture dimensions now accept Float32 outputs through ordinary numeric casts.
-  One typed-operation unit and three runtime modes pass. Four retained mip/MS negatives pass after
-  correcting stale expectations to the existing earlier capability/type diagnostics; failures retained.
+- Texture handles accept selected UInt2 low/high word transport. Non-mip dimensions accept
+  int/uint/float results, including actual 1DArray/2DArray layer counts. Explicit full/restricted
+  views are qualified; CUDA's zero layer counts remain a comparison difference.
+- Local record arrays support internal mutable and readonly references, nested forwarding and
+  canonical OutParam returns. Readonly transport preserves mutation visibility without granting
+  writes; native array/pointer results and unproven roots remain excluded.
+- Surfaces support in-range dynamic component stores, native32 1DArray/2DArray with correct
+  layer-first provider calls, Half arrays/volumes, and explicit signed/unsigned 8/16 storage with
+  matching logical 32-bit values across 1D/2D/1DArray/2DArray/3D, widths 1/2/4. Narrow integer stores
+  retain the D3D-based saturation policy; Vulkan out-of-range write equivalence is unqualified.
+- Coherent pointer memory supports naturally aligned Int/UInt32/64 for exactly Device/global
+  and Workgroup/shared with scoped relaxed operations. Actual SM70 admission, canonical memory
+  attributes and checked producer spaces remain required; qualification is at SM80.
+- Std430/Scalar/C Device record pointers support address-only entry and internal-helper parameters,
+  signed32 offsets and UInt64 address observation. Strides follow shared layout rules; the
+  motivating record has 64/48/40-byte strides. No dereference, export, pointer result/storage,
+  inverse reconstruction or AnyValue expansion is implied. CUDA rejects Std430 and uses 40 for
+  Scalar/C; its three nonzero Scalar mismatches remain recorded.
 
-The full baseline retains its original 36 corpus gaps and four dynamic-surface failures; focused
-records supersede the affected cells without relabeling the full run. Current identities and
-precise reuse are in `features.nvvm-texture-descriptor-words`,
-`features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references`,
-`features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
-`features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
-`features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
-`features.nvvm-half-volume-surfaces`, `features.nvvm-coherent-pointer-memory` and
-`features.nvvm-layout-pointer-transport`, `features.nvvm-integer-surface-formats` and
-`features.nvvm-integer-array-volume-surfaces` and `features.nvvm-std430-pointer-transport`. Fifteen
-implementations have passed focused validation since the full run.
+The latest batch is `features.nvvm-layout-pointer-helpers`, raw evidence under
+`build/nvvm-layout-pointer-helpers/`. Four shared units, three direct static units, twelve
+compile/diagnostic cells and eight allocated-address O0/O3 cases pass. Both modes retain six
+noinline helpers/calls; caller and nested offsets are checked independently, with full guards and
+unchanged inputs. Every call actual proves its origin before exact-type admission. A synthetic
+valid-call-then-invalid-call test rejects a same-typed global producer before provider creation.
+The shared build took 34 seconds; refreshing the older isolated static build took 334 seconds, both
+with eight jobs. Its first test regenerated the cached core module; final static identity records
+that transition separately. The fixture's initial unknown `[__noinline]` attribute and correction
+to `[noinline]` are retained. No production fix or test retry was needed for this batch.
 
-Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
-A separate scalar query preserves spatial rank and maps to the existing provider depth query with
-the real 2DArray descriptor. Three units, five runtime cells and four unchanged mip/MS negatives pass.
-The Slang O3 raw-handle probe also returns 5/3 for explicit full/restricted views of one 11×7×5
-allocation, with exact guards and independently checked view descriptors. CUDA C++ still returns
-zero; this discrepancy is documented rather than used as the oracle. The null-view getter anomaly
-and singleton host-binding limitation remain separate and unresolved.
+The full checkpoint remains unchanged: its 36 main gaps and 249 surface cells retain their original
+identities. Focused records supersede specifically resolved texture-handle, dynamic-surface and
+coherent-groupshared cells. The surface harness currently has 106 rows; 23 new grouped rows (69 cells)
+need reviewed adoption at the next deliberately selected full checkpoint. No automatic full run.
 
-Non-mip Texture1DArray dimensions now also pass all three output scalar families, using the
-existing scalar count query mapped to provider height. Three units, five runtime cells and four
-unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
-The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; fifteen feature implementations have passed focused validation since the full checkpoint.
+Keep these open distinctions visible:
 
-Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
-scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
-argument order: the layer precedes spatial coordinates only in the LLVM call. Before the fix,
-logical (1,4,2) accessed physical (1,2,4); exact O0/O3 failures are retained. Twelve focused physical
-cells, including non-array native/Half controls and CUDA comparisons, pass. Four distinct units,
-four retained diagnostics, 85 harness cases and 22 report contracts pass. The fake needed a valid
-constant-record admission fix, and new coordinate assertions needed correction; all attempts remain
-recorded. Production binaries stayed unchanged through those test-only retries. The eight-job build
-took 28 seconds. Original 83 surface case/oracle identities and the full 249-cell baseline are
-unchanged; two new grouped rows are recorded separately for the next reviewed full expansion.
+- CubeArray restricted views reported a plausible count but selected faces shifted by one face;
+  full-view success does not qualify restricted binding. Mip-query linkage failures and the full
+  dimensions corpus fixture remain unresolved. Do not divide counts or guess view endpoints.
+- The original three-layout pointer fixture now reaches an unsupported parameter-buffer field
+  address after helper admission. Its unspecified pointer bindings are never executed. Broader
+  conventional pointer storage and AnyValue roles require separate work.
+- Original physical-storage-buffer and redundant-coherent-load fixtures contain races or unsupported
+  scopes. Their compile evidence does not resolve runtime failures. Graphics tests, hardware atomics,
+  generic `requirePrelude` text and non-square host packing remain distinct from missing primitives.
+- Unannotated packed bindings, normalized formats and three-channel transfers remain outside the
+  qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
+  selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-CubeArray binding remains unqualified. The first explicit-view probe returned depth 30/18
-instead of intended cube counts 5/3. A separate content probe then tested endpoint indices in cubes:
-null-full and explicit 0..4 passed both count and all source-cube samples, while restricted 1..3
-reported count 3 but sampled faces shifted by one face, not one cube. Exact observations are retained
-in the 1D feature's research history. Matching counts/getter echoes do not establish intended
-selection; neither division by six nor another endpoint guess is justified. No CubeArray admission
-change follows these failures. Continue with another qualified feature while this binding contract
-remains open. Mip-count linkage histories and the full dimensions corpus failure remain unresolved.
-No new full campaign.
-
-Native and formatted Half surface storage now passes for 1D/2D arrays, widths 1/2/4, with
-whole/static-component updates. Eight new NVVM O0/O3 physical cells pass; the four corresponding
-CUDA compile failures are unchanged. Two non-array controls add five passes and one retained CUDA
-compile failure. Four units, four diagnostics and 89 harness contracts pass. All original 85
-case/oracle identities are preserved. The eight-job build took 35 seconds; no conversion policy,
-module version or ABI changed. The full surface baseline retains its original 249 cells.
-
-3D Half surface storage now passes the same native/formatted representations and widths with
-whole/static-component updates. Four new NVVM physical cells pass; six existing array/non-array
-control outcomes remain exact. Two CUDA volume fixture failures retain the shared helper's invalid
-component subscripts, without claiming all CUDA whole-volume operations fail. Four units, four
-unchanged diagnostics, 91 harness cases and 22 report contracts pass. Volume depth and array role
-remain distinct, with independent host readback and exact spatial guards. The eight-job build took
-34 seconds. The full baseline remains unchanged; eight new rows require reviewed adoption of
-24 cells at the next full checkpoint.
-
-Scoped coherent pointer memory now passes for naturally aligned Int/UInt32/64 with exactly
-Device/global and Workgroup/shared accesses. Three distinct units, four race-free O0/O3 GPU cells,
-eight negative cells, two LLVM/PTX inspections/assemblies and a Vulkan compile control pass. The
-original groupshared source is unchanged and its two NVVM failures are resolved in focused evidence.
-The physical-pointer fixture compiles but is not executed; redundant-load still rejects unsupported
-scope. Both original programs contain races, so their runtime failures are not declared resolved.
-
-Focused testing found and fixed three production gaps: pointer offsets now inherit the canonical
-base layout at the buffer-layout producer, explicit target bodies prevent CUDA from silently emitting
-ordinary loads, and preflight checks actual SM70 capability rather than trusting source-profile
-upgrade warnings. The original failed outputs are retained. Fake pointer fields and per-global type
-recording also needed repairs; only the test plugin was rebuilt for those final retries. The successful
-production compiler checks were reused with exact identity. Optional interface6 leaves existing ABI46
-tables unchanged. Other scope/space pairs, new pointer roles and volatile semantics remain excluded.
-Research and all attempts are under `build/nvvm-coherent-pointer-memory/`; no new full campaign.
-
-Explicit Scalar/C layout Device record pointers now support entry transport, signed32 offsets and
-one-way UInt64 address observation. Eight allocated-address O0/O3 cases pass, with independent
-48/40-byte strides, guards and unchanged inputs. Four distinct units, four compile/negative cells
-and two existing coherent runtime controls pass. One negative used the nonexistent public Generic
-address-space name; its corrected GroupShared case passes with unchanged no-mutation assertions.
-The first attempt remains recorded. Compiler build took33 seconds with eight jobs; only the test
-plugin was rebuilt for the fixture correction.
-
-Shared layout selection owns the C physical record and Scalar stride; preflight retains the exact
-stride and entry root, and emission uses non-inbounds byte offsets. Record dereferences, helpers,
-pointer storage/reconstruction remain excluded. Std430 entry transport is qualified below. CUDA C++
-uses stride40 for both layouts, failing the three nonzero Scalar cases; retain that discrepancy rather than changing the oracle.
-CUDA source and Vulkan SPIR-V controls are byte-identical before/after. The original three-layout
-corpus test remains unresolved. Evidence is under `build/nvvm-layout-pointer-transport/`.
-
-Explicit signed/unsigned 8/16-bit surface formats now pass for non-array 1D/2D, widths 1/2/4,
-with whole, static-component and in-range dynamic-component stores. Loads extend to matching
-32-bit shader values; stores saturate before narrowing. Twelve new NVVM O0/O3 physical cells,
-four units and four retained diagnostics pass. Two existing integer32/Half controls retain their
-six exact outcomes. All six new CUDA comparison cells still fail compilation because integer
-surface-conversion helpers are missing; no CUDA runtime equivalence is claimed.
-
-The harness now has 97 rows, preserving all 91 earlier input/oracle identities. Its CPU contracts
-and 22 report checks pass. The build initially caught a misspelled enum in a test assertion;
-correcting that token completed the eight-job build in21 seconds. Production needed no build fix.
-D3D's narrower-integer clamp contract owns this policy; Vulkan load interpretation agrees, while
-out-of-range storage-image encoding equivalence remains unqualified. Raw evidence is under
-`build/nvvm-integer-surface-formats/`. Unannotated packed bindings and normalized formats retain their separate boundaries.
-
-The same explicit integer formats now also pass for 1DArray/2DArray/non-array3D, completing the
-existing native32/Half geometry family without changing conversion code. Eighteen new O0/O3
-physical cells and four retained control cells pass; nine new CUDA compile failures match before,
-and both control CUDA failures remain exact. Four units, four diagnostics, 106 harness contracts
-and 22 report contracts pass. All 97 prior source/oracle identities are preserved. The eight-job
-build took37 seconds with no retry. Evidence is under
-`build/nvvm-integer-array-volume-surfaces/`. Fifteen feature batches are now accepted since the
-full checkpoint; its 249 surface cells remain unchanged, with 69 new cells awaiting reviewed
-adoption at the next deliberately selected full checkpoint.
-
-Std430 Device record pointers now share the checked address-only transport with Scalar/C.
-Eight allocated-address O0/O3 cases pass with independent64/48/40 strides, alignment16/8/8, full
-guards and unchanged input allocations. Four units and ten compile/diagnostic cells pass. Mandatory
-actual-CUDA validation rejects live Std430 types at O0/O3 and minimum optimization before layout
-information disappears; ordinary NVVM memory roles still reject Std430. Vulkan SPIR-V, LLVM shader
-IR and old Scalar/C CUDA source are byte-identical to before. The eight-job build took92 seconds.
-The original corpus fixture still rejects a helper pointer parameter and was not executed; its
-failure remains unresolved. Raw evidence is under `build/nvvm-std430-pointer-transport/`.
-
-Next, select another bounded feature from the remaining physical surface/type contracts. CubeArray
-restricted views, mip queries and broader explicit-layout memory/helper roles retain separate gaps.
-Continue focused reviewed batches; do not rerun the full checkpoint merely for this feature.
-
-The generic `requirePrelude` source-text boundary, graphics entry tests and hardware capability
-failures are separate from missing NVVM primitives.
-
-Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
-policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range
-qualification with non-atomic whole-texel RMW and no new out-of-range guarantee.
+Next: native logical signed/unsigned 8/16 surface values, widths 1/2/4 across the five qualified
+geometries, using canonical matching integer formats. Design review confirms existing provider
+primitives and identity conversion suffice. Preserve logical 32-bit saturation; reject native width,
+signedness or channel mismatches before physical lowering. Reuse the physical harness in one grouped
+batch with representative high-bit loads, independent native marker stores and exact guards.
 
 ## Retained boundaries
 

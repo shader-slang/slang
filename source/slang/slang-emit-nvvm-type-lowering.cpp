@@ -2493,7 +2493,8 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                use == NVVMTypeUse::Storage;
 
     if (layoutTransportPointer)
-        return use == NVVMTypeUse::EntryPointParameter || use == NVVMTypeUse::Value;
+        return use == NVVMTypeUse::EntryPointParameter || use == NVVMTypeUse::Value ||
+               use == NVVMTypeUse::HelperParameter;
 
     // Scalar BF16 has a qualified i16 representation in local and helper roles only.
     // Do not add it to recursive copyable/storage predicates: that would also admit

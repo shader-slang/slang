@@ -5778,6 +5778,10 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
         struct A { uint64_t f0; uint f1; };
         struct B { float3 f; };
         struct C { A a; uint test1; B b; uint test2; bool c; bool d; bool e; };
+        [noinline] uint64_t observe<L : IBufferDataLayout>(LayoutPtr<C, L> p, int index)
+        { return uint64_t(p + index); }
+        [noinline] uint64_t forward<L : IBufferDataLayout>(LayoutPtr<C, L> p, int index)
+        { return observe<L>(p, index); }
         [CUDAKernel]
         void computeMain(
             uniform LayoutPtr<C, Std430DataLayout> d,
@@ -5791,6 +5795,9 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
             output[3] = uint64_t(s + index);
             output[4] = uint64_t(c);
             output[5] = uint64_t(c + index);
+            output[6] = forward<Std430DataLayout>(d, index);
+            output[7] = forward<ScalarDataLayout>(s, index);
+            output[8] = forward<CDataLayout>(c, index);
         }
     )SLANG";
     ComPtr<slang::IBlob> code, diagnostics;
@@ -5799,14 +5806,67 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
         getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
     SLANG_CHECK(code != nullptr);
-    SLANG_CHECK_ABORT(gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() == 3);
-    SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 6);
+    SLANG_CHECK_ABORT(gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() == 6);
+    SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 9);
+    const auto entryBase =
+        gFakeNVVMBuilder.bitCastValueRefs[gFakeNVVMBuilder.storeValueRefs[0].index];
+    const auto entryFunction = entryBase.functionIndex;
     const int64_t strides[] = {64, 48, 40};
-    for (Index offset = 0; offset < 3; ++offset)
+    Index directOffsets = 0;
+    for (Index offset = 0; offset < 6; ++offset)
     {
         const auto base = gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs[offset];
         SLANG_CHECK_ABORT(base.kind == FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK_ABORT(base.index >= 0 && base.index < 3);
+        Index layoutIndex = base.index;
+        const bool isDirect = base.functionIndex == entryFunction;
+        if (!isDirect)
+        {
+            // Follow the two recorded call edges, not mangled names or emission order. Each
+            // forwarder passes its own first parameter unchanged to the offset-owning helper.
+            SLANG_CHECK(base.index == 0);
+            Index forwardFunction = -1;
+            for (Index call = 0; call < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount();
+                 ++call)
+                if (gFakeNVVMBuilder.callCalleeFunctionIndices[call] == base.functionIndex)
+                {
+                    const auto actual =
+                        gFakeNVVMBuilder
+                            .callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[call]];
+                    SLANG_CHECK(actual.kind == FakeNVVMBuilderValueKind::Parameter);
+                    SLANG_CHECK(actual.index == 0);
+                    SLANG_CHECK(forwardFunction == -1);
+                    forwardFunction = actual.functionIndex;
+                }
+            SLANG_CHECK_ABORT(forwardFunction >= 0);
+            Index entryCall = -1;
+            for (Index call = 0; call < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount();
+                 ++call)
+                if (gFakeNVVMBuilder.callCalleeFunctionIndices[call] == forwardFunction)
+                {
+                    const auto actual =
+                        gFakeNVVMBuilder
+                            .callArgumentValueRefs[gFakeNVVMBuilder.callArgumentOffsets[call]];
+                    SLANG_CHECK(actual.kind == FakeNVVMBuilderValueKind::Parameter);
+                    SLANG_CHECK(actual.functionIndex == entryFunction);
+                    SLANG_CHECK(entryCall == -1);
+                    entryCall = call;
+                    layoutIndex = actual.index;
+                }
+            SLANG_CHECK_ABORT(entryCall >= 0);
+            SLANG_CHECK_ABORT(layoutIndex >= 0 && layoutIndex < 3);
+            const auto stored = gFakeNVVMBuilder.storeValueRefs[6 + layoutIndex];
+            SLANG_CHECK(stored.kind == FakeNVVMBuilderValueKind::Call);
+            SLANG_CHECK(stored.index == entryCall);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionFlags[base.functionIndex] ==
+                SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+            SLANG_CHECK(
+                gFakeNVVMBuilder.functionFlags[forwardFunction] ==
+                SLANG_NVVM_FUNCTION_FLAG_NO_INLINE);
+        }
+        else
+            ++directOffsets;
+        SLANG_CHECK_ABORT(layoutIndex >= 0 && layoutIndex < 3);
         const auto scaled = gFakeNVVMBuilder.byteOffsetPointerOffsetValueRefs[offset];
         SLANG_CHECK_ABORT(scaled.kind == FakeNVVMBuilderValueKind::ScalarOperation);
         const auto& multiply = gFakeNVVMBuilder.scalarOperations[scaled.index];
@@ -5815,18 +5875,18 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
         SLANG_CHECK_ABORT(multiply.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant);
         SLANG_CHECK(
             gFakeNVVMBuilder.integerConstantValues[multiply.operands[1].index] ==
-            strides[base.index]);
+            strides[layoutIndex]);
         SLANG_CHECK_ABORT(multiply.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
         const auto& widen = gFakeNVVMBuilder.scalarOperations[multiply.operands[0].index];
         SLANG_CHECK(widen.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
         SLANG_CHECK(NVVMSemantics::areSameType(widen.resultType, NVVMSemantics::kSignedI64));
         SLANG_CHECK(NVVMSemantics::areSameType(widen.operandTypes[0], NVVMSemantics::kSignedI32));
         SLANG_CHECK(widen.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(widen.operands[0].index == 3);
+        SLANG_CHECK(widen.operands[0].index == (isDirect ? 3 : 1));
         SLANG_CHECK(widen.operands[0].functionIndex == base.functionIndex);
 
         // The stored addresses must come from this exact base and its selected byte offset.
-        for (Index moved = 0; moved < 2; ++moved)
+        for (Index moved = 0; isDirect && moved < 2; ++moved)
         {
             const auto stored = gFakeNVVMBuilder.storeValueRefs[2 * base.index + moved];
             SLANG_CHECK_ABORT(stored.kind == FakeNVVMBuilderValueKind::BitCast);
@@ -5837,6 +5897,7 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
             SLANG_CHECK(pointer.index == (moved ? offset : base.index));
         }
     }
+    SLANG_CHECK(directOffsets == 3);
     SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 0);
 }
 
@@ -5855,9 +5916,22 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission)
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
-            [__noinline] uint64_t observe(LayoutPtr<R, SelectedLayout> p) { return uint64_t(p); }
+            [CudaDeviceExport] [noinline] uint64_t observe(LayoutPtr<R, SelectedLayout> p) { return uint64_t(p); }
             [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
                 uniform Ptr<uint64_t> output) { output[0] = observe(p); }
+        )SLANG",
+        R"SLANG(
+            struct R { float3 value; bool flag; };
+            [noinline] LayoutPtr<R, SelectedLayout> forward(LayoutPtr<R, SelectedLayout> p)
+            { return p; }
+            [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
+                uniform Ptr<uint64_t> output) { output[0] = uint64_t(forward(p)); }
+        )SLANG",
+        R"SLANG(
+            struct R { float3 value; bool flag; };
+            [noinline] uint64_t observe(LayoutPtr<R, SelectedLayout> p) { return uint64_t(p); }
+            [CUDAKernel] void computeMain(uniform uint64_t address, uniform Ptr<uint64_t> output)
+            { output[0] = observe(LayoutPtr<R, SelectedLayout>(address)); }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };

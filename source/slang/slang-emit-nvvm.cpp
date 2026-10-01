@@ -5236,6 +5236,12 @@ SlangResult _validateNVVMHelperTarget(
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         if (isCUDAExport &&
+            asNVVMSupportedLayoutTransportPointerType(helper->getParamType(parameterIndex)))
+            return _diagnoseUnsupportedIRType(
+                codeGenContext,
+                "exported layout pointer helper parameter",
+                helper->getParamType(parameterIndex));
+        if (isCUDAExport &&
             (asNVVMSupportedLocalSubstandardRecordArrayType(helper->getParamType(parameterIndex)) ||
              asNVVMSupportedLocalRecordArrayReferenceType(helper->getParamType(parameterIndex))))
             return _diagnoseUnsupportedIRType(
@@ -5646,16 +5652,30 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
     return address;
 }
 
-// Address-only pointers can originate at an actual entry parameter or a checked offset from it.
-// A type-compatible block parameter, integer cast, or helper argument supplies no such proof.
-IRParam* _getNVVMLayoutPointerRoot(const NVVMEmissionPlan& plan, IRFunc* entryPoint, IRInst* value)
+// Address-only pointers originate at the current function's first-block parameter or a checked
+// offset. Internal formals are conditional roots: every direct call validates its actual producer
+// before accepting an exact type match, and all bodies are checked before provider mutation.
+IRParam* _getNVVMLayoutPointerRoot(
+    const NVVMEmissionPlan& plan,
+    IRFunc* entryPoint,
+    IRFunc* function,
+    IRInst* value)
 {
     if (!value || !asNVVMSupportedLayoutTransportPointerType(value->getDataType()))
         return nullptr;
     if (auto parameter = as<IRParam>(value))
-        return parameter->getParent() == entryPoint->getFirstBlock() ? parameter : nullptr;
+    {
+        if (parameter->getParent() != function->getFirstBlock())
+            return nullptr;
+        if (function != entryPoint &&
+            (!function->isDefinition() || function->findDecoration<IREntryPointDecoration>() ||
+             function->findDecoration<IRCudaKernelDecoration>() ||
+             function->findDecorationImpl(kIROp_CudaDeviceExportDecoration)))
+            return nullptr;
+        return parameter;
+    }
     if (auto offset = plan.layoutPointerOffsets.tryGetValue(value))
-        return offset->root;
+        return offset->root->getParent() == function->getFirstBlock() ? offset->root : nullptr;
     return nullptr;
 }
 
@@ -6830,7 +6850,11 @@ SlangResult _validateNVVMFunction(
                             value,
                             space) &&
                         space == SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
-                    if (!_getNVVMLayoutPointerRoot(requirements.emissionPlan, entryPoint, value) &&
+                    if (!_getNVVMLayoutPointerRoot(
+                            requirements.emissionPlan,
+                            entryPoint,
+                            function,
+                            value) &&
                         !completeDevicePointer)
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
@@ -6956,6 +6980,21 @@ SlangResult _validateNVVMFunction(
                          ++argumentIndex)
                     {
                         IRInst* argument = call->getArg(argumentIndex);
+                        auto parameterType = callee->getParamType(argumentIndex);
+                        const bool isLayoutPointer =
+                            asNVVMSupportedLayoutTransportPointerType(parameterType) != nullptr;
+                        // A same-typed global or block parameter is not an admitted address root.
+                        // Check every actual, including later calls to an already accepted helper.
+                        if (isLayoutPointer &&
+                            (!argument || argument->getDataType() != parameterType ||
+                             !_getNVVMLayoutPointerRoot(
+                                 requirements.emissionPlan,
+                                 entryPoint,
+                                 function,
+                                 argument)))
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("layout pointer call argument producer"));
                         if (!_isSupportedNVVMHelperArgument(
                                 argument,
                                 callee->getParamType(argumentIndex)))
@@ -6969,7 +7008,17 @@ SlangResult _validateNVVMFunction(
                                                   codeGenContext,
                                                   toSlice("call argument type"));
                         }
-                        if (_getNVVMLocalSubstandardRecordArrayPointer(argument) ||
+                        if (isLayoutPointer)
+                        {
+                            SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                                codeGenContext,
+                                argument,
+                                call,
+                                availableValues,
+                                dominatorTree));
+                        }
+                        else if (
+                            _getNVVMLocalSubstandardRecordArrayPointer(argument) ||
                             asNVVMSupportedLocalResourceStructPointerType(
                                 argument->getDataType()) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
@@ -7186,6 +7235,7 @@ SlangResult _validateNVVMFunction(
                         auto root = _getNVVMLayoutPointerRoot(
                             requirements.emissionPlan,
                             entryPoint,
+                            function,
                             basePointer);
                         if (!root || inst->getDataType() != layoutPointer)
                             return _diagnoseUnsupportedIR(

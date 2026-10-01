@@ -50,6 +50,74 @@ struct LocalRecordArrayIR
 
 } // namespace
 
+// A valid first call does not establish provenance for later actuals of the same canonical type.
+SLANG_UNIT_TEST(nvvmLayoutPointerHelpersCheckEveryCallProducer)
+{
+    for (auto layoutOp :
+         {kIROp_Std430BufferLayoutType, kIROp_ScalarBufferLayoutType, kIROp_CBufferLayoutType})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto record = builder.createStructType();
+        builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+        auto pointer = builder.getPtrType(
+            record,
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            builder.getType(layoutOp));
+        IRType* parameters[] = {pointer};
+        auto helper = builder.createFunc();
+        helper->setFullType(builder.getFuncType(1, parameters, builder.getUInt64Type()));
+        builder.setInsertInto(helper);
+        builder.emitBlock();
+        IRInst* formal = builder.emitParam(pointer);
+        auto address =
+            builder.emitIntrinsicInst(builder.getUInt64Type(), kIROp_CastPtrToInt, 1, &formal);
+        builder.emitReturn(address);
+
+        builder.setInsertInto(module);
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(1, parameters, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        IRInst* actual = builder.emitParam(pointer);
+        builder.emitCallInst(builder.getUInt64Type(), helper, 1, &actual);
+        auto terminator = builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+        SLANG_CHECK(requirements.emissionPlan.pointerToIntegerValues.containsKey(address));
+
+        builder.setInsertInto(module);
+        IRInst* global = builder.createGlobalVar(record);
+        global->setFullType(pointer);
+        SLANG_CHECK_ABORT(global->getDataType() == helper->getParamType(0));
+        builder.setInsertBefore(terminator);
+        builder.emitCallInst(builder.getUInt64Type(), helper, 1, &global);
+        SLANG_CHECK(SLANG_FAILED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+        const auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
+        if (diagnostic.indexOf(toSlice("layout pointer call argument producer")) < 0)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(diagnostic.indexOf(toSlice("E52017")) >= 0);
+        SLANG_CHECK(diagnostic.indexOf(toSlice("layout pointer call argument producer")) >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
 // Start with each admitted role in turn. A cached local or internal parameter representation must
 // neither authorize a native result/resource role nor be poisoned by its earlier rejection.
 SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)

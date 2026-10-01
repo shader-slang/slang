@@ -183,12 +183,18 @@ key and qualified parent, not pointee type alone. Indexed children retain the pa
 access/storage proof. Constant-memory parameter-group loads remain ordinary loads; invariant global
 buffer recipes require their separate immutable-location contract.
 
-Explicit Std430/Scalar/C Device pointers to finite copyable records have an address-only role. Shared
-buffer-layout selection owns the layout; preflight queries its stride once and retains the entry
-root, exact pointer type and signed index in an offset plan. Emission uses global byte pointers,
-signed 64-bit scaling and non-inbounds byte offsets. Canonical `CastPtrToInt` observes the address
-as UInt64. The physical representation grants no record dereference, helper ABI, pointer storage
-or inverse integer conversion. Existing numeric pointer roles keep their own representations and
+Explicit Std430/Scalar/C Device pointers to finite copyable records have an address-only role.
+Shared buffer-layout selection owns the layout; preflight queries its stride once and retains the
+current function's root, exact pointer type and signed index in an offset plan. Emission uses global
+byte pointers, signed 64-bit scaling and non-inbounds byte offsets. Canonical `CastPtrToInt` observes
+the address as UInt64. Internal first-block helper parameters are conditional roots: every call
+checks the actual's exact type and entry/formal/planned-offset producer before the general type-match
+path, then checks availability and dominance. The existing finite direct-call closure validates all
+bodies before provider mutation. No interprocedural provenance walk or new pointer representation is
+needed. Foreign-function and block parameters cannot supply a root.
+
+This representation grants no record dereference, exported helper ABI, pointer result/storage or
+inverse integer conversion. Existing numeric pointer roles keep their own representations and
 exclude Std430 storage. The mandatory shared storage-lowering boundary rejects live Std430 types
 for actual CUDA source before layout operands can disappear; source capability upgrades alone do
 not grant CUDA support. Vulkan and LLVM retain their existing layout rules.

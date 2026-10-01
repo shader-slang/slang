@@ -81806,6 +81806,197 @@
         "last_targeted": "std430-pointer-transport",
         "implementations_since_full": 15
       }
+    },
+    "nvvm-layout-pointer-helpers": {
+      "status": "accepted-focused",
+      "scope": "Internal defined helper parameters for already qualified Std430/Scalar/C Device ReadWrite finite record pointers. Address observation and signed32 offsets only; module43/providerABI46/container2 unchanged.",
+      "contract": "Current-function first-block internal formals are conditional roots. Every direct call actual must match the canonical pointer type and entry/formal/planned-offset producer before exact-type admission, then pass availability/dominance. Existing acyclic direct closure validates all bodies before module creation. No pointer results/storage/export/dereference or new representation.",
+      "identity": {
+        "revision": "17a0117eb960f3afee1af96d226d5e3d39630fd7",
+        "patch_sha256": "09921bf43af42b57f785bdaa2e989e972ce9e6f50d5006613c5cd66fb2ea3400",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "71815cd6b87a4d978071abc5c604abb984bd511afd5d5cc0888aab613a7b0238",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "1c16c1cd107f16211c9549dc9c79a2602153f85e6d0fc0b282580c810029d61b",
+          "source/slang/slang-emit-nvvm.cpp": "d3c6ba8309522d47882bdcc85cbe37bde92fab292cc32aaac34366ea893867e0",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "2c41bf6c5129cfe4fffece46add5852014193d1b4720eb5f9601ef38c4a707e4",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "8d2debbce9e166099ef3870ba0b3cfce983ccb3c3caae9cc94524fcc3ea139f1",
+          "tests/cuda/nvvm-layout-pointer-helpers.slang": "38758bafdaed6594f4d1bb7d0167fbb5144e4c075662e06c7cdd793858b98579"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "e6508bd15bef2886e853745474ccf64197c94cedf49cb6339f6d99cb196f58d7",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "449ee71f5da022d4bf885a6a04dd05aef04d9f93c6568364d65007ee65eab5b8",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "f4c7da80ea0fc0727fb7b5ba7a3e586384d783efd5f2a65c7c82ffe65d618f5c"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-layout-pointer-helpers/build.json",
+        "sha256": "f909347798b301cc5ff375201afbd9c3dbfe3d317fdb180adbb730cc269e15a8"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-layout-pointer-helpers/units.json",
+            "sha256": "d49947d8a5d44dd013d2ba20e3112cc2c97a8afca73181f16d6d8ea1bf2688b4"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangCopyableValuesAndNumericBorrowsCrossHelperBoundaries.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLayoutPointersUseCheckedByteOffsets.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangPointerOffsetUsesDirectPipeline.internal": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "compile_diagnostics": {
+          "gate": {
+            "path": "build/nvvm-layout-pointer-helpers/compile-tests.json",
+            "sha256": "5b072287213b82a25c507315b197caadf33b96e9d872c18eaa0db4b6f8fc8cde"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-layout-pointer-helpers.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-helpers.slang.1": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.3": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.4": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.5": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport.slang.1": "passed",
+            "tests/cuda/nvvm-std430-pointer-transport.slang": "passed",
+            "tests/cuda/nvvm-std430-pointer-transport.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 12
+          }
+        },
+        "static": {
+          "build": {
+            "path": "build/nvvm-layout-pointer-helpers/build-static.json",
+            "sha256": "e110f0703824c748d3237136f5bf9ae0d7d184c54ac75d18324b786d7219d1e2"
+          },
+          "identity": {
+            "path": "build/nvvm-layout-pointer-helpers/static-tested-identity.json",
+            "sha256": "96c454f09958a5743e8df14d00b92e6169189e09181ee2429b5e9fa8e264ba2b"
+          },
+          "new_provenance": {
+            "path": "build/nvvm-layout-pointer-helpers/static-provenance.json",
+            "sha256": "5f32e71aed39e4057394e90d91c61a2990bd42e40bc6ee3d447b0fd80ff6ba0f"
+          },
+          "controls": {
+            "path": "build/nvvm-layout-pointer-helpers/static-controls.json",
+            "sha256": "e8bea558d0573469a9208b686a0e5677ea201618dc8f1ff4de9043fb002050fa"
+          },
+          "test_count": 3,
+          "scope": "One new synthetic test covers3layouts: accepted first call then same-typed global actual fails specific producer E52017 before provider creation. Two retained local-record-array role/cache/provenance controls."
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-layout-pointer-helpers/runtime.json",
+            "sha256": "c5a48dac579dc26cd5ad95a49abfd1f7539e060a07554349323d782341ffab6c"
+          },
+          "results": {
+            "path": "build/nvvm-layout-pointer-helpers/runtime-results.json",
+            "sha256": "054e37ad27bcb66e22610aefb5b8731c364713e3a59bc3ebd6464517f5123dfd"
+          },
+          "passed_cases": 8,
+          "indices": [-1, 0, 1, 2],
+          "strides": [64, 48, 40],
+          "scope": "O0/O3 three allocated/aligned interior bases; caller-shifted address and nested-step delta independently checked, all128outputwords includingguards exact and all3072inputbytes unchanged. Bothoffsets remain interior. No record dereference."
+        },
+        "retained_calls": {
+          "path": "build/nvvm-layout-pointer-helpers/code-inspection.json",
+          "sha256": "caa221f9c77a04b3b79dad74e9c02da16971e3b2db8f6ffa8d94cc4d6bcd51a6"
+        },
+        "source": {
+          "path": "tests/cuda/nvvm-layout-pointer-helpers.slang",
+          "sha256": "38758bafdaed6594f4d1bb7d0167fbb5144e4c075662e06c7cdd793858b98579"
+        },
+        "host": {
+          "path": "build/nvvm-layout-pointer-helpers/run-pointer-transport.py",
+          "sha256": "4abbffa42131ce6088b27cd677bcfef0fb4330c5063e01f6e70c010262177e7e"
+        },
+        "host_freeze": {
+          "path": "build/nvvm-layout-pointer-helpers/harness-freeze.json",
+          "sha256": "07cf39d8fac889bc832d24bbbb2bd674dbd6f3af75236d9f47395682b119a146"
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-layout-pointer-helpers/before-nvvm-corrected.json",
+          "sha256": "30e79ebf79ef0999c499ac5aed1f441cd326735835f2383153a9db5ee4374074"
+        },
+        "transition": "Dedicated noinline nested-helper source E52017 helper parameter/noPTX to O0/O3 compile and eight allocated runtime cases. Six retained helper bodies/calls per mode; not original corpus resolution."
+      },
+      "validation_incidents": {
+        "unknown_attribute": {
+          "initial": {
+            "path": "build/nvvm-layout-pointer-helpers/before-nvvm.json",
+            "sha256": "a97fe1f5a63b6fcf5c4e345471ab998008475dca675927c8cc0076ffcfdc2715"
+          },
+          "corrected": {
+            "path": "build/nvvm-layout-pointer-helpers/before-nvvm-corrected.json",
+            "sha256": "30e79ebf79ef0999c499ac5aed1f441cd326735835f2383153a9db5ee4374074"
+          },
+          "history": "Initial fixture used unknown [__noinline] (E31000) alongside genuine E52017. Replaced with recognized [noinline], preserving initialsource/freeze; correctedbefore has no attribute warnings. No production change for this incident."
+        }
+      },
+      "retained_failures": {
+        "original_fixture": {
+          "gate": {
+            "path": "build/nvvm-layout-pointer-helpers/original-nvvm-compile-only.json",
+            "sha256": "9ea10a4e4ed9c62b6525577fe5df35306917713ed1477b16f9d5c4b90f51d611"
+          },
+          "prior": {
+            "path": "build/nvvm-std430-pointer-transport/original-nvvm-compile-only.json",
+            "sha256": "b3d6f30b9aa72b7812071fead0a8637e5287192bcad0f20c34228a37968486ab"
+          },
+          "transition": "Earlier helper-parameter E52017 advances to struct field address result Ptr<cbuffer<SLANG_ParameterGroup_Globals>,...ScalarLayout>. Conventional pointer storage/AnyValue remains separate; no execution or corpus resolution."
+        },
+        "cuda": "Six actual CUDA Std430 rejection cells remain E55200 at O0/O3/min-opt; old Scalar/C stride mismatch retained in prior focused evidence."
+      },
+      "preservation": {
+        "prior_feature_count": 57,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        }
+      },
+      "limitations": [
+        "Parameter-only internal helper transport, no pointer results/storage/export/undefined helper/AnyValue/dereference/reconstruction.",
+        "The direct closure proof does not admit arbitrary aliases, block roots or foreign-function SSA.",
+        "No runtime of original fixture with unspecified pointer bindings.",
+        "Focused SM80 correctness, no fullcampaign or performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "layout-pointer-helpers",
+        "implementations_since_full": 16
+      }
     }
   }
 }
