@@ -57,7 +57,7 @@ These instructions require SM53 or newer; this batch is qualified at SM80 and SM
 Round ties and approximate exp2/tanh remain separate documented policies. CUDA is comparison
 evidence, not an automatic oracle; retain the documented Vulkan/D3D12 contract distinctions.
 
-## Current tested identity
+## Full checkpoint identity
 
 The full run used repository revision `d35654675` after test-only repairs. Production compiler
 source is revision `593a686f79ea51e3248373f9aaf47e1593140e32` plus implementation patch
@@ -77,22 +77,32 @@ Environment: native Ubuntu 24.04, eight logical AMD EPYC CPUs, about 30 GiB RAM,
 UUID `GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736`, driver 595.71.05, CUDA 12.9.2 / NVRTC 12.9.86,
 LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no performance claim.
 
-## Next action
+## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-First implement UInt2 word transport for selected read-only texture descriptor handles. The fresh
-`bugs/gh-6657-nonbindless-uniform.slang#discovery-1` capability failures provide the before evidence.
-Lower the existing canonical UInt2 descriptor operations to ordinary unsigned word packing and
-existing UInt64 descriptor conversion; keep unsupported resource kinds rejected. Use independent
-low/high word checks, real bound texture loads, focused discovery and no-mutation negatives.
-The active uncommitted plan is `plan.texture-handle-words.md`.
+UInt2 low/high word transport for selected read-only texture descriptors is implemented and passes
+focused validation. Its existing runtime fixture passes in CUDA O3 and NVVM O0/O3; the two
+`bugs/gh-6657-nonbindless-uniform.slang#discovery-1` NVVM cells now execute correctly. Record layout
+is unchanged: fields 0/16/24, stride 32. Buffer/sampler/writable/MS roles remain excluded. The full
+baseline retains its original 36 gaps; the focused record supersedes those two NVVM failures
+without relabeling the full run. Initial grouped-unit fixture admission failed before conversion;
+its supported-input repair passes, with explicit earlier multisample diagnostics. Three distinct
+units, three descriptor runtime cells, four buffer negatives and two discovery cells pass. No
+production correction was needed.
 
-Then rank dynamic formatted-surface component stores and local record-array out/inout references
-against the retained failures. Approximate Half exp2/tanh remain a separate accuracy/capability
-choice; other transcendental evaluation policies stay unchanged until supported by evidence.
+Next implement in-range dynamic surface component stores under `plan.surface-dynamic-components.md`:
+keep existing physical format/provenance admission, convert only the replacement scalar, and
+preserve untouched physical lanes with typed selection. Use the two existing dynamic cases and
+two static controls in NVVM O0/O3; retain non-atomic RMW and no new out-of-range guarantee.
+
+The current feature identity is recorded in `features.nvvm-texture-descriptor-words`; the full
+identity above retains its actual earlier compiler. One implementation has landed since the full run.
+
+Then rank local record-array out/inout references against the retained failures. Approximate Half
+exp2/tanh remain a separate accuracy/capability choice; other transcendental evaluation policies stay unchanged until supported by evidence.
 
 ## Retained boundaries
 

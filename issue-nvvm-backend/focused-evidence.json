@@ -78204,6 +78204,284 @@
         "Round ties and approximate exp2/tanh are documented separate policies; default widened accurate paths remain. CUDA is comparison evidence, not a universal oracle.",
         "Full user-requested checkpoint follows this commit; all41priorfeatureobjects and fullbaseline/identity remain unchanged."
       ]
+    },
+    "nvvm-texture-descriptor-words": {
+      "status": "accepted-focused",
+      "scope": "Selected read-only texture descriptor UInt2 low/high word transport through existing UInt64 representation. Module43/providerABI46/container2 unchanged.",
+      "contract": {
+        "low_word": 0,
+        "high_word": 1,
+        "pack": "UInt64(low) | (UInt64(high) << 32)",
+        "unpack": "UInt32(bits), UInt32(bits >> 32)",
+        "runtime_patterns": [
+          "0000000000000000",
+          "8000000000000001",
+          "ffffffffffffffff",
+          "123456789abcdef0"
+        ],
+        "sentinel_handles_dereferenced": false,
+        "bound_texture_loads": ["Float32", "UInt32"],
+        "excluded_roles": [
+          "buffer",
+          "sampler",
+          "writable texture",
+          "multisampled texture"
+        ]
+      },
+      "identity": {
+        "revision": "a29c000480b6911632d2aa50eb86af51e559134e",
+        "patch_sha256": "30e38e3a06378e6d71eec988ef858301c5d9234143dd88738c23dad44782c1ec",
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "23485eed9095f344ae7bb0008f08a68a2f803537cac19b32248e8be15fac5417",
+          "source/slang/slang-ir-nvvm-legalize.cpp": "b484ca221489aa54db8c241daa64b5c4ae6b46575e2c638f2c784622c8ab1213",
+          "tests/cuda/nvvm-texture-descriptor-conversion.slang": "2613a2123679348da7f407954b47341e5c4ad578eb9ef73d5d4c41755f3c0813",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "c4a466346ba58fa85b6613e39ece8144e09cce2e7d3e8557a8b380e6118edf18"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "b7be3fdde2ae9d9ef7ee278b85388e12a29e4e13a74bc81029bff09c8fca86aa",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "a1756cc4cb037f948a1c4b4eacf4f03cd6aa11f02835b58e725598476ce453af",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c51b826b4080fc3690b449ecec2fcb013d7c7350f633e09e0ba6d383c177845e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "75d3ab9556fd027a953b6c40864d124d06ad55dd46f2a601e093a2cabd2fe60c",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "e34e9035c4f49c5972f9dc41c3535837f8e8867d52cec39cc634702378623fcf",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "d244e7e25cc50bb72a3f2c177564a558fc2bac47cc725f9a1f84cb2a60c3f448"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ],
+        "test_only_changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so"
+        ]
+      },
+      "initial_validation_identity": {
+        "path": "build/nvvm-texture-handle-words/tested-identity.json",
+        "sha256": "795a041e45269b4133fdcbeff2425ebc83420c2a29da4eca2dac9bc8b39e79ce"
+      },
+      "build": {
+        "path": "build/nvvm-texture-handle-words/build.json",
+        "sha256": "5021abcd4324b8796598298d6ad1c1b5f489e95f664786e9e48d8c3be1c97e39"
+      },
+      "validation": {
+        "units": {
+          "passed_unique": 3,
+          "initial": {
+            "path": "build/nvvm-texture-handle-words/units.json",
+            "sha256": "c110e37f6b8e668caf34f5f94593831cab1cb43286b76d9a5bad024250e74322"
+          },
+          "initial_outcomes": {
+            "slang-unit-test-tool/nvvmSlangTextureDescriptorWordsUseCanonicalUInt64.internal": "FAILED",
+            "slang-unit-test-tool/nvvmSlangResourceStructsCrossLocalAndHelperBoundaries.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangAggregateAndReadOnlyResourceUsesDirectPipeline.internal": "passed"
+          },
+          "final_retry": {
+            "path": "build/nvvm-texture-handle-words/unit-final.json",
+            "sha256": "991494620b6b771a33a3f78ea76a4713db745215924870cbde9944a7a17b98ea"
+          },
+          "final_outcomes": {
+            "slang-unit-test-tool/nvvmSlangTextureDescriptorWordsUseCanonicalUInt64.internal": "passed"
+          },
+          "reuse": "Two initial control passes retained; production unchanged across test-only corrections. New grouped unit finally passes positive checks and eight rejection/no-mutation cases."
+        },
+        "runtime": {
+          "passed": 3,
+          "gate": {
+            "path": "build/nvvm-texture-handle-words/runtime.json",
+            "sha256": "2ee8a9254ea1385310be8119a5c5843e338dfa80479460a6f8cb8bc771908b81"
+          },
+          "scope": "CUDA O3 UInt64 control; NVVM O0/O3 both word directions and real bound texture loads, anchored output/guards/completions."
+        },
+        "buffer_negatives": {
+          "passed": 4,
+          "gate": {
+            "path": "build/nvvm-texture-handle-words/buffer-negatives.json",
+            "sha256": "1e90f147f6fd7b9dbb0b3dfe622307422a642899b2c39874118b7b8a2e9f1ca0"
+          }
+        },
+        "discovery": {
+          "passed": 2,
+          "gate": {
+            "path": "build/nvvm-texture-handle-words/discovery.json",
+            "sha256": "3d3186662fcdfb38c6286cfd2594deeeca8f76f7e2da18adffe9e1c00e584b95"
+          },
+          "results": {
+            "path": "build/nvvm-texture-handle-words/after/results.json",
+            "sha256": "a76e7f1ef2ec5651156f0cb03c80f35009fb1c646a164422374077e065c9f80d"
+          }
+        },
+        "layout": {
+          "path": "build/nvvm-texture-handle-words/layout-validation.json",
+          "sha256": "ac6b77b842ae96dda2fb491a87321d81ad9a13eb80c79a95444ef9d29b2f6c45"
+        }
+      },
+      "resolved_baseline_cells": [
+        {
+          "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+          "mode": "nvvm-o0",
+          "before": {
+            "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+            "source": "bugs/gh-6657-nonbindless-uniform.slang",
+            "source_line": 5,
+            "source_test_ordinal": 4,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o0",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "infrastructure",
+            "return_code": 1,
+            "execution_counts": {
+              "passed": 0,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2093,
+            "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+            "canonical_shape": "target capability requirement",
+            "log": "build/nvvm-integration/full-after-cleanup-1/checkpoint-results/discovery/logs/nvvm-o0/17af9ea1fc1f2359c61d8f53c898bbeb58b48c92.log"
+          },
+          "after": {
+            "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+            "source": "bugs/gh-6657-nonbindless-uniform.slang",
+            "source_line": 5,
+            "source_test_ordinal": 4,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o0",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 1633,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-texture-handle-words/after/logs/nvvm-o0/17af9ea1fc1f2359c61d8f53c898bbeb58b48c92.log"
+          }
+        },
+        {
+          "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+          "mode": "nvvm-o3",
+          "before": {
+            "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+            "source": "bugs/gh-6657-nonbindless-uniform.slang",
+            "source_line": 5,
+            "source_test_ordinal": 4,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "infrastructure",
+            "return_code": 1,
+            "execution_counts": {
+              "passed": 0,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2075,
+            "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+            "canonical_shape": "target capability requirement",
+            "log": "build/nvvm-integration/full-after-cleanup-1/checkpoint-results/discovery/logs/nvvm-o3/9651719bf3aa61fdbb5243049e2fd25029b0bae3.log"
+          },
+          "after": {
+            "id": "bugs/gh-6657-nonbindless-uniform.slang#discovery-1",
+            "source": "bugs/gh-6657-nonbindless-uniform.slang",
+            "source_line": 5,
+            "source_test_ordinal": 4,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 1595,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-texture-handle-words/after/logs/nvvm-o3/9651719bf3aa61fdbb5243049e2fd25029b0bae3.log"
+          }
+        }
+      ],
+      "before": {
+        "path": "build/nvvm-texture-handle-words/before-discovery.json",
+        "sha256": "49ac39eafb5ea6e033480a6271a4fa12f659f49eed828ad42a499d931a505bae"
+      },
+      "validation_incidents": [
+        {
+          "kind": "unsupported test entry shape",
+          "initial": {
+            "path": "build/nvvm-texture-handle-words/units.json",
+            "sha256": "c110e37f6b8e668caf34f5f94593831cab1cb43286b76d9a5bad024250e74322"
+          },
+          "repair": {
+            "path": "build/nvvm-texture-handle-words/unit-fixture-repair.json",
+            "sha256": "da96750a59a6754a4027223c35742c7a1f7e1cfd73674b5292f0dd7509fb5a53"
+          },
+          "build": {
+            "path": "build/nvvm-texture-handle-words/build-unit-repair.json",
+            "sha256": "bbb76158fd32d488aabf03c8104f0e3089b998608fb21294e0520c5d65d13ab5"
+          },
+          "retry": {
+            "path": "build/nvvm-texture-handle-words/unit-retry.json",
+            "sha256": "9f82ba984e081e397f24bdbf8894c3bd273b2ed8698c2b4ae25a150ff14d8994"
+          },
+          "resolution": "Use live supported pointer/buffer inputs. Production unchanged; positive typed conversion assertions then pass."
+        },
+        {
+          "kind": "earlier multisample rejection",
+          "failed_retry": {
+            "path": "build/nvvm-texture-handle-words/unit-retry.json",
+            "sha256": "9f82ba984e081e397f24bdbf8894c3bd273b2ed8698c2b4ae25a150ff14d8994"
+          },
+          "probes": {
+            "path": "build/nvvm-texture-handle-words/negative-probes/results.json",
+            "sha256": "f07584672dc285f11a133f74da8930c4aab7363fcfd0c6e969aa4e379b1986c6"
+          },
+          "build": {
+            "path": "build/nvvm-texture-handle-words/build-unit-diagnostics.json",
+            "sha256": "e9e4bd87f290d40fb690ac1131ac11408d914d4647fd017eb975051cc2e0f114"
+          },
+          "retry": {
+            "path": "build/nvvm-texture-handle-words/unit-final.json",
+            "sha256": "991494620b6b771a33a3f78ea76a4713db745215924870cbde9944a7a17b98ea"
+          },
+          "resolution": "Explicitly require E55215 for both multisample cases; six other cases retain E52017. All failed-compile/null-output/no-provider-mutation assertions preserved."
+        }
+      ],
+      "limitations": [
+        "Only selected read-only texture types are admitted; no new descriptor representation or resource role.",
+        "Buffer cases reject at structured layout, sampler cases at the two exact UInt2 conversions, writable cases at helper roles, and multisample cases at earlier target legalization.",
+        "Old NVRTC discovery capability failure retained as historical comparison; new runtime CUDA control passes without using new UInt2 capability.",
+        "Full accepted baseline and identity remain unchanged. Two focused resolutions do not relabel or rerun the full corpus. No performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "texture-descriptor-words",
+        "implementations_since_full": 1
+      }
     }
   }
 }

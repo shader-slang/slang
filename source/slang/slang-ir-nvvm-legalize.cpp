@@ -512,6 +512,82 @@ void _legalizeNVVMLocalBooleanVectorAddresses(LinkedIR& linkedIR)
     }
 }
 
+// Expresses texture descriptor word transport through the existing UInt64 representation.
+// Consider `uint2 words = uint2(textureHandle)`: the checked cast retains the actual resource
+// type, so this boundary can select read-only texture handles without reconstructing provenance.
+// Buffers and samplers have different contracts and remain for ordinary preflight rejection.
+void _legalizeNVVMTextureDescriptorWordConversions(LinkedIR& linkedIR)
+{
+    List<IRInst*> conversions;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                const bool toHandle = inst->getOp() == kIROp_CastUInt2ToDescriptorHandle;
+                if ((!toHandle && inst->getOp() != kIROp_CastDescriptorHandleToUInt2) ||
+                    inst->getOperandCount() != 1)
+                    continue;
+                auto value = inst->getOperand(0);
+                auto handleType = as<IRDescriptorHandleType>(
+                    toHandle ? inst->getDataType() : value->getDataType());
+                auto wordsType =
+                    as<IRVectorType>(toHandle ? value->getDataType() : inst->getDataType());
+                auto count = wordsType ? as<IRIntLit>(wordsType->getElementCount()) : nullptr;
+                NVVMReadOnlyTextureType texture;
+                if (handleType && wordsType && count && count->getValue() == 2 &&
+                    isNVVMUnsignedI32Type(wordsType->getElementType()) &&
+                    getNVVMSupportedReadOnlyTextureType(handleType->getResourceType(), texture))
+                    conversions.add(inst);
+            }
+        }
+    }
+
+    IRBuilder builder(linkedIR.module);
+    auto uintType = builder.getUIntType();
+    auto uint64Type = builder.getUInt64Type();
+    auto shift = builder.getIntValue(uint64Type, 32);
+    for (auto inst : conversions)
+    {
+        builder.setInsertBefore(inst);
+        IRBuilderSourceLocRAII sourceLocationScope(&builder, inst->sourceLoc);
+        auto value = inst->getOperand(0);
+        IRInst* result = nullptr;
+        if (inst->getOp() == kIROp_CastUInt2ToDescriptorHandle)
+        {
+            auto low =
+                builder.emitCast(uint64Type, builder.emitElementExtract(value, IRIntegerValue(0)));
+            auto high =
+                builder.emitCast(uint64Type, builder.emitElementExtract(value, IRIntegerValue(1)));
+            auto bits =
+                builder.emitBitOr(uint64Type, low, builder.emitShl(uint64Type, high, shift));
+            result = builder.emitIntrinsicInst(
+                inst->getDataType(),
+                kIROp_CastUInt64ToDescriptorHandle,
+                1,
+                &bits);
+        }
+        else
+        {
+            auto bits = builder.emitIntrinsicInst(
+                uint64Type,
+                kIROp_CastDescriptorHandleToUInt64,
+                1,
+                &value);
+            IRInst* words[] = {
+                builder.emitCast(uintType, bits),
+                builder.emitCast(uintType, builder.emitShr(uint64Type, bits, shift))};
+            result = builder.emitMakeVector(inst->getDataType(), 2, words);
+        }
+        inst->replaceUsesWith(result);
+        inst->removeAndDeallocate();
+    }
+}
+
 SlangResult _verifyNVVMReadyIR(CodeGenContext* codeGenContext, const LinkedIR& linkedIR)
 {
     for (auto globalInst : linkedIR.module->getGlobalInsts())
@@ -551,6 +627,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     SLANG_RETURN_ON_FAIL(_foldNVVMCompileTimeOffsetQueries(codeGenContext, linkedIR));
     SLANG_RETURN_ON_FAIL(_removeNVVMCompileTimeOnlyInstructions(codeGenContext, linkedIR));
     _legalizeNVVMLocalBooleanVectorAddresses(linkedIR);
+    _legalizeNVVMTextureDescriptorWordConversions(linkedIR);
 
     IRDeadCodeEliminationOptions options;
     options.keepLayoutsAlive = true;

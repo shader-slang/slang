@@ -55,7 +55,10 @@ queries, handles the selected derivative and bounds policies, removes the canoni
 `unmodified` check, performs cleanup and verifies postconditions. Zero-index bounds policy becomes
 typed compare/select arithmetic using each access's own extent and index type; the direct route
 does not preprocess the CUDA prelude. Selected local Boolean-vector lane writes become SSA lane
-updates, without admitting escaping or external packed-lane references.
+updates, without admitting escaping or external packed-lane references. Selected read-only texture
+descriptor conversions between UInt2 and handles become unsigned low/high word operations around
+the existing UInt64 handle conversion. The canonical descriptor resource type selects this lowering;
+it does not grant integer conversion to buffer, sampler or writable-resource handles.
 
 Typed layout queries retain the semantic fact that optimization could otherwise erase. `OffsetOf`
 carries the exact canonical field key as part of IR identity, so equal-valued fields keep distinct

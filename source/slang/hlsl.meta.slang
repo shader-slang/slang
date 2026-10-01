@@ -29064,6 +29064,7 @@ __intrinsic_type($(kIROp_DescriptorHandleType))
 struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
 {
     [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    [require(nvvm, descriptor_handle)]
     __intrinsic_op($(kIROp_CastUInt2ToDescriptorHandle))
     __init(uint2 handleValue);
 
@@ -29135,6 +29136,7 @@ extension uint2
     [require(glsl_spirv)]
     [require(hlsl, sm_6_6)]
     [require(wgsl)]
+    [require(nvvm)]
     __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
 }
 

@@ -3786,6 +3786,142 @@ SLANG_UNIT_TEST(nvvmSlangImplicitTextureSamplesUseProducerSemantics)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangTextureDescriptorWordsUseCanonicalUInt64)
+{
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        const char* source = R"SLANG(
+        [noinline] uint64_t packWords(uint2 words)
+        { return uint64_t(DescriptorHandle<Texture2D<float4>>(words)); }
+        [noinline] uint2 unpackBits(uint64_t bits)
+        { return uint2(DescriptorHandle<Texture2D<float4>>(bits)); }
+        [CUDAKernel] void computeMain(
+            uniform Ptr<uint64_t, Access::ReadWrite, AddressSpace::Device> output,
+            uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> input,
+            uniform uint64_t bits)
+        {
+            output[0] = packWords(uint2(input[0], input[1]));
+            uint2 result = unpackBits(bits);
+            output[1] = uint64_t(result.x);
+            output[2] = uint64_t(result.y);
+        }
+    )SLANG";
+        ComPtr<slang::IBlob> code, diagnostics;
+        auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK(code != nullptr);
+        bool sawPack = false, sawLogicalHighWord = false;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+        {
+            if (operation.key.operation == SLANG_NVVM_VALUE_OP_SHIFT_RIGHT)
+            {
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI64));
+                SLANG_CHECK(NVVMSemantics::areSameType(
+                    operation.operandTypes[0],
+                    NVVMSemantics::kUnsignedI64));
+                SLANG_CHECK_ABORT(
+                    operation.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant);
+                SLANG_CHECK(
+                    gFakeNVVMBuilder.integerConstantValues[operation.operands[1].index] == 32);
+                sawLogicalHighWord = true;
+            }
+            if (operation.key.operation != SLANG_NVVM_VALUE_OP_BIT_OR)
+                continue;
+            SLANG_CHECK(
+                NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kUnsignedI64));
+            SLANG_CHECK_ABORT(
+                operation.operands[1].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+            const auto& shift = gFakeNVVMBuilder.scalarOperations[operation.operands[1].index];
+            SLANG_CHECK(shift.key.operation == SLANG_NVVM_VALUE_OP_SHIFT_LEFT);
+            SLANG_CHECK_ABORT(shift.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[shift.operands[1].index] == 32);
+            const FakeNVVMBuilderValueRef words[] = {operation.operands[0], shift.operands[0]};
+            for (Index lane = 0; lane < 2; ++lane)
+            {
+                SLANG_CHECK_ABORT(words[lane].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                const auto& widen = gFakeNVVMBuilder.scalarOperations[words[lane].index];
+                SLANG_CHECK(widen.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(widen.resultType, NVVMSemantics::kUnsignedI64));
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(widen.operandTypes[0], NVVMSemantics::kUnsignedI32));
+                SLANG_CHECK_ABORT(
+                    widen.operands[0].kind == FakeNVVMBuilderValueKind::VectorElement);
+                SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[widen.operands[0].index] == lane);
+            }
+            sawPack = true;
+        }
+        SLANG_CHECK(sawPack && sawLogicalHighWord);
+        SLANG_CHECK(gFakeNVVMBuilder.emitCallCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 3);
+    }
+
+    const struct
+    {
+        const char* resource;
+        const char* diagnostic;
+    } excludedRoles[] = {
+        {"ByteAddressBuffer", "E52017"},
+        {"SamplerState", "E52017"},
+        {"RWTexture2D<float4>", "E52017"},
+        // Multisampled resources are rejected by target legalization before NVVM preflight.
+        {"Texture2DMS<float4>", "E55215"},
+    };
+    for (const auto& excludedRole : excludedRoles)
+        for (bool fromWords : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> negativeSession;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                slang_createGlobalSession(SLANG_API_VERSION, negativeSession.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> negativeLoader(new FakeDirectNVVMLoader);
+            negativeSession->setSharedLibraryLoader(negativeLoader);
+            StringBuilder negative;
+            // Separate helpers keep unsupported casts live instead of an inverse-pair fold.
+            negative << "typealias Handle = DescriptorHandle<" << excludedRole.resource << ">; ";
+            if (fromWords)
+                negative << "[noinline] Handle convert(uint2 words) { return Handle(words); } "
+                         << "[CUDAKernel] void computeMain("
+                         << "uniform Ptr<uint, Access::ReadWrite, AddressSpace::Device> input, "
+                         << "uniform RWStructuredBuffer<Handle> output) "
+                         << "{ output[0] = convert(uint2(input[0], input[1])); }";
+            else
+                negative << "[noinline] uint2 convert(Handle h) { return uint2(h); } "
+                         << "[CUDAKernel] void computeMain(uniform StructuredBuffer<Handle> input, "
+                         << "uniform RWStructuredBuffer<uint2> output) "
+                         << "{ output[0] = convert(input[0]); }";
+            ComPtr<slang::IBlob> rejectedCode, rejectedDiagnostics;
+            SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+                negativeSession,
+                negative.getBuffer(),
+                rejectedCode,
+                rejectedDiagnostics)));
+            const String diagnosticText = _getBlobText(rejectedDiagnostics);
+            if (!diagnosticText.contains(excludedRole.diagnostic))
+            {
+                StringBuilder message;
+                message << excludedRole.resource << (fromWords ? " from words: " : " to words: ")
+                        << diagnosticText;
+                getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+            }
+            SLANG_CHECK(diagnosticText.contains(excludedRole.diagnostic));
+            SLANG_CHECK(!rejectedCode);
+            SLANG_CHECK(gFakeNVVMBuilder.loadRequestCount == 0);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+}
+
 SLANG_UNIT_TEST(nvvmSlangResourceStructsCrossLocalAndHelperBoundaries)
 {
     _resetDirectNVVMFakes();
