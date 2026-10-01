@@ -8962,10 +8962,11 @@ static bool doesInterfaceDeclareUsableRequirement(
     return false;
 }
 
-// Collect the non-core-module interfaces visible from `scope` that directly declare a requirement
-// named `requirementName` satisfying `doesInterfaceDeclareUsableRequirement`, appending each one
-// once to `outInterfaces`. Each entry is the declaration the interface's name refers to: the
-// `GenericDecl` for a generic interface, the `InterfaceDecl` otherwise.
+// Collect the interfaces declared directly in the containers on `scope`'s parent and sibling
+// chains (excluding the core module) that are visible from `scope` and directly declare a
+// requirement named `requirementName` satisfying `doesInterfaceDeclareUsableRequirement`,
+// appending each one once to `outInterfaces`. Each entry is the declaration the interface's name
+// refers to: the `GenericDecl` for a generic interface, the `InterfaceDecl` otherwise.
 //
 // The core module is skipped (as `findClosestInScopeName` does) because it is in scope for every
 // program, so its common requirement names (`equals`, `lessThan`, ...) would follow almost any
