@@ -161,6 +161,15 @@ calls are side-effecting, have no output constraint or result handle, and follow
 writebacks. Procedural intersection, callback tracing, callables and pointer payload transport
 remain outside this contract.
 
+Transform-list size and handle queries use exact UInt32/UInt64 SDK signatures in any-hit and
+closest-hit. Handle-property queries accept opaque UInt64 values in the existing OptiX stages;
+transform type returns signed Int32 before core conversion to the public enum, instance ID returns
+UInt32, and child handles remain UInt64. These handles have no pointer semantics. The provider
+validates signatures before deriving scalar register constraints, and separates dynamic list indexes
+and handles from payload-only literal index checks. Core passes every SDK argument explicitly.
+Matrix storage and full active-transform-list composition are separate contracts; one-instance
+application evidence cannot justify a first-instance shortcut for public matrix queries.
+
 Shader termination has canonical declaration identity before optimization: the core
 IgnoreHit and AcceptHitAndEndSearch declarations carry existing KnownBuiltin metadata.
 The shared IR call-effect query follows resolved callees with fresh cycle-safe state; memory

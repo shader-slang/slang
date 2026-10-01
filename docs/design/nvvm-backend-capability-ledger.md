@@ -103,6 +103,17 @@ remain excluded. The original global record-constructor Call variant remains unr
 fixture constructs records locally. Its NVRTC dynamic device-initializer failures remain unadmitted,
 alongside the earlier NVVM constructor/projection failures and corrected CLI invocation history.
 
+GetTransformListSize, GetTransformListHandle, GetTraversableTransformType,
+GetTraversableInstanceId and GetTraversableChild now use typed scalar SDK calls. The dedicated
+sibling RHI test passes 165 assertions at NVVM O0/O3, with a prior-compiler NVRTC control also
+passing 165. Qualification covers two single-level static instances in AnyHit and ClosestHit:
+53 guarded words include distinct custom IDs, a full 64-bit child comparison against the host BLAS,
+a miss with preserved sentinels, and nonzero opaque instance handles consistent across stages.
+Instance handle bits are not a fixed portable oracle. PTX proves the uniform list index remains
+dynamic and handles remain 64-bit. Three affected units and all 15 smoke cells pass. Recorded
+E41012 profile-upgrade warnings do not invalidate the outputs. This does not qualify multilevel
+traversal, motion, matrix loads or interpretation of an opaque handle as a memory address.
+
 The original RHI matrix raygen now compiles to PTX, advancing beyond module-scope vector `add`.
 All four complete ObjectToWorld/WorldToObject cases still reject with E52017 at their exact CUDA-only
 matrix wrappers. Their earlier NVRTC control passes 162 assertions, but no NVVM matrix runtime is

@@ -3428,7 +3428,8 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
         "_optix_read_instance_idx",
         "_optix_read_instance_id",
         "_optix_get_ray_flags",
-        "_optix_get_hit_kind"};
+        "_optix_get_hit_kind",
+        "_optix_get_transform_list_size"};
     if (!intrinsic.operandCount)
     {
         for (auto query : queries)
@@ -3458,6 +3459,26 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
             areSameType(intrinsic.resultType, kVoid))
             return OptixIntrinsicKind::Terminate;
         return OptixIntrinsicKind::None;
+    }
+    if (intrinsic.operandCount == 1 &&
+        (intrinsic.operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
+         intrinsic.operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT))
+    {
+        const auto& argument = intrinsic.operands[0].type;
+        if (name == "_optix_get_transform_list_handle" && areSameType(argument, kUnsignedI32) &&
+            areSameType(intrinsic.resultType, kUnsignedI64))
+            return OptixIntrinsicKind::Query64;
+        if (areSameType(argument, kUnsignedI64))
+        {
+            if ((name == "_optix_get_transform_type_from_handle" &&
+                 areSameType(intrinsic.resultType, kSignedI32)) ||
+                (name == "_optix_get_instance_id_from_handle" &&
+                 areSameType(intrinsic.resultType, kUnsignedI32)))
+                return OptixIntrinsicKind::Query32;
+            if (name == "_optix_get_instance_child_from_handle" &&
+                areSameType(intrinsic.resultType, kUnsignedI64))
+                return OptixIntrinsicKind::Query64;
+        }
     }
     const bool get = name == "_optix_get_payload";
     const bool set = name == "_optix_set_payload";
@@ -3632,7 +3653,11 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
             values.push_back(value);
             parameters.push_back(parameterType);
         }
-        if (operandCount && llvm::cast<llvm::ConstantInt>(values[0])->getZExtValue() > 31)
+        // Only payload registers have a literal index bounded by the SDK's register bank.
+        // Transform-list indexes and traversable handles are ordinary dynamic scalar inputs.
+        if ((optixKind == OptixIntrinsicKind::GetPayload ||
+             optixKind == OptixIntrinsicKind::SetPayload) &&
+            llvm::cast<llvm::ConstantInt>(values[0])->getZExtValue() > 31)
             return SLANG_E_INVALID_ARG;
 
         const bool isSet = optixKind == OptixIntrinsicKind::SetPayload;
@@ -3645,12 +3670,18 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
         llvm::SmallString<96> assembly(isVoid ? "call " : "call ($0), ");
         assembly.append(llvm::StringRef(intrinsic->name, intrinsic->nameSize));
         assembly.append(isSet ? ", ($0, $1);" : operandCount ? ", ($1);" : ", ();");
-        const char* constraints = isTerminate                                     ? ""
-                                  : isSet                                         ? "r,r"
-                                  : operandCount                                  ? "=r,r"
-                                  : optixKind == OptixIntrinsicKind::Query64      ? "=l"
-                                  : optixKind == OptixIntrinsicKind::QueryFloat32 ? "=f"
-                                                                                  : "=r";
+        llvm::SmallString<16> constraints;
+        if (!isVoid)
+            constraints.append(
+                intrinsic->resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT ? "=f"
+                : intrinsic->resultType.bitWidth == 64                             ? "=l"
+                                                                                   : "=r");
+        for (size_t i = 0; i < operandCount; ++i)
+        {
+            if (!constraints.empty())
+                constraints.append(",");
+            constraints.append(intrinsic->operands[i].type.bitWidth == 64 ? "l" : "r");
+        }
         // Keep SDK observations and register writes at their execution point. The trace
         // operation separately clobbers memory because its callbacks can access user storage.
         auto primitive = llvm::InlineAsm::get(type, assembly, constraints, true);

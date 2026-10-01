@@ -3068,7 +3068,9 @@ bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
     // A miss has only ray state.
     if (name == toSlice("_optix_read_primitive_idx") ||
         name == toSlice("_optix_read_instance_idx") || name == toSlice("_optix_read_instance_id") ||
-        name == toSlice("_optix_get_hit_kind"))
+        name == toSlice("_optix_get_hit_kind") ||
+        name == toSlice("_optix_get_transform_list_size") ||
+        name == toSlice("_optix_get_transform_list_handle"))
         return stage == Stage::ClosestHit || stage == Stage::AnyHit;
     if (name == toSlice("_optix_get_payload") || name == toSlice("_optix_set_payload"))
         return stage == Stage::Miss || stage == Stage::ClosestHit || stage == Stage::AnyHit;

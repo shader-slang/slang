@@ -42,13 +42,15 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
     {
         RayCallback,
         HitCallback,
-        AnyHit
+        AnyHit,
+        Optix
     };
     const struct
     {
         const char* name;
         const char* resultType;
         QueryStage allowedStage;
+        const char* parameterType = nullptr;
     } queries[] = {
         {"_optix_get_world_ray_origin_x", "float", QueryStage::RayCallback},
         {"_optix_get_world_ray_origin_y", "float", QueryStage::RayCallback},
@@ -71,6 +73,11 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
         {"_optix_get_object_ray_direction_z", "float", QueryStage::AnyHit},
         {"_optix_ignore_intersection", "void", QueryStage::AnyHit},
         {"_optix_terminate_ray", "void", QueryStage::AnyHit},
+        {"_optix_get_transform_list_size", "uint", QueryStage::HitCallback},
+        {"_optix_get_transform_list_handle", "uint64_t", QueryStage::HitCallback, "uint"},
+        {"_optix_get_transform_type_from_handle", "int", QueryStage::Optix, "uint64_t"},
+        {"_optix_get_instance_id_from_handle", "uint", QueryStage::Optix, "uint64_t"},
+        {"_optix_get_instance_child_from_handle", "uint64_t", QueryStage::Optix, "uint64_t"},
     };
     for (const auto& query : queries)
         for (SlangStage stage :
@@ -79,7 +86,8 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
               SLANG_STAGE_MISS,
               SLANG_STAGE_CLOSEST_HIT})
         {
-            if ((stage == SLANG_STAGE_MISS && query.allowedStage == QueryStage::RayCallback) ||
+            if ((query.allowedStage == QueryStage::Optix && stage != SLANG_STAGE_COMPUTE) ||
+                (stage == SLANG_STAGE_MISS && query.allowedStage == QueryStage::RayCallback) ||
                 (stage == SLANG_STAGE_CLOSEST_HIT && query.allowedStage != QueryStage::AnyHit))
                 continue;
             _resetDirectNVVMFakes();
@@ -113,15 +121,25 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
                                              ? "[shader(\"raygeneration\")] "
                                          : stage == SLANG_STAGE_MISS ? "[shader(\"miss\")] "
                                                                      : "[shader(\"closesthit\")] ";
+            StringBuilder parameter;
+            if (query.parameterType)
+            {
+                parameter << query.parameterType << " value";
+                source << "uniform " << query.parameterType << " inputValue; ";
+            }
             source << "[require(nvvm)] " << (isVoid ? "" : "[NonUniformReturn] ") << type
-                   << " primitive() { __target_switch { case nvvm: __intrinsic_asm \"" << query.name
-                   << "\"; } } [noinline] " << type << " indirect() { " << (isVoid ? "" : "return ")
-                   << "primitive(); } ";
+                   << " primitive(" << parameter.getUnownedSlice()
+                   << ") { __target_switch { case nvvm: __intrinsic_asm \"" << query.name << "\""
+                   << (query.parameterType ? ", value" : "") << "; } } [noinline] " << type
+                   << " indirect(" << parameter.getUnownedSlice() << ") { "
+                   << (isVoid ? "" : "return ") << "primitive("
+                   << (query.parameterType ? "value" : "") << "); } ";
             if (isVoid)
                 source << entryAttribute << "void main() { indirect(); }";
             else
                 source << "RWStructuredBuffer<" << type << "> output; " << entryAttribute
-                       << "void main() { output[0] = indirect(); }";
+                       << "void main() { output[0] = indirect("
+                       << (query.parameterType ? "inputValue" : "") << "); }";
             ComPtr<slang::IBlob> diagnostics, code;
             ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
                 "optixRayStateStage",

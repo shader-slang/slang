@@ -87177,6 +87177,245 @@
         "Only authored #cuda-1/nvvm-o0 and #cuda-2/nvvm-o3 are admitted. Other discovered adaptations remain exploratory, including CUDA.",
         "Third small iteration since the 1711-cell working checkpoint at 0762f003c. Scheduled broader working validation remains due within three to five iterations; full RHI stays on demand."
       ]
+    },
+    "nvvm-optix-transform-list": {
+      "status": "accepted-focused",
+      "scope": "Five exact typed SDK scalar queries: current transform-list size/handle and traversable transform type, instance ID and child handle. Dynamic scalar inputs remain distinct from payload register indexes.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "revision": "c60ddb3c6cdc3da327153af7922d107594fbb33c",
+        "source_sha256": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "aa086a985cf218a6f08dcf73406c6ffd450f0052788938ee2781fefbfb078630",
+          "source/slang/hlsl.meta.slang": "8f8ed2083b5b38274008e1cd6ae6966d2fb558fced411f69a3256b9839a645e5",
+          "source/slang/slang-emit-nvvm.cpp": "47ee3e0032aeb6bc8c53c9ff04868c17eefa2715bcb5a66b89993696d9680297",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "1541f343628f2ecaed378c739de15bc09cac049a2a8f68002bfd0b5430ee1842",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "a35095efaccca79acfcc0c7625e312627b95cfedc0488bed81d8f5513a0fcbef"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "674e6c4cd7e53add8144ff4657c935cc41dd2ad78ae608406978ff042230f043",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "386a308268f3cd872833d3d9bcd30915a723a27654f4d29b2e2777ac18800f65",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "38dbab6622b625884495a9e48ad4c2e207aebd41ca4758797200f774d12e8252",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "fba8b97e6ff3785854578f34bb4efc5232f8bbbf3d788ccd57a55928f00a59bc"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "meaning": "Matching typed OptiX transform-list and instance-handle query build. Provider ABI/module version unchanged; RHI follows actual-device capabilities.",
+        "patch_sha256": "743fed69457ecc406a26c812b79338393655656452efbc4bc523b5b735678d44"
+      },
+      "shared_capture": {
+        "path": "build/nvvm-optix-transform-list/identity.json",
+        "sha256": "c9e9ab6c1293f64f50cf574dc70ccfd7ac3d3835f0ed0abac09049d496542b19"
+      },
+      "before_identity": {
+        "path": "build/nvvm-optix-transform-list/before-identity.json",
+        "sha256": "5b64ed4cdea440a91147792466e867424446468b6a51b10667faad86a7ded5cc"
+      },
+      "rhi_identity": {
+        "path": "build/nvvm-optix-transform-list/rhi-identity.json",
+        "sha256": "331ab5bdb9112477321b6a33698d3e7b6e80b9e43c9265482a67d708feca1b72"
+      },
+      "sdk_identity": {
+        "path": "build/nvvm-optix-transform-list/sdk-identity.json",
+        "sha256": "dab9a597d38e761bfeb85723fb074a76972e29ff519dbd59ee3bbdcd1846a7a4"
+      },
+      "validation": {
+        "build": {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/build-retry.json",
+            "sha256": "7d5d2bb26dc5aefd4861b6627cd1d67a60cc828540a6ad13167ffb494028044f",
+            "return_code": 0,
+            "elapsed_seconds": 0.2740912437438965
+          },
+          "meaning": "Successful no-work incremental confirmation after tool session loss;0.274s is not full build latency. Original26/26-step log retained separately."
+        },
+        "rhi_build": {
+          "path": "build/nvvm-optix-transform-list/rhi-build.json",
+          "sha256": "e54afb6fa2fb2d7cb1a0efcc5e71883ffb2a3e4c85077c24629bdfd77ee6eda6",
+          "return_code": 0,
+          "elapsed_seconds": 2.8317465782165527
+        },
+        "units": {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/units.json",
+            "sha256": "144011f7521042ceb2af522860f8d0ba605fbf3291cb89f038d2c4a4c48688a0",
+            "return_code": 0,
+            "elapsed_seconds": 14.111297369003296
+          },
+          "outcomes": {
+            "nvvmIRBuilderOptixPrimitivesKeepExactSignatures": "passed",
+            "nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation": "passed",
+            "nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission": "passed"
+          },
+          "passed": 3,
+          "ignored": 0,
+          "coverage": "Exact scalar signatures, dynamic parameters and declared integer constants, register constraints, foreign/wrong/null value and descriptor/constant-promise rejection with paired serialization equality. Payload index32 still rejects; transform signature may accept32 without claiming it is a valid current-list runtime index. Stage unit retains62 forbidden cases and adds9."
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/nvvm-after.json",
+            "sha256": "0e0e93b23ed4ea1c01eefac46bfc6389de4289863e0a61bebbcd95f606cfd823",
+            "return_code": 0,
+            "elapsed_seconds": 2.3573808670043945
+          },
+          "outcomes": {
+            "ray-tracing-transform-list.cuda": "passed"
+          },
+          "optimization_levels": [0, 3],
+          "passed_assertions": 165,
+          "filtered_out_cases": 937
+        },
+        "nvrtc_control": {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/nvrtc-before.json",
+            "sha256": "a0b1dc72c868374241ddbdb1c6e9860f26ab08a73d1d161e376275ece7fe4de7",
+            "return_code": 0,
+            "elapsed_seconds": 3.046132802963257
+          },
+          "passed_cases": 1,
+          "passed_assertions": 165,
+          "optimization_levels": [0, 3],
+          "meaning": "Accepted pre-change compiler and same independent fixture; not fresh CUDA qualification of final compiler."
+        },
+        "ptx": {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/dynamic-index-ptx.json",
+            "sha256": "dbd0ad59fb289cbc6e1e3b347efd3b9336ec2aa6e596ea9d2f8691c29e851fef",
+            "return_code": 0,
+            "elapsed_seconds": 0.309467077255249
+          },
+          "artifact": {
+            "path": "build/nvvm-optix-transform-list/closest-hit.ptx",
+            "sha256": "01f4aaaf3609990c6af352479e5b3a954c689ac256b4d10ab86a618f35e7677f"
+          },
+          "statements": [
+            "ld.const.u32 \t%r37, [SLANG_globalParams+24];",
+            "call (%rd1), _optix_get_transform_list_handle, (%r37);",
+            "call (%rd2), _optix_get_instance_child_from_handle, (%rd1);",
+            "call (%r38), _optix_get_transform_list_size, ();",
+            "call (%r39), _optix_get_transform_type_from_handle, (%rd1);",
+            "call (%r40), _optix_get_instance_id_from_handle, (%rd1);"
+          ],
+          "meaning": "Isolated closest-hit O3/SM80 CLI: runtime uniform load feeds list index; returned64-bit handle feeds child/type/ID calls. RHI follows actual-device target policy separately."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/smoke.json",
+            "sha256": "8ed1620a3bd88ca979b21acddf5bac14dbf11d53c608f6a13ef9fd04982e9947",
+            "return_code": 0,
+            "elapsed_seconds": 22.236091136932373
+          },
+          "selection": {
+            "path": "build/nvvm-optix-transform-list/smoke-1/selection.json",
+            "sha256": "740b5f66382aeb40a9267e97a35bffd0088b94c773a725e803755e7f00939c07"
+          },
+          "provenance": {
+            "path": "build/nvvm-optix-transform-list/smoke-1/provenance.json",
+            "sha256": "05cff2f2b951b8ad389ae43942bc04ee83f3b69cff5d221c88dd2671a8d17303"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "reuse": "No fake/static/API/ABI changes; earlier contracts retain original identities. No full working or full RHI run in this slice."
+      },
+      "runtime_contract": {
+        "fixture": "../slang-rhi/tests/test-ray-tracing-transform-list.slang",
+        "host": "../slang-rhi/tests/test-ray-tracing-transform-list.cpp",
+        "output_words": 53,
+        "payload_words": 17,
+        "oracle": "Two translated instances with host-defined customIDs F00D/1234 and one miss. AnyHit/ClosestHit each report list size/index/type/ID, opaque instance handle and child handle. Child full64 equals host native BLAS handle; instance handles must be nonzero and consistent across stages, not fixed portable bit patterns. Phase3 proves both callbacks, miss phase4 retains16sentinels, two guards remain untouched. AnyHit observations are idempotent, so duplicate callbacks cannot accumulate changes.",
+        "scope": "One static instance per traversal path in the existing single-level, no-motion RHI pipeline. Dynamic uniform index is supplied as0. No nested-list/motion/matrix or arbitrary-handle qualification."
+      },
+      "resolved_failures": [
+        {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/nvvm-before.json",
+            "sha256": "5180fc79a52c6844118242e920d469f1b489c82a585bc0ee2e3d245805374901",
+            "return_code": 1,
+            "elapsed_seconds": 1.3879964351654053
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-optix-transform-list/before-identity.json",
+            "sha256": "5b64ed4cdea440a91147792466e867424446468b6a51b10667faad86a7ded5cc"
+          },
+          "rhi_identity": {
+            "path": "build/nvvm-optix-transform-list/rhi-identity.json",
+            "sha256": "331ab5bdb9112477321b6a33698d3e7b6e80b9e43c9265482a67d708feca1b72"
+          },
+          "diagnostic": "E52017 GenericAsm assembly=optixGetTransformListHandle, signature=uint64_t(uint)",
+          "assertions": {
+            "passed": 26,
+            "failed": 2
+          },
+          "meaning": "O0 pipeline rejection; O3 not reached. Typed core arms and exact provider signatures now pass the unchanged fixture at both levels."
+        }
+      ],
+      "validation_incidents": [
+        {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/build-interruption.json",
+            "sha256": "e973dd90dbd2898ba6a874afa20149e08ecb9483be4f71e843f432efb8f062ef"
+          },
+          "resolution": "Environment refresh lost the tool session and wrapper completion record. No build process remained; separate no-work incremental retry returned0. No invented initial duration/exit status."
+        },
+        {
+          "record": {
+            "path": "build/nvvm-optix-transform-list/fixture-padded-design.json",
+            "sha256": "d2f0b505300af65b101c2855883ad1c8db22b7eae0e173eae07c479175ada560"
+          },
+          "source": {
+            "path": "build/nvvm-optix-transform-list/fixture-padded-design.slang",
+            "sha256": "455a45a68d1a1221f6d05ce9d0d5450c231d2f89aa231708a138c96f4b0f6c56"
+          },
+          "meaning": "Unexecuted design correction: uint4 observation fields would pad17livewords to80bytes. UInt32 arrays restore dense68bytes without changing53-word host oracle or production admission."
+        },
+        {
+          "diagnostic": "E41012 profile implicitly upgraded to optix_multilevel_traversal",
+          "records": [
+            {
+              "path": "build/nvvm-optix-transform-list/nvrtc-before.json",
+              "sha256": "a0b1dc72c868374241ddbdb1c6e9860f26ab08a73d1d161e376275ece7fe4de7",
+              "return_code": 0,
+              "elapsed_seconds": 3.046132802963257
+            },
+            {
+              "path": "build/nvvm-optix-transform-list/nvvm-after.json",
+              "sha256": "0e0e93b23ed4ea1c01eefac46bfc6389de4289863e0a61bebbcd95f606cfd823",
+              "return_code": 0,
+              "elapsed_seconds": 2.3573808670043945
+            },
+            {
+              "path": "build/nvvm-optix-transform-list/dynamic-index-ptx.json",
+              "sha256": "dbd0ad59fb289cbc6e1e3b347efd3b9336ec2aa6e596ea9d2f8691c29e851fef",
+              "return_code": 0,
+              "elapsed_seconds": 0.309467077255249
+            }
+          ],
+          "meaning": "Retained capability warnings accompany successful compilation; capability spelling is not multilevel runtime qualification."
+        }
+      ],
+      "qualification": [
+        "Current-list queries are admitted in AnyHit/ClosestHit; handle-property queries in existing OptiX stages. Compute/Intersection/callable boundaries remain. Runtime here qualifies AH/CH only.",
+        "No SDK pointer exposure, general UInt64-to-pointer conversion, public matrix implementation, ABI/module version change, or CUDA-body string interpretation.",
+        "Full current-transform matrices still need complete SDK composition. Instance-scoped matrix storage is a separate bounded next contract; do not assume a single-instance shortcut for public matrices.",
+        "Fourth iteration since the1711-cell working checkpoint at0762f003c. Inventory remains1713working459exploratory; next working checkpoint due by fifth iteration. Optional full RHI stays on demand."
+      ],
+      "rhi_oracle_commit": "2edb568aebc7f27098c50f4b15696dd8f41ebdd3"
     }
   }
 }

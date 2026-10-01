@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty-two feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 78 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty-three feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 79 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -273,12 +273,27 @@ under build/nvvm-global-expressions.
 The original matrix raygen now compiles to PTX. All four complete RHI matrix cases advance to
 E52017 for their exact CUDA-only ObjectToWorld/WorldToObject wrappers; no NVVM matrix runtime is
 claimed. Their earlier NVRTC control passes four tests (162 assertions) on its recorded identity.
-**Next work:** prepare transform queries using the SDK's full active-transform-list composition
-contract, with checked primitive signatures, stage ownership and matrix orientation. A single-instance
-shortcut is not an implementation of the public matrix APIs. The existing RHI pipeline's single-level,
-non-motion qualification does not establish general transform support.
+Five transform-list/instance-handle APIs are now qualified through exact typed SDK calls:
+GetTransformListSize, GetTransformListHandle, GetTraversableTransformType,
+GetTraversableInstanceId and GetTraversableChild. The dedicated sibling RHI oracle passes 165
+assertions at NVVM O0/O3 (2.357s); its prior-compiler NVRTC control passes 165 (3.046s).
+Two single-level static instances have distinct custom IDs. Both AnyHit and ClosestHit observe
+53 guarded output words across two hits and a miss; the full 64-bit child is compared with the
+host-created BLAS handle. Opaque instance handles are nonzero and stage-consistent, without a
+fixed-bit expectation. PTX retains a dynamic `ld.const.u32` index feeding the list-handle call and
+64-bit handle registers. Three affected units pass (14.111s), and all 15 smoke cells pass (22.236s).
+The E41012 implicit optix_multilevel_traversal profile-upgrade warnings remain recorded without
+functional failures. The original build log reaches 26/26, but its tool session lost the completion
+record; a separate successful no-work retry verifies the build, not a 0.274s full-build duration.
+Raw evidence is under build/nvvm-optix-transform-list; earlier failures and identities are preserved.
+
+**Next work:** qualify instance-scoped matrix row loads with independent forward/inverse orientation
+checks. Public ObjectToWorld/WorldToObject matrices still require the SDK's full active-transform-list
+composition contract; a single-instance shortcut is not their implementation. The RHI pipeline's
+single-level, non-motion qualification does not establish general transform support.
 Raw SDK object-ray queries remain AnyHit/Intersection-only, and GeometryIndex is distinct from
 SBT record index. Motion, procedural/callable ABI and recursive callback tracing remain separate.
-This is the third small iteration after the 1,711-cell working checkpoint at `0762f003c`; run the
-next working checkpoint by the fifth iteration, or sooner for a broad change. The earlier checkpoint
+This is the fourth small iteration after the 1,711-cell working checkpoint at `0762f003c`; run the
+next working checkpoint after the next iteration, or sooner for a broad change. The current tier
+inventory remains 1,713 working / 459 exploratory with 15 smoke cells. The earlier checkpoint
 was not rerun or relabeled. Full RHI remains on demand.

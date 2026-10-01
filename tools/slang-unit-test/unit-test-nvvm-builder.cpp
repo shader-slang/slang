@@ -26,6 +26,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
         {"_optix_read_instance_id", NVVMSemantics::kUnsignedI32},
         {"_optix_get_ray_flags", NVVMSemantics::kUnsignedI32},
         {"_optix_get_hit_kind", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_transform_list_size", NVVMSemantics::kUnsignedI32},
         {"_optix_get_world_ray_origin_x", NVVMSemantics::kFloat32},
         {"_optix_get_world_ray_origin_y", NVVMSemantics::kFloat32},
         {"_optix_get_world_ray_origin_z", NVVMSemantics::kFloat32},
@@ -178,10 +179,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, i64)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SlangNVVMTypeHandle argumentTypes[] = {i32, i64};
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            builder.getFunctionType(scope.module, voidType, &i32, 1, functionType)));
+            builder.getFunctionType(scope.module, voidType, argumentTypes, 2, functionType)));
         SlangNVVMValueHandle function = nullptr, otherFunction = nullptr, liveIndex = nullptr,
-                             foreignValue = nullptr;
+                             foreignValue = nullptr, liveHandle = nullptr, foreignHandle = nullptr;
         for (auto entry : {&function, &otherFunction})
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
                 scope.module,
@@ -194,6 +196,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation)
             SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, liveIndex)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
             builder.getFunctionParameter(scope.module, otherFunction, 0, foreignValue)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 1, liveHandle)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionParameter(scope.module, otherFunction, 1, foreignHandle)));
         SlangNVVMBlockHandle block = nullptr;
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
@@ -310,6 +316,111 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation)
                 SLANG_CHECK(store ? result == nullptr : result != nullptr);
             }
         }
+        // Transform queries consume dynamic scalar arguments; payload indexes above retain
+        // their distinct literal/range rule. Paired serializations cover both boundaries.
+        const struct
+        {
+            const char* name;
+            SlangNVVMValueTypeDesc result;
+            SlangNVVMValueTypeDesc argument;
+        } transformQueries[] = {
+            {"_optix_get_transform_list_handle",
+             NVVMSemantics::kUnsignedI64,
+             NVVMSemantics::kUnsignedI32},
+            {"_optix_get_transform_type_from_handle",
+             NVVMSemantics::kSignedI32,
+             NVVMSemantics::kUnsignedI64},
+            {"_optix_get_instance_id_from_handle",
+             NVVMSemantics::kUnsignedI32,
+             NVVMSemantics::kUnsignedI64},
+            {"_optix_get_instance_child_from_handle",
+             NVVMSemantics::kUnsignedI64,
+             NVVMSemantics::kUnsignedI64},
+        };
+        for (const auto& query : transformQueries)
+        {
+            const bool handleInput = query.argument.bitWidth == 64;
+            SlangNVVMValueHandle argument = handleInput ? liveHandle : liveIndex;
+            SlangNVVMNamedIntrinsicOperandDesc parameter = {
+                query.argument,
+                SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+            SlangNVVMNamedIntrinsicDesc desc =
+                {query.name, strlen(query.name), query.result, &parameter, 1};
+            SLANG_CHECK(builder.supportsNamedIntrinsic(desc));
+            if (injectFailures)
+            {
+                for (int mismatch = 0; mismatch < 12; ++mismatch)
+                {
+                    auto invalid = desc;
+                    SlangNVVMNamedIntrinsicOperandDesc badParameters[] = {parameter, parameter};
+                    invalid.operands = badParameters;
+                    if (mismatch == 0)
+                        invalid.resultType.bitWidth = query.result.bitWidth == 64 ? 32 : 64;
+                    if (mismatch == 1)
+                        invalid.resultType.kind =
+                            query.result.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                                ? SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
+                                : SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+                    if (mismatch == 2)
+                        invalid.resultType.laneCount = 2;
+                    if (mismatch == 3)
+                        invalid.resultType = NVVMSemantics::kFloat32;
+                    if (mismatch == 4)
+                        badParameters[0].type.bitWidth = handleInput ? 32 : 64;
+                    if (mismatch == 5)
+                        badParameters[0].type.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+                    if (mismatch == 6)
+                        badParameters[0].type.laneCount = 2;
+                    if (mismatch == 7)
+                        badParameters[0].type = NVVMSemantics::kFloat32;
+                    if (mismatch == 8)
+                        badParameters[0].kind = 0xffffffffu;
+                    if (mismatch == 9)
+                        invalid.operandCount = 0;
+                    if (mismatch == 10)
+                        invalid.operandCount = 2;
+                    if (mismatch == 11)
+                        invalid.resultType = NVVMSemantics::kVoid;
+                    SLANG_CHECK(!builder.supportsNamedIntrinsic(invalid));
+                    SlangNVVMValueHandle rejected = function;
+                    SLANG_CHECK(SLANG_FAILED(
+                        builder.emitNamedIntrinsic(scope.module, invalid, &argument, 1, rejected)));
+                    SLANG_CHECK(rejected == nullptr);
+                }
+                for (auto invalidValue :
+                     {handleInput ? foreignHandle : foreignValue,
+                      handleInput ? liveIndex : liveHandle,
+                      SlangNVVMValueHandle(nullptr)})
+                {
+                    SlangNVVMValueHandle rejected = function;
+                    SLANG_CHECK(SLANG_FAILED(
+                        builder
+                            .emitNamedIntrinsic(scope.module, desc, &invalidValue, 1, rejected)));
+                    SLANG_CHECK(rejected == nullptr);
+                }
+                auto constantParameter = parameter;
+                constantParameter.kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT;
+                auto constantDesc = desc;
+                constantDesc.operands = &constantParameter;
+                SLANG_CHECK(builder.supportsNamedIntrinsic(constantDesc));
+                SlangNVVMValueHandle rejected = function;
+                SLANG_CHECK(SLANG_FAILED(
+                    builder
+                        .emitNamedIntrinsic(scope.module, constantDesc, &argument, 1, rejected)));
+                SLANG_CHECK(rejected == nullptr);
+            }
+            SlangNVVMValueHandle result = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitNamedIntrinsic(scope.module, desc, &argument, 1, result)));
+            SLANG_CHECK(result != nullptr);
+            // A declared constant is also legal, with no payload-register bound. In
+            // particular, index 32 is accepted here while rejected by get/set payload.
+            parameter.kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT;
+            auto constantArgument = handleInput ? wrongWidth : tooLarge;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitNamedIntrinsic(scope.module, desc, &constantArgument, 1, result)));
+            SLANG_CHECK(result != nullptr);
+        }
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
         const SlangNVVMSerializationFormat formats[] = {
             SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
@@ -324,9 +435,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation)
                 _countOccurrences(text.getUnownedSlice(), toSlice("_optix_get_payload,")) == 2);
             SLANG_CHECK(
                 _countOccurrences(text.getUnownedSlice(), toSlice("_optix_set_payload,")) == 2);
-            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("asm sideeffect")) == 4);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("asm sideeffect")) == 12);
             SLANG_CHECK(text.contains("\"=r,r\"(i32 31)"));
             SLANG_CHECK(text.contains("\"r,r\"(i32 0, i32"));
+            SLANG_CHECK(text.contains("_optix_get_transform_list_handle, ($1);\", \"=l,r\"(i32 %"));
+            SLANG_CHECK(
+                text.contains("_optix_get_transform_type_from_handle, ($1);\", \"=r,l\"(i64 %"));
+            SLANG_CHECK(
+                text.contains("_optix_get_instance_id_from_handle, ($1);\", \"=r,l\"(i64 %"));
+            SLANG_CHECK(
+                text.contains("_optix_get_instance_child_from_handle, ($1);\", \"=l,l\"(i64 %"));
             if (injectFailures)
             {
                 SLANG_CHECK(text == control[i]);

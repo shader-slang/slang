@@ -22188,6 +22188,56 @@ static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 // Multi-level Traversal Intrinsics
 //
 
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixTransformListSize()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_transform_list_size";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint64_t __nvvmOptixTransformListHandle(uint index)
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_transform_list_handle", index;
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal int __nvvmOptixTransformTypeFromHandle(uint64_t handle)
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_transform_type_from_handle", handle;
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixInstanceIdFromHandle(uint64_t handle)
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_instance_id_from_handle", handle;
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint64_t __nvvmOptixInstanceChildFromHandle(uint64_t handle)
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_instance_child_from_handle", handle;
+    }
+}
+
 /// Type representing transform types in multi-level traversal.
 /// @category raytracing
 enum TRAVERSABLE_TRANSFORM_TYPE : uint
@@ -22220,6 +22270,7 @@ TRAVERSABLE_TRANSFORM_TYPE GetTraversableTransformType(uint64_t handle)
 {
     __target_switch
     {
+    case nvvm: return TRAVERSABLE_TRANSFORM_TYPE(__nvvmOptixTransformTypeFromHandle(handle));
     case cuda: __intrinsic_asm "optixGetTransformTypeFromHandle";
     }
 }
@@ -22254,6 +22305,7 @@ uint GetTraversableInstanceId(uint64_t handle)
 {
     __target_switch
     {
+    case nvvm: return __nvvmOptixInstanceIdFromHandle(handle);
     case cuda: __intrinsic_asm "optixGetInstanceIdFromHandle";
     }
 }
@@ -22270,6 +22322,7 @@ uint64_t GetTraversableChild(uint64_t handle)
 {
     __target_switch
     {
+    case nvvm: return __nvvmOptixInstanceChildFromHandle(handle);
     case cuda: __intrinsic_asm "optixGetInstanceChildFromHandle";
     }
 }
@@ -22317,6 +22370,7 @@ uint GetTransformListSize()
 {
     __target_switch
     {
+    case nvvm: return __nvvmOptixTransformListSize();
     case cuda: __intrinsic_asm "optixGetTransformListSize";
     }
 }
@@ -22333,6 +22387,7 @@ uint64_t GetTransformListHandle(uint index)
 {
     __target_switch
     {
+    case nvvm: return __nvvmOptixTransformListHandle(index);
     case cuda: __intrinsic_asm "optixGetTransformListHandle";
     }
 }
