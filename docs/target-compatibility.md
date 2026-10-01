@@ -203,6 +203,8 @@ cbuffer ShaderRecord
 
 In practice to write shader code that works across D3D12 and VK you should have a single constant buffer marked as 'shader record' for VK and then on D3D that constant buffer should be bound in the local root signature on D3D.
 
+On CUDA/OptiX the same shader-record constant buffer is read from the running program's shader binding table (SBT) record through `optixGetSbtDataPointer()`, and its contents use the ordinary CUDA struct layout.
+
 <a id="tex-load"></a>
 
 ## tex.Load

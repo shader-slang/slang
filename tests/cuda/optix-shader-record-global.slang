@@ -72,16 +72,19 @@ layout(shaderRecordEXT) ConstantBuffer<SbtData> gSbtRecordData;
 uniform float gScale;
 RWStructuredBuffer<float4> gOut;
 
-// A use from a helper function, not only from the entry point itself.
+// Uses from a helper function and from a `static` global's initializer, not only from the entry
+// point itself.
 float4 readColor()
 {
     return gSbtRecordData.color;
 }
 
+static uint gCachedId = gSbtRecordData.id;
+
 [shader("closesthit")]
 void chsMain(inout float4 payload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    payload = readColor() * gScale + float(gSbtRecordData.id);
+    payload = readColor() * gScale + float(gSbtRecordData.id + gCachedId);
     gOut[0] = payload;
 }
 

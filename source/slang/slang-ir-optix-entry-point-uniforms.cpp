@@ -14,6 +14,18 @@
 namespace Slang
 {
 
+/// Emit a read of the running program's OptiX SBT record pointer, typed as `sbtDataType`, at the
+/// start of `code`'s body: a function, or the initializer of a global variable. The pointer is
+/// fetched once per body, so every use of the record in `code` shares that single fetch.
+static IRInst* emitOptiXSbtDataPtrAtBodyStart(
+    IRBuilder& builder,
+    IRGlobalValueWithCode* code,
+    IRType* sbtDataType)
+{
+    builder.setInsertBefore(code->getFirstBlock()->getFirstOrdinaryInst());
+    return builder.emitIntrinsicInst(sbtDataType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+}
+
 struct CollectOptixEntryPointUniformParams : PerEntryPointPass
 {
 
@@ -225,10 +237,8 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
         }
 
         // Now, replace the collected parameter with OptiX SBT accesses.
-        auto paramType = collectedParam->getFullType();
-        builder->setInsertBefore(entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
         IRInst* getAttr =
-            builder->emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+            emitOptiXSbtDataPtrAtBodyStart(*builder, entryPointFunc, collectedParam->getFullType());
         collectedParam->replaceUsesWith(getAttr);
         collectedParam->removeAndDeallocate();
         fixUpFuncType(entryPointFunc);
@@ -283,8 +293,9 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
 /// The CUDA shader-record layout rules give `gSbtRecordData` a `ShaderRecord` slot and no
 /// `Uniform` bytes, so `collectGlobalUniformParameters` leaves it at module scope rather than
 /// folding it into `GlobalParams`. On OptiX the record is whatever `optixGetSbtDataPointer()`
-/// returns for the running program, so we rematerialize that pointer at each use. Uses may sit in
-/// helper functions, or in several entry points that each read their own record.
+/// returns for the running program, so we fetch that pointer in each body that uses the
+/// parameter. Uses may sit in helper functions, in the initializer of a `static` global, or in
+/// several entry points that each read their own record.
 static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module)
 {
     List<IRGlobalParam*> shaderRecordParams;
@@ -301,14 +312,18 @@ static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module)
     IRBuilder builder(module);
     for (auto param : shaderRecordParams)
     {
-        auto paramType = param->getFullType();
+        Dictionary<IRGlobalValueWithCode*, IRInst*> sbtDataPerBody;
         while (auto use = param->firstUse)
         {
-            auto user = use->getUser();
-            SLANG_RELEASE_ASSERT(as<IRBlock>(user->getParent()));
-            builder.setInsertBefore(user);
-            auto sbtData =
-                builder.emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+            auto block = as<IRBlock>(use->getUser()->getParent());
+            SLANG_RELEASE_ASSERT(block);
+            auto body = as<IRGlobalValueWithCode>(block->getParent());
+            IRInst* sbtData = nullptr;
+            if (!sbtDataPerBody.tryGetValue(body, sbtData))
+            {
+                sbtData = emitOptiXSbtDataPtrAtBodyStart(builder, body, param->getFullType());
+                sbtDataPerBody.add(body, sbtData);
+            }
             builder.replaceOperand(use, sbtData);
         }
         param->removeAndDeallocate();
@@ -319,7 +334,8 @@ void collectOptiXEntryPointUniformParams(IRModule* module)
 {
     // look into all entry point functions by checking the IREntryPointDecoration on the children
     // Insts of the module. For any ray tracing entry points, collect all uniform parameters into
-    // one common struct, and replace parameter usage with SBT record accesses.
+    // one common struct, and replace parameter usage with SBT record accesses. Module-scope
+    // shader-record parameters are then routed to the SBT record as well.
     CollectOptixEntryPointUniformParams context;
     context.processModule(module);
 
