@@ -597,8 +597,6 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                     }
                 }
 
-                // Append _convert on the name to signify we need to use a code path, that
-                // will automatically do the format conversion.
                 if (access.isFormatConversion)
                     m_writer->emit("_convert");
             }

@@ -14,7 +14,6 @@ struct CUDASurfaceAccessInfo
     /// from its element type.
     bool isFormatConversion = false;
 
-    /// The access needs the `half` type to be enabled.
     bool requiresHalf = false;
 
     /// The factor applied to the x coordinate, which CUDA surfaces address in bytes.
