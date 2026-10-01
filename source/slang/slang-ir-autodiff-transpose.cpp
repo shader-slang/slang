@@ -1691,18 +1691,21 @@ struct DiffTransposePass
         IRMakeDifferentialPair* fwdMakePair,
         IRInst* revValue)
     {
+        // This opcode constructs a value pair. Its reverse gradient may still have
+        // an associated type expressed as lookupWitness, so do not rediscover the
+        // pair flavor by requiring its type to be a concrete pair opcode here.
         TranspositionResult result;
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getPrimal(),
-            builder->emitDifferentialPairGetPrimal(
+            builder->emitDifferentialValuePairGetPrimal(
                 fwdMakePair->getPrimal()->getDataType(),
                 revValue),
             fwdMakePair));
         result.revPairs.add(RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakePair->getDifferentialValue(),
-            builder->emitDifferentialPairGetDifferential(
+            builder->emitDifferentialValuePairGetDifferential(
                 fwdMakePair->getDifferentialValue()->getDataType(),
                 revValue),
             fwdMakePair));
