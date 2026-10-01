@@ -761,7 +761,7 @@ local commit and stop unless further work was explicitly authorized.
 
 ## Physical surface correctness
 
-`extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. Six fixtures under
+`extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. The original six fixtures under
 `tests/cuda/nvvm-surface-physical-*.slang` supply 83 cases: native Float32, signed/unsigned32 and
 annotated Half, 1D/2D scalar/2/4 channels, whole/component writes, exhaustive scalar Half decode, converted NaNs,
 dynamic-component writes, literal-rounding controls and zero-boundary operations. Four mixed-format
@@ -815,8 +815,13 @@ exact. Known wrong-output signatures stay exact too.
 Layered native32 rows are `native32-1d-array` and `uint32-2d-array-order`. The first groups
 Float32/SInt32/UInt32 scalar, two- and four-channel resources; the second isolates array coordinate
 order with aligned, in-bounds asymmetric coordinates. Array depth is independent of spatial height.
-The current harness has 85 rows; the retained full baseline has 83. Preserve its 249 cells and use
-the focused layered evidence when reviewing the six-cell expansion at the next full checkpoint.
+Four additional Half-array rows group native Half and formatted Float32/r16f/rg16f/rgba16f values
+at both array ranks, widths 1/2/4, with whole or static-component copies. Independent source marker
+writes prevent matching wrong load/store addresses from hiding corruption. Native copies and
+untouched channels remain exact, including NaNs; converted NaNs use class-only comparison.
+The current harness has 89 rows; the retained full baseline has 83. Preserve its 249 cells and use
+the focused layered evidence when reviewing the eighteen-cell expansion at the next full checkpoint.
+The four new CUDA Half-array compile failures remain explicit comparison limitations.
 
 A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires
 review. Bootstrap or expansion is a separate reviewed adoption of validated outcomes, never an

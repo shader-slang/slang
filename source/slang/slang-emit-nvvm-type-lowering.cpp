@@ -1717,35 +1717,30 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
         return false;
 
     SlangNVVMValueTypeDesc elementType = {};
-    if (_getNVVMSelected32BitNumericElementType(textureType->getElementType(), elementType))
+    if (!_getNVVMSelected32BitNumericElementType(textureType->getElementType(), elementType))
     {
-        outType.textureType = textureType;
-        outType.shape = shape;
-        outType.isArray = isArray;
-        outType.coordinateLaneCount = coordinateLaneCount + (isArray ? 1u : 0u);
-        outType.elementType = elementType;
-        return true;
-    }
-
-    IRType* scalarType = textureType->getElementType();
-    uint32_t laneCount = 1;
-    if (auto vectorType = as<IRVectorType>(scalarType))
-    {
-        auto count = as<IRIntLit>(vectorType->getElementCount());
-        if (!count || (count->getValue() != 2 && count->getValue() != 4))
+        IRType* scalarType = textureType->getElementType();
+        uint32_t laneCount = 1;
+        if (auto vectorType = as<IRVectorType>(scalarType))
+        {
+            auto count = as<IRIntLit>(vectorType->getElementCount());
+            if (!count || (count->getValue() != 2 && count->getValue() != 4))
+                return false;
+            scalarType = vectorType->getElementType();
+            laneCount = uint32_t(count->getValue());
+        }
+        uint32_t bitWidth = 0;
+        if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) || bitWidth != 16 ||
+            shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
             return false;
-        scalarType = vectorType->getElementType();
-        laneCount = uint32_t(count->getValue());
+        elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, bitWidth, laneCount};
     }
-    uint32_t bitWidth = 0;
-    if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) || bitWidth != 16 ||
-        isArray || shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
-        return false;
 
     outType.textureType = textureType;
     outType.shape = shape;
-    outType.coordinateLaneCount = coordinateLaneCount;
-    outType.elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, bitWidth, laneCount};
+    outType.isArray = isArray;
+    outType.coordinateLaneCount = coordinateLaneCount + (isArray ? 1u : 0u);
+    outType.elementType = elementType;
     return true;
 }
 
@@ -1787,7 +1782,7 @@ bool getNVVMSupportedSurfaceField(
         return true;
     }
     if (outType.elementType.bitWidth != 32 || formatInfo.scalarType != SLANG_SCALAR_TYPE_FLOAT16 ||
-        outType.isArray || outType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
+        outType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
     {
         return false;
     }

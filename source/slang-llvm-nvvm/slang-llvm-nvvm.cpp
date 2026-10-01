@@ -4220,9 +4220,9 @@ static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& op
     {
         return false;
     }
-    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                              operation.elementType.bitWidth == 16 && !operation.isArray &&
-                              operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
+    return is32BitNumeric ||
+           (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+            operation.elementType.bitWidth == 16 && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -4255,6 +4255,22 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
         {llvm::Intrinsic::nvvm_sust_b_2d_i16_zero,
          llvm::Intrinsic::nvvm_sust_b_2d_v2i16_zero,
          llvm::Intrinsic::nvvm_sust_b_2d_v4i16_zero},
+    };
+    static const llvm::Intrinsic::ID kLoadI16Array[2][3] = {
+        {llvm::Intrinsic::nvvm_suld_1d_array_i16_zero,
+         llvm::Intrinsic::nvvm_suld_1d_array_v2i16_zero,
+         llvm::Intrinsic::nvvm_suld_1d_array_v4i16_zero},
+        {llvm::Intrinsic::nvvm_suld_2d_array_i16_zero,
+         llvm::Intrinsic::nvvm_suld_2d_array_v2i16_zero,
+         llvm::Intrinsic::nvvm_suld_2d_array_v4i16_zero},
+    };
+    static const llvm::Intrinsic::ID kStoreI16Array[2][3] = {
+        {llvm::Intrinsic::nvvm_sust_b_1d_array_i16_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_array_v2i16_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_array_v4i16_zero},
+        {llvm::Intrinsic::nvvm_sust_b_2d_array_i16_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_array_v2i16_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_array_v4i16_zero},
     };
     static const llvm::Intrinsic::ID kLoadI32[3][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_i32_zero,
@@ -4302,6 +4318,12 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
     const uint32_t physicalBitWidth = operation.elementType.bitWidth;
     if (physicalBitWidth == 16)
     {
+        if (operation.isArray)
+        {
+            return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                       ? kLoadI16Array[dimensionIndex][laneIndex]
+                       : kStoreI16Array[dimensionIndex][laneIndex];
+        }
         return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
                    ? kLoadI16[dimensionIndex][laneIndex]
                    : kStoreI16[dimensionIndex][laneIndex];

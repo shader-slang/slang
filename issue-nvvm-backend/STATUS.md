@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Eight bounded feature batches now pass focused validation after the full checkpoint:
+Nine bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -107,7 +107,7 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references`,
 `features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
 `features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
-`features.nvvm-native-array-surfaces`. Eight
+`features.nvvm-native-array-surfaces` and `features.nvvm-half-array-surfaces`. Nine
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -122,7 +122,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; eight feature implementations have passed focused validation since the full checkpoint.
+unchanged; nine feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -144,6 +144,19 @@ selection; neither division by six nor another endpoint guess is justified. No C
 change follows these failures. Continue with another qualified feature while this binding contract
 remains open. Mip-count linkage histories and the full dimensions corpus failure remain unresolved.
 No new full campaign.
+
+Native and formatted Half surface storage now passes for 1D/2D arrays, widths 1/2/4, with
+whole/static-component updates. Eight new NVVM O0/O3 physical cells pass; the four corresponding
+CUDA compile failures are unchanged. Two non-array controls add five passes and one retained CUDA
+compile failure. Four units, four diagnostics and 89 harness contracts pass. All original 85
+case/oracle identities are preserved. The eight-job build took 35 seconds; no conversion policy,
+module version or ABI changed. The full surface baseline remains 249 cells; six added grouped rows
+now require reviewed adoption of eighteen cells at the next full checkpoint.
+
+The next selected batch is 3D Half surface storage with the same native/formatted representations,
+widths and whole/component operations. Reuse the physical runner with explicit volume depth;
+keep volume coordinates distinct from array layers. Capture unsupported before outcomes, retain
+RN-even/NaN/untouched-bit contracts and add no metadata or approximate-math policy.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

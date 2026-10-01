@@ -25,7 +25,8 @@ import tempfile
 import time
 
 REPO = Path(__file__).resolve().parents[1]
-FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered"]
+FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered",
+            "half-layered"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
 FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4)}
@@ -168,6 +169,11 @@ def cases():
     add("uint32-2d-array-order", "layered", "exercise", 11, 7, 1, False, 2,
         dict(SURFACE_DIM=2))
     rows[-1]["array_layers"] = 7
+    for shape in (1, 2):
+        for label, entry in (("whole", "wholeCopies"), ("components", "componentCopies")):
+            add(f"half-{shape}d-array-{label}", "half-layered", entry, 11,
+                1 if shape == 1 else 5, 4, True, shape, dict(SURFACE_DIM=shape))
+            rows[-1]["array_layers"] = 3
     return rows
 
 
@@ -191,6 +197,12 @@ def resource_specs(row):
         return [spec(prefix + str(index), scalar, lanes, scalar)
                 for index, (scalar, lanes) in enumerate(families)
                 for prefix in ("source", "observed")]
+    if row["fixture"] == "half-layered":
+        return [spec(prefix + family + suffix, "half", lanes, scalar)
+                for family, scalar in (("Half", "float16"), ("Format", "float32"))
+                for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
+                for prefix in ("source", "result")] + [
+                    spec("sourceFloat", "float32", 4), spec("resultFloat", "float32", 4)]
     scalar = row.get("scalar", "float32")
     return [spec("surface", "half" if row["half"] else scalar, row["lanes"], scalar),
             spec("observed", scalar, row["lanes"], scalar)]
@@ -308,10 +320,78 @@ def layered_oracle(row):
                            for a, b in zip(initial, expected)])
 
 
+def half_layered_oracle(row):
+    """Reuse Half conversion rules while independently checking layered copy and marker stores."""
+    specs = resource_specs(row)
+    width, height, layers = row["width"], row["height"], row["array_layers"]
+    initial, expected = [], []
+    exceptions = [set() for _ in specs]
+    for resource, spec in enumerate(specs):
+        if resource == 12:
+            pattern = VALUES + [INITIAL_FLOAT[1], INITIAL_FLOAT[3]]
+        elif resource == 13:
+            pattern = INITIAL_FLOAT
+        elif resource % 2:
+            pattern = INITIAL_HALF
+        else:
+            pattern = LOAD_HALF + [INITIAL_HALF[1], INITIAL_HALF[3]]
+        # Explicit layer/resource phase plus spatial terms avoid repeating at a layer boundary.
+        words = [pattern[(resource * 3 + layer * 5 + y * 7 + x + lane * 3) % len(pattern)]
+                 for layer in range(layers) for y in range(height) for x in range(width)
+                 for lane in range(spec["lanes"])]
+        initial.append(words)
+        expected.append(list(words))
+    partial = row["entry"] == "componentCopies"
+    active = 0
+    for layer in range(layers):
+        for y in range(height):
+            for x in range(width):
+                if not (1 <= x < 9 and layer < 2 and (row["shape"] == 1 or 1 <= y < 4)):
+                    continue
+                active += 1
+                texel = (layer * height + y) * width + x
+                for source in range(0, 12, 2):
+                    lanes = specs[source]["lanes"]
+                    for lane in range(lanes):
+                        if partial and lane not in ((1, 3) if lanes == 4 else (lanes - 1,)):
+                            continue
+                        index = texel * lanes + lane
+                        if source < 6:
+                            expected[source + 1][index] = initial[source][index]
+                        else:
+                            value = initial[12][texel * 4 + lane]
+                            if value & 0x7FFFFFFF > 0x7F800000:
+                                expected[source + 1][index] = 0x7E00
+                                exceptions[source + 1].add(index)
+                            else:
+                                expected[source + 1][index] = narrow_half(value)
+                        # This store does not derive from a shader load, so wrong address pairs
+                        # cannot cancel. The marker is a distinct finite, normal Half bit pattern.
+                        code = (((source // 2 * 3 + layer) * 5 + y) * 11 + x) * 4 + lane
+                        require(code < 4096, "Half marker coordinate exceeds its bounded encoding")
+                        expected[source][index] = 0x3000 | code
+                for lane, (source, source_lane) in enumerate(((6, 0), (8, 1), (10, 2), (10, 3))):
+                    if not partial or lane in (1, 3):
+                        index = texel * specs[source]["lanes"] + source_lane
+                        expected[13][texel * 4 + lane] = widen_half(initial[source][index])
+                        if initial[source][index] & 0x7FFF > 0x7C00:
+                            exceptions[13].add(texel * 4 + lane)
+    resources = []
+    for spec, before, after, nan_positions in zip(specs, initial, expected, exceptions):
+        size = FORMATS[spec["storage"]][1]
+        resources.append(dict(initial=b"".join(v.to_bytes(size, "little") for v in before),
+                              expected=b"".join(v.to_bytes(size, "little") for v in after),
+                              nan_positions=nan_positions, active_texels=active,
+                              guard_texels=width * height * layers - active))
+    return dict(resources=resources)
+
+
 def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
     if row["fixture"] == "layered":
         return layered_oracle(row)
+    if row["fixture"] == "half-layered":
+        return half_layered_oracle(row)
     if row["fixture"] in ("integers", "mixed"):
         return expanded_oracle(row)
     n = row["width"] * row["height"] * row["lanes"]
@@ -659,7 +739,7 @@ def self_test():
             require(compare(row, buffers, index, data["expected"])["mismatch_count"] == 0,
                     "Reference oracle rejected")
     # Each added resource has independent storage, including source-only arrays and guard texels.
-    for row in (x for x in cases() if x["fixture"] in ("integers", "mixed", "layered")):
+    for row in (x for x in cases() if x["fixture"] in ("integers", "mixed", "layered", "half-layered")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -734,6 +814,65 @@ def self_test():
                 damaged[wrong:wrong + lanes * 4] = damaged[start:start + lanes * 4]
                 require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
                         "Wrong vector X byte scale was ignored")
+    for row in (x for x in cases() if x["fixture"] == "half-layered"):
+        buffers = oracle(row)
+        specs = resource_specs(row)
+        data = resource_buffers(row, buffers)
+        width, height = row["width"], row["height"]
+        partial = row["entry"] == "componentCopies"
+        for source in range(0, 12, 2):
+            lanes = specs[source]["lanes"]
+            result = data[source]
+            damaged = bytearray(result["expected"])
+            # Simulate matching load/store layer permutation: result copies could cancel,
+            # but source stores carry shader-generated logical-layer markers independently.
+            for layer in (0, 1):
+                for y in range(height):
+                    if row["shape"] == 2 and not 1 <= y < 4:
+                        continue
+                    for x in range(1, 9):
+                        for lane in range(lanes):
+                            if partial and lane not in ((1, 3) if lanes == 4 else (lanes - 1,)):
+                                continue
+                            index = ((layer * height + y) * width + x) * lanes + lane
+                            other = (((1 - layer) * height + y) * width + x) * lanes + lane
+                            damaged[index * 2:index * 2 + 2] = result["expected"][other * 2:other * 2 + 2]
+            require(compare(row, buffers, source, damaged)["mismatch_count"] > 0,
+                    "Matching Half load/store layer permutation escaped independent markers")
+            require(compare(row, buffers, source, data[source + 1]["expected"])["mismatch_count"] > 0,
+                    "Half source/result substitution was ignored")
+            if partial and lanes > 1:
+                destination = data[source + 1]
+                candidates = [i for i in range(len(destination["expected"]) // 2)
+                              if i % lanes not in ((1, 3) if lanes == 4 else (lanes - 1,)) and
+                              int.from_bytes(destination["expected"][i * 2:i * 2 + 2], "little") & 0x7FFF > 0x7C00]
+                require(candidates, "Component fixture lacks untouched Half NaN payload controls")
+                damaged = bytearray(destination["expected"])
+                damaged[candidates[0] * 2] ^= 1
+                require(compare(row, buffers, source + 1, damaged)["mismatch_count"] == 1,
+                        "Untouched Half NaN payload was treated as a converted NaN")
+        converted_sizes = set()
+        for resource, result in enumerate(data):
+            if not result["nan_positions"]:
+                continue
+            size = FORMATS[specs[resource]["storage"]][1]
+            converted_sizes.add(size)
+            position = min(result["nan_positions"])
+            for bits, failures in ((0xFE13 if size == 2 else 0xFFC12345, 0), (0, 1)):
+                damaged = bytearray(result["expected"])
+                damaged[position * size:(position + 1) * size] = bits.to_bytes(size, "little")
+                require(compare(row, buffers, resource, damaged)["mismatch_count"] == failures,
+                        "Layered converted-NaN class check is incorrect")
+        require(converted_sizes == {2, 4}, "Layered fixture lacks both converted-NaN directions")
+        native = data[1]
+        copied_nan = next((i for i in range(len(native["expected"]) // 2)
+                           if native["expected"][i * 2:i * 2 + 2] != native["initial"][i * 2:i * 2 + 2]
+                           and int.from_bytes(native["expected"][i * 2:i * 2 + 2], "little") & 0x7FFF > 0x7C00), None)
+        require(copied_nan is not None, "Native Half copy lacks exact NaN payload coverage")
+        damaged = bytearray(native["expected"])
+        damaged[copied_nan * 2] ^= 1
+        require(compare(row, buffers, 1, damaged)["mismatch_count"] == 1,
+                "Native Half copy incorrectly admitted NaN payload changes")
     literal = oracle(next(x for x in cases() if x["case"] == "half-1d-1-literal-store"))
     dynamic = oracle(next(x for x in cases() if x["case"] == "half-1d-1-wholeStore"))
     require(literal == dynamic, "Literal stores changed the frozen whole-store oracle")

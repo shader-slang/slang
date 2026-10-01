@@ -450,7 +450,7 @@ distinct scalar UInt32 query mapped to `txq.height`/`txq.depth` with the real ar
 preserved. Spatial rank remains one/two. Integer and Float32 outputs use ordinary numeric casts; other array-count bodies retain the previous zero
 fallback. Mip, multisample and writable-resource admission remain unchanged. Public direct
 RWTexture2DArray.Store gains the same native32 path already admitted by canonical image stores.
-No Half-array, float3 sampling, extra access mode or query-level admission is implied.
+Float3 sampling, extra access modes and query-level admission remain excluded.
 
 All active semantic tags and resource-text recognizers are retired. Deprecated AST/IR serialized
 slots remain inert under module 43; ABI 46/container 2 are unchanged. Exact removed-tag/text tests
@@ -490,12 +490,12 @@ the qualified stack; `txq.level.width` loaded and executed. No full API repair i
 
 NVVM surface legalization supports the existing native 32-bit signed/unsigned/Float32 scalar, two-
 and four-channel transfers in 1D/2D/3D and 1DArray/2DArray shapes. Native Half and annotated Half
-storage with Float32 shader values remain limited to non-array 1D/2D. Matching Float32 uses Float32
+storage with Float32 shader values support 1D/2D and 1DArray/2DArray; 3D Half remains excluded. Matching Float32 uses Float32
 payloads directly. Static component masks and in-range dynamic scalar indices update physical channels without
 re-encoding untouched NaN payloads. Dynamic indices use the existing non-atomic whole-texel merge;
 there is no new out-of-range lane guarantee. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
 
-The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 85 cases,
+The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 89 cases,
 including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
 nonzero guards and zero-boundary accesses. Native signed/unsigned32 cases exercise 1D/2D scalar,
 two- and four-channel loads, whole stores and component stores with exact integer bits. Four mixed
@@ -512,9 +512,15 @@ resource/layer/coordinate/lane bits, independent stores and complete host readba
 wrong load/store address from hiding corruption. The original 83 case/oracle identities remain
 unchanged. Explicit array role selects layered allocation and copy depth, even for a singleton;
 CPU checks cover that role without claiming singleton GPU qualification.
+Four [Half-array cases](../../tests/cuda/nvvm-surface-physical-half-layered.slang) cover both array
+ranks, native Half and formatted Float32 values, widths 1/2/4 and whole/static-component updates.
+Fourteen independently read-back resources distinguish raw copies, narrowing, widening and source
+marker writes. NVVM O0/O3 passes all eight cells; four CUDA cells retain missing layered conversion
+helpers and invalid component-subscript compilation. Converted NaNs require class; native copies,
+untouched channels and layer guards retain exact bits. No new dynamic-array runtime claim is made.
 The recurring checkpoint replays physical readbacks and compares its complete inventory against the
 [current baseline](../../issue-nvvm-backend/accepted-baseline.json), preserving known failures.
-That full baseline still owns its original 249 cells; the six added layered cells require explicit
+That full baseline still owns its original 249 cells; the eighteen added layered cells require explicit
 reviewed adoption at the next full checkpoint.
 [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC

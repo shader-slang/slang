@@ -79927,6 +79927,225 @@
         "last_targeted": "native-array-surfaces",
         "implementations_since_full": 8
       }
+    },
+    "nvvm-half-array-surfaces": {
+      "status": "accepted-focused",
+      "scope": "Native Half and annotated r16f/rg16f/rgba16f storage with Float32 values for RWTexture1DArray/2DArray, scalar/2/4 lanes, whole/static-component accesses. Module43/providerABI46/container2 unchanged.",
+      "contract": "Preserve actual array shape/rank through shared type admission; select genuine LLVM i16 array intrinsics with existing layer-first call ordering. Native Half copies preserve bits; finite conversions use RN-even, converted NaNs require class, untouched channels and guards remain exact.",
+      "identity": {
+        "revision": "521e62a020a705bd2598aaa3ba873ff884ce4068",
+        "patch_sha256": "d6eacc6e06bab11723fefed5cff978ca3ebf088231307c80804c69b44214c648",
+        "source_sha256": {
+          "extras/validate-nvvm-surfaces.py": "cc6cee534089c077f3908329e1f2aaa840a639391b37153c68c95509f2c2ccd4",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "d51a1cd6767c8013ba58e5dcea249c5da499977f1b0103bbbdf0082701c0d5c1",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "be15187c99876078289b85d6af2e2c0e0126eadb0de08473041b749f85a1d72c",
+          "source/slang/slang-emit-nvvm.cpp": "10f20bda922120a6ed2049c5d9c819af78931cc6393d276a89b64422ecea8b92",
+          "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "3eeba4ffc8a96d2ff765c874df76a852e75a1bdb33438c320c264a0a0c591d53",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "75a96aba35f299a2af06a9bd361fc16f906e8a6f23bc66a3212bbb33b0f5c026",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "7e96680b81b1aa8a50ce293ddb864e1fb2053b2df3873ffae53b72c48e1d21ae",
+          "tests/cuda/nvvm-surface-physical-half-layered.slang": "2d4f1314648bd3455bab6c6e219c58d948f82219c372e1d99d2421ea1b4a6c88"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "0d867804cf0a64a89a40d12b94d9eb1095b49d9d2ce50d23dab8776916496066",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "61ee1b9db96e7f901b8e3f79c9efae0a9d29e2e71517c046c10f072c6ea54622",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "28b1312eb8e8e76d008691adedc587f388d87b969eaa96f9483a2d140e87c6fd",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "a95234f705ee62d21f0ddeaa3f3c44a321c823883f8783e82cb60650b1f8866b"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-half-array-surfaces/build.json",
+        "sha256": "63393b537aa1faaef382e62a635c55f7880875cb081ff99cb3225fc29f881059"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-half-array-surfaces/units.json",
+            "sha256": "4723671289701f3721b753169a630571e2ae7af91c94753f70ce4e2dc3c0bd9b"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderQueriesTypedSurfaceOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation.internal": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-half-array-surfaces/negatives.json",
+            "sha256": "25edd9977d27897031bbde72def1d948ccea922d90c5d0735167722b78f8fc24"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-formatted-surface-provenance.slang": "passed",
+            "tests/cuda/nvvm-native-float-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 4
+          },
+          "scope": "Half3-array replaces obsolete Half4-array rejection; Int3 and provenance/Float32 negatives retained."
+        },
+        "physical": {
+          "gate": {
+            "path": "build/nvvm-half-array-surfaces/physical.json",
+            "sha256": "2808688ddc7db049be64b8a91f72da70d5cbf871ccb7139e12ae37370c14f957"
+          },
+          "validated": {
+            "path": "build/nvvm-half-array-surfaces/physical-validation.json",
+            "sha256": "5033b40f21ea0a098b4789141082d75fe8446e7441f137614b63237227a0104c"
+          },
+          "requested_cells": 18,
+          "counts": {
+            "passed": 13,
+            "compile-failed": 5
+          },
+          "outcomes": {
+            "half-1d-4-loadValues|nvrtc-o3": "passed",
+            "half-1d-4-loadValues|nvvm-o0": "passed",
+            "half-1d-4-loadValues|nvvm-o3": "passed",
+            "half-1d-array-components|nvrtc-o3": "compile-failed",
+            "half-1d-array-components|nvvm-o0": "passed",
+            "half-1d-array-components|nvvm-o3": "passed",
+            "half-1d-array-whole|nvrtc-o3": "compile-failed",
+            "half-1d-array-whole|nvvm-o0": "passed",
+            "half-1d-array-whole|nvvm-o3": "passed",
+            "half-2d-4-componentStore|nvrtc-o3": "compile-failed",
+            "half-2d-4-componentStore|nvvm-o0": "passed",
+            "half-2d-4-componentStore|nvvm-o3": "passed",
+            "half-2d-array-components|nvrtc-o3": "compile-failed",
+            "half-2d-array-components|nvvm-o0": "passed",
+            "half-2d-array-components|nvvm-o3": "passed",
+            "half-2d-array-whole|nvrtc-o3": "compile-failed",
+            "half-2d-array-whole|nvvm-o0": "passed",
+            "half-2d-array-whole|nvvm-o3": "passed"
+          },
+          "scope": "Four new grouped array rows plus non-array Half load/component controls in three modes. Full14-resource readbacks include independent source marker writes, conversion observations, layer guards and exact untouched bits."
+        },
+        "cpu": {
+          "harness": {
+            "path": "build/nvvm-half-array-surfaces/contracts.json",
+            "sha256": "c77e42452285bf3526ed82112bf83494fd61a5ee018625008706b15a42553952"
+          },
+          "harness_case_count": 89,
+          "original_case_oracle_preservation": {
+            "path": "build/nvvm-half-array-surfaces/harness-freeze.json",
+            "sha256": "0cf24d5feddf5d3145338269f1bf507b1c73ce99183cbc6a27f5d500887722b0"
+          },
+          "report_validator_reused": {
+            "path": "build/nvvm-surface-1d-array/report-contracts.json",
+            "sha256": "df10de34c0dc85152a8a4b0394b450a94a45e86df48030d583ee1cd2b8959683"
+          },
+          "report_contract_tests_reused": 22,
+          "reuse": "Report validator and its tests unchanged; new18 cells independently replayed by it."
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-half-array-surfaces/before-validation.json",
+          "sha256": "922db23902352e48197f4000c1bc87c0748fb4b572ea138d62ad9be851150e8f"
+        },
+        "transitions": [
+          {
+            "case": "half-1d-array-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-1d-array-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-1d-array-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-1d-array-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-2d-array-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-2d-array-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-2d-array-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "half-2d-array-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          }
+        ],
+        "unchanged_cuda_failures": 4,
+        "comparison": "All12 before/after case/source/oracle identities exact; all4 normalized CUDA failed cells identical."
+      },
+      "retained_failures": {
+        "array_cuda": "Missing surf1DLayeredread_convert/surf2DLayeredread_convert and invalid layered component subscript syntax. Actual compile failures, not numerical evidence.",
+        "control_cuda": "Existing non-array component compile failure retained."
+      },
+      "preservation": {
+        "prior_feature_count": 50,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "original_surface_rows_oracles": 85,
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_surface_expansion": "Full baseline retains249 cells; six added rows since full require reviewed18-cell adoption at next full checkpoint."
+      },
+      "limitations": [
+        "3D Half, three channels, 64-bit, Cube/MS, new formats, general aliases and resource-helper provenance remain excluded.",
+        "New layered runtime checks use static component selection; no new dynamic-array, singleton-GPU, OOB or concurrency guarantee.",
+        "Focused correctness; no new full campaign or performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "half-array-surfaces",
+        "implementations_since_full": 9
+      }
     }
   }
 }

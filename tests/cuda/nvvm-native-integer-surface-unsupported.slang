@@ -14,11 +14,11 @@ void int3Main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 //INT3: direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'
 
-// Native32 1D arrays are supported. Half arrays still have no selected physical surface row.
+// Native32 and Half arrays support only scalar, two-lane and four-lane physical rows.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=ARRAY): -target ptx -emit-cuda-via-nvvm -entry arrayMain -stage compute -capability cuda_sm_7_0 -o nvvm-native-integer-surface-array-unsupported.ptx
 
-RWTexture1DArray<half4> arrayTexture;
+RWTexture1DArray<half3> arrayTexture;
 
 [numthreads(1, 1, 1)]
 void arrayMain(uint3 dispatchThreadID : SV_DispatchThreadID)
