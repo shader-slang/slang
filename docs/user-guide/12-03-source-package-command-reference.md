@@ -17,9 +17,9 @@ arguments.
 ## Synopsis
 
 ```text
-slang package [--experimental] <command> [<arguments>]
-slang pkg [--experimental] <command> [<arguments>]
-slang-package [--experimental] <command> [<arguments>]
+slang package <command> [<arguments>]
+slang pkg <command> [<arguments>]
+slang-package <command> [<arguments>]
 ```
 
 ## Description
@@ -35,23 +35,7 @@ package therefore forms its own workspace.
 
 Package commands do not change Slang's `import` syntax. `fetch`, `update`, and local-registration
 commands regenerate `slang-package-includes.txt` for compiler sessions that consume the
-materialized graph. `bundle`
-creates a flattened source bundle and documentation. Experimental bundle mode can additionally
-create `.slang-module` files and native host executables.
-
-## Global option
-
-### `--experimental`
-
-Enable experimental command behavior. This option must appear before the command:
-
-```text
-slang package --experimental bundle
-slang package --experimental run --binary
-```
-
-It enables `.slang-module` and host-executable output during `bundle`, and the `--binary` form of
-`run`. It does not change dependency resolution.
+materialized graph. `bundle` creates a flattened source bundle and documentation.
 
 ## Commands
 
@@ -69,8 +53,7 @@ The commands are:
 - [`validate`](#validate) — check that a package is suitable for sharing.
 - [`tree`](#tree) — print the selected dependency graph.
 - [`why`](#why) — explain why a package is in the selected graph.
-- [`bundle`](#bundle) — validate the graph and create package outputs.
-- [`run`](#run) — run a configured host program from existing bundle output.
+- [`bundle`](#bundle) — validate the graph and create the source distribution.
 - [`docs`](#docs) — open or print the generated documentation index.
 - [`test`](#test) — reserved; package testing is not implemented.
 
@@ -82,13 +65,12 @@ The commands are:
 slang package help
 slang package -help
 slang package --help
-slang package --experimental help
 ```
 
 ### Description
 
-Print a concise list of available commands. The experimental form also shows experimental bundle
-and run behavior. There is currently no command-specific `help <command>` form.
+Print a concise list of available commands. There is currently no command-specific
+`help <command>` form.
 
 ## `init`
 
@@ -673,13 +655,12 @@ resolver rejected during an earlier `update`, and it does not contact remotes.
 
 ```text
 slang package bundle [--skip-validate]
-slang package --experimental bundle [--skip-validate]
 ```
 
 ### Description
 
-Validate the materialized graph as buildable and create distribution output under the configured
-workspace output directory (`out/` by default).
+Validate the materialized graph as buildable and create the source distribution under the
+configured workspace output directory (`out/` by default).
 
 If a locked Git checkout is missing, bundle runs `fetch` first without `--clean`. If dependencies
 exist without a lock, that fetch runs `update --yes` to create the first lock. An existing lock is
@@ -690,31 +671,14 @@ correct `module` and `implementing` declarations, and unique primary import path
 closure. Bundle intentionally permits placeholder licenses, enabled overrides, and local path
 dependencies because those do not prevent compilation.
 
-### Stable output
+### Output
 
-A normal bundle:
+A bundle:
 
-- copies every exported `.slang` file to `out/bundle/source/`, preserving its
-  export-relative import path, when `workspace.bundle.source` is enabled; and
+- copies every exported `.slang` file to `out/bundle/source/`, preserving its export-relative
+  import path; and
 - copies each package's Markdown files from `docs/` to `out/docs/<package-name>/` and writes
   `out/docs/index.md`.
-
-`workspace.bundle.source` defaults to enabled. Existing source output is removed when it is
-disabled.
-
-### Experimental output
-
-With the global `--experimental` option, bundle additionally:
-
-- compiles each primary module to `out/bundle/modules/<import-path>.slang-module` when
-  `workspace.bundle.modules` is enabled;
-- writes `out/bundle/modules/provenance.json`;
-- compiles configured workspace `build.host.executables` to `out/host/`; and
-- copies the required `slang-rt` runtime beside those native executables and writes
-  `out/host/EXPERIMENTAL.txt`.
-
-The `.slang-module` format is unstable and tied to the producing compiler. Experimental host
-output requires a matching exported workspace primary and a supported downstream C++ compiler.
 
 ### Option
 
@@ -722,39 +686,6 @@ output requires a matching exported workspace primary and a supported downstream
 : Skip source declaration and import-uniqueness checks. The legal graph still runs, and export
 files are still inventoried for bundle output. If bundle invokes fetch, the option is passed
 through and also skips new-release publish checks. A warning is printed.
-
-## `run`
-
-### Synopsis
-
-```text
-slang package run [<name>] [<arguments>...]
-slang package --experimental run --binary [<name>] [<arguments>...]
-```
-
-### Description
-
-Run a host program configured by `build.host`. `run` consumes existing bundle output and does not
-run `bundle` automatically.
-
-If `<name>` matches an entry in `build.host.executables`, that executable is selected and the
-remaining arguments are forwarded. Otherwise, the configured `build.host.default` is selected
-and all arguments are forwarded. A sole configured executable becomes the default automatically;
-manifests with multiple executables must name a default.
-
-### Source mode
-
-Normal `run` invokes the sibling `slangi` interpreter on
-`out/bundle/source/<name>.slang`. The source bundle must be enabled and already built. Because
-the interpreter searches from the input file's directory, the configured executable primary must
-be at an export root.
-
-### Binary mode
-
-`--binary`
-: Run the native artifact under `out/host/`. This option must immediately follow `run` and
-requires the global `--experimental` option and a previous experimental bundle. Binary mode can
-run an executable primary nested below the export root.
 
 ## `docs`
 
@@ -767,7 +698,7 @@ slang package docs --print
 
 ### Description
 
-Use the documentation index from the last bundle. The command does not copy or regenerate
+Use the documentation index from the last `bundle`. The command does not copy or regenerate
 documentation; run `bundle` first.
 
 Without options, open `out/docs/index.md` with the platform's registered Markdown application.
@@ -832,8 +763,8 @@ cache; offline resolution requires it.
 `workspace.dependencies`.
 
 `out/`
-: Default output directory for source bundles, documentation, and experimental artifacts. The
-path is configured by `workspace.output`.
+: Default output directory for source bundles and documentation. The path is configured by
+`workspace.output`. `bundle` refreshes `out/docs`.
 
 ## Exit status
 
@@ -850,3 +781,80 @@ the report.
   application journeys and behavioral contracts.
 - [Writing Module Files, Import, and Include](module-files) — source-layout rules enforced by
   validation.
+
+## Experimental
+
+Unstable package behavior. These commands and options are separate from the stable reference
+above. They require `--experimental` immediately before the command. The option does not change
+stable commands or dependency resolution.
+
+### Synopsis
+
+```text
+slang package --experimental <command> [<arguments>]
+slang pkg --experimental <command> [<arguments>]
+slang-package --experimental <command> [<arguments>]
+```
+
+### `help`
+
+```text
+slang package --experimental help
+```
+
+Print the stable command list, and also `build` and `run`.
+
+### `build`
+
+```text
+slang package --experimental build [--skip-validate]
+```
+
+Create the built distribution. `.slang-module` files and host executables are unstable. `build`
+performs the same validation, source copy, and documentation refresh as `bundle`, then adds binary
+targets. `docs` can open the index this command writes. A later `bundle` removes
+`out/bundle/modules` and `out/host`.
+
+If a locked Git checkout is missing, build runs `fetch` first without `--clean`. If dependencies
+exist without a lock, that fetch runs `update --yes` to create the first lock. An existing lock is
+never rewritten by build.
+
+In addition to the source bundle and `out/docs` written by `bundle`, build:
+
+- compiles each primary module to `out/bundle/modules/<import-path>.slang-module`;
+- writes `out/bundle/modules/provenance.json`;
+- compiles configured workspace `build.host.executables` to `out/host/` when that list is present;
+  and
+- copies the required `slang-rt` runtime beside those native executables and writes
+  `out/host/EXPERIMENTAL.txt`.
+
+The `.slang-module` format is unstable and tied to the producing compiler. Host output requires a
+matching exported workspace primary and a supported downstream C++ compiler. When no host
+executables are configured, build removes `out/host`.
+
+`--skip-validate`
+: The same escape hatch as on `bundle`. The option is also passed through when build invokes
+fetch.
+
+### `run`
+
+```text
+slang package --experimental run [<name>] [<arguments>...]
+slang package --experimental run --binary [<name>] [<arguments>...]
+```
+
+Run a host program configured by `build.host`. `run` consumes existing output and does not bundle
+or build first. Without `--experimental` the command is rejected.
+
+If `<name>` matches an entry in `build.host.executables`, that executable is selected and the
+remaining arguments are forwarded. Otherwise, the configured `build.host.default` is selected and
+all arguments are forwarded. A sole configured executable becomes the default automatically;
+manifests with multiple executables must name a default.
+
+Without `--binary`, `run` invokes the sibling `slangi` interpreter on
+`out/bundle/source/<name>.slang`. The source bundle must already exist. Because the interpreter
+searches from the input file's directory, the configured executable primary must be at an export
+root.
+
+`--binary` must immediately follow `run`. It executes the native artifact under `out/host/` from
+the last `build`, including an executable primary nested below the export root.

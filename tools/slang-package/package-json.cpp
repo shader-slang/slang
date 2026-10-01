@@ -576,7 +576,7 @@ static SlangResult _readWorkspace(
     for (auto pair : container->getObject(workspace))
     {
         String key = container->getStringFromKey(pair.key);
-        if (key != "dependencies" && key != "output" && key != "excludes" && key != "bundle")
+        if (key != "dependencies" && key != "output" && key != "excludes")
         {
             outError = String("Unknown field in 'workspace': ") + key;
             return SLANG_FAIL;
@@ -595,38 +595,6 @@ static SlangResult _readWorkspace(
         outWorkspace.outputDirectory,
         outError));
     SLANG_RETURN_ON_FAIL(_readExclusions(container, workspace, outWorkspace.exclusions, outError));
-    JSONValue bundle = _find(container, workspace, "bundle");
-    if (bundle.isValid())
-    {
-        if (bundle.getKind() != JSONValue::Kind::Object)
-        {
-            outError = "Workspace 'bundle' must be an object.";
-            return SLANG_FAIL;
-        }
-        for (auto pair : container->getObject(bundle))
-        {
-            String key = container->getStringFromKey(pair.key);
-            if (key != "modules" && key != "source")
-            {
-                outError = String("Unknown field in 'workspace.bundle': ") + key;
-                return SLANG_FAIL;
-            }
-        }
-        SLANG_RETURN_ON_FAIL(_readOptionalBool(
-            container,
-            bundle,
-            "modules",
-            true,
-            outWorkspace.bundle.modules,
-            outError));
-        SLANG_RETURN_ON_FAIL(_readOptionalBool(
-            container,
-            bundle,
-            "source",
-            true,
-            outWorkspace.bundle.source,
-            outError));
-    }
     if (outWorkspace.depsDirectory.getLength())
         outWorkspace.depsDirectory = Path::simplify(outWorkspace.depsDirectory);
     if (outWorkspace.outputDirectory.getLength())
@@ -1030,13 +998,6 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
                 manifest.workspace.outputDirectory.getUnownedSlice(),
                 SourceLoc());
         }
-        _writeKey(writer, "bundle");
-        writer.startObject(SourceLoc());
-        _writeKey(writer, "modules");
-        writer.addBoolValue(manifest.workspace.bundle.modules, SourceLoc());
-        _writeKey(writer, "source");
-        writer.addBoolValue(manifest.workspace.bundle.source, SourceLoc());
-        writer.endObject(SourceLoc());
         if (manifest.workspace.exclusions.getCount())
         {
             _writeKey(writer, "excludes");

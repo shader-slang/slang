@@ -195,8 +195,6 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.build.host.executables.getCount() == 1);
     SLANG_CHECK(manifest.build.host.executables[0] == "root-tool");
     SLANG_CHECK(manifest.build.host.defaultExecutable == "root-tool");
-    SLANG_CHECK(manifest.workspace.bundle.modules);
-    SLANG_CHECK(manifest.workspace.bundle.source);
 
     const String pinnedText = "{\n"
                               "  \"schema_version\": 1,\n"
@@ -383,14 +381,13 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("nested-workspace.json", nestedWorkspaceText, manifest, error)));
 
-    const String disabledBundleText =
+    const String removedBundleText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],\"dependencies\":{},\"workspace\":{\"bundle\":{\"modules\":false,"
         "\"source\":true}}}";
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        readManifestText("disabled-bundle.json", disabledBundleText, manifest, error)));
-    SLANG_CHECK(!manifest.workspace.bundle.modules);
-    SLANG_CHECK(manifest.workspace.bundle.source);
+    SLANG_CHECK(
+        SLANG_FAILED(readManifestText("removed-bundle.json", removedBundleText, manifest, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String unknownBundleFieldText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
@@ -910,7 +907,17 @@ SLANG_UNIT_TEST(PackageToolBundle)
         File::exists(Path::combine(temp.path, "out/bundle/source/acme/noise/helper.slang")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/main.slang")));
 
-    const char* experimentalBundleArguments[] = {"slang-package", "--experimental", "bundle"};
+    const char* experimentalSourceArguments[] = {"slang-package", "--experimental", "bundle"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(experimentalSourceArguments),
+        experimentalSourceArguments,
+        error)));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/main.slang")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/docs/index.md")));
+
+    const char* experimentalBundleArguments[] = {"slang-package", "--experimental", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(experimentalBundleArguments),
@@ -976,14 +983,22 @@ SLANG_UNIT_TEST(PackageToolBundleRejectsCleanAndYes)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown bundle option")) >= 0);
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
 
-    const char* legacyBuildArguments[] = {"slang-package", "build"};
+    const char* stableBuildArguments[] = {"slang-package", "build"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(legacyBuildArguments),
-        legacyBuildArguments,
+        SLANG_COUNT_OF(stableBuildArguments),
+        stableBuildArguments,
         error)));
-    SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid command or arguments")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--experimental")) >= 0);
+
+    const char* cleanBuildArguments[] = {"slang-package", "--experimental", "build", "--clean"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(cleanBuildArguments),
+        cleanBuildArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown build option")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
@@ -1012,35 +1027,6 @@ SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(refArguments), refArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires --adopt")) >= 0);
-}
-
-SLANG_UNIT_TEST(PackageToolBundleFlags)
-{
-    TemporaryDirectory temp;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
-    const char* initArguments[] = {"slang-package", "init"};
-    String error;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
-    Manifest manifest;
-    String manifestPath = Path::combine(temp.path, "slang-package.json");
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
-    manifest.workspace.bundle.modules = false;
-    manifest.workspace.bundle.source = false;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
-        Path::combine(temp.path, "src/library.slang"),
-        "module library;\n"
-        "public int getValue() { return 1; }\n")));
-
-    const char* bundleArguments[] = {"slang-package", "bundle"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules/library.slang-module")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules/provenance.json")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/source/library.slang")));
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
@@ -1146,7 +1132,7 @@ SLANG_UNIT_TEST(PackageToolRun)
         SLANG_COUNT_OF(stableRunArguments),
         stableRunArguments,
         error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not configure")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires")) >= 0);
 
     const char* runArguments[] = {"slang-package", "--experimental", "run", "argument"};
     SLANG_CHECK(SLANG_FAILED(
@@ -1169,13 +1155,10 @@ SLANG_UNIT_TEST(PackageToolRun)
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/host")));
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/package-run-test.slang")));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        temp.path,
-        SLANG_COUNT_OF(stableRunArguments),
-        stableRunArguments,
-        error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
 
-    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     String executablePath = Path::combine(
@@ -1225,8 +1208,8 @@ SLANG_UNIT_TEST(PackageToolRunModes)
     const char* sourceRun[] = {"slang-package", "run"};
     SLANG_CHECK(
         SLANG_FAILED(executeInDirectory(temp.path, SLANG_COUNT_OF(sourceRun), sourceRun, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("source entry")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang package bundle")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--experimental")) >= 0);
 
     const char* experimentalSourceRun[] = {"slang-package", "--experimental", "run"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
@@ -1249,15 +1232,6 @@ SLANG_UNIT_TEST(PackageToolRunModes)
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has not been built")) >= 0);
 
-    manifest.workspace.bundle.source = false;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
-    SLANG_CHECK(
-        SLANG_FAILED(executeInDirectory(temp.path, SLANG_COUNT_OF(sourceRun), sourceRun, error)));
-    SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("workspace.bundle.source")) >= 0);
-    manifest.workspace.bundle.source = true;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
-
     const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
@@ -1267,8 +1241,9 @@ SLANG_UNIT_TEST(PackageToolRunModes)
         String("out/host/package-run-test") + Process::getExecutableSuffix())));
 
     const char* namedSourceRun[] = {"slang-package", "run", "package-run-test"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+    SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(namedSourceRun), namedSourceRun, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("requires")) >= 0);
     const char* experimentalNamedSourceRun[] =
         {"slang-package", "--experimental", "run", "package-run-test"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
@@ -1315,7 +1290,7 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
         "    return argc == 2 ? 0 : 1;\n"
         "}\n")));
 
-    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(File::exists(
@@ -1329,7 +1304,7 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
     SLANG_CHECK(
         experimentalMarker.getUnownedSlice().indexOf(UnownedStringSlice("EXPERIMENTAL")) >= 0);
 
-    const char* defaultRun[] = {"slang-package", "run"};
+    const char* defaultRun[] = {"slang-package", "--experimental", "run"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(defaultRun), defaultRun, error)));
     const char* namedRun[] = {"slang-package", "--experimental", "run", "--binary", "beta", "arg"};
@@ -1389,7 +1364,7 @@ SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "build"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("root-tool.slang")) >= 0);
@@ -2158,7 +2133,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
         "module main;\n"
         "import a;\n"
         "public int useA() { return aValue(); }\n")));
-    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "build"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/modules/a.slang-module")));
@@ -2584,7 +2559,7 @@ SLANG_UNIT_TEST(PackageToolFailureTranscripts)
         executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
     SLANG_CHECK(
         formatCommandError(error) ==
-        "slang-package: error: run --binary requires the global --experimental option.\n");
+        "slang-package: error: run requires the global --experimental option.\n");
 
     Manifest manifest;
     manifest.name = "root";

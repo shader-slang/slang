@@ -13,9 +13,9 @@ same application when an upstream package changes its graph and when you extract
 application into a package.
 
 Journeys 1 through 7 use only stable commands, so they describe what the tool supports today
-without any opt-in. Binary module generation, host executable compilation, and binary `run` are
+without any opt-in. Binary module generation, host executable compilation, and `run` are
 experimental, and everything about them is collected in Journey 8, the last journey, so it can be
-read or ignored on its own. Source `run` is stable.
+read or ignored on its own.
 
 This is also a behavioral contract for the package tool. The maintainer appendix turns the
 journeys into must/must-not checks for future command changes.
@@ -872,11 +872,12 @@ application can consume it.
 - Moving a module can expose accidental dependency direction or visibility problems. The package
   tool detects graph and layout errors, not architectural cycles in your intended API.
 
-## Journey 8: bundle binary artifacts (experimental)
+## Journey 8: build binary artifacts (experimental)
 
 Everything before this point uses stable commands. `.slang-module` generation, host executable
-compilation, and binary `run` are experimental, so they are separated here: the journeys above
-stay valid whether or not these features ship in their current form. Source `run` is stable.
+compilation, and `run` are experimental, so they are separated here: the journeys above stay
+valid whether or not these features ship in their current form. `bundle` remains the source
+distribution; `build` is that distribution plus the binary targets.
 
 ### Goal
 
@@ -888,13 +889,14 @@ accepting that the artifacts, command spelling, and features may change.
 Starting from the `image-viewer` package of Journey 1, opt in to module generation:
 
 ```sh
-slang package --experimental bundle
+slang package --experimental build
 ```
 
-When `workspace.bundle.modules` is enabled, this writes `.slang-module` files under
-`out/bundle/modules`. The command emits a warning every time because their binary format is not
-stable. The adjacent `provenance.json` records that the format is experimental and unstable,
-along with the compiler version, source commit, tracked-source dirty state, and path.
+This writes `.slang-module` files under `out/bundle/modules`. The command emits a warning every
+time because their binary format is not stable. The adjacent `provenance.json` records that the
+format is experimental and unstable, along with the compiler version, source commit,
+tracked-source dirty state, and path. It also refreshes the source bundle and documentation that
+`bundle` writes.
 
 To produce a host executable too, give the entry module a C++-visible entry point:
 
@@ -919,19 +921,20 @@ Declare the executable in the `build.host` section of `slang-package.json`:
 }
 ```
 
-Plain `slang package bundle` still produces the stable source bundle and skips host and module
-binaries. The stable run path interprets that source bundle:
+Plain `slang package bundle` still produces the stable source bundle and docs, and it removes host
+and module binaries left by an earlier build. Interpreting that source bundle requires the same
+experimental option as native execution:
 
 ```sh
 slang package bundle
-slang package run
+slang package --experimental run
 ```
 
 Opt in to binary outputs and native execution with the global flag, which must appear before the
 subcommand, and the run-specific `--binary` option:
 
 ```sh
-slang package --experimental bundle
+slang package --experimental build
 slang package --experimental run --binary
 ```
 
@@ -939,7 +942,7 @@ Both run modes accept an optional executable name and forward every remaining ar
 with no `--` separator:
 
 ```sh
-slang package run image-viewer --input frame.exr
+slang package --experimental run image-viewer --input frame.exr
 slang package --experimental run --binary image-viewer --input frame.exr
 ```
 
@@ -948,32 +951,32 @@ application flag in that position is still forwarded.
 
 ### Tool does
 
-- `bundle` performs the same validation, source-bundle, and documentation work as the stable path.
-  When enabled in the manifest, it additionally compiles `.slang-module` files and emits a warning
-  about their unstable binary format.
+- `build` performs the same validation, source-bundle, and documentation work as `bundle`, then
+  compiles `.slang-module` files and emits a warning about their unstable binary format.
 - Module provenance records `experimental: true`, `format_stability: "unstable"`, and the
   compiler source commit and dirty state so copied artifacts retain their compatibility boundary.
 - Host executables and runtime libraries are written under `out/host`, which contains
   `EXPERIMENTAL.txt` even when copied separately from the rest of the output tree.
-- `bundle` without `--experimental` produces source and documentation only, regardless of module or
-  host settings, and removes stale module and host directories from an earlier experimental bundle.
+- `bundle` produces source and documentation only, and removes stale module and host directories
+  from an earlier experimental build. `--experimental` does not add binaries to `bundle`.
+- `build` and `run` without the global `--experimental` option are rejected.
 - `run` interprets the already-built source copy selected by the optional name, otherwise
   `build.host.default` or the only configured executable.
-- `--experimental run --binary` executes the corresponding already-built native artifact.
-- Neither mode bundles or resolves packages.
-- `slang package --experimental help` documents the binary bundle and run options.
+- `run --binary` executes the corresponding already-built native artifact.
+- Neither mode bundles, builds, or resolves packages.
+- `slang package --experimental help` documents `build` and `run`.
 
 ### Current gaps and pitfalls
 
-- There is no package-level bundle script. Host executables need a supported C++ compiler and the
+- There is no package-level build script. Host executables need a supported C++ compiler and the
   sibling Slang tools available at runtime, and the tool does not check for the C++ compiler as
   part of the toolchain constraint.
-- Because `run` never bundles, a stale source copy or native artifact runs silently after a source
-  edit. Run the corresponding bundle first.
-- If the selected output does not exist, `run` reports the missing path and bundle command instead
-  of attempting a bundle.
-- A stable bundle intentionally does not diagnose missing host toolchains or invalid executable
-  entry points because it does not attempt those outputs.
+- Because `run` never bundles or builds, a stale source copy or native artifact runs silently
+  after a source edit. Run `bundle` or experimental `build` first.
+- If the selected output does not exist, `run` reports the missing path and the command that
+  produces it instead of attempting a distribution.
+- `bundle` intentionally does not diagnose missing host toolchains or invalid executable entry
+  points because it does not attempt those outputs.
 
 ## Lessons from established package workflows
 
@@ -1233,29 +1236,29 @@ another workspace can fetch it.
 
 ### `--experimental`
 
-**Use it when:** you need `.slang-module` binaries or host executables. Journey 8 covers both
-workflows.
+**Use it when:** you need `.slang-module` binaries, host executables, or `run`. Journey 8 covers
+these workflows.
 
-**It changes:** `bundle` also compiles enabled `.slang-module` output and configured host
-executables, and `run --binary` becomes available. The flag is global and must appear before the
-subcommand. Source `run` stays available without it. Every other journey in this chapter is
-unaffected by it.
+**It changes:** `build` becomes available and compiles `.slang-module` output and configured host
+executables, and `run` becomes available, including `run --binary`. The flag is global and must
+appear before the subcommand. Every other journey in this chapter is unaffected by it.
 
-**It does not change:** validation, resolution, bundle output, or documentation collection.
+**It does not change:** validation, resolution, `bundle` output, or documentation collection.
+`bundle` still writes only the source distribution and docs, even when the flag is present.
 
 ### Help spellings and commands without flags
 
-`slang package help`, `-help`, and `--help` print stable package help, including source `run`.
-Commands are grouped by the file they primarily write or report: the manifest
-(`slang-package.json`), the overlay (`slang-package-overlay.json`), the lock
-(`slang-package-lock.json`), then bundle. `unedit --adopt` is listed under overlay because it
-drops that registration; it also writes the manifest and lock. Stable help says
-`--experimental` enables experimental options; `slang package --experimental help` lists
-`run --binary` and the extra `bundle` outputs. `init`, `status`, `tree`, and `edit` accept no
-additional arguments; `validate` accepts an optional package name or `--all`; `bundle` accepts
-only `--skip-validate` (not `--clean` or `--yes`); `unedit` accepts `--clean`, or `--adopt`
-with optional `--ref` and `--as`, plus `--yes`; and `docs` accepts `--print`. `test` is present
-but returns a not-implemented error.
+`slang package help`, `-help`, and `--help` print stable package help. Commands are grouped by the
+file they primarily write or report: the manifest (`slang-package.json`), the overlay
+(`slang-package-overlay.json`), the lock (`slang-package-lock.json`), then bundle.
+`unedit --adopt` is listed under overlay because it drops that registration; it also writes the
+manifest and lock. Stable help says `--experimental` enables experimental options;
+`slang package --experimental help` lists `build` and `run`. `init`, `status`, `tree`, and `edit`
+accept no additional arguments;
+`validate` accepts an optional package name or `--all`; `bundle` and experimental `build` accept
+only `--skip-validate` (not `--clean` or `--yes`); `unedit` accepts `--clean`, or `--adopt` with
+optional `--ref` and `--as`, plus `--yes`; and `docs` accepts `--print`. `test` is present but
+returns a not-implemented error.
 
 ## Gaps, tensions, and intentional asymmetries
 
@@ -1330,8 +1333,8 @@ dependencies therefore appear only in each consumer's root lock.
 
 ### Run, docs, and test do less than their names may imply
 
-`run` does not bundle, `docs` opens `out/docs/index.md` (or prints the path with `--print`), and
-`test` is
+`run` is experimental and does not bundle, `docs` opens `out/docs/index.md` (or prints the path
+with `--print`), and `test` is
 unimplemented. Narrow side effects make commands predictable, but missing `bundle --run`,
 documentation generation, and package testing leave common loops manual.
 
@@ -1510,18 +1513,17 @@ them or update this chapter and its regression tests in the same change.
 Keep this separable from the contracts above, so the stable journeys hold whether or not binary
 artifacts ship in their current form.
 
-- `.slang-module` and host executable builds require the global `--experimental` flag before the
-  subcommand.
-- A stable bundle distributes source and removes stale module and host output.
-- Every experimental module bundle warns that the binary format is unstable. Module provenance records the
+- `.slang-module` and host executable output require `slang package --experimental build`.
+- `bundle` distributes source and docs and removes stale module and host output.
+- Every experimental build warns that the module format is unstable. Module provenance records the
   experimental status, compiler source commit, and tracked-source dirty state.
 - Host output lives under `out/host` with an `EXPERIMENTAL.txt` marker.
-- `bundle` without the flag still emits source and docs, skips binary outputs, and removes stale
-  module and host directories.
-- Stable `run` interprets the bundled source; `--experimental run --binary` executes an existing
-  native artifact.
-- `--experimental help` adds the binary bundle and run options.
-- Neither run mode silently builds or resolves.
+- `build` without the flag is rejected. `bundle` with the flag still emits source and docs only.
+- Both commands refresh documentation under `out/docs`.
+- `run` requires `--experimental`. Without `--binary` it interprets the bundled source;
+  `run --binary` executes an existing native artifact from the last experimental build.
+- `--experimental help` adds `build` and `run`.
+- Neither run mode silently bundles, builds, or resolves.
 
 ## Executable test anchors
 

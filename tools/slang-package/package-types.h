@@ -51,23 +51,6 @@ struct Exclusion
     String reason;
 };
 
-/// Optional workspace outputs written under `<workspace.output>/bundle` (`out/bundle` by default).
-///
-/// Consider this example:
-///
-/// ```json
-/// "workspace": { "bundle": { "modules": true, "source": false } }
-/// ```
-///
-/// `slang package bundle` then writes `.slang-module` files under `out/bundle/modules` and skips
-/// the flattened source tree. Both flags default to true when `bundle` is omitted, so a workspace
-/// that never mentions the object still produces a complete bundle.
-struct BundleSettings
-{
-    bool modules = true;
-    bool source = true;
-};
-
 /// Root-only workspace layout from `slang-package.json`. Dependency manifests may contain
 /// these fields, but only the manifest that starts resolution controls materialization and output.
 struct WorkspaceSettings
@@ -76,17 +59,17 @@ struct WorkspaceSettings
     /// `deps`.
     String depsDirectory;
     String outputDirectory;
-    BundleSettings bundle;
     List<Exclusion> exclusions;
 };
 
 /// Native host output from `build.host` in `slang-package.json`. Dependency manifests may
-/// declare this field, but only the workspace that starts a bundle produces executables.
+/// declare this field, but only the workspace that starts an experimental build produces
+/// executables.
 ///
 /// Each entry in `executables` is both the output filename (without a platform suffix) and the
 /// stem of a workspace primary: `video-preview` requires an exported `video-preview.slang`.
-/// `defaultExecutable` selects the primary that `slang package run` interprets, or the native
-/// artifact that `slang package --experimental run --binary` executes.
+/// `defaultExecutable` selects the primary that `slang package --experimental run` interprets,
+/// or the native artifact that `slang package --experimental run --binary` executes.
 struct HostSettings
 {
     List<String> executables;

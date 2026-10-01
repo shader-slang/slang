@@ -82,7 +82,7 @@ order: manifest, overlay, lock.
 `build` is a sibling of `workspace` in the manifest. `workspace.output` names the output directory
 (`out/` by default), while `build.host` configures native executables. A dependency may declare
 `build.host`; only the package
-you run `bundle` and `run` in produces executables.
+you bundle in produces executables.
 
 Most Git dependencies use `git` plus a `version` range, written with `slang package dependency
 add NAME --git URL --version RANGE`. To pin a branch, tag, or full 40-character commit, use
@@ -149,8 +149,9 @@ corrective command without returning a failure merely because the workspace is d
 
 Fetch also writes gitignored `slang-package-includes.txt` (one absolute export directory per
 line). This walkthrough does not invoke `slangc` on that file: `video-preview` is a host
-program, not a shader, and `slangi` does not read the list. After `bundle`, `slang package run`
-interprets the flattened source bundle. Compiling shaders with the same list is in
+program, not a shader, and `slangi` does not read the list. After `bundle`,
+`slang package --experimental run` interprets the flattened source bundle. Compiling shaders with
+the same list is in
 [Slang Source Packages](source-packages).
 
 ## Preview a new solve, then apply it
@@ -213,43 +214,45 @@ package-specific update mode yet.
 ## Bundle, run, and collect docs
 
 ```sh
-slang package --experimental bundle
+slang package bundle
 ```
 
-This example uses experimental bundle because its manifest configures `build.host.executables` and the
-walkthrough demonstrates `.slang-module` output. A stable `slang package bundle` distributes the
-source bundle and docs only; binary module generation and host executable compilation are
-experimental. Source interpretation with `run` is stable.
+`bundle` is the source distribution. It checks that the materialized graph is legal and buildable,
+without requiring publish licenses or a portable workspace, then:
 
-Bundle checks that the materialized graph is legal and buildable, without requiring publish
-licenses or a portable workspace, then:
-
-- When `workspace.bundle.modules` is enabled (the default), emits a `.slang-module` for every
-  primary in the workspace and its dependencies under `out/bundle/modules/`, preserving
-  import-relative paths (`video-preview`, `video/display`, `color/convert`, `color/encoding`), and
-  writes `out/bundle/modules/provenance.json` naming the Slang version, source commit, and
-  tracked-source dirty state that produced them. Bundle warns that this binary format is unstable
-  and experimental.
-- When `workspace.bundle.source` is enabled (the default), copies exported `.slang` files into
-  `out/bundle/source/` at those same import-relative paths so the directory is one search path.
-- Compiles each name in `build.host.executables` to `out/host/<name>`, copies `slang-rt` beside it, and
-  writes `out/host/EXPERIMENTAL.txt`.
-- Copies Markdown from each package's `docs/` into `out/docs/<package>/` and writes
+- copies exported `.slang` files into `out/bundle/source/` at import-relative paths
+  (`video-preview`, `video/display`, `color/convert`, `color/encoding`) so the directory is one
+  search path; and
+- copies Markdown from each package's `docs/` into `out/docs/<package>/` and writes
   `out/docs/index.md`.
 
-The `out/bundle/modules` tree can serve a consumer that should not receive `deps/` source only
-when it uses the exact toolchain recorded in provenance; the binary format has no stability
-guarantee. The stable distribution layout is `out/bundle/source/`.
-
 ```sh
-slang package run
+slang package --experimental build
 ```
 
-Run asks sibling `slangi` to interpret the existing `build.host.default` source
-(`out/bundle/source/video-preview.slang`) and does not bundle first. If the source bundle is
-missing, it tells you to bundle first. A leading argument that matches a listed executable name
-selects that primary; remaining arguments are forwarded. To run the experimental native artifact
-instead:
+`build` is the built distribution, and it stays behind the global `--experimental` option because
+the binary format is unstable. It does everything `bundle` does, then also:
+
+- emits a `.slang-module` for every primary in the workspace and its dependencies under
+  `out/bundle/modules/`, preserving those same import-relative paths, and writes
+  `out/bundle/modules/provenance.json` naming the Slang version, source commit, and tracked-source
+  dirty state that produced them. The command warns that this binary format is unstable; and
+- compiles each name in `build.host.executables` to `out/host/<name>`, copies `slang-rt` beside
+  it, and writes `out/host/EXPERIMENTAL.txt`.
+
+A later `bundle` refreshes source and docs and removes `out/bundle/modules` and `out/host` left by
+that build. The module tree can serve a consumer that should not receive `deps/` source only when
+it uses the exact toolchain recorded in provenance. The stable distribution layout is
+`out/bundle/source/`.
+
+```sh
+slang package --experimental run
+```
+
+`run` is experimental. It asks sibling `slangi` to interpret the existing `build.host.default`
+source (`out/bundle/source/video-preview.slang`) and does not bundle first. If the source bundle
+is missing, it tells you to bundle first. A leading argument that matches a listed executable name
+selects that primary; remaining arguments are forwarded. To run the native artifact instead:
 
 ```sh
 slang package --experimental run --binary
@@ -260,7 +263,7 @@ slang package docs --print
 ```
 
 `--print` writes the path to `out/docs/index.md`. Bare `docs` opens that file with the registered
-Markdown application. Neither copies or regenerates files; run `bundle` when the documentation
+Markdown application. Neither copies or regenerates files; run `bundle` or experimental `build` when the documentation
 should change. `slang package test` is reserved and not implemented yet.
 
 ## Develop against a local tree
@@ -362,16 +365,17 @@ Git-to-Git remapping is not available yet. Overrides replace a dependency with a
 ```sh
 slang package fetch
 slang package status
-slang package --experimental bundle
+slang package bundle
 ```
 
 `fetch` is optional when CI only needs a bundle: `bundle` fetches any missing locked trees itself.
 A first clone with no lock also works: `bundle` runs fetch, which runs update `--yes` and writes
 the first lock. An existing lock is never rewritten. Keep an explicit `fetch` when you want
-materialization without building, or when you need `--clean`.
+materialization without distributing, or when you need `--clean`.
 
-Drop `--experimental` when CI only needs the stable source bundle and documentation. Keep it only
-when CI deliberately tests unstable module or host outputs.
+Use `slang package --experimental build` only when CI deliberately tests unstable module or host
+outputs. That command refreshes the same source and documentation as `bundle`, then adds the
+binary artifacts.
 
 CI should not run `update`. Update is a deliberate choice to take newer tags and rewrite the
 committed lock. After you have reviewed `update --dry-run` locally, commit the new lock and let
