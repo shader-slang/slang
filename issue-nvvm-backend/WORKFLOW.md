@@ -35,8 +35,11 @@ For substantial batches, keep a short uncommitted ExecPlan with scope, input-sha
 validation results. Do not turn the plan into the program backlog.
 
 Select work from exploratory failures grouped by their underlying missing representation or
-operation, weighted by application relevance. Prefer related operations and feature combinations
-that share lowering and calling conventions. Isolate genuinely new ABI, resource, control-flow or
+operation, weighted by application relevance. Implement complete feature families: identify every
+related operation, variant and shared prerequisite before coding, and qualify the whole family
+before claiming it complete. This maintainer direction supersedes isolated-operation slices. Use
+related batches that share lowering and calling conventions; intermediate dependency commits do
+not constitute completion of the family. Isolate genuinely new ABI, resource, control-flow or
 synchronization contracts into bounded slices with executable milestones. Reuse canonical shared
 IR and checked plan records. Express core behavior through explicit NVVM branches, typed named
 calls and ordinary Slang composition; genuine primitive PTX remains an intentional interface.
@@ -87,7 +90,13 @@ retain their own compiler choices. Record those limits, actual executed tests, s
 Require CUDA availability so a missing device/compiler cannot produce a misleading pass. Group
 new failures by compiler representation/operation, RHI binding/harness or external runtime cause;
 use application relevance to choose bounded next slices. Do not weaken RHI assertions or silently
-add its results to the accepted Slang corpus. Full suite runs remain separately requested milestones.
+add its results to the accepted Slang corpus. Full suite runs remain separately requested milestones. The maintainer has now explicitly requested
+one full CUDA suite run across all feature areas. Keep its current registration outcomes and failing
+families in `rhi-cuda-status.json`, including exact compiler ownership, selected comparison outcomes,
+skip reasons and unresolved/resolved histories. Raw attempts remain under ignored build paths;
+replace the manifest in place after subsequent runs, using Git for superseded snapshots. Reconcile
+named results with assertion failures: the custom reporter can print SKIPPED after a failed CHECK.
+Do not treat interrupted or unrun registrations as passes or automatic expected failures.
 
 ## Fast validation by default
 

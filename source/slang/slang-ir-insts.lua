@@ -1679,6 +1679,8 @@ local insts = {
 	{ optixTraceRay = { min_operands = 11 } },
 	-- Original payload type, fifteen fixed scalar arguments, and live uint32 payload words.
 	{ optixTraceRayPayload = { min_operands = 17 } },
+	-- Effectful Float4 row read of a valid instance transform; the SDK pointer stays internal.
+	{ optixInstanceTransformRow = { operands = { { "handle" }, { "row" }, { "inverse" } } } },
 	-- Read a uint32 value from OptiX payload register N (0-31).
 	-- Operand 0: register index (int literal)
 	{ getOptiXPayloadRegister = { min_operands = 1 } },

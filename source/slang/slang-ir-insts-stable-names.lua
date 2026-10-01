@@ -891,5 +891,6 @@ return {
 	["offsetOf"] = 915,
 	["textureQueryLayerCount"] = 916,
 	["optixTraceRay"] = 917,
-	["optixTraceRayPayload"] = 918
+	["optixTraceRayPayload"] = 918,
+	["optixInstanceTransformRow"] = 919
 }

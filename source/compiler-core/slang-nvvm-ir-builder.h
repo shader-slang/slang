@@ -114,6 +114,20 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
+    const SlangNVVMBuilderInstanceTransformOperationsAPI* getInstanceTransformOperationsAPI() const
+    {
+        return m_instanceTransformOperations.isOperationSupported ? &m_instanceTransformOperations
+                                                                  : nullptr;
+    }
+
+    bool supportsInstanceTransform(const SlangNVVMInstanceTransformDesc& operation) const;
+    SlangResult emitInstanceTransform(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMInstanceTransformDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Returns the optional scoped-memory interface, or null for an older provider.
     const SlangNVVMBuilderMemoryOperationsAPI* getMemoryOperationsAPI() const
     {
@@ -441,6 +455,7 @@ private:
     SlangNVVMBuilderAtomicOperationsAPI m_atomicOperations = {};
     SlangNVVMBuilderMemoryOperationsAPI m_memoryOperations = {};
     SlangNVVMBuilderTraceOperationsAPI m_traceOperations = {};
+    SlangNVVMBuilderInstanceTransformOperationsAPI m_instanceTransformOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;

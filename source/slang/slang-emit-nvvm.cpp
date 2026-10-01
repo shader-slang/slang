@@ -3125,6 +3125,28 @@ bool _planNVVMOptixRegister(IRInst* inst, Stage stage, NVVMPlannedNamedIntrinsic
     return true;
 }
 
+// Core constructs a matrix from three literal row reads. Retain the exact selector and handle
+// here so emission never reinterprets a handle as a general pointer or rechecks source syntax.
+bool _planNVVMInstanceTransform(IRInst* inst, Stage stage, NVVMPlannedInstanceTransform& plan)
+{
+    plan = {};
+    if (!_isNVVMOptixStage(stage) || inst->getOperandCount() != 3)
+        return false;
+    auto result = as<IRVectorType>(inst->getDataType());
+    auto row = as<IRIntLit>(inst->getOperand(1));
+    auto inverse = _asExecutableBoolConstant(inst->getOperand(2));
+    if (!result || result->getElementType()->getOp() != kIROp_FloatType ||
+        getIntVal(result->getElementCount()) != 4 ||
+        inst->getOperand(0)->getDataType()->getOp() != kIROp_UInt64Type || !row ||
+        row->getDataType()->getOp() != kIROp_UIntType || row->getValue() < 0 ||
+        row->getValue() > 2 || !inverse)
+        return false;
+    plan.source = inst;
+    plan.handle = inst->getOperand(0);
+    plan.desc = {uint32_t(row->getValue()), uint32_t(inverse->getValue())};
+    return true;
+}
+
 bool _planNVVMTraceRay(IRInst* inst, Stage stage, NVVMPlannedTraceRay& plan)
 {
     plan = {};
@@ -6371,6 +6393,22 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_OptixInstanceTransformRow:
+                {
+                    NVVMPlannedInstanceTransform transform;
+                    if (!_planNVVMInstanceTransform(
+                            inst,
+                            entryPoint->findDecoration<IREntryPointDecoration>()
+                                ->getProfile()
+                                .getStage(),
+                            transform))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("OptiX instance transform row"));
+                    requirements.emissionPlan.instanceTransforms.add(transform);
+                }
+                break;
+
             case kIROp_OptixTraceRayPayload:
                 {
                     NVVMPlannedTraceRay trace;
@@ -6925,6 +6963,22 @@ SlangResult _validateNVVMFunction(
         {
             switch (inst->getOp())
             {
+            case kIROp_OptixInstanceTransformRow:
+                {
+                    const auto transform = _findPlannedNVVMOperation(
+                        requirements.emissionPlan.instanceTransforms,
+                        inst);
+                    SLANG_RELEASE_ASSERT(transform);
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        transform->handle,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    availableValues.add(inst);
+                }
+                break;
+
             case kIROp_OptixTraceRayPayload:
             case kIROp_GetOptiXPayloadRegister:
             case kIROp_SetOptiXPayloadRegister:
@@ -10464,6 +10518,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SLANG_E_NOT_AVAILABLE);
         }
     }
+    for (const auto& transform : requirements.emissionPlan.instanceTransforms)
+    {
+        if (!builder.supportsInstanceTransform(transform.desc))
+            return _requireBuilderOperation(
+                codeGenContext,
+                "OptiX instance transform row",
+                SLANG_E_NOT_AVAILABLE);
+    }
     for (const auto& trace : requirements.emissionPlan.traceRays)
     {
         if (!builder.supportsTraceRay(trace.desc))
@@ -10888,6 +10950,32 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 toSlice("slangLocal"),
                                 loweredStorage)));
                         valueMap[inst] = loweredStorage;
+                    }
+                    break;
+
+                case kIROp_OptixInstanceTransformRow:
+                    {
+                        const auto transform = planIndex.findInstanceTransform(inst);
+                        SLANG_RELEASE_ASSERT(transform);
+                        SlangNVVMValueHandle handle = nullptr, value = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            transform->handle,
+                            valueMap,
+                            typeContext,
+                            handle));
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "OptiX instance transform row",
+                            builder.emitInstanceTransform(
+                                moduleScope.module,
+                                transform->desc,
+                                &handle,
+                                1,
+                                value)));
+                        valueMap[inst] = value;
                     }
                     break;
 

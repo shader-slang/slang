@@ -87416,6 +87416,290 @@
         "Fourth iteration since the1711-cell working checkpoint at0762f003c. Inventory remains1713working459exploratory; next working checkpoint due by fifth iteration. Optional full RHI stays on demand."
       ],
       "rhi_oracle_commit": "2edb568aebc7f27098c50f4b15696dd8f41ebdd3"
+    },
+    "nvvm-optix-instance-matrix": {
+      "status": "accepted-focused",
+      "scope": "Instance-scoped forward/inverse affine matrices through canonical effectful Float4 row reads; valid opaque UInt64 instance handles only. Full current-transform-list matrices remain separate.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; smoke uses existing SM80 policy; isolated PTX inspection explicitly selects SM80.",
+        "revision": "75a94dfb67d7d0a27f9b2aa5f7a29dc75da3f290",
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "42a65595e9f5e1d357bdba5ef1633d3a456ac4b711ef9d02127b9e2234415973",
+          "source/compiler-core/slang-nvvm-ir-builder.cpp": "5748f22d1babee881e1c1854392c6705ed3a4161c60869f591f9cfe7b183992d",
+          "source/compiler-core/slang-nvvm-ir-builder.h": "0606f0606581c6bb74622dd764feb789075b84ddd42958270377789d65e87bcd",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "1e2f2d907217c80f527ffcefb10052e8f932a13eba783f45255113e97c16dd34",
+          "source/slang/hlsl.meta.slang": "55240df1b1a4a4193797272dcf7c817bbac041b6daceca21104f5202e7644be7",
+          "source/slang/slang-emit-nvvm-plan.cpp": "2b7462e5c42185ae0c7f0c95f32c7697c391f303816629dbdd66ac3be3414797",
+          "source/slang/slang-emit-nvvm-plan.h": "4df09906a8c8c21d136e2e681f0647e7e84b92fcafe4f4163650c7ebe1af7750",
+          "source/slang/slang-emit-nvvm.cpp": "6aaa09bdeec2a57c16bc519c8b7bbed3d9ccba7f97689117506950ae4717bb0e",
+          "source/slang/slang-ir-insts-stable-names.lua": "c5e19a9bac40926ed94517f943986549938fcb3351aba61c08ed1c8601cbe82e",
+          "source/slang/slang-ir-insts.lua": "88d102816074c76756f842fc6aea7f36e47c95a37c2329af31267b4e688c619a",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "052e40ad9bdffc5820b36f2f0a64be2c6a6995bd4daee3661680612dea95cfeb",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "df6cc4cccb4854d1287eaacaec022e035fdfc6f6927a135e4f8616f2ddb4663c"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "36baa0923214c9497b22f8ac977aad6fd678d41f2808e0613e874c1e191762ed",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "460fe7e37bcfc80389e30578687e5e72fa4d5b41ebce405d83b1db4b21fc75b8",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "bba2e71fc582f745ecd0eac9c57b394d074b874b1febd5293c7700070def2049",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "6fbc52e6bd41161e504d4cacbadce04a17f1610200076b495aade54ed4bc3e41",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "4e80baaac27bf5db4805420fb0ef2f4211ba69c494e62cfed82fbd280191e98d",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "59679df0013c8947ade456f79da26ac06789695c646832f58c891bc7bfebe21e",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "899a2fc93384ed074b19681494ff14c62b8cb1797a2393275b0d71f644c99132"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "meaning": "Matching typed OptiX instance-matrix row build; optional interface8, stable opcode919, existing ABI46/module43/container2 unchanged.",
+        "patch_sha256": "73726dc45089b132a3ad98c0ca5c4b6b1ca3968972bd6e383784310cfb69cd05"
+      },
+      "shared_capture": {
+        "path": "build/nvvm-optix-instance-matrix/identity.json",
+        "sha256": "496e70f96f55de27dcb1900593fd2ff13e3ccaa4f748f467c9fe7efe6edb2d40"
+      },
+      "before_identity": {
+        "path": "build/nvvm-optix-instance-matrix/before-identity.json",
+        "sha256": "d93e4d19118c50559df9fc0af1da26a783d365c84be82291d97edbcf34d98491"
+      },
+      "static_identity": {
+        "path": "build/nvvm-optix-instance-matrix/static-identity.json",
+        "sha256": "4f926d814cb15a9a2210fe355abd991a87d163467bd7ba2a9db2d6e27118a651"
+      },
+      "rhi_identity": {
+        "path": "build/nvvm-optix-instance-matrix/rhi-identity.json",
+        "sha256": "33171f198ed97334b9c88f9c13c22a36dd26f559a300ccff07ba18dfb3beae94"
+      },
+      "sdk_identity": {
+        "path": "build/nvvm-optix-transform-list/sdk-identity.json",
+        "sha256": "dab9a597d38e761bfeb85723fb074a76972e29ff519dbd59ee3bbdcd1846a7a4"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-optix-instance-matrix/build.json",
+          "sha256": "292c72701a84630015c985174f5a08164c3e560246473ce20f9640ebb2096c5b",
+          "return_code": 0,
+          "elapsed_seconds": 332.7658929824829
+        },
+        "static_build": {
+          "path": "build/nvvm-optix-instance-matrix/static-build.json",
+          "sha256": "2dcbaf2f9db80ce4b1aa26b6bbc091b14aaeddaf33def03c856d91b38ed70812",
+          "return_code": 0,
+          "elapsed_seconds": 327.12126326560974
+        },
+        "rhi_build": {
+          "path": "build/nvvm-optix-instance-matrix/rhi-build.json",
+          "sha256": "9561ac306ed9e95803c45a1c8ea6898446cd58d43943911c0c9dafa1ad3e7d0c",
+          "return_code": 0,
+          "elapsed_seconds": 2.7947380542755127
+        },
+        "provider": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/units.json",
+            "sha256": "d57fb49a3a5e208bbe449fcab91ad9bec90828832e11f848500715ba1e06b8a9",
+            "return_code": 0,
+            "elapsed_seconds": 1.4170591831207275
+          },
+          "passed": 1,
+          "ignored": 0,
+          "outcomes": {
+            "nvvmIRBuilderInstanceRowsKeepPointersInternal": "passed"
+          },
+          "coverage": "All six row/direction descriptors; exact SDK pointer/offset/cvta/vector-load/effect/result checks; invalid descriptors, operands, ownership, insertion and optional-interface tables; paired no-mutation serialization in both LLVM dialects."
+        },
+        "static": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/static.json",
+            "sha256": "e4aea534d7b0265b21cde7ec742e7e69890447d1793bd8a0b5297eb42252bd2e",
+            "return_code": 0,
+            "elapsed_seconds": 7.0572779178619385
+          },
+          "passed": 1,
+          "ignored": 0,
+          "outcomes": {
+            "nvvmOptixInstanceRowsRequireCheckedImmediates": "passed"
+          },
+          "groups": 15,
+          "checked_plans": 24,
+          "coverage": "Four accepted stage groups, three forbidden stages and eight malformed type/immediate/arity groups. Four accepted groups inspect six plans each, then reject absent optional support. All15 assert zero provider module/program creation; effect/non-hoistable/local placement asserted."
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/nvvm-after.json",
+            "sha256": "f452fc026d67814792ab6f2870abaf8a6e16bafaa353d55715896210a4de7ac2",
+            "return_code": 0,
+            "elapsed_seconds": 2.2799360752105713
+          },
+          "outcomes": {
+            "ray-tracing-instance-matrix.cuda": "passed"
+          },
+          "optimization_levels": [0, 3],
+          "passed_assertions": 215,
+          "filtered_out_cases": 938
+        },
+        "nvrtc_control": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/nvrtc-before.json",
+            "sha256": "4723d7478803296f0bc122b0e80c9efeffef86f4263589d865bed5314039ce29",
+            "return_code": 0,
+            "elapsed_seconds": 2.92106294631958
+          },
+          "passed_cases": 1,
+          "passed_assertions": 215,
+          "optimization_levels": [0, 3],
+          "meaning": "Same independent fixture on accepted prior compiler; not a fresh CUDA qualification of final compiler."
+        },
+        "ptx": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/ptx.json",
+            "sha256": "b1c6d0937f0c2413391e35d0113f878e01fc4261a4354e39a109bf87517e1321",
+            "return_code": 0,
+            "elapsed_seconds": 0.3105597496032715
+          },
+          "artifact": {
+            "path": "build/nvvm-optix-instance-matrix/closest-hit.ptx",
+            "sha256": "7166ba2942500a4096d68c3d3212363d0a1c66eed34311d02c1387bf20e04e19"
+          },
+          "inspection": {
+            "path": "build/nvvm-optix-instance-matrix/ptx-inspection.json",
+            "sha256": "ea0e13d214aa89b7e1afdadb4d345bcba51262fac37c2ed17207fd1eec319372"
+          },
+          "meaning": "Isolated ClosestHit O3/SM80 CLI contains six exact SDK pointer calls and offsets0/16/32 in each direction, cvta.to.global.u64 and ld.global.v4.u32. Pointers remain inside effectful assembly; no performance or general pointer-ABI claim."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/smoke.json",
+            "sha256": "1871e4b08a17236e3f001f3f1576f74fdb33023536cf3bf6d8cc59ee21cee295",
+            "return_code": 0,
+            "elapsed_seconds": 21.60625958442688
+          },
+          "selection": {
+            "path": "build/nvvm-optix-instance-matrix/smoke-1/selection.json",
+            "sha256": "cff6c284947de90d9b78a5501f34e19264dea3dee4853cb3c0c9292d8e39bdf0"
+          },
+          "provenance": {
+            "path": "build/nvvm-optix-instance-matrix/smoke-1/provenance.json",
+            "sha256": "8a1973ea2960106c7cd15fb52b8be310a17bc2b15ce23b71fa8b8f5090928816"
+          },
+          "selected": 15,
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0,
+          "mode_counts": {
+            "nvvm-o0": 2,
+            "nvvm-o3": 13
+          }
+        },
+        "working": {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/working.json",
+            "sha256": "d41da63bfc1ffa10612fe0622483cc75e1b7afaf43a0b6439c38be70d810f797",
+            "return_code": 0,
+            "elapsed_seconds": 1066.5929162502289
+          },
+          "selection": {
+            "path": "build/nvvm-optix-instance-matrix/working-1/selection.json",
+            "sha256": "ba7eaf107bd563990eaea0d7b7e41db4304eb67084b8f109a958354e9eea90c1"
+          },
+          "provenance": {
+            "path": "build/nvvm-optix-instance-matrix/working-1/provenance.json",
+            "sha256": "357f88bea78286226f1dbbceb2b57af9b777879be3eade860ca782666026d381"
+          },
+          "selected": 1713,
+          "correct": 1713,
+          "regressions": 0,
+          "input_changes": 0,
+          "mode_counts": {
+            "nvrtc-o3": 569,
+            "nvvm-o0": 572,
+            "nvvm-o3": 572
+          }
+        }
+      },
+      "runtime_contract": {
+        "fixture": "../slang-rhi/tests/test-ray-tracing-instance-matrix.slang",
+        "host": "../slang-rhi/tests/test-ray-tracing-instance-matrix.cpp",
+        "output_words": 77,
+        "payload_words": 25,
+        "stage": "ClosestHit",
+        "oracle": "Two asymmetric affine instances with independently authored forward/inverse coefficients. Each hit checks all24 Float32 coefficients; miss retains24 sentinels; phase and two guards checked. Exact finite Float32 numeric equality accepts either signed zero, with no epsilon or backend-derived expected values.",
+        "forward_matrices": [
+          [0, -2, 0, 1, 4, 1, 0, 2, 0, 0, 8, 3],
+          [2, 0, 1, 8, 0, 0, -4, -2, 0, 8, 2, 1]
+        ],
+        "inverse_matrices": [
+          [0.125, 0.25, 0, -0.625, -0.5, 0, 0, 0.5, 0, 0, 0.125, -0.375],
+          [0.5, 0.125, 0, -3.75, 0, 0.0625, 0.125, 0, 0, -0.25, 0, -0.5]
+        ],
+        "scope": "Two single-level static instances and one miss in existing RHI pipeline, actual-device target policy. Runtime does not qualify other admitted stages, static/motion transform storage, arbitrary handles or full-list matrix composition."
+      },
+      "resolved_failures": [
+        {
+          "record": {
+            "path": "build/nvvm-optix-instance-matrix/nvvm-before.json",
+            "sha256": "0c47df3c7e92175a14ba682efe7b20728d42af8b1b53a4ecb11e3ea37fee6bd2",
+            "return_code": 1,
+            "elapsed_seconds": 1.3847143650054932
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-optix-instance-matrix/before-identity.json",
+            "sha256": "d93e4d19118c50559df9fc0af1da26a783d365c84be82291d97edbcf34d98491"
+          },
+          "rhi_identity": {
+            "path": "build/nvvm-optix-instance-matrix/rhi-identity.json",
+            "sha256": "33171f198ed97334b9c88f9c13c22a36dd26f559a300ccff07ba18dfb3beae94"
+          },
+          "diagnostic": "E52017 GenericAsm assembly=_slang_optixGetInstanceTransformFromHandle, signature=Void(uint64_t, OutParam<Array<vector<float,4>, 3>>)",
+          "assertions": {
+            "passed": 23,
+            "failed": 2
+          },
+          "meaning": "Original O0 pipeline rejection; O3 not reached. Final typed rows pass the unchanged oracle at both levels."
+        }
+      ],
+      "validation_incidents": [
+        {
+          "diagnostic": "E41012 profile implicitly upgraded to optix_multilevel_traversal",
+          "records": [
+            {
+              "path": "build/nvvm-optix-instance-matrix/nvrtc-before.json",
+              "sha256": "4723d7478803296f0bc122b0e80c9efeffef86f4263589d865bed5314039ce29",
+              "return_code": 0,
+              "elapsed_seconds": 2.92106294631958
+            },
+            {
+              "path": "build/nvvm-optix-instance-matrix/nvvm-after.json",
+              "sha256": "f452fc026d67814792ab6f2870abaf8a6e16bafaa353d55715896210a4de7ac2",
+              "return_code": 0,
+              "elapsed_seconds": 2.2799360752105713
+            },
+            {
+              "path": "build/nvvm-optix-instance-matrix/ptx.json",
+              "sha256": "b1c6d0937f0c2413391e35d0113f878e01fc4261a4354e39a109bf87517e1321",
+              "return_code": 0,
+              "elapsed_seconds": 0.3105597496032715
+            }
+          ],
+          "meaning": "Warnings retained with successful compilation; capability does not establish multilevel runtime qualification."
+        }
+      ],
+      "qualification": [
+        "Stable opcode919 appended, optional interface8 version1 added; existing ABI46 tables/module43/container2 unchanged. Absent support rejects before module creation; malformed optional table fails initialization.",
+        "Core/shared matrix lowering own logical matrices. The provider owns SDK pointers and 16byte row reads, with side effects and memory clobber. No arbitrary UInt64-to-pointer permission or CUDA text recognition.",
+        "Static stage acceptance is RG/Miss/ClosestHit/AnyHit, with fresh runtime evidence only in ClosestHit. Valid instance handle is an existing API precondition, with no invented fallback.",
+        "Fifth implementation since0762f003c working checkpoint. Fresh1713 working checkpoint preserves all admitted configurations; historical full baseline remains unchanged and full RHI remains on demand.",
+        "Public full active-list ObjectToWorld/WorldToObject matrices remain unsupported. Static/motion transform kinds and complete direction-dependent composition require separate implementation and oracles."
+      ],
+      "rhi_oracle_commit": "f48fee6ef3f13ecf61e187dffc46721845c3d0ce"
     }
   }
 }

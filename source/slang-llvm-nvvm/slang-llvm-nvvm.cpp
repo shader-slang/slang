@@ -1075,6 +1075,66 @@ static SlangResult SLANG_NVVM_CALL _emitMemoryOperation(
 }
 
 static SlangResult SLANG_NVVM_CALL
+_isInstanceTransformSupported(const SlangNVVMInstanceTransformDesc* desc, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!desc || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = desc->row < 3 && desc->inverse <= 1;
+    return SLANG_OK;
+}
+
+// A handle is not an address. The SDK returns the row-storage pointer, which must stay inside
+// this operation. For example, inverse row 2 calls the inverse-pointer primitive and reads
+// exactly 16 bytes at offset 32, using the SDK's global-address conversion and vector load.
+static SlangResult SLANG_NVVM_CALL _emitInstanceTransform(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMInstanceTransformDesc* desc,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    auto state = _getModule(module);
+    auto block = _getValidInsertionBlock(state);
+    uint32_t supported = 0;
+    if (SLANG_FAILED(_isInstanceTransformSupported(desc, &supported)) || !supported || !outValue ||
+        !block || !operands || operandCount != 1)
+        return SLANG_E_INVALID_ARG;
+    auto handle = _getValue(operands[0]);
+    auto i64 = llvm::Type::getInt64Ty(state->context);
+    if (!_isValueUsableAtInsertionPoint(state, block, handle) || handle->getType() != i64)
+        return SLANG_E_INVALID_ARG;
+
+    auto i32 = llvm::Type::getInt32Ty(state->context);
+    auto tuple = llvm::StructType::get(state->context, {i32, i32, i32, i32});
+    auto functionType = llvm::FunctionType::get(tuple, {i64}, false);
+    std::string assembly = "{ .reg .b64 transformPtr; call (transformPtr), ";
+    assembly += desc->inverse ? "_optix_get_instance_inverse_transform_from_handle"
+                              : "_optix_get_instance_transform_from_handle";
+    assembly += ", ($4); add.u64 transformPtr, transformPtr, ";
+    assembly += std::to_string(desc->row * 16);
+    assembly += "; cvta.to.global.u64 transformPtr, transformPtr; "
+                "ld.global.v4.u32 {$0,$1,$2,$3}, [transformPtr]; }";
+    // Match the SDK's volatile read, and keep ordinary memory accesses ordered around it.
+    auto primitive = llvm::InlineAsm::get(functionType, assembly, "=r,=r,=r,=r,l,~{memory}", true);
+    auto call = state->builder.CreateCall(primitive, {handle});
+    auto wordVector = llvm::FixedVectorType::get(i32, 4);
+    llvm::Value* words = llvm::UndefValue::get(wordVector);
+    for (unsigned lane = 0; lane < 4; ++lane)
+        words = state->builder.CreateInsertElement(
+            words,
+            state->builder.CreateExtractValue(call, lane),
+            uint64_t(lane));
+    auto resultType = llvm::FixedVectorType::get(llvm::Type::getFloatTy(state->context), 4);
+    *outValue =
+        reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateBitCast(words, resultType));
+    return SLANG_OK;
+}
+
+static SlangResult SLANG_NVVM_CALL
 _isTraceRaySupported(const SlangNVVMTraceRayDesc* desc, uint32_t* outSupported)
 {
     if (outSupported)
@@ -5364,6 +5424,13 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _emitTraceRay,
     };
 
+    static const SlangNVVMBuilderInstanceTransformOperationsAPI instanceTransformOperations = {
+        sizeof(SlangNVVMBuilderInstanceTransformOperationsAPI),
+        SLANG_NVVM_INSTANCE_TRANSFORM_OPERATIONS_VERSION,
+        _isInstanceTransformSupported,
+        _emitInstanceTransform,
+    };
+
     switch (interfaceID)
     {
     case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION:
@@ -5380,6 +5447,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS:
         *outInterface = &memoryOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS:
+        *outInterface = &instanceTransformOperations;
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS:
         *outInterface = &traceOperations;

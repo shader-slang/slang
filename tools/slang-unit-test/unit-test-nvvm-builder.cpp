@@ -457,6 +457,209 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation)
     }
 }
 
+// Injects only the optional table so malformed-interface tests reuse the ordinary fake provider.
+static SlangNVVMBuilderInstanceTransformOperationsAPI gInstanceTransformTestAPI;
+static SlangResult SLANG_NVVM_CALL
+_queryInstanceTransformTestInterface(SlangNVVMBuilderInterfaceID id, const void** output)
+{
+    if (id == SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS)
+    {
+        if (!output)
+            return SLANG_E_INVALID_ARG;
+        *output = &gInstanceTransformTestAPI;
+        return SLANG_OK;
+    }
+    return _fakeNVVMBuilderQueryInterface(id, output);
+}
+
+// SDK pointers are private to this operation; returning Float4 exercises the public value contract.
+SLANG_UNIT_TEST(nvvmIRBuilderInstanceRowsKeepPointersInternal)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const auto api = builder.getInstanceTransformOperationsAPI();
+    SLANG_CHECK_ABORT(api);
+    SLANG_CHECK(api->structureSize == sizeof(*api));
+    SLANG_CHECK(api->version == SLANG_NVVM_INSTANCE_TRANSFORM_OPERATIONS_VERSION);
+    for (uint32_t inverse : {0u, 1u})
+        for (uint32_t row : {0u, 1u, 2u})
+        {
+            const SlangNVVMInstanceTransformDesc desc = {row, inverse};
+            SLANG_CHECK(builder.supportsInstanceTransform(desc));
+            String control[2];
+            for (bool reject : {false, true})
+            {
+                ScopedNVVMBuilderModule scope;
+                scope.builder = &builder;
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.createModule(toSlice("instance-row"), scope.module)));
+                SlangNVVMTypeHandle i64 = nullptr, i32 = nullptr, f32 = nullptr, f4 = nullptr,
+                                    functionType = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 64, i64)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32)));
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 32, f32)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVectorType(scope.module, f32, 4, f4)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionType(scope.module, f4, &i64, 1, functionType)));
+                SlangNVVMValueHandle function = nullptr, other = nullptr, handle = nullptr,
+                                     foreign = nullptr, wrongWidth = nullptr;
+                for (auto target : {&function, &other})
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                        scope.module,
+                        functionType,
+                        SLANG_NVVM_LINKAGE_EXTERNAL,
+                        SLANG_NVVM_FUNCTION_FLAG_NONE,
+                        target == &function ? toSlice("row") : toSlice("other"),
+                        *target)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionParameter(scope.module, function, 0, handle)));
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, other, 0, foreign)));
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.getIntegerConstant(scope.module, i32, 0, wrongWidth)));
+                ScopedNVVMBuilderModule foreignModule;
+                foreignModule.builder = &builder;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.createModule(toSlice("foreign"), foreignModule.module)));
+                SlangNVVMTypeHandle foreignType = nullptr;
+                SlangNVVMValueHandle foreignConstant = nullptr;
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(builder.getIntegerType(foreignModule.module, 64, foreignType)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerConstant(
+                    foreignModule.module,
+                    foreignType,
+                    1,
+                    foreignConstant)));
+                if (reject)
+                {
+                    SlangNVVMValueHandle result = function;
+                    SLANG_CHECK(
+                        SLANG_FAILED(api->emitOperation(scope.module, &desc, &handle, 1, &result)));
+                    SLANG_CHECK(!result);
+                }
+                SlangNVVMBlockHandle block = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.createBlock(scope.module, function, toSlice("entry"), block)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+                if (reject)
+                {
+                    const SlangNVVMInstanceTransformDesc invalidDescs[] =
+                        {{3, inverse}, {0xffffffffu, inverse}, {row, 2}, {row, 0xffffffffu}};
+                    for (const auto& invalid : invalidDescs)
+                    {
+                        uint32_t supported = 1;
+                        SLANG_CHECK(
+                            SLANG_SUCCEEDED(api->isOperationSupported(&invalid, &supported)));
+                        SLANG_CHECK(!supported);
+                        SlangNVVMValueHandle result = function;
+                        SLANG_CHECK(SLANG_FAILED(
+                            api->emitOperation(scope.module, &invalid, &handle, 1, &result)));
+                        SLANG_CHECK(!result);
+                    }
+                    uint32_t supported = 1;
+                    SLANG_CHECK(SLANG_FAILED(api->isOperationSupported(nullptr, &supported)));
+                    SLANG_CHECK(!supported);
+                    SLANG_CHECK(SLANG_FAILED(api->isOperationSupported(&desc, nullptr)));
+                    for (auto invalid :
+                         {foreign,
+                          foreignConstant,
+                          wrongWidth,
+                          function,
+                          SlangNVVMValueHandle(nullptr)})
+                    {
+                        SlangNVVMValueHandle result = function;
+                        SLANG_CHECK(SLANG_FAILED(
+                            api->emitOperation(scope.module, &desc, &invalid, 1, &result)));
+                        SLANG_CHECK(!result);
+                    }
+                    for (int invalid = 0; invalid < 6; ++invalid)
+                    {
+                        SlangNVVMValueHandle result = function;
+                        SLANG_CHECK(SLANG_FAILED(api->emitOperation(
+                            invalid == 0 ? nullptr : scope.module,
+                            invalid == 1 ? nullptr : &desc,
+                            invalid == 2 ? nullptr : &handle,
+                            invalid == 3   ? 0
+                            : invalid == 4 ? 2
+                                           : 1,
+                            invalid == 5 ? nullptr : &result)));
+                        if (invalid != 5)
+                            SLANG_CHECK(!result);
+                    }
+                }
+                SlangNVVMValueHandle result = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.emitInstanceTransform(scope.module, desc, &handle, 1, result)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, result)));
+                if (reject)
+                {
+                    result = function;
+                    SLANG_CHECK(
+                        SLANG_FAILED(api->emitOperation(scope.module, &desc, &handle, 1, &result)));
+                    SLANG_CHECK(!result);
+                }
+                const SlangNVVMSerializationFormat formats[] = {
+                    SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                    SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY};
+                for (Index i = 0; i < 2; ++i)
+                {
+                    ComPtr<ISlangBlob> blob;
+                    SLANG_CHECK_ABORT(
+                        SLANG_SUCCEEDED(builder.serializeModule(scope.module, formats[i], blob)));
+                    auto text = _getBlobText(blob);
+                    SLANG_CHECK(
+                        _countOccurrences(text.getUnownedSlice(), toSlice("asm sideeffect")) == 1);
+                    SLANG_CHECK(text.contains(
+                        inverse ? "_optix_get_instance_inverse_transform_from_handle"
+                                : "_optix_get_instance_transform_from_handle"));
+                    StringBuilder offset;
+                    offset << "add.u64 transformPtr, transformPtr, " << row * 16 << ";";
+                    SLANG_CHECK(text.contains(offset.getUnownedSlice()));
+                    SLANG_CHECK(text.contains("cvta.to.global.u64 transformPtr, transformPtr"));
+                    SLANG_CHECK(text.contains("ld.global.v4.u32 {$0,$1,$2,$3}, [transformPtr]"));
+                    SLANG_CHECK(text.contains("=r,=r,=r,=r,l,~{memory}"));
+                    SLANG_CHECK(text.contains("ret <4 x float>"));
+                    SLANG_CHECK(!text.contains("inttoptr"));
+                    if (reject)
+                    {
+                        SLANG_CHECK(text == control[i]);
+                    }
+                    else
+                    {
+                        control[i] = text;
+                    }
+                }
+            }
+        }
+
+    // An omitted optional table is an old provider; a present malformed table is an error.
+    // Reuse the ordinary fake tables without teaching the fake how to emit SDK memory reads.
+    _resetDirectNVVMFakes();
+    ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+    auto root = _makeFakeNVVMBuilderAPI();
+    NVVMIRBuilder oldProvider;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(root, library, oldProvider)));
+    SLANG_CHECK(!oldProvider.supportsInstanceTransform({0, 0}));
+    root.queryInterface = _queryInstanceTransformTestInterface;
+    for (int invalid = 0; invalid < 5; ++invalid)
+    {
+        gInstanceTransformTestAPI = *api;
+        if (invalid == 1)
+            gInstanceTransformTestAPI.structureSize = 0;
+        if (invalid == 2)
+            ++gInstanceTransformTestAPI.version;
+        if (invalid == 3)
+            gInstanceTransformTestAPI.isOperationSupported = nullptr;
+        if (invalid == 4)
+            gInstanceTransformTestAPI.emitOperation = nullptr;
+        NVVMIRBuilder checked;
+        SLANG_CHECK(
+            (invalid == 0) == SLANG_SUCCEEDED(NVVMIRBuilder::initialize(root, library, checked)));
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderOptixTracePreservesTupleAndRejectsWithoutMutation)
 {
     NVVMIRBuilder builder;

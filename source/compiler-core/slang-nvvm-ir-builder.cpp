@@ -190,6 +190,25 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
         traceOperations = candidate;
     }
 
+    SlangNVVMBuilderInstanceTransformOperationsAPI instanceTransformOperations = {};
+    const void* instanceTransformOperationsRaw = nullptr;
+    const SlangResult instanceTransformResult = api.queryInterface(
+        SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS,
+        &instanceTransformOperationsRaw);
+    if (instanceTransformResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(instanceTransformResult);
+        if (!instanceTransformOperationsRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate = *static_cast<const SlangNVVMBuilderInstanceTransformOperationsAPI*>(
+            instanceTransformOperationsRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_INSTANCE_TRANSFORM_OPERATIONS_VERSION ||
+            !candidate.isOperationSupported || !candidate.emitOperation)
+            return SLANG_E_NO_INTERFACE;
+        instanceTransformOperations = candidate;
+    }
+
     outBuilder.m_api = api;
     outBuilder.m_foundation = foundation;
     outBuilder.m_construction = construction;
@@ -200,6 +219,7 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
     // Older ABI46 providers may omit this interface. Ordinary programs must keep working.
     outBuilder.m_memoryOperations = memoryOperations;
     outBuilder.m_traceOperations = traceOperations;
+    outBuilder.m_instanceTransformOperations = instanceTransformOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
 }
@@ -477,6 +497,34 @@ SlangResult NVVMIRBuilder::emitTraceRay(
         return SLANG_E_NOT_AVAILABLE;
     return _validateHandleResult(
         m_traceOperations.emitTraceRay(module, &operation, operands, operandCount, &outValue),
+        outValue);
+}
+
+bool NVVMIRBuilder::supportsInstanceTransform(const SlangNVVMInstanceTransformDesc& operation) const
+{
+    if (!isInitialized() || !m_instanceTransformOperations.isOperationSupported)
+        return false;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(
+               m_instanceTransformOperations.isOperationSupported(&operation, &supported)) &&
+           supported;
+}
+
+SlangResult NVVMIRBuilder::emitInstanceTransform(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMInstanceTransformDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsInstanceTransform(operation))
+        return SLANG_E_NOT_AVAILABLE;
+    return _validateHandleResult(
+        m_instanceTransformOperations
+            .emitOperation(module, &operation, operands, operandCount, &outValue),
         outValue);
 }
 

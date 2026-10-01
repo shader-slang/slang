@@ -131,6 +131,7 @@ void NVVMEmissionPlanIndex::initialize(const NVVMEmissionPlan& plan)
     _indexOperations(plan.valueOperations, m_valueOperations);
     _indexOperations(plan.namedIntrinsics, m_namedIntrinsics);
     _indexOperations(plan.traceRays, m_traceRays);
+    _indexOperations(plan.instanceTransforms, m_instanceTransforms);
     _indexOperations(plan.uint64WordConstructions, m_uint64WordConstructions);
     _indexOperations(plan.numericTruthinessOperations, m_numericTruthinessOperations);
     _indexOperations(plan.floatingRemainderOperations, m_floatingRemainderOperations);
@@ -156,6 +157,11 @@ SLANG_NVVM_DEFINE_PLAN_FIND(
     namedIntrinsics,
     m_namedIntrinsics)
 SLANG_NVVM_DEFINE_PLAN_FIND(findTraceRay, NVVMPlannedTraceRay, traceRays, m_traceRays)
+SLANG_NVVM_DEFINE_PLAN_FIND(
+    findInstanceTransform,
+    NVVMPlannedInstanceTransform,
+    instanceTransforms,
+    m_instanceTransforms)
 SLANG_NVVM_DEFINE_PLAN_FIND(findLoad, NVVMPlannedLoad, loads, m_loads)
 SLANG_NVVM_DEFINE_PLAN_FIND(findStore, NVVMPlannedStore, stores, m_stores)
 SLANG_NVVM_DEFINE_PLAN_FIND(

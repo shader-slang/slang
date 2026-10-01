@@ -425,6 +425,14 @@ struct NVVMPlannedTraceRay
     List<IRInst*> operands;
 };
 
+/// Retains one checked SDK row read, without exposing the SDK's storage pointer.
+struct NVVMPlannedInstanceTransform
+{
+    IRInst* source = nullptr;
+    IRInst* handle = nullptr;
+    SlangNVVMInstanceTransformDesc desc = {};
+};
+
 /// Retains the authoritative storage stride and proven parameter/load root for an address offset.
 struct NVVMPlannedLayoutPointerOffset
 {
@@ -454,6 +462,7 @@ struct NVVMEmissionPlan
     List<NVVMPlannedValueOperation> valueOperations;
     List<NVVMPlannedNamedIntrinsic> namedIntrinsics;
     List<NVVMPlannedTraceRay> traceRays;
+    List<NVVMPlannedInstanceTransform> instanceTransforms;
     List<NVVMPlannedUInt64WordConstruction> uint64WordConstructions;
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
@@ -518,6 +527,7 @@ public:
         IRInst* source) const;
     const NVVMPlannedNamedIntrinsic* findNamedIntrinsic(IRInst* source) const;
     const NVVMPlannedTraceRay* findTraceRay(IRInst* source) const;
+    const NVVMPlannedInstanceTransform* findInstanceTransform(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
@@ -539,6 +549,7 @@ private:
     Dictionary<IRInst*, Index> m_valueOperations;
     Dictionary<IRInst*, Index> m_namedIntrinsics;
     Dictionary<IRInst*, Index> m_traceRays;
+    Dictionary<IRInst*, Index> m_instanceTransforms;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;
     Dictionary<IRInst*, Index> m_floatingRemainderOperations;

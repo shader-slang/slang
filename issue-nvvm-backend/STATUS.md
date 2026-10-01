@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty-three feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 79 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 80 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -287,13 +287,28 @@ functional failures. The original build log reaches 26/26, but its tool session 
 record; a separate successful no-work retry verifies the build, not a 0.274s full-build duration.
 Raw evidence is under build/nvvm-optix-transform-list; earlier failures and identities are preserved.
 
-**Next work:** qualify instance-scoped matrix row loads with independent forward/inverse orientation
-checks. Public ObjectToWorld/WorldToObject matrices still require the SDK's full active-transform-list
-composition contract; a single-instance shortcut is not their implementation. The RHI pipeline's
-single-level, non-motion qualification does not establish general transform support.
-Raw SDK object-ray queries remain AnyHit/Intersection-only, and GeometryIndex is distinct from
-SBT record index. Motion, procedural/callable ABI and recursive callback tracing remain separate.
-This is the fourth small iteration after the 1,711-cell working checkpoint at `0762f003c`; run the
-next working checkpoint after the next iteration, or sooner for a broad change. The current tier
-inventory remains 1,713 working / 459 exploratory with 15 smoke cells. The earlier checkpoint
-was not rerun or relabeled. Full RHI remains on demand.
+Instance-scoped matrix rows are accepted. The two public traversable matrix APIs return independently
+checked forward/inverse coefficients for two asymmetric instances in ClosestHit: 215 RHI assertions
+pass at O0/O3 (2.280s), with matching prior-compiler NVRTC controls. The real-provider unit passes
+(1.417s); the 15-group static contract passes (7.057s), checking 24 valid plans and exact rejection
+boundaries. Shared build 332.766s and static build 327.121s pass. Focused PTX inspection confirms six
+row reads, and all 15 smoke cells pass (21.606s). Optional interface 8 preserves existing ABI46 tables
+and rejects unsupported row use before module creation. Raw evidence: build/nvvm-optix-instance-matrix.
+
+The scheduled working checkpoint after five implementations passes all 1,713 admitted configurations
+in 1066.593s, with zero regressions and zero changed inputs on the matching instance-row compiler.
+The earlier 1,711-cell checkpoint and historical full baseline retain their own identities. Current
+inventory: 1,713 working / 459 exploratory /15 smoke. Sources and binaries stayed frozen for the run.
+
+**Next work:** the maintainer explicitly requested the full slang-rhi CUDA suite across all feature
+areas, with a durable failing-test inventory. Run it now using the local NVVM compiler and selected
+NVRTC controls; preserve failures, explicit skips, route exceptions and interrupted/unrun cases.
+Subsequent full application runs remain on demand. Implement complete feature families, including
+related variants and shared prerequisites, chosen from these results. The narrow nonzero-raygen
+probe was superseded before execution and will be included in the full selection.
+
+Public composite ObjectToWorld/WorldToObject matrices remain unsupported; their complete family
+requires static/motion transform semantics and full direction-dependent list composition. Single-level
+application evidence cannot justify a first-instance shortcut. Raw SDK object-ray queries remain
+AnyHit/Intersection-only, and GeometryIndex is distinct from SBT record index. Procedural/callable
+ABI and recursive callback tracing remain separate. The full RHI run has not yet executed.

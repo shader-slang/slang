@@ -22327,6 +22327,12 @@ uint64_t GetTraversableChild(uint64_t handle)
     }
 }
 
+// The row operation retains its memory read; only the provider sees the SDK's pointer.
+[require(nvvm)]
+[NonUniformReturn]
+__intrinsic_op($(kIROp_OptixInstanceTransformRow))
+internal float4 __nvvmOptixInstanceTransformRow(uint64_t handle, uint row, bool inverse);
+
 /// Returns the object-to-world transform from an instance traversable.
 /// @param handle Instance traversable handle to query
 /// @return 3x4 transform matrix representing the object-to-world transformation
@@ -22339,6 +22345,10 @@ float3x4 GetTraversableObjectToWorld(uint64_t handle)
 {
     __target_switch
     {
+    case nvvm:
+        return float3x4(__nvvmOptixInstanceTransformRow(handle, 0, false),
+            __nvvmOptixInstanceTransformRow(handle, 1, false),
+            __nvvmOptixInstanceTransformRow(handle, 2, false));
     case cuda: __intrinsic_asm "_slang_optixGetInstanceTransformFromHandle";
     }
 }
@@ -22355,6 +22365,10 @@ float3x4 GetTraversableWorldToObject(uint64_t handle)
 {
     __target_switch
     {
+    case nvvm:
+        return float3x4(__nvvmOptixInstanceTransformRow(handle, 0, true),
+            __nvvmOptixInstanceTransformRow(handle, 1, true),
+            __nvvmOptixInstanceTransformRow(handle, 2, true));
     case cuda: __intrinsic_asm "_slang_optixGetInstanceInverseTransformFromHandle";
     }
 }

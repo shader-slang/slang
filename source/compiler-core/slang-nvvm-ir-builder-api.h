@@ -99,6 +99,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_ATOMIC_OPERATIONS ((SlangNVVMBuilderInterfaceID)5u)
 #define SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS ((SlangNVVMBuilderInterfaceID)6u)
 #define SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS ((SlangNVVMBuilderInterfaceID)7u)
+#define SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS ((SlangNVVMBuilderInterfaceID)8u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -669,6 +670,32 @@ extern "C"
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderTraceOperationsAPI;
+
+    /** One row of a valid OptiX instance's affine transform. No SDK pointer escapes this operation.
+     */
+    typedef struct SlangNVVMInstanceTransformDesc
+    {
+        uint32_t row;     /**< Row index in [0,2]. */
+        uint32_t inverse; /**< Zero for object-to-world, one for world-to-object. */
+    } SlangNVVMInstanceTransformDesc;
+
+    /** Optional interface; existing ABI46 tables are unchanged. One UInt64 instance handle
+        produces Float32x4. The provider owns the SDK pointer and its effectful 16-byte read. */
+    typedef struct SlangNVVMBuilderInstanceTransformOperationsAPI
+    {
+#define SLANG_NVVM_INSTANCE_TRANSFORM_OPERATIONS_VERSION 1u
+        uint32_t structureSize;
+        uint32_t version;
+        SlangNVVMResult(SLANG_NVVM_CALL* isOperationSupported)(
+            const SlangNVVMInstanceTransformDesc* operation,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitOperation)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMInstanceTransformDesc* operation,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderInstanceTransformOperationsAPI;
 
     typedef struct SlangNVVMBuilderSurfaceOperationsAPI
     {

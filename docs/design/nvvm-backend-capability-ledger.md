@@ -111,13 +111,28 @@ passing 165. Qualification covers two single-level static instances in AnyHit an
 a miss with preserved sentinels, and nonzero opaque instance handles consistent across stages.
 Instance handle bits are not a fixed portable oracle. PTX proves the uniform list index remains
 dynamic and handles remain 64-bit. Three affected units and all 15 smoke cells pass. Recorded
-E41012 profile-upgrade warnings do not invalidate the outputs. This does not qualify multilevel
-traversal, motion, matrix loads or interpretation of an opaque handle as a memory address.
+E41012 profile-upgrade warnings do not invalidate the outputs. This scalar-query qualification does
+not establish multilevel traversal, motion or interpretation of an opaque handle as a memory address.
+
+Instance-scoped forward and inverse matrices are qualified by an independent sibling RHI oracle:
+two asymmetric affine instances, all 24 coefficients per hit, preserved miss sentinels and guards,
+215 passing assertions at NVVM O0/O3 (2.280s). The prior-compiler NVRTC control passes 215 assertions.
+Coefficient checks use exact finite Float32 equality with signed-zero equivalence, without an epsilon.
+Fresh runtime qualification is **ClosestHit only**. Compiler static checks cover 15 grouped cases:
+4 valid-stage groups,3 forbidden-stage groups and8 type/immediate/arity rejection groups. The valid
+RG/Miss/ClosestHit/AnyHit groups inspect 24 checked row plans, then prove old-provider rejection
+before mutation. Provider contracts cover all 6 row/direction variants, invalid descriptors/operands/
+insertion, malformed optional tables and paired no-mutation serialization in both LLVM dialects.
+These checks do not claim fresh runtime execution in RG/Miss/AnyHit. All15 smoke cells pass.
+
+The qualified APIs require valid instance handles, matching their existing CUDA contract. No
+non-instance fallback, arbitrary SDK-pointer dereference, static/motion transform storage or
+composite current-list matrix support is claimed.
 
 The original RHI matrix raygen now compiles to PTX, advancing beyond module-scope vector `add`.
 All four complete ObjectToWorld/WorldToObject cases still reject with E52017 at their exact CUDA-only
-matrix wrappers. Their earlier NVRTC control passes 162 assertions, but no NVVM matrix runtime is
-qualified. Future matrix support must preserve SDK composition of the full active transform list,
+matrix wrappers. Their earlier NVRTC control passes 162 assertions, but these four composite NVVM
+matrix cases remain unqualified. Their implementation must preserve SDK composition of the full active transform list,
 forward/inverse orientation and the transposed 4x3 forms. The RHI single-level, non-motion pipeline
 alone cannot qualify general transform semantics or justify a single-instance shortcut.
 These application tests use RHI's actual-device target policy, separate from the SM80 fixtures above.

@@ -167,8 +167,20 @@ transform type returns signed Int32 before core conversion to the public enum, i
 UInt32, and child handles remain UInt64. These handles have no pointer semantics. The provider
 validates signatures before deriving scalar register constraints, and separates dynamic list indexes
 and handles from payload-only literal index checks. Core passes every SDK argument explicitly.
-Matrix storage and full active-transform-list composition are separate contracts; one-instance
-application evidence cannot justify a first-instance shortcut for public matrix queries.
+The instance-scoped `GetTraversableObjectToWorld` and `GetTraversableWorldToObject` APIs construct
+three Float4 rows through canonical `OptixInstanceTransformRow`. Preflight retains a UInt64 handle,
+literal row 0–2 and literal direction, validates the selected OptiX stage and ordinary value
+availability, and queries optional provider support before module creation. The provider alone
+resolves the SDK storage pointer and performs the effectful 16-byte global row read. Neither that
+pointer nor a general integer-to-pointer permission enters compiler storage roles. The row operation
+is non-hoistable and effectful; provider assembly retains side effects and a memory clobber.
+
+Optional interface 8 has its own size/version 1 contract. An older ABI46 provider may omit it and
+continue compiling unrelated programs; a program requiring a row read fails preflight, while a
+present malformed table fails initialization. Existing table layouts, module43 and container2 remain
+unchanged. Core and shared lowering own the logical matrix, while the provider owns only Float4 row
+reads of a valid instance. Composite public `ObjectToWorld`/`WorldToObject` queries still require
+complete active-list composition, including transform kinds and direction-dependent ordering.
 
 Shader termination has canonical declaration identity before optimization: the core
 IgnoreHit and AcceptHitAndEndSearch declarations carry existing KnownBuiltin metadata.
