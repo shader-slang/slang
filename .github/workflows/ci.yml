@@ -573,6 +573,26 @@ jobs:
       slang-user-skills: true
       server-count: 4
 
+  # Observe the quick CPU selection beside full CI on the same artifact.
+  # It deliberately does not appear in check-ci.needs. The called workflow
+  # tolerates failures and preserves the actual outcome in its artifacts.
+  shadow-l0-linux-release-cpu:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: release
+      runs-on: '["ubuntu-24.04"]'
+      cpu-only: true
+      server-count: 4
+      test-category: quick
+      shadow: true
+
   # macOS tests
   test-macos-debug-clang-aarch64:
     needs: [filter, build-macos-debug-clang-aarch64]
