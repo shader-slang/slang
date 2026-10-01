@@ -2824,7 +2824,8 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
 {
     outOperation = {};
     const IROp op = inst->getOp();
-    const bool isQuery = op == kIROp_TextureQuerySize;
+    const bool isLayerQuery = op == kIROp_TextureQueryLayerCount;
+    const bool isQuery = op == kIROp_TextureQuerySize || isLayerQuery;
     const bool isFetch = op == kIROp_TextureFetch;
     const bool isGather = op == kIROp_TextureGather;
     const bool isLevel = op == kIROp_SampleLevel;
@@ -2844,6 +2845,15 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
     operation.isArray = textureType.isArray ? 1u : 0u;
     operation.elementType = textureType.elementType;
 
+    if (isLayerQuery)
+    {
+        if (!textureType.isArray || textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D ||
+            !isNVVMUnsignedI32Type(inst->getDataType()))
+            return false;
+        operation.operation = SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
+        outOperation.diagnosticName = "sampled Texture2DArray layer count";
+        return true;
+    }
     if (isQuery)
     {
         if (textureType.isArray && textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D)
@@ -6188,6 +6198,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_TextureFetch:
             case kIROp_TextureGather:
             case kIROp_TextureQuerySize:
+            case kIROp_TextureQueryLayerCount:
                 {
                     NVVMTextureOperationRequirement operation;
                     if (!_resolveNVVMTextureOperation(inst, operation))
@@ -6947,6 +6958,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_TextureFetch:
             case kIROp_TextureGather:
             case kIROp_TextureQuerySize:
+            case kIROp_TextureQueryLayerCount:
                 for (UInt i = 0; i < inst->getOperandCount(); ++i)
                 {
                     SLANG_RETURN_ON_FAIL(_validateSelectedValue(
@@ -10841,6 +10853,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_TextureFetch:
                 case kIROp_TextureGather:
                 case kIROp_TextureQuerySize:
+                case kIROp_TextureQueryLayerCount:
                     {
                         const auto* operation =
                             _findTextureOperationRequirement(requirements.textureOperations, inst);

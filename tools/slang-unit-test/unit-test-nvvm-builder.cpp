@@ -300,6 +300,10 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
                 SLANG_CHECK(
                     builder.supportsTextureOperation(query) ==
                     (shape == SLANG_NVVM_TEXTURE_SHAPE_3D));
+                query.isArray = 1;
+                SLANG_CHECK(
+                    builder.supportsTextureOperation(query) ==
+                    (shape == SLANG_NVVM_TEXTURE_SHAPE_2D));
             }
 
     const SlangNVVMValueTypeKind fetchKinds[] = {
@@ -714,133 +718,173 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries)
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
 
-    ScopedNVVMBuilderModule module;
-    module.builder = &builder;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.createModule(toSlice("switch-texture-queries"), module.module)));
-
-    SlangNVVMTypeHandle voidType = nullptr;
-    SlangNVVMTypeHandle int32Type = nullptr;
-    SlangNVVMTypeHandle int64Type = nullptr;
-    SlangNVVMTypeHandle functionType = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, int32Type)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, int64Type)));
-    const SlangNVVMTypeHandle parameterTypes[] = {int64Type, int32Type};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
-        module.module,
-        voidType,
-        parameterTypes,
-        SLANG_COUNT_OF(parameterTypes),
-        functionType)));
-
-    SlangNVVMValueHandle function = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
-        module.module,
-        functionType,
-        SLANG_NVVM_LINKAGE_EXTERNAL,
-        SLANG_NVVM_FUNCTION_FLAG_NONE,
-        toSlice("switchTextureQueries"),
-        function)));
-    SlangNVVMValueHandle texture = nullptr;
-    SlangNVVMValueHandle selector = nullptr;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, texture)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, selector)));
-
-    SlangNVVMBlockHandle entryBlock = nullptr;
-    SlangNVVMBlockHandle widthBlock = nullptr;
-    SlangNVVMBlockHandle heightBlock = nullptr;
-    SlangNVVMBlockHandle depthBlock = nullptr;
-    SlangNVVMBlockHandle defaultBlock = nullptr;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(module.module, function, toSlice("width"), widthBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(module.module, function, toSlice("height"), heightBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(module.module, function, toSlice("depth"), depthBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        builder.createBlock(module.module, function, toSlice("default"), defaultBlock)));
-
-    SlangNVVMValueHandle caseValues[3] = {};
-    for (size_t i = 0; i < SLANG_COUNT_OF(caseValues); ++i)
+    String control[2];
+    for (bool injectFailure : {false, true})
     {
+        ScopedNVVMBuilderModule module;
+        module.builder = &builder;
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            builder.getIntegerConstant(module.module, int32Type, int64_t(i), caseValues[i])));
-    }
-    const SlangNVVMBlockHandle caseBlocks[] = {widthBlock, heightBlock, depthBlock};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
-    SLANG_CHECK(
-        builder.emitSwitch(
+            builder.createModule(toSlice("switch-texture-queries"), module.module)));
+
+        SlangNVVMTypeHandle voidType = nullptr;
+        SlangNVVMTypeHandle int32Type = nullptr;
+        SlangNVVMTypeHandle int64Type = nullptr;
+        SlangNVVMTypeHandle functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 32, int32Type)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(module.module, 64, int64Type)));
+        const SlangNVVMTypeHandle parameterTypes[] = {int64Type, int32Type};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+            module.module,
+            voidType,
+            parameterTypes,
+            SLANG_COUNT_OF(parameterTypes),
+            functionType)));
+
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            module.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("switchTextureQueries"),
+            function)));
+        SlangNVVMValueHandle texture = nullptr;
+        SlangNVVMValueHandle selector = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 0, texture)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(module.module, function, 1, selector)));
+
+        SlangNVVMBlockHandle entryBlock = nullptr;
+        SlangNVVMBlockHandle widthBlock = nullptr;
+        SlangNVVMBlockHandle heightBlock = nullptr;
+        SlangNVVMBlockHandle depthBlock = nullptr;
+        SlangNVVMBlockHandle defaultBlock = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createBlock(module.module, function, toSlice("entry"), entryBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createBlock(module.module, function, toSlice("width"), widthBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createBlock(module.module, function, toSlice("height"), heightBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createBlock(module.module, function, toSlice("depth"), depthBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.createBlock(module.module, function, toSlice("default"), defaultBlock)));
+
+        SlangNVVMValueHandle caseValues[3] = {};
+        for (size_t i = 0; i < SLANG_COUNT_OF(caseValues); ++i)
+        {
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getIntegerConstant(module.module, int32Type, int64_t(i), caseValues[i])));
+        }
+        const SlangNVVMBlockHandle caseBlocks[] = {widthBlock, heightBlock, depthBlock};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, entryBlock)));
+        SLANG_CHECK(
+            builder.emitSwitch(
+                module.module,
+                selector,
+                nullptr,
+                caseBlocks,
+                SLANG_COUNT_OF(caseBlocks),
+                defaultBlock) == SLANG_E_INVALID_ARG);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitSwitch(
             module.module,
             selector,
-            nullptr,
+            caseValues,
             caseBlocks,
             SLANG_COUNT_OF(caseBlocks),
-            defaultBlock) == SLANG_E_INVALID_ARG);
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitSwitch(
-        module.module,
-        selector,
-        caseValues,
-        caseBlocks,
-        SLANG_COUNT_OF(caseBlocks),
-        defaultBlock)));
+            defaultBlock)));
 
-    const SlangNVVMTextureOperation operations[] = {
-        SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
-        SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
-        SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH,
-    };
-    const SlangNVVMTextureShape shapes[] = {
-        SLANG_NVVM_TEXTURE_SHAPE_1D,
-        SLANG_NVVM_TEXTURE_SHAPE_2D,
-        SLANG_NVVM_TEXTURE_SHAPE_3D,
-    };
-    const SlangNVVMValueTypeDesc floatType = {
-        SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
-        32,
-        1,
-    };
-    for (size_t i = 0; i < SLANG_COUNT_OF(caseBlocks); ++i)
-    {
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, caseBlocks[i])));
-        const SlangNVVMTextureOperationDesc operation = {
-            operations[i],
-            shapes[i],
-            0,
-            floatType,
+        const SlangNVVMTextureOperation operations[] = {
+            SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
+            SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
+            SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH,
         };
-        SlangNVVMValueHandle queryResult = nullptr;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-            builder.emitTextureOperation(module.module, operation, &texture, 1, queryResult)));
-        SLANG_CHECK_ABORT(queryResult != nullptr);
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, defaultBlock)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitUnreachable(module.module)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(module.module, function)));
+        const SlangNVVMTextureShape shapes[] = {
+            SLANG_NVVM_TEXTURE_SHAPE_1D,
+            SLANG_NVVM_TEXTURE_SHAPE_2D,
+            SLANG_NVVM_TEXTURE_SHAPE_3D,
+        };
+        const SlangNVVMValueTypeDesc floatType = {
+            SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+            32,
+            1,
+        };
+        for (size_t i = 0; i < SLANG_COUNT_OF(caseBlocks); ++i)
+        {
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.setInsertBlock(module.module, caseBlocks[i])));
+            const SlangNVVMTextureOperationDesc operation = {
+                operations[i],
+                shapes[i],
+                0,
+                floatType,
+            };
+            SlangNVVMValueHandle queryResult = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitTextureOperation(module.module, operation, &texture, 1, queryResult)));
+            SLANG_CHECK_ABORT(queryResult != nullptr);
+            if (operations[i] == SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH)
+            {
+                auto arrayDepth = operation;
+                arrayDepth.shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
+                arrayDepth.isArray = 1;
+                SlangNVVMValueHandle layerCount = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder
+                        .emitTextureOperation(module.module, arrayDepth, &texture, 1, layerCount)));
+                SLANG_CHECK(layerCount != nullptr);
+                if (injectFailure)
+                {
+                    // Reject the non-array role while the insertion block is live. Final complete
+                    // module bytes must match the control, not just the successful call count.
+                    arrayDepth.isArray = 0;
+                    SlangNVVMValueHandle rejected = layerCount;
+                    SLANG_CHECK(SLANG_FAILED(builder.emitTextureOperation(
+                        module.module,
+                        arrayDepth,
+                        &texture,
+                        1,
+                        rejected)));
+                    SLANG_CHECK(rejected == nullptr);
+                }
+            }
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, defaultBlock)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitUnreachable(module.module)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(module.module, function)));
 
-    const SlangNVVMSerializationFormat formats[] = {
-        SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
-        SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
-    };
-    for (const auto format : formats)
-    {
-        ComPtr<ISlangBlob> assemblyBlob;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assemblyBlob)));
-        const String assembly = _getBlobText(assemblyBlob);
-        const UnownedStringSlice assemblySlice = assembly.getUnownedSlice();
-        SLANG_CHECK(assembly.indexOf("switch i32 ") >= 0);
-        SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("unreachable")) == 1);
-        SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("call i32 @llvm.nvvm.txq.")) == 3);
-        SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.width(i64") >= 0);
-        SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.height(i64") >= 0);
-        SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.depth(i64") >= 0);
-        SLANG_CHECK(assembly.indexOf("nounwind readnone") >= 0);
+        const SlangNVVMSerializationFormat formats[] = {
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+        };
+        Index formatIndex = 0;
+        for (const auto format : formats)
+        {
+            ComPtr<ISlangBlob> assemblyBlob;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(module.module, format, assemblyBlob)));
+            const String assembly = _getBlobText(assemblyBlob);
+            const UnownedStringSlice assemblySlice = assembly.getUnownedSlice();
+            SLANG_CHECK(assembly.indexOf("switch i32 ") >= 0);
+            SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("unreachable")) == 1);
+            SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("call i32 @llvm.nvvm.txq.")) == 4);
+            SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.width(i64") >= 0);
+            SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.height(i64") >= 0);
+            SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.depth(i64") >= 0);
+            SLANG_CHECK(assembly.indexOf("nounwind readnone") >= 0);
+            if (injectFailure)
+            {
+                SLANG_CHECK(assembly == control[formatIndex]);
+            }
+            else
+            {
+                control[formatIndex] = assembly;
+            }
+            ++formatIndex;
+        }
     }
 }
 

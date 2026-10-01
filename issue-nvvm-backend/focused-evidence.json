@@ -79220,6 +79220,225 @@
         "last_targeted": "texture-float-dimensions",
         "implementations_since_full": 5
       }
+    },
+    "nvvm-texture-array-layer-counts": {
+      "status": "accepted-focused",
+      "scope": "Actual view-relative non-mip read-only Texture2DArray layer counts with int/uint/float outputs. Module43/providerABI46/container2 unchanged.",
+      "contract": "Stable916 TextureQueryLayerCount returns scalar UInt32, preserving the spatial query rank. Core casts and ordered assignments own output composition. Provider/fake QUERY_DEPTH admission adds exactly2DArray while retaining actual shape/isArray identity.",
+      "identity": {
+        "revision": "a4a219c9a5516fb0475bbac55d1e62974eb8c9e9",
+        "patch_sha256": "1f24391886c48d687d55bbf27b0b9d4d7a44352374e3b5558a74ac899eaf838f",
+        "source_sha256": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "0e3f25a5ef6be39634d428336046ade6564b7aaf9d6d2edbd4e5df557106d02e",
+          "source/slang/hlsl.meta.slang": "3071f8e66b161f9103ffebde9aef77b464ca56e05a257d9e731acde5199fb3dd",
+          "source/slang/slang-core-module-textures.cpp": "032472430425d34c11ffb6c74fee795984b71d023487f81e53fdc063cbbc798d",
+          "source/slang/slang-emit-nvvm.cpp": "e23bebb8a906cb408c8eeece6b8015d66bfc0abc7f673211fd4d569dbfb4670f",
+          "source/slang/slang-ir-insts-stable-names.cpp": "ecced59e00443f4d4bc0bec794c0c82b71848a8461230808898562d805bff9c4",
+          "source/slang/slang-ir-insts-stable-names.lua": "06273040ce23f26947138013619cc0bef1dbe2a4ff7266265a4fa1884197cbfd",
+          "source/slang/slang-ir-insts.lua": "12335bef6b6a7d6b2bc903dd8de4fb31d669c48ddddb85db0503165925902b5b",
+          "tests/cuda/nvvm-texture-dimensions.slang": "7577d58d193451d2e1b0dd36f8c752fe198087bfb4dc9678310646f0e1bfe5f6",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "6620c8e96226487992dd93e53f577298adef5eef28d8110221f57dc85446a9eb",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "dfc6485ee6f1abb51c4039e449f22eec93b92b7d08b5730d983e5343e36e9ece",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "116b8756cb24ad507d1ec23bf07938a34e3ccf1ac3e2a8a9b361fa74731382c3",
+          "tests/cuda/nvvm-texture-array-layer-counts.slang": "9c55694578ed01d1952e802f70ce6b5567a4df5c4fd2227d1e4e9a1dcabb5033",
+          "tests/cuda/nvvm-texture-query-unsupported.slang": "c8662b5fc4fd68f6a34035719d5f189840f7743cc4c0b775e4d3524488519742"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "2b722453de155987fc12f5ca64c19398ee01590b306a6c361f1ccbe9b0547c34",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "082befa92725e5d98f093151952cc941083ef7d586012e4b41dd535067f7ab0c",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "b3e271f7d1e90263a641fce80b07c0a61e5eed6b8f1b3c7a8c27fe5b1be93b3e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "4ea265109fc846d7fbc0bede0b0bdaa49a814c80c8b1c0a876e553e6fb457a1a"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ],
+        "probe_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-texture-array-layer-counts/slang-view-probe.cu": "43d70fdafd26fca503e6abafcc4ac3514a763feef44fbb41c0b0e295125c55f6",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-texture-array-layer-counts/slang-view-probe": "3f273e3aadf0d77559134ec0d5d4dcf4284c3eba2ce266f3854852a9c01b050f",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-texture-array-layer-counts/view-kernel.slang": "32668a27ae16eab14f6d033a0c2ad26dfc934bf5ecc2b68df91e76e065923a05"
+        }
+      },
+      "build": {
+        "path": "build/nvvm-texture-array-layer-counts/build.json",
+        "sha256": "c1e7c37466369c8a4d7d3b38407794fa98e91397f7e7f812c51dfa75a7debb6e"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-texture-array-layer-counts/units.json",
+            "sha256": "87996a4b203b46ecbf936284812a8a2b1e3f445c6f300e96465fb509779140b3"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderQueriesTypedTextureOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangResourceOperationsUseTypedInstructions.internal": "passed"
+          },
+          "counts": {
+            "passed": 3
+          }
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-texture-array-layer-counts/runtime.json",
+            "sha256": "b10c0ef97416a8b92f0e84afc29b16c800cde7564f29ba8940612eddda10c68e"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-texture-array-layer-counts.slang (cuda)": "passed",
+            "tests/cuda/nvvm-texture-array-layer-counts.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang.2 (cuda)": "passed"
+          },
+          "counts": {
+            "passed": 5
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-texture-array-layer-counts/negatives.json",
+            "sha256": "aaf59613ff7a4fdbc51b3aaca216c3ebe10f397d3ddf00ba7c99200f678e9315"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-texture-query-unsupported.slang": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.3": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        }
+      },
+      "view_runtime": {
+        "compile": {
+          "path": "build/nvvm-texture-array-layer-counts/compile-view.json",
+          "sha256": "c9ab2d50d632d780c8fc0efbf057ac876d8c2247913406db7e328d51738095b5"
+        },
+        "execution": {
+          "path": "build/nvvm-texture-array-layer-counts/view-runtime.json",
+          "sha256": "72f761f6124fab35d7d96aa18677bbebef5f659c19ecd9d8402adf2e4931f728"
+        },
+        "host_build": {
+          "path": "build/nvvm-texture-array-layer-counts/build-probe.json",
+          "sha256": "ad9d6eef6828c32afdaaf6be8615edbe3723ca4d038181ccf296ac7f0938890f"
+        },
+        "host_identity": {
+          "path": "build/nvvm-texture-array-layer-counts/probe-identity.json",
+          "sha256": "788151555c7813d757f253e147e64e9b8a970e23ad6de1dc69b3afae20fc5b76"
+        },
+        "abi": {
+          "path": "build/nvvm-texture-array-layer-counts/view-abi.json",
+          "sha256": "93e37e147b2d8f9202a56897e6cd9b87e101f71dcaf4e332d26feb93eeb7913a"
+        },
+        "ptx": {
+          "path": "build/nvvm-texture-array-layer-counts/view-kernel.ptx",
+          "sha256": "875dddbefef2ccffeb209546b5a51d051691a2f4add7bcfee79ee6428527376f"
+        },
+        "observations": [
+          {
+            "case": "null-full",
+            "handle": 1,
+            "allocation": [11, 7, 5],
+            "allocation_flags": 1,
+            "view_status": 0,
+            "explicit_view": false,
+            "fetched_view_format": -944914128,
+            "fetched_view": [
+              100133946478846, 7645020720, 100133946753142, 3350053424, 32765,
+              1446682640, 23314
+            ],
+            "expected": [11, 7, 5],
+            "output": [324508639, 11, 7, 5, 3235823838, 3735928559],
+            "match": true
+          },
+          {
+            "case": "explicit-full",
+            "handle": 1,
+            "allocation": [11, 7, 5],
+            "allocation_flags": 1,
+            "view_status": 0,
+            "explicit_view": true,
+            "fetched_view_format": 13,
+            "fetched_view": [11, 7, 5, 0, 0, 0, 4],
+            "expected": [11, 7, 5],
+            "output": [324508639, 11, 7, 5, 3235823838, 3735928559],
+            "match": true
+          },
+          {
+            "case": "restricted-1-through-3",
+            "handle": 1,
+            "allocation": [11, 7, 5],
+            "allocation_flags": 1,
+            "view_status": 0,
+            "explicit_view": true,
+            "fetched_view_format": 13,
+            "fetched_view": [11, 7, 5, 0, 0, 1, 3],
+            "expected": [11, 7, 3],
+            "output": [324508639, 11, 7, 3, 3235823838, 3735928559],
+            "match": true
+          }
+        ],
+        "qualification": "Fresh end-to-end Slang NVVM O3 execution on raw UInt64 handles, non-square11x7 UInt32 allocation with5layers. Full/restricted explicit views independently validated; counts5/3. Null control uses allocation facts only; fetched null descriptor fields are unusable. Handles destroyed between cases; reused value1 is not an alias claim."
+      },
+      "runtime_contract": "NVVM O0/O3 independently check declared arrays2/3/5, int/uint/float outputs, UInt32/SInt32/Float32 element types and raw descriptor helper. Three zero error words, completion4096, untouched leading324508639 and trailing3735928559 guards. Shared three-mode fixture retains14 zero words/completion/tailguard, all prior spatial/nonarray/CubeArray-zero controls.",
+      "comparison_change": {
+        "before_fixture": {
+          "path": "build/nvvm-texture-array-layer-counts/before-dimensions.slang",
+          "sha256": "dea2131b54ca9f64214f0bb0edebb3ed860732f4ade92a80a63ff523e68c224d"
+        },
+        "change": "Removed only shared2DArray count-zero assertion; its spatial check remains. Dedicated NVVM fixture checks real counts. CUDA-source still returns zero, explicitly documented as a comparison discrepancy, not expected Slang semantics.",
+        "semantic_sources": [
+          "https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/resinfo--sm4---asm-",
+          "https://docs.vulkan.org/spec/latest/chapters/images.html#spirvenv-image-query"
+        ]
+      },
+      "negative_boundaries": "Real-provider supports/serialization retain non-array2D depth rejection. Failed live descriptor returns null and paired complete modules serialize identically. Compiler invalid ordinary2D scalar layer query, writable and CubeArray-float reject E52017 with null output and no provider creation. Four mip/MS negatives unchanged.",
+      "validation_incidents": [],
+      "retained_anomalies": [
+        "Both prior mechanism probe and fresh Slang probe return CUDA_SUCCESS with unusable null-view descriptor fields. Those fields remain raw evidence only; explicit descriptors independently validate view counts.",
+        "render-test arrayLength1 produces non-array binding. No singleton qualification or shader zero-to-one fallback."
+      ],
+      "preservation": {
+        "prior_feature_count": 47,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_dimensions_history": "Full compute/texture-get-dimensions discovery still needs excluded mip/count/array contracts; original failures remain unresolved."
+      },
+      "limitations": [
+        "1DArray/CubeArray counts, mip/level counts, multisample and writable queries excluded.",
+        "Restricted view end-to-end proof is UInt32, non-mip2DArray, Slang O3, CUDA12.9/SM80 on L4 driver595.71.05; no claim for all formats/drivers.",
+        "No host binding repair, new providerABI, full campaign or performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "texture-array-layer-counts",
+        "implementations_since_full": 6
+      }
     }
   }
 }

@@ -84,8 +84,9 @@ void computeMain()
     outputBuffer[11] = any(cubeSize != int2(4)) || any(floatCubeSize != float2(4.0f)) ? 1 : 0;
     int3 arraySize = int3(-1);
     arrayTexture.GetDimensions(arraySize.x, arraySize.y, arraySize.z);
-    // CUDA's prelude explicitly returns zero for unavailable array-size queries.
-    outputBuffer[12] = any(arraySize != int3(8, 8, 0)) ? 1 : 0;
+    // Spatial dimensions agree across backends. CUDA's legacy layer-count fallback is zero;
+    // nvvm-texture-array-layer-counts.slang independently checks the actual NVVM count.
+    outputBuffer[12] = any(arraySize.xy != int2(8, 8)) ? 1 : 0;
     cubeArrayTexture.GetDimensions(arraySize.x, arraySize.y, arraySize.z);
     outputBuffer[13] = any(arraySize != int3(4, 4, 0)) ? 1 : 0;
     outputBuffer[14] = 4096;

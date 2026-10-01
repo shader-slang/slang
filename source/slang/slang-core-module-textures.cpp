@@ -660,9 +660,10 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
             StringBuilder nvvm;
-            // Float outputs use ordinary conversion of spatial queries; array-count support
-            // remains limited to the existing integer-output contract.
-            if (!includeMipInfo && !isMultisample && (dimType != DimType::Float || !isArray) &&
+            // Spatial extents and the qualified 2D array layer count are distinct queries.
+            // Other array families retain their existing integer-output contract.
+            if (!includeMipInfo && !isMultisample &&
+                (dimType != DimType::Float || !isArray || baseShape == SLANG_TEXTURE_2D) &&
                 !(isArray && baseShape == SLANG_TEXTURE_1D))
             {
                 nvvm << "let size = __nvvmTextureQuerySize(this);\n";
@@ -672,7 +673,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 if (baseShape == SLANG_TEXTURE_3D)
                     nvvm << "depth = " << rawT << "(size.z);\n";
                 if (isArray)
-                    nvvm << "elements = " << rawT << "(0);\n";
+                {
+                    nvvm << "elements = " << rawT << "("
+                         << (baseShape == SLANG_TEXTURE_2D ? "__nvvmTextureQueryLayerCount(this)"
+                                                           : "0")
+                         << ");\n";
+                }
                 nvvm << "return;";
             }
 

@@ -11344,27 +11344,27 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
         SLANG_CHECK(store.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
         SLANG_CHECK(store.elementType.bitWidth == 32 && store.elementType.laneCount == 1);
     }
-    _resetDirectNVVMFakes();
+    const struct
     {
+        bool isArray;
+        const char* outputType;
+    } dimensionCases[] = {{false, "float"}, {true, "uint"}, {true, "int"}, {true, "float"}};
+    for (const auto& test : dimensionCases)
+    {
+        _resetDirectNVVMFakes();
         ComPtr<slang::IGlobalSession> session;
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         session->setSharedLibraryLoader(loader);
-        const char* source = R"SLANG(
-            Texture3D<float4> texture;
-            RWStructuredBuffer<float> output;
-            [numthreads(1,1,1)] void computeMain()
-            {
-                float width, height, depth;
-                texture.GetDimensions(width, height, depth);
-                output[0] = width;
-                output[1] = height;
-                output[2] = depth;
-            }
-        )SLANG";
+        StringBuilder source;
+        source << (test.isArray ? "Texture2DArray<float4>" : "Texture3D<float4>")
+               << " texture; RWStructuredBuffer<" << test.outputType << "> output; "
+               << "[numthreads(1,1,1)] void computeMain() { " << test.outputType
+               << " width,height,third; texture.GetDimensions(width,height,third); "
+               << "output[0]=width; output[1]=height; output[2]=third; }";
         ComPtr<slang::IBlob> code, diagnostics;
-        auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        auto result = _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
         if (SLANG_FAILED(result))
             getTestReporter()->message(
                 TestMessageType::Info,
@@ -11380,31 +11380,58 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
         // including the unsigned numeric conversion, so swapped lanes cannot cancel in runtime.
         for (Index lane = 0; lane < 3; ++lane)
         {
-            const auto stored = gFakeNVVMBuilder.storeValueRefs[lane];
-            SLANG_CHECK_ABORT(stored.kind == FakeNVVMBuilderValueKind::ScalarOperation);
-            const auto& conversion = gFakeNVVMBuilder.scalarOperations[stored.index];
-            SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT);
-            SLANG_CHECK(conversion.operandCount == 1);
-            SLANG_CHECK(NVVMSemantics::areSameType(conversion.resultType, NVVMSemantics::kFloat32));
-            SLANG_CHECK(NVVMSemantics::areSameType(
-                conversion.operandTypes[0],
-                NVVMSemantics::kUnsignedI32));
-            const auto extracted = conversion.operands[0];
-            SLANG_CHECK_ABORT(extracted.kind == FakeNVVMBuilderValueKind::VectorElement);
-            SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[extracted.index] == uint32_t(lane));
-            const auto vector = gFakeNVVMBuilder.vectorElementBaseValueRefs[extracted.index];
-            SLANG_CHECK_ABORT(vector.kind == FakeNVVMBuilderValueKind::VectorConstruct);
-            SLANG_CHECK_ABORT(gFakeNVVMBuilder.vectorConstructElementCounts[vector.index] == 3);
-            const auto query =
-                gFakeNVVMBuilder.vectorConstructElementValueRefs
-                    [gFakeNVVMBuilder.vectorConstructElementOffsets[vector.index] + lane];
+            auto value = gFakeNVVMBuilder.storeValueRefs[lane];
+            if (UnownedStringSlice(test.outputType) == "float")
+            {
+                SLANG_CHECK_ABORT(value.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                const auto& conversion = gFakeNVVMBuilder.scalarOperations[value.index];
+                SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT);
+                SLANG_CHECK(conversion.operandCount == 1);
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(conversion.resultType, NVVMSemantics::kFloat32));
+                SLANG_CHECK(NVVMSemantics::areSameType(
+                    conversion.operandTypes[0],
+                    NVVMSemantics::kUnsignedI32));
+                value = conversion.operands[0];
+            }
+            else if (
+                UnownedStringSlice(test.outputType) == "int" &&
+                value.kind == FakeNVVMBuilderValueKind::ScalarOperation)
+            {
+                // An explicit same-width signed conversion and its canonical identity both
+                // preserve the query's bits; no floating conversion is permitted here.
+                const auto& conversion = gFakeNVVMBuilder.scalarOperations[value.index];
+                SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
+                SLANG_CHECK(
+                    NVVMSemantics::areSameType(conversion.resultType, NVVMSemantics::kSignedI32));
+                SLANG_CHECK(NVVMSemantics::areSameType(
+                    conversion.operandTypes[0],
+                    NVVMSemantics::kUnsignedI32));
+                value = conversion.operands[0];
+            }
+            auto query = value;
+            if (!test.isArray || lane < 2)
+            {
+                SLANG_CHECK_ABORT(value.kind == FakeNVVMBuilderValueKind::VectorElement);
+                SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[value.index] == uint32_t(lane));
+                const auto vector = gFakeNVVMBuilder.vectorElementBaseValueRefs[value.index];
+                SLANG_CHECK_ABORT(vector.kind == FakeNVVMBuilderValueKind::VectorConstruct);
+                SLANG_CHECK_ABORT(
+                    gFakeNVVMBuilder.vectorConstructElementCounts[vector.index] ==
+                    (test.isArray ? 2 : 3));
+                query = gFakeNVVMBuilder.vectorConstructElementValueRefs
+                            [gFakeNVVMBuilder.vectorConstructElementOffsets[vector.index] + lane];
+            }
             SLANG_CHECK_ABORT(query.kind == FakeNVVMBuilderValueKind::TextureOperation);
             const auto& operation = gFakeNVVMBuilder.textureOperations[query.index];
             SLANG_CHECK(operation.operation == operations[lane]);
-            SLANG_CHECK(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && operation.isArray == 0);
+            SLANG_CHECK(
+                operation.shape ==
+                (test.isArray ? SLANG_NVVM_TEXTURE_SHAPE_2D : SLANG_NVVM_TEXTURE_SHAPE_3D));
+            SLANG_CHECK(operation.isArray == uint32_t(test.isArray));
         }
     }
-    for (bool isArray : {false, true})
+    for (Index invalidCase = 0; invalidCase < 3; ++invalidCase)
     {
         _resetDirectNVVMFakes();
         ComPtr<slang::IGlobalSession> session;
@@ -11412,12 +11439,18 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
             SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         session->setSharedLibraryLoader(loader);
+        const bool isArray = invalidCase == 1;
         StringBuilder source;
-        source << (isArray ? "Texture2DArray<float4>" : "RWTexture2D<float4>")
+        source << (isArray            ? "TextureCubeArray<float4>"
+                   : invalidCase == 0 ? "RWTexture2D<float4>"
+                                      : "Texture2D<float4>")
                << " texture; RWStructuredBuffer<float> output; "
-               << "[numthreads(1,1,1)] void computeMain() { float w,h,n; "
-               << "texture.GetDimensions(w,h" << (isArray ? ",n" : "") << "); output[0]=w+h"
-               << (isArray ? "+n" : "") << "; }";
+               << "[numthreads(1,1,1)] void computeMain() { float w,h,n; ";
+        if (invalidCase == 2)
+            source << "output[0] = __nvvmTextureQueryLayerCount(texture); }";
+        else
+            source << "texture.GetDimensions(w,h" << (isArray ? ",n" : "") << "); output[0]=w+h"
+                   << (isArray ? "+n" : "") << "; }";
         ComPtr<slang::IBlob> code, diagnostics;
         const auto result =
             _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
@@ -11425,7 +11458,7 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
         if (SLANG_SUCCEEDED(result) || text.indexOf("E52017") < 0)
         {
             StringBuilder message;
-            message << (isArray ? "Float32 array dimensions: " : "writable dimensions: ") << text;
+            message << "unsupported dimension case " << invalidCase << ": " << text;
             getTestReporter()->message(TestMessageType::Info, message.getBuffer());
         }
         SLANG_CHECK(SLANG_FAILED(result));

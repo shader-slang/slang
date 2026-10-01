@@ -888,5 +888,6 @@ return {
 	["textureGather"] = 912,
 	["textureQuerySize"] = 913,
 	["fma"] = 914,
-	["offsetOf"] = 915
+	["offsetOf"] = 915,
+	["textureQueryLayerCount"] = 916
 }

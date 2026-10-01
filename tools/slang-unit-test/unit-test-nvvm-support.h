@@ -6557,7 +6557,9 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
         return isNumericElement && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
     case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
-        return isNumericElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+        return isNumericElement &&
+               (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ||
+                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D && operation.isArray));
     case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
         return isNumericElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||

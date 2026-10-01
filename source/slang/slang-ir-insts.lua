@@ -1658,6 +1658,8 @@ local insts = {
 	{ textureGather = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "component" } } } },
 	-- Base spatial extents as uint/uint2/uint3; array layers are not part of this result.
 	{ textureQuerySize = { operands = { { "texture" } } } },
+	-- Number of array layers visible through the bound texture view, as scalar uint.
+	{ textureQueryLayerCount = { operands = { { "texture" } } } },
 	{ sampleGrad = { operands = { { "texture" }, { "sampler" }, { "coord" }, { "gradX" } } } },
 	{ GroupMemoryBarrierWithGroupSync = {} },
 	{ ControlBarrier = {} },
