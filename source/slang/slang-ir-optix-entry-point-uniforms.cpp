@@ -8,6 +8,7 @@
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -273,6 +274,47 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
     }
 };
 
+/// Replace each module-scope shader-record parameter with a read of the current OptiX SBT record.
+///
+/// Consider:
+///
+///     layout(shaderRecordEXT) ConstantBuffer<SbtData> gSbtRecordData;
+///
+/// The CUDA shader-record layout rules give `gSbtRecordData` a `ShaderRecord` slot and no
+/// `Uniform` bytes, so `collectGlobalUniformParameters` leaves it at module scope rather than
+/// folding it into `GlobalParams`. On OptiX the record is whatever `optixGetSbtDataPointer()`
+/// returns for the running program, so we rematerialize that pointer at each use. Uses may sit in
+/// helper functions, or in several entry points that each read their own record.
+static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module)
+{
+    List<IRGlobalParam*> shaderRecordParams;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto param = as<IRGlobalParam>(inst);
+        if (!param)
+            continue;
+        auto varLayout = findVarLayout(param);
+        if (varLayout && varLayout->usesResourceKind(LayoutResourceKind::ShaderRecord))
+            shaderRecordParams.add(param);
+    }
+
+    IRBuilder builder(module);
+    for (auto param : shaderRecordParams)
+    {
+        auto paramType = param->getFullType();
+        while (auto use = param->firstUse)
+        {
+            auto user = use->getUser();
+            SLANG_RELEASE_ASSERT(as<IRBlock>(user->getParent()));
+            builder.setInsertBefore(user);
+            auto sbtData =
+                builder.emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
+            builder.replaceOperand(use, sbtData);
+        }
+        param->removeAndDeallocate();
+    }
+}
+
 void collectOptiXEntryPointUniformParams(IRModule* module)
 {
     // look into all entry point functions by checking the IREntryPointDecoration on the children
@@ -280,6 +322,8 @@ void collectOptiXEntryPointUniformParams(IRModule* module)
     // one common struct, and replace parameter usage with SBT record accesses.
     CollectOptixEntryPointUniformParams context;
     context.processModule(module);
+
+    replaceShaderRecordGlobalParamsWithSbtAccess(module);
 }
 
 } // namespace Slang

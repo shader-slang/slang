@@ -1840,6 +1840,15 @@ LayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl_ = {
     &kCUDAObjectLayoutRulesImpl,
 };
 
+// A shader-record constant buffer is the OptiX SBT record itself rather than a pointer stored
+// in the launch parameters, so the buffer consumes a `ShaderRecord` slot instead of `Uniform`
+// bytes. Its contents still use the ordinary CUDA layout.
+LayoutRulesImpl kCUDAShaderRecordLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl,
+    &kCUDALayoutRulesImpl,
+    &kGLSLShaderRecordConstantBufferObjectLayoutRulesImpl_,
+};
+
 // GLSL cases
 
 LayoutRulesImpl kStd140LayoutRulesImpl_ = {
@@ -2578,8 +2587,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getHitAttributesParameterRules()
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
-    // Just following HLSLs lead for the moment
-    return &kCUDALayoutRulesImpl_;
+    return &kCUDAShaderRecordLayoutRulesImpl_;
 }
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getEntryPointParameterRules()
