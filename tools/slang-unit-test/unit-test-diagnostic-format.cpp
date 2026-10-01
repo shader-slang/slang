@@ -238,3 +238,25 @@ SLANG_UNIT_TEST(diagnosticFormatWithoutSource)
         diagnostic);
     SLANG_CHECK(text == "note: unlocated note\n    label without source\n");
 }
+
+SLANG_UNIT_TEST(diagnosticFormatEmptyMessages)
+{
+    GenericDiagnostic diagnostic = {};
+    diagnostic.code = 42;
+    diagnostic.severity = Severity::Error;
+    diagnostic.primarySpan.message = "primary label";
+    DiagnosticNote note;
+    note.span.message = "note label";
+    diagnostic.notes.add(note);
+    note.message = "following note";
+    note.span.message = String();
+    diagnostic.notes.add(note);
+
+    const String text = renderDiagnostic(
+        nullptr,
+        nullptr,
+        {.format = SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO},
+        diagnostic);
+    SLANG_CHECK(
+        text == "error E00042: \n    primary label\nnote: \n    note label\nnote: following note\n");
+}

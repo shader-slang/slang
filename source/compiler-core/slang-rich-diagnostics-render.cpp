@@ -831,6 +831,8 @@ private:
             ss << line << "\n";
             firstLine = false;
         }
+        if (firstLine)
+            ss << "\n";
     }
 
     // Reuse the source and span layout, indenting every line so source text and multiline
