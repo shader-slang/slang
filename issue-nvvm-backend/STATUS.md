@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Two bounded feature batches now pass focused validation after the full checkpoint:
+Three bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -92,17 +92,21 @@ Two bounded feature batches now pass focused validation after the full checkpoin
   runtime cells, two distinct units and four existing negatives pass. The merge converts only the
   replacement and preserves untouched physical lanes. A fake Float32/Boolean classification bug
   and an overbroad call-count assertion were fixed; original attempts remain recorded.
+- Internal out/inout references to existing local record arrays support nested forwarding and
+  source array returns through canonical OutParam lowering. Three shared units and nine runtime
+  cells plus two direct static role/provenance units pass. Native array/pointer results,
+  readonly/external roles and unproven pointer roots remain excluded.
 
 The full baseline retains its original 36 corpus gaps and four dynamic-surface failures; focused
 records supersede the affected cells without relabeling the full run. Current identities and
-precise reuse are in `features.nvvm-texture-descriptor-words` and
-`features.nvvm-dynamic-surface-components`. Two implementations have landed since the full run.
+precise reuse are in `features.nvvm-texture-descriptor-words`,
+`features.nvvm-dynamic-surface-components` and `features.nvvm-local-record-array-references`.
+Three implementations have passed focused validation since the full run.
 
-Next admit internal out/inout references to existing local record arrays under
-`plan.local-record-array-refs.md`. Include internal source array returns because canonical
-legalization uses the same OutParam/local-storage contract. Keep native array-return and external
-ABIs closed; require qualified local/internal-parameter roots at type, call and address boundaries.
-Use focused shared/static role and provenance tests plus a small independent runtime fixture.
+Next consider internal readonly borrows of the same local record arrays. Preserve mutable/readonly
+access distinctions in helper forwarding and child addresses; readonly borrowing of mutable caller
+storage must not imply invariant loads. Prepare a bounded plan and focused controls before extending
+the retained readonly-array rejection. Continue the authorized workflow without a new full campaign.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

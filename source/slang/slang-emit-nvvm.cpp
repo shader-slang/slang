@@ -193,10 +193,22 @@ bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& pa
     return false;
 }
 
-// Proves that this array pointer comes from an ordinary mutable local allocation. A matching
-// pointee on an out/inout parameter, shared global, or derived external pointer is insufficient.
+// Proves that this array pointer comes from mutable local storage or an internal out/inout
+// parameter. For example, forwarding `out Payload values[2]` to an inout helper preserves the
+// same storage; a matching pointer on a global, block parameter or external function does not.
 IRPtrTypeBase* _getNVVMLocalSubstandardRecordArrayPointer(IRInst* value)
 {
+    if (auto parameter = as<IRParam>(value))
+    {
+        auto block = as<IRBlock>(parameter->getParent());
+        auto function = block ? as<IRFunc>(block->getParent()) : nullptr;
+        if (!function || !function->isDefinition() || block != function->getFirstBlock() ||
+            function->findDecoration<IREntryPointDecoration>() ||
+            function->findDecoration<IRCudaKernelDecoration>() ||
+            function->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
+            return nullptr;
+        return asNVVMSupportedLocalRecordArrayReferenceType(parameter->getDataType());
+    }
     auto pointerType =
         value && value->getOp() == kIROp_Var ? as<IRPtrTypeBase>(value->getDataType()) : nullptr;
     return pointerType && pointerType->getOp() == kIROp_PtrType &&
@@ -4944,6 +4956,11 @@ bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
     IRType* argumentType = argument ? argument->getDataType() : nullptr;
     if (!argumentType)
         return false;
+    if (auto reference = asNVVMSupportedLocalRecordArrayReferenceType(parameterType))
+    {
+        auto actual = _getNVVMLocalSubstandardRecordArrayPointer(argument);
+        return actual && isTypeEqual(actual->getValueType(), reference->getValueType());
+    }
     if (isTypeEqual(argumentType, parameterType))
         return true;
 
@@ -5195,7 +5212,8 @@ SlangResult _validateNVVMHelperTarget(
     for (UInt parameterIndex = 0; parameterIndex < helper->getParamCount(); ++parameterIndex)
     {
         if (isCUDAExport &&
-            asNVVMSupportedLocalSubstandardRecordArrayType(helper->getParamType(parameterIndex)))
+            (asNVVMSupportedLocalSubstandardRecordArrayType(helper->getParamType(parameterIndex)) ||
+             asNVVMSupportedLocalRecordArrayReferenceType(helper->getParamType(parameterIndex))))
             return _diagnoseUnsupportedIRType(
                 codeGenContext,
                 "exported substandard record array helper parameter",
@@ -6764,7 +6782,8 @@ SlangResult _validateNVVMFunction(
                                                   codeGenContext,
                                                   toSlice("call argument type"));
                         }
-                        if (asNVVMSupportedLocalResourceStructPointerType(
+                        if (_getNVVMLocalSubstandardRecordArrayPointer(argument) ||
+                            asNVVMSupportedLocalResourceStructPointerType(
                                 argument->getDataType()) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedLocalHelperValuePointerType(argument->getDataType()) ||
@@ -9313,6 +9332,12 @@ SlangResult validateNVVMSupportedIR(
         {
             IRType* parameterType = parameter->getDataType();
             _addNVVMReachableStructTypes(parameterType, selectedReachableStructTypes);
+            if (auto reference = _getNVVMLocalSubstandardRecordArrayPointer(parameter))
+            {
+                _addNVVMReachableStructTypes(
+                    reference->getValueType(),
+                    selectedReachableStructTypes);
+            }
             if (auto elementStruct =
                     _getNVVMRawBufferAggregateElementType(parameter->getDataType()))
             {

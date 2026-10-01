@@ -78697,6 +78697,186 @@
         "last_targeted": "dynamic-surface-components",
         "implementations_since_full": 2
       }
+    },
+    "nvvm-local-record-array-references": {
+      "status": "accepted-focused",
+      "scope": "Internal out/inout references to existing fixed local identity-record arrays, including source array returns lowered to OutParam. Module43/providerABI46/container2 unchanged.",
+      "contract": {
+        "types": "One-dimensional nonempty fixed arrays of already admitted integer/FP8/BF16/BF2 identity records; no new representation.",
+        "roots": "Qualified mutable local Var or first-block OutParam/BorrowInOutParam of defined non-entry/non-exported internal helper. Actual root proof precedes exact-type call admission.",
+        "roles": "Reference type is HelperParameter-only; pointee reuses Storage lowering and role-specific pointer cache. Native array/pointer HelperResult remains closed.",
+        "addresses": "Existing checked child-address facts preserve local record storage and writable provenance; no arbitrary parent graph walk.",
+        "semantics": "Out initialization, out-to-inout and nested inout forwarding mutate caller storage while previous array values retain snapshots."
+      },
+      "identity": {
+        "revision": "eab7f5b49ac9c689ac23b48b041b11b5700cc773",
+        "patch_sha256": "2b6c4808a73d12e0fe560089d9c1fd4a5b084d1aa74a879f0e1b67a47bee8213",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "402a1dc5ff7f9e0717e0d37c0dc44267e2488b2fb9a0337b20fae166cf49b5be",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "26520e900babd36fd9f87780624d1871d0d608ae793eafe01c6af54da52668ab",
+          "source/slang/slang-emit-nvvm.cpp": "6f039ecf99a4b020224a650db18d5bbf97b449fa476ca6b71f4fa2c4690f1006",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "372483794a09a06071ba4284e8ef798f3c46ce7eae84f6f82691a590ff7538c0",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "2fc6091343a9015591bd0a9052eef9888f9a40a1b399ec99348489c7aa7732c4",
+          "tests/cuda/nvvm-local-substandard-record-array-references.slang": "2a6aa03008aa4d4975296a35abd7e66d52972a6939a9c721a4b490095a02078d"
+        },
+        "new_fixture": {
+          "path": "tests/cuda/nvvm-local-substandard-record-array-references.slang",
+          "sha256": "2a6aa03008aa4d4975296a35abd7e66d52972a6939a9c721a4b490095a02078d"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "b2e6cf6306cdb3cfc42e27862d8934c3d4526cb6304d474cb9ab03cf47dc76ad",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "71cf96417143e8443a391e72296e41e0218cb77adf36777e4d2ecf3ad6e2cf58",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c51b826b4080fc3690b449ecec2fcb013d7c7350f633e09e0ba6d383c177845e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "75d3ab9556fd027a953b6c40864d124d06ad55dd46f2a601e093a2cabd2fe60c",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "e34e9035c4f49c5972f9dc41c3535837f8e8867d52cec39cc634702378623fcf",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "146723cd3ecddebce5b89cae253e0d6525f971d2d72853636b6161685f324f3f"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-local-record-array-refs/build.json",
+        "sha256": "a112580608c34f65ab8008b5fe50c855e5d2b0fd3d18cbe0e0df6b7fa98b5b7c"
+      },
+      "static_build": {
+        "path": "build/nvvm-local-record-array-refs/build-static.json",
+        "sha256": "2269794891872f318f9d96c3ffb472da2101871cffce72414ac5018c3507ba56"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-local-record-array-refs/units.json",
+            "sha256": "01951f9ee3413152436d2e6577b68de69187b721b2176461f8b325996c265f88"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed"
+          },
+          "counts": {
+            "passed": 3
+          }
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-local-record-array-refs/runtime.json",
+            "sha256": "1d8b14d58154f9afccd12ce9d45eb2d3bb3d834aae48b920dd9dc2ed40076e48"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-local-substandard-record-array-copies.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-copies.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-references.slang (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-references.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-references.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-arrays.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-arrays.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-substandard-record-array-parameter.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-substandard-record-array-parameter.slang.2 (cuda)": "passed"
+          },
+          "counts": {
+            "passed": 9
+          }
+        },
+        "static": {
+          "passed": 2,
+          "gate": {
+            "path": "build/nvvm-local-record-array-refs/static-units.json",
+            "sha256": "1c9dc593e9a8f15c58873ff036fdf5ae3f259a4fd69b253bd650ef37779ecb29"
+          },
+          "outcomes": {
+            "nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder": "passed",
+            "nvvmLocalRecordArrayAddressesRequireLocalProducer": "passed"
+          },
+          "identity": {
+            "path": "build/nvvm-local-record-array-refs/static-before-identity.json",
+            "sha256": "027f22499d5280ab55bb140aee41b63be4a9e51174acd2fdb1697412a425dcf9"
+          },
+          "verified_after": {
+            "path": "build/nvvm-local-record-array-refs/static-after-identity.json",
+            "sha256": "027f22499d5280ab55bb140aee41b63be4a9e51174acd2fdb1697412a425dcf9"
+          }
+        }
+      },
+      "inputs": [
+        {
+          "path": "tests/cuda/nvvm-local-substandard-record-arrays.slang",
+          "sha256": "64ddd37f5acae1f911e8f4f08bdeee91285a9e92964ec62ec6f6ebce09c1058c"
+        },
+        {
+          "path": "tests/cuda/nvvm-local-substandard-record-array-copies.slang",
+          "sha256": "0376100768754cd3282e87dd8da6d768dbbc95451069046f175572fb223e2669"
+        },
+        {
+          "path": "tests/cuda/nvvm-substandard-record-array-parameter.slang",
+          "sha256": "4e6561a30ac72ffb33bdd9ee6afd73e7a8d49df9763a0110be9ae3ad96b2090e"
+        }
+      ],
+      "runtime_contract": {
+        "new_fixture": {
+          "path": "tests/cuda/nvvm-local-substandard-record-array-references.slang",
+          "sha256": "2a6aa03008aa4d4975296a35abd7e66d52972a6939a9c721a4b490095a02078d"
+        },
+        "modes": ["CUDA O3", "NVVM O0", "NVVM O3"],
+        "seeds": [291, 65244, 32769, 32705],
+        "checks": "All four slot/lane combinations; initialized nested integer/FP8/BF16/BF2 fields, independent integer-bit expectations, source array returns, direct out initialization, forwarding, literal postchecks, saved snapshots, two output guards and four completion words.",
+        "neighbor_controls": "Six NVVM O0/O3 transport, copy and by-value parameter cells; old CUDA nested-copy loops not rerun."
+      },
+      "role_transitions": [
+        {
+          "source_row": "array result",
+          "before": "helper parameter preflight rejection",
+          "after": "real-provider LLVM compilation succeeds"
+        },
+        {
+          "source_row": "inout array",
+          "before": "helper parameter preflight rejection",
+          "after": "real-provider LLVM compilation succeeds"
+        },
+        {
+          "source_row": "out array",
+          "before": "helper parameter preflight rejection",
+          "after": "real-provider LLVM compilation succeeds"
+        }
+      ],
+      "negative_contract": "Eleven other original source rows retained, plus exported out and exported inout; failed compilation, null output and no provider module mutation remain asserted. Static cache order, entry/global/block/undefined roots and same-typed forged call arguments remain rejected.",
+      "validation_incidents": [],
+      "preservation": {
+        "prior_feature_count": 44,
+        "full_baseline": "unchanged",
+        "full_identity": "unchanged",
+        "prior_focused_objects": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "history": "Older NVRTC wrong-output/timeout and parser histories retain original identities; no claim of resolving main corpus cells."
+      },
+      "limitations": [
+        "No readonly or exported references, native array/pointer returns, global/shared/resource/entry/block/undefined roots, wrappers, multidimensional arrays or BF3/BF4 array elements.",
+        "Four-seed two-element focused runtime qualification, not large-array scalability or concurrent/escaping alias support.",
+        "No performance claim or fresh full campaign. Configured shared and static compiler strings retain their actual older values."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "local-record-array-references",
+        "implementations_since_full": 3
+      }
     }
   }
 }

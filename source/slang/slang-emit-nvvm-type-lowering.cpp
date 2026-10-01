@@ -774,6 +774,19 @@ IRArrayType* asNVVMSupportedLocalSubstandardRecordArrayType(IRInst* type, uint32
     return arrayType;
 }
 
+IRPtrTypeBase* asNVVMSupportedLocalRecordArrayReferenceType(IRInst* type)
+{
+    auto pointer = as<IRPtrTypeBase>(type);
+    if (!pointer ||
+        (pointer->getOp() != kIROp_OutParamType &&
+         pointer->getOp() != kIROp_BorrowInOutParamType) ||
+        pointer->getOperandCount() != 1 || pointer->getAddressSpace() != AddressSpace::Generic ||
+        pointer->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        !asNVVMSupportedLocalSubstandardRecordArrayType(pointer->getValueType()))
+        return nullptr;
+    return pointer;
+}
+
 IRStructType* asNVVMSupportedLocalSubstandardRecordType(IRInst* type)
 {
     if (auto record = asNVVMSupportedSubstandardRecordType(type))
@@ -2406,6 +2419,9 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
         return use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage ||
                use == NVVMTypeUse::HelperParameter;
 
+    if (localRecordArrayReference)
+        return use == NVVMTypeUse::HelperParameter;
+
     // Local record references qualify parameters and allocations, not a new pointer-return ABI.
     if (use == NVVMTypeUse::HelperResult && localHelperPointer &&
         asNVVMSupportedSubstandardRecordType(localHelperPointerValueType) &&
@@ -2517,6 +2533,7 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
     info.isSubstandardRecord = asNVVMSupportedSubstandardRecordType(type) != nullptr;
     info.isLocalSubstandardRecordArray =
         asNVVMSupportedLocalSubstandardRecordArrayType(type) != nullptr;
+    info.localRecordArrayReference = asNVVMSupportedLocalRecordArrayReferenceType(type);
     info.isPointerBearingHelperValue =
         info.isHelperValue && !isNVVMSupportedCopyableValueType(type);
     info.deviceNumericPointer = asNVVMSupportedDeviceNumericPointerType(type);
@@ -2796,6 +2813,17 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 outType)));
         m_entryParameterRepresentationMap[type] = outType;
         return SLANG_OK;
+    }
+
+    if (typeInfo.localRecordArrayReference)
+    {
+        return _lowerPointerType(
+            type,
+            typeInfo.localRecordArrayReference->getValueType(),
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            outType,
+            NVVMTypeUse::Storage,
+            false);
     }
 
     if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult) &&

@@ -51,7 +51,7 @@ struct LocalRecordArrayIR
 } // namespace
 
 // Start with each admitted role in turn. A cached local or internal parameter representation must
-// neither authorize a reference/result/resource role nor be poisoned by its earlier rejection.
+// neither authorize a native result/resource role nor be poisoned by its earlier rejection.
 SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
 {
     NVVMStaticTestContext context(unitTestContext);
@@ -87,6 +87,19 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
                 SLANG_CHECK(rejected == nullptr);
             }
 
+            if (first == NVVMTypeUse::HelperParameter)
+            {
+                // Populate the reference representation before any array value/storage lookup.
+                for (IROp op : {kIROp_OutParamType, kIROp_BorrowInOutParamType})
+                {
+                    SlangNVVMTypeHandle reference = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(
+                        ir.builder.getPtrType(op, array),
+                        NVVMTypeUse::HelperParameter,
+                        reference)));
+                    SLANG_CHECK(reference != nullptr);
+                }
+            }
             SlangNVVMTypeHandle firstType = nullptr;
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, first, firstType)));
             SLANG_CHECK_ABORT(firstType != nullptr);
@@ -136,6 +149,44 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, use, repeated)));
                 SLANG_CHECK(repeated == expected);
             }
+            for (IROp referenceOp : {kIROp_OutParamType, kIROp_BorrowInOutParamType})
+            {
+                auto reference = ir.builder.getPtrType(referenceOp, array);
+                SlangNVVMTypeHandle expectedPointer = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+                    scope.module,
+                    expected,
+                    SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+                    expectedPointer)));
+                for (bool afterAdmission : {false, true})
+                {
+                    for (auto use :
+                         {NVVMTypeUse::Value,
+                          NVVMTypeUse::Storage,
+                          NVVMTypeUse::HelperValue,
+                          NVVMTypeUse::HelperResult,
+                          NVVMTypeUse::EntryPointParameter,
+                          NVVMTypeUse::EntryPointResult,
+                          NVVMTypeUse::ParameterGroupStorage,
+                          NVVMTypeUse::StructuredBufferStorage})
+                    {
+                        SlangNVVMTypeHandle rejected = expectedPointer;
+                        SLANG_CHECK(SLANG_FAILED(lowering.lowerType(reference, use, rejected)));
+                        SLANG_CHECK(rejected == nullptr);
+                    }
+                    SlangNVVMTypeHandle admittedReference = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(
+                        reference,
+                        NVVMTypeUse::HelperParameter,
+                        admittedReference)));
+                    SLANG_CHECK(admittedReference == expectedPointer);
+                    SlangNVVMTypeHandle repeatedArray = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        lowering.lowerType(array, NVVMTypeUse::Storage, repeatedArray)));
+                    SLANG_CHECK(repeatedArray == expected);
+                    SLANG_UNUSED(afterAdmission);
+                }
+            }
             auto pointer = ir.builder.getPtrType(kIROp_PtrType, array);
             for (auto use :
                  {NVVMTypeUse::Value, NVVMTypeUse::HelperParameter, NVVMTypeUse::HelperResult})
@@ -155,6 +206,8 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
     enum class RootKind
     {
         Local,
+        InternalOut,
+        InternalInOut,
         Global,
         EntryParameter,
         BlockParameter,
@@ -162,6 +215,8 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
     };
     const RootKind kinds[] = {
         RootKind::Local,
+        RootKind::InternalOut,
+        RootKind::InternalInOut,
         RootKind::Global,
         RootKind::EntryParameter,
         RootKind::BlockParameter,
@@ -172,6 +227,8 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         NVVMStaticTestContext context(unitTestContext);
         LocalRecordArrayIR ir(context.env.getSessionImpl());
         auto& builder = ir.builder;
+        const bool isInternal = kind == RootKind::InternalOut || kind == RootKind::InternalInOut;
+        const bool isSupported = kind == RootKind::Local || isInternal;
         auto pointerType = builder.getPtrType(kIROp_PtrType, ir.outerArray);
         IRInst* root = nullptr;
         if (kind == RootKind::Global)
@@ -189,6 +246,26 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         builder.setInsertInto(entry);
         auto block = builder.emitBlock();
         auto input = builder.emitParam(builder.getUIntType());
+        IRInst* localAllocation = nullptr;
+        if (isInternal)
+        {
+            auto referenceType = builder.getPtrType(
+                kind == RootKind::InternalOut ? kIROp_OutParamType : kIROp_BorrowInOutParamType,
+                ir.outerArray);
+            builder.setInsertInto(ir.module.get());
+            auto helper = builder.createFunc();
+            IRType* helperTypes[] = {referenceType, builder.getUIntType()};
+            helper->setFullType(builder.getFuncType(2, helperTypes, builder.getVoidType()));
+            builder.setInsertInto(block);
+            localAllocation = builder.emitVar(ir.outerArray);
+            IRInst* arguments[] = {localAllocation, input};
+            builder.emitCallInst(builder.getVoidType(), helper, 2, arguments);
+            builder.emitReturn();
+            builder.setInsertInto(helper);
+            builder.emitBlock();
+            root = builder.emitParam(referenceType);
+            input = builder.emitParam(builder.getUIntType());
+        }
         if (kind == RootKind::EntryParameter)
             root = builder.emitParam(pointerType);
         auto index = builder.emitBitAnd(
@@ -200,7 +277,8 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         else if (kind == RootKind::Local || kind == RootKind::BlockParameter)
             root = builder.emitVar(ir.outerArray);
         SLANG_CHECK_ABORT(root != nullptr);
-        SLANG_CHECK_ABORT(root->getDataType() == pointerType);
+        if (!isInternal)
+            SLANG_CHECK_ABORT(root->getDataType() == pointerType);
 
         if (kind == RootKind::BlockParameter)
         {
@@ -218,7 +296,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         IRInst* wholeStore = nullptr;
         IRInst* pairValue = nullptr;
         IRInst* bf16Value = nullptr;
-        if (kind == RootKind::Local)
+        if (isSupported)
         {
             bf16Value =
                 builder.emitBitCast(ir.bf16, builder.getIntValue(builder.getUInt16Type(), 0));
@@ -247,7 +325,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         auto lane = builder.emitElementAddress(pair, index);
         IRInst* pairStore = nullptr;
         IRInst* laneStore = nullptr;
-        if (kind == RootKind::Local)
+        if (isSupported)
         {
             pairStore = builder.emitStore(pair, pairValue);
             laneStore = builder.emitStore(lane, bf16Value);
@@ -258,7 +336,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         linked.entryPoints.add(entry);
         NVVMOperationRequirements requirements;
         const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
-        if (kind != RootKind::Local)
+        if (!isSupported)
         {
             SLANG_CHECK(SLANG_FAILED(result));
             SLANG_CHECK(requirements.emissionPlan.addresses.findElementAddress(element) == nullptr);
@@ -280,7 +358,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         const auto& plan = requirements.emissionPlan;
         SLANG_CHECK_ABORT(plan.localStorage.getCount() == 2);
-        SLANG_CHECK(plan.localStorage[0].source == root);
+        SLANG_CHECK(plan.localStorage[0].source == (isInternal ? localAllocation : root));
         SLANG_CHECK(plan.localStorage[0].valueType == ir.outerArray);
         SLANG_CHECK(plan.localStorage[0].valueUse == NVVMTypeUse::Storage);
         SLANG_CHECK(plan.localStorage[0].alignment == 4);
@@ -322,5 +400,63 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
             }
         }
         SLANG_CHECK(checkedStores == 3);
+    }
+    // Type equality is not a producer proof. These calls use the exact formal reference type;
+    // a global reaches argument validation, while undefined/block values reject even earlier.
+    for (auto kind : {RootKind::Global, RootKind::Undefined, RootKind::BlockParameter})
+    {
+        NVVMStaticTestContext context(unitTestContext);
+        LocalRecordArrayIR ir(context.env.getSessionImpl());
+        auto& builder = ir.builder;
+        auto reference = builder.getPtrType(kIROp_BorrowInOutParamType, ir.outerArray);
+        IRInst* global = builder.createGlobalVar(ir.outerArray);
+        global->setFullType(reference);
+        auto helper = builder.createFunc();
+        IRType* helperTypes[] = {reference};
+        helper->setFullType(builder.getFuncType(1, helperTypes, builder.getVoidType()));
+        builder.setInsertInto(helper);
+        builder.emitBlock();
+        builder.emitParam(reference);
+        builder.emitReturn();
+        builder.setInsertInto(ir.module.get());
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        auto block = builder.emitBlock();
+        IRInst* argument = global;
+        if (kind == RootKind::Undefined)
+            argument = builder.emitLoadFromUninitializedMemory(reference);
+        else if (kind == RootKind::BlockParameter)
+        {
+            auto next = builder.emitBlock();
+            argument = builder.emitParam(reference);
+            builder.setInsertInto(block);
+            builder.emitBranch(next, 1, &global);
+            builder.setInsertInto(next);
+        }
+        SLANG_CHECK_ABORT(argument->getDataType() == helper->getParamType(0));
+        builder.emitCallInst(builder.getVoidType(), helper, 1, &argument);
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = ir.module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        SLANG_CHECK(SLANG_FAILED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+        const auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
+        const auto expected =
+            kind == RootKind::Global ? toSlice("call argument type")
+            : kind == RootKind::Undefined
+                ? UnownedStringSlice(getIROpInfo(kIROp_LoadFromUninitializedMemory).name)
+                : toSlice("basic-block parameter");
+        if (diagnostic.indexOf(expected) < 0)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(diagnostic.indexOf(expected) >= 0);
     }
 }

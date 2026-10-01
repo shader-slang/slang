@@ -149,11 +149,15 @@ bool isNVVMSupportedHelperValueType(IRInst* type);
 IRStructType* asNVVMSupportedSubstandardRecordType(IRInst* type);
 
 /// Returns an ordinary fixed array of qualified identity records for local values, storage and
-/// internal value parameters. This does not admit reference/result roles, nested arrays or
-/// wrappers.
+/// internal value parameters. Mutable references have a separate classifier; native results,
+/// nested arrays and wrappers remain excluded.
 IRArrayType* asNVVMSupportedLocalSubstandardRecordArrayType(
     IRInst* type,
     uint32_t* outElementCount = nullptr);
+
+/// Returns an exact mutable internal reference type to an admitted local record array. Call and
+/// address preflight must separately prove that its value has a qualified local/helper producer.
+IRPtrTypeBase* asNVVMSupportedLocalRecordArrayReferenceType(IRInst* type);
 
 /// Returns a qualified local record, including the existing BF3/BF4 component storage family.
 IRStructType* asNVVMSupportedLocalSubstandardRecordType(IRInst* type);
@@ -419,6 +423,7 @@ struct NVVMTypeInfo
     bool isHelperValue = false;
     bool isSubstandardRecord = false;
     bool isLocalSubstandardRecordArray = false;
+    IRPtrTypeBase* localRecordArrayReference = nullptr;
     bool isPointerBearingHelperValue = false;
     bool isRawBuffer = false;
     bool isSurface = false;

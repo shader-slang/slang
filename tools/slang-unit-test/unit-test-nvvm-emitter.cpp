@@ -10395,6 +10395,10 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
             }
             [noinline] uint read(Payload value)
             { return uint(bit_cast<uint16_t>(value.pair.x)) + uint(value.after); }
+            [noinline] void mutateNested(inout Outer records[2], uint slot, uint lane)
+            { records[slot].inner.pair[lane] = bit_cast<BFloat16>(uint16_t(99)); }
+            [noinline] void forwardNested(inout Outer records[2], uint slot, uint lane)
+            { mutateNested(records, slot, lane); }
             RWStructuredBuffer<uint> outputBuffer;
             [numthreads(1, 1, 1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             {
@@ -10410,7 +10414,7 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
                     nested[k].tail = k + 37;
                 }
                 let savedNested = nested;
-                nested[tid.y & 1].inner.pair[tid.z & 1] = bit_cast<BFloat16>(uint16_t(99));
+                forwardNested(nested, tid.y & 1, tid.z & 1);
                 outputBuffer[0] = read(saved[0]);
                 outputBuffer[1] = read(saved[tid.x & 1]);
                 outputBuffer[2] = read(values[tid.x & 1]);
@@ -10451,6 +10455,93 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
         SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    }
+    // These exact source cases were previously rejected solely at mutable helper parameters.
+    const struct
+    {
+        const char* name;
+        const char* source;
+    } referenceCases[] = {
+        {"array result", R"SLANG(
+            struct Payload
+            {
+                BFloat16 value;
+            }
+            typedef Payload Pair[2];
+            [noinline] Pair make(uint v)
+            {
+                Pair p;
+                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(v));
+                return p;
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                let p = make(tid.x);
+                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
+            }
+        )SLANG"},
+        {"inout array", R"SLANG(
+            struct Payload
+            {
+                BFloat16 value;
+            }
+            [noinline] void mutate(inout Payload p[2], uint v)
+            {
+                p[v & 1].value = bit_cast<BFloat16>(uint16_t(v));
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p[2];
+                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(1));
+                mutate(p, tid.x);
+                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
+            }
+        )SLANG"},
+        {"out array", R"SLANG(
+            struct Payload
+            {
+                BFloat16 value;
+            }
+            [noinline] void initialize(out Payload p[2], uint v)
+            {
+                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(v));
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p[2];
+                initialize(p, tid.x);
+                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
+            }
+        )SLANG"},
+    };
+    for (const auto& test : referenceCases)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new RealBuilderFakeNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(session, test.source, code, diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            StringBuilder message;
+            message << test.name << ": " << _getBlobText(diagnostics);
+            getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK(code != nullptr);
+        SLANG_CHECK(gFakeNVVM.addedModule.indexOf("[2 x { i16 }]*") >= 0);
+        SLANG_CHECK(gFakeNVVM.addedModule.indexOf("call void ") >= 0);
+        SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+        SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
@@ -10528,9 +10619,11 @@ SLANG_UNIT_TEST(nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI)
                 uint16_t after;
             }
             typedef Payload Pair[2];
+            [noinline] void mutate(inout Pair values, uint slot, uint lane, uint bits)
+            { values[slot].pair[lane] = bit_cast<BFloat16>(uint16_t(bits)); }
             [noinline] uint inspect(Pair values, uint slot, uint lane, uint bits)
             {
-                values[slot].pair[lane] = bit_cast<BFloat16>(uint16_t(bits));
+                mutate(values, slot, lane, bits);
                 return uint(bit_cast<uint16_t>(values[0].pair.x))
                     + uint(bit_cast<uint16_t>(values[1].pair.y))
                     + uint(values[slot].before) + uint(values[1-slot].after);
@@ -10609,7 +10702,7 @@ SLANG_UNIT_TEST(nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
-// Internal array value parameters do not grant references, results or external storage a new role.
+// Internal mutable references do not grant native results or external storage a new role.
 // Keep each read observable so preflight sees the intended surviving role.
 SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles)
 {
@@ -10619,8 +10712,46 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles)
         const char* construct;
         const char* source;
     };
-    // Array returns are lowered to an OutParam, so their rejection is a parameter contract.
+    // Mutable internal references do not authorize an external reference or native result ABI.
     const Case cases[] = {
+        {"exported inout array", "exported substandard record array helper parameter", R"SLANG(
+            struct Payload
+            {
+                BFloat16 value;
+            }
+            [CudaDeviceExport] [noinline] void mutate(inout Payload p[2], uint v)
+            {
+                p[v & 1].value = bit_cast<BFloat16>(uint16_t(v));
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p[2];
+                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(1));
+                mutate(p, tid.x);
+                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
+            }
+        )SLANG"},
+        {"exported out array", "exported substandard record array helper parameter", R"SLANG(
+            struct Payload
+            {
+                BFloat16 value;
+            }
+            [CudaDeviceExport] [noinline] void initialize(out Payload p[2], uint v)
+            {
+                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(v));
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p[2];
+                initialize(p, tid.x);
+                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
+            }
+        )SLANG"},
+
         {"exported array parameter", "exported substandard record array helper parameter", R"SLANG(
             struct Payload { BFloat16 value; }
             typedef Payload Pair[2];
@@ -10673,63 +10804,8 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles)
                 outputBuffer[0] = inspect(values, tid.y & 1, tid.z & 1);
             }
         )SLANG"},
-        {"array result", "helper function parameter: OutParam<Array<Payload, 2>>", R"SLANG(
-            struct Payload
-            {
-                BFloat16 value;
-            }
-            typedef Payload Pair[2];
-            [noinline] Pair make(uint v)
-            {
-                Pair p;
-                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(v));
-                return p;
-            }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                let p = make(tid.x);
-                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
-            }
-        )SLANG"},
-        {"inout array", "helper function parameter: BorrowInOutParam<Array<Payload, 2>>", R"SLANG(
-            struct Payload
-            {
-                BFloat16 value;
-            }
-            [noinline] void mutate(inout Payload p[2], uint v)
-            {
-                p[v & 1].value = bit_cast<BFloat16>(uint16_t(v));
-            }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                Payload p[2];
-                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(1));
-                mutate(p, tid.x);
-                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
-            }
-        )SLANG"},
-        {"out array", "helper function parameter: OutParam<Array<Payload, 2>>", R"SLANG(
-            struct Payload
-            {
-                BFloat16 value;
-            }
-            [noinline] void initialize(out Payload p[2], uint v)
-            {
-                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(v));
-            }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                Payload p[2];
-                initialize(p, tid.x);
-                outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
-            }
-        )SLANG"},
+
+
         {"readonly array", "helper function parameter: BorrowInParam<Array<Payload, 2>", R"SLANG(
             struct Payload
             {
