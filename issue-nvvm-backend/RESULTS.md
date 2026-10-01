@@ -819,8 +819,13 @@ Four additional Half-array rows group native Half and formatted Float32/r16f/rg1
 at both array ranks, widths 1/2/4, with whole or static-component copies. Independent source marker
 writes prevent matching wrong load/store addresses from hiding corruption. Native copies and
 untouched channels remain exact, including NaNs; converted NaNs use class-only comparison.
-The current harness has 89 rows; the retained full baseline has 83. Preserve its 249 cells and use
-the focused layered evidence when reviewing the eighteen-cell expansion at the next full checkpoint.
+Two additional Half-volume rows reuse those conversion/marker contracts with ordinary XYZ
+coordinates and explicit spatial depth. Volumes use height/depth with no layered flag; only
+`array_layers` establishes an array role. The full host copy and report validator check these
+roles independently. The shared component body prevents both CUDA volume entries from compiling;
+keep this fixture limitation separate from CUDA whole-volume support generally.
+The current harness has 91 rows; the retained full baseline has 83. Preserve its 249 cells and use
+the focused layered evidence when reviewing the twenty-four-cell expansion at the next full checkpoint.
 The four new CUDA Half-array compile failures remain explicit comparison limitations.
 
 A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires

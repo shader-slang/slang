@@ -1730,8 +1730,7 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
             laneCount = uint32_t(count->getValue());
         }
         uint32_t bitWidth = 0;
-        if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) || bitWidth != 16 ||
-            shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
+        if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) || bitWidth != 16)
             return false;
         elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, bitWidth, laneCount};
     }
@@ -1781,8 +1780,7 @@ bool getNVVMSupportedSurfaceField(
     {
         return true;
     }
-    if (outType.elementType.bitWidth != 32 || formatInfo.scalarType != SLANG_SCALAR_TYPE_FLOAT16 ||
-        outType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
+    if (outType.elementType.bitWidth != 32 || formatInfo.scalarType != SLANG_SCALAR_TYPE_FLOAT16)
     {
         return false;
     }

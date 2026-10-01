@@ -342,6 +342,8 @@ Array coordinates retain their logical order through legalization: `(byteX, laye
 `(byteX, y, layer)`. Only the provider's physical intrinsic call moves the layer before spatial
 coordinates, as required by LLVM's array-surface interface. The descriptor retains the actual
 resource rank and array role; coordinate packing never disguises one resource shape as another.
+Non-array volumes retain `(byteX, y, z)` at the intrinsic boundary. Native Half and formatted
+Half storage reuse the same explicit conversion and bit-transport paths across these shapes.
 Arbitrary resource-helper provenance, additional packed/normalized formats and general aliases
 remain outside the qualified boundary.
 

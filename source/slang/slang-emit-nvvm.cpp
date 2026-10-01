@@ -2773,7 +2773,6 @@ bool _resolveNVVMPhysicalSurfaceOperation(IRInst* inst, NVVMPlannedSurfaceOperat
         (physicalType.bitWidth != surfaceType.elementType.bitWidth &&
          !(physicalType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
            physicalType.bitWidth == 16 && surfaceType.elementType.bitWidth == 32)) ||
-        (physicalType.bitWidth == 16 && surfaceType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D) ||
         (isStore && !as<IRVoidType>(inst->getDataType())))
         return false;
 

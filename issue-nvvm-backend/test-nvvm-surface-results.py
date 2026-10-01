@@ -70,7 +70,7 @@ class Contracts(unittest.TestCase):
             self.save(d/'reflection.json', {'parameters':params,'entryPoints':[{'name':row['entry'],'stage':'compute','threadGroupSize':[1,1,1]}]})
             runtime=dict(status='passed',initial_host_copies_verified=True,surface_bindings_verified=True,
                          global_surface_handles_uploaded=True,launched_and_synchronized=True,
-                         actual_array_descriptors=[{'Width':row['width'],'Height':row['height'] if row['shape']==2 else 0,'Depth':row.get('array_layers',0),'Format':self.h.FORMATS[s['storage']][0],'NumChannels':s['lanes'],'Flags':3 if 'array_layers' in row else 2} for s in specs],
+                         actual_array_descriptors=[{'Width':row['width'],'Height':row['height'] if row['shape']>=2 else 0,'Depth':row.get('volume_depth',row.get('array_layers',0)),'Format':self.h.FORMATS[s['storage']][0],'NumChannels':s['lanes'],'Flags':3 if 'array_layers' in row else 2} for s in specs],
                          cleanup=[dict(operation=op,return_code=0) for op in ['cuModuleUnload']+['cuSurfObjectDestroy']*len(specs)+['cuArrayDestroy']*len(specs)+['cuCtxDestroy_v2']],readbacks=[])
             for i,(s,b) in enumerate(zip(specs,data)):
                 (d/(s['name']+'-actual.bin')).write_bytes(b['expected'])
@@ -132,11 +132,19 @@ class Contracts(unittest.TestCase):
         self.assertEqual(surfaces.compare(None,block)['status'],'review-required')
         self.assertEqual(surfaces.compare(block,block)['status'],'passed')
 
-    def test_layered_descriptors_and_array_role(self):
-        layered = [r for r in surfaces.load_harness().cases() if r['fixture'] == 'layered']
+    def test_layered_and_volume_descriptors_and_array_role(self):
+        cases = surfaces.load_harness().cases()
+        layered = [r for r in cases if r['fixture'] == 'layered']
+        volumes = [r for r in cases if r['fixture'] == 'half-volume']
+        self.assertEqual({r['case'] for r in volumes}, {'half-3d-whole', 'half-3d-components'})
+        for row in volumes:
+            self.assertNotIn('array_layers', row)
+            self.assertEqual((row['shape'], row['width'], row['height'], row['volume_depth']),
+                             (3, 11, 5, 3))
         singleton = dict(next(r for r in layered if r['shape'] == 1),
                          case='native32-1d-array-single-layer', array_layers=1)
-        for row in layered + [singleton]:
+        spatial_rows = layered + [singleton] + volumes
+        for row in spatial_rows:
             self.rows.append(row)
             self.add_case(row)
             self.report['requested_cells'] += 3
@@ -145,14 +153,20 @@ class Contracts(unittest.TestCase):
             row = next(r for r in self.rows if r['case'] == outcome['id'])
             for resource in outcome['resources']:
                 descriptor = resource['descriptor']
-                self.assertEqual(descriptor['Depth'], row.get('array_layers', 0))
+                self.assertEqual(descriptor['Height'], row['height'] if row['shape'] >= 2 else 0)
+                self.assertEqual(descriptor['Depth'], row.get('volume_depth', row.get('array_layers', 0)))
                 self.assertEqual(descriptor['Flags'], 3 if 'array_layers' in row else 2)
 
-        for row in layered + [singleton]:
+        for row in spatial_rows:
             cell = next(c for c in self.report['cells'] if c['case'] == row['case'])
             runtime_path = self.root / cell['case'] / cell['mode'] / 'runtime.json'
             descriptor = cell['runtime']['actual_array_descriptors'][0]
-            for field, wrong in (('Depth', 0), ('Depth', row['array_layers'] + 1), ('Flags', 2)):
+            depth = row.get('volume_depth', row.get('array_layers', 0))
+            mutations = [('Depth', 0), ('Depth', depth + 1),
+                         ('Flags', 2 if 'array_layers' in row else 3)]
+            if row['shape'] >= 2:
+                mutations.append(('Height', 0))
+            for field, wrong in mutations:
                 with self.subTest(case=row['case'], field=field, wrong=wrong):
                     correct = descriptor[field]
                     descriptor[field] = wrong
@@ -163,7 +177,7 @@ class Contracts(unittest.TestCase):
                     self.save(runtime_path, cell['runtime'])
 
         # Rehash the modified reflection so rejection proves the array role, not file tampering.
-        for row in layered + [singleton, self.rows[0]]:
+        for row in spatial_rows + [self.rows[0]]:
             cell = next(c for c in self.report['cells'] if c['case'] == row['case'])
             reflection_path = self.root / cell['case'] / cell['mode'] / 'reflection.json'
             reflection = surfaces.read(reflection_path)

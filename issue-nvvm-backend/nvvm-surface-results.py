@@ -181,8 +181,9 @@ def validate_report(path, exit_code, harness=None):
         expected_cleanup = ['cuModuleUnload'] + ['cuSurfObjectDestroy'] * len(specs) + ['cuArrayDestroy'] * len(specs) + ['cuCtxDestroy_v2']
         require([r['operation'] for r in cleanup] == expected_cleanup and
                 all(r['return_code'] == 0 for r in cleanup), 'incomplete/failed cleanup')
-        descriptors = [{'Width': row['width'], 'Height': row['height'] if row['shape'] == 2 else 0,
-                        'Depth': row.get('array_layers', 0), 'Format': harness.FORMATS[s['storage']][0],
+        descriptors = [{'Width': row['width'], 'Height': row['height'] if row['shape'] >= 2 else 0,
+                        'Depth': row.get('volume_depth', row.get('array_layers', 0)),
+                        'Format': harness.FORMATS[s['storage']][0],
                         'NumChannels': s['lanes'], 'Flags': 3 if 'array_layers' in row else 2}
                        for s in specs]
         require(runtime['actual_array_descriptors'] == descriptors, 'wrong actual resource descriptors')

@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Nine bounded feature batches now pass focused validation after the full checkpoint:
+Ten bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -107,7 +107,8 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references`,
 `features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
 `features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
-`features.nvvm-native-array-surfaces` and `features.nvvm-half-array-surfaces`. Nine
+`features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
+`features.nvvm-half-volume-surfaces`. Ten
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -122,7 +123,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; nine feature implementations have passed focused validation since the full checkpoint.
+unchanged; ten feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -150,13 +151,22 @@ whole/static-component updates. Eight new NVVM O0/O3 physical cells pass; the fo
 CUDA compile failures are unchanged. Two non-array controls add five passes and one retained CUDA
 compile failure. Four units, four diagnostics and 89 harness contracts pass. All original 85
 case/oracle identities are preserved. The eight-job build took 35 seconds; no conversion policy,
-module version or ABI changed. The full surface baseline remains 249 cells; six added grouped rows
-now require reviewed adoption of eighteen cells at the next full checkpoint.
+module version or ABI changed. The full surface baseline retains its original 249 cells.
 
-The next selected batch is 3D Half surface storage with the same native/formatted representations,
-widths and whole/component operations. Reuse the physical runner with explicit volume depth;
-keep volume coordinates distinct from array layers. Capture unsupported before outcomes, retain
-RN-even/NaN/untouched-bit contracts and add no metadata or approximate-math policy.
+3D Half surface storage now passes the same native/formatted representations and widths with
+whole/static-component updates. Four new NVVM physical cells pass; six existing array/non-array
+control outcomes remain exact. Two CUDA volume fixture failures retain the shared helper's invalid
+component subscripts, without claiming all CUDA whole-volume operations fail. Four units, four
+unchanged diagnostics, 91 harness cases and 22 report contracts pass. Volume depth and array role
+remain distinct, with independent host readback and exact spatial guards. The eight-job build took
+34 seconds. The full baseline remains unchanged; eight new rows require reviewed adoption of
+24 cells at the next full checkpoint.
+
+Next, investigate the existing coherent-pointer corpus failures as a bounded memory-semantics
+research gate. Establish scope, availability/visibility and volatile behavior against Slang's
+Vulkan/D3D contracts before opening capability admission or extending provider memory operations.
+CUDA C++ remains comparison evidence. The generic `requirePrelude` source-text boundary, graphics
+entry tests and hardware capability failures are separate from missing NVVM primitives.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

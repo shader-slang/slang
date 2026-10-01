@@ -6409,9 +6409,8 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     {
         return false;
     }
-    return is32BitNumeric ||
-           (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-            operation.elementType.bitWidth == 16 && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
+    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              operation.elementType.bitWidth == 16);
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(

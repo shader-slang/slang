@@ -26,7 +26,7 @@ import time
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered",
-            "half-layered"]
+            "half-layered", "half-volume"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
 FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4)}
@@ -174,6 +174,9 @@ def cases():
             add(f"half-{shape}d-array-{label}", "half-layered", entry, 11,
                 1 if shape == 1 else 5, 4, True, shape, dict(SURFACE_DIM=shape))
             rows[-1]["array_layers"] = 3
+    for label, entry in (("whole", "wholeCopies"), ("components", "componentCopies")):
+        add(f"half-3d-{label}", "half-volume", entry, 11, 5, 4, True, 3)
+        rows[-1]["volume_depth"] = 3
     return rows
 
 
@@ -197,7 +200,7 @@ def resource_specs(row):
         return [spec(prefix + str(index), scalar, lanes, scalar)
                 for index, (scalar, lanes) in enumerate(families)
                 for prefix in ("source", "observed")]
-    if row["fixture"] == "half-layered":
+    if row["fixture"] in ("half-layered", "half-volume"):
         return [spec(prefix + family + suffix, "half", lanes, scalar)
                 for family, scalar in (("Half", "float16"), ("Format", "float32"))
                 for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
@@ -320,10 +323,11 @@ def layered_oracle(row):
                            for a, b in zip(initial, expected)])
 
 
-def half_layered_oracle(row):
-    """Reuse Half conversion rules while independently checking layered copy and marker stores."""
+def half_surface_oracle(row):
+    """Reuse Half conversion rules for independent array-layer or spatial-Z marker stores."""
     specs = resource_specs(row)
-    width, height, layers = row["width"], row["height"], row["array_layers"]
+    width, height = row["width"], row["height"]
+    layers = row["volume_depth"] if "volume_depth" in row else row["array_layers"]
     initial, expected = [], []
     exceptions = [set() for _ in specs]
     for resource, spec in enumerate(specs):
@@ -390,8 +394,8 @@ def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
     if row["fixture"] == "layered":
         return layered_oracle(row)
-    if row["fixture"] == "half-layered":
-        return half_layered_oracle(row)
+    if row["fixture"] in ("half-layered", "half-volume"):
+        return half_surface_oracle(row)
     if row["fixture"] in ("integers", "mixed"):
         return expanded_oracle(row)
     n = row["width"] * row["height"] * row["lanes"]
@@ -571,14 +575,15 @@ def run_device(ptx, row, buffers, output):
                 raise RuntimeError(f'{name}: {code} {label.value!r} {message.value!r}')
         def copy_array(array, data, spec, upload):
             host = C.create_string_buffer(data, len(data))
-            layers = row.get('array_layers', 1)
+            depth = row.get('volume_depth', row.get('array_layers', 1))
             is_array = 'array_layers' in row
-            copy = Copy3D() if is_array else Copy2D()
+            copy_3d = is_array or 'volume_depth' in row
+            copy = Copy3D() if copy_3d else Copy2D()
             pitch = row['width'] * spec['lanes'] * FORMATS[spec['storage']][1]
-            require(len(data) == pitch * row['height'] * layers, 'Host array copy extent mismatch')
+            require(len(data) == pitch * row['height'] * depth, 'Host array copy extent mismatch')
             copy.WidthInBytes, copy.Height = pitch, row['height']
-            if is_array:
-                copy.Depth = layers
+            if copy_3d:
+                copy.Depth = depth
                 copy.srcHeight = copy.dstHeight = row['height']
             if upload:
                 copy.srcMemoryType, copy.srcHost, copy.srcPitch = 1, C.addressof(host), pitch
@@ -586,7 +591,7 @@ def run_device(ptx, row, buffers, output):
             else:
                 copy.srcMemoryType, copy.srcArray = 3, array.value
                 copy.dstMemoryType, copy.dstHost, copy.dstPitch = 1, C.addressof(host), pitch
-            check('cuMemcpy3D_v2' if is_array else 'cuMemcpy2D_v2', C.byref(copy))
+            check('cuMemcpy3D_v2' if copy_3d else 'cuMemcpy2D_v2', C.byref(copy))
             return host.raw
         check('cuInit', 0)
         device = I()
@@ -601,10 +606,10 @@ def run_device(ptx, row, buffers, output):
         result['actual_array_descriptors'] = []
         for i, spec in enumerate(specs):
             fmt = FORMATS[spec['storage']][0]
-            layers = row.get('array_layers', 1)
+            depth = row.get('volume_depth', row.get('array_layers', 0))
             is_array = 'array_layers' in row
-            desc = Array3DDesc(row['width'], row['height'] if row['shape'] == 2 else 0,
-                               layers if is_array else 0, fmt, spec['lanes'],
+            desc = Array3DDesc(row['width'], row['height'] if row['shape'] >= 2 else 0,
+                               depth, fmt, spec['lanes'],
                                3 if is_array else 2)
             check('cuArray3DCreate_v2', C.byref(arrays[i]), C.byref(desc))
             actual_desc = Array3DDesc()
@@ -637,7 +642,8 @@ def run_device(ptx, row, buffers, output):
         result['global_surface_handles_uploaded'] = True
         function = VP()
         check('cuModuleGetFunction', C.byref(function), module, row['entry'].encode())
-        check('cuLaunchKernel', function, row['width'], row['height'], row.get('array_layers', 1),
+        check('cuLaunchKernel', function, row['width'], row['height'],
+              row.get('volume_depth', row.get('array_layers', 1)),
               1, 1, 1, 0, None, None, None)
         check('cuCtxSynchronize')
         result['launched_and_synchronized'] = True
@@ -673,6 +679,9 @@ def run_device(ptx, row, buffers, output):
 
 def validate_bindings(reflection, row, ptx, architecture):
     """Verify every resource descriptor against reflection and the actual PTX launch ABI."""
+    if "volume_depth" in row:
+        require(row["shape"] == 3 and "array_layers" not in row and row["volume_depth"] > 0,
+                "Volume depth requires a non-array 3D surface")
     params = reflection.get("parameters", [])
     specs = resource_specs(row)
     require(len(params) == len(specs), "Wrong global surface binding count")
@@ -739,7 +748,8 @@ def self_test():
             require(compare(row, buffers, index, data["expected"])["mismatch_count"] == 0,
                     "Reference oracle rejected")
     # Each added resource has independent storage, including source-only arrays and guard texels.
-    for row in (x for x in cases() if x["fixture"] in ("integers", "mixed", "layered", "half-layered")):
+    for row in (x for x in cases() if x["fixture"] in
+                ("integers", "mixed", "layered", "half-layered", "half-volume")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -768,6 +778,14 @@ def self_test():
         if "array_layers" in row:
             # An explicit singleton keeps its array role, independently of extent.
             validate_bindings(reflection, dict(row, array_layers=1), ptx, 80)
+        if "volume_depth" in row:
+            for invalid in (dict(row, array_layers=3), dict(row, shape=2), dict(row, volume_depth=0)):
+                try:
+                    validate_bindings(reflection, invalid, ptx, 80)
+                except ValueError:
+                    pass
+                else:
+                    raise ValueError("Invalid spatial depth/array role combination was ignored")
         for index in range(len(specs)):
             for field, value in (("name", "wrongResource"), ("format", "rgba8")):
                 damaged = copy.deepcopy(reflection)
@@ -814,7 +832,7 @@ def self_test():
                 damaged[wrong:wrong + lanes * 4] = damaged[start:start + lanes * 4]
                 require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
                         "Wrong vector X byte scale was ignored")
-    for row in (x for x in cases() if x["fixture"] == "half-layered"):
+    for row in (x for x in cases() if x["fixture"] in ("half-layered", "half-volume")):
         buffers = oracle(row)
         specs = resource_specs(row)
         data = resource_buffers(row, buffers)
@@ -828,7 +846,7 @@ def self_test():
             # but source stores carry shader-generated logical-layer markers independently.
             for layer in (0, 1):
                 for y in range(height):
-                    if row["shape"] == 2 and not 1 <= y < 4:
+                    if row["shape"] != 1 and not 1 <= y < 4:
                         continue
                     for x in range(1, 9):
                         for lane in range(lanes):

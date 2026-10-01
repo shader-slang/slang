@@ -919,6 +919,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = load2D;
     unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+    unsupported.isArray = 1;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = load2D;
     unsupported.boundaryMode = SlangNVVMSurfaceBoundaryMode(1);
@@ -969,6 +970,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
                         SLANG_CHECK(
                             builder.supportsSurfaceOperation(halfArray) ==
                             (shape != SLANG_NVVM_TEXTURE_SHAPE_3D));
+                        halfArray.isArray = 0;
+                        SLANG_CHECK(builder.supportsSurfaceOperation(halfArray));
                     }
                 }
             }
@@ -980,6 +983,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = physicalStore2D;
     unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+    unsupported.isArray = 1;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported = physicalStore2D;
     unsupported.isArray = 1;
@@ -993,6 +997,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported.elementType.laneCount = 3;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
     unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_1D;
+    SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
+    unsupported = load2D;
+    unsupported.elementType.kind = SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 }
 
@@ -1028,14 +1035,16 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(builder.getIntegerConstant(module.module, i64, 101, surface)));
-        for (uint32_t dimensions : {1u, 2u})
+        for (uint32_t dimensions : {1u, 2u, 3u})
         {
+            const bool isArray = dimensions != 3;
+            const uint32_t coordinateCount = dimensions + uint32_t(isArray);
             SlangNVVMTypeHandle coordinateType = nullptr;
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-                builder.getVectorType(module.module, i32, dimensions + 1, coordinateType)));
+                builder.getVectorType(module.module, i32, coordinateCount, coordinateType)));
             SlangNVVMValueHandle coordinates[3] = {};
             const uint32_t values[] = {16, dimensions == 1 ? 3u : 7u, 3};
-            for (uint32_t i = 0; i <= dimensions; ++i)
+            for (uint32_t i = 0; i < coordinateCount; ++i)
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
                     builder.getIntegerConstant(module.module, i32, values[i], coordinates[i])));
             SlangNVVMValueHandle coordinate = nullptr;
@@ -1043,7 +1052,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
                 module.module,
                 coordinateType,
                 coordinates,
-                dimensions + 1,
+                coordinateCount,
                 coordinate)));
             for (uint32_t lanes : {1u, 2u, 4u})
                 for (uint32_t bitWidth : {32u, 16u})
@@ -1051,7 +1060,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
                     SlangNVVMSurfaceOperationDesc operation = {
                         SLANG_NVVM_SURFACE_OP_LOAD,
                         SlangNVVMTextureShape(dimensions),
-                        1,
+                        uint32_t(isArray),
                         {bitWidth == 16 ? SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
                                         : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
                          bitWidth,
@@ -1088,6 +1097,25 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
                             2,
                             rejected)));
                         SLANG_CHECK(rejected == nullptr);
+                        invalid = operation;
+                        invalid.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
+                        invalid.isArray = 1;
+                        SLANG_CHECK(SLANG_FAILED(builder.emitSurfaceOperation(
+                            module.module,
+                            invalid,
+                            operands,
+                            2,
+                            rejected)));
+                        SLANG_CHECK(rejected == nullptr);
+                        invalid = operation;
+                        invalid.elementType = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, lanes};
+                        SLANG_CHECK(SLANG_FAILED(builder.emitSurfaceOperation(
+                            module.module,
+                            invalid,
+                            operands,
+                            2,
+                            rejected)));
+                        SLANG_CHECK(rejected == nullptr);
                         SlangNVVMValueHandle wrongCoordinate[] = {surface, coordinates[0]};
                         SLANG_CHECK(SLANG_FAILED(builder.emitSurfaceOperation(
                             module.module,
@@ -1114,19 +1142,25 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
             SLANG_CHECK_ABORT(
                 SLANG_SUCCEEDED(builder.serializeModule(module.module, format, blob)));
             const String assembly = _getBlobText(blob);
-            for (uint32_t dimensions : {1u, 2u})
+            for (uint32_t dimensions : {1u, 2u, 3u})
                 for (uint32_t lanes : {1u, 2u, 4u})
                     for (uint32_t bitWidth : {32u, 16u})
                         for (bool store : {false, true})
                         {
                             StringBuilder call;
                             call << "@llvm.nvvm." << (store ? "sust.b." : "suld.") << dimensions
-                                 << "d.array.";
+                                 << "d" << (dimensions == 3 ? "." : ".array.");
                             if (lanes != 1)
                                 call << "v" << lanes;
-                            call << "i" << bitWidth << ".zero(i64 101, i32 3, i32 16";
-                            if (dimensions == 2)
-                                call << ", i32 7";
+                            call << "i" << bitWidth << ".zero(i64 101, ";
+                            if (dimensions == 3)
+                                call << "i32 16, i32 7, i32 3";
+                            else
+                            {
+                                call << "i32 3, i32 16";
+                                if (dimensions == 2)
+                                    call << ", i32 7";
+                            }
                             call << (store ? "," : ")");
                             SLANG_CHECK(assembly.indexOf(call.getBuffer()) >= 0);
                         }

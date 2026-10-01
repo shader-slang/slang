@@ -4220,9 +4220,8 @@ static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& op
     {
         return false;
     }
-    return is32BitNumeric ||
-           (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-            operation.elementType.bitWidth == 16 && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D);
+    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+                              operation.elementType.bitWidth == 16);
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -4240,21 +4239,27 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
 {
     if (!_isSurfaceOperationSupported(operation))
         return llvm::Intrinsic::not_intrinsic;
-    static const llvm::Intrinsic::ID kLoadI16[2][3] = {
+    static const llvm::Intrinsic::ID kLoadI16[3][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_i16_zero,
          llvm::Intrinsic::nvvm_suld_1d_v2i16_zero,
          llvm::Intrinsic::nvvm_suld_1d_v4i16_zero},
         {llvm::Intrinsic::nvvm_suld_2d_i16_zero,
          llvm::Intrinsic::nvvm_suld_2d_v2i16_zero,
          llvm::Intrinsic::nvvm_suld_2d_v4i16_zero},
+        {llvm::Intrinsic::nvvm_suld_3d_i16_zero,
+         llvm::Intrinsic::nvvm_suld_3d_v2i16_zero,
+         llvm::Intrinsic::nvvm_suld_3d_v4i16_zero},
     };
-    static const llvm::Intrinsic::ID kStoreI16[2][3] = {
+    static const llvm::Intrinsic::ID kStoreI16[3][3] = {
         {llvm::Intrinsic::nvvm_sust_b_1d_i16_zero,
          llvm::Intrinsic::nvvm_sust_b_1d_v2i16_zero,
          llvm::Intrinsic::nvvm_sust_b_1d_v4i16_zero},
         {llvm::Intrinsic::nvvm_sust_b_2d_i16_zero,
          llvm::Intrinsic::nvvm_sust_b_2d_v2i16_zero,
          llvm::Intrinsic::nvvm_sust_b_2d_v4i16_zero},
+        {llvm::Intrinsic::nvvm_sust_b_3d_i16_zero,
+         llvm::Intrinsic::nvvm_sust_b_3d_v2i16_zero,
+         llvm::Intrinsic::nvvm_sust_b_3d_v4i16_zero},
     };
     static const llvm::Intrinsic::ID kLoadI16Array[2][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_array_i16_zero,
