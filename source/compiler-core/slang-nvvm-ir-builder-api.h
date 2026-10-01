@@ -299,8 +299,12 @@ extern "C"
 #define SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL ((SlangNVVMTextureOperation)4u)
 #define SLANG_NVVM_TEXTURE_OP_GATHER ((SlangNVVMTextureOperation)5u)
 #define SLANG_NVVM_TEXTURE_OP_SAMPLE ((SlangNVVMTextureOperation)6u)
+#define SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH ((SlangNVVMTextureOperation)7u)
+#define SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_HEIGHT ((SlangNVVMTextureOperation)8u)
+#define SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH ((SlangNVVMTextureOperation)9u)
+#define SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE ((SlangNVVMTextureOperation)10u)
 
-    /** Describes one complete typed sampled-texture operation. */
+    /** Describes one complete typed sampled-texture operation or surface dimension query. */
     typedef struct SlangNVVMTextureOperationDesc
     {
         SlangNVVMTextureOperation operation;

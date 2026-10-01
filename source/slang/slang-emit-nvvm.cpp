@@ -107,6 +107,18 @@ static const SlangNVVMValueOperationDesc kNVVMRawBufferCountConversion = {
     SLANG_COUNT_OF(kNVVMRawBufferCountConversionOperands),
 };
 
+// Byte views store byte extents; typed views store floor(byteExtent / elementStride).
+static const SlangNVVMValueTypeDesc kNVVMByteViewCountOperands[] = {
+    NVVMSemantics::kUnsignedI64,
+    NVVMSemantics::kUnsignedI64,
+};
+static const SlangNVVMValueOperationDesc kNVVMByteViewCountDivision = {
+    SLANG_NVVM_VALUE_OP_DIVIDE,
+    NVVMSemantics::kUnsignedI64,
+    kNVVMByteViewCountOperands,
+    SLANG_COUNT_OF(kNVVMByteViewCountOperands),
+};
+
 bool _getNVVMStructuredBufferStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
@@ -2835,7 +2847,18 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
 
     IRInst* texture = inst->getOperand(0);
     NVVMReadOnlyTextureType textureType;
-    if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType))
+    NVVMSurfaceType surfaceType;
+    const bool isSurfaceQuery =
+        isQuery && getNVVMSupportedSurfaceType(texture->getDataType(), surfaceType);
+    if (isSurfaceQuery)
+    {
+        textureType.textureType = surfaceType.textureType;
+        textureType.shape = SlangNVVMTextureShape(surfaceType.shape);
+        textureType.isArray = surfaceType.isArray;
+        textureType.coordinateLaneCount = surfaceType.coordinateLaneCount;
+        textureType.elementType = surfaceType.elementType;
+    }
+    else if (!getNVVMSupportedReadOnlyTextureType(texture->getDataType(), textureType))
         return false;
     outOperation.source = inst;
     outOperation.texture = texture;
@@ -2852,10 +2875,12 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
              textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
             !isNVVMUnsignedI32Type(inst->getDataType()))
             return false;
-        operation.operation = textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D
+        operation.operation = isSurfaceQuery ? SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE
+                              : textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D
                                   ? SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT
                                   : SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
-        outOperation.diagnosticName = "sampled texture array layer count";
+        outOperation.diagnosticName =
+            isSurfaceQuery ? "surface array size" : "sampled texture array layer count";
         return true;
     }
     if (isQuery)
@@ -2872,11 +2897,18 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
             SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH,
         };
         outOperation.operationCount = uint32_t(rank);
-        outOperation.diagnosticName = "sampled texture dimension query";
+        outOperation.diagnosticName =
+            isSurfaceQuery ? "surface dimension query" : "sampled texture dimension query";
         for (UInt i = 0; i < rank; ++i)
         {
             outOperation.operations[i] = operation;
-            outOperation.operations[i].operation = queryOperations[i];
+            const SlangNVVMTextureOperation surfaceQueries[] = {
+                SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH,
+                SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_HEIGHT,
+                SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH,
+            };
+            outOperation.operations[i].operation =
+                isSurfaceQuery ? surfaceQueries[i] : queryOperations[i];
         }
         return true;
     }
@@ -2912,7 +2944,8 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
     if (isFetch)
     {
         if ((textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D &&
-             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_3D) ||
+             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_3D &&
+             !(textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D && textureType.isArray)) ||
             !isNVVMSignedI32Type(inst->getOperand(2)->getDataType()))
             return false;
         operation.operation = SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL;
@@ -3674,6 +3707,18 @@ bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
     IRType* resourceType = nullptr;
     switch (inst->getOp())
     {
+    case kIROp_CombinedTextureSamplerGetSampler:
+        {
+            NVVMReadOnlyTextureType texture;
+            if (!getNVVMSupportedReadOnlyTextureType(value->getDataType(), texture) ||
+                !texture.textureType->isCombined() ||
+                !asNVVMSupportedSamplerValueType(inst->getDataType()))
+                return false;
+            // CUDA embeds sampling state in the texture object. The ordinary sampler operand
+            // is an opaque placeholder and never becomes a separate hardware sampler reference.
+        }
+        break;
+
     case kIROp_CastDescriptorHandleToResource:
         if (!asNVVMSupportedDescriptorHandleType(value->getDataType(), &resourceType) ||
             inst->getDataType() != resourceType)
@@ -3698,8 +3743,10 @@ bool _getNVVMDescriptorHandleConversion(IRInst* inst, IRInst*& outValue)
                 as<IRDescriptorHandleType>(toHandle ? inst->getDataType() : value->getDataType());
             IRType* bitsType = toHandle ? value->getDataType() : inst->getDataType();
             NVVMReadOnlyTextureType textureType;
+            NVVMSurfaceType surfaceType;
             if (!handleType || bitsType->getOp() != kIROp_UInt64Type ||
-                !getNVVMSupportedReadOnlyTextureType(handleType->getResourceType(), textureType))
+                (!getNVVMSupportedReadOnlyTextureType(handleType->getResourceType(), textureType) &&
+                 !getNVVMSupportedSurfaceType(handleType->getResourceType(), surfaceType)))
             {
                 return false;
             }
@@ -6290,6 +6337,22 @@ SlangResult _validateNVVMFunction(
                 isEntryPoint ? toSlice("entry-point parameter")
                              : toSlice("helper function parameter"));
         }
+        if (isEntryPoint && isNVVMSupportedValueType(param->getDataType()))
+        {
+            NVVMEntryNumericLayout layout;
+            if (!getNVVMEntryNumericLayout(codeGenContext, param->getDataType(), layout))
+                return _diagnoseUnsupportedIR(codeGenContext, toSlice("numeric entry layout"));
+            requirements.emissionPlan.entryNumericParameters[param] = layout;
+            if (layout.isBoolean)
+                _requireValueOperation(
+                    requirements.valueOperations,
+                    kNVVMStructuredBoolLoadOperation,
+                    "numeric entry Boolean decode");
+            if (layout.isHalf)
+                _requireNVVMHalfHelperABIOperations(
+                    requirements.valueOperations,
+                    layout.scalarType);
+        }
         NVVMRawBufferType rawBufferType;
         if (isEntryPoint && getNVVMSupportedRawBufferType(param->getDataType(), rawBufferType) &&
             !_hasNVVMCompatibleRawBufferElementLayout(codeGenContext, param->getDataType()))
@@ -6620,6 +6683,7 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_CombinedTextureSamplerGetSampler:
             case kIROp_CastDescriptorHandleToResource:
             case kIROp_CastResourceToDescriptorHandle:
             case kIROp_CastUInt64ToDescriptorHandle:
@@ -6908,12 +6972,26 @@ SlangResult _validateNVVMFunction(
             case kIROp_GetEquivalentStructuredBuffer:
                 {
                     NVVMEquivalentStructuredBuffer conversion;
-                    if (!_getNVVMEquivalentStructuredBuffer(inst, conversion))
+                    IRSizeAndAlignment elementLayout;
+                    if (!_getNVVMEquivalentStructuredBuffer(inst, conversion) ||
+                        !_getNVVMStructuredBufferStorageLayout(
+                            codeGenContext,
+                            conversion.resultType.structuredElementType,
+                            elementLayout) ||
+                        elementLayout.size <= 0 || elementLayout.size > kNVVMUInt32Max)
                     {
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
                             toSlice("equivalent structured-buffer view"));
                     }
+                    requirements.emissionPlan.equivalentStructuredBuffers[inst] = {
+                        conversion.buffer,
+                        conversion.resultType.structuredElementType,
+                        uint32_t(elementLayout.size)};
+                    _requireValueOperation(
+                        requirements.valueOperations,
+                        kNVVMByteViewCountDivision,
+                        "byte-view element count");
                 }
                 break;
 
@@ -7277,6 +7355,7 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_CombinedTextureSamplerGetSampler:
             case kIROp_CastDescriptorHandleToResource:
             case kIROp_CastResourceToDescriptorHandle:
             case kIROp_CastUInt64ToDescriptorHandle:
@@ -9179,6 +9258,91 @@ SlangResult _emitNVVMStructuredBufferStorageConversion(
                                         outValue));
 }
 
+// Decodes only logical lanes from the checked CUDA entry carrier. Padding (notably Half3's
+// fourth storage lane) never becomes a semantic value, and helper calls see ordinary vector SSA.
+SlangResult _emitNVVMEntryNumericDecode(
+    CodeGenContext* context,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& types,
+    const NVVMEntryNumericLayout& layout,
+    SlangNVVMValueHandle parameter,
+    SlangNVVMValueHandle& outValue)
+{
+    SlangNVVMValueHandle storage = parameter;
+    if (layout.isVector)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            context,
+            "numeric entry storage load",
+            builder.emitLoad(
+                module,
+                parameter,
+                layout.alignment,
+                SLANG_NVVM_LOAD_FLAG_NONE,
+                storage)));
+    }
+    SlangNVVMValueHandle lanes[4] = {};
+    for (uint32_t i = 0; i < layout.laneCount; ++i)
+    {
+        SlangNVVMValueHandle lane = storage;
+        if (layout.isVector)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "numeric entry lane extraction",
+                builder.emitAggregateElementExtract(module, storage, i, lane)));
+        }
+        if (layout.isBoolean)
+        {
+            SlangNVVMTypeHandle byteType = nullptr;
+            SlangNVVMValueHandle zero = nullptr;
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "numeric entry Boolean byte",
+                builder.getIntegerType(module, 8, byteType)));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "numeric entry Boolean zero",
+                builder.getIntegerConstant(module, byteType, 0, zero)));
+            const SlangNVVMValueHandle operands[] = {lane, zero};
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "numeric entry Boolean decode",
+                builder.emitValueOperation(
+                    module,
+                    kNVVMStructuredBoolLoadOperation,
+                    operands,
+                    2,
+                    lanes[i])));
+        }
+        else if (layout.isHalf)
+        {
+            SLANG_RETURN_ON_FAIL(_emitNVVMHalfHelperABIReinterpretation(
+                context,
+                builder,
+                module,
+                layout.scalarType,
+                false,
+                lane,
+                lanes[i]));
+        }
+        else
+            lanes[i] = lane;
+    }
+    outValue = lanes[0];
+    if (layout.isVector)
+    {
+        SlangNVVMTypeHandle vectorType = nullptr;
+        SLANG_RETURN_ON_FAIL(types.lowerType(layout.type, NVVMTypeUse::Value, vectorType));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            context,
+            "numeric entry vector decode",
+            builder.emitVectorConstruct(module, vectorType, lanes, layout.laneCount, outValue)));
+    }
+    return SLANG_OK;
+}
+
 // Executes a checked memory conversion without rediscovering its address role or layout.
 SlangResult _emitNVVMPlannedStorageConversion(
     CodeGenContext* codeGenContext,
@@ -10692,10 +10856,19 @@ SlangResult emitNVVMIRFromLinkedIR(
         for (auto param : function->getParams())
         {
             SlangNVVMTypeHandle parameterType = nullptr;
-            SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                param->getDataType(),
-                isEntryPoint ? NVVMTypeUse::EntryPointParameter : NVVMTypeUse::HelperParameter,
-                parameterType));
+            if (auto numeric = requirements.emissionPlan.entryNumericParameters.tryGetValue(param))
+            {
+                SlangNVVMTypeHandle storageType = nullptr;
+                SLANG_RETURN_ON_FAIL(
+                    typeContext.lowerEntryNumericType(*numeric, parameterType, storageType));
+            }
+            else
+            {
+                SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                    param->getDataType(),
+                    isEntryPoint ? NVVMTypeUse::EntryPointParameter : NVVMTypeUse::HelperParameter,
+                    parameterType));
+            }
             parameterTypes.add(parameterType);
         }
 
@@ -10733,7 +10906,26 @@ SlangResult emitNVVMIRFromLinkedIR(
             size_t parameterIndex = 0;
             for (auto parameter : function->getParams())
             {
-                if (asNVVMSupportedResourceStructType(parameter->getDataType()))
+                auto numeric =
+                    requirements.emissionPlan.entryNumericParameters.tryGetValue(parameter);
+                if (numeric && numeric->isVector)
+                {
+                    SlangNVVMTypeHandle parameterType = nullptr;
+                    SlangNVVMTypeHandle storageType = nullptr;
+                    SLANG_RETURN_ON_FAIL(
+                        typeContext.lowerEntryNumericType(*numeric, parameterType, storageType));
+                    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                        codeGenContext,
+                        "numeric entry byval attributes",
+                        builder.setFunctionParameterAttributes(
+                            moduleScope.module,
+                            loweredFunction,
+                            parameterIndex,
+                            SLANG_NVVM_PARAMETER_FLAG_BY_VALUE,
+                            storageType,
+                            numeric->alignment)));
+                }
+                else if (asNVVMSupportedResourceStructType(parameter->getDataType()))
                 {
                     SlangNVVMTypeHandle aggregateType = nullptr;
                     SLANG_RETURN_ON_FAIL(typeContext.lowerType(
@@ -10819,6 +11011,9 @@ SlangResult emitNVVMIRFromLinkedIR(
 
         IRBlock* entryBlock = function->getFirstBlock();
         bool hasHalfParameter = false;
+        const bool hasEntryNumericParameters =
+            function == entryPoint &&
+            requirements.emissionPlan.entryNumericParameters.getCount() != 0;
         bool hasEntryAggregateValueParameter = false;
         for (auto param : function->getParams())
         {
@@ -10831,13 +11026,32 @@ SlangResult emitNVVMIRFromLinkedIR(
                  asNVVMSupportedResourceStructType(param->getDataType()) &&
                  !asNVVMSupportedScalarStructType(param->getDataType()));
         }
-        if (hasHalfParameter || hasEntryAggregateValueParameter)
+        if (hasHalfParameter || hasEntryAggregateValueParameter || hasEntryNumericParameters)
         {
             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                 codeGenContext,
                 hasHalfParameter ? "Half helper ABI entry-block selection"
                                  : "aggregate entry-parameter block selection",
                 builder.setInsertBlock(moduleScope.module, blockMap.getValue(entryBlock))));
+        }
+        if (hasEntryNumericParameters)
+        {
+            for (auto param : function->getParams())
+            {
+                auto numeric = requirements.emissionPlan.entryNumericParameters.tryGetValue(param);
+                if (!numeric)
+                    continue;
+                SlangNVVMValueHandle decoded = nullptr;
+                SLANG_RETURN_ON_FAIL(_emitNVVMEntryNumericDecode(
+                    codeGenContext,
+                    builder,
+                    moduleScope.module,
+                    typeContext,
+                    *numeric,
+                    valueMap.getValue(param),
+                    decoded));
+                valueMap[param] = decoded;
+            }
         }
         if (hasHalfParameter)
         {
@@ -11544,6 +11758,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_CombinedTextureSamplerGetSampler:
                 case kIROp_CastDescriptorHandleToResource:
                 case kIROp_CastResourceToDescriptorHandle:
                 case kIROp_CastUInt64ToDescriptorHandle:
@@ -12692,8 +12907,10 @@ SlangResult emitNVVMIRFromLinkedIR(
 
                 case kIROp_GetEquivalentStructuredBuffer:
                     {
-                        NVVMEquivalentStructuredBuffer conversion;
-                        SLANG_RELEASE_ASSERT(_getNVVMEquivalentStructuredBuffer(inst, conversion));
+                        const auto selected =
+                            requirements.emissionPlan.equivalentStructuredBuffers.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(selected);
+                        const auto& conversion = *selected;
                         SlangNVVMValueHandle loweredBuffer = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -12703,12 +12920,6 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBuffer));
-                        if (isNVVMUnsignedI32Type(conversion.resultType.structuredElementType))
-                        {
-                            valueMap[inst] = loweredBuffer;
-                            break;
-                        }
-
                         SlangNVVMValueHandle loweredDataPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
@@ -12721,12 +12932,38 @@ SlangResult emitNVVMIRFromLinkedIR(
                         SlangNVVMValueHandle loweredCount = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "raw byte-address buffer element count",
+                            "raw byte-address buffer byte extent",
                             builder.emitAggregateElementExtract(
                                 moduleScope.module,
                                 loweredBuffer,
                                 1,
                                 loweredCount)));
+
+                        SlangNVVMTypeHandle countType = nullptr;
+                        SlangNVVMValueHandle stride = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "byte-view extent type",
+                            builder.getIntegerType(moduleScope.module, 64, countType)));
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "typed-view element stride",
+                            builder.getIntegerConstant(
+                                moduleScope.module,
+                                countType,
+                                conversion.elementStride,
+                                stride)));
+                        const SlangNVVMValueHandle countOperands[] = {loweredCount, stride};
+                        SlangNVVMValueHandle elementCount = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "byte-view element count",
+                            builder.emitValueOperation(
+                                moduleScope.module,
+                                kNVVMByteViewCountDivision,
+                                countOperands,
+                                SLANG_COUNT_OF(countOperands),
+                                elementCount)));
 
                         SlangNVVMTypeHandle loweredIndexType = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
@@ -12744,7 +12981,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 loweredZero)));
                         SlangNVVMTypeHandle loweredElementType = nullptr;
                         SLANG_RETURN_ON_FAIL(typeContext.lowerType(
-                            conversion.resultType.structuredElementType,
+                            conversion.elementType,
                             NVVMTypeUse::Value,
                             loweredElementType));
                         SlangNVVMValueHandle loweredTypedPointer = nullptr;
@@ -12764,7 +13001,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                             loweredResultType));
                         const SlangNVVMValueHandle loweredElements[] = {
                             loweredTypedPointer,
-                            loweredCount,
+                            elementCount,
                         };
                         SlangNVVMValueHandle loweredResult = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(

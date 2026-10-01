@@ -69,6 +69,244 @@
         "failed": 0,
         "runtime_skipped": 10
       }
+    },
+    "resource-rhi-nvrtc-before": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-nvrtc-before.json",
+        "sha256": "5773002e8da9a11a7e098bb0ff3039d6900cc60886ef8dd6afe519f7bd88a28e"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-nvrtc-before.log",
+        "sha256": "ddda841321fe12435da82156aa1408f2f726408a4944737869d79c4c50655b86"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/before-compiler-identity.json",
+        "sha256": "51ae9cd46e2e59257a1b91931e26d84ae9ecff6c2f051e02cc59831d360cb150"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze-before-dimensions.json",
+        "sha256": "1c86a38b79650c4b220ca18f4cc9ff70b8c776192229696bd2db12f73cd89154"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 4.004198789596558,
+      "compiler_selection": "nvrtc",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 1835,
+        "passed": 1835,
+        "failed": 0
+      },
+      "registered_cases": 2,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
+    },
+    "resource-rhi-nvvm-before": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-nvvm-before.json",
+        "sha256": "8b8f5383ce7707bd921dd7e50d514d2b6a5d31b5fd18b17e69d9f87139bf504a"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-nvvm-before.log",
+        "sha256": "7865cfbf0a7c4be52a896625f49221b9754ffeecbd87cd02bf3ee07f6f56e31d"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/before-compiler-identity.json",
+        "sha256": "51ae9cd46e2e59257a1b91931e26d84ae9ecff6c2f051e02cc59831d360cb150"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze-before-dimensions.json",
+        "sha256": "1c86a38b79650c4b220ca18f4cc9ff70b8c776192229696bd2db12f73cd89154"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 1.6541924476623535,
+      "compiler_selection": "nvvm",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 0,
+        "failed": 2,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 9,
+        "passed": 7,
+        "failed": 2
+      },
+      "registered_cases": 2,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
+    },
+    "resource-rhi-dimensions-nvrtc-before": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-dimensions-nvrtc-before.json",
+        "sha256": "0ec618d71fe69a2d5ac5b8ffdc5a3a016e27ff1b4707b45d9e68fc0f58979a87"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-dimensions-nvrtc-before.log",
+        "sha256": "a375c411c5ceda4afbd6712797eb4e1eb554e60f4a230026f191cff9afb4735b"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/dimensions-before-identity.json",
+        "sha256": "54bbe5dca25035209722ac2b416d22cd83dc60ca5bfa8a2711ff11884bbb8a84"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze.json",
+        "sha256": "08f0672f3e243383fb8d232bbd845cf25ee3f0304353fcbca2671fd571193274"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 2.523024797439575,
+      "compiler_selection": "nvrtc",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 77,
+        "passed": 73,
+        "failed": 4
+      },
+      "registered_cases": 1,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
+    },
+    "resource-rhi-dimensions-nvvm-before": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-dimensions-nvvm-before.json",
+        "sha256": "9964201307a834dc9350d1c2dbff25e9a4daa2d47e485065db06ce86ecd31ffc"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-dimensions-nvvm-before.log",
+        "sha256": "3e01394b52afc313f5ee4b4edeee589141f3ce6225d95f2a71b27c4a3526f111"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/dimensions-before-identity.json",
+        "sha256": "54bbe5dca25035209722ac2b416d22cd83dc60ca5bfa8a2711ff11884bbb8a84"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze.json",
+        "sha256": "08f0672f3e243383fb8d232bbd845cf25ee3f0304353fcbca2671fd571193274"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 1.3546631336212158,
+      "compiler_selection": "nvvm",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 5,
+        "passed": 4,
+        "failed": 1
+      },
+      "registered_cases": 1,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
+    },
+    "resource-rhi-after": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-after.json",
+        "sha256": "3035cb2c82a36bc74390aa275cece2967be5f2bc42629cbabf146461a1e1a1ca"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-after.log",
+        "sha256": "bef4f978f7803339258f7bf781ed561647bdcc8d191ab34cb09f2621a653543c"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/after-build-identity.json",
+        "sha256": "60612184261979a1dc94b1e9269a83b7c5132d4c79f31c1e06c40d90a3323916"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze.json",
+        "sha256": "08f0672f3e243383fb8d232bbd845cf25ee3f0304353fcbca2671fd571193274"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 8.390668869018555,
+      "compiler_selection": "nvvm",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 24,
+        "failed": 3,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 103978,
+        "passed": 103974,
+        "failed": 4
+      },
+      "registered_cases": 27,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
+    },
+    "resource-rhi-repair": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-repair.json",
+        "sha256": "fdb133de3659ec324a63dc267a733caeb6f29713258974180df818fb53dd63a7"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-repair.log",
+        "sha256": "87be3901d3371ea56fe688366d803e993c3b6a6bd6eb2840e885be944089da8a"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/repair-build-identity.json",
+        "sha256": "116d152f3a5b956af504090f069d8c500293f69673f820c63186f10d33102dfd"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze.json",
+        "sha256": "08f0672f3e243383fb8d232bbd845cf25ee3f0304353fcbca2671fd571193274"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 8.83342432975769,
+      "compiler_selection": "nvvm",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 25,
+        "failed": 2,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 105695,
+        "passed": 105690,
+        "failed": 5
+      },
+      "registered_cases": 27,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
+    },
+    "resource-rhi-final": {
+      "gate": {
+        "path": "build/nvvm-resource-parameters/rhi-final.json",
+        "sha256": "885c4b02318a694ca59b04c1b08d5c9b47c16e54897771d1c905abf57286d3d1"
+      },
+      "log": {
+        "path": "build/nvvm-resource-parameters/rhi-final.log",
+        "sha256": "fdd82caf3358b7b733200c69ca4f30d26b9a28e26295ee7807cbf7543231242e"
+      },
+      "identity": {
+        "path": "build/nvvm-resource-parameters/final-build-identity.json",
+        "sha256": "1e0c12b2f270df15078686a3ab77d99abefebf36a156ad7f364d05dba344380f"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze.json",
+        "sha256": "08f0672f3e243383fb8d232bbd845cf25ee3f0304353fcbca2671fd571193274"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 9.446778059005737,
+      "compiler_selection": "nvvm",
+      "scope": "Focused family selection; no new full-suite claim.",
+      "counts": {
+        "passed": 27,
+        "failed": 0,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 105767,
+        "passed": 105767,
+        "failed": 0
+      },
+      "registered_cases": 27,
+      "optimization_policy": "New fixtures contain O0/O3 loops; fatal O0 failures do not reach O3. Existing tests keep authored/default options."
     }
   },
   "reconciliation": {
@@ -133,12 +371,13 @@
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Checked pointer-bearing record field address and storage roles.",
       "source_candidates": ["../slang-rhi/tests/test-bind-pointers.cpp"],
-      "registrations": ["bind-pointers-struct-float-copy.cuda"]
+      "registrations": ["bind-pointers-struct-float-copy.cuda"],
+      "initial_unresolved_count": 1
     },
     {
       "id": "combined_sampler_values",
       "title": "Combined texture/sampler helper values",
-      "current_unresolved_count": 3,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 3,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Combined Sampler2D value representation and helper transport.",
@@ -150,22 +389,26 @@
         "bindless-combined-texture-samplers.cuda",
         "combined-texture-sampler-filter-linear.cuda",
         "combined-texture-sampler-filter-point.cuda"
-      ]
+      ],
+      "initial_unresolved_count": 3,
+      "resolution_run": "resource-rhi-final"
     },
     {
       "id": "texture_fetch",
       "title": "Bindless texture fetch",
-      "current_unresolved_count": 1,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 1,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Canonical textureFetch operation and actual resource representation.",
       "source_candidates": ["../slang-rhi/tests/test-bindless.cpp"],
-      "registrations": ["bindless-textures.cuda"]
+      "registrations": ["bindless-textures.cuda"],
+      "initial_unresolved_count": 1,
+      "resolution_run": "resource-rhi-final"
     },
     {
       "id": "compute_entry_parameters",
       "title": "Compute entry parameter roles",
-      "current_unresolved_count": 20,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 20,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Canonical entry parameter admission across indirect dispatch, sampling, format/view tests and resource lifetime; later errors remain possible.",
@@ -199,7 +442,9 @@
         "texture-view-load-rw-single.cuda",
         "texture-view-store-all-layers-single-mip.cuda",
         "texture-view-store-single.cuda"
-      ]
+      ],
+      "initial_unresolved_count": 20,
+      "resolution_run": "resource-rhi-final"
     },
     {
       "id": "typed_buffer_global",
@@ -209,7 +454,8 @@
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Conventional global Buffer resource admission and null-view semantics.",
       "source_candidates": ["../slang-rhi/tests/test-null-views.cpp"],
-      "registrations": ["null-views.cuda"]
+      "registrations": ["null-views.cuda"],
+      "initial_unresolved_count": 1
     },
     {
       "id": "hitobject_representation",
@@ -253,7 +499,8 @@
         "ray-tracing-sphere-intrinsics-hit-object.cuda",
         "ray-tracing-transform-hitobject-object-to-world.cuda",
         "ray-tracing-transform-hitobject-world-to-object.cuda"
-      ]
+      ],
+      "initial_unresolved_count": 26
     },
     {
       "id": "cluster_query",
@@ -263,7 +510,8 @@
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Typed SDK optixGetClusterId query and owning stages.",
       "source_candidates": ["../slang-rhi/tests/test-ray-tracing-clusters.cpp"],
-      "registrations": ["ray-tracing-cluster-tracing.cuda"]
+      "registrations": ["ray-tracing-cluster-tracing.cuda"],
+      "initial_unresolved_count": 1
     },
     {
       "id": "callable_abi",
@@ -275,7 +523,8 @@
       "source_candidates": [
         "../slang-rhi/tests/test-ray-tracing-intrinsics.cpp"
       ],
-      "registrations": ["ray-tracing-intrinsics-call-shader.cuda"]
+      "registrations": ["ray-tracing-intrinsics-call-shader.cuda"],
+      "initial_unresolved_count": 1
     },
     {
       "id": "trace_payload_boundary",
@@ -291,7 +540,8 @@
       "registrations": [
         "ray-tracing-lss-intrinsics.cuda",
         "ray-tracing-sphere-intrinsics.cuda"
-      ]
+      ],
+      "initial_unresolved_count": 2
     },
     {
       "id": "intersection_stage",
@@ -301,7 +551,8 @@
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Inspect unsupported selected stage and built-in intersection ownership; preserve procedural-stage boundaries.",
       "source_candidates": ["../slang-rhi/tests/test-ray-tracing.cpp"],
-      "registrations": ["ray-tracing-native-primitive-flags.cuda"]
+      "registrations": ["ray-tracing-native-primitive-flags.cuda"],
+      "initial_unresolved_count": 1
     },
     {
       "id": "active_list_matrix_composition",
@@ -318,7 +569,8 @@
         "ray-tracing-transform-object-to-world-4x3.cuda",
         "ray-tracing-transform-world-to-object-3x4.cuda",
         "ray-tracing-transform-world-to-object-4x3.cuda"
-      ]
+      ],
+      "initial_unresolved_count": 4
     }
   ],
   "registrations": [
@@ -601,7 +853,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -617,6 +869,27 @@
           "status": "passed",
           "terminal_line": 11,
           "detail": "0.13s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.58s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.57s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.57s",
           "failed_assertions": 0
         }
       ],
@@ -638,8 +911,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "bindless-textures.cuda#occurrence-1",
@@ -652,7 +944,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -668,6 +960,27 @@
           "status": "passed",
           "terminal_line": 12,
           "detail": "0.17s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.08s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.06s",
           "failed_assertions": 0
         }
       ],
@@ -689,8 +1002,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "buffer-barrier.cuda#occurrence-1",
@@ -2852,7 +3184,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -2868,6 +3200,27 @@
           "status": "passed",
           "terminal_line": 82,
           "detail": "0.09s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -2889,8 +3242,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "combined-texture-sampler-filter-point.cuda#occurrence-1",
@@ -2903,7 +3275,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -2919,6 +3291,27 @@
           "status": "passed",
           "terminal_line": 83,
           "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -2940,8 +3333,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "command-encoder-labels.cuda#occurrence-1",
@@ -3047,7 +3459,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -3063,6 +3475,27 @@
           "status": "passed",
           "terminal_line": 178,
           "detail": "0.17s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 98,
+          "detail": "0.04s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 98,
+          "detail": "0.03s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 98,
+          "detail": "0.03s",
           "failed_assertions": 0
         }
       ],
@@ -3084,8 +3517,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "compute-indirect-zero.cuda#occurrence-1",
@@ -3098,7 +3550,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -3114,6 +3566,27 @@
           "status": "passed",
           "terminal_line": 179,
           "detail": "0.13s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 99,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 99,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 99,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -3135,8 +3608,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "compute-indirect.cuda#occurrence-1",
@@ -3149,7 +3641,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -3165,6 +3657,27 @@
           "status": "passed",
           "terminal_line": 180,
           "detail": "0.12s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 100,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 100,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 100,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -3186,8 +3699,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "compute-smoke.cuda#occurrence-1",
@@ -3697,7 +4229,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -3713,6 +4245,27 @@
           "status": "passed",
           "terminal_line": 197,
           "detail": "0.39s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 101,
+          "detail": "0.34s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 101,
+          "detail": "0.33s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 101,
+          "detail": "0.34s",
           "failed_assertions": 0
         }
       ],
@@ -3734,8 +4287,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "device-lifetime-in-flight-command-buffer.cuda#occurrence-1",
@@ -4213,7 +4785,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -4229,6 +4801,27 @@
           "status": "passed",
           "terminal_line": 213,
           "detail": "0.88s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 102,
+          "detail": "0.19s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 102,
+          "detail": "0.12s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 102,
+          "detail": "0.11s",
           "failed_assertions": 0
         }
       ],
@@ -4250,8 +4843,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "heap-alignment-sizes.cuda#occurrence-1",
@@ -8065,7 +8677,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8081,6 +8693,27 @@
           "status": "passed",
           "terminal_line": 492,
           "detail": "0.09s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 114,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 130,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 105,
+          "detail": "0.02s",
           "failed_assertions": 0
         }
       ],
@@ -8102,8 +8735,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "sampler-border-black-transparent.cuda#occurrence-1",
@@ -8116,7 +8768,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8132,6 +8784,27 @@
           "status": "passed",
           "terminal_line": 493,
           "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 115,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 131,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 106,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -8153,8 +8826,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "sampler-border-custom-color.cuda#occurrence-1",
@@ -8167,7 +8859,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8183,6 +8875,27 @@
           "status": "passed",
           "terminal_line": 494,
           "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 116,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 132,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 107,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -8204,8 +8917,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "sampler-border-white-opaque.cuda#occurrence-1",
@@ -8218,7 +8950,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8234,6 +8966,27 @@
           "status": "passed",
           "terminal_line": 495,
           "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 117,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 133,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 108,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -8255,8 +9008,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "sampler-filter-linear.cuda#occurrence-1",
@@ -8269,7 +9041,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8285,6 +9057,27 @@
           "status": "passed",
           "terminal_line": 496,
           "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 118,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 134,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 109,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -8306,8 +9099,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "sampler-filter-point.cuda#occurrence-1",
@@ -8320,7 +9132,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8336,6 +9148,27 @@
           "status": "passed",
           "terminal_line": 497,
           "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 119,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 135,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 110,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -8357,8 +9190,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "serial-pipeline-creation.cuda#occurrence-1",
@@ -8433,7 +9285,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8449,6 +9301,27 @@
           "status": "passed",
           "terminal_line": 500,
           "detail": "0.07s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 120,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 136,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 111,
+          "detail": "0.01s",
           "failed_assertions": 0
         }
       ],
@@ -8470,8 +9343,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "staging-heap-alloc-free.cuda#occurrence-1",
@@ -9445,7 +10337,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9461,6 +10353,27 @@
           "status": "passed",
           "terminal_line": 532,
           "detail": "0.16s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "failed",
+          "terminal_line": 141,
+          "detail": "0.01s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 150,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 113,
+          "detail": "0.02s",
           "failed_assertions": 0
         }
       ],
@@ -9482,8 +10395,40 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": ["E52018"],
+          "assertion_records": [
+            {
+              "line": 136,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52018]: LLVM 14 NVVM IR builder operation 'surface dimension query' failed with result -2147024809",
+              "context": []
+            },
+            {
+              "line": 139,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-texture-view-3d.cpp:115: FATAL ERROR: REQUIRE( !((device->createComputePipeline(pipelineDesc, pipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": []
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-host-write-read.cuda#occurrence-1",
@@ -9527,7 +10472,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9543,6 +10488,27 @@
           "status": "passed",
           "terminal_line": 534,
           "detail": "4.73s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 142,
+          "detail": "0.80s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 151,
+          "detail": "0.71s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 114,
+          "detail": "0.73s",
           "failed_assertions": 0
         }
       ],
@@ -9564,8 +10530,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-load-ro-all-layers-single-mip.cuda#occurrence-1",
@@ -9578,7 +10563,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9594,6 +10579,27 @@
           "status": "passed",
           "terminal_line": 535,
           "detail": "6.95s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 143,
+          "detail": "1.54s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 152,
+          "detail": "1.46s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 115,
+          "detail": "1.45s",
           "failed_assertions": 0
         }
       ],
@@ -9615,8 +10621,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-load-ro-single.cuda#occurrence-1",
@@ -9629,7 +10654,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9645,6 +10670,27 @@
           "status": "passed",
           "terminal_line": 536,
           "detail": "6.92s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 144,
+          "detail": "1.51s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 153,
+          "detail": "1.53s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 116,
+          "detail": "1.52s",
           "failed_assertions": 0
         }
       ],
@@ -9666,8 +10712,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-load-rw-all-layers-single-mip.cuda#occurrence-1",
@@ -9680,7 +10745,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9696,6 +10761,27 @@
           "status": "passed",
           "terminal_line": 537,
           "detail": "0.99s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 145,
+          "detail": "0.24s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 154,
+          "detail": "0.21s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 117,
+          "detail": "0.20s",
           "failed_assertions": 0
         }
       ],
@@ -9717,8 +10803,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-load-rw-single.cuda#occurrence-1",
@@ -9731,7 +10836,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9747,6 +10852,27 @@
           "status": "passed",
           "terminal_line": 538,
           "detail": "0.92s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 146,
+          "detail": "0.18s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 155,
+          "detail": "0.20s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 118,
+          "detail": "0.18s",
           "failed_assertions": 0
         }
       ],
@@ -9768,8 +10894,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-store-all-layers-single-mip.cuda#occurrence-1",
@@ -9782,7 +10927,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9798,6 +10943,27 @@
           "status": "passed",
           "terminal_line": 539,
           "detail": "0.93s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 147,
+          "detail": "0.20s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 156,
+          "detail": "0.18s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 119,
+          "detail": "0.17s",
           "failed_assertions": 0
         }
       ],
@@ -9819,8 +10985,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "texture-view-store-single.cuda#occurrence-1",
@@ -9833,7 +11018,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9849,6 +11034,27 @@
           "status": "passed",
           "terminal_line": 540,
           "detail": "0.55s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 148,
+          "detail": "0.10s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 157,
+          "detail": "0.10s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 120,
+          "detail": "0.10s",
           "failed_assertions": 0
         }
       ],
@@ -9870,8 +11076,27 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
-      ]
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     },
     {
       "id": "uint16-structured-buffer.cuda#occurrence-1",
@@ -9903,6 +11128,417 @@
           "failed_assertions": 0
         }
       ]
+    },
+    {
+      "id": "numeric-entry-abi.cuda#occurrence-1",
+      "name": "numeric-entry-abi.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp",
+          "line": 309
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "resource-rhi-nvrtc-before",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "1.63s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-nvvm-before",
+          "status": "failed",
+          "terminal_line": 12,
+          "detail": "0.42s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "passed",
+          "terminal_line": 103,
+          "detail": "0.93s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "passed",
+          "terminal_line": 103,
+          "detail": "0.82s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 103,
+          "detail": "0.81s",
+          "failed_assertions": 0
+        }
+      ],
+      "qualification": "New independent O0/O3 family fixture; not present in the initial full inventory.",
+      "failure_history": [
+        {
+          "run": "resource-rhi-nvvm-before",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": ["E52017"],
+          "assertion_records": [
+            {
+              "line": 8,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'",
+              "context": []
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        }
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
+    },
+    {
+      "id": "resource-parameter-abi.cuda#occurrence-1",
+      "name": "resource-parameter-abi.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp",
+          "line": 71
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "resource-rhi-nvrtc-before",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "1.34s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "resource-rhi-nvvm-before",
+          "status": "failed",
+          "terminal_line": 22,
+          "detail": "0.28s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "failed",
+          "terminal_line": 113,
+          "detail": "0.13s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "failed",
+          "terminal_line": 129,
+          "detail": "0.79s",
+          "failed_assertions": 4
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 104,
+          "detail": "0.79s",
+          "failed_assertions": 0
+        }
+      ],
+      "qualification": "New independent O0/O3 family fixture; not present in the initial full inventory.",
+      "failure_history": [
+        {
+          "run": "resource-rhi-nvvm-before",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": ["E52017"],
+          "assertion_records": [
+            {
+              "line": 18,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Sampler1D'",
+              "context": []
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": ["E52017"],
+          "assertion_records": [
+            {
+              "line": 109,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'GenericAsm assembly=.GetDimensions, signature=Void(ByteAddressBuffer, OutParam<uint>)'",
+              "context": []
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": [],
+          "assertion_records": [
+            {
+              "line": 109,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 128, 32 )",
+                "  logged: optimization := 0",
+                "          word := 53"
+              ]
+            },
+            {
+              "line": 114,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 128, 32 )",
+                "  logged: optimization := 0",
+                "          word := 54"
+              ]
+            },
+            {
+              "line": 119,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 128, 32 )",
+                "  logged: optimization := 3",
+                "          word := 53"
+              ]
+            },
+            {
+              "line": 124,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 128, 32 )",
+                "  logged: optimization := 3",
+                "          word := 54"
+              ]
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        }
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
+    },
+    {
+      "id": "surface-dimensions.cuda#occurrence-1",
+      "name": "surface-dimensions.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp",
+          "line": 475
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "failed"
+      },
+      "history": [
+        {
+          "run": "resource-rhi-dimensions-nvrtc-before",
+          "status": "failed",
+          "terminal_line": 28,
+          "detail": "1.52s",
+          "failed_assertions": 4
+        },
+        {
+          "run": "resource-rhi-dimensions-nvvm-before",
+          "status": "failed",
+          "terminal_line": 12,
+          "detail": "0.42s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "resource-rhi-after",
+          "status": "failed",
+          "terminal_line": 130,
+          "detail": "0.12s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "resource-rhi-repair",
+          "status": "failed",
+          "terminal_line": 149,
+          "detail": "0.13s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "resource-rhi-final",
+          "status": "passed",
+          "terminal_line": 112,
+          "detail": "0.69s",
+          "failed_assertions": 0
+        }
+      ],
+      "qualification": "New independent O0/O3 family fixture; not present in the initial full inventory.",
+      "failure_history": [
+        {
+          "run": "resource-rhi-dimensions-nvrtc-before",
+          "compiler_selection": "nvrtc",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": [],
+          "assertion_records": [
+            {
+              "line": 8,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 0, 3 )",
+                "  logged: optimization := 0",
+                "          word := 8"
+              ]
+            },
+            {
+              "line": 13,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 0, 4 )",
+                "  logged: optimization := 0",
+                "          word := 11"
+              ]
+            },
+            {
+              "line": 18,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 0, 3 )",
+                "  logged: optimization := 3",
+                "          word := 8"
+              ]
+            },
+            {
+              "line": 23,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-resource-parameter-abi.cpp:29: ERROR: CHECK_EQ( actual[word], expected[word] ) is NOT correct!",
+              "context": [
+                "  values: CHECK_EQ( 0, 4 )",
+                "  logged: optimization := 3",
+                "          word := 11"
+              ]
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-dimensions-nvvm-before",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": ["E52017"],
+          "assertion_records": [
+            {
+              "line": 8,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'",
+              "context": []
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-after",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": ["E52018"],
+          "assertion_records": [
+            {
+              "line": 126,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52018]: LLVM 14 NVVM IR builder operation 'surface dimension query' failed with result -2147024809",
+              "context": []
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-repair",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "diagnostic_codes": [],
+          "assertion_records": [
+            {
+              "line": 142,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Driver] cuModuleLoadData(&pipeline->m_module, module.code->getBufferPointer()) call failed",
+              "context": [
+                "  result: 801 (CUDA_ERROR_NOT_SUPPORTED)",
+                "  detail: operation not supported",
+                "  location: /home/skallweit/codex/agent-sandbox/slang-rhi/src/cuda/cuda-pipeline.cpp:86"
+              ]
+            }
+          ],
+          "details": "Exact diagnostic and value/context lines retained in the hashed log; expectations unchanged."
+        },
+        {
+          "run": "resource-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        }
+      ],
+      "resolution": "Qualified resource/numeric parameter family on the identity attached to this focused run."
     }
-  ]
+  ],
+  "current_known_outcomes": {
+    "registration_count": 272,
+    "unique_name_count": 271,
+    "scope": "Original full inventory plus three focused fixtures. Unselected cases retain original identities; this is not a rerun of the full suite.",
+    "by_compiler": {
+      "nvvm": {
+        "passed": 225,
+        "failed": 37,
+        "skipped": 10
+      },
+      "nvrtc": {
+        "passed": 261,
+        "skipped": 10,
+        "failed": 1
+      }
+    },
+    "original_nvvm_failures_resolved": 24,
+    "original_nvvm_failures_remaining": 37,
+    "new_fixture_nvrtc_difference": "surface-dimensions retains four zero-layer count mismatches at O0/O3; independent expected counts3/4 unchanged."
+  },
+  "initial_full_checkpoint_fields": "scope, identity, inventory, reconciliation and original nvvm-full/nvrtc-full runs retain the initial269-registration identity. Current focused histories and current_known_outcomes are separately scoped.",
+  "current_inventory": {
+    "gate": {
+      "path": "build/nvvm-resource-parameters/rhi-inventory.json",
+      "sha256": "e4a8d12a13e24ae342eb95f9b0ed6a8c19f03b2ea265b697f02dd34744932d97"
+    },
+    "listing": {
+      "path": "build/nvvm-resource-parameters/rhi-inventory.log",
+      "sha256": "f49d49c8b4ef600a8b90b6f175987371af2dedea2a52e7b39e55b8484871ad8a"
+    },
+    "registration_count": 272,
+    "unique_name_count": 271,
+    "manifest_multiset_matches": true,
+    "scope": "Listing only after adding three independent fixtures; not a full-suite execution."
+  }
 }

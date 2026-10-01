@@ -2528,6 +2528,10 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
             case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
             case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
             case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
+            case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH:
+            case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_HEIGHT:
+            case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH:
+            case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE:
                 return true;
             case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
                 return (textureOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
@@ -3342,15 +3346,6 @@ static bool _getFakeNVVMBuilderSequentialElementTypeKind(
         return true;
     }
     return false;
-}
-
-static bool _isFakeNVVMBuilderResourceViewValue(SlangNVVMValueHandle value)
-{
-    FakeNVVMBuilderValueRef valueRef;
-    if (!_getFakeNVVMBuilderValueRef(value, valueRef))
-        return false;
-    FakeNVVMBuilderScalarTypeKind elementTypeKind;
-    return _getFakeNVVMBuilderResourceViewElementTypeKind(valueRef, elementTypeKind);
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderCreateModule(
@@ -5088,6 +5083,11 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateElementExtract(
     SlangNVVMTypeHandle elementType = nullptr;
     bool isAggregateElement = false;
     FakeNVVMBuilderScalarTypeKind resourceElementTypeKind;
+    // Loaded resource views retain their element type through the recorded field/array owner.
+    // Recover that aggregate type before selecting either its data pointer or extent field.
+    if (!aggregateType &&
+        _getFakeNVVMBuilderResourceViewElementTypeKind(baseRef, resourceElementTypeKind))
+        aggregateType = _getFakeNVVMBuilderResourceViewType(resourceElementTypeKind);
     if (aggregateType && elementIndex == 0 &&
         _getFakeNVVMBuilderResourceViewElementTypeKind(aggregateType, resourceElementTypeKind))
     {
@@ -5100,9 +5100,7 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderEmitAggregateElementExtract(
     {
         isAggregateElement = true;
     }
-    else if (
-        elementIndex != 0 || !_isFakeNVVMBuilderResourceViewValue(aggregateValue) ||
-        !_getFakeNVVMBuilderResourceViewElementTypeKind(baseRef, elementTypeKind))
+    else
     {
         return SLANG_E_INVALID_ARG;
     }
@@ -6704,6 +6702,27 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
     if (!isValidShape)
         return false;
 
+    if (operation.operation >= SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH &&
+        operation.operation <= SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE)
+    {
+        SlangNVVMSurfaceOperationDesc surface =
+            {SLANG_NVVM_SURFACE_OP_LOAD, operation.shape, operation.isArray, operation.elementType};
+        if (!_isFakeNVVMSurfaceOperationSupported(surface))
+            return false;
+        switch (operation.operation)
+        {
+        case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH:
+            return true;
+        case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_HEIGHT:
+            return operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+        case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH:
+            return operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+        case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE:
+            return operation.isArray != 0;
+        default:
+            return false;
+        }
+    }
     const bool isSampleElement =
         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
         operation.elementType.bitWidth == 32 &&
@@ -6733,7 +6752,8 @@ static bool _isFakeNVVMTextureOperationSupported(const SlangNVVMTextureOperation
                 (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D && operation.isArray));
     case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
         return isNumericElement &&
-               (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
+               ((operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D && operation.isArray) ||
+                operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
                 (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray));
     case SLANG_NVVM_TEXTURE_OP_GATHER:
         return isGatherElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D &&

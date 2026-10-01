@@ -41,6 +41,14 @@ struct NVVMValueOperationRequirement
 
 using NVVMValueOperationRequirements = List<NVVMValueOperationRequirement>;
 
+/// Retains the typed view's element stride; the source extent is measured in bytes.
+struct NVVMPlannedEquivalentStructuredBuffer
+{
+    IRInst* buffer = nullptr;
+    IRType* elementType = nullptr;
+    uint32_t elementStride = 0;
+};
+
 struct NVVMPlannedValueOperation
 {
     IRInst* source = nullptr;
@@ -449,6 +457,8 @@ struct NVVMPlannedLayoutPointerOffset
 struct NVVMEmissionPlan
 {
     NVVMAddressPlan addresses;
+    Dictionary<IRInst*, NVVMEntryNumericLayout> entryNumericParameters;
+    Dictionary<IRInst*, NVVMPlannedEquivalentStructuredBuffer> equivalentStructuredBuffers;
     Dictionary<IRInst*, NVVMPlannedLayoutPointerOffset> layoutPointerOffsets;
     Dictionary<IRInst*, IRInst*> pointerToIntegerValues;
     List<NVVMPlannedLocalStorage> localStorage;

@@ -4,6 +4,7 @@
 #include "slang/slang-emit-nvvm.h"
 #include "slang/slang-ir-legalize-varying-params.h"
 #include "slang/slang-ir-nvvm-legalize.h"
+#include "slang/slang-ir-nvvm-surface-legalize.h"
 
 using namespace Slang;
 
@@ -1905,5 +1906,371 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
                 context.sink.outputBuffer.getBuffer());
         SLANG_CHECK(diagnostic.indexOf(expected) >= 0);
         SLANG_CHECK(requirements.emissionPlan.stores.getCount() == 0);
+    }
+}
+
+// One canonical entry contains the complete numeric family and all qualified texture geometries.
+// Planning must retain reflected packing before creating a provider module.
+SLANG_UNIT_TEST(nvvmResourceEntriesRetainCheckedPackingAndQueries)
+{
+    _resetDirectNVVMFakes();
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder builder(module);
+    builder.setInsertInto(module);
+    List<IRType*> types;
+    const IROp numeric[] = {
+        kIROp_BoolType,
+        kIROp_Int8Type,
+        kIROp_UInt8Type,
+        kIROp_Int16Type,
+        kIROp_UInt16Type,
+        kIROp_IntType,
+        kIROp_UIntType,
+        kIROp_Int64Type,
+        kIROp_UInt64Type,
+        kIROp_HalfType,
+        kIROp_FloatType,
+        kIROp_DoubleType,
+    };
+    for (auto op : numeric)
+        for (uint32_t lanes = 1; lanes <= 4; ++lanes)
+        {
+            auto scalar = builder.getType(op);
+            types.add(lanes == 1 ? scalar : builder.getVectorType(scalar, lanes));
+        }
+    const IROp shapes[] = {
+        kIROp_TextureShape1DType,
+        kIROp_TextureShape2DType,
+        kIROp_TextureShape3DType,
+        kIROp_TextureShapeCubeType};
+    auto zero = builder.getIntValue(builder.getIntType(), 0);
+    auto one = builder.getIntValue(builder.getIntType(), 1);
+    // Seven readonly and seven combined geometries, plus five writable geometries.
+    for (int flavor = 0; flavor < 3; ++flavor)
+        for (auto shape : shapes)
+            for (bool array : {false, true})
+            {
+                if ((shape == kIROp_TextureShape3DType && array) ||
+                    (flavor == 2 && shape == kIROp_TextureShapeCubeType))
+                    continue;
+                types.add(builder.getTextureType(
+                    builder.getFloatType(),
+                    builder.getType(shape),
+                    array ? one : zero,
+                    zero,
+                    zero,
+                    flavor == 2 ? one : zero,
+                    zero,
+                    flavor == 1 ? one : zero,
+                    zero));
+            }
+    types.add(builder.getType(kIROp_SamplerStateType));
+    // These layouts/flavors still lack an external entry contract.
+    IRType* excluded[] = {
+        builder.getType(kIROp_SamplerComparisonStateType),
+        builder.getArrayType(types[48], one),
+        builder.getTextureType(
+            builder.getFloatType(),
+            builder.getType(kIROp_TextureShape2DType),
+            zero,
+            one,
+            one,
+            zero,
+            zero,
+            zero,
+            zero),
+        builder.getTextureType(
+            builder.getFloatType(),
+            builder.getType(kIROp_TextureShape2DType),
+            zero,
+            zero,
+            zero,
+            zero,
+            one,
+            zero,
+            zero),
+        builder.getTextureType(
+            builder.getFloatType(),
+            builder.getType(kIROp_TextureShapeCubeType),
+            zero,
+            zero,
+            zero,
+            one,
+            zero,
+            zero,
+            zero),
+        builder.getTextureType(
+            builder.getFloatType(),
+            builder.getType(kIROp_TextureShape3DType),
+            one,
+            zero,
+            zero,
+            one,
+            zero,
+            zero,
+            zero),
+    };
+    for (auto type : excluded)
+    {
+        SLANG_CHECK(!isNVVMSupportedParameterType(type));
+        SLANG_CHECK(!classifyNVVMType(type).supports(NVVMTypeUse::EntryPointParameter));
+    }
+    auto entry = builder.createFunc();
+    entry->setFullType(
+        builder.getFuncType(types.getCount(), types.getBuffer(), builder.getVoidType()));
+    builder.addEntryPointDecoration(
+        entry,
+        Profile(Stage::Compute),
+        toSlice("computeMain"),
+        toSlice("test"));
+    builder.setInsertInto(entry);
+    builder.emitBlock();
+    List<IRParam*> params;
+    for (auto type : types)
+        params.add(builder.emitParam(type));
+    // Query every spatial dimension and array size using actual surface handles.
+    Index expectedQueries = 0;
+    for (Index i = 48; i < params.getCount(); ++i)
+    {
+        NVVMSurfaceType surface;
+        if (!getNVVMSupportedSurfaceType(params[i]->getDataType(), surface))
+            continue;
+        const auto rank = surface.coordinateLaneCount - (surface.isArray ? 1u : 0u);
+        IRInst* operand = params[i];
+        builder.emitIntrinsicInst(
+            rank == 1 ? builder.getUIntType()
+                      : static_cast<IRType*>(builder.getVectorType(builder.getUIntType(), rank)),
+            kIROp_TextureQuerySize,
+            1,
+            &operand);
+        ++expectedQueries;
+        if (surface.isArray)
+        {
+            builder.emitIntrinsicInst(
+                builder.getUIntType(),
+                kIROp_TextureQueryLayerCount,
+                1,
+                &operand);
+            ++expectedQueries;
+        }
+    }
+    // Combined and writable descriptor casts keep the same opaque handle. They do not
+    // manufacture a sampler object or permit a mismatched resource type.
+    for (Index i = 48; i + 1 < params.getCount(); ++i)
+    {
+        auto texture = cast<IRTextureTypeBase>(params[i]->getDataType());
+        if (!texture->isCombined() && texture->getAccess() != SLANG_RESOURCE_ACCESS_READ_WRITE)
+            continue;
+        auto handleType = builder.getType(kIROp_DescriptorHandleType, texture);
+        IRInst* value = params[i];
+        auto handle =
+            builder.emitIntrinsicInst(handleType, kIROp_CastResourceToDescriptorHandle, 1, &value);
+        IRInst* handleValue = handle;
+        auto bits = builder.emitIntrinsicInst(
+            builder.getUInt64Type(),
+            kIROp_CastDescriptorHandleToUInt64,
+            1,
+            &handleValue);
+        IRInst* bitsValue = bits;
+        handleValue = builder.emitIntrinsicInst(
+            handleType,
+            kIROp_CastUInt64ToDescriptorHandle,
+            1,
+            &bitsValue);
+        value = builder.emitIntrinsicInst(
+            texture,
+            kIROp_CastDescriptorHandleToResource,
+            1,
+            &handleValue);
+        if (texture->isCombined())
+            builder.emitIntrinsicInst(
+                builder.getType(kIROp_SamplerStateType),
+                kIROp_CombinedTextureSamplerGetSampler,
+                1,
+                &value);
+    }
+    builder.emitReturn();
+    LinkedIR linked = {};
+    linked.module = module;
+    linked.entryPoints.add(entry);
+    NVVMOperationRequirements requirements;
+    const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, context.sink.outputBuffer.getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(requirements.emissionPlan.entryNumericParameters.getCount() == 48);
+    for (Index i = 0; i < 48; ++i)
+    {
+        auto selected = requirements.emissionPlan.entryNumericParameters.tryGetValue(params[i]);
+        SLANG_CHECK_ABORT(selected);
+        SLANG_CHECK(selected->type == types[i]);
+        SLANG_CHECK(selected->laneCount == uint32_t(i % 4 + 1));
+        SLANG_CHECK(selected->size == selected->storageLaneCount * selected->scalarBitWidth / 8);
+    }
+    SLANG_CHECK(requirements.textureOperations.getCount() == expectedQueries);
+    for (const auto& query : requirements.textureOperations)
+    {
+        for (uint32_t i = 0; i < query.operationCount; ++i)
+            SLANG_CHECK(
+                query.operations[i].operation >= SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH &&
+                query.operations[i].operation <= SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE);
+        if (query.source->getOp() == kIROp_TextureQueryLayerCount)
+            SLANG_CHECK(
+                query.operations[0].operation == SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE);
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+    SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+}
+
+
+// A surface format belongs to its declared entry/field or explicit descriptor conversion.
+// Passing the same type through an arbitrary helper does not transfer an entry annotation.
+SLANG_UNIT_TEST(nvvmResourceEntryFormatsRequireDeclaredOwners)
+{
+    enum class Case
+    {
+        Native,
+        HalfFormat,
+        Normalized,
+        WrongKind,
+        HelperParameter,
+        HelperResult,
+        Descriptor,
+        WrongDescriptor
+    };
+    for (auto testCase :
+         {Case::Native,
+          Case::HalfFormat,
+          Case::Normalized,
+          Case::WrongKind,
+          Case::HelperParameter,
+          Case::HelperResult,
+          Case::Descriptor,
+          Case::WrongDescriptor})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto zero = builder.getIntValue(builder.getIntType(), 0);
+        auto one = builder.getIntValue(builder.getIntType(), 1);
+        auto element = builder.getVectorType(builder.getFloatType(), 4);
+        auto texture = builder.getTextureType(
+            element,
+            builder.getType(kIROp_TextureShape2DType),
+            zero,
+            zero,
+            zero,
+            one,
+            zero,
+            zero,
+            zero);
+        const bool descriptor = testCase == Case::Descriptor || testCase == Case::WrongDescriptor;
+        const bool helperParam = testCase == Case::HelperParameter;
+        const bool helperResult = testCase == Case::HelperResult;
+        IRFunc* helper = nullptr;
+        if (helperParam || helperResult)
+        {
+            helper = builder.createFunc();
+            IRType* parameter = texture;
+            helper->setFullType(builder.getFuncType(
+                1,
+                &parameter,
+                helperResult ? static_cast<IRType*>(texture) : builder.getVoidType()));
+            builder.setInsertInto(helper);
+            builder.emitBlock();
+            auto value = builder.emitParam(texture);
+            if (helperResult)
+                builder.emitReturn(value);
+            else
+            {
+                auto coordinate = builder.emitMakeVectorFromScalar(
+                    builder.getVectorType(builder.getIntType(), 2),
+                    zero);
+                IRInst* operands[] = {value, coordinate};
+                builder.emitIntrinsicInst(element, kIROp_ImageLoad, 2, operands);
+                builder.emitReturn();
+            }
+            builder.setInsertInto(module);
+        }
+        auto entry = builder.createFunc();
+        IRType* parameter = descriptor ? builder.getUInt64Type() : static_cast<IRType*>(texture);
+        entry->setFullType(builder.getFuncType(1, &parameter, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        IRInst* resource = builder.emitParam(parameter);
+        if (!descriptor && testCase != Case::Native)
+            builder.addFormatDecoration(
+                resource,
+                testCase == Case::Normalized  ? ImageFormat::rgba8
+                : testCase == Case::WrongKind ? ImageFormat::rgba16ui
+                                              : ImageFormat::rgba16f);
+        if (descriptor)
+        {
+            auto handle = builder.getType(kIROp_DescriptorHandleType, texture);
+            auto bits =
+                builder.emitIntrinsicInst(handle, kIROp_CastUInt64ToDescriptorHandle, 1, &resource);
+            IRType* resultType = texture;
+            if (testCase == Case::WrongDescriptor)
+                resultType = builder.getTextureType(
+                    element,
+                    builder.getType(kIROp_TextureShape1DType),
+                    zero,
+                    zero,
+                    zero,
+                    one,
+                    zero,
+                    zero,
+                    zero);
+            IRInst* operand = bits;
+            resource = builder.emitIntrinsicInst(
+                resultType,
+                kIROp_CastDescriptorHandleToResource,
+                1,
+                &operand);
+        }
+        if (helperParam || helperResult)
+            resource = builder.emitCallInst(helper->getResultType(), helper, 1, &resource);
+        if (!helperParam)
+        {
+            auto coordinate = builder.emitMakeVectorFromScalar(
+                builder.getVectorType(builder.getIntType(), 2),
+                zero);
+            IRInst* operands[] = {resource, coordinate};
+            builder.emitIntrinsicInst(element, kIROp_ImageLoad, 2, operands);
+        }
+        builder.emitReturn();
+        legalizeNVVMSurfaceOperations(module);
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const bool valid = testCase == Case::Native || testCase == Case::HalfFormat ||
+                           testCase == Case::Descriptor;
+        if (valid && SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(SLANG_SUCCEEDED(result) == valid);
+        if (valid)
+        {
+            SLANG_CHECK_ABORT(requirements.surfaceOperations.getCount() == 1);
+            SLANG_CHECK(
+                requirements.surfaceOperations[0].desc.elementType.bitWidth ==
+                (testCase == Case::HalfFormat ? 16u : 32u));
+        }
+        else
+            SLANG_CHECK(
+                context.sink.outputBuffer.getUnownedSlice().indexOf(toSlice("E52017")) >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
 }

@@ -346,6 +346,14 @@ struct NVVMSurfaceType
 /// Resolves one selected read-write CUDA surface and its complete semantic element type.
 bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType);
 
+/// Validates one producer-owned type and optional physical format through the shared surface
+/// policy.
+bool getNVVMSupportedSurfaceFormat(
+    IRInst* type,
+    IRFormatDecoration* format,
+    NVVMSurfaceType& outType,
+    SlangNVVMValueTypeDesc& outPhysicalType);
+
 /// Resolves the physical storage selected by a conventional-global surface field.
 bool getNVVMSupportedSurfaceField(
     IRStructField* field,
@@ -393,8 +401,29 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field);
 /// Returns the canonical pointer produced by selected structured-buffer element addressing.
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);
 
+/// Records CUDA launch storage independently of the ordinary scalar/vector SSA representation.
+struct NVVMEntryNumericLayout
+{
+    IRType* type = nullptr;
+    IRType* scalarType = nullptr;
+    uint32_t laneCount = 1;
+    uint32_t storageLaneCount = 1;
+    uint32_t scalarBitWidth = 0;
+    uint32_t size = 0;
+    uint32_t alignment = 0;
+    bool isVector = false;
+    bool isBoolean = false;
+    bool isHalf = false;
+};
+
+/// Selects a finite numeric entry carrier using the same CUDA layout rules as reflection.
+bool getNVVMEntryNumericLayout(
+    CodeGenContext* context,
+    IRType* type,
+    NVVMEntryNumericLayout& outLayout);
+
 /// Returns whether `type` has an accepted direct CUDA launch-parameter representation.
-bool isNVVMSupportedParameterType(IRInst* type);
+bool isNVVMSupportedParameterType(IRType* type);
 
 /// Returns whether `type` has a finite external structured-buffer storage representation.
 bool isNVVMSupportedStructuredBufferStorageType(IRInst* type);
@@ -517,6 +546,12 @@ public:
     }
 
     SlangResult lowerType(IRType* type, NVVMTypeUse use, SlangNVVMTypeHandle& outType);
+
+    /// Materializes an already-checked entry carrier; vectors use a byval scalar array.
+    SlangResult lowerEntryNumericType(
+        const NVVMEntryNumericLayout& layout,
+        SlangNVVMTypeHandle& outParameterType,
+        SlangNVVMTypeHandle& outStorageType);
 
 private:
     struct PointerTypeKey

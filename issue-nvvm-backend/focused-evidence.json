@@ -87706,7 +87706,7 @@
       "scope": "Complete registered CUDA application suite in the tested sibling RHI binary, across all registered feature areas. Initial full NVVM/NVRTC comparison and maintained failure inventory; not full NVVM acceptance.",
       "manifest": {
         "path": "issue-nvvm-backend/rhi-cuda-status.json",
-        "sha256": "4a4d98fbacca0ff14c12d389e2d55d6b57e23900aa622b869670b1d935b06abe"
+        "sha256": "d5fb1f8850a9e7f42be34eedb2ac467594d42684731de3d2379cfed3d84df22c"
       },
       "identity": {
         "path": "build/nvvm-rhi-full/identity.json",
@@ -87815,7 +87815,331 @@
         "Custom devices/sessions and internal utilities retain documented compiler ownership. Default authored optimization is not universal O0/O3 qualification; RHI derives architecture from the actual device.",
         "NVVM25.755s and NVRTC89.312s are fresh-process suite wall times with different failure/execution outcomes, not a performance comparison.",
         "Historical full Slang baseline/identity and all80prior feature objects remain unchanged; no RHI corpus admissions. Future full RHI runs remain on demand; complete families guide focused repairs."
-      ]
+      ],
+      "failure_family_counts_scope": "Initial full checkpoint; current focused resolution is separate.",
+      "current_focused_resolution": {
+        "registration_count": 272,
+        "unique_name_count": 271,
+        "scope": "Original full inventory plus three focused fixtures. Unselected cases retain original identities; this is not a rerun of the full suite.",
+        "by_compiler": {
+          "nvvm": {
+            "passed": 225,
+            "failed": 37,
+            "skipped": 10
+          },
+          "nvrtc": {
+            "passed": 261,
+            "skipped": 10,
+            "failed": 1
+          }
+        },
+        "original_nvvm_failures_resolved": 24,
+        "original_nvvm_failures_remaining": 37,
+        "new_fixture_nvrtc_difference": "surface-dimensions retains four zero-layer count mismatches at O0/O3; independent expected counts3/4 unchanged."
+      },
+      "current_failure_family_counts": {
+        "nested_pointer_record_field": 1,
+        "combined_sampler_values": 0,
+        "texture_fetch": 0,
+        "compute_entry_parameters": 0,
+        "typed_buffer_global": 1,
+        "hitobject_representation": 26,
+        "cluster_query": 1,
+        "callable_abi": 1,
+        "trace_payload_boundary": 2,
+        "intersection_stage": 1,
+        "active_list_matrix_composition": 4
+      }
+    },
+    "nvvm-resource-parameters": {
+      "status": "accepted-focused",
+      "scope": "Complete selected CUDA entry parameter family:48 numeric scalar/vector shapes, existing byte/structured views and supported texture/surface/sampler/combined handle transport, with typed dimensions/fetch and checked format ownership.",
+      "identity": {
+        "path": "build/nvvm-resource-parameters/final-build-identity.json",
+        "sha256": "1e0c12b2f270df15078686a3ab77d99abefebf36a156ad7f364d05dba344380f"
+      },
+      "source_identity": {
+        "path": "build/nvvm-resource-parameters/source-freeze-counts.json",
+        "sha256": "4c3af75eecf265ed82720996bad67fe6a3b1dc47b90ccc19fd6f72b8299e7ce6"
+      },
+      "static_identity": {
+        "path": "build/nvvm-resource-parameters/static-identity.json",
+        "sha256": "dbdcf71293c5a2b1da8560178307a06311129772d3f06e4826f6aa4b72f42dd4"
+      },
+      "fixture_identity": {
+        "path": "build/nvvm-resource-parameters/fixture-freeze.json",
+        "sha256": "08f0672f3e243383fb8d232bbd845cf25ee3f0304353fcbca2671fd571193274"
+      },
+      "test_only_repair": {
+        "path": "build/nvvm-resource-parameters/test-repair-identity.json",
+        "sha256": "6d90d60bb927545cdd824228676596a2c017cdf302968e93ad6b69e33b430836"
+      },
+      "rhi_manifest": {
+        "path": "issue-nvvm-backend/rhi-cuda-status.json",
+        "sha256": "d5fb1f8850a9e7f42be34eedb2ac467594d42684731de3d2379cfed3d84df22c"
+      },
+      "validation": {
+        "shared_build": {
+          "path": "build/nvvm-resource-parameters/build-counts.json",
+          "sha256": "cf307d74635d66c2e2b2bca35e6c590b976d23fbf57f678a933bd799b7cafbcc",
+          "return_code": 0,
+          "elapsed_seconds": 34.79526114463806
+        },
+        "static_build": {
+          "path": "build/nvvm-resource-parameters/static-build.json",
+          "sha256": "5fcb5dae2b0d3a3617deabeba7da09958c275de0dfb50be2a807e49d14758b8e",
+          "return_code": 0,
+          "elapsed_seconds": 310.0478677749634
+        },
+        "test_only_build": {
+          "path": "build/nvvm-resource-parameters/test-build.json",
+          "sha256": "3c136e9b234f406dd00ad9a606f27bae444f662813ea99dbb32c6913cfefc583",
+          "return_code": 0,
+          "elapsed_seconds": 22.047402143478394
+        },
+        "shared_units": {
+          "final_count_and_query": {
+            "path": "build/nvvm-resource-parameters/count-units.json",
+            "sha256": "8034fd63a38e1a83628d72eb5fb62c702afd7a436da488dcea4d9564dc0da707",
+            "return_code": 0,
+            "elapsed_seconds": 3.8823373317718506
+          },
+          "existing_view_retry": {
+            "path": "build/nvvm-resource-parameters/existing-view-retry.json",
+            "sha256": "55d538ebb3f0eb903a571ea8c1e4b4bfe012e35e42b17f3b7469cb74598d80e0",
+            "return_code": 0,
+            "elapsed_seconds": 1.8489129543304443
+          },
+          "retained_fetch_and_fake_admission": {
+            "path": "build/nvvm-resource-parameters/provider-units.json",
+            "sha256": "8cc627459098250c37c59bc4722208abf74db798ddc7d0072effded260f52565",
+            "return_code": 1,
+            "elapsed_seconds": 1.4864580631256104
+          },
+          "scope": "Three final affected units and two repaired existing units pass. Earlier fetch/fake-admission passes retain their tested identity; that original gate also retains its now-resolved SUQ wrapper failure."
+        },
+        "static": {
+          "resource": {
+            "path": "build/nvvm-resource-parameters/static-resource.json",
+            "sha256": "99ebc35c09ac7ca79530ffa24c9214bf2d01a75d84d58e7ca37728adcc471d1b",
+            "return_code": 0,
+            "elapsed_seconds": 7.121826887130737
+          },
+          "numeric": {
+            "path": "build/nvvm-resource-parameters/static-numeric.json",
+            "sha256": "ed655230c53b351cefb6a6d071f38ddde9f64edae56f1e70a4a75378acc55e2c",
+            "return_code": 0,
+            "elapsed_seconds": 0.2610898017883301
+          },
+          "half_roles": {
+            "path": "build/nvvm-resource-parameters/static-half-roles.json",
+            "sha256": "242329150126387199b19df5c1b7df5dd4fad347f47d4b96719e55ebe2da9599",
+            "return_code": 0,
+            "elapsed_seconds": 0.2586097717285156
+          },
+          "pointer_roles": {
+            "path": "build/nvvm-resource-parameters/static-pointer-roles.json",
+            "sha256": "6e9d590b5aa79930995a29e64203c0ee5d348421c5132882307bf749ebe39eb0",
+            "return_code": 0,
+            "elapsed_seconds": 0.25824642181396484
+          },
+          "passed": 6,
+          "ignored": 0,
+          "scope": "48 carriers with both cache orders; all7readonly+7combined+5writable geometries,7query plans;8format/provenance cases and adjacent exclusions; existing Half/pointer roles. Static evidence precedes the unrelated loaded-view fake recorder repair."
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-resource-parameters/rhi-final.json",
+            "sha256": "885c4b02318a694ca59b04c1b08d5c9b47c16e54897771d1c905abf57286d3d1",
+            "return_code": 0,
+            "elapsed_seconds": 9.446778059005737
+          },
+          "passed_cases": 27,
+          "failed_cases": 0,
+          "passed_assertions": 105767,
+          "runtime_skips": 0,
+          "filtered_out": 915,
+          "original_failures_resolved": 24,
+          "new_fixtures": 3,
+          "optimization_scope": "New numeric/resource/surface fixtures each execute O0/O3; original24cases retain authored/default settings."
+        },
+        "comparison": {
+          "numeric_and_resource": {
+            "path": "build/nvvm-resource-parameters/rhi-nvrtc-before.json",
+            "sha256": "5773002e8da9a11a7e098bb0ff3039d6900cc60886ef8dd6afe519f7bd88a28e",
+            "return_code": 0,
+            "elapsed_seconds": 4.004198789596558
+          },
+          "passed_assertions": 1835,
+          "surface_dimensions": {
+            "path": "build/nvvm-resource-parameters/rhi-dimensions-nvrtc-before.json",
+            "sha256": "0ec618d71fe69a2d5ac5b8ffdc5a3a016e27ff1b4707b45d9e68fc0f58979a87",
+            "return_code": 1,
+            "elapsed_seconds": 2.523024797439575
+          },
+          "surface_passed_assertions": 73,
+          "surface_failed_assertions": 4,
+          "difference": "CUDA C++ returns0 for both array layer counts at O0/O3; independent allocation counts3/4 remain the oracle."
+        },
+        "surface_query_probe": {
+          "build": {
+            "path": "build/nvvm-resource-parameters/suq-driver-build.json",
+            "sha256": "2f44be1471ec11f0b75b338a3da03bd592b38a9793a367f1d972e65171454443",
+            "return_code": 0,
+            "elapsed_seconds": 0.515941858291626
+          },
+          "runtime": {
+            "path": "build/nvvm-resource-parameters/suq-driver-runtime.json",
+            "sha256": "c3200e47f448f20c6e33011c6fa43d66fbed45884ef7e9145a3b6fa39fa3b912",
+            "return_code": 2,
+            "elapsed_seconds": 0.3449900150299072
+          },
+          "outcomes": {
+            "path": "build/nvvm-resource-parameters/suq-driver-outcomes.json",
+            "sha256": "00a5509dfa70524d620eedf67772afa04481461dbcce62a2e40d9d95062528f9"
+          },
+          "sources": {
+            "path": "build/nvvm-resource-parameters/suq-driver-probe/source-identity.json",
+            "sha256": "7e6bdb73701d1d901dff1ac498e5e0ac255d322a52af0eb7e5d4f4ec701e0667"
+          },
+          "executed_queries": 15,
+          "unrun_array_size_queries": 5,
+          "scope": "All width/height/depth queries on5independent real R32Float surfaces pass guards/completion and exact descriptor binding. 1DArrayheight3 and2DArraydepth4 establish an empirical CUDA mapping. Separate array_size module rejects801; exit2 deliberately preserves that rejection, not a full probe pass."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-resource-parameters/smoke.json",
+            "sha256": "97dafe69ba941873d0ad0216641c7525869c7323ba9c4d641e4d8d9c47b220fc",
+            "return_code": 0,
+            "elapsed_seconds": 21.923800706863403
+          },
+          "selection": {
+            "path": "build/nvvm-resource-parameters/smoke-1/selection.json",
+            "sha256": "8b6238c9bdd4d4a79bd6e84fe5bc618310446b313ceeb98edd18de8c3e23f228"
+          },
+          "provenance": {
+            "path": "build/nvvm-resource-parameters/smoke-1/provenance.json",
+            "sha256": "f4fd3e12d3e5e5f8a832e21d81899e0d2174cec166e13f19be88695fe94e6d10"
+          },
+          "selected": 15,
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0,
+          "mode_counts": {
+            "nvvm-o0": 2,
+            "nvvm-o3": 13
+          }
+        },
+        "inventory": {
+          "record": {
+            "path": "build/nvvm-resource-parameters/rhi-inventory.json",
+            "sha256": "e4a8d12a13e24ae342eb95f9b0ed6a8c19f03b2ea265b697f02dd34744932d97",
+            "return_code": 0,
+            "elapsed_seconds": 0.2646369934082031
+          },
+          "registrations": 272,
+          "unique_names": 271,
+          "scope": "Listing only; exact manifest multiset matches. No new full-suite execution."
+        }
+      },
+      "contracts": [
+        "Shared provider-independent entry/helper type roles preserve existing pointer/storage boundaries. CUDA layout owns numeric byte size/alignment; vectors use entry-only byval scalar arrays, Bool/Half use integer carriers, Half3 padding never becomes a value.",
+        "Byte/structured views retain pointer/count ABI with bytes vs elements. GetEquivalentStructuredBuffer selects checked stride2/4/8, requires unsigned64 division before mutation, casts pointer and reconstructs element count; UInt32 is not an identity conversion.",
+        "Seven selected sampled/combined geometries, five writable geometries and regular samplers keep8-byte slots. Combined handles are not split. No new normalized formats, lane3texture values, MS/comparison/shadow shapes, RWCube,3Darrays or arbitrary helper format provenance.",
+        "Canonical entry formal, global field or exact descriptor conversion owns writable format. Queries use SUQ; logical array count maps to verified height/depth rather than driver-rejected array_size. This is scoped empirical CUDA qualification, not a universal PTX rule.",
+        "Integer1DArray fetch supports Float/Int/UInt32 widths1/2/4 and maps(x,layer) to(layer,x). Independent x17/layer5/mip2 provider assertions and real bindless execution qualify order.",
+        "Original full RHI269 outcomes remain immutable history; focused retries resolve24failures, leaving37. Three new fixtures yield current known225NVVMpass/37fail/10skip over272registrations. These mixed-age results are not another full-suite run."
+      ],
+      "failure_history": [
+        {
+          "stage": "before",
+          "numeric_resource": {
+            "path": "build/nvvm-resource-parameters/rhi-nvvm-before.json",
+            "sha256": "8b8f5383ce7707bd921dd7e50d514d2b6a5d31b5fd18b17e69d9f87139bf504a",
+            "return_code": 1,
+            "elapsed_seconds": 1.6541924476623535
+          },
+          "surface": {
+            "path": "build/nvvm-resource-parameters/rhi-dimensions-nvvm-before.json",
+            "sha256": "9964201307a834dc9350d1c2dbff25e9a4daa2d47e485065db06ce86ecd31ffc",
+            "return_code": 1,
+            "elapsed_seconds": 1.3546631336212158
+          },
+          "detail": "O0entry parameter/helperSampler1D rejects; O3unreached."
+        },
+        {
+          "stage": "initial_shared_build",
+          "record": {
+            "path": "build/nvvm-resource-parameters/build.json",
+            "sha256": "674f586a0047dfb6c5fbf466802cc968782a30a622c53e8d991a487e268bb96f",
+            "return_code": 1,
+            "elapsed_seconds": 72.57053065299988
+          },
+          "detail": "New SUQ test used nonexistent wrapper method; corrected to supportsTextureOperation."
+        },
+        {
+          "stage": "shared_build_retry",
+          "record": {
+            "path": "build/nvvm-resource-parameters/build-retry.json",
+            "sha256": "c64996798d3f58846af2268d7c4dcf9d873b72ed237e781e86e173cc2320d49e",
+            "return_code": 1,
+            "elapsed_seconds": 79.56199908256531
+          },
+          "detail": "Entry wrapper accepted IRInst* but classifier requires IRType*. Canonical callers already pass IRType; declaration/definition tightened."
+        },
+        {
+          "stage": "first_family_run",
+          "record": {
+            "path": "build/nvvm-resource-parameters/rhi-after.json",
+            "sha256": "3035cb2c82a36bc74390aa275cece2967be5f2bc42629cbabf146461a1e1a1ca",
+            "return_code": 1,
+            "elapsed_seconds": 8.390668869018555
+          },
+          "detail": "24pass3fail: byte GetDimensions CUDA GenericAsm and two SUQ stale wrapper enum rejections. Typed core selection and provider-owned descriptor admission repair them."
+        },
+        {
+          "stage": "second_family_run",
+          "record": {
+            "path": "build/nvvm-resource-parameters/rhi-repair.json",
+            "sha256": "fdb133de3659ec324a63dc267a733caeb6f29713258974180df818fb53dd63a7",
+            "return_code": 1,
+            "elapsed_seconds": 8.83342432975769
+          },
+          "detail": "25pass2fail: byte sizes128vs32 at words53/54 O0/O3 and surface array_size module801. Correct equivalent-view count units and use directly verified SUQphysicalqueries; oracles unchanged."
+        },
+        {
+          "stage": "existing_fake_regressions",
+          "record": {
+            "path": "build/nvvm-resource-parameters/existing-view-units.json",
+            "sha256": "fe5b57e4f4897cd4b45b9a8671caafde39a55a21ea8e810741077b2783e6b19b",
+            "return_code": 1,
+            "elapsed_seconds": 1.8642089366912842
+          },
+          "detail": "Loaded resource view recorder allowed pointer field0 but rejected count1; exact old constructor/extraction expectations retained the retired UInt32identity. Reuse recorded type ownership, remove fallback, assert quotient/source dataflow; test-only retry passes."
+        },
+        {
+          "stage": "low_level_probe",
+          "record": {
+            "path": "build/nvvm-resource-parameters/suq-probe.json",
+            "sha256": "52450c8dea753e7867517873dd50931f4d08f51c80be166f5483dc391fc7fc58",
+            "return_code": 9,
+            "elapsed_seconds": 0.03448629379272461
+          },
+          "retry": {
+            "path": "build/nvvm-resource-parameters/suq-probe-layout.json",
+            "sha256": "18bb1bad9063b27f1a7f58e52dbd086d1c3499aa842573fdd9ff5f757da1fd62",
+            "return_code": 0,
+            "elapsed_seconds": 0.13749146461486816
+          },
+          "detail": "Initial minimal LLVM probe lacked required datalayout; provider-layout retry emits all4SUQinstructions. Compilation did not establish driver array_size support."
+        }
+      ],
+      "qualification": [
+        "All relevant positive/negative/runtime checks preserve exact oracles; no failure was demoted. No new module/provider/container version.",
+        "No new working-corpus admission or full Slang/RHI checkpoint. Current working inventory1713/exploratory459/smoke15; one implementation since the prior accepted working checkpoint.",
+        "Original full baseline and all80earlier unrelated feature objects remain unchanged. Raw evidence and five-part report stay ignored; current architecture/status/manifest updated in place."
+      ],
+      "rhi_fixture_commit": "7280a008b2056cb4f772660bac8a1857fa1dffb5"
     }
   }
 }

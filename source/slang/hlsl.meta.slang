@@ -178,6 +178,7 @@ struct ByteAddressBuffer
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
+        case nvvm:
         default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
@@ -1301,6 +1302,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().Sample(__getSampler(), location);
             case glsl:
                 __intrinsic_asm "$ctexture($0, $1)$z";
+            case nvvm:
+                return __nvvmTextureSample(this, __getSampler(), location);
             case cuda:
                 if (isArray != 0)
                 {
@@ -2166,6 +2169,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return __getTexture().SampleLevel(__getSampler(), location, level);
             case glsl:
                 __intrinsic_asm "$ctextureLod($0, $1, $2)$z";
+            case nvvm:
+                return __nvvmTextureSampleLevel(this, __getSampler(), location, level);
             case cuda:
                 // The 'tex*Lod<T>' CUDA runtime built-ins below are specialized only
                 // for float/uint/int vector types (no __half overload), so a half texel
@@ -6440,6 +6445,7 @@ struct $(item.name)
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
+        case nvvm:
         default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }

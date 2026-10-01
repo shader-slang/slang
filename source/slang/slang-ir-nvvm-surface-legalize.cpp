@@ -39,6 +39,38 @@ IRStructField* findSurfaceField(IRInst* resource)
     return field && isTypeEqual(field->getFieldType(), resource->getDataType()) ? field : nullptr;
 }
 
+// Entry uniforms retain their own format decoration; collected globals retain it on the key.
+// A descriptor conversion establishes native typed storage, but does not invent an annotation
+// for an arbitrary helper parameter or recover formats from its possible callers.
+bool getSurfaceFormat(IRInst* resource, NVVMSurfaceType& type, SlangNVVMValueTypeDesc& physical)
+{
+    if (auto field = findSurfaceField(resource))
+        return getNVVMSupportedSurfaceField(field, type, physical);
+    if (auto param = as<IRParam>(resource))
+    {
+        auto block = as<IRBlock>(param->getParent());
+        auto function = block ? as<IRFunc>(block->getParent()) : nullptr;
+        if (function && function->getFirstBlock() == block &&
+            function->findDecoration<IREntryPointDecoration>())
+            return getNVVMSupportedSurfaceFormat(
+                param->getDataType(),
+                param->findDecoration<IRFormatDecoration>(),
+                type,
+                physical);
+    }
+    if (resource && resource->getOp() == kIROp_CastDescriptorHandleToResource &&
+        resource->getOperandCount() == 1)
+    {
+        IRType* resourceType = nullptr;
+        if (asNVVMSupportedDescriptorHandleType(
+                resource->getOperand(0)->getDataType(),
+                &resourceType) &&
+            isTypeEqual(resourceType, resource->getDataType()))
+            return getNVVMSupportedSurfaceFormat(resourceType, nullptr, type, physical);
+    }
+    return false;
+}
+
 // Builds the one physical contract used for reads, writes, and masked updates. Unsupported static
 // formats and resource provenance remain for NVVM preflight to reject; no runtime inference occurs.
 bool getSurfaceAccess(
@@ -49,8 +81,7 @@ bool getSurfaceAccess(
 {
     NVVMSurfaceType surfaceType;
     SlangNVVMValueTypeDesc physicalType = {};
-    if (!resource || !coordinate ||
-        !getNVVMSupportedSurfaceField(findSurfaceField(resource), surfaceType, physicalType) ||
+    if (!resource || !coordinate || !getSurfaceFormat(resource, surfaceType, physicalType) ||
         (physicalType.laneCount != 1 && physicalType.laneCount != 2 && physicalType.laneCount != 4))
         return false;
 

@@ -205,6 +205,26 @@ through caller, AnyHit, ClosestHit and miss, including complete output buffers a
 both names with the same compiler/device options. Their local geometry prevents duplicate AnyHit
 invocations; they do not require matrix queries or a full-suite run.
 
+For numeric/resource entry transport, select `numeric-entry-abi.cuda`,
+`resource-parameter-abi.cuda` and `surface-dimensions.cuda`. Each runs O0/O3 internally. The first
+checks all 48 scalar/vector argument shapes, CUDA member offsets, adjacent tails and exact lane
+bits. The second checks mixed resource bindings, buffer mutations, untouched allocations and
+combined 1D/1DArray samplers. The third checks every writable geometry and a Half surface using
+independent allocation dimensions and guarded output.
+
+```bash
+"$RHI_BUILD/RelWithDebInfo/slang-rhi-tests" --select-devices=cuda --require-devices=cuda \
+  --cuda-compiler=nvvm \
+  --test-case=numeric-entry-abi.cuda,resource-parameter-abi.cuda,surface-dimensions.cuda
+```
+
+The CUDA C++ comparison currently returns zero for surface array counts, failing the third
+fixture's expected counts 3 and 4 at both optimization levels. Preserve those four comparison
+mismatches; do not change the independent oracle to match them. Existing application retries
+keep their authored/default optimization settings. Select affected names from
+[rhi-cuda-status.json](rhi-cuda-status.json) and preserve the original full-run history. A focused
+retry updates only its executed cases and does not constitute another full-suite run.
+
 When the broader suite is requested, capture the registered inventory and run all CUDA cases:
 
 ```bash

@@ -252,7 +252,7 @@ transforming physical-storage pass.
 Canonical IR types, field keys and instructions remain the semantic source of truth. Equal physical
 LLVM types do not imply equal Slang semantics: Half/BF16 both occupy 16 bits, and the two FP8 formats
 both occupy 8 bits. `classifyNVVMType` provides provider-independent canonical analysis shared by
-helper signature preflight and type lowering. `NVVMTypeInfo::supports` owns role distinctions.
+entry/helper signature preflight and type lowering. `NVVMTypeInfo::supports` owns role distinctions.
 Actual argument provenance, export restrictions and CUDA/LLVM layout compatibility remain separate
 proofs.
 
@@ -262,6 +262,24 @@ checked **before** cache access. Value/helper/storage representations have disti
 pointer key includes its pointee use. A successful storage lookup cannot authorize a previously
 unsupported value, external reference or exported signature. Copyable HelperValue requests redirect
 to Value before cache access, preserving request-order independence.
+
+Compute entry numeric parameters retain the CUDA launch layout selected by the shared layout
+rules. Preflight records scalar kind, semantic lane count, storage extent and explicit alignment.
+Scalar Bool/Half use i8/i16 carriers; other scalar kinds retain their ordinary physical type.
+All numeric vectors use entry-only byval scalar arrays, then decode into ordinary SSA before the
+body. For example, double3 consumes 24 bytes rather than LLVM vector storage's 32, and Half3
+consumes four half storage lanes while decoding only three semantic lanes. This representation
+has its own cache and does not alter helper, local or resource storage.
+
+Byte/structured buffer entry values retain pointer-plus-count storage, with bytes for byte buffers
+and elements for structured buffers. A checked equivalent-structured-view plan selects the element
+stride, reinterprets the pointer and divides the byte extent by that stride. A UInt32 view is not
+an identity conversion: preserving its byte count would make GetDimensions four times too large.
+Sampled textures, writable
+surfaces, regular samplers and combined texture/samplers retain their existing eight-byte CUDA
+slots. Combined textures remain one fused handle; core sample composition projects the placeholder
+sampler without splitting the launch ABI. Admitting a handle does not grant arbitrary surface
+format provenance or unsupported resource operations.
 
 Half helper parameters/results use physical i16 scalars or `<N x i16>` vectors for admitted widths
 2–4, while body values remain canonical Half. Callers encode arguments, callees decode parameters,
@@ -506,9 +524,11 @@ Several implementation exceptions carry independent contracts:
 
 ## Resources and evidence boundaries
 
-Surface legalization runs before shared subscript expansion discards component masks. The canonical
-collected field's static format selects physical payload types, explicit conversion and byte-X
-coordinates; equal logical types can therefore access different formats. The provider emits typed
+Surface legalization runs before shared subscript expansion discards component masks. A shared
+validator reads the canonical resource type and optional format metadata from a collected field,
+first-block entry formal or exact descriptor-to-resource conversion. That checked owner selects
+physical payload types, explicit conversion and byte-X coordinates; equal logical types can
+therefore access different formats. The provider emits typed
 operations and mechanical register transport, not format discovery or implicit storage conversion. Component
 updates preserve untouched raw lanes and remain non-atomic. In-range dynamic scalar components
 select the converted replacement against each old physical lane; only the replacement is converted.
@@ -536,6 +556,15 @@ uses independent host readback and preserves existing NVRTC compile/rounding fai
 use RN-even, including subnormal/overflow boundaries; the NVRTC formatted-store truncation behavior
 is separate. [The resource ledger](nvvm-backend-capability-ledger.md#texture-surface-and-descriptor-contracts)
 owns exact shapes, format admissions and retained exclusions.
+
+Surface dimensions use their own SUQ descriptor namespace, with width/height/depth for spatial
+axes and a distinct array-count operation for 1DArray/2DArray layers. The qualified CUDA driver
+rejects PTX suq.array_size at module load. Independent real-array probes establish height/depth
+as the layer extent for its 1DArray/2DArray surface descriptors, so the provider uses those physical
+queries. This is an empirically qualified CUDA mapping, not a universal PTX array_size equivalence.
+Sampled-texture TXQ operations cannot query surface handles. Both descriptor families validate shape, element storage and operands before creating any
+LLVM instruction. Integer 1DArray fetches similarly preserve canonical (x, layer) coordinates until
+the provider selects PTX's (layer, x) order.
 
 Texture operations use canonical sample/fetch/gather/query IR with typed resources, samplers,
 coordinates and results. Existing ignored gather offsets and zero array-count outputs are not full

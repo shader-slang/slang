@@ -81,7 +81,7 @@ void checkHalfBoundaryCacheOrders(UnitTestContext* testContext, uint32_t laneCou
                     : value;
             SLANG_CHECK(actual == expected);
         }
-        for (auto forbidden : {NVVMTypeUse::EntryPointParameter, NVVMTypeUse::EntryPointResult})
+        for (auto forbidden : {NVVMTypeUse::EntryPointResult})
         {
             SlangNVVMTypeHandle actual = boundary;
             SLANG_CHECK(SLANG_FAILED(lowering.lowerType(canonical, forbidden, actual)));
@@ -357,5 +357,113 @@ SLANG_UNIT_TEST(nvvmAccelerationHandlesKeepOpaqueRoles)
                 SLANG_CHECK(actual == nullptr);
             }
         }
+    }
+}
+
+// CUDA parameter storage and ordinary SSA remain distinct even when either cache is populated
+// first.
+SLANG_UNIT_TEST(nvvmNumericEntryCarriersPreserveCudaPacking)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    const IROp scalarOps[] = {
+        kIROp_BoolType,
+        kIROp_Int8Type,
+        kIROp_UInt8Type,
+        kIROp_Int16Type,
+        kIROp_UInt16Type,
+        kIROp_IntType,
+        kIROp_UIntType,
+        kIROp_Int64Type,
+        kIROp_UInt64Type,
+        kIROp_HalfType,
+        kIROp_FloatType,
+        kIROp_DoubleType,
+    };
+    const uint32_t bytes[] = {1, 1, 1, 2, 2, 4, 4, 8, 8, 2, 4, 8};
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    for (Index kind = 0; kind < SLANG_COUNT_OF(scalarOps); ++kind)
+        for (uint32_t lanes = 1; lanes <= 4; ++lanes)
+        {
+            auto scalar = ir.getType(scalarOps[kind]);
+            IRType* type = lanes == 1 ? scalar : ir.getVectorType(scalar, lanes);
+            const bool half = scalarOps[kind] == kIROp_HalfType;
+            const bool boolean = scalarOps[kind] == kIROp_BoolType;
+            const auto storedLanes = half && lanes == 3 ? 4u : lanes;
+            const auto expectedSize = storedLanes * bytes[kind];
+            const auto expectedAlignment = half && lanes >= 3 ? 4u
+                                           : lanes == 3       ? bytes[kind]
+                                                              : Math::Min(16u, lanes * bytes[kind]);
+            NVVMEntryNumericLayout layout;
+            SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, type, layout));
+            SLANG_CHECK(layout.size == expectedSize && layout.alignment == expectedAlignment);
+            SLANG_CHECK(layout.laneCount == lanes && layout.storageLaneCount == storedLanes);
+            SLANG_CHECK(layout.scalarBitWidth == bytes[kind] * 8);
+            SLANG_CHECK(layout.isBoolean == boolean && layout.isHalf == half);
+            SLANG_CHECK(isNVVMSupportedParameterType(type));
+            SLANG_CHECK(classifyNVVMType(type).supports(NVVMTypeUse::EntryPointParameter));
+            for (bool entryFirst : {false, true})
+            {
+                ScopedNVVMBuilderModule scope;
+                scope.builder = &provider;
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(provider.createModule(toSlice("entry-numeric"), scope.module)));
+                NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+                SlangNVVMTypeHandle logical = nullptr;
+                SlangNVVMTypeHandle actual = nullptr;
+                if (!entryFirst)
+                    SLANG_CHECK_ABORT(
+                        SLANG_SUCCEEDED(lowering.lowerType(type, NVVMTypeUse::Value, logical)));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    lowering.lowerType(type, NVVMTypeUse::EntryPointParameter, actual)));
+                SlangNVVMTypeHandle physicalScalar = nullptr;
+                if (half || boolean)
+                {
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        provider.getIntegerType(scope.module, bytes[kind] * 8, physicalScalar)));
+                }
+                else
+                {
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        lowering.lowerType(scalar, NVVMTypeUse::Value, physicalScalar)));
+                }
+                SlangNVVMTypeHandle expected = physicalScalar;
+                if (lanes > 1)
+                {
+                    SlangNVVMTypeHandle array = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        provider.getArrayType(scope.module, physicalScalar, storedLanes, array)));
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+                        scope.module,
+                        array,
+                        SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+                        expected)));
+                }
+                SLANG_CHECK(actual == expected);
+                SlangNVVMTypeHandle after = nullptr;
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(lowering.lowerType(type, NVVMTypeUse::Value, after)));
+                if (!entryFirst)
+                    SLANG_CHECK(after == logical);
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    lowering.lowerType(type, NVVMTypeUse::EntryPointParameter, actual)));
+                SLANG_CHECK(actual == expected);
+                if (lanes > 1 || half || boolean)
+                    SLANG_CHECK(after != actual);
+            }
+        }
+    for (auto type :
+         {ir.getType(kIROp_BFloat16Type),
+          ir.getType(kIROp_FloatE4M3Type),
+          ir.getType(kIROp_FloatE5M2Type),
+          static_cast<IRType*>(
+              ir.getArrayType(ir.getFloatType(), ir.getIntValue(ir.getIntType(), 3)))})
+    {
+        NVVMEntryNumericLayout layout;
+        SLANG_CHECK(!getNVVMEntryNumericLayout(&context.codeGen, type, layout));
+        SLANG_CHECK(!isNVVMSupportedParameterType(type));
     }
 }

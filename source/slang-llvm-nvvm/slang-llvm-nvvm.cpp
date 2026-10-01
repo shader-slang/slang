@@ -4967,11 +4967,29 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
         (operation.elementType.laneCount == 1 || operation.elementType.laneCount == 2 ||
          operation.elementType.laneCount == 4);
     const bool isGatherElement = isNumericElement && operation.elementType.laneCount == 4;
+    // Surface handles belong to a distinct descriptor namespace from sampled textures.
+    // Reuse surface storage admission so dimension queries cover the same element family.
+    const SlangNVVMSurfaceOperationDesc surface = {
+        SLANG_NVVM_SURFACE_OP_LOAD,
+        operation.shape,
+        operation.isArray,
+        operation.elementType,
+        SLANG_NVVM_SURFACE_BOUNDARY_ZERO,
+    };
+    const bool isSurface = _isSurfaceOperationSupported(surface);
     switch (operation.operation)
     {
     case SLANG_NVVM_TEXTURE_OP_SAMPLE:
     case SLANG_NVVM_TEXTURE_OP_SAMPLE_LEVEL:
         return isSampleElement;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH:
+        return isSurface;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_HEIGHT:
+        return isSurface && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH:
+        return isSurface && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE:
+        return isSurface && operation.isArray;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return isNumericElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
@@ -4984,7 +5002,8 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
     case SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL:
         return isNumericElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D ||
-                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray));
+                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && !operation.isArray) ||
+                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D && operation.isArray));
     case SLANG_NVVM_TEXTURE_OP_GATHER:
         return isGatherElement && operation.shape == SLANG_NVVM_TEXTURE_SHAPE_2D &&
                !operation.isArray && operation.component < 4;
@@ -5011,6 +5030,18 @@ static llvm::Intrinsic::ID _getTextureIntrinsicID(const SlangNVVMTextureOperatio
 
     switch (operation.operation)
     {
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_WIDTH:
+        return llvm::Intrinsic::nvvm_suq_width;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_HEIGHT:
+        return llvm::Intrinsic::nvvm_suq_height;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_DEPTH:
+        return llvm::Intrinsic::nvvm_suq_depth;
+    case SLANG_NVVM_TEXTURE_OP_SURFACE_QUERY_ARRAY_SIZE:
+        // CUDA's layered surface descriptors expose the layer extent as height for 1D arrays
+        // and depth for 2D arrays. The qualified driver rejects suq.array_size at module load;
+        // keep the logical array role explicit while selecting these verified physical queries.
+        return operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D ? llvm::Intrinsic::nvvm_suq_height
+                                                              : llvm::Intrinsic::nvvm_suq_depth;
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return llvm::Intrinsic::nvvm_txq_width;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
@@ -5182,6 +5213,15 @@ static SlangResult SLANG_NVVM_CALL _emitTextureOperation(
             constraints += ",r,r,r";
             arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(0)));
             arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(1)));
+        }
+        else if (operation->shape == SLANG_NVVM_TEXTURE_SHAPE_1D && operation->isArray)
+        {
+            assembly = std::string("tex.level.a1d.v4.") + dataType +
+                       ".s32 {$0, $1, $2, $3}, [$4, {$5, $6}], $7;";
+            constraints += ",r,r,r";
+            // Slang supplies (x, layer); PTX requires the layer before the spatial coordinate.
+            arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(1)));
+            arguments.push_back(state->builder.CreateExtractElement(coordinate, uint64_t(0)));
         }
         else if (operation->shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
         {

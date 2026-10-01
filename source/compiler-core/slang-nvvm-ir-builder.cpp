@@ -358,8 +358,8 @@ SlangResult NVVMIRBuilder::emitTextureOperation(
                 operation.operation == SLANG_NVVM_TEXTURE_OP_FETCH_LEVEL
             ? 3
             : 1;
-    if (operation.operation > SLANG_NVVM_TEXTURE_OP_SAMPLE ||
-        operandCount != expectedOperandCount || !operands)
+    // The provider owns descriptor admission, including appended operation codes.
+    if (operandCount != expectedOperandCount || !operands)
     {
         return SLANG_E_INVALID_ARG;
     }

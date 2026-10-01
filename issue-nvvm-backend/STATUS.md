@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 81 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty-five feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 82 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -328,11 +328,34 @@ diagnostic, comparison, skip reason, compiler-route exception and unresolved fam
 | Pointer-bearing record, bindless fetch, typed-buffer global, cluster query, callable ABI, intersection stage | 1 each |
 
 These groups identify the first observed rejection, not necessarily the complete root cause.
-**Next work:** scope and implement the complete resource-parameter transport family, including
-related texture/sampler variants and shared storage/binding prerequisites, guided by the entry-point
-failures. Refine the manifest as deeper causes emerge. The maintainer requires complete families;
-do not declare completion from an isolated operation. Use focused family retries and smoke, with
-working checkpoints every three to five implementation batches. Further full RHI runs remain on demand.
+The complete selected resource-parameter family is now accepted. All 24 original failures in its
+scope pass, together with three new RHI fixtures: 27 cases / 105,767 assertions, no skips. The new
+fixtures execute O0/O3 and check all 48 numeric entry shapes, buffer/view counts, texture/sampler/
+combined handles and five writable texture geometries. Six static tests, focused provider/emitter
+checks and all 15 smoke cells pass. Two existing fake-provider regressions were repaired and their
+exact retries pass; production binaries stayed unchanged for that test-only repair.
+
+Entry transport uses CUDA layout and separate carriers without changing ordinary helper/storage
+roles. Equivalent structured views now convert byte extents to element counts at the conversion
+boundary. Writable formats retain explicit declaration/descriptor ownership. Surface layer counts
+use directly qualified CUDA height/depth queries: the separate `suq.array_size` probe rejects at
+module load with CUDA801. The NVRTC surface fixture returns zero instead of layer counts 3/4 at
+both O0/O3; its four wrong assertions remain recorded, with the allocation-based oracle unchanged.
+
+The manifest preserves the original full run and all failed attempts. Focused updates plus three
+new fixtures give **225 pass / 37 fail / 10 skip** among 272 current NVVM registrations. These are
+mixed-age known outcomes, not another full-suite run. NVRTC has 261 pass / 1 fail / 10 skip, with
+the new surface-dimension discrepancy. Current unresolved groups: HitObject representation 26,
+active-list matrix composition 4, trace payload 2, and one each for pointer-bearing records,
+typed-buffer globals, cluster queries, callable ABI and intersection stages. Raw family evidence:
+`build/nvvm-resource-parameters`; current contracts and exact identities are in focused evidence.
+
+**Next work:** investigate the complete HitObject representation/operation family against its
+26 retained RHI failures, including producer, stage and payload prerequisites before implementation.
+The maintainer requires complete families; isolated operations do not establish completion.
+There is one implementation since the accepted 1,713-cell working checkpoint. Continue focused
+family checks plus smoke; working runs remain every three to five batches or sooner for concrete
+shared risks. Further full RHI runs remain on demand.
 
 Public composite ObjectToWorld/WorldToObject matrices remain unsupported; their complete family
 requires static/motion semantics and full direction-dependent list composition. A single-instance

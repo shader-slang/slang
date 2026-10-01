@@ -7,7 +7,8 @@ inventories and outcomes. Source test links below identify durable contracts; th
 records which compiler and inputs were actually tested. Deeper historical evidence is available through the
 [archive guide](../../issue-nvvm-backend/HISTORY.md).
 
-Helper parameter/result admission and provider lowering use the same `NVVMTypeInfo` role policy.
+Entry and helper parameter/result admission and provider lowering share provider-independent
+`NVVMTypeInfo` role analysis.
 Argument provenance, exported ABI restrictions and physical layout compatibility remain separate
 requirements; sharing type classification does not broaden any qualified role.
 
@@ -560,6 +561,25 @@ requires `membar.cta` without `bar.sync`. This preserves existing barrier scopes
 subgroup and WithGroupSync mappings. It does not qualify arbitrary transitive helper convergence:
 LLVM convergence metadata is retained on the intrinsic but is not propagated to helper declarations.
 
+## CUDA entry parameter transport
+
+Compute entries accept Bool, signed/unsigned 8/16/32/64-bit integers, Half, Float and Double,
+each scalar or vector2/3/4. Shared CUDA layout owns size/alignment; entry-only byval scalar arrays
+carry vectors, Bool uses byte transport, and Half uses integer bit transport. Half3's fourth storage
+lane is padding. Ordinary value, helper and storage caches keep their own roles. The sibling RHI
+`numeric-entry-abi` fixture independently checks all 48 shapes, exact bits and neighboring words at
+O0/O3. General arrays/matrices, BF16/FP8 and unsupported pointer roles are not added.
+
+Byte/structured buffers retain pointer/count transport, with counts in bytes/elements respectively.
+Equivalent structured views divide byte extents by the checked element stride (2/4/8), including
+UInt32 views; pointer reinterpretation does not preserve the count units. Division support is
+checked before provider mutation. Seven supported readonly and combined texture geometries,
+five writable geometries and regular samplers retain single 64-bit slots. Combined handles are
+not split. The sibling `resource-parameter-abi` fixture checks mixed entry layout, resource contents,
+helper transport, dimensions and guards at O0/O3. Static tests cover role/cache order and rejection
+boundaries; focused evidence retains all 24 resolved original RHI failures and three new fixtures.
+No new main-corpus admission or full checkpoint is implied.
+
 ## Texture, surface and descriptor contracts
 
 | Region                                  | Current contract / evidence                                                                                                        | Limits / regression                                                                                                                                                                                                                                                                                           |
@@ -577,9 +597,22 @@ preflight; sampler validation remains required, while the provider still uses CU
 state. Gather offsets remain ignored. Non-mip Texture1DArray/Texture2DArray layer counts use a
 distinct scalar UInt32 query mapped to `txq.height`/`txq.depth` with the real array descriptor
 preserved. Spatial rank remains one/two. Integer and Float32 outputs use ordinary numeric casts; other array-count bodies retain the previous zero
-fallback. Mip, multisample and writable-resource admission remain unchanged. Public direct
+fallback. Mip and multisample admission remain unchanged. Writable dimensions are qualified
+separately below. Public direct
 RWTexture2DArray.Store gains the same native32 path already admitted by canonical image stores.
 Float3 sampling, extra access modes and query-level admission remain excluded.
+
+Writable dimension queries cover 1D/2D/3D/1DArray/2DArray and use surface queries, preserving
+existing scalar kinds and widths1/2/4. Global fields, entry formals or exact descriptor conversions
+own writable format; arbitrary helper format provenance and normalized/mismatched memory accesses
+remain rejected. The sibling `surface-dimensions` fixture checks native Float shapes and a formatted
+Half surface at O0/O3. Direct CUDA array probes qualify height as 1DArray layer count and depth as
+2DArray layer count on the tested driver/toolkit. This is an empirical CUDA representation contract,
+not a universal PTX rule: isolated `suq.array_size` fails module loading with CUDA801. CUDA C++ gives
+zero for the two array counts at O0/O3; the allocation-based expected counts remain 3 and 4.
+Integer 1DArray fetch covers Float/Int/UInt32 widths1/2/4 and explicitly reorders `(x, layer)` to
+PTX `(layer, x)`; provider assertions and real bindless RHI execution qualify that ordering.
+Lane3 texture values, MS/comparison/shadow resources, RWCube and 3D arrays remain excluded.
 
 All active semantic tags and resource-text recognizers are retired. Deprecated AST/IR serialized
 slots remain inert under module 43; ABI 46/container 2 are unchanged. Exact removed-tag/text tests

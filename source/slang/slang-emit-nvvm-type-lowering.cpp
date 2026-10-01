@@ -3,6 +3,7 @@
 #include "slang-base-type-info.h"
 #include "slang-code-gen.h"
 #include "slang-diagnostics.h"
+#include "slang-ir-layout.h"
 
 namespace Slang
 {
@@ -1803,17 +1804,33 @@ bool getNVVMSupportedSurfaceField(
     NVVMSurfaceType& outType,
     SlangNVVMValueTypeDesc& outPhysicalType)
 {
+    return getNVVMSupportedSurfaceFormat(
+        field ? field->getFieldType() : nullptr,
+        field ? field->getKey()->findDecoration<IRFormatDecoration>() : nullptr,
+        outType,
+        outPhysicalType);
+}
+
+bool getNVVMSupportedSurfaceFormat(
+    IRInst* type,
+    IRFormatDecoration* formatDecoration,
+    NVVMSurfaceType& outType,
+    SlangNVVMValueTypeDesc& outPhysicalType)
+{
     outType = {};
     outPhysicalType = {};
-    if (!field || !getNVVMSupportedSurfaceType(field->getFieldType(), outType))
+    if (!getNVVMSupportedSurfaceType(type, outType))
         return false;
 
     outPhysicalType = outType.elementType;
-    auto formatDecoration = field->getKey()->findDecoration<IRFormatDecoration>();
-    if (!formatDecoration)
+    const auto typeFormat = ImageFormat(outType.textureType->getFormat());
+    const auto format = formatDecoration ? formatDecoration->getFormat() : typeFormat;
+    if (formatDecoration && typeFormat != ImageFormat::unknown && typeFormat != format)
+        return false;
+    if (format == ImageFormat::unknown)
         return true;
 
-    const ImageFormatInfo& formatInfo = getImageFormatInfo(formatDecoration->getFormat());
+    const ImageFormatInfo& formatInfo = getImageFormatInfo(format);
     if (formatInfo.channelCount != outType.elementType.laneCount)
         return false;
 
@@ -1827,7 +1844,7 @@ bool getNVVMSupportedSurfaceField(
         // Normalized formats also use UINT8/UINT16 metadata. Only these exact integer formats
         // select integer conversion; matching scalar width alone would silently admit UNORM.
         // Logical32 can convert to narrower storage; native narrow values require matching width.
-        switch (formatDecoration->getFormat())
+        switch (format)
         {
         case ImageFormat::r8i:
         case ImageFormat::rg8i:
@@ -1877,8 +1894,7 @@ bool getNVVMSupportedReadOnlyTextureType(IRInst* type, NVVMReadOnlyTextureType& 
     auto textureType = as<IRTextureTypeBase>(type);
     if (!textureType || textureType->getOp() != kIROp_TextureType ||
         textureType->getOperandCount() < 9 || textureType->isMultisample() ||
-        textureType->isShadow() || textureType->isCombined() ||
-        textureType->getAccess() != SLANG_RESOURCE_ACCESS_READ)
+        textureType->isShadow() || textureType->getAccess() != SLANG_RESOURCE_ACCESS_READ)
     {
         return false;
     }
@@ -1938,8 +1954,10 @@ IRDescriptorHandleType* asNVVMSupportedDescriptorHandleType(IRInst* type, IRType
     IRType* resourceType = handleType ? handleType->getResourceType() : nullptr;
     NVVMRawBufferType rawBufferType;
     NVVMReadOnlyTextureType sampledTextureType;
+    NVVMSurfaceType surfaceType;
     if (!handleType || (!getNVVMSupportedRawBufferType(resourceType, rawBufferType) &&
                         !getNVVMSupportedReadOnlyTextureType(resourceType, sampledTextureType) &&
+                        !getNVVMSupportedSurfaceType(resourceType, surfaceType) &&
                         !asNVVMSupportedSamplerValueType(resourceType)))
     {
         return nullptr;
@@ -2121,18 +2139,48 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
     return ptrType;
 }
 
-bool isNVVMSupportedParameterType(IRInst* type)
+bool getNVVMEntryNumericLayout(
+    CodeGenContext* context,
+    IRType* type,
+    NVVMEntryNumericLayout& outLayout)
 {
-    NVVMRawBufferType rawBufferType;
-    IRType* parameterGroupElementType = nullptr;
-    return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedResourceStructType(type) ||
-           (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType) &&
-            hasNVVMParameterGroupStorageValueRepresentation(parameterGroupElementType)) ||
-           asNVVMSupportedDeviceNumericPointerType(type) ||
-           asNVVMSupportedLayoutTransportPointerType(type) ||
-           asNVVMSupportedDeviceArrayPointerType(type) ||
-           getNVVMSupportedRawBufferType(type, rawBufferType);
+    outLayout = {};
+    if (!context || !isNVVMSupportedValueType(type))
+        return false;
+    auto vector = asNVVMSupportedValueVectorType(type);
+    IRType* scalar = vector ? vector->getElementType() : type;
+    IRSizeAndAlignment layout;
+    IRSizeAndAlignment scalarLayout;
+    if (SLANG_FAILED(getSizeAndAlignment(
+            context->getTargetReq(),
+            IRTypeLayoutRules::getCUDA(),
+            type,
+            &layout)) ||
+        SLANG_FAILED(getSizeAndAlignment(
+            context->getTargetReq(),
+            IRTypeLayoutRules::getCUDA(),
+            scalar,
+            &scalarLayout)) ||
+        scalarLayout.size <= 0 || scalarLayout.size > 8 || layout.size <= 0 || layout.size > 32 ||
+        layout.size % scalarLayout.size || layout.alignment <= 0 || layout.alignment > 16)
+        return false;
+    outLayout.type = type;
+    outLayout.scalarType = scalar;
+    outLayout.isVector = vector != nullptr;
+    outLayout.laneCount =
+        vector ? uint32_t(cast<IRIntLit>(vector->getElementCount())->getValue()) : 1;
+    outLayout.storageLaneCount = uint32_t(layout.size / scalarLayout.size);
+    outLayout.scalarBitWidth = uint32_t(scalarLayout.size * 8);
+    outLayout.size = uint32_t(layout.size);
+    outLayout.alignment = uint32_t(layout.alignment);
+    outLayout.isBoolean = isNVVMBoolType(scalar);
+    outLayout.isHalf = isNVVMFloat16Type(scalar);
+    return outLayout.storageLaneCount >= outLayout.laneCount && outLayout.storageLaneCount <= 4;
+}
+
+bool isNVVMSupportedParameterType(IRType* type)
+{
+    return classifyNVVMType(type).supports(NVVMTypeUse::EntryPointParameter);
 }
 
 static bool _isNVVMSupportedStructuredBufferStorageType(IRInst* type, HashSet<IRInst*>& activeTypes)
@@ -2563,11 +2611,12 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
         return isVoid;
     case NVVMTypeUse::HelperResult:
         return isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
-               localHelperPointer || isRawBuffer || isSampledTexture;
+               localHelperPointer || isRawBuffer || isSampledTexture || isSurface || samplerValue;
     case NVVMTypeUse::EntryPointParameter:
-        return isInteger || isFloat32 || resourceStructType || deviceNumericPointer ||
-               deviceCopyablePointer || devicePhysicalStoragePointer || deviceArrayPointer ||
-               isRawBuffer || (parameterGroup && hasParameterGroupValueRepresentation);
+        return isInteger || isFloatingPoint || isBool || valueVectorType || resourceStructType ||
+               deviceNumericPointer || deviceArrayPointer || isRawBuffer || isSampledTexture ||
+               isSurface || samplerValue ||
+               (parameterGroup && hasParameterGroupValueRepresentation);
     case NVVMTypeUse::HelperParameter:
         return isHelperValue || resourceStructType || localResourceStructPointer ||
                localCopyablePointer || localHelperPointer || helperReferencePointer ||
@@ -2702,6 +2751,44 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
     const auto info = classifyNVVMType(type);
     m_typeInfoMap[type] = info;
     return info;
+}
+
+// Consider `kernel(uniform double3 value, uniform uint tail)`. CUDA places the tail after
+// 24 bytes, whereas LLVM's vector storage would consume 32. A byval scalar array carries the
+// reflected bytes and explicit parameter alignment; only entry emission decodes it to vector SSA.
+SlangResult NVVMTypeLoweringContext::lowerEntryNumericType(
+    const NVVMEntryNumericLayout& layout,
+    SlangNVVMTypeHandle& outParameterType,
+    SlangNVVMTypeHandle& outStorageType)
+{
+    SlangNVVMTypeHandle scalarType = nullptr;
+    if (layout.isBoolean || layout.isHalf)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "numeric entry storage scalar",
+            m_builder.getIntegerType(m_module, layout.scalarBitWidth, scalarType)));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(lowerType(layout.scalarType, NVVMTypeUse::Value, scalarType));
+    }
+    outStorageType = scalarType;
+    outParameterType = scalarType;
+    if (layout.isVector)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "numeric entry component storage",
+            m_builder.getArrayType(m_module, scalarType, layout.storageLaneCount, outStorageType)));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "numeric entry byval pointer",
+            m_builder.getPointerType(
+                m_module,
+                outStorageType,
+                SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+                outParameterType)));
+    }
+    m_entryParameterRepresentationMap[layout.type] = outParameterType;
+    return SLANG_OK;
 }
 
 SlangResult NVVMTypeLoweringContext::lowerType(
@@ -2944,6 +3031,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // NVPTX represents an aggregate kernel parameter as a generic pointer carrying `byval`, while
     // the same canonical Slang struct remains a first-class LLVM struct in ordinary value roles.
     // Keep this physical ABI representation separate from the canonical value-type cache.
+    if (use == NVVMTypeUse::EntryPointParameter && isNVVMSupportedValueType(type))
+    {
+        NVVMEntryNumericLayout layout;
+        if (!getNVVMEntryNumericLayout(m_codeGenContext, type, layout))
+            return SLANG_E_INVALID_ARG;
+        SlangNVVMTypeHandle storageType = nullptr;
+        return lowerEntryNumericType(layout, outType, storageType);
+    }
+
     if (use == NVVMTypeUse::EntryPointParameter && resourceStructType)
     {
         if (auto mappedType = m_entryParameterRepresentationMap.tryGetValue(type))
