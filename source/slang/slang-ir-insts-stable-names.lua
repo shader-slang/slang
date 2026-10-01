@@ -903,5 +903,6 @@ return {
 	["optixHitObjectTraverse"] = 927,
 	["optixHitObjectInvoke"] = 928,
 	["optixHitObjectAttributes"] = 929,
-	["optixHitObjectPayload"] = 930
+	["optixHitObjectPayload"] = 930,
+	["optixCurrentTransformRow"] = 931
 }

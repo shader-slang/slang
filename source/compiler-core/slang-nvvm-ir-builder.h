@@ -127,6 +127,13 @@ public:
         const SlangNVVMValueHandle* operands,
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
+    bool supportsCurrentTransform(const SlangNVVMInstanceTransformDesc& operation) const;
+    SlangResult emitCurrentTransform(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMInstanceTransformDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
 
     const SlangNVVMBuilderHitObjectOperationsAPI* getHitObjectOperationsAPI() const
     {
@@ -470,6 +477,7 @@ private:
     SlangNVVMBuilderMemoryOperationsAPI m_memoryOperations = {};
     SlangNVVMBuilderTraceOperationsAPI m_traceOperations = {};
     SlangNVVMBuilderInstanceTransformOperationsAPI m_instanceTransformOperations = {};
+    SlangNVVMBuilderCurrentTransformOperationsAPI m_currentTransformOperations = {};
     SlangNVVMBuilderHitObjectOperationsAPI m_hitObjectOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};

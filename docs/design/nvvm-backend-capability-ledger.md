@@ -171,17 +171,25 @@ before mutation. Provider contracts cover all 6 row/direction variants, invalid 
 insertion, malformed optional tables and paired no-mutation serialization in both LLVM dialects.
 These checks do not claim fresh runtime execution in RG/Miss/AnyHit. All15 smoke cells pass.
 
-The qualified APIs require valid instance handles, matching their existing CUDA contract. No
-non-instance fallback, arbitrary SDK-pointer dereference, static/motion transform storage or
-composite current-list matrix support is claimed.
+The instance-scoped APIs require valid instance handles, matching their existing CUDA contract.
+They do not grant arbitrary SDK-pointer dereference or treat a non-instance handle as an instance.
 
-The original RHI matrix raygen now compiles to PTX, advancing beyond module-scope vector `add`.
-All four complete ObjectToWorld/WorldToObject cases still reject with E52017 at their exact CUDA-only
-matrix wrappers. Their earlier NVRTC control passes 162 assertions, but these four composite NVVM
-matrix cases remain unqualified. Their implementation must preserve SDK composition of the full active transform list,
-forward/inverse orientation and the transposed 4x3 forms. The RHI single-level, non-motion pipeline
-alone cannot qualify general transform semantics or justify a single-instance shortcut.
-These application tests use RHI's actual-device target policy, separate from the SM80 fixtures above.
+The complete current-ray ObjectToWorld/WorldToObject family is qualified separately: all four RHI
+3x4/4x3 cases pass 162 assertions. The independent nested instance/SRT/matrix motion host checks all
+309 guarded words at NVVM O0/O3, including current matrices in AnyHit and ClosestHit at times 0,
+0.5 and 1, and repeated saved-hit invocation with evolving payloads. It reuses the existing exact
+finite matrix expectations; signed zeros compare equal, without an epsilon. The
+[current-transform fixture](../../tests/pipeline/ray-tracing/nvvm-current-transform-motion.slang)
+keeps the source contract reproducible. The four RHI cases retain authored/default optimization;
+the motion fixture supplies explicit O0/O3 coverage. Earlier NVRTC controls retain their identity.
+
+Typed row planning admits AnyHit/ClosestHit/Intersection and checks literal row/direction plus
+Float4 result. Interface 10 preserves older provider tables and rejects absent support before
+module creation. The provider shares ordered instance/static/matrix/SRT evaluation with owned
+HitObjects while keeping incoming and saved lists distinct. Runtime qualification here is AH/CH,
+with fixed nonidentity quaternion/scales and interpolated translation; changing-quaternion motion,
+maximum depth and Intersection execution remain unqualified. Each returned row currently composes
+the full list independently; no speed claim is made.
 Compute/raygen calls to ray state and compute/raygen/miss calls to hit-only helpers reject before
 provider module creation.
 See [the optional application workflow](../../issue-nvvm-backend/RESULTS.md#optional-slang-rhi-cuda-suite)

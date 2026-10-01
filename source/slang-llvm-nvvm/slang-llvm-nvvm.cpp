@@ -73,6 +73,7 @@ struct ModuleState
     llvm::Function* hitObjectCapture = nullptr;
     llvm::Function* hitObjectRestore = nullptr;
     llvm::Function* hitObjectMatrix[2] = {};
+    llvm::Function* currentTransformMatrix[2] = {};
     llvm::Function* hitObjectTransform[2] = {};
 };
 
@@ -1238,6 +1239,29 @@ static SlangResult SLANG_NVVM_CALL _emitTraceRay(
 }
 
 #include "slang-llvm-nvvm-hit-object.h"
+
+// Current-ray rows compose SDK-owned list members; no HitObject storage is created or modified.
+static SlangResult SLANG_NVVM_CALL _emitCurrentTransform(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMInstanceTransformDesc* desc,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    auto state = _getModule(module);
+    uint32_t supported = 0;
+    if (SLANG_FAILED(_isInstanceTransformSupported(desc, &supported)) || !supported || !outValue ||
+        !_getValidInsertionBlock(state) || operandCount != 0)
+        return SLANG_E_INVALID_ARG;
+    HitObjectEmitter emitter(state);
+    auto matrix = state->builder.CreateCall(emitter.getMatrixHelper(desc->inverse != 0, true));
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(
+        state->builder.CreateExtractValue(matrix, desc->row));
+    return SLANG_OK;
+}
+
 
 static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
@@ -5488,8 +5512,18 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _emitInstanceTransform,
     };
 
+    static const SlangNVVMBuilderCurrentTransformOperationsAPI currentTransformOperations = {
+        sizeof(SlangNVVMBuilderCurrentTransformOperationsAPI),
+        SLANG_NVVM_CURRENT_TRANSFORM_OPERATIONS_VERSION,
+        _isInstanceTransformSupported,
+        _emitCurrentTransform,
+    };
+
     switch (interfaceID)
     {
+    case SLANG_NVVM_BUILDER_INTERFACE_CURRENT_TRANSFORM_OPERATIONS:
+        *outInterface = &currentTransformOperations;
+        return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION:
         *outInterface = &foundation;
         return SLANG_OK;

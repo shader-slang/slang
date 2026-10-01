@@ -209,6 +209,25 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
         instanceTransformOperations = candidate;
     }
 
+    SlangNVVMBuilderCurrentTransformOperationsAPI currentTransformOperations = {};
+    const void* currentTransformOperationsRaw = nullptr;
+    const SlangResult currentTransformResult = api.queryInterface(
+        SLANG_NVVM_BUILDER_INTERFACE_CURRENT_TRANSFORM_OPERATIONS,
+        &currentTransformOperationsRaw);
+    if (currentTransformResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(currentTransformResult);
+        if (!currentTransformOperationsRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate = *static_cast<const SlangNVVMBuilderCurrentTransformOperationsAPI*>(
+            currentTransformOperationsRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_CURRENT_TRANSFORM_OPERATIONS_VERSION ||
+            !candidate.isOperationSupported || !candidate.emitOperation)
+            return SLANG_E_NO_INTERFACE;
+        currentTransformOperations = candidate;
+    }
+
     SlangNVVMBuilderHitObjectOperationsAPI hitObjectOperations = {};
     const void* hitObjectRaw = nullptr;
     const SlangResult hitObjectResult =
@@ -239,6 +258,7 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
     outBuilder.m_memoryOperations = memoryOperations;
     outBuilder.m_traceOperations = traceOperations;
     outBuilder.m_instanceTransformOperations = instanceTransformOperations;
+    outBuilder.m_currentTransformOperations = currentTransformOperations;
     outBuilder.m_hitObjectOperations = hitObjectOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
@@ -599,6 +619,34 @@ SlangResult NVVMIRBuilder::emitInstanceTransform(
         return SLANG_E_NOT_AVAILABLE;
     return _validateHandleResult(
         m_instanceTransformOperations
+            .emitOperation(module, &operation, operands, operandCount, &outValue),
+        outValue);
+}
+
+bool NVVMIRBuilder::supportsCurrentTransform(const SlangNVVMInstanceTransformDesc& operation) const
+{
+    if (!isInitialized() || !m_currentTransformOperations.isOperationSupported)
+        return false;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(
+               m_currentTransformOperations.isOperationSupported(&operation, &supported)) &&
+           supported;
+}
+
+SlangResult NVVMIRBuilder::emitCurrentTransform(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMInstanceTransformDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsCurrentTransform(operation))
+        return SLANG_E_NOT_AVAILABLE;
+    return _validateHandleResult(
+        m_currentTransformOperations
             .emitOperation(module, &operation, operands, operandCount, &outValue),
         outValue);
 }

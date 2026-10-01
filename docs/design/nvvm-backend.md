@@ -179,8 +179,18 @@ Optional interface 8 has its own size/version 1 contract. An older ABI46 provide
 continue compiling unrelated programs; a program requiring a row read fails preflight, while a
 present malformed table fails initialization. Existing table layouts, module43 and container2 remain
 unchanged. Core and shared lowering own the logical matrix, while the provider owns only Float4 row
-reads of a valid instance. Composite public `ObjectToWorld`/`WorldToObject` queries still require
-complete active-list composition, including transform kinds and direction-dependent ordering.
+reads of a valid instance.
+
+Current-ray `ObjectToWorld`/`WorldToObject` matrices use `OptixCurrentTransformRow` and optional
+interface 10. Core constructs 3x4 matrices from three checked rows and transposes for 4x3 results;
+aliases retain that same path. Admission is closest-hit, any-hit and intersection only. A checked
+row record without an explicit handle selects the current ray's implicit list, rather than one
+instance or an outgoing HitObject. The provider shares ordered transform composition with saved
+HitObjects: forward composition visits the list from leaf to root, inverse composition from root
+to leaf, with instance/static/matrix-motion/SRT members evaluated at the selected ray time. Current
+and saved helper caches retain their distinct signatures. These operations preserve effects and
+memory observations; they neither expose SDK pointers nor grant general pointer conversion.
+Each row currently evaluates the full list independently; no performance improvement is claimed.
 
 ### Owned HitObject state
 

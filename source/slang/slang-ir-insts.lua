@@ -1680,6 +1680,7 @@ local insts = {
 	-- Original payload type, fifteen fixed scalar arguments, and live uint32 payload words.
 	{ optixTraceRayPayload = { min_operands = 17 } },
 	-- Effectful Float4 row read of a valid instance transform; the SDK pointer stays internal.
+	{ optixCurrentTransformRow = { operands = { { "row" }, { "inverse" } } } },
 	{ optixInstanceTransformRow = { operands = { { "handle" }, { "row" }, { "inverse" } } } },
 	-- Typed operations retain the source object; SDK outgoing state is provider-private.
 	{ optixHitObjectQuery = { min_operands = 3 } },

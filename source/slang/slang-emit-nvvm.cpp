@@ -3206,19 +3206,25 @@ bool _planNVVMOptixRegister(IRInst* inst, Stage stage, NVVMPlannedNamedIntrinsic
 bool _planNVVMInstanceTransform(IRInst* inst, Stage stage, NVVMPlannedInstanceTransform& plan)
 {
     plan = {};
-    if (!_isNVVMOptixStage(stage) || inst->getOperandCount() != 3)
+    const bool current = inst->getOp() == kIROp_OptixCurrentTransformRow;
+    const UInt start = current ? 0 : 1;
+    if (current
+            ? (stage != Stage::AnyHit && stage != Stage::ClosestHit && stage != Stage::Intersection)
+            : !_isNVVMOptixStage(stage))
+        return false;
+    if (inst->getOperandCount() != start + 2)
         return false;
     auto result = as<IRVectorType>(inst->getDataType());
-    auto row = as<IRIntLit>(inst->getOperand(1));
-    auto inverse = _asExecutableBoolConstant(inst->getOperand(2));
+    auto row = as<IRIntLit>(inst->getOperand(start));
+    auto inverse = _asExecutableBoolConstant(inst->getOperand(start + 1));
     if (!result || result->getElementType()->getOp() != kIROp_FloatType ||
         getIntVal(result->getElementCount()) != 4 ||
-        inst->getOperand(0)->getDataType()->getOp() != kIROp_UInt64Type || !row ||
+        (!current && inst->getOperand(0)->getDataType()->getOp() != kIROp_UInt64Type) || !row ||
         row->getDataType()->getOp() != kIROp_UIntType || row->getValue() < 0 ||
         row->getValue() > 2 || !inverse)
         return false;
     plan.source = inst;
-    plan.handle = inst->getOperand(0);
+    plan.handle = current ? nullptr : inst->getOperand(0);
     plan.desc = {uint32_t(row->getValue()), uint32_t(inverse->getValue())};
     return true;
 }
@@ -6746,6 +6752,7 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_OptixCurrentTransformRow:
             case kIROp_OptixInstanceTransformRow:
                 {
                     NVVMPlannedInstanceTransform transform;
@@ -6757,7 +6764,7 @@ SlangResult _validateNVVMFunction(
                             transform))
                         return _diagnoseUnsupportedIR(
                             codeGenContext,
-                            toSlice("OptiX instance transform row"));
+                            toSlice("OptiX transform row"));
                     requirements.emissionPlan.instanceTransforms.add(transform);
                 }
                 break;
@@ -7364,18 +7371,20 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_OptixCurrentTransformRow:
             case kIROp_OptixInstanceTransformRow:
                 {
                     const auto transform = _findPlannedNVVMOperation(
                         requirements.emissionPlan.instanceTransforms,
                         inst);
                     SLANG_RELEASE_ASSERT(transform);
-                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
-                        codeGenContext,
-                        transform->handle,
-                        inst,
-                        availableValues,
-                        dominatorTree));
+                    if (transform->handle)
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            transform->handle,
+                            inst,
+                            availableValues,
+                            dominatorTree));
                     availableValues.add(inst);
                 }
                 break;
@@ -11045,10 +11054,11 @@ SlangResult emitNVVMIRFromLinkedIR(
     }
     for (const auto& transform : requirements.emissionPlan.instanceTransforms)
     {
-        if (!builder.supportsInstanceTransform(transform.desc))
+        if (!(transform.handle ? builder.supportsInstanceTransform(transform.desc)
+                               : builder.supportsCurrentTransform(transform.desc)))
             return _requireBuilderOperation(
                 codeGenContext,
-                "OptiX instance transform row",
+                "OptiX transform row",
                 SLANG_E_NOT_AVAILABLE);
     }
     for (const auto& trace : requirements.emissionPlan.traceRays)
@@ -11571,28 +11581,36 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_OptixCurrentTransformRow:
                 case kIROp_OptixInstanceTransformRow:
                     {
                         const auto transform = planIndex.findInstanceTransform(inst);
                         SLANG_RELEASE_ASSERT(transform);
                         SlangNVVMValueHandle handle = nullptr, value = nullptr;
-                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
-                            codeGenContext,
-                            builder,
-                            moduleScope.module,
-                            transform->handle,
-                            valueMap,
-                            typeContext,
-                            handle));
+                        if (transform->handle)
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                transform->handle,
+                                valueMap,
+                                typeContext,
+                                handle));
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,
-                            "OptiX instance transform row",
-                            builder.emitInstanceTransform(
-                                moduleScope.module,
-                                transform->desc,
-                                &handle,
-                                1,
-                                value)));
+                            "OptiX transform row",
+                            transform->handle ? builder.emitInstanceTransform(
+                                                    moduleScope.module,
+                                                    transform->desc,
+                                                    &handle,
+                                                    1,
+                                                    value)
+                                              : builder.emitCurrentTransform(
+                                                    moduleScope.module,
+                                                    transform->desc,
+                                                    nullptr,
+                                                    0,
+                                                    value)));
                         valueMap[inst] = value;
                     }
                     break;

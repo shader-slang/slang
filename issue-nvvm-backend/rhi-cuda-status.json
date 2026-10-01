@@ -605,6 +605,35 @@
       },
       "scope": "Focused family evidence, not a full suite. Intermediate failed trials retain exact build/graph transitions in the feature failure history; runtime-identity-1 is the final shared7/provider4/ANY reference, not a claim every earlier trial used those binaries.",
       "optimization_policy": "New lifecycle contains O0/O3 loops; fatal O0 compilation failures do not reach O3. Existing tests retain authored/default options."
+    },
+    "current-transform-rhi": {
+      "gate": {
+        "path": "build/nvvm-current-transforms/rhi.json",
+        "sha256": "485dae1f111fc9737a312e5ae76da92c2ca5e699e39c8acc85a627ca4859714b",
+        "return_code": 0,
+        "elapsed_seconds": 2.226454734802246
+      },
+      "log": {
+        "path": "build/nvvm-current-transforms/rhi.log",
+        "sha256": "7a2385ad2a0d1f9de45e8105dae469da37f73a0af7359ec8838cbb4ff0d80748"
+      },
+      "identity": {
+        "path": "build/nvvm-current-transforms/identity.json",
+        "sha256": "6080dd956bebf1593954ef84c3e642c3424a813383eac5df3e8c0e174f1d8706"
+      },
+      "compiler_selection": "nvvm",
+      "return_code": 0,
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "runtime_skipped": 0
+      },
+      "assertions": {
+        "total": 162,
+        "passed": 162,
+        "failed": 0
+      },
+      "scope": "Four current-ray matrix APIs. Authored/default options; separate nested motion gate supplies O0/O3 coverage. Not a full suite."
     }
   },
   "reconciliation": {
@@ -857,7 +886,7 @@
     {
       "id": "active_list_matrix_composition",
       "title": "Active transform-list matrix composition",
-      "current_unresolved_count": 4,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 4,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Full forward/inverse list semantics and transposed forms; current instance-scoped row support is not a replacement.",
@@ -870,7 +899,8 @@
         "ray-tracing-transform-world-to-object-3x4.cuda",
         "ray-tracing-transform-world-to-object-4x3.cuda"
       ],
-      "initial_unresolved_count": 4
+      "initial_unresolved_count": 4,
+      "resolution_run": "current-transform-rhi"
     }
   ],
   "registrations": [
@@ -9573,7 +9603,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9589,6 +9619,13 @@
           "status": "passed",
           "terminal_line": 482,
           "detail": "0.28s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "(0.71s)",
           "failed_assertions": 0
         }
       ],
@@ -9610,6 +9647,11 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "resolved",
+          "resolution": "Typed current-ray rows share ordered complete transform composition; both directions and transposed forms pass. Original failure and NVRTC identity retained."
         }
       ]
     },
@@ -9624,7 +9666,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9640,6 +9682,13 @@
           "status": "passed",
           "terminal_line": 483,
           "detail": "0.35s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "(0.15s)",
           "failed_assertions": 0
         }
       ],
@@ -9661,6 +9710,11 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "resolved",
+          "resolution": "Typed current-ray rows share ordered complete transform composition; both directions and transposed forms pass. Original failure and NVRTC identity retained."
         }
       ]
     },
@@ -9675,7 +9729,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9691,6 +9745,13 @@
           "status": "passed",
           "terminal_line": 484,
           "detail": "0.52s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "(0.15s)",
           "failed_assertions": 0
         }
       ],
@@ -9712,6 +9773,11 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "resolved",
+          "resolution": "Typed current-ray rows share ordered complete transform composition; both directions and transposed forms pass. Original failure and NVRTC identity retained."
         }
       ]
     },
@@ -9726,7 +9792,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9742,6 +9808,13 @@
           "status": "passed",
           "terminal_line": 485,
           "detail": "0.50s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "(0.15s)",
           "failed_assertions": 0
         }
       ],
@@ -9763,6 +9836,11 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "current-transform-rhi",
+          "status": "resolved",
+          "resolution": "Typed current-ray rows share ordered complete transform composition; both directions and transposed forms pass. Original failure and NVRTC identity retained."
         }
       ]
     },
@@ -13143,8 +13221,8 @@
     "scope": "Initial full inventory plus four focused fixtures. Unselected cases retain original identities; not another full-suite run.",
     "by_compiler": {
       "nvvm": {
-        "passed": 252,
-        "failed": 11,
+        "passed": 256,
+        "failed": 7,
         "skipped": 10
       },
       "nvrtc": {
@@ -13153,8 +13231,8 @@
         "failed": 2
       }
     },
-    "original_nvvm_failures_resolved": 50,
-    "original_nvvm_failures_remaining": 11,
+    "original_nvvm_failures_resolved": 54,
+    "original_nvvm_failures_remaining": 7,
     "new_fixture_nvrtc_differences": [
       "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
       "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged"

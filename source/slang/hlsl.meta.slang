@@ -21890,8 +21890,11 @@ float3 ObjectRayDirection()
     }
 }
 
-// TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
-// floats by reference.
+[require(nvvm)]
+[NonUniformReturn]
+__intrinsic_op($(kIROp_OptixCurrentTransformRow))
+internal float4 __nvvmOptixCurrentTransformRow(uint row, bool inverse);
+
 /// Returns the object-to-world transformation matrix (3x4).
 /// @return 3x4 matrix transforming from object to world space
 /// @remarks Includes position and orientation of the current instance
@@ -21904,6 +21907,10 @@ float3x4 ObjectToWorld3x4()
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
     case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case nvvm:
+        return float3x4(__nvvmOptixCurrentTransformRow(0, false),
+            __nvvmOptixCurrentTransformRow(1, false),
+            __nvvmOptixCurrentTransformRow(2, false));
     case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix";
     case spirv:
         return spirv_asm
@@ -21926,6 +21933,10 @@ float3x4 WorldToObject3x4()
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
     case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case nvvm:
+        return float3x4(__nvvmOptixCurrentTransformRow(0, true),
+            __nvvmOptixCurrentTransformRow(1, true),
+            __nvvmOptixCurrentTransformRow(2, true));
     case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix";
     case spirv:
         return spirv_asm
@@ -21942,12 +21953,17 @@ float3x4 WorldToObject3x4()
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(nvvm, cuda_sm_2_0, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
     case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case nvvm:
+        return transpose(float3x4(__nvvmOptixCurrentTransformRow(0, false),
+            __nvvmOptixCurrentTransformRow(1, false),
+            __nvvmOptixCurrentTransformRow(2, false)));
     case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix4x3";
     case spirv:
         return spirv_asm
@@ -21963,12 +21979,17 @@ float4x3 ObjectToWorld4x3()
 /// @category raytracing
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(nvvm, cuda_sm_2_0, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
     case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
+    case nvvm:
+        return transpose(float3x4(__nvvmOptixCurrentTransformRow(0, true),
+            __nvvmOptixCurrentTransformRow(1, true),
+            __nvvmOptixCurrentTransformRow(2, true)));
     case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix4x3";
     case spirv:
         return spirv_asm

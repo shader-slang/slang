@@ -14002,3 +14002,82 @@ SLANG_UNIT_TEST(nvvmIRBuilderHitObjectOperationContract)
     }
     SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
 }
+
+SLANG_UNIT_TEST(nvvmIRBuilderCurrentTransformsKeepCheckedRows)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    String control;
+    for (bool reject : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("current-rows"), scope.module)));
+        SlangNVVMTypeHandle f32 = nullptr, f4 = nullptr, signature = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 32, f32)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVectorType(scope.module, f32, 4, f4)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionType(scope.module, f4, nullptr, 0, signature)));
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            signature,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("row"),
+            function)));
+        SlangNVVMValueHandle result = function;
+        if (reject)
+        {
+            SLANG_CHECK(SLANG_FAILED(
+                builder.emitCurrentTransform(scope.module, {0, 0}, nullptr, 0, result)));
+            SLANG_CHECK(!result);
+        }
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        if (reject)
+        {
+            const SlangNVVMInstanceTransformDesc invalid[] = {{3, 0}, {0, 2}, {0xffffffffu, 1}};
+            for (const auto& desc : invalid)
+            {
+                SLANG_CHECK(!builder.supportsCurrentTransform(desc));
+                SLANG_CHECK(SLANG_FAILED(
+                    builder.emitCurrentTransform(scope.module, desc, nullptr, 0, result)));
+                SLANG_CHECK(!result);
+            }
+            SLANG_CHECK(SLANG_FAILED(
+                builder.emitCurrentTransform(scope.module, {0, 0}, &function, 1, result)));
+            SLANG_CHECK(!result);
+        }
+        for (uint32_t inverse = 0; inverse < 2; ++inverse)
+            for (uint32_t row = 0; row < 3; ++row)
+            {
+                const SlangNVVMInstanceTransformDesc desc = {row, inverse};
+                SLANG_CHECK(builder.supportsCurrentTransform(desc));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.emitCurrentTransform(scope.module, desc, nullptr, 0, result)));
+            }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitValueReturn(scope.module, result)));
+        ComPtr<ISlangBlob> blob;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+            blob)));
+        String text = _getBlobText(blob);
+        for (auto name :
+             {"_optix_get_transform_list_size",
+              "_optix_get_transform_list_handle",
+              "_optix_get_ray_time"})
+            SLANG_CHECK(text.contains(name));
+        SLANG_CHECK(!text.contains("slang.optix9.hit.object"));
+        if (reject)
+        {
+            SLANG_CHECK(text == control);
+        }
+        else
+            control = text;
+    }
+}

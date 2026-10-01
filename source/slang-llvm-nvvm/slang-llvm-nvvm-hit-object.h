@@ -569,18 +569,25 @@ public:
         b.restoreIP(saved);
         return function;
     }
-    llvm::Function* getMatrixHelper(bool inverse)
+    llvm::Function* getMatrixHelper(bool inverse, bool current = false)
     {
-        auto& cached = state->hitObjectMatrix[inverse];
+        auto& cached =
+            current ? state->currentTransformMatrix[inverse] : state->hitObjectMatrix[inverse];
         if (cached)
             return cached;
         auto leaf = getTransformHelper(inverse);
         auto saved = b.saveIP();
-        auto type = llvm::FunctionType::get(matrixType(), {storage->getPointerTo()}, false);
+        llvm::SmallVector<llvm::Type*, 1> parameters;
+        if (!current)
+            parameters.push_back(storage->getPointerTo());
+        auto type = llvm::FunctionType::get(matrixType(), parameters, false);
         auto function = llvm::Function::Create(
             type,
             llvm::GlobalValue::InternalLinkage,
-            inverse ? "__slang_optix9_world_to_object" : "__slang_optix9_object_to_world",
+            current
+                ? (inverse ? "__slang_optix_current_world_to_object"
+                           : "__slang_optix_current_object_to_world")
+                : (inverse ? "__slang_optix9_world_to_object" : "__slang_optix9_object_to_world"),
             state->module.get());
         _nameFunctionParameters(function);
         cached = function;
@@ -590,11 +597,21 @@ public:
         auto body = llvm::BasicBlock::Create(state->context, "body", function);
         auto done = llvm::BasicBlock::Create(state->context, "done", function);
         b.SetInsertPoint(entry);
-        auto object = function->getArg(0);
-        auto isHit = b.CreateICmpEQ(load(object, Tag), b.getInt32(1));
-        // Miss/NOP snapshots intentionally need no transform storage contents.
-        auto count = b.CreateSelect(isHit, load(object, TransformCount), b.getInt32(0));
-        auto time = element(object, Ray, 8);
+        llvm::Value* object = current ? nullptr : function->getArg(0);
+        llvm::Value* count;
+        llvm::Value* time;
+        if (current)
+        {
+            count = scalar("_optix_get_transform_list_size", u32);
+            time = scalar("_optix_get_ray_time", f32);
+        }
+        else
+        {
+            auto isHit = b.CreateICmpEQ(load(object, Tag), b.getInt32(1));
+            // Miss/NOP snapshots intentionally need no transform storage contents.
+            count = b.CreateSelect(isHit, load(object, TransformCount), b.getInt32(0));
+            time = element(object, Ray, 8);
+        }
         auto initial = packMatrix(identityMatrix());
         b.CreateBr(test);
         b.SetInsertPoint(test);
@@ -605,7 +622,8 @@ public:
         b.CreateCondBr(b.CreateICmpULT(index, count), body, done);
         b.SetInsertPoint(body);
         auto selected = inverse ? index : b.CreateSub(b.CreateSub(count, b.getInt32(1)), index);
-        auto handle = b.CreateLoad(u64, elementAddress(object, Transforms, selected));
+        auto handle = current ? scalar("_optix_get_transform_list_handle", u64, {selected})
+                              : b.CreateLoad(u64, elementAddress(object, Transforms, selected));
         auto local = b.CreateCall(leaf, {handle, time});
         auto nextMatrix = packMatrix(multiplyMatrix(unpackMatrix(local), unpackMatrix(composed)));
         auto nextIndex = b.CreateAdd(index, b.getInt32(1));

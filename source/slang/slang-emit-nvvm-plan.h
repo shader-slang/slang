@@ -442,7 +442,7 @@ struct NVVMPlannedHitObjectOperation
     List<IRInst*> operands;
 };
 
-/// Retains one checked SDK row read, without exposing the SDK's storage pointer.
+/// Retains a checked affine row; a null handle selects the current ray's complete transform list.
 struct NVVMPlannedInstanceTransform
 {
     IRInst* source = nullptr;

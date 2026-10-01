@@ -617,125 +617,136 @@ SLANG_UNIT_TEST(nvvmOptixInstanceRowsRequireCheckedImmediates)
         WrongResult,
         WrongArity
     };
-    for (auto stage :
-         {Stage::RayGeneration,
-          Stage::Miss,
-          Stage::ClosestHit,
-          Stage::AnyHit,
-          Stage::Compute,
-          Stage::Intersection,
-          Stage::Callable})
-        for (auto testCase :
-             {Case::Valid,
-              Case::RowRange,
-              Case::SignedRow,
-              Case::DynamicRow,
-              Case::WrongInverse,
-              Case::DynamicInverse,
-              Case::WrongHandle,
-              Case::WrongResult,
-              Case::WrongArity})
-        {
-            // Type/immediate boundaries do not need to be multiplied by every valid stage.
-            if (stage != Stage::RayGeneration && testCase != Case::Valid)
-                continue;
-            _resetDirectNVVMFakes();
-            NVVMStaticTestContext context(unitTestContext);
-            auto module = IRModule::create(context.env.getSessionImpl());
-            IRBuilder builder(module);
-            builder.setInsertInto(module);
-            auto entry = builder.createFunc();
-            entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
-            builder
-                .addEntryPointDecoration(entry, Profile(stage), toSlice("probe"), toSlice("test"));
-            builder.setInsertInto(entry);
-            builder.emitBlock();
-            IRInst* handle = builder.getIntValue(builder.getUInt64Type(), 1);
-            List<IRInst*> rows;
-            for (UInt inverse = 0; inverse < 2; ++inverse)
-                for (UInt row = 0; row < 3; ++row)
-                {
-                    IRInst* selectedRow = builder.getIntValue(builder.getUIntType(), row);
-                    IRInst* selectedInverse = builder.getBoolValue(inverse != 0);
-                    IRType* resultType = builder.getVectorType(builder.getFloatType(), 4);
-                    if (testCase == Case::RowRange)
-                        selectedRow = builder.getIntValue(builder.getUIntType(), 3);
-                    if (testCase == Case::SignedRow)
-                        selectedRow = builder.getIntValue(builder.getIntType(), row);
-                    if (testCase == Case::DynamicRow)
-                        selectedRow =
-                            builder.emitAdd(builder.getUIntType(), selectedRow, selectedRow);
-                    if (testCase == Case::WrongInverse)
-                        selectedInverse = builder.getIntValue(builder.getUIntType(), inverse);
-                    if (testCase == Case::DynamicInverse)
-                        selectedInverse = builder.emitIntrinsicInst(
-                            builder.getBoolType(),
-                            kIROp_Not,
-                            1,
-                            &selectedInverse);
-                    if (testCase == Case::WrongHandle)
-                        handle = builder.getIntValue(builder.getInt64Type(), 1);
-                    if (testCase == Case::WrongResult)
-                        resultType = builder.getVectorType(builder.getFloatType(), 3);
-                    IRInst* operands[] = {handle, selectedRow, selectedInverse};
-                    auto value = builder.emitIntrinsicInst(
-                        resultType,
-                        kIROp_OptixInstanceTransformRow,
-                        testCase == Case::WrongArity ? 2 : 3,
-                        operands);
-                    SLANG_CHECK(value->mightHaveSideEffects());
-                    SLANG_CHECK(!getIROpInfo(value->getOp()).isHoistable());
-                    SLANG_CHECK(value->getParent() == entry->getFirstBlock());
-                    rows.add(value);
-                }
-            builder.emitReturn();
-            LinkedIR linked = {};
-            linked.module = module;
-            linked.entryPoints.add(entry);
-            NVVMOperationRequirements requirements;
-            const bool valid =
-                testCase == Case::Valid && (stage == Stage::RayGeneration || stage == Stage::Miss ||
-                                            stage == Stage::ClosestHit || stage == Stage::AnyHit ||
-                                            stage == Stage::Intersection);
-            auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
-            if (valid != SLANG_SUCCEEDED(result))
-                getTestReporter()->message(
-                    TestMessageType::Info,
-                    context.sink.outputBuffer.getBuffer());
-            SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
-            if (valid)
+    for (bool current : {false, true})
+        for (auto stage :
+             {Stage::RayGeneration,
+              Stage::Miss,
+              Stage::ClosestHit,
+              Stage::AnyHit,
+              Stage::Compute,
+              Stage::Intersection,
+              Stage::Callable})
+            for (auto testCase :
+                 {Case::Valid,
+                  Case::RowRange,
+                  Case::SignedRow,
+                  Case::DynamicRow,
+                  Case::WrongInverse,
+                  Case::DynamicInverse,
+                  Case::WrongHandle,
+                  Case::WrongResult,
+                  Case::WrongArity})
             {
-                SLANG_CHECK_ABORT(requirements.emissionPlan.instanceTransforms.getCount() == 6);
-                NVVMEmissionPlanIndex index;
-                index.initialize(requirements.emissionPlan);
-                for (Index i = 0; i < 6; ++i)
+                // Type/immediate boundaries do not need to be multiplied by every valid stage.
+                if ((stage != (current ? Stage::ClosestHit : Stage::RayGeneration) &&
+                     testCase != Case::Valid) ||
+                    (current && testCase == Case::WrongHandle))
+                    continue;
+                _resetDirectNVVMFakes();
+                NVVMStaticTestContext context(unitTestContext);
+                auto module = IRModule::create(context.env.getSessionImpl());
+                IRBuilder builder(module);
+                builder.setInsertInto(module);
+                auto entry = builder.createFunc();
+                entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+                builder.addEntryPointDecoration(
+                    entry,
+                    Profile(stage),
+                    toSlice("probe"),
+                    toSlice("test"));
+                builder.setInsertInto(entry);
+                builder.emitBlock();
+                IRInst* handle = builder.getIntValue(builder.getUInt64Type(), 1);
+                List<IRInst*> rows;
+                for (UInt inverse = 0; inverse < 2; ++inverse)
+                    for (UInt row = 0; row < 3; ++row)
+                    {
+                        IRInst* selectedRow = builder.getIntValue(builder.getUIntType(), row);
+                        IRInst* selectedInverse = builder.getBoolValue(inverse != 0);
+                        IRType* resultType = builder.getVectorType(builder.getFloatType(), 4);
+                        if (testCase == Case::RowRange)
+                            selectedRow = builder.getIntValue(builder.getUIntType(), 3);
+                        if (testCase == Case::SignedRow)
+                            selectedRow = builder.getIntValue(builder.getIntType(), row);
+                        if (testCase == Case::DynamicRow)
+                            selectedRow =
+                                builder.emitAdd(builder.getUIntType(), selectedRow, selectedRow);
+                        if (testCase == Case::WrongInverse)
+                            selectedInverse = builder.getIntValue(builder.getUIntType(), inverse);
+                        if (testCase == Case::DynamicInverse)
+                            selectedInverse = builder.emitIntrinsicInst(
+                                builder.getBoolType(),
+                                kIROp_Not,
+                                1,
+                                &selectedInverse);
+                        if (testCase == Case::WrongHandle)
+                            handle = builder.getIntValue(builder.getInt64Type(), 1);
+                        if (testCase == Case::WrongResult)
+                            resultType = builder.getVectorType(builder.getFloatType(), 3);
+                        IRInst* operands[] = {handle, selectedRow, selectedInverse};
+                        auto value = builder.emitIntrinsicInst(
+                            resultType,
+                            current ? kIROp_OptixCurrentTransformRow
+                                    : kIROp_OptixInstanceTransformRow,
+                            (current ? 2 : 3) - (testCase == Case::WrongArity ? 1 : 0),
+                            operands + (current ? 1 : 0));
+                        SLANG_CHECK(value->mightHaveSideEffects());
+                        SLANG_CHECK(!getIROpInfo(value->getOp()).isHoistable());
+                        SLANG_CHECK(value->getParent() == entry->getFirstBlock());
+                        rows.add(value);
+                    }
+                builder.emitReturn();
+                LinkedIR linked = {};
+                linked.module = module;
+                linked.entryPoints.add(entry);
+                NVVMOperationRequirements requirements;
+                const bool valid =
+                    testCase == Case::Valid &&
+                    ((!current && (stage == Stage::RayGeneration || stage == Stage::Miss)) ||
+                     stage == Stage::ClosestHit || stage == Stage::AnyHit ||
+                     stage == Stage::Intersection);
+                auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+                if (valid != SLANG_SUCCEEDED(result))
+                    getTestReporter()->message(
+                        TestMessageType::Info,
+                        context.sink.outputBuffer.getBuffer());
+                SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
+                if (valid)
                 {
-                    auto planned = index.findInstanceTransform(rows[i]);
-                    SLANG_CHECK_ABORT(planned);
-                    SLANG_CHECK(planned->source == rows[i] && planned->handle == handle);
-                    SLANG_CHECK(planned->desc.row == uint32_t(i % 3));
-                    SLANG_CHECK(planned->desc.inverse == uint32_t(i / 3));
+                    SLANG_CHECK_ABORT(requirements.emissionPlan.instanceTransforms.getCount() == 6);
+                    NVVMEmissionPlanIndex index;
+                    index.initialize(requirements.emissionPlan);
+                    for (Index i = 0; i < 6; ++i)
+                    {
+                        auto planned = index.findInstanceTransform(rows[i]);
+                        SLANG_CHECK_ABORT(planned);
+                        SLANG_CHECK(
+                            planned->source == rows[i] &&
+                            planned->handle == (current ? nullptr : handle));
+                        SLANG_CHECK(planned->desc.row == uint32_t(i % 3));
+                        SLANG_CHECK(planned->desc.inverse == uint32_t(i / 3));
+                    }
+                    NVVMIRBuilder provider;
+                    ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+                    SLANG_CHECK_ABORT(
+                        SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, provider)));
+                    ComPtr<IArtifact> artifact;
+                    SLANG_CHECK(SLANG_FAILED(emitNVVMIRFromLinkedIR(
+                        &context.codeGen,
+                        linked,
+                        provider,
+                        requirements,
+                        artifact)));
+                    SLANG_CHECK(!artifact);
                 }
-                NVVMIRBuilder provider;
-                ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
-                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, provider)));
-                ComPtr<IArtifact> artifact;
-                SLANG_CHECK(SLANG_FAILED(emitNVVMIRFromLinkedIR(
-                    &context.codeGen,
-                    linked,
-                    provider,
-                    requirements,
-                    artifact)));
-                SLANG_CHECK(!artifact);
+                const auto expectedDiagnostic = stage == Stage::Callable
+                                                    ? toSlice("entry-point stage")
+                                                    : toSlice("OptiX transform row");
+                SLANG_CHECK(
+                    context.sink.outputBuffer.getUnownedSlice().indexOf(expectedDiagnostic) >= 0);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
             }
-            const auto expectedDiagnostic = stage == Stage::Callable
-                                                ? toSlice("entry-point stage")
-                                                : toSlice("OptiX instance transform row");
-            SLANG_CHECK(
-                context.sink.outputBuffer.getUnownedSlice().indexOf(expectedDiagnostic) >= 0);
-            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-        }
 }
 
 // Original payload types and stage ownership are checked before any optional provider call.

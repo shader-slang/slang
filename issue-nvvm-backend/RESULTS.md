@@ -225,6 +225,21 @@ This is observational compatibility evidence, with unmeasured performance and no
 scene-depth claim. Use scene-derived expected values. Exact outcomes and loaded identities belong
 in focused evidence and the RHI manifest; these commands alone do not imply acceptance.
 
+### Current-ray transform matrices
+
+The four RHI transform tests are selected with
+`--test-case=ray-tracing-transform-object-to-world-*.cuda,ray-tracing-transform-world-to-object-*.cuda`.
+They retain authored/default options. For explicit NVVM O0/O3 nested-motion execution, compile
+`tests/pipeline/ray-tracing/nvvm-current-transform-motion.slang` with the same four per-stage
+commands, reflection checks and `run-motion` host described above. Its symbol and 24-byte launch
+layout are unchanged. Unused stages may omit the global symbol from PTX; reflection still retains
+the complete field layout. Every emitted symbol must retain the checked layout.
+
+The unchanged 309-word host oracle checks AH 3x4 aliases and CH 4x3 transposes at times 0/0.5/1.
+Its matrix expectations come from the authored scene, independently of compiler output. Pair this
+with `nvvmIRBuilderCurrentTransformsKeepCheckedRows`, `nvvmIRBuilderInstanceRowsKeepPointersInternal`
+and static `nvvmOptixInstanceRowsRequireCheckedImmediates`, which now covers both row sources.
+
 ## Optional slang-rhi CUDA suite
 
 This is on-demand application validation. The prepared sibling checkout needs the test harness's

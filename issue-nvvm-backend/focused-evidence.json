@@ -87823,8 +87823,8 @@
         "scope": "Initial full inventory plus four focused fixtures. Unselected cases retain original identities; not another full-suite run.",
         "by_compiler": {
           "nvvm": {
-            "passed": 252,
-            "failed": 11,
+            "passed": 256,
+            "failed": 7,
             "skipped": 10
           },
           "nvrtc": {
@@ -87833,8 +87833,8 @@
             "failed": 2
           }
         },
-        "original_nvvm_failures_resolved": 50,
-        "original_nvvm_failures_remaining": 11,
+        "original_nvvm_failures_resolved": 54,
+        "original_nvvm_failures_remaining": 7,
         "new_fixture_nvrtc_differences": [
           "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
           "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged"
@@ -87851,7 +87851,7 @@
         "callable_abi": 1,
         "trace_payload_boundary": 2,
         "intersection_stage": 0,
-        "active_list_matrix_composition": 4
+        "active_list_matrix_composition": 0
       }
     },
     "nvvm-resource-parameters": {
@@ -88674,6 +88674,144 @@
         "Focused acceptance only. Original full baseline, initial RHI checkpoint and all unrelated feature objects preserved.",
         "Current mixed-age RHI273 registrations: NVVM252pass11fail10skip; NVRTC261pass2fail10skip.50 original NVVM failures resolved,11 remain; arbitrary MakeHit intentionally unsupported.",
         "Working1713/exploratory459/smoke15 unchanged; second accepted implementation since working checkpoint. No new full Slang/RHI run."
+      ]
+    },
+    "nvvm-current-ray-transforms": {
+      "status": "accepted-focused",
+      "scope": "Complete current-ray ObjectToWorld/WorldToObject 3x4/4x3 and aliases. AH/CH/IS admission; current nested-motion execution qualified in AH/CH. Full ordered instance/static/matrix/SRT composition shares its owner with saved HitObjects.",
+      "identity": {
+        "path": "build/nvvm-current-transforms/identity.json",
+        "sha256": "6080dd956bebf1593954ef84c3e642c3424a813383eac5df3e8c0e174f1d8706"
+      },
+      "validation": {
+        "build-3": {
+          "path": "build/nvvm-current-transforms/build-3.json",
+          "sha256": "f433b85b1ba3e6207b37cc8346ac8056051db0ec95369bb4444376889d1d50ec",
+          "return_code": 0,
+          "elapsed_seconds": 173.88176131248474
+        },
+        "static-build": {
+          "path": "build/nvvm-current-transforms/static-build.json",
+          "sha256": "efc32519f6069227abe39e301a33b1e3bf03b306b4c8ed53ad10b2f5d4203d61",
+          "return_code": 0,
+          "elapsed_seconds": 338.63839745521545
+        },
+        "static": {
+          "path": "build/nvvm-current-transforms/static.json",
+          "sha256": "20c0da860a92da8a334adcd0940faf771c5fa2c7034d1bc4fd3472790f3b506b",
+          "return_code": 0,
+          "elapsed_seconds": 6.996225595474243
+        },
+        "units": {
+          "path": "build/nvvm-current-transforms/units.json",
+          "sha256": "ac3c5acc3010868a237bb16c55970cce14aed3bd336ae74ae18322a1868cfd66",
+          "return_code": 0,
+          "elapsed_seconds": 1.4669013023376465
+        },
+        "rhi": {
+          "path": "build/nvvm-current-transforms/rhi.json",
+          "sha256": "485dae1f111fc9737a312e5ae76da92c2ca5e699e39c8acc85a627ca4859714b",
+          "return_code": 0,
+          "elapsed_seconds": 2.226454734802246
+        },
+        "motion-2": {
+          "path": "build/nvvm-current-transforms/motion-2.json",
+          "sha256": "971c4143c265c86f5c291bad24be96b5a8e902833a357a88caaa2bbacca49823",
+          "return_code": 0,
+          "elapsed_seconds": 15.873280763626099
+        },
+        "smoke": {
+          "path": "build/nvvm-current-transforms/smoke.json",
+          "sha256": "f2f5c4c91af71570a0d43382ffe55f4a2247e9aa68028e21472d00195c1c36f0",
+          "return_code": 0,
+          "elapsed_seconds": 21.55241370201111
+        }
+      },
+      "outcomes": {
+        "rhi": {
+          "passed": 4,
+          "assertions": 162,
+          "names": [
+            "ray-tracing-transform-object-to-world-3x4.cuda",
+            "ray-tracing-transform-object-to-world-4x3.cuda",
+            "ray-tracing-transform-world-to-object-3x4.cuda",
+            "ray-tracing-transform-world-to-object-4x3.cuda"
+          ]
+        },
+        "provider": {
+          "passed": 2,
+          "ignored": 0
+        },
+        "static": {
+          "passed": 1,
+          "ignored": 0,
+          "scope": "Current and explicit-instance row stages, literals, types, plans and old-provider rejection before mutation."
+        },
+        "motion": {
+          "modes": ["nvvm-o0", "nvvm-o3"],
+          "checked_words_each": 309,
+          "passed": true,
+          "scope": "Unchanged host scene-derived expected matrices. AH3x4 aliases/CH4x3 transposes; times0/.5/1; repeated Invoke; fixed nonidentity quaternion/scales, interpolated translation.",
+          "oracle": {
+            "path": "build/nvvm-hitobject/motion-probe/run-motion.cpp",
+            "sha256": "157d4cca7807a1cad7f3b45ba3737c8702a617be9c5dabe9454de7726bb22454"
+          },
+          "abi": [
+            {
+              "path": "build/nvvm-current-transforms/motion-2/o0-abi-check.json",
+              "sha256": "f4092334c2190755c94b8646e7dd90c708da3e9da8c50de756437499355c3de3"
+            },
+            {
+              "path": "build/nvvm-current-transforms/motion-2/o3-abi-check.json",
+              "sha256": "d2dbfaf2bc4b5e13d34454f3bc677ab1d5d742ea2f3f59a3cf3772f2ffd411fc"
+            }
+          ]
+        },
+        "smoke": {
+          "passed": 15,
+          "regressions": 0,
+          "input_changes": 0,
+          "selection": {
+            "path": "build/nvvm-current-transforms/smoke-1/selection.json",
+            "sha256": "55f1035c0a2ba0f65e0302faed5726d8af185437bfe7ce06ca8c1ae41cd05405"
+          }
+        }
+      },
+      "failure_history": [
+        {
+          "attempt": {
+            "path": "build/nvvm-current-transforms/build-1.json",
+            "sha256": "46c9333d66dd6609e7828c08052d823ad64c24e838521d5c52547b46d37f81c6",
+            "return_code": 1,
+            "elapsed_seconds": 322.7560510635376
+          },
+          "reason": "Public stage-constrained3x4 call made NVVM/CUDA target-switch cases incomparable; compose typed rows directly and declare transpose SM2 capability."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-current-transforms/build-2.json",
+            "sha256": "35459feec59c045439b29ad9411425400a45610083f6b6c5d88c448142bc339e",
+            "return_code": 1,
+            "elapsed_seconds": 74.34993028640747
+          },
+          "reason": "New test assertion macro needed braces before else; test-only fix."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-current-transforms/motion.json",
+            "sha256": "86cc851ce5d40e7413d6a8823e921f55ce5a3146e7368d91b6c1b7ffb0ee9a24",
+            "return_code": 1,
+            "elapsed_seconds": 0.7759582996368408
+          },
+          "reason": "Probe required unused launch symbol in miss PTX; failed before launch. Reflection retained exact layout; retry permits unused-symbol elimination and validates every emitted record."
+        }
+      ],
+      "boundaries": [
+        "No arbitrary MakeHit change.",
+        "No fresh NVRTC transform run; original four controls retain their identity.",
+        "Intersection execution, changing quaternion and maximum depth remain unqualified.",
+        "Each row composes the full list separately; no speed claim.",
+        "Focused third implementation since working checkpoint; no full-baseline replacement."
       ]
     }
   }
