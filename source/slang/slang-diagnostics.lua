@@ -5054,6 +5054,13 @@ err(
     span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
 )
 
+err(
+    "shader-record-outside-ray-tracing-stage",
+    39033,
+    "shader record used outside a ray tracing stage",
+    span { loc = "location", message = "this shader record is used by entry point '~entryPoint', which is not a ray tracing stage; on CUDA/OptiX only ray tracing programs have a shader binding table record to read it from" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,

@@ -5,11 +5,14 @@
 
 #include "slang-ir-optix-entry-point-uniforms.h"
 
+#include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-profile.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -284,6 +287,35 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
     }
 };
 
+/// Report an error for each entry point that references `param`, a shader-record parameter, but
+/// is not a ray tracing stage. Only OptiX ray tracing programs have an SBT record, so in a compute
+/// kernel `optixGetSbtDataPointer()` has nothing to return.
+static void diagnoseShaderRecordUseOutsideRayTracingStages(
+    DiagnosticSink* sink,
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
+    IRGlobalParam* param)
+{
+    auto entryPoints = getReferencingEntryPoints(referencingEntryPoints, param);
+    if (!entryPoints)
+        return;
+    for (auto entryPoint : *entryPoints)
+    {
+        auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
+        if (entryPointDecoration &&
+            isRaytracingStage(entryPointDecoration->getProfile().getStage()))
+            continue;
+
+        String entryPointName;
+        if (entryPointDecoration)
+            entryPointName = entryPointDecoration->getName()->getStringSlice();
+        else if (auto nameHint = entryPoint->findDecoration<IRNameHintDecoration>())
+            entryPointName = nameHint->getName();
+        sink->diagnose(Diagnostics::ShaderRecordOutsideRayTracingStage{
+            .entryPoint = entryPointName,
+            .location = param->sourceLoc});
+    }
+}
+
 /// Replace each module-scope shader-record parameter with a read of the current OptiX SBT record.
 ///
 /// Consider:
@@ -296,7 +328,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass
 /// returns for the running program, so we fetch that pointer in each body that uses the
 /// parameter. Uses may sit in helper functions, in the initializer of a `static` global, or in
 /// several entry points that each read their own record.
-static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module)
+static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module, DiagnosticSink* sink)
 {
     List<IRGlobalParam*> shaderRecordParams;
     for (auto inst : module->getGlobalInsts())
@@ -308,10 +340,17 @@ static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module)
         if (varLayout && varLayout->usesResourceKind(LayoutResourceKind::ShaderRecord))
             shaderRecordParams.add(param);
     }
+    if (shaderRecordParams.getCount() == 0)
+        return;
+
+    Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
+    buildEntryPointReferenceGraph(referencingEntryPoints, module);
 
     IRBuilder builder(module);
     for (auto param : shaderRecordParams)
     {
+        diagnoseShaderRecordUseOutsideRayTracingStages(sink, referencingEntryPoints, param);
+
         Dictionary<IRGlobalValueWithCode*, IRInst*> sbtDataPerBody;
         while (auto use = param->firstUse)
         {
@@ -330,16 +369,15 @@ static void replaceShaderRecordGlobalParamsWithSbtAccess(IRModule* module)
     }
 }
 
-void collectOptiXEntryPointUniformParams(IRModule* module)
+void collectOptiXEntryPointUniformParams(IRModule* module, DiagnosticSink* sink)
 {
     // look into all entry point functions by checking the IREntryPointDecoration on the children
     // Insts of the module. For any ray tracing entry points, collect all uniform parameters into
-    // one common struct, and replace parameter usage with SBT record accesses. Module-scope
-    // shader-record parameters are then routed to the SBT record as well.
+    // one common struct, and replace parameter usage with SBT record accesses.
     CollectOptixEntryPointUniformParams context;
     context.processModule(module);
 
-    replaceShaderRecordGlobalParamsWithSbtAccess(module);
+    replaceShaderRecordGlobalParamsWithSbtAccess(module, sink);
 }
 
 } // namespace Slang

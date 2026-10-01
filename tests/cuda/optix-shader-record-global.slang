@@ -8,8 +8,9 @@
 // `ShaderRecordBufferKHR`. It must not become a pointer field of the `GlobalParams` launch struct.
 // Ordinary globals keep their place in `GlobalParams`.
 
-// SBT reads are not `__ldg`'d (the host may rewrite the SBT between launches, #10188), so
-// `CHECK-NOT: __ldg` is placed on both sides of the anchor.
+// The helper, the `static` initializer (the second `id_0` read, before the kernel) and the kernel
+// each read the record through the SBT. SBT reads are not `__ldg`'d (the host may rewrite the SBT
+// between launches, #10188), so `CHECK-NOT: __ldg` is placed between every anchor.
 
 //CHECK-NOT: __ldg
 //CHECK: struct GlobalParams_0
@@ -18,7 +19,14 @@
 //CHECK-NOT: gSbtRecordData
 //CHECK: };
 //CHECK-NOT: __ldg
-//CHECK: optixGetSbtDataPointer
+//CHECK: readColor_0()
+//CHECK: optixGetSbtDataPointer())->color_0
+//CHECK-NOT: __ldg
+//CHECK: optixGetSbtDataPointer())->id_0
+//CHECK-NOT: __ldg
+//CHECK: __closesthit__chsMain
+//CHECK-NOT: __ldg
+//CHECK: optixGetSbtDataPointer())->id_0
 //CHECK-NOT: __ldg
 
 //CHECK-PTX: _optix_get_sbt_data_ptr_64

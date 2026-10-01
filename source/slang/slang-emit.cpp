@@ -1388,7 +1388,7 @@ Result linkAndOptimizeIR(
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
-            SLANG_PASS(collectOptiXEntryPointUniformParams);
+            SLANG_PASS(collectOptiXEntryPointUniformParams, sink);
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
