@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:04:29Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 070b3ccec0f278478300fb9f59f4c0f312a12c4abadffcc0764197842e97ad2b
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: d807725b6040c080c535db387f308cf71ca1c9086ca5fd46801c9c1556dba17e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -23,14 +23,18 @@ itself is not declared there — it is one of the abstract roots in
 
 The parser entry point is `Parser::ParseStatement`
 ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp) line
-6914), a keyword-lookahead dispatcher that selects one of the
+6928), a keyword-lookahead dispatcher that selects one of the
 `Parse*Statement` / `parse*Stmt` helpers; `Parser::parseBlockStatement`
-(line 7130) parses a `{ ... }` block. Function bodies are not parsed at
+(line 7154) parses a `{ ... }` block. Both take an
+`AllowCaseDefaultStatements` argument, which is how a `case` or
+`default` written outside a `switch` body is parsed into a node and
+then diagnosed rather than rejected as an unexpected token — see
+[../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md). Function bodies are not parsed at
 the same time as the declarations that own them: the parser runs in one
 of two stages, `ParsingStage::Decl` or `ParsingStage::Body` (the
-`ParsingStage` enum is at lines 86-90), and `parseOptBody` (line 2219)
+`ParsingStage` enum is at lines 85-89), and `parseOptBody` (line 2227)
 records a `{`-delimited body as an `UnparsedStmt` instead of parsing it.
-`parseUnparsedStmt` (line 9951) later re-enters with
+`parseUnparsedStmt` (line 9976) later re-enters with
 `stage = ParsingStage::Body` and turns those tokens into a real
 `BlockStmt`. See
 [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md) for the
@@ -136,10 +140,10 @@ groupings that may own a lexical scope. Its single field,
 `scopeDecl: ScopeDecl*`, is the container declaration that block-local
 declarations are added to, so name lookup walking outward from a
 statement finds them. Only four parser routines fill it in:
-`Parser::parseBlockStatement` for `BlockStmt` (line 7141),
-`Parser::ParseForStatement` for the scoped `for` (line 7417),
-`parseGpuForeachStmt` (line 6738), and `parseCompileTimeForStmt`
-(line 6858). `SwitchStmt` and `TargetSwitchStmt` inherit `ScopeStmt`
+`Parser::parseBlockStatement` for `BlockStmt` (line 7165),
+`Parser::ParseForStatement` for the scoped `for` (line 7441),
+`parseGpuForeachStmt` (line 6752), and `parseCompileTimeForStmt`
+(line 6872). `SwitchStmt` and `TargetSwitchStmt` inherit `ScopeStmt`
 through `BreakableStmt` but leave `scopeDecl` null — a `switch` takes
 its lexical scope from the `BlockStmt` the parser builds for its body
 — and `WhileStmt` / `DoWhileStmt` introduce no scope of their own.
@@ -156,22 +160,22 @@ exactly that way: the first statement in a block becomes `body`
 directly, and the second one causes a `SeqStmt` to be created and both
 to be moved into it. An empty block gets an `EmptyStmt` body rather than
 a null one. Two other places build a `SeqStmt`:
-`Parser::parseIfLetStatement` (line 7284) and the per-case body loop in
-`parseTargetSwitchStmtImpl` (line 6603).
+`Parser::parseIfLetStatement` (line 7308) and the per-case body loop in
+`parseTargetSwitchStmtImpl` (line 6617).
 
 ### UnparsedStmt
 
 An `UnparsedStmt` is not an exotic construct — it is the ordinary
 first-stage representation of a function body. When the parser reaches
-a `{` where a body is expected, `parseOptBody` (line 2219) does not
+a `{` where a body is expected, `parseOptBody` (line 2227) does not
 recurse into `parseBlockStatement`; it copies the tokens up to the
 matching `}` into `UnparsedStmt::tokens` (terminated by a synthetic
 end-of-file token) and records the two scopes that were in effect,
 `currentScope` and `outerScope`. Callers such as the function-decl
-parser at line 2410 treat the result as the decl's `body`.
+parser at line 2418 treat the result as the decl's `body`.
 
 The captured scopes are what makes the deferral safe: when the body is
-finally needed, `parseUnparsedStmt` (line 9951) reinstalls them on a
+finally needed, `parseUnparsedStmt` (line 9976) reinstalls them on a
 fresh `Parser` configured with `stage = ParsingStage::Body` and calls
 `parseBlockStatement`, so the body is parsed with exactly the lookup
 environment it had at its original position. The result is a normal
@@ -185,7 +189,7 @@ Holds the predicate and both branches as raw `Stmt*`. The
 `negativeStatement` slot is null for an `if` without an `else`. The
 `afterLoc` field is the location the parser is looking at once both
 branches have been consumed (`tokenReader.peekLoc()` at the end of
-`Parser::parseIfStatement`, line 7373), i.e. the first token past the
+`Parser::parseIfStatement`, line 7397), i.e. the first token past the
 whole `if`.
 
 There is no dedicated node for `if let`. When `ParseStatement` sees
@@ -199,11 +203,11 @@ AST is therefore looking for `SeqStmt`, not a distinct class.
 ### SwitchStmt, CaseStmt, DefaultStmt
 
 `SwitchStmt::body` is always a `BlockStmt` — `ParseSwitchStmt`
-(line 6572) parses the `{ ... }` with `parseBlockStatement` — and that
+(line 6586) parses the `{ ... }` with `parseBlockStatement` — and that
 block's body is normally a `SeqStmt` of mixed `CaseStmt`, `DefaultStmt`,
 and other statements. The case labels are not the parents of the
 statements that fall under them: `ParseCaseStmt` and `ParseDefaultStmt`
-(lines 6584 and 6594) read only `case <expr> :` / `default :` and leave
+(lines 6598 and 6608) read only `case <expr> :` / `default :` and leave
 the following statements as siblings, so each `CaseStmt`/`DefaultStmt`
 is just a marker in the sequence. `BreakStmt` inside a `SwitchStmt` is
 matched via `BreakableStmt::uniqueID`.
@@ -216,7 +220,7 @@ which derives from `BreakableStmt`, which in turn derives from
 a `ScopeDecl` of its own.
 `ForStmt::statement` is the body; `initialStatement` is parsed as a
 statement (not an expression) so that a `DeclStmt` can introduce loop
-variables, and `Parser::ParseForStatement` (line 7392) diagnoses anything
+variables, and `Parser::ParseForStatement` (line 7416) diagnoses anything
 that is not a `DeclStmt` or `ExpressionStmt` there, keeping the
 constructed loop node so that parsing can recover. A block written in
 that position — `for ({ int i = 0; } n < 3; n = n + 1)` — is the shape
@@ -224,11 +228,24 @@ that trips it, and what the user sees is `E20001`, "unexpected
 statement, expected expression", reported on the offending statement.
 `UnscopedForStmt` is the HLSL-compatibility form: the same function
 creates it instead of a `ForStmt` when `getSourceLanguage()` is
-`SourceLanguage::HLSL`, and in that case it fills in `scopeDecl` but
-never pushes the scope, so the loop variable leaks into the surrounding
+`SourceLanguage::HLSL` — which, importantly, follows the **input
+file's extension** and cannot be selected with `-lang`. In
+`OptionsParser::addInputPath`
+([slang-options.cpp](../../../../source/slang/slang-options.cpp) line
+1850) the extension test runs *before* the language value is consulted:
+a path ending in `.slang` goes straight to `addInputSlangPath`, so a
+`-lang hlsl` on the command line — which only sets
+`CompilerOptionName::Language` — never reaches it. The language value
+is used only for a path whose extension did not already decide, and
+otherwise `findSourceLanguageFromPath` derives it from the extension
+anyway. So the same source compiled as `foo.hlsl` leaks the loop
+variable while `foo.slang` does not, and adding `-lang hlsl` to the
+`.slang` compile does not change that. In the HLSL case the parser
+fills in `scopeDecl` but never pushes the scope, so the loop variable
+leaks into the surrounding
 scope.
 
-A `do` statement is parsed by `Parser::ParseDoStatement` (line 7516),
+A `do` statement is parsed by `Parser::ParseDoStatement` (line 7540),
 which parses the body first and only then decides what it built: a
 following `while` produces a `DoWhileStmt`, a following `catch`
 produces a `CatchStmt`, and anything else is an error.
@@ -245,8 +262,8 @@ the expression against the enclosing function's declared return type.
 A range-based for whose bounds must be compile-time constants
 (`rangeBeginVal` and `rangeEndVal` are `IntVal*` filled in by
 checking). The parser produces it from the `$for (name in Range(...))`
-syntax: `parseCompileTimeStmt` (line 6900) consumes the `$` and
-`parseCompileTimeForStmt` (line 6854) the rest. `Range` is a required
+syntax: `parseCompileTimeStmt` (line 6914) consumes the `$` and
+`parseCompileTimeForStmt` (line 6868) the rest. `Range` is a required
 literal keyword there — the parser reads it with `ReadToken("Range")`,
 so any other identifier in that position is the parse error `E20004`,
 "unexpected identifier, expected 'Range'". The one-argument form
@@ -263,7 +280,7 @@ A `TargetSwitchStmt` is a static dispatch chosen at compile time by
 matching capabilities; each `TargetCaseStmt` carries a capability code
 and a body. `StageSwitchStmt` is the same shape but dispatches on
 pipeline stage rather than capability, and the two share a parser:
-`parseTargetSwitchStmt` and `parseStageSwitchStmt` (lines 6699 and 6705)
+`parseTargetSwitchStmt` and `parseStageSwitchStmt` (lines 6713 and 6719)
 differ only in which node they allocate before calling
 `parseTargetSwitchStmtImpl`.
 
@@ -285,7 +302,7 @@ more than once.
 
 ### DeferStmt
 
-`Parser::ParseDeferStatement` (line 7571) reads the `defer` keyword and
+`Parser::ParseDeferStatement` (line 7595) reads the `defer` keyword and
 then a single `Stmt` — so a deferred block needs no trailing semicolon —
 and stores it in `DeferStmt::statement`. The node carries no other
 state; when the deferred statement actually runs is decided by IR
@@ -306,7 +323,7 @@ Note that the statement-level spelling is `do { ... } catch (e) { ... }`
 — there is no `try` statement; a `try` at statement position is routed
 to `Parser::ParseExpressionStatement` because `try` is an expression
 keyword. A `do` may be followed by several `catch` clauses, and
-`Parser::ParseDoCatchStatement` (line 7482) chains them: it loops while
+`Parser::ParseDoCatchStatement` (line 7506) chains them: it loops while
 the next token is `catch`, using the `CatchStmt` it just built as the
 `tryBody` of the next one, so `n` catch clauses become `n` nested
 `CatchStmt`s and the outermost one is returned.
@@ -326,7 +343,7 @@ Choosing between the first two requires backtracking: for a statement
 that starts with an identifier or `::`, `ParseStatement` speculatively
 parses a type and, if an identifier follows, rewinds the token reader
 and re-parses the whole thing as a declaration through
-`Parser::parseVarDeclrStatement` (line 7237); otherwise it rewinds and
+`Parser::parseVarDeclrStatement` (line 7261); otherwise it rewinds and
 calls `ParseExpressionStatement`. A `;` immediately after an `if` is
 suspicious rather than illegal, so that case still yields an `EmptyStmt`
 but also reports `Diagnostics::UnintendedEmptyStatement` — the warning
@@ -338,7 +355,7 @@ compiling.
 
 Slang supports labeled statements and labeled breaks. `LabelStmt`
 attaches a label token to an inner statement, and `ParseStatement`
-selects `Parser::parseLabelStatement` (line 7227) when it sees an
+selects `Parser::parseLabelStatement` (line 7251) when it sees an
 identifier immediately followed by `:`; `BreakStmt::targetLabel`
 optionally names the enclosing labeled loop or switch to break out
 of. Resolution of `targetLabel` to a `BreakableStmt::uniqueID` is
@@ -351,7 +368,7 @@ current pixel and carries no operands.
 ### RequireCapabilityStmt
 
 Asserts that the surrounding function requires the listed capability
-atoms. `Parser::ParseRequireCapabilityStatement` (line 7601) recognizes
+atoms. `Parser::ParseRequireCapabilityStatement` (line 7626) recognizes
 the `__requireCapability` keyword and validates each name as it is read,
 via `findCapabilityName`; a name that does not resolve is dropped and
 diagnosed as `Diagnostics::UnknownCapability` — `E36105`,

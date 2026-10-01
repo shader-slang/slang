@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generic-interface-requirements
-//META: doc_section_digest=2baff5b5f1d715938cf9566d6f570582a342e5719c0e3486b541366359660b9d
+//META: doc_section_digest=e0a5749b29e520ad49aa65105bc29051abf25351d8b6a63196e0e34d7a152ac7
 //META: purpose=A generic interface method's satisfying implementation is stored in the conforming type's witness table as a requirement-local `IRGeneric`, not as a flat function value.
 //META: intent=functional
 //META: pipeline_stage=lower

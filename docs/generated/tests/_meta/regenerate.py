@@ -3172,15 +3172,25 @@ def cmd_verify(args: argparse.Namespace) -> int:
             ignored += 1
 
     # Bucket failures: expected (known compiler bug, tracked) vs
-    # unexpected (must fix). Normalize multi-directive variants
-    # (`foo.slang.1`) to their canonical .slang path for matching.
+    # unexpected (must fix).
+    #
+    # slang-test names the Nth `//TEST` directive in a file
+    # `<file>.slang.N` (the first keeps the bare name), and an
+    # expected-failure entry may legitimately be written either way:
+    # the bare path when every directive in the file is known-failing,
+    # or the indexed path when only one target of an emission fan-out
+    # is. `lint_expected_failures` resolves both, so matching has to
+    # accept both too -- check the reported path as-is *and* with the
+    # index stripped. Canonicalising only the reported side would make
+    # an indexed entry unmatchable, which silently reports a tracked
+    # failure as a new one.
     def canonical(p: str) -> str:
         return re.sub(r"\.slang(\.\d+)$", ".slang", p)
 
     expected_fail: list[str] = []
     failed: list[str] = []
     for p in failed_all:
-        if canonical(p) in expected_failures:
+        if p in expected_failures or canonical(p) in expected_failures:
             expected_fail.append(p)
         else:
             failed.append(p)

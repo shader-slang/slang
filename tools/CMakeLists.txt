@@ -56,7 +56,48 @@ function(generator dir)
     endif()
 endfunction()
 
-if(NOT SLANG_OVERRIDE_LUA_PATH)
+if(SLANG_USE_SYSTEM_LUA)
+    if(SLANG_OVERRIDE_LUA_PATH)
+        message(
+            FATAL_ERROR
+            "SLANG_USE_SYSTEM_LUA and SLANG_OVERRIDE_LUA_PATH cannot be combined"
+        )
+    endif()
+    find_package(Lua 5.4 QUIET)
+    set(slang_fiddle_lua_include_args)
+    if(Lua_FOUND)
+        set(slang_fiddle_lua_library ${LUA_LIBRARIES})
+        # The system include path belongs only to this leaf generator, not its interface.
+        set(slang_fiddle_lua_include_args
+            INCLUDE_DIRECTORIES_PRIVATE
+            ${LUA_INCLUDE_DIR}
+        )
+    else()
+        # FindLua in CMake 3.22 does not search Lua 5.5. Its pkg-config file does.
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SLANG_LUA55 REQUIRED IMPORTED_TARGET lua-5.5)
+        set(slang_fiddle_lua_library PkgConfig::SLANG_LUA55)
+        # The imported target supplies its own include directories.
+    endif()
+    # The bundled translation unit compiles Lua's private onelua.c source.
+    slang_glob_sources(slang_fiddle_sources slang-fiddle)
+    list(
+        REMOVE_ITEM
+        slang_fiddle_sources
+        "${CMAKE_CURRENT_SOURCE_DIR}/slang-fiddle/slang-fiddle-lua.cpp"
+    )
+    generator(
+        slang-fiddle
+        EXPLICIT_SOURCE
+        ${slang_fiddle_sources}
+        LINK_WITH_PRIVATE
+        compiler-core
+        ${slang_fiddle_lua_library}
+        ${slang_fiddle_lua_include_args}
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE
+        SLANG_USE_SYSTEM_LUA=1
+    )
+elseif(NOT SLANG_OVERRIDE_LUA_PATH)
     generator(
         slang-fiddle
         LINK_WITH_PRIVATE
@@ -262,6 +303,36 @@ if(SLANG_ENABLE_GFX)
     )
 endif()
 if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
+    # ---- spvdb integration for SPVDB_DEBUGGER tests -------------------------
+    # spvdb (vendored at tests/spvdb) is a SPIR-V interpreter and source-level
+    # debugger. Build libspvdb here and link it into slang-test so that
+    # .slang test files under tests/debuginfo can drive the debugger
+    # in-process and validate its output with FileCheck.
+    #
+    # slang-test-main.cpp is the translation unit that compiles the stb_image
+    # implementation, so spvdb normally reuses those symbols instead of
+    # compiling a second copy. In a static-library build, though, Slang also
+    # defines STB_IMAGE_STATIC (see cmake/CompilerFlags.cmake), which makes
+    # every stbi_* function internal to slang-test-main.cpp and therefore
+    # unreachable from spvdb — there, spvdb has to compile its own copy.
+    if(SLANG_LIB_TYPE STREQUAL "STATIC")
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE FALSE)
+    else()
+        set(SPVDB_PARENT_PROVIDES_STB_IMAGE TRUE)
+    endif()
+    add_subdirectory(
+        "${slang_SOURCE_DIR}/tests/spvdb"
+        "${CMAKE_CURRENT_BINARY_DIR}/spvdb"
+        EXCLUDE_FROM_ALL
+    )
+
+    # spvdb is a vendored library that brings its own warning configuration, so
+    # it deliberately does not go through slang_add_target /
+    # set_default_compile_options. It is linked into slang-test, though, and
+    # sanitizer settings have to match across a whole binary, so apply just the
+    # sanitizer flags to it.
+    add_sanitizer_options(spvdb)
+
     # The test executables and runtime-loaded modules
     slang_add_target(
         test-server
@@ -290,9 +361,11 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             compiler-core
             slang
             stb
+            spvdb
             ${CMAKE_DL_LIBS}
             Threads::Threads
         INCLUDE_FROM_PRIVATE prelude slang-rhi
+        EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_ENABLE_SPVDB=1
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test
@@ -424,6 +497,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_SHARED_LIBRARY_TOOL
             SLANG_NO_DEPRECATION
             "SLANG_PACKAGE_COMPILER_VERSION=\"${SLANG_VERSION_FULL}\""
+            # The record-replay unit tests call into the record-replay subsystem, which is compiled
+            # out when SLANG_ENABLE_RECORD_REPLAY is OFF; the tests guard their bodies on this macro.
+            SLANG_ENABLE_RECORD_REPLAY=$<BOOL:${SLANG_ENABLE_RECORD_REPLAY}>
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -464,6 +540,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             ${slang_SOURCE_DIR}/tools/slang-package/package-tool.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-types.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-validate.cpp
+            ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )
@@ -487,6 +564,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
     )
+    if(SLANG_ENABLE_OPTIX)
+        target_compile_definitions(
+            slang-unit-test
+            PRIVATE SLANG_UNIT_TEST_ENABLE_OPTIX=1
+        )
+        target_include_directories(
+            slang-unit-test
+            SYSTEM
+            PRIVATE ${OptiX_INCLUDE_DIRS}
+        )
+    endif()
     slang_add_target(
         slang-reflection-test
         MODULE

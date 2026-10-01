@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#module-level-outputs
-//META: doc_section_digest=d246c5b26aea56aab3063bb078408e447e5266c12518eab4e032ae8f4ee5812b
+//META: doc_section_digest=f8561fc2ad6dee3455d62d72f0d7eee4f8a8254c3b4628aad794dd6cd769e81e
 //META: purpose=Only FuncDecls registered as entry points carry an `entryPoint(...)` decoration; a sibling non-entry helper function in the same translation unit is lowered without that decoration.
 //META: intent=boundary
 //META: pipeline_stage=lower

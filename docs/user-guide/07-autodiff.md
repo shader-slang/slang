@@ -964,7 +964,7 @@ The following built-in functions are differentiable and both their forward and b
 - Interpolation and clamping functions: `lerp`, `smoothstep`, `clamp`, `saturate`
 - Trigonometric functions: `sin`, `cos`, `sincos`, `tan`, `asin`, `acos`, `atan`, `atan2`
 - Hyperbolic functions: `sinh`, `cosh`, `tanh`
-- Exponential and logarithmic functions: `exp`, `exp2`, `pow`, `log`, `log2`, `log10`
+- Exponential and logarithmic functions: `exp`, `exp2`, `exp10`, `pow`, `log`, `log2`, `log10`
 - Vector functions: `dot`, `cross`, `length`, `distance`, `normalize`, `reflect`, `refract`
 - Matrix transforms: `mul(matrix, vector)`, `mul(vector, matrix)`, `mul(matrix, matrix)`
 - Matrix operations: `transpose`, `determinant`

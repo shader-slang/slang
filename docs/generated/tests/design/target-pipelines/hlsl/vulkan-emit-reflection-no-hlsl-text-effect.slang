@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#option-set-toggles
-//META: doc_section_digest=65ae1152b296463b8293b7591a32f87fe87ce08c5528a74ea4488483c5c3c5b7
+//META: doc_section_digest=fbeeea07809c9805840949444c53383bbc2008651cf6d8186e90c648ffe29510
 //META: purpose=`-fspv-reflect` turns on the pass that adds user-type-name decorations even on the HLSL pipeline, but those decorations are read only by the SPIR-V emitter, so the emitted HLSL text is unchanged and carries no user-type marker.
 //META: intent=negative
 //META: pipeline_stage=emit

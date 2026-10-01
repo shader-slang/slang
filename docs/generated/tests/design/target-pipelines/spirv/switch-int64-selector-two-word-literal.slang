@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#opswitch-case-literals-follow-the-selector-width
-//META: doc_section_digest=261553d1527d9ea1e4d05d9bd40bce371d25c59c042c492c960808b79eb5b1ee
+//META: doc_section_digest=5f05fae71db3799a3e7d29911813239729e0a4f62dfaf364df2eaf00a962914b
 //META: purpose=A switch on an int64_t selector emits OpSwitch case literals wide enough for the 64-bit selector (a value above 2^32 survives intact).
 //META: intent=boundary
 //META: pipeline_stage=emit

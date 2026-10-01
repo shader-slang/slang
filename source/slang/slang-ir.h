@@ -2257,9 +2257,15 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 28;
+    const static UInt k_minSupportedModuleVersion = 31;
+    const static UInt k_maxSupportedModuleVersion = 32;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
+
+    /// Returns whether `version` is in the inclusive range this compiler can load.
+    static bool isModuleVersionSupported(UInt64 version)
+    {
+        return version >= k_minSupportedModuleVersion && version <= k_maxSupportedModuleVersion;
+    }
 
 private:
     friend struct IRSerialReadContext;

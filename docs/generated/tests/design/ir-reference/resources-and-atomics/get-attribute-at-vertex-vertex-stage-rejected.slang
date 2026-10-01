@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#shader-io
-//META: doc_section_digest=212a9e3fd4ca324be91b034872f2b7a9afdb1fe8ac5acfc9f068664d69c3e326
+//META: doc_section_digest=f7c6858573b963cd26309bca37271d80f05b56002d6f2e67fef1e445032158d0
 //META: purpose=The `fragment`-stage requirement behind `ResolveVaryingInputRef` / `GetPerVertexInputArray` is enforced by capability checking, so the same `GetAttributeAtVertex` call in a `vertex` entry point is rejected with `E36107`.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -998,6 +998,106 @@ float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler
     }
 }
 
+// GLSL shadow sampling with bias / gradients (combined-sampler path).
+//
+// These wrappers exist so the SampleCmpBias/SampleCmpGrad methods can emit GLSL's
+// texture()/textureOffset()/textureGrad()/textureGradOffset() with GLSL's argument
+// ordering, rather than raw HLSL-style intrinsic calls. They mirror the __glsl150_*
+// (no extension) vs __glsl_shadow_lod_* (GL_EXT_texture_shadow_lod) split already used
+// by the SampleCmpLevel path.
+//
+// Capability boundary, per the GL_EXT_texture_shadow_lod spec:
+//  - texture()/textureOffset() WITH bias are core GLSL 1.50 for sampler1DShadow,
+//    sampler1DArrayShadow, sampler2DShadow and samplerCubeShadow; the extension only
+//    adds the sampler2DArrayShadow and samplerCubeArrayShadow bias variants (and the
+//    sampler2DArrayShadow textureOffset+bias variant).
+//  - textureGrad()/textureGradOffset() on shadow samplers are entirely core GLSL; the
+//    extension adds no gradient variants at all.
+// So the grad wrappers never require the extension, and only the *_ext bias wrappers do.
+
+// Core (no extension): texture(sampler, P, bias) for the GLSL-1.50 baseline shadow types.
+[require(glsl, texture_shadowbias)]
+float __glsl150_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($0, $1, $2)";
+    }
+}
+
+// Extension: texture(sampler2DArrayShadow, vec4 P, float bias). Added by GL_EXT_texture_shadow_lod.
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowbias)]
+float __glsl_shadow_lod_texture_bias<TSampler, TCoord>(TSampler s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($0, $1, $2)";
+    }
+}
+
+// Extension: texture(samplerCubeArrayShadow, vec4 P, float compare, float bias). The comparison
+// value is a separate argument here (the coordinate is already a full vec4), unlike the other
+// forms where it is packed into the coordinate vector.
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowbias)]
+float __glsl_shadow_lod_texture_bias_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($0, $1, $2, $3)";
+    }
+}
+
+// Core (no extension): textureOffset(sampler, P, offset, bias) for the GLSL-1.50 baseline types.
+// Note the GLSL argument order is (sampler, P, offset, bias) — offset precedes bias.
+[require(glsl, texture_shadowbias)]
+float __glsl150_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($0, $1, $2, $3)";
+    }
+}
+
+// Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowbias)]
+float __glsl_shadow_lod_texture_bias_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureOffset($0, $1, $2, $3)";
+    }
+}
+
+// Core (no extension): textureGrad(sampler, P, dPdx, dPdy). All shadow-sampler gradient forms
+// we emit are core GLSL, so there is no extension-requiring gradient wrapper.
+[require(glsl, texture_shadowgrad)]
+float __glsl150_texture_grad<TSampler, TCoord, TGrad>(TSampler s, TCoord value, TGrad gradX, TGrad gradY)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGrad($0, $1, $2, $3)";
+    }
+}
+
+// Core (no extension): textureGradOffset(sampler, P, dPdx, dPdy, offset).
+[require(glsl, texture_shadowgrad)]
+float __glsl150_texture_grad_offset<TSampler, TCoord, TGrad, TOffset>(TSampler s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGradOffset($0, $1, $2, $3, $4)";
+    }
+}
+
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value)
 {
@@ -1115,6 +1215,90 @@ float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture
     case glsl:
         __requireCapability(GL_EXT_texture_shadow_lod);
         __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    }
+}
+
+// GLSL shadow sampling with bias / gradients for the separate Texture* + SamplerComparisonState
+// path. These are the counterparts of the combined-sampler wrappers above; they emit the same
+// GLSL built-ins through the combined-sampler intrinsic form ($p), and follow the same
+// core (__glsl150_*) vs GL_EXT_texture_shadow_lod (__glsl_shadow_lod_*) capability split.
+
+// Core (no extension): texture(sampler, P, bias).
+[require(glsl, texture_shadowbias)]
+float __glsl150_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture($p, $2, $3)";
+    }
+}
+
+// Extension: texture(sampler2DArrayShadow, vec4 P, float bias).
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowbias)]
+float __glsl_shadow_lod_texture_bias<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($p, $2, $3)";
+    }
+}
+
+// Extension: texture(samplerCubeArrayShadow, vec4 P, float compare, float bias) — compare separate.
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowbias)]
+float __glsl_shadow_lod_texture_bias_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "texture($p, $2, $3, $4)";
+    }
+}
+
+// Core (no extension): textureOffset(sampler, P, offset, bias).
+[require(glsl, texture_shadowbias)]
+float __glsl150_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureOffset($p, $2, $3, $4)";
+    }
+}
+
+// Extension: textureOffset(sampler2DArrayShadow, vec4 P, ivec2 offset, float bias).
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowbias)]
+float __glsl_shadow_lod_texture_bias_offset<TTexture, TCoord, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, constexpr TOffset offset, float bias)
+{
+    __target_switch
+    {
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureOffset($p, $2, $3, $4)";
+    }
+}
+
+// Core (no extension): textureGrad(sampler, P, dPdx, dPdy).
+[require(glsl, texture_shadowgrad)]
+float __glsl150_texture_grad<TTexture, TCoord, TGrad>(TTexture t, SamplerComparisonState s, TCoord value, TGrad gradX, TGrad gradY)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGrad($p, $2, $3, $4)";
+    }
+}
+
+// Core (no extension): textureGradOffset(sampler, P, dPdx, dPdy, offset).
+[require(glsl, texture_shadowgrad)]
+float __glsl150_texture_grad_offset<TTexture, TCoord, TGrad, TOffset>(TTexture t, SamplerComparisonState s, TCoord value, TGrad gradX, TGrad gradY, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureGradOffset($p, $2, $3, $4, $5)";
     }
 }
 
@@ -1888,12 +2072,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // GLSL's textureGrad() on shadow samplers is entirely core (GLSL 1.50); the
+            // GL_EXT_texture_shadow_lod extension adds no gradient variants, so no branch here
+            // requires it. The only shape-specific handling is the sampler1DShadow coordinate,
+            // which GLSL expects as vec3 P = (s, unused, compareValue).
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad(this, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY);
+            else
+                return __glsl150_texture_grad(this, __makeVector(location, compareValue), gradX, gradY);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1909,13 +2102,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // textureGradOffset() on shadow samplers is core GLSL for the offset-capable shapes
+            // (1D, 1DArray, 2D, 2DArray); cube shapes are excluded by the static_assert above.
+            // sampler1DShadow needs its coordinate padded to vec3.
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad_offset(this, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY, offset);
+            else
+                return __glsl150_texture_grad_offset(this, __makeVector(location, compareValue), gradX, gradY, offset);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1960,12 +2161,44 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowbias)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // GLSL's texture(sampler, P, bias) is core (GLSL 1.50) for sampler1DShadow,
+            // sampler1DArrayShadow, sampler2DShadow and samplerCubeShadow; GL_EXT_texture_shadow_lod
+            // only adds the sampler2DArrayShadow and samplerCubeArrayShadow bias variants. Route
+            // baseline shapes to the no-extension wrapper and only the two array-of-2D/cube shapes
+            // to the extension wrappers, so we never emit GL_EXT_texture_shadow_lod for the baseline
+            // forms. sampler1DShadow's coordinate is padded to vec3.
+            //
+            // Combined shadow samplers only ever have __Shape1D/__Shape2D/__ShapeCube, and __ShapeCube
+            // reports dimensions == 3 (there is no 3D shadow sampler), so the dimensions == 3 branch
+            // below is the cube / cube-array case.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, __makeVector(__makeVector(location, 0.0), compareValue), bias);
+                else
+                    return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias(this, __makeVector(location, compareValue), bias);
+            }
+            else
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_cube_array_shadow(this, location, compareValue, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -1981,13 +2214,32 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowbias)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // textureOffset(sampler, P, offset, bias) — note GLSL orders offset before bias.
+            // Core for sampler1DShadow, sampler1DArrayShadow and sampler2DShadow; the extension
+            // adds only the sampler2DArrayShadow variant. Cube shapes are excluded above.
+            // sampler1DShadow's coordinate is padded to vec3.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, __makeVector(__makeVector(location, 0.0), compareValue), offset, bias);
+                else
+                    return __glsl150_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
+            }
+            else
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_offset(this, __makeVector(location, compareValue), offset, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3414,12 +3666,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // GLSL textureGrad() on shadow samplers is core; sampler1DShadow needs a padded vec3 P.
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad(this, s, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY);
+            else
+                return __glsl150_texture_grad(this, s, __makeVector(location, compareValue), gradX, gradY);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3437,13 +3695,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(glsl_hlsl_spirv, texture_shadowgrad)]
     float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
         static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
         __target_switch
         {
+        case glsl:
+            // textureGradOffset() on shadow samplers is core GLSL; cube shapes excluded above.
+            if (Shape.dimensions == 1 && isArray == 0)
+                return __glsl150_texture_grad_offset(this, s, __makeVector(__makeVector(location, 0.0), compareValue), gradX, gradY, offset);
+            else
+                return __glsl150_texture_grad_offset(this, s, __makeVector(location, compareValue), gradX, gradY, offset);
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3492,12 +3756,39 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowbias)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // Same core-vs-extension split as the combined-sampler SampleCmpBias: texture(P, bias)
+            // is core for 1D/1DArray/2D/Cube shadow samplers; GL_EXT_texture_shadow_lod adds only
+            // the 2DArray and CubeArray variants. sampler1DShadow's coordinate is padded to vec3.
+            // Shadow samplers are only 1D/2D/Cube (no 3D shadow), and __ShapeCube reports
+            // dimensions == 3, so the dimensions == 3 branch below is the cube / cube-array case.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, s, __makeVector(__makeVector(location, 0.0), compareValue), bias);
+                else
+                    return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias(this, s, __makeVector(location, compareValue), bias);
+            }
+            else
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias(this, s, __makeVector(location, compareValue), bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_cube_array_shadow(this, s, location, compareValue, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -3515,13 +3806,29 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowbias)]
+    [require(glsl_hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
         __requireComputeDerivative();
         __target_switch
         {
+        case glsl:
+            // textureOffset(P, offset, bias) — core for 1D/1DArray/2D; extension adds only 2DArray.
+            if (Shape.dimensions == 1)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, s, __makeVector(__makeVector(location, 0.0), compareValue), offset, bias);
+                else
+                    return __glsl150_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
+            }
+            else
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
+                else
+                    return __glsl_shadow_lod_texture_bias_offset(this, s, __makeVector(location, compareValue), offset, bias);
+            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
@@ -10282,12 +10589,104 @@ T dot(T x, T y)
     }
 }
 
+// Computes a vector dot product with scalar arithmetic for targets without a native operation.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+T __vectorDotFallback(vector<T, N> x, vector<T, N> y)
+{
+    T result = T(0);
+    [ForceUnroll]
+    for(int i = 0; i < N; ++i)
+        result += x[i] * y[i];
+    return result;
+}
+
+// Implements the target-specific vector dot product behavior for the broad builtin-arithmetic
+// overload below. Keep its target arms and `N == 1` rule synchronized with the retained
+// floating-point and integer overloads below. Their pre-existing zero-width behavior remains
+// target-path-specific and is not normalized here.
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T __vectorDotImpl(vector<T, N> x, vector<T, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return x[0] * y[0];
+    }
+
+    // Follow the builtin signatures defined by each target language. The HLSL `dot` type table and
+    // WGSL section 17.5.20 include integer and floating-point vectors. GLSL 4.60 section 8.5 and
+    // Metal Shading Language section 6.8 declare `dot` only for floating-point vectors. SPIR-V uses
+    // OpDot for floating-point vectors and SPV_KHR_integer_dot_product for integer vectors. Other
+    // targets use the scalar-arithmetic fallback above.
+    __target_switch
+    {
+    case glsl:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case hlsl: __intrinsic_asm "dot";
+    case metal:
+        if (__isFloat<T>())
+            __intrinsic_asm "dot";
+        else
+            return __vectorDotFallback(x, y);
+    case spirv:
+        if (__isFloat<T>())
+        {
+            return spirv_asm {
+                OpDot $$T result $x $y
+            };
+        }
+        else
+        {
+            spirv_asm
+            {
+                OpCapability DotProduct;
+                OpCapability DotProductInputAll;
+                OpExtension "SPV_KHR_integer_dot_product";
+            };
+
+            if (__isSignedInt<T>())
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpSDot $x $y;
+                };
+            }
+            else
+            {
+                return spirv_asm
+                {
+                    result:$$T = OpUDot $x $y;
+                };
+            }
+        }
+    case wgsl: __intrinsic_asm "dot";
+    default: return __vectorDotFallback(x, y);
+    }
+}
+
+// Keep the established floating-point and integer overloads so that concrete calls retain their
+// overload ranking and floating-point calls retain the derivative registrations on `__d_dot` in
+// `diff.meta.slang`. Those registrations bind to the floating-point signature by overload
+// resolution, so that overload remains distinct from the broader arithmetic signature.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Handle 1-vector case explicitly since many backends don't support it natively
+    // Preserve the established concrete floating-point intrinsic path. A non-forced forwarding
+    // wrapper leaves a helper in textual output, while forcing the worker inline expands it early
+    // enough to perturb existing CUDA caller-control-flow optimization. Keeping this overload's
+    // original target switch preserves both behaviors; `tests/cuda/vector-dot-unroll.slang`
+    // protects the emitted CUDA and C++ structure. Keep this switch and the `N == 1` rule
+    // synchronized with `__vectorDotImpl` above.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10311,37 +10710,14 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
-
-BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
-{
-    // Handle 1-vector case explicitly since many backends don't support it natively
-    if (N == 1)
-    {
-        return BFloat16(float(x[0]) * float(y[0]));
-    }
-    if (N == 0)
-    {
-        return BFloat16(0.0f);
-    }
-
-    __target_switch
-    {
-    case spirv:
-        return spirv_asm {
-            OpCapability BFloat16DotProductKHR;
-            OpDot $$BFloat16 result $x $y
-        };
-    case cuda:
-        __intrinsic_asm "_slang_vector_dot";
-    }
-}
-
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
-    // Handle 1-vector case explicitly since many backends don't support it natively
+    // Preserve the established concrete integer intrinsic path for the same reason as the
+    // floating-point overload above. Keep this switch and the `N == 1` rule synchronized with
+    // `__vectorDotImpl`.
     if (N == 1)
     {
         return x[0] * y[0];
@@ -10381,6 +10757,44 @@ T dot(vector<T, N> x, vector<T, N> y)
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[__readNone]
+[ForceInline]
+// Keep this broad overload below the default-rank family-specific overloads. Slang 202c removes the
+// deprecated generic-parameter-count tie-breaker, so rank -1 preserves those overloads for concrete
+// calls while still making this one available to generic code that can prove only
+// __BuiltinArithmeticType.
+[OverloadRank(-1)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T dot(vector<T, N> x, vector<T, N> y)
+{
+    return __vectorDotImpl(x, y);
+}
+
+BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return BFloat16(float(x[0]) * float(y[0]));
+    }
+    if (N == 0)
+    {
+        return BFloat16(0.0f);
+    }
+
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm {
+            OpCapability BFloat16DotProductKHR;
+            OpDot $$BFloat16 result $x $y
+        };
+    case cuda:
+        __intrinsic_asm "_slang_vector_dot";
     }
 }
 
@@ -11676,7 +12090,7 @@ void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp
     __intrinsic_asm "{ var s = frexp($0); ($1) = s.fract; ($2) = s.exp; }";
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -13671,7 +14085,7 @@ void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
     __intrinsic_asm "{ var s = modf($0); ($1) = s.fract; ($2) = s.whole; }";
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -15141,7 +15555,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
     }
 }
 
-__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1 : MatrixLayoutMode, let L2 : MatrixLayoutMode>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -17739,6 +18153,7 @@ __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveIsFirstLane))]
 bool WaveIsFirstLane()
 {
     __target_switch
@@ -18283,6 +18698,7 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 T WaveReadLaneFirst(T expr)
 {
     __target_switch
@@ -18305,6 +18721,7 @@ __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
     __target_switch
@@ -18324,6 +18741,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+[KnownBuiltin($((int)KnownBuiltinDeclName::WaveReadLaneFirst))]
 matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 {
     __target_switch
@@ -19524,6 +19942,7 @@ $}
 
 __generic<T:ITexelElement, let format:int>
 extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
+    $(isReadOnly?": IArray<T>":"")
 {
     [__readNone]
     $(requireToSetQuery)
@@ -19543,6 +19962,29 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
             };
         }
     }
+
+${
+        if (isReadOnly) {
+$}
+    // These exact-signature members witness `IArray<T>`. The native `uint` subscript remains a
+    // separate overload.
+    int getCount()
+    {
+        uint count;
+        GetDimensions(count);
+        return int(count);
+    }
+
+    __subscript(int index) -> T
+    {
+        [__readNone]
+        [ForceInline]
+        $(requireToSet)
+        get { return Load(index); }
+    }
+${
+        }
+$}
 
     $(isReadOnly?"[__readNone] ":"")
     $(requireToSet)
@@ -19791,11 +20233,19 @@ int __callablePayloadLocation(__ref Payload payload);
 /// @remarks Used to implement dynamic shader calls during ray tracing
 /// @category raytracing
 __generic<Payload>
-[require(glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+[require(cuda_glsl_hlsl_spirv, raytracing_raygen_closesthit_miss_callable)]
+// A target-agnostic identity so IR passes recognize a `CallShader` call regardless of the
+// `__target_switch` arm selected, without depending on the intrinsic's emitted spelling.
+[KnownBuiltin($( (int)KnownBuiltinDeclName::CallShader))]
 void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
     {
+    // OptiX direct calls are variadic. `$*0` emits every argument that survives type legalization:
+    // an empty payload contributes no physical argument, while a non-empty payload remains the
+    // second argument. CallShader always returns void; results flow back through that payload when
+    // one is present.
+    case cuda: __intrinsic_asm "optixDirectCall<void>($*0)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:
         {
@@ -20097,6 +20547,16 @@ bool __reportIntersection(float tHit, uint hitKind)
     }
 }
 
+//@hidden:
+// Marker for the OptiX write side of a portable `ReportHit`. The `attributes` aggregate is
+// passed as a single operand; the CUDA varying-param legalization pass flattens it field-wise
+// into scalar attribute leaves before emission (see `legalizeOptiXReportIntersections`).
+__generic<A>
+__intrinsic_op($(kIROp_ReportOptiXIntersection))
+[require(cuda, raytracing_intersection)]
+bool __reportOptiXIntersection(float tHit, uint hitKind, A attributes);
+//@public:
+
 /// Reports a hit from an intersection shader.
 /// @param tHit Distance along the ray where the intersection occurred
 /// @param hitKind User-defined value identifying the type of hit
@@ -20106,7 +20566,7 @@ bool __reportIntersection(float tHit, uint hitKind)
 /// @category raytracing
 __generic<A>
 [ForceInline]
-[require(glsl_hlsl_spirv, raytracing_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_intersection)]
 bool ReportHit(float tHit, uint hitKind, A attributes)
 {
     __target_switch
@@ -20119,6 +20579,8 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
         static A a;
         a = attributes;
         return __reportIntersection(tHit, hitKind);
+    case cuda:
+        return __reportOptiXIntersection(tHit, hitKind, attributes);
     }
 }
 
@@ -23976,9 +24438,12 @@ struct HitObject
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
-        /// shader is invoked. (DXR 1.3 variant without AccelerationStructure parameter)
+        /// shader is invoked. (Native SER variant without AccelerationStructure parameter — the accel
+        /// structure is baked into the HitObject. Lowers on every SER target except NVAPI, whose Invoke
+        /// has no AccelerationStructure-free form.)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         HitObject HitOrMiss,
         inout payload_t Payload)
@@ -23998,6 +24463,55 @@ struct HitObject
                 "NVAPI shader-execution-reordering target call "
                 "HitObject::Invoke(accelerationStructure, hitObject, payload), or compile for a "
                 "native DXR 1.3 SER target.");
+        // These cases match the 3-argument Invoke overload. The SPIR-V/GLSL bodies pass the hit
+        // object and payload to their helpers explicitly and never mention the AccelerationStructure
+        // (it is baked into the HitObject; the explicit TLAS is a pure NVAPI/DXIL artifact). The cuda
+        // case emits `optixInvoke`, whose arguments are forwarded positionally, so this 2-argument
+        // overload emits optixInvoke(hitObject, payload); the matching prelude wrapper ignores the
+        // hit-object handle and reorders on implicit thread state.
+        case _GL_NV_shader_invocation_reorder:
+            {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __glslInvoke(HitOrMiss, __rayPayloadLocation(p));
+                Payload = p;
+            }
+        case glsl: // use GL_EXT until KHR is available.
+            {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __glslInvokeEXT(HitOrMiss, __rayPayloadLocation(p));
+                Payload = p;
+            }
+        case cuda: __intrinsic_asm "optixInvoke";
+        case spvShaderInvocationReorderNV:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
+                    OpHitObjectExecuteShaderNV
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+                Payload = p;
+            }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __spirvExecuteShaderEXT(HitOrMiss, p);
+                Payload = p;
+            }
         }
     }
 
@@ -24800,6 +25314,62 @@ struct HitObject
             }
         }
     }
+
+        /// GLSL helper: fetches the triangle vertex positions into an out array.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    [require(glsl, ser_position_raygen_closesthit_miss)]
+    [__NoSideEffect]
+    void __glslGetTriangleVertexPositions(out float3 arr[3])
+    {
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+        __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
+    }
+
+        /// Returns the world-space vertex positions of the triangle that was hit.
+        /// Valid if the hit object represents a triangle hit.
+        /// @return Array of three vertex positions in world space
+        /// @remarks Requires ray tracing position fetch extension
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_ray_tracing_position_fetch)
+    [ForceInline]
+    [require(glsl_spirv, ser_position_raygen_closesthit_miss)]
+    [__NoSideEffect]
+    float3[3] GetTriangleVertexPositions()
+    {
+        typedef float3[3] float3Arr3;
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder:
+            float3 output[3];
+            __glslGetTriangleVertexPositions(output);
+            return output;
+        // A HitObject built under the NV capability is emitted as OpTypeHitObjectNV,
+        // but OpHitObjectGetIntersectionTriangleVertexPositionsEXT (the only opcode for
+        // this query) requires an OpTypeHitObjectEXT operand. There is no NV opcode, and
+        // mixing an NV-typed HitObject with the EXT op produces invalid SPIR-V, so this
+        // combination is rejected at compile time rather than emitted. Note that
+        // spvShaderInvocationReorderNV inherits from spvShaderInvocationReorderEXT for
+        // capability purposes, but the emitted HitObject type still follows the NV/EXT
+        // split, so we cannot simply fall through to the EXT case below.
+        case spvShaderInvocationReorderNV:
+            static_assert(false,
+                "GetTriangleVertexPositions() has no SPIRV NV equivalent. "
+                "Use the spvShaderInvocationReorderEXT capability instead.");
+            return float3Arr3();
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_KHR_ray_tracing_position_fetch";
+                OpCapability RayTracingPositionFetchKHR;
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3Arr3 = OpHitObjectGetIntersectionTriangleVertexPositionsEXT &this;
+            };
+        }
+    }
+
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
@@ -27516,6 +28086,48 @@ interface IOpaqueDescriptor
     static const DescriptorAccess descriptorAccess;
 }
 
+/// True when `T` lowers to a texture or sampler type — the types whose `DescriptorHandle` is a native
+/// `uint64` handle under `spvBindlessTextureNV` rather than a `uint2` heap index. Folds to a
+/// compile-time constant once `T` is concrete (peephole over `kIROp_IsBindlessTextureNVEncodable`), so
+/// it serves as a `static_assert` condition and lets dead-branch elimination drop the native cast for a
+/// non-encodable `T`. The fold calls the IR classifier `isBindlessTextureNVEncodableResourceType`
+/// (`slang-ir-util.cpp`) — the single source of truth; the AST twin `_isBindlessTextureNVUInt64ElementType`
+/// (`slang-type-layout.cpp`, for layout/reflection) must stay in agreement.
+__generic<T>
+__intrinsic_op($(kIROp_IsBindlessTextureNVEncodable))
+bool __isBindlessTextureNVEncodable_impl(T t);
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isBindlessTextureNVEncodable()
+{
+    return __isBindlessTextureNVEncodable_impl(__declVal<T>());
+}
+
+/// True when `T`'s `DescriptorHandle` uses the native `SPV_NV_bindless_texture` `uint64` representation
+/// on the current SPIR-V target: `spvBindlessTextureNV` is enabled and `T` is an encodable
+/// texture/sampler. It pairs the capability check with `__isBindlessTextureNVEncodable<T>()` for call
+/// sites not already inside a `case spvBindlessTextureNV:` — e.g. a `static_assert` condition or a
+/// target-agnostic comparison. (The native-cast dispatch in `defaultGetDescriptorFromHandle` calls
+/// `__isBindlessTextureNVEncodable<T>()` directly, since its arms already select the capability.) The
+/// `case spirv:`/`default` arm keeps the switch's inferred SPIR-V
+/// capability at `{spirv}`, so a caller does not inherit a spurious `spvBindlessTextureNV` requirement on
+/// the default model. `[ForceInline]` inlines the `__target_switch` at each call site so it folds to a
+/// compile-time constant — required both to use it as a `static_assert` condition and to let dead-branch
+/// elimination drop the native cast for a non-encodable `T`.
+[ForceInline]
+bool usesNativeSpirvDescriptorHandle<T : IOpaqueDescriptor>()
+{
+    __target_switch
+    {
+    case spvBindlessTextureNV:
+        return __isBindlessTextureNVEncodable<T>();
+    case spirv:
+    default:
+        return false;
+    }
+}
+
 __magic_type(DynamicResourceType)
 __intrinsic_type($(kIROp_DynamicResourceType))
 struct __DynamicResource<let kind = __DynamicResourceKind.General>
@@ -27562,7 +28174,31 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+        // A single `ResourceDescriptorHeap[i]` index carries no sampler index, so building a combined
+        // texture-sampler from it hard-codes the sampler to heap slot 0. Reject that only on the
+        // targets whose `defaultGetDescriptorFromHandle` arm routes a `CombinedTextureSampler`
+        // through `__makeCombinedTextureSamplerFromHandle`, i.e. consumes a separate sampler index:
+        // HLSL and SPIR-V `spvDescriptorHeapEXT`. Default SPIR-V and GLSL instead load one native
+        // combined descriptor by `.x`, where the single index is correct, so they are accepted.
+        // WGSL is not covered here: it splits a combined sampler into two descriptors in the later
+        // `lowerCombinedTextureSamplers` pass, which runs before this `static_assert` is checked and
+        // itself fails on a combined sampler built from the heap, so this guard cannot turn that into
+        // a clean diagnostic. These `case`s mirror the combined-sampler branches in
+        // `defaultGetDescriptorFromHandle`; the two lists are kept in agreement.
+        __target_switch
+        {
+        case hlsl:
+        case spvDescriptorHeapEXT:
+            static_assert(This.kind != DescriptorKind.CombinedTextureSampler, "Cannot initialize a combined texture-sampler from a single ResourceDescriptorHeap index; load the texture and sampler separately from ResourceDescriptorHeap and SamplerDescriptorHeap.");
+            break;
+        case spirv:
+            // Explicit plain-SPIR-V arm: without it the `spvDescriptorHeapEXT` case claims the whole
+            // SPIR-V family, forcing an implicit capability upgrade (E41012) on plain-SPIR-V compiles.
+            break;
+        default:
+            break;
+        }
+        return getDescriptorFromExplicitHeapIndex<This>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
 
@@ -27591,7 +28227,7 @@ extension __SubpassImpl<T, isMS> : __IDynamicResourceCastable<__DynamicResourceK
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+        return getDescriptorFromExplicitHeapIndex<This>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
 
@@ -27609,10 +28245,10 @@ const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
     { "RWStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "AppendStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
     { "ConsumeStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "StorageBuffer", "General", "RasterizerOrdered" },
     { "ByteAddressBuffer", "StorageBuffer", "General", "Read" },
     { "RWByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
-    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "StorageBuffer", "General", "RasterizerOrdered" },
     { "SamplerState", "Sampler", "Sampler", "Unknown" },
     { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
     { "ConstantBuffer<T, L>", "ConstantBuffer", "General", "Read" },
@@ -27657,7 +28293,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     [ForceInline]
     __init($(untypedHandleType) h)
     {
-        return getDescriptorFromHandle(DescriptorHandle<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0)));
+        return getDescriptorFromExplicitHeapIndex<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0));
     }
 }
 
@@ -27706,19 +28342,28 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         }
     }
 
+    // Ordering compares in the handle's native representation. Handles that are `uint64` — all kinds on
+    // `cuda`, and on SPIR-V exactly the types `usesNativeSpirvDescriptorHandle` identifies (an encodable
+    // texture/sampler under `spvBindlessTextureNV`) — compare as `uint64`; everything else uses the
+    // `uint2` lexicographic order. The SPIR-V split keys on `__isBindlessTextureNVEncodable<T>()`, not on
+    // `DescriptorKind`: buffers and acceleration structures are `uint2`, and so are `SubpassInput` and
+    // `TextureBuffer`, which share a texture/texel `DescriptorKind` but are not encodable texture/sampler
+    // types. `equals` needs no such split: bit-equality is the same in either representation.
     [ForceInline]
     bool lessThan(DescriptorHandle<T> other)
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this < (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
+            break;
         }
+        if (usesNativeSpirvDescriptorHandle<T>())
+            return (uint64_t)this < (uint64_t)other;
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y);
     }
 
     [ForceInline]
@@ -27726,14 +28371,16 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     {
         __target_switch
         {
-        case spvBindlessTextureNV:
         case cuda:
             return (uint64_t)this <= (uint64_t)other;
         default:
-            let vthis = ((uint2)this);
-            let vother = (uint2)other;
-            return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
+            break;
         }
+        if (usesNativeSpirvDescriptorHandle<T>())
+            return (uint64_t)this <= (uint64_t)other;
+        let vthis = ((uint2)this);
+        let vother = (uint2)other;
+        return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y);
     }
 }
 
@@ -27825,6 +28472,48 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedResourceHandle h)
     {
+        // A `ResourceDescriptorHeap[i]` index cannot be stored in a native bindless `.Handle` (a
+        // `uint64` under `spvBindlessTextureNV` for an encodable texture/sampler): there is no faithful
+        // place for the index, so we diagnose rather than reinterpret the bits.
+        // `usesNativeSpirvDescriptorHandle<T>()` is the single source of that decision (see its
+        // definition for the `[ForceInline]`/capability-scoping rationale). Non-native and
+        // heap-index-only representations (including `spvDescriptorHeapEXT` alone) convert normally and
+        // are not diagnosed here.
+        static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
+        // A single `ResourceDescriptorHeap[i]` index also cannot build a combined texture-sampler on the
+        // targets whose `defaultGetDescriptorFromHandle` combined-sampler branch consumes a separate
+        // sampler index (HLSL, SPIR-V `spvDescriptorHeapEXT`). Under NV+EXT the native-handle assertion
+        // above already owns the diagnosis, so the check below is refined to `spvDescriptorHeapEXT`
+        // without NV (the nested switch).
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+            break;
+        case spvDescriptorHeapEXT:
+            // With `spvBindlessTextureNV` also enabled, an encodable combined sampler is a native handle
+            // and the native-handle assertion above already rejects it with the single message; adding
+            // the combined-sampler message too would be a contradictory second diagnostic (the explicit
+            // `uint2` form it recommends is itself invalid for a native handle). The check is therefore
+            // restricted to `spvDescriptorHeapEXT` without NV. The outer `case spirv:` sibling below still
+            // collapses this switch's SPIR-V capability to `{spirv}`, so the inner `spvBindlessTextureNV`
+            // arm does not leak NV onto a plain-SPIR-V compile.
+            __target_switch
+            {
+            case spvBindlessTextureNV:
+                break;
+            default:
+                static_assert(T.kind != DescriptorKind.CombinedTextureSampler, "a combined texture-sampler needs separate resource and sampler descriptor-heap indices on this target, so its .Handle cannot be built from a single ResourceDescriptorHeap index; use the explicit .Handle(uint2(resourceIndex, samplerIndex)) form to specify both");
+                break;
+            }
+            break;
+        case spirv:
+            // Explicit plain-SPIR-V arm (see the `_Texture` conversion above): avoids the implicit
+            // `spvDescriptorHeapEXT` capability upgrade (E41012) on plain-SPIR-V compiles.
+            break;
+        default:
+            break;
+        }
         return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
     }
 }
@@ -27836,6 +28525,10 @@ extension DescriptorHandle<T>
     [ForceInline]
     __init(UntypedSamplerHandle h)
     {
+        // As in the resource constructor: a `SamplerDescriptorHeap[j]` index cannot be stored in a native
+        // bindless sampler `.Handle` (a `uint64` under `spvBindlessTextureNV`), so diagnose via the same
+        // `usesNativeSpirvDescriptorHandle<T>()` decision and the same common message.
+        static_assert(!usesNativeSpirvDescriptorHandle<T>(), "Cannot convert a descriptor heap index to a native bindless DescriptorHandle; with spvDescriptorHeapEXT, assign the heap entry directly to the resource or sampler type instead");
         return DescriptorHandle<T>(uint2(__getUntypedSamplerHandleIndex(h), 0));
     }
 }
@@ -27907,25 +28600,19 @@ public enum BindlessDescriptorOptions
     VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
 
-/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
-/// to a descriptor object.
+/// Look up `handleValue` in the Vulkan dynamic-resource heap and return the descriptor. This is the
+/// `uint2`-handle path used directly on plain SPIR-V / GLSL (the `spirv`/`glsl` arm of
+/// `defaultGetDescriptorFromHandle`); the descriptors `spvBindlessTextureNV` does not convert (buffers
+/// and acceleration structures) reach it via that same `spirv` arm when only `spvBindlessTextureNV` is
+/// enabled (that capability implies `spirv`) — with `spvDescriptorHeapEXT` also enabled they take the
+/// EXT arm instead. So the dynamic-heap lowering lives in exactly one place. Capabilities are
+/// inferred from the body (as for `defaultGetDescriptorFromHandle`) rather than declared, so the
+/// acceleration-structure path's `__asuint64` / ray-tracing requirements are picked up automatically.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+T getDescriptorFromDynamicResourceHeap<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions)
 {
-    __target_switch
+    switch(bindlessOptions)
     {
-    case hlsl:
-        if (T.kind == DescriptorKind.Sampler)
-            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
-        else if (T.kind == DescriptorKind.CombinedTextureSampler)
-            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
-        else
-            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spirv:
-    case glsl:
-
-        switch(bindlessOptions)
-        {
 ${
 {
     static const struct
@@ -27995,17 +28682,101 @@ $}
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     }
     }
-    case wgsl:
-        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
-    case spvDescriptorHeapEXT:
+}
+
+/// Load a descriptor from the `spvDescriptorHeapEXT` descriptor heap. The single-descriptor kinds use
+/// only `handle.x` as the heap index: samplers load from the sampler heap, every other kind from the
+/// resource heap. A combined texture-sampler is the exception — it is assembled from both components of
+/// the handle (a combined descriptor carries a texture part and a sampler part), so
+/// `__makeCombinedTextureSamplerFromHandle` receives the whole `uint2` rather than just `.x`. This is
+/// the single lowering for the EXT heap, shared by the `spvDescriptorHeapEXT` arm of
+/// `defaultGetDescriptorFromHandle` and by the untyped-handle→resource constructors that convert a
+/// `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` index directly to a resource, so the two
+/// paths stay in agreement.
+[ForceInline]
+T getDescriptorFromDescriptorHeapEXT<T:IOpaqueDescriptor>(uint2 handle)
+{
+    if (T.kind == DescriptorKind.Sampler)
+        return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), handle.x);
+    else if (T.kind == DescriptorKind.CombinedTextureSampler)
+        return __makeCombinedTextureSamplerFromHandle<T>(handle);
+    else
+        return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), handle.x);
+}
+
+/// Convert an explicit descriptor-heap index (from `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]`,
+/// packed as `handle.x`) into a descriptor `T`. Shared by every untyped-handle→resource constructor.
+///
+/// When the handle would use the native SPIR-V representation — `usesNativeSpirvDescriptorHandle<T>()`,
+/// i.e. `spvBindlessTextureNV` enabled and `T` an encodable texture/sampler — routing the index through the
+/// `(type, capability)`-keyed `getDescriptorFromHandle` would let the NV dispatch in
+/// `defaultGetDescriptorFromHandle` reinterpret it as a native `uint64` handle (issue #13070). In that
+/// case, load directly from the EXT heap when one also exists (`spvBindlessTextureNV + spvDescriptorHeapEXT`);
+/// when it does not (plain `spvBindlessTextureNV`), there is no heap to load from and the index conversion
+/// is unsupported — fall through to `getDescriptorFromHandle` (whose `.Handle` counterpart is diagnosed in
+/// the constructors above). In every other case defer to `getDescriptorFromHandle`, which is correct for
+/// the index and preserves a user override — this includes `spvDescriptorHeapEXT` alone
+/// (`usesNativeSpirvDescriptorHandle` is false without NV, so the override is honored) and non-native types
+/// on any target. The EXT-direct load is deliberately nested inside the `usesNativeSpirvDescriptorHandle`
+/// guard rather than keyed on `spvDescriptorHeapEXT` alone: gating it behind NV is what lets
+/// `spvDescriptorHeapEXT`-only compiles keep honoring a user `getDescriptorFromHandle` override, since only
+/// the NV+EXT combination must bypass it to avoid the `uint64` reinterpretation.
+[ForceInline]
+T getDescriptorFromExplicitHeapIndex<T:IOpaqueDescriptor>(uint2 handle)
+{
+    if (usesNativeSpirvDescriptorHandle<T>())
+    {
+        __target_switch
+        {
+        case spvDescriptorHeapEXT:
+            return getDescriptorFromDescriptorHeapEXT<T>(handle);
+        case spirv:
+        default:
+            break;
+        }
+    }
+    return getDescriptorFromHandle(DescriptorHandle<T>(handle));
+}
+
+/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
+/// to a descriptor object.
+[ForceInline]
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+{
+    __target_switch
+    {
+    case hlsl:
         if (T.kind == DescriptorKind.Sampler)
-            return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);
+            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
         else if (T.kind == DescriptorKind.CombinedTextureSampler)
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
-            return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), ((uint2)handleValue).x);
+            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spirv:
+    case glsl:
+        // This arm also collapses the switch's inferred SPIR-V requirement to `{spirv}`, so the
+        // `spvBindlessTextureNV` cases below do not force that capability onto a plain-SPIR-V compile.
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case wgsl:
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        if (__isBindlessTextureNVEncodable<T>())
+            return __castDescriptorHandleToResource<T>(handleValue);
+        return getDescriptorFromDynamicResourceHeap<T>(handleValue, bindlessOptions);
+    case spvDescriptorHeapEXT:
+        // `spvDescriptorHeapEXT` is more specific than `spvBindlessTextureNV`, so re-check NV here to
+        // keep an encodable texture/sampler on its native `uint64` cast rather than a `uint2` heap index
+        // (#13070); everything else falls through to the EXT heap.
+        __target_switch
+        {
+        case spvBindlessTextureNV:
+            if (__isBindlessTextureNVEncodable<T>())
+                return __castDescriptorHandleToResource<T>(handleValue);
+            break;
+        default:
+            break;
+        }
+        return getDescriptorFromDescriptorHeapEXT<T>((uint2)handleValue);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
     }
@@ -32547,6 +33318,18 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecExp2($0)";
     }
+}
+
+// [ForceInline]
+[require(cooperative_vector)]
+CoopVec<T, N> exp10<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    // No cooperative-vector backend provides a dedicated exp10 intrinsic, so map the scalar
+    // operation across the lanes.
+    CoopVec<T, N> ret;
+    for(int i = 0; i < N; ++i)
+        ret[i] = exp10(x[i]);
+    return ret;
 }
 
 // [ForceInline]

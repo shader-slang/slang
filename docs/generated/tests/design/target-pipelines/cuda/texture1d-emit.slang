@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=5cfb04763d734c87abb0c612990b5db758ffc4cce1785fc806d10db967096a26
+//META: doc_section_digest=adb7772d22130e19606f914e1755ef4fc121330a80f3fed809d48cb7d085a379
 //META: purpose=Texture1D<float4> maps to the CUDA primitive CUtexObject and SampleLevel lowers to tex1DLod<T>(...).
 //META: intent=expansion
 //META: pipeline_stage=emit

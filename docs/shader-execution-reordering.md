@@ -340,7 +340,7 @@ static void HitObject.Invoke<payload_t>(
     HitObject            HitOrMiss,
     inout payload_t      Payload);
 
-// DXR 1.3 overload (without AccelerationStructure)
+// Native SER overload (without AccelerationStructure): DXR 1.3, Vulkan (NV/EXT), GLSL, CUDA, and SPIR-V; not NVAPI
 static void HitObject.Invoke<payload_t>(
     HitObject            HitOrMiss,
     inout payload_t      Payload);
@@ -627,7 +627,7 @@ Returns the world-space vertex positions of the triangle that was hit. Valid if 
 ## Signature
 
 ```
-void HitObject.GetTriangleVertexPositions(out float3 positions[3]);
+float3[3] HitObject.GetTriangleVertexPositions();
 ```
 
 ---

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:07:24Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 6ca22e11b1ae848bc68390906f1d20589efa4eb3e3366532aa60f8ccaecd4b6c
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 65f4d04b81a252bdf8f9d6ad8dbf23298b6c1d531bb88ec62640be268f72a096
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,7 +12,7 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page is the per-opcode reference for the `Decoration` family —
 the largest single family in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua),
-spanning lines 1752-2702 and holding 196 concrete opcodes at
+spanning lines 1756-2702 and holding 196 concrete opcodes at
 `source_commit`. Decorations attach metadata to other IR
 instructions: names, layout binding, control-flow hints,
 target-specific intrinsic spellings, capability requirements,
@@ -24,7 +24,7 @@ variable and trying to identify what each decoration says about it.
 
 The opcodes live under the top-level `Decoration` entry of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) at
-line 1752. Per-opcode info (mnemonics, fixed operand counts, op
+line 1756. Per-opcode info (mnemonics, fixed operand counts, op
 flags) is registered in the generated `kIROps` table in
 [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp).
 C++ wrappers are declared in
@@ -44,22 +44,22 @@ out-of-line helper definitions such as `addLayoutDecoration`.
 Most decorations originate from AST-side modifiers and attributes.
 In
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-the main producers are `addVarDecorations` (line 3114) for
+the main producers are `addVarDecorations` (line 3127) for
 parameters, fields, and global variables; `addLinkageDecoration`
-(line 1522) for the import / export / public / extern family;
-`addTargetIntrinsicDecorations` (line 13340),
-`addSpecializedForTargetDecorations` (line 13321), and
-`addTargetRequirementDecorations` (line 13420) for the
-target-specific group; `lowerFuncDeclInContext` (line 13784) for
+(line 1538) for the import / export / public / extern family;
+`addTargetIntrinsicDecorations` (line 13649),
+`addSpecializedForTargetDecorations` (line 13630), and
+`addTargetRequirementDecorations` (line 13729) for the
+target-specific group; `lowerFuncDeclInContext` (line 14093) for
 function- and entry-point-level attributes; and
-`lowerFrontEndEntryPointToIR` (line 15198) for decorations that are
+`lowerFrontEndEntryPointToIR` (line 15521) for decorations that are
 meaningful only on an entry point. The primal/diff transcription
 markers, varying-parameter legalization markers, and SPIR-V backend
 hints are introduced by the IR passes themselves, but some autodiff
 markers do come from lowering: `visitTreatAsDifferentiableExpr` (line
 5890) emits `TreatCallAsDifferentiableDecoration` and
 `DifferentiableCallDecoration`, and the `[PreferCheckpoint]` /
-`[PreferRecompute]` attributes lower at line 14604.
+`[PreferRecompute]` attributes lower at line 14913.
 
 ## Family hierarchy
 
@@ -245,8 +245,8 @@ The work-graph attributes are declared as `attribute_syntax` in
 rather than in `core.meta.slang`; see
 [../ast-reference/modifiers.md](../ast-reference/modifiers.md) for the
 AST classes. The function-level ones are lowered by
-`lowerFuncDeclInContext` (line 14473 onward) and the parameter-level
-ones by `addVarDecorations` (line 3258 onward) in
+`lowerFuncDeclInContext` (line 14782 onward) and the parameter-level
+ones by `addVarDecorations` (line 3271 onward) in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -495,7 +495,7 @@ identities from being handed to a future, unrelated opcode.
 `shader64BitIndexing` is nullary and is attached only to an entry-point
 function, by `lowerFrontEndEntryPointToIR`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 15198). It is not lowered from the `[Shader64BitIndexing]`
+line 15521). It is not lowered from the `[Shader64BitIndexing]`
 attribute directly. Instead lowering reads the entry point's
 `inferredCapabilityRequirements` and looks for the
 `spvShader64BitIndexingEXT` atom in *any* alternative of the capability
@@ -544,7 +544,7 @@ a bit mask: `Linear` 0, `NoPerspective` 1, `NoInterpolation` 2,
 ([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) lines
 154-164). `addVarDecorations`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-lines 3125-3149) maps one source modifier to one value —
+lines 3138-3149) maps one source modifier to one value —
 `linear`, `noperspective`, `nointerpolation`, `centroid`, `sample`,
 and Slang's own `pervertex` respectively — so a dump that shows
 `[interpolationMode(2 : Int)]` was written `nointerpolation`.

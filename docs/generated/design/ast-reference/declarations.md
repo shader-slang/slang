@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:46:18Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 40846d6323a4545ce1013f919b025bb0a96aea7d0df6f90a941d573b1467ac6d
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 67940a084aa0b35e9225f49e52855ca7e35df3d40265437c64936d7ac58a63b7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -258,8 +258,33 @@ node class the compiler was built with; the parser then runs no
 attribute-specific logic at all, and the attribute's checking —
 including which declarations it may be placed on — comes from that C++
 class. A user module can therefore add a new *spelling* for an
-existing attribute class, but not a genuinely new attribute. All 126
-`attribute_syntax` declarations in the tree ship with the compiler:
+existing attribute class, but not a genuinely new attribute.
+
+The `attribute_syntax` line is not sufficient on its own, though. Where
+an attribute may be *placed* is carried by `AttributeTargetModifier`s
+on the attribute declaration, which
+[slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)
+creates from `__attributeTarget(...)` (line 956) and later iterates
+when validating a use (line 1527). That loop starts from
+`validTarget = false` and only a matching syntax class sets it, so an
+attribute declared with no `__attributeTarget` has no valid placement
+at all and every use is rejected with `E31002` (*invalid attribute
+placement*, "attribute '<name>' is not valid here"). A new spelling
+therefore takes two lines, and the core module writes them adjacently —
+`NoDiscard` is declared as
+
+```slang
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [NoDiscard] : NoDiscardAttribute;
+```
+
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines
+4718-4719), so a user-written `attribute_syntax [MyNoDiscard] : NoDiscardAttribute;`
+needs its own `__attributeTarget(FunctionDeclBase)` above it to be
+usable anywhere.
+
+All 126 `attribute_syntax` declarations in the tree ship with the
+compiler:
 108 in [core.meta.slang](../../../../source/slang/core.meta.slang),
 8 in [diff.meta.slang](../../../../source/slang/diff.meta.slang),
 8 in [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang),

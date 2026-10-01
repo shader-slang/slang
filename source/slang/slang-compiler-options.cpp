@@ -315,6 +315,19 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << " " << (v.intValue * 8);
             }
             break;
+        case CompilerOptionName::BitfieldPackingRules:
+            {
+                for (auto v : option.value)
+                {
+                    SLANG_RELEASE_ASSERT(v.kind == CompilerOptionValueKind::Int);
+                    const auto ruleName = NameValueUtil::findName(
+                        TypeTextUtil::getBitfieldPackingRulesInfos(),
+                        v.intValue);
+                    SLANG_RELEASE_ASSERT(ruleName.getLength() != 0);
+                    sb << " " << name << " " << ruleName;
+                }
+                break;
+            }
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
         case CompilerOptionName::ForceCLayout:
@@ -344,7 +357,6 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::IncompleteLibrary:
         case CompilerOptionName::EnableExperimentalDynamicDispatch:
         case CompilerOptionName::GenerateWholeProgram:
-        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
         case CompilerOptionName::ExperimentalFeature:
         case CompilerOptionName::EmitSeparateDebug:
         case CompilerOptionName::TraceCoverage:
@@ -362,6 +374,14 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::LoopInversion:
         case CompilerOptionName::AllowGLSL:
             if (option.value.getCount() && option.value[0].intValue != 0)
+                sb << " " << name;
+            break;
+        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
+            // API clients can set both bitfield options, and the explicit rule takes precedence.
+            // The CLI rejects both flags on one command line, so we omit this boolean when an
+            // explicit rule is also present in the option set.
+            if (!hasOption(CompilerOptionName::BitfieldPackingRules) && option.value.getCount() &&
+                option.value[0].intValue != 0)
                 sb << " " << name;
             break;
         default:
@@ -438,6 +458,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::WarningsAsErrors:
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
+    case CompilerOptionName::DisableNotes:
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
@@ -570,6 +591,9 @@ void CompilerOptionSet::addCapabilityAtom(CapabilityName cap)
     add(CompilerOptionName::Capability, cap);
 }
 
+// Return the downstream-tool arguments for `downstreamToolName`, concatenating the serialized
+// argument list of every stored `DownstreamArgs` entry that targets that tool, in the order the
+// entries appear.
 List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)
 {
     List<String> result;
@@ -582,7 +606,6 @@ List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)
             args.deserialize(argSet.stringValue2);
             for (auto arg : args.m_args)
                 result.add(arg.value);
-            break;
         }
     }
     return result;
@@ -631,6 +654,16 @@ void applySettingsToDiagnosticSink(
             outputSink,
             element.stringValue.getUnownedSlice(),
             Severity::Warning,
+            Severity::Disable);
+    }
+    disableArray = options.getArray(CompilerOptionName::DisableNotes);
+    for (auto& element : disableArray)
+    {
+        overrideDiagnostics(
+            targetSink,
+            outputSink,
+            element.stringValue.getUnownedSlice(),
+            Severity::Note,
             Severity::Disable);
     }
     auto enableArray = options.getArray(CompilerOptionName::EnableWarning);
