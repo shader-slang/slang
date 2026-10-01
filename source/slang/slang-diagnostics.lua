@@ -395,7 +395,7 @@ err(
 
 err(
     "cannot-load-search-path-list",
-    117,
+    136,
     "cannot load search path list",
     span { loc = "location", message = "~reason" }
 )
