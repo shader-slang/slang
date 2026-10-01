@@ -628,7 +628,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
     }
 
-    void processModule()
+    void processModule(ConstArrayView<IRFunc*> additionalRoots)
     {
         for (auto globalInst : module->getGlobalInsts())
         {
@@ -639,9 +639,25 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
             if (auto func = as<IRFunc>(globalInst))
             {
-                if (func->findDecoration<IREntryPointDecoration>())
+                // Metal function-table functions are physical entry points even though they do
+                // not carry an ordinary EntryPointDecoration. Starting address-space propagation
+                // from them also specializes helpers reached only through an IFT or VFT.
+                if (func->findDecoration<IREntryPointDecoration>() ||
+                    func->findDecoration<IRMetalVisibleFunctionDecoration>() ||
+                    func->findDecoration<IRMetalIntersectionFunctionDecoration>())
+                {
                     workList.add(func);
+                }
             }
+        }
+
+        // Some target-owned entry points intentionally do not use a native EntryPointDecoration.
+        // Their producer supplies those exact executable roots so this pass can legalize their
+        // bodies without misrepresenting them as native shader stages.
+        for (auto func : additionalRoots)
+        {
+            if (workList.indexOf(func) < 0)
+                workList.add(func);
         }
 
         // Before running the dataflow, reconcile every local pointer slot's *contained*
@@ -700,10 +716,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 void specializeAddressSpace(
     IRModule* module,
     InitialAddressSpaceAssigner* addrSpaceAssigner,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    ConstArrayView<IRFunc*> additionalRoots)
 {
     AddressSpaceContext context(module, addrSpaceAssigner, sink);
-    context.processModule();
+    context.processModule(additionalRoots);
 }
 
 void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)

@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="430" viewBox="0 0 820 430" role="img" aria-label="Metal intersection function buffer arguments layout">
+  <style>
+    .title { font: 700 20px sans-serif; fill: #202020; }
+    .label { font: 700 13px sans-serif; fill: #202020; }
+    .small { font: 12px sans-serif; fill: #333333; }
+    .tiny { font: 11px sans-serif; fill: #333333; }
+    .panel { fill: #ffffff; stroke: #777777; stroke-width: 1.5; rx: 8; }
+    .metalTable { fill: #f8fbff; stroke: #336699; stroke-width: 2; rx: 7; }
+    .userData { fill: #f3fff6; stroke: #2f7d45; stroke-width: 2; rx: 7; }
+    .visible { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 6; }
+    .note { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .header { fill: #e9f2ff; stroke: #667788; stroke-width: 1; }
+    .cell { fill: #ffffff; stroke: #667788; stroke-width: 1; }
+    .highlight { fill: #ffe8e5; stroke: #b42318; stroke-width: 2; }
+    .arrow { stroke: #333333; stroke-width: 1.8; marker-end: url(#arrow); fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333"/>
+    </marker>
+  </defs>
+
+  <text x="34" y="38" class="title">Metal intersection_function_buffer_arguments Layout</text>
+  <text x="34" y="62" class="small">Candidate-hit dispatch is table-shaped; descriptor-side data carries records and visible-function dispatch resources.</text>
+
+  <rect x="34" y="86" width="752" height="304" class="panel"/>
+
+  <rect x="64" y="122" width="402" height="226" class="metalTable"/>
+  <text x="88" y="149" class="label">function-buffer table: m x n</text>
+  <text x="88" y="170" class="small">one generated candidate-hit function per entry</text>
+
+  <rect x="88" y="194" width="70" height="28" class="header"/>
+  <text x="106" y="212" class="tiny">row/col</text>
+  <rect x="158" y="194" width="84" height="28" class="header"/>
+  <text x="185" y="212" class="tiny">slot 0</text>
+  <rect x="242" y="194" width="84" height="28" class="header"/>
+  <text x="269" y="212" class="tiny">slot 1</text>
+  <rect x="326" y="194" width="84" height="28" class="header"/>
+  <text x="353" y="212" class="tiny">slot 2</text>
+  <rect x="410" y="194" width="34" height="28" class="header"/>
+  <text x="420" y="212" class="tiny">...</text>
+
+  <rect x="88" y="222" width="70" height="44" class="header"/>
+  <text x="106" y="249" class="tiny">row 0</text>
+  <rect x="158" y="222" width="84" height="44" class="cell"/>
+  <text x="169" y="249" class="tiny">IntersectionFn</text>
+  <rect x="242" y="222" width="84" height="44" class="cell"/>
+  <text x="253" y="249" class="tiny">IntersectionFn</text>
+  <rect x="326" y="222" width="84" height="44" class="cell"/>
+  <text x="337" y="249" class="tiny">IntersectionFn</text>
+  <rect x="410" y="222" width="34" height="44" class="cell"/>
+  <text x="420" y="249" class="tiny">...</text>
+
+  <rect x="88" y="266" width="70" height="44" class="header"/>
+  <text x="106" y="293" class="tiny">row 1</text>
+  <rect x="158" y="266" width="84" height="44" class="cell"/>
+  <text x="169" y="293" class="tiny">IntersectionFn</text>
+  <rect x="242" y="266" width="84" height="44" class="highlight"/>
+  <text x="253" y="293" class="tiny">IntersectionFn</text>
+  <rect x="326" y="266" width="84" height="44" class="cell"/>
+  <text x="337" y="293" class="tiny">IntersectionFn</text>
+  <rect x="410" y="266" width="34" height="44" class="cell"/>
+  <text x="420" y="293" class="tiny">...</text>
+
+  <rect x="88" y="310" width="70" height="22" class="header"/>
+  <text x="117" y="325" class="tiny">...</text>
+  <rect x="158" y="310" width="84" height="22" class="cell"/>
+  <text x="194" y="325" class="tiny">...</text>
+  <rect x="242" y="310" width="84" height="22" class="cell"/>
+  <text x="278" y="325" class="tiny">...</text>
+  <rect x="326" y="310" width="84" height="22" class="cell"/>
+  <text x="362" y="325" class="tiny">...</text>
+  <rect x="410" y="310" width="34" height="22" class="cell"/>
+  <text x="420" y="325" class="tiny">...</text>
+
+  <path d="M468 236 L502 236" class="arrow"/>
+  <path d="M468 286 L502 286" class="arrow"/>
+
+  <rect x="506" y="122" width="130" height="226" class="userData"/>
+  <text x="530" y="149" class="label">descriptor data</text>
+  <text x="530" y="184" class="small">hit records</text>
+  <text x="530" y="209" class="small">miss records</text>
+  <text x="530" y="234" class="small">call records</text>
+  <text x="530" y="259" class="small">slot maps</text>
+  <text x="530" y="284" class="small">bindless data</text>
+
+  <rect x="656" y="122" width="104" height="72" class="visible"/>
+  <text x="676" y="148" class="label">Miss</text>
+  <text x="676" y="170" class="tiny">visible funcs</text>
+
+  <rect x="656" y="207" width="104" height="72" class="visible"/>
+  <text x="674" y="233" class="label">ClosestHit</text>
+  <text x="676" y="255" class="tiny">visible funcs</text>
+
+  <rect x="656" y="292" width="104" height="56" class="visible"/>
+  <text x="678" y="318" class="label">Callable</text>
+  <text x="676" y="338" class="tiny">visible funcs</text>
+
+  <rect x="74" y="360" width="644" height="22" class="note"/>
+  <text x="96" y="376" class="small">Miss dispatch uses missIndex; ClosestHit dispatch uses the same logical hit slot as the candidate-hit table.</text>
+</svg>

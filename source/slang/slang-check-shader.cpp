@@ -1778,6 +1778,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
+    diagnoseMixedRayTracingAPIUse(entryPoint, sink);
 
     // An entry point is invoked by the pipeline, which has no channel for returning an error, so
     // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
@@ -2553,6 +2554,21 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        if (targetCaps.getCompileTarget() == CapabilityAtom::metal &&
+            entryPoint->getStage() == Stage::RayGeneration &&
+            linkage->getStructuralRayTracingDeclRegistry().isVisibleFrom(
+                entryPoint->getModuleDependencies()))
+        {
+            // Metal has no native ray-generation stage. Treat the source stage as abstract during
+            // capability validation and let post-specialization structural lowering decide
+            // whether it has a Metal implementation. The decision cannot use the checked-AST call
+            // graph: consider `generic<T : ITracer>(T x) { x.trace(); }` called with a concrete
+            // implementation whose method invokes `RayTracer.trace`. Witness specialization
+            // exposes that trace only in IR. The Metal pass changes exactly the ray-generation
+            // entry points that reach such an operation to physical compute kernels, then
+            // diagnoses any entry point that remains in the unsupported logical stage.
+            stageCapabilitySet = CapabilitySet{CapabilityName::_raygen};
+        }
         targetCaps.join(stageCapabilitySet);
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {
@@ -2756,6 +2772,38 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
+    auto entryPointProfile = entryPointReq->getProfile();
+    bool foundStructuralStage = false;
+    StructuralRayTracingEntryPointInfo structuralInfo;
+    auto structuralEntryPointDeclRef = findStructuralRayTracingEntryPointByName(
+        linkage,
+        translationUnit->getModule(),
+        entryPointName,
+        entryPointProfile,
+        sink,
+        &foundStructuralStage,
+        &structuralInfo);
+    if (foundStructuralStage)
+    {
+        if (!structuralEntryPointDeclRef)
+            return nullptr;
+
+        auto entryPoint =
+            EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
+        entryPoint->setNameOverride(entryPointName);
+        // A qualified stage type such as `Stages.Miss` is the source lookup identity, but the dot
+        // is not legal in CUDA and other C-like target symbols. Store the compiler-owned physical
+        // default separately so an unrenamed component agrees with trace-program reflection. An
+        // explicit `renameEntryPoint()` still wraps this component and replaces the default.
+        auto sourceTypeName = getStructuralRayTracingSourceTypeName(
+            linkage->getASTBuilder(),
+            structuralInfo.stageType);
+        entryPoint->setEntryPointNameOverride(
+            getStructuralRayTracingEntryPointName(sourceTypeName.getUnownedSlice()));
+        entryPoint->setStructuralRayTracingInfo(structuralInfo);
+        return sink->getErrorCount() ? nullptr : entryPoint;
+    }
+
     DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
 
@@ -2776,7 +2824,6 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     // then we might be able to infer a stage for the entry point request if
     // it didn't have one, *or* issue a diagnostic if there is a mismatch with the profile.
 
-    auto entryPointProfile = entryPointReq->getProfile();
     resolveStageOfProfileWithEntryPoint(
         entryPointProfile,
         linkage->m_optionSet,
@@ -3200,6 +3247,7 @@ void FrontEndCompileRequest::checkEntryPoints()
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     auto sink = getSink();
+    List<EntryPoint*> selectedEntryPoints;
 
     // The validation of entry points here will be modal, and controlled
     // by whether the user specified any entry points directly via
@@ -3229,6 +3277,7 @@ void FrontEndCompileRequest::checkEntryPoints()
                 // compilation API doesn't allow for grouping).
                 //
                 entryPointReq->getTranslationUnit()->module->_addEntryPoint(entryPoint);
+                selectedEntryPoints.add(entryPoint);
             }
         }
 
@@ -3258,7 +3307,16 @@ void FrontEndCompileRequest::checkEntryPoints()
         {
             auto translationUnit = translationUnits[tt];
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
+            for (auto entryPoint : translationUnit->getModule()->getEntryPoints())
+                selectedEntryPoints.add(entryPoint);
         }
+    }
+
+    diagnoseMixedRayTracingAPIsInSelectedProgram(linkage, selectedEntryPoints, sink);
+
+    for (auto translationUnit : translationUnits)
+    {
+        diagnoseMixedRayTracingAPIsInModule(linkage, translationUnit->getModule(), sink);
     }
 }
 

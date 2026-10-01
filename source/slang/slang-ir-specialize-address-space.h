@@ -9,6 +9,7 @@ namespace Slang
 {
 struct IRModule;
 struct IRInst;
+struct IRFunc;
 class DiagnosticSink;
 enum class AddressSpace : uint64_t;
 
@@ -41,10 +42,15 @@ struct NoOpInitialAddressSpaceAssigner : public InitialAddressSpaceAssigner
 /// values in two different concrete address spaces. Only the SPIR-V legalizer passes a sink; with
 /// the default `nullptr` the pre-pass and that diagnostic are skipped (the other backends' behavior
 /// is unchanged), so a caller that wants the diagnostic must supply a sink.
+///
+/// `additionalRoots` identifies target-owned executable functions that intentionally have no
+/// native `EntryPointDecoration`. Their reachable call graphs receive the same address-space
+/// specialization as ordinary entry points.
 void specializeAddressSpace(
     IRModule* module,
     InitialAddressSpaceAssigner* addrSpaceAssigner,
-    DiagnosticSink* sink = nullptr);
+    DiagnosticSink* sink = nullptr,
+    ConstArrayView<IRFunc*> additionalRoots = {});
 
 /// Traverse the user graph of the initial insts and fix up address spaces to make sure they are
 /// consistent. This is needed after inlining a callee, the address space of the callee's

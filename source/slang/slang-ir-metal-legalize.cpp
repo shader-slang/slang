@@ -455,10 +455,10 @@ void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, Diagnost
     processInst(module->getModuleInst(), targetProgram, sink);
 }
 
-void specializeAddressSpaceForMetal(IRModule* module)
+void specializeAddressSpaceForMetal(IRModule* module, ConstArrayView<IRFunc*> additionalRoots)
 {
     MetalAddressSpaceAssigner metalAddressSpaceAssigner;
-    specializeAddressSpace(module, &metalAddressSpaceAssigner);
+    specializeAddressSpace(module, &metalAddressSpaceAssigner, nullptr, additionalRoots);
 }
 
 } // namespace Slang

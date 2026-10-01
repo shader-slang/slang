@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="450" viewBox="0 0 1080 450" role="img" aria-label="Reachability definition: the SBT entries a trace call can select">
+  <style>
+    .title { font: 700 20px sans-serif; fill: #202020; }
+    .label { font: 700 14px sans-serif; fill: #202020; }
+    .small { font: 12px sans-serif; fill: #333333; }
+    .tiny { font: 11px sans-serif; fill: #333333; }
+    .code { font: 12px monospace; fill: #202020; }
+    .trace { fill: #f8fbff; stroke: #336699; stroke-width: 1.5; rx: 7; }
+    .calc { fill: #f0f6ff; stroke: #336699; stroke-width: 1.5; rx: 7; }
+    .table { fill: #ffffff; stroke: #2f7d45; stroke-width: 1.5; rx: 7; }
+    .row { fill: #f8f8f8; stroke: #d7d7d7; stroke-width: 1; }
+    .reachable { fill: #eaf7ef; stroke: #2f7d45; stroke-width: 2; }
+    .callout { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .warn { fill: #ffe4e0; stroke: #b42318; stroke-width: 2; rx: 8; }
+    .arrow { stroke: #333333; stroke-width: 1.7; marker-end: url(#arrow); fill: none; }
+    .greenArrow { stroke: #2f7d45; stroke-width: 1.9; marker-end: url(#arrowGreen); fill: none; }
+    .orangeArrow { stroke: #a65f00; stroke-width: 1.8; marker-end: url(#arrowOrange); fill: none; }
+    .redArrow { stroke: #b42318; stroke-width: 2; marker-end: url(#arrowRed); fill: none; }
+    .bracket { stroke: #2f7d45; stroke-width: 2.2; fill: none; }
+    .greenText { font: 700 14px sans-serif; fill: #276738; }
+    .redText { font: 700 13px sans-serif; fill: #8a1f17; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2f7d45"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#a65f00"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#b42318"/>
+    </marker>
+  </defs>
+
+  <text x="34" y="36" class="title">Reachability: which SBT entries can one trace call access?</text>
+
+  <rect x="42" y="78" width="210" height="126" class="trace"/>
+  <text x="68" y="105" class="label">One trace call</text>
+  <text x="64" y="132" class="code">TraceRay(...)</text>
+  <text x="64" y="158" class="tiny">sbtOffset = 2</text>
+  <text x="64" y="176" class="tiny">sbtStride = 3</text>
+  <text x="64" y="194" class="tiny">missIndex = 0</text>
+
+  <rect x="302" y="78" width="236" height="126" class="calc"/>
+  <text x="330" y="105" class="label">Runtime SBT index</text>
+  <text x="322" y="132" class="small">slot = instanceContribution</text>
+  <text x="366" y="151" class="small">+ geometryContribution * stride</text>
+  <text x="366" y="170" class="small">+ offset</text>
+  <text x="322" y="194" class="tiny">over all possible hits from this ray</text>
+
+  <path d="M252 141 L302 141" class="arrow"/>
+
+  <rect x="590" y="42" width="246" height="300" class="table"/>
+  <text x="660" y="68" class="label">Host SBT</text>
+
+  <rect x="615" y="86" width="176" height="26" class="row"/>
+  <text x="628" y="104" class="tiny">slot 0: other ray type</text>
+  <rect x="615" y="112" width="176" height="26" class="row"/>
+  <text x="628" y="130" class="tiny">slot 1: other ray type</text>
+  <rect x="615" y="138" width="176" height="34" class="reachable"/>
+  <text x="628" y="154" class="tiny">slot 2: HitGroup A</text>
+  <text x="646" y="168" class="tiny">AnyHit1, Intersection1</text>
+  <rect x="615" y="172" width="176" height="26" class="row"/>
+  <text x="628" y="190" class="tiny">slot 3: other ray type</text>
+  <rect x="615" y="198" width="176" height="26" class="row"/>
+  <text x="628" y="216" class="tiny">slot 4: other ray type</text>
+  <rect x="615" y="224" width="176" height="34" class="reachable"/>
+  <text x="628" y="240" class="tiny">slot 5: HitGroup B</text>
+  <text x="646" y="254" class="tiny">AnyHit2, Intersection2</text>
+  <rect x="615" y="258" width="176" height="26" class="row"/>
+  <text x="628" y="276" class="tiny">slot 6: other ray type</text>
+  <rect x="615" y="284" width="176" height="34" class="reachable"/>
+  <text x="628" y="300" class="tiny">slot 8: HitGroup C</text>
+  <text x="646" y="314" class="tiny">ClosestHit only</text>
+
+  <path d="M538 141 C565 132 577 135 615 153" class="greenArrow"/>
+  <path d="M538 151 C570 190 582 225 615 241" class="greenArrow"/>
+  <path d="M538 165 C570 242 582 288 615 300" class="greenArrow"/>
+
+  <path d="M808 138 L828 138 L828 318 L808 318" class="bracket"/>
+  <text x="844" y="222" class="greenText">Reachable entries</text>
+  <text x="844" y="244" class="small">the set this trace call</text>
+  <text x="844" y="263" class="small">may select at runtime</text>
+
+  <rect x="42" y="248" width="496" height="104" class="callout"/>
+  <text x="64" y="277" class="label">Definition used by this proposal</text>
+  <text x="64" y="302" class="small">Reachability(trace call) = the SBT hit or miss records</text>
+  <text x="64" y="322" class="small">that can be selected by that trace call.</text>
+  <text x="64" y="342" class="small">Those records determine which shader logic is reachable.</text>
+
+  <rect x="848" y="78" width="190" height="100" class="warn"/>
+  <text x="870" y="106" class="redText">Why this matters for Metal</text>
+  <text x="870" y="132" class="small">Reachable AnyHit and</text>
+  <text x="870" y="151" class="small">Intersection functions need</text>
+  <text x="870" y="170" class="small">the trace call's tag set.</text>
+
+  <path d="M836 154 C854 151 858 144 870 132" class="orangeArrow"/>
+
+  <path d="M715 342 L715 362" class="redArrow"/>
+  <rect x="590" y="362" width="448" height="74" class="warn"/>
+  <text x="612" y="386" class="redText">Existing model: host determines reachability</text>
+  <text x="612" y="407" class="small">Shader compile sees the trace call, but not the host SBT records</text>
+  <text x="612" y="426" class="small">or the binding edges to AnyHit/Intersection entries.</text>
+</svg>

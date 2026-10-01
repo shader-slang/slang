@@ -3021,6 +3021,12 @@ void handleSingleParam(
     builder->addLayoutDecoration(globalParam, paramLayout);
     if (auto nameDecor = pp->findDecoration<IRNameHintDecoration>())
         builder->addNameHintDecoration(globalParam, nameDecor->getName());
+    // Structural ray-tracing lowering puts the payload-partition location on its synthesized
+    // entry-point parameter. Preserve that location when GLSL legalization replaces the parameter
+    // with the native incoming-payload global; Vulkan pairs it with the outgoing trace payload by
+    // this decoration.
+    if (auto payloadDecoration = pp->findDecoration<IRVulkanRayPayloadInDecoration>())
+        cloneDecoration(payloadDecoration, globalParam);
     moveValueBefore(globalParam, builder->getFunc());
     pp->replaceUsesWith(globalParam);
 
@@ -4837,7 +4843,8 @@ void legalizeEntryPointForGLSL(
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
-    ShaderExtensionTracker* glslExtensionTracker)
+    ShaderExtensionTracker* glslExtensionTracker,
+    bool preserveOriginalEntryPointName)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -4905,7 +4912,7 @@ void legalizeEntryPointForGLSL(
 
     // Rename the entrypoint to "main" to conform to GLSL standard,
     // if the compile options require us to do it.
-    if (!shouldUseOriginalEntryPointName(codeGenContext) &&
+    if (!preserveOriginalEntryPointName && !shouldUseOriginalEntryPointName(codeGenContext) &&
         codeGenContext->getEntryPointCount() == 1)
     {
         entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
@@ -5100,9 +5107,22 @@ void legalizeEntryPointsForGLSL(
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
 {
-    for (auto func : funcs)
+    bool hasMultipleRequestedEntryPoints = context->getEntryPointCount() > 1;
+    for (Index i = 0; i < funcs.getCount(); ++i)
     {
-        legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
+        auto func = funcs[i];
+        // Structural ray-tracing synthesis can append auxiliary stages to a single requested
+        // entry point. Keep those stage names, but retain the normal `main` ABI name for the
+        // requested entry point at index zero.
+        bool preserveOriginalEntryPointName =
+            hasMultipleRequestedEntryPoints || (funcs.getCount() > 1 && i != 0);
+        legalizeEntryPointForGLSL(
+            session,
+            module,
+            func,
+            context,
+            glslExtensionTracker,
+            preserveOriginalEntryPointName);
     }
 
     assignRayPayloadHitObjectAttributeLocations(module);

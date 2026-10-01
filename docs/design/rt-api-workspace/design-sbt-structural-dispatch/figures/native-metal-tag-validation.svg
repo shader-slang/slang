@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="370" viewBox="0 0 1120 370" role="img" aria-label="Native Metal tag validation at pipeline build time">
+  <style>
+    .title { font: 700 22px sans-serif; fill: #202020; }
+    .label { font: 700 14px sans-serif; fill: #202020; }
+    .small { font: 12px sans-serif; fill: #333333; }
+    .code { font: 12px monospace; fill: #202020; }
+    .metal { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .stage { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .host { fill: #f3fff6; stroke: #2f7d45; stroke-width: 1.5; rx: 7; }
+    .ok { fill: #eaf7ef; stroke: #2f7d45; stroke-width: 2; rx: 8; }
+    .warn { fill: #ffe4e0; stroke: #b42318; stroke-width: 2.4; rx: 8; }
+    .arrow { stroke: #333333; stroke-width: 1.7; marker-end: url(#arrow); fill: none; }
+    .greenArrow { stroke: #2f7d45; stroke-width: 1.8; marker-end: url(#arrowGreen); fill: none; }
+    .redArrow { stroke: #b42318; stroke-width: 2; marker-end: url(#arrowRed); fill: none; }
+    .greenText { font: 700 14px sans-serif; fill: #276738; }
+    .redText { font: 700 14px sans-serif; fill: #8a1f17; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2f7d45"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#b42318"/>
+    </marker>
+  </defs>
+
+  <text x="36" y="38" class="title">Native Metal: explicit tags make pipeline validation possible</text>
+  <text x="36" y="62" class="small">The shader author writes tags on both intersectors and custom intersection functions. Host bindings are validated when the pipeline is built.</text>
+
+  <rect x="55" y="105" width="245" height="104" class="metal"/>
+  <text x="78" y="132" class="label">Metal shader source</text>
+  <text x="78" y="160" class="code">intersector&lt;TagA&gt; tracerA;</text>
+  <text x="78" y="184" class="code">intersector&lt;TagB&gt; tracerB;</text>
+
+  <rect x="355" y="92" width="285" height="132" class="stage"/>
+  <text x="377" y="119" class="label">Tagged intersection functions</text>
+  <text x="377" y="148" class="code">[[intersection(TagA)]] fA()</text>
+  <text x="377" y="172" class="code">[[intersection(TagB)]] fB()</text>
+  <text x="377" y="196" class="code">[[intersection(TagB)]] fC()</text>
+
+  <rect x="695" y="96" width="205" height="124" class="host"/>
+  <text x="722" y="124" class="label">Host bindings</text>
+  <text x="722" y="153" class="small">tracerA slot 0 -> fA</text>
+  <text x="722" y="177" class="small">tracerA slot 1 -> fB</text>
+  <text x="722" y="201" class="redText">slot 1 is a mismatch</text>
+
+  <rect x="955" y="96" width="155" height="124" class="ok"/>
+  <text x="983" y="124" class="greenText">Pipeline build</text>
+  <text x="978" y="153" class="small">sees tracer tags,</text>
+  <text x="978" y="174" class="small">function tags,</text>
+  <text x="978" y="195" class="small">and bindings</text>
+
+  <path d="M300 157 L355 157" class="arrow"/>
+  <path d="M640 157 L695 157" class="greenArrow"/>
+  <path d="M900 157 L955 157" class="greenArrow"/>
+
+  <rect x="180" y="270" width="820" height="58" class="warn"/>
+  <text x="210" y="294" class="redText">Late but detectable:</text>
+  <text x="370" y="294" class="small">pipeline build can reject tracerA -> fB because both sides already carry concrete Metal tags.</text>
+  <path d="M802 220 C770 246 730 258 650 270" class="redArrow"/>
+</svg>

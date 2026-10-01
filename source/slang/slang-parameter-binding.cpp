@@ -7,6 +7,7 @@
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-structural-ray-tracing.h"
 #include "slang-type-layout.h"
 #include "slang.h"
 
@@ -3268,9 +3269,10 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
 /// the resources required for a constant buffer in the appropriate
 /// target-specific fashion.
 ///
-static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindingContext* context)
+static ParameterBindingAndKindInfo _allocateConstantBufferBindingInSpace(
+    ParameterBindingContext* context,
+    UInt space)
 {
-    UInt space = context->shared->defaultSpace;
     auto usedRangeSet = _getOrCreateUsedRangeSetForSpace(context, space);
 
     auto layoutInfo =
@@ -3289,6 +3291,11 @@ static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindi
         layoutInfo.size.getFiniteValue());
     info.space = space;
     return info;
+}
+
+static ParameterBindingAndKindInfo _allocateConstantBufferBinding(ParameterBindingContext* context)
+{
+    return _allocateConstantBufferBindingInSpace(context, context->shared->defaultSpace);
 }
 
 static ParameterBindingAndKindInfo _assignConstantBufferBinding(
@@ -3323,6 +3330,95 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
     info.index = index;
     info.space = space;
     return info;
+}
+
+struct StructuralRayTracingRecordReservationEvidence
+{
+    bool hasProgramOperation = false;
+    bool hasRecordAccess = false;
+};
+
+/// Collects the compiler-owned operations that can require a D3D structural Record binding.
+///
+/// Parameter binding runs before higher-order specialization, so source call-graph reachability is
+/// not authoritative here. These IR markers are the same source of truth consumed by adapter
+/// synthesis later in the pipeline and survive calls through function-valued parameters.
+static void _collectStructuralRayTracingRecordReservationEvidence(
+    IRInst* root,
+    StructuralRayTracingRecordReservationEvidence& evidence)
+{
+    switch (root->getOp())
+    {
+    case kIROp_StructuralRayTracingTrace:
+    case kIROp_StructuralRayTracingCallShader:
+        evidence.hasProgramOperation = true;
+        break;
+    case kIROp_StructuralRayTracingGetRecord:
+        evidence.hasRecordAccess = true;
+        break;
+    default:
+        break;
+    }
+
+    for (auto child = root->getFirstDecorationOrChild(); child; child = child->getNextInst())
+        _collectStructuralRayTracingRecordReservationEvidence(child, evidence);
+}
+
+/// Returns whether this component can produce a structural stage with application record data.
+///
+/// A structural stage is represented by its `invoke` method until target adapters are synthesized,
+/// so it has no ordinary source parameter for `Record`. Reserving a compiler-owned space here lets
+/// the later adapter producer assign ordinary constant-buffer registers without colliding with
+/// source parameters.
+static bool _hasStructuralRayTracingRecordContract(ComponentType* program, ASTBuilder* astBuilder)
+{
+    auto& registry = program->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return false;
+
+    auto voidType = astBuilder->getVoidType();
+    auto hasRecord = [voidType](Type* recordType)
+    { return recordType && !recordType->equals(voidType); };
+
+    bool canDispatchStructuralProgram = false;
+    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    {
+        auto entryPoint = program->getEntryPoint(i);
+        auto& info = entryPoint->getStructuralRayTracingInfo();
+        if (info.invokeMethod && hasRecord(info.recordType))
+            return true;
+
+        // Keep this union in sync with the `structural_raytracing_trace` and
+        // `structural_raytracing_call_shader` aliases in slang-capabilities.capdef.
+        switch (entryPoint->getStage())
+        {
+        case Stage::RayGeneration:
+        case Stage::ClosestHit:
+        case Stage::Miss:
+            canDispatchStructuralProgram = true;
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (!canDispatchStructuralProgram)
+        return false;
+
+    StructuralRayTracingRecordReservationEvidence evidence;
+    program->enumerateIRModules(
+        [&](IRModule* module) {
+            _collectStructuralRayTracingRecordReservationEvidence(
+                module->getModuleInst(),
+                evidence);
+        });
+
+    // An operation may be hidden behind a higher-order helper until specialization, and an open
+    // schema may acquire its stages only while linking. Pairing the two canonical marker kinds is
+    // therefore deliberately conservative: an unreachable operation plus an unreachable Record
+    // read in the same selected component can reserve one otherwise-unused compiler-owned space,
+    // but it cannot collide with or renumber any user binding in that space.
+    return evidence.hasProgramOperation && evidence.hasRecordAccess;
 }
 
 /// Remove resource usage from `typeLayout` that should only be stored per-entry-point.
@@ -3370,6 +3466,22 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->name = entryPoint->getName();
     entryPointLayout->nameOverride = entryPointNameOverride;
+
+    // A selected structural stage can be compiled without appearing in an `IHitGroup` or trace
+    // schema. Preserve its checked Record contract directly on the entry-point layout so a D3D
+    // runtime can construct the corresponding local root signature without rediscovering source
+    // interface conformances. The ordinary target type-layout producer remains the sole source of
+    // the application's byte layout.
+    auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
+    if (structuralInfo.invokeMethod && structuralInfo.recordType)
+    {
+        entryPointLayout->structuralRayTracingRecordType = structuralInfo.recordType;
+        entryPointLayout->structuralRayTracingRecordTypeLayout =
+            getStructuralRayTracingRecordTypeLayout(
+                context->getTargetRequest(),
+                structuralInfo.recordType);
+        SLANG_RELEASE_ASSERT(entryPointLayout->structuralRayTracingRecordTypeLayout);
+    }
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
@@ -3787,10 +3899,26 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         ParameterBindingContext contextData = *m_context;
         auto context = &contextData;
         context->stage = entryPoint->getStage();
+
+        // A component wrapper supplies an explicit rename through
+        // `m_currentEntryPointNameOverride`. Otherwise preserve a non-trivial physical default
+        // owned by the entry point itself. Structural stages use this distinction for qualified
+        // source names such as `Stages.Miss`: the source name remains the lookup identity, while
+        // `getEntryPointNameOverride()` returns the target-safe symbol used by IR linking.
+        String entryPointNameOverride = m_currentEntryPointNameOverride;
+        if (!entryPointNameOverride.getLength())
+        {
+            auto defaultPhysicalName = entryPoint->getEntryPointNameOverride(0);
+            if (defaultPhysicalName.getUnownedSlice() !=
+                getUnownedStringSliceText(entryPoint->getName()))
+            {
+                entryPointNameOverride = _Move(defaultPhysicalName);
+            }
+        }
         collectEntryPointParameters(
             context,
             entryPoint,
-            m_currentEntryPointNameOverride,
+            entryPointNameOverride,
             specializationInfo);
     }
 
@@ -4703,6 +4831,9 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     // we are creating a default constant buffer, since it should get
     // a binding in that "default" space.
 
+    const bool needsStructuralRayTracingRecordBinding =
+        isD3DTarget(targetReq) &&
+        _hasStructuralRayTracingRecordContract(program, context.getASTBuilder());
     const bool needDefaultSpace =
         needDefaultConstantBuffer || _calcNeedsDefaultSpace(sharedContext);
 
@@ -4763,6 +4894,35 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
     // parameters and entry points that need them.
     //
     _completeBindings(&context, program);
+
+    // D3D names structural `Record` values through ordinary cbuffer registers. Slang RHI binds
+    // those registers through local-root CBVs whose addresses come from shader-table entries.
+    // Reserve a fresh whole space only after every user parameter has received its binding. This
+    // gives each generated adapter a distinct register while ensuring that compiler-owned local
+    // parameters cannot collide with, or perturb, public global bindings.
+    if (needsStructuralRayTracingRecordBinding)
+    {
+        const UInt bindingSpace = allocateUnusedSpaces(&context, 1);
+        programLayout->structuralRayTracingRecordBindingSpace = Int(bindingSpace);
+
+        auto voidType = context.getASTBuilder()->getVoidType();
+        for (auto entryPointLayout : programLayout->entryPoints)
+        {
+            auto recordType = entryPointLayout->structuralRayTracingRecordType;
+            if (!recordType || recordType->equals(voidType))
+                continue;
+
+            // Allocate from the selected stage contract, even when optimization later proves that
+            // this stage never reads `input.record`. This keeps reflection and the host's local
+            // root-signature contract stable; on-demand IR lowering may simply omit the unused
+            // cbuffer declaration.
+            auto binding = _allocateConstantBufferBindingInSpace(&context, bindingSpace);
+            SLANG_RELEASE_ASSERT(binding.kind == LayoutResourceKind::ConstantBuffer);
+            entryPointLayout->structuralRayTracingRecordBindingIndex = Int(binding.index);
+            entryPointLayout->structuralRayTracingRecordBindingSpace = Int(binding.space);
+            ++programLayout->structuralRayTracingSelectedRecordBindingCount;
+        }
+    }
 
     // We may need to finally do any shifting if we have HLSLToVulkanLayoutOptions
     _maybeApplyHLSLToVulkanShifts(&context, globalConstantBufferBinding, targetProgram, sink);

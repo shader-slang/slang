@@ -2774,6 +2774,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         validateArrayElementTypeForVariable(varDecl);
     }
 
+    diagnoseInvalidStructuralRayTracingVariableType(varDecl);
+
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
 
@@ -6446,7 +6448,8 @@ bool SemanticsVisitor::doesTypeSatisfyConstraintRequirements(
 bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
     Type* satisfyingType,
     DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
-    RefPtr<WitnessTable> witnessTable)
+    RefPtr<WitnessTable> witnessTable,
+    Decl* satisfyingDecl)
 {
     if (auto declRefType = as<DeclRefType>(satisfyingType))
     {
@@ -6455,6 +6458,16 @@ bool SemanticsVisitor::doesTypeSatisfyAssociatedTypeRequirement(
         if (declRefType->getDeclRef().getDecl()->hasModifier<ToBeSynthesizedModifier>())
             return false;
     }
+
+    diagnoseInvalidStructuralRayTracingOpenSectionTag(
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        satisfyingDecl);
+    diagnoseDuplicateStructuralRayTracingSchemaEntries(
+        satisfyingType,
+        requiredAssociatedTypeDeclRef.getDecl(),
+        witnessTable->witnessedType,
+        satisfyingDecl);
 
     // Register the satisfying type to the witness table. Any constraints
     // written on this associated type are sibling interface requirements, and
@@ -6567,7 +6580,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                subAggTypeDeclRef.getDecl());
         }
     }
     else if (auto typedefDeclRef = memberDeclRef.as<TypeDefDecl>())
@@ -6582,7 +6596,8 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesTypeSatisfyAssociatedTypeRequirement(
                 satisfyingType,
                 requiredTypeDeclRef,
-                witnessTable);
+                witnessTable,
+                typedefDeclRef.getDecl());
         }
     }
     else if (auto propertyDeclRef = memberDeclRef.as<PropertyDecl>())
@@ -11370,6 +11385,10 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
         {
         case ConformanceInterfaceCheckStatus::Checking:
         case ConformanceInterfaceCheckStatus::Succeeded:
+            registerStructuralRayTracingStageConformance(
+                superInterfaceDeclRef,
+                witnessTable,
+                inheritanceDecl->loc);
             return witnessTable;
         case ConformanceInterfaceCheckStatus::Failed:
             return nullptr;
@@ -11428,6 +11447,10 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
+    registerStructuralRayTracingStageConformance(
+        superInterfaceDeclRef,
+        witnessTable,
+        inheritanceDecl->loc);
     return witnessTable;
 }
 
@@ -11737,6 +11760,11 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
     // The conformance was satisfied if all the requirements were satisfied.
     //
+    if (result)
+        registerStructuralRayTracingStageConformance(
+            superInterfaceDeclRef,
+            witnessTable,
+            inheritanceDecl->loc);
     return result;
 }
 
@@ -16352,7 +16380,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+        diagnoseInvalidStructuralRayTracingVariableType(paramDecl);
     }
+
+    diagnoseInvalidStructuralRayTracingCallableResult(decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -17410,6 +17441,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
+    diagnoseInvalidStructuralRayTracingPropertyType(decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }

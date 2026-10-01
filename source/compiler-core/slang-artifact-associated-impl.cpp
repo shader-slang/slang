@@ -291,6 +291,8 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
         return static_cast<slang::IMetadata*>(this);
     if (guid == slang::IBindlessResourceMetadata::getTypeGuid())
         return static_cast<slang::IBindlessResourceMetadata*>(this);
+    if (guid == slang::IStructuralRayTracingMetadata::getTypeGuid())
+        return static_cast<slang::IStructuralRayTracingMetadata*>(this);
     if (guid == slang::ICoverageTracingMetadata::getTypeGuid())
     {
         return static_cast<slang::ICoverageTracingMetadata*>(this);
@@ -361,6 +363,33 @@ const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
 bool ArtifactPostEmitMetadata::usesBindlessResourceHeap()
 {
     return m_usesBindlessResourceHeap;
+}
+
+uint32_t ArtifactPostEmitMetadata::getMetalPayloadInfoCount()
+{
+    return uint32_t(m_structuralRayTracingMetalPayloads.getCount());
+}
+
+SlangResult ArtifactPostEmitMetadata::getMetalPayloadInfo(
+    uint32_t index,
+    slang::StructuralRayTracingMetalPayloadInfo* outInfo)
+{
+    if (!outInfo)
+        return SLANG_E_INVALID_ARG;
+    constexpr size_t kV1MinSize =
+        offsetof(slang::StructuralRayTracingMetalPayloadInfo, intersectionFunctionSignature) +
+        sizeof(slang::MetalIntersectionFunctionSignature);
+    if (outInfo->structSize < kV1MinSize ||
+        index >= uint32_t(m_structuralRayTracingMetalPayloads.getCount()))
+    {
+        return SLANG_E_INVALID_ARG;
+    }
+
+    const auto& record = m_structuralRayTracingMetalPayloads[index];
+    outInfo->schemaName = record.schemaName.getBuffer();
+    outInfo->payloadIndex = record.payloadIndex;
+    outInfo->intersectionFunctionSignature = record.intersectionFunctionSignature;
+    return SLANG_OK;
 }
 
 uint32_t ArtifactPostEmitMetadata::getCounterCount()
