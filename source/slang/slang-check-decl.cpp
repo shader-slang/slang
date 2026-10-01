@@ -11661,6 +11661,9 @@ bool SemanticsVisitor::checkInterfaceConformance(
         if (as<InterfaceDefaultImplDecl>(requiredMemberDecl.getDecl()))
             continue;
         ensureDecl(requiredMemberDecl, DeclCheckState::ReadyForReference);
+        // Validate attributes on empty declarations before skipping them as requirements.
+        if (as<EmptyDecl>(requiredMemberDecl.getDecl()))
+            continue;
         auto requiredMemberDeclRef = m_astBuilder->getLookupDeclRef(
             subTypeConformsToSuperInterfaceWitness,
             requiredMemberDecl.getDecl());
