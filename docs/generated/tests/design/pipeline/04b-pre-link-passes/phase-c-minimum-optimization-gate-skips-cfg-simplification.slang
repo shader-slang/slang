@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#option-set-toggles
-//META: doc_section_digest=7c951a88b67c0d94a6d4504f2d7616fdfe324b58f96f2245c67178d693892a88
+//META: doc_section_digest=af8456e51bdb3fb57f8ddeaae70da165649c7adf3497efb5a4038eb6995a71a1
 //META: purpose=The minimum-optimizations toggle gates C3 and C4, so the empty-block cleanup that normally merges the entry block away is skipped when it is set.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

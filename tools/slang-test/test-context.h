@@ -235,7 +235,7 @@ protected:
     /// Indexed by thread, so it needs no lock for the same reason the connections do not.
     Slang::List<int> m_rpcRequestOrdinals;
     Slang::List<TestReporter*> m_reporters;
-    Slang::List<TestRequirements*> m_testRequirements = nullptr;
+    Slang::List<TestRequirements*> m_testRequirements;
 
     Slang::ComPtr<SlangSession> m_session;
 

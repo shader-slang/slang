@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#definition-forms
-//META: doc_section_digest=d6d360ed810fe20f1543f761a89b7a194383364a9db523edf2e823b33ddfb19e
+//META: doc_section_digest=2c0608f6d4897cdbfc247f90cd3fba9250321d1c82341829952363fd26bccf89
 //META: purpose=The `spirv_latest` alias names the highest member of the SPIR-V version family, so `-capability spirv_latest` emits the same module version as the explicit `spirv_1_6` spelling.
 //META: intent=functional
 //META: pipeline_stage=emit

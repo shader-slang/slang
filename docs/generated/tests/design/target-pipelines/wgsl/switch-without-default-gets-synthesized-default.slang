@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizeirforwgsl
-//META: doc_section_digest=33ccb88a3da115be9cff2c913440e47d7a1de3a78d0cd2269b27a0b1b59788c0
+//META: doc_section_digest=30e56d9f0d7666e6c1720d330ddfe5f3548f085a58909b38e8ab63dd7d22f058
 //META: purpose=legalizeSwitch synthesizes the default case WGSL requires when the source switch has none
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -1031,6 +1031,16 @@ typedef uint32_t SlangSizeT;
     // compiled against an older version of this header.
     namespace slang
     {
+    enum class BitfieldPackingRules
+    {
+        // Uses LSB-first packing; fields may share storage across underlying type sizes.
+        Default = 0,
+        // Uses LSB-first packing; a type-size change starts new storage. Rejects zero-width fields.
+        MSVC = 1,
+        // Uses MSB-first packing and starts new storage on type-size changes. Not recommended.
+        LegacyMSBFirstMSVC = 2,
+    };
+
     enum class CompilerOptionName
     {
         MacroDefine = 0, // stringValue0: macro name;  stringValue1: macro value
@@ -1203,7 +1213,8 @@ typedef uint32_t SlangSizeT;
         DenormalModeFp32 = 126,
         DenormalModeFp64 = 127,
 
-        // Bitfield options
+        // Deprecated. When no BitfieldPackingRules value is supplied, true selects MSB-first
+        // packing and starts new storage on underlying type-size changes.
         UseMSVCStyleBitfieldPacking = 128, // bool
 
         ForceCLayout = 129, // bool
@@ -1334,11 +1345,15 @@ typedef uint32_t SlangSizeT;
         // command-line parser.
         GetCompilerPath = 159,
 
+        BitfieldPackingRules = 160, // intValue0: slang::BitfieldPackingRules
+
+        DisableNotes = 161, // stringValue0: comma-separated note codes or names.
+
         // New options are always appended immediately before the `CountOf` sentinel below, to
         // preserve this enum's append-only ABI contract: inserting a value earlier would shift
         // every later enumerator's integer for code already compiled against an older header.
-        SaveAutodiffModule = 160,
-        SaveAutodiffModuleBinSource = 161,
+        SaveAutodiffModule = 162,
+        SaveAutodiffModuleBinSource = 163,
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
@@ -2955,6 +2970,23 @@ struct TypeLayoutReflection
     VariableLayoutReflection* getContainerVarLayout()
     {
         return (VariableLayoutReflection*)spReflectionTypeLayout_getContainerVarLayout(
+            (SlangReflectionTypeLayout*)this);
+    }
+
+    /** Get the variable layout for the "content" of a container-like type layout.
+     *
+     * The "content" is what a container holds, as opposed to the container ("wrapper") itself: the
+     * single element for a constant buffer / parameter block / texture buffer, and the sequence of
+     * elements for a structured buffer. For a constant buffer / parameter block / texture buffer
+     * this returns the element variable layout, whose offsets are relative to the container (they
+     * account for the container's own resource usage). For a structured buffer it returns a
+     * variable layout at offset zero whose `getTypeLayout()` is an array type layout, so
+     * `getElementTypeLayout` / `getElementStride` on it behave as for any array. Returns null for
+     * type layouts that are not container-like.
+     */
+    VariableLayoutReflection* getContentVarLayout()
+    {
+        return (VariableLayoutReflection*)spReflectionTypeLayout_GetContentVarLayout(
             (SlangReflectionTypeLayout*)this);
     }
 
@@ -6084,12 +6116,16 @@ SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
    Switches to playback mode on success.
    @param folderPath Path to the replay folder.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
 
 /* Load the most recent replay from the replay directory.
    Switches to playback mode on success.
    @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+   Returns SLANG_E_NOT_AVAILABLE when Slang is built with the record-replay layer excluded
+   (SLANG_ENABLE_RECORD_REPLAY=OFF).
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
 

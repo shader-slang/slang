@@ -70,6 +70,10 @@ void TestContext::setMaxTestRunnerThreadCount(int count)
         ordinal = 0;
     }
     m_testRequirements.setCount(count);
+    for (auto& requirements : m_testRequirements)
+    {
+        requirements = nullptr;
+    }
     m_reporters.setCount(count);
     for (auto& reporter : m_reporters)
     {

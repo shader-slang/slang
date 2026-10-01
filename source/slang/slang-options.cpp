@@ -140,6 +140,7 @@ enum class ValueCategory
     VulkanShift,
     SourceEmbedStyle,
     LanguageVersion,
+    BitfieldPackingRules,
 
     CountOf,
 };
@@ -168,6 +169,7 @@ SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
 SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
 SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedUtil::Style)
 SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
+SLANG_GET_VALUE_CATEGORY(BitfieldPackingRules, slang::BitfieldPackingRules)
 
 } // namespace
 
@@ -301,6 +303,13 @@ void initCommandOptions(CommandOptions& options)
             "File System Type",
             UserValue(ValueCategory::FileSystemType));
         options.addValues(TypeTextUtil::getFileSystemTypeInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "bitfield-packing-rules",
+            "Bitfield Packing Rules",
+            UserValue(ValueCategory::BitfieldPackingRules));
+        options.addValues(TypeTextUtil::getBitfieldPackingRulesInfos());
 
         options.addCategory(
             CategoryKind::Value,
@@ -589,6 +598,10 @@ void initCommandOptions(CommandOptions& options)
          "version does not recognize is silently ignored, so one option value can be shared across "
          "compiler versions that do not all define the warning; an unrecognized warning name is "
          "still reported as an error."},
+        {OptionKind::DisableNotes,
+         "-notes-disable",
+         "-notes-disable <id>[,<id>...]",
+         "Disable specific notes, given by numeric id or name."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
@@ -644,8 +657,8 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Instrument the shader with per-branch-arm coverage counters for "
          "if/else, loop-condition, switch case/default arms, and switch no-match "
-         "default paths. Expression-level short-circuit and ternary branches are "
-         "not instrumented by this mode yet. "
+         "default paths, and for the true/false arms of scalar `?:` conditions and "
+         "short-circuiting `&&` / `||` left operands. "
          "Shares the synthesized `__slang_coverage` buffer and coverage metadata path."},
         {OptionKind::TraceCoverageBoolean,
          "-trace-coverage-boolean",
@@ -769,11 +782,19 @@ void initCommandOptions(CommandOptions& options)
          "-reflection-json",
          "-reflection-json <path>",
          "Emit reflection data in JSON format to a file."},
+        {OptionKind::BitfieldPackingRules,
+         "-bitfield-packing-rules",
+         "-bitfield-packing-rules <bitfield-packing-rules>",
+         "Select the rules to use for packing bitfields. The value must be one of the "
+         "<bitfield-packing-rules> documented below. Cannot be combined with "
+         "-msvc-style-bitfield-packing."},
         {OptionKind::UseMSVCStyleBitfieldPacking,
          "-msvc-style-bitfield-packing",
          nullptr,
-         "Pack bitfields according to MSVC rules (msb first, new field when underlying type size "
-         "changes) rather than gcc-style (lsb first)"}};
+         "Deprecated. Uses the same packing rules as -bitfield-packing-rules "
+         "legacy-msb-first-msvc. Use -bitfield-packing-rules msvc for MSVC's bit order and "
+         "type-size grouping on little-endian platforms. Cannot be combined with "
+         "-bitfield-packing-rules."}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -1235,7 +1256,11 @@ void initCommandOptions(CommandOptions& options)
          "-validate-uniformity",
          nullptr,
          "Perform uniformity validation analysis."},
-        {OptionKind::AllowGLSL, "-allow-glsl", nullptr, "Enable GLSL as an input language."},
+        {OptionKind::AllowGLSL,
+         "-allow-glsl",
+         nullptr,
+         "Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension "
+         "or `-lang glsl` for each GLSL input instead."},
         {OptionKind::EnableExperimentalPasses,
          "-enable-experimental-passes",
          nullptr,
@@ -1475,18 +1500,28 @@ struct OptionsParser
         bool writeAsSourceBytes = false;
     };
 
-    int addTranslationUnit(SlangSourceLanguage language, Stage impliedStage);
+    /// Add matching raw/API translation-unit records and preserve explicit-language provenance.
+    int addTranslationUnit(
+        SlangSourceLanguage language,
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
-    void addInputSlangPath(String const& path);
+    /// Add a path to the shared Slang translation unit, preserving an explicit override if present.
+    void addInputSlangPath(
+        String const& path,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
+    /// Add a foreign-language path in its own translation unit with its extension-implied stage.
     void addInputForeignShaderPath(
         String const& path,
         SlangSourceLanguage language,
-        Stage impliedStage);
+        Stage impliedStage,
+        SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     static Profile::RawVal findGlslProfileFromPath(const String& path);
 
-    SlangResult addInputStdin(SlangSourceLanguage sourceLanguage);
+    /// Add standard input using the required explicitly selected source language.
+    SlangResult addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested);
 
     SlangResult addInputPath(
         char const* inPath,
@@ -1652,10 +1687,17 @@ struct OptionsParser
     String m_currentOptionName;
 };
 
-int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage impliedStage)
+int OptionsParser::addTranslationUnit(
+    SlangSourceLanguage language,
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     auto translationUnitIndex = m_rawTranslationUnits.getCount();
     auto translationUnitID = m_compileRequest->addTranslationUnit(language, nullptr);
+
+    auto translationUnit = m_frontEndReq->getTranslationUnit(translationUnitID);
+    translationUnit->sourceLanguageExplicitlyRequested =
+        SourceLanguage(sourceLanguageExplicitlyRequested);
 
     // As a sanity check: the API should be returning the same translation
     // unit index as we maintain internally. This invariant would only
@@ -1674,17 +1716,28 @@ int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage implie
     return int(translationUnitIndex);
 }
 
-void OptionsParser::addInputSlangPath(String const& path)
+void OptionsParser::addInputSlangPath(
+    String const& path,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     // All of the input .slang files will be grouped into a single logical translation unit,
     // which we create lazily when the first .slang file is encountered.
     if (m_slangTranslationUnitIndex == -1)
     {
         m_translationUnitCount++;
-        m_slangTranslationUnitIndex =
-            addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+        m_slangTranslationUnitIndex = addTranslationUnit(
+            SLANG_SOURCE_LANGUAGE_SLANG,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
+    auto translationUnit = m_frontEndReq->getTranslationUnit(
+        m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID);
+    if (sourceLanguageExplicitlyRequested != SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    {
+        translationUnit->sourceLanguageExplicitlyRequested =
+            SourceLanguage(sourceLanguageExplicitlyRequested);
+    }
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID,
         path.begin());
@@ -1696,10 +1749,12 @@ void OptionsParser::addInputSlangPath(String const& path)
 void OptionsParser::addInputForeignShaderPath(
     String const& path,
     SlangSourceLanguage language,
-    Stage impliedStage)
+    Stage impliedStage,
+    SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     m_translationUnitCount++;
-    m_currentTranslationUnitIndex = addTranslationUnit(language, impliedStage);
+    m_currentTranslationUnitIndex =
+        addTranslationUnit(language, impliedStage, sourceLanguageExplicitlyRequested);
 
     m_compileRequest->addTranslationUnitSourceFile(
         m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
@@ -1747,6 +1802,8 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     static const Entry entries[] = {
         {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
+        // Literate Slang historically accepts any Markdown path, not only `.slang.md`.
+        {".md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
         {".fx", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
@@ -1808,7 +1865,7 @@ SlangResult OptionsParser::_readStdin(List<Byte>& outSource)
     SLANG_UNREACHABLE("unexpected stdin read result");
 }
 
-SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
+SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguageExplicitlyRequested)
 {
     if (m_stdinConsumed)
     {
@@ -1816,7 +1873,7 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
         return SLANG_FAIL;
     }
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_sink->diagnose(Diagnostics::CannotDeduceSourceLanguage{.path = kStdinDisplayPath});
         return SLANG_FAIL;
@@ -1827,20 +1884,29 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
     List<Byte> source;
     SLANG_RETURN_ON_FAIL(_readStdin(source));
 
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         if (m_slangTranslationUnitIndex == -1)
         {
             m_translationUnitCount++;
-            m_slangTranslationUnitIndex =
-                addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
+            m_slangTranslationUnitIndex = addTranslationUnit(
+                SLANG_SOURCE_LANGUAGE_SLANG,
+                Stage::Unknown,
+                sourceLanguageExplicitlyRequested);
         }
+        m_frontEndReq
+            ->getTranslationUnit(
+                m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID)
+            ->sourceLanguageExplicitlyRequested = SourceLanguage(sourceLanguageExplicitlyRequested);
         m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
     }
     else
     {
         m_translationUnitCount++;
-        m_currentTranslationUnitIndex = addTranslationUnit(sourceLanguage, Stage::Unknown);
+        m_currentTranslationUnitIndex = addTranslationUnit(
+            sourceLanguageExplicitlyRequested,
+            Stage::Unknown,
+            sourceLanguageExplicitlyRequested);
     }
 
     const char* sourceBegin =
@@ -1857,19 +1923,20 @@ SlangResult OptionsParser::addInputStdin(SlangSourceLanguage sourceLanguage)
 
 SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langOverride)
 {
-    SlangSourceLanguage sourceLanguage = SlangSourceLanguage(langOverride);
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    SlangSourceLanguage sourceLanguageExplicitlyRequested = SlangSourceLanguage(langOverride);
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         auto linkage = m_requestImpl->getLinkage();
         if (linkage->m_optionSet.hasOption(CompilerOptionName::Language))
         {
-            sourceLanguage = linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
-                CompilerOptionName::Language);
+            sourceLanguageExplicitlyRequested =
+                linkage->m_optionSet.getEnumOption<SlangSourceLanguage>(
+                    CompilerOptionName::Language);
         }
     }
 
     if (strcmp(inPath, kStdinCommandLinePath) == 0)
-        return addInputStdin(sourceLanguage);
+        return addInputStdin(sourceLanguageExplicitlyRequested);
 
     // look at the extension on the file name to determine
     // how we should handle it.
@@ -1879,19 +1946,30 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (
-        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
-        langOverride == SourceLanguage::Slang)
+    Stage stageImpliedByFileExtension = Stage::Unknown;
+    SlangSourceLanguage sourceLanguageImpliedByFileExtension =
+        findSourceLanguageFromPath(path, stageImpliedByFileExtension);
+    SlangSourceLanguage sourceLanguage = sourceLanguageExplicitlyRequested;
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+        sourceLanguage = sourceLanguageImpliedByFileExtension;
+
+    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_SLANG)
     {
         // Plain old slang code
-        addInputSlangPath(path);
+        addInputSlangPath(path, sourceLanguageExplicitlyRequested);
         return SLANG_OK;
     }
 
     Stage impliedStage = Stage::Unknown;
-    if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
+    // A stage-bearing extension belongs to the source-language convention that defined it.
+    // Consider `shader.vert -lang hlsl`: `.vert` means both GLSL and vertex input, but once the
+    // explicit HLSL selection overrides GLSL, carrying over only the vertex half would combine
+    // incompatible provenance. Require an explicit `-stage` instead; a matching or inferred
+    // language may continue to use the extension-implied stage.
+    if (sourceLanguageExplicitlyRequested == SLANG_SOURCE_LANGUAGE_UNKNOWN ||
+        sourceLanguageExplicitlyRequested == sourceLanguageImpliedByFileExtension)
     {
-        sourceLanguage = findSourceLanguageFromPath(path, impliedStage);
+        impliedStage = stageImpliedByFileExtension;
     }
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
@@ -1899,7 +1977,11 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         return SLANG_FAIL;
     }
 
-    addInputForeignShaderPath(path, sourceLanguage, impliedStage);
+    addInputForeignShaderPath(
+        path,
+        sourceLanguage,
+        impliedStage,
+        sourceLanguageExplicitlyRequested);
 
     return SLANG_OK;
 }
@@ -2773,6 +2855,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
     m_reader.init(&args, m_sink);
 
+    // A compile request can inherit packing options from its session. A named rule in the option
+    // set makes the deprecated CLI flag ineffective, so we reject that flag. An inherited
+    // deprecated bool can be overridden by a named CLI rule. We track whether the deprecated flag
+    // appears in this argument list so that the two CLI spellings also conflict in either order.
+    bool hasLegacyBitfieldPackingOptionInArgs = false;
+
     while (m_reader.hasArg())
     {
         auto arg = m_reader.getArgAndAdvance();
@@ -2805,9 +2893,37 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
         switch (optionKind)
         {
+        case OptionKind::AllowGLSL:
+            // Unlike ordinary compiler options, this deprecated spelling governs only the input
+            // translation units of the current compile request. Keeping it off the linkage avoids
+            // silently changing the language of source modules loaded by an `import`.
+            m_requestImpl->setLegacyAllowGLSLInput(true);
+            break;
+        case OptionKind::UseMSVCStyleBitfieldPacking:
+            if (!hasLegacyBitfieldPackingOptionInArgs)
+                m_sink->diagnose(Diagnostics::DeprecatedMsvcStyleBitfieldPacking{});
+            if (linkage->m_optionSet.hasOption(CompilerOptionName::BitfieldPackingRules))
+            {
+                m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
+                return SLANG_FAIL;
+            }
+            hasLegacyBitfieldPackingOptionInArgs = true;
+            linkage->m_optionSet.set(optionKind, true);
+            break;
+        case OptionKind::BitfieldPackingRules:
+            {
+                if (hasLegacyBitfieldPackingOptionInArgs)
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingBitfieldPackingRulesOptions{});
+                    return SLANG_FAIL;
+                }
+                slang::BitfieldPackingRules rules = slang::BitfieldPackingRules::Default;
+                SLANG_RETURN_ON_FAIL(_expectValue(rules));
+                linkage->m_optionSet.set(optionKind, rules);
+                break;
+            }
         case OptionKind::NoMangle:
         case OptionKind::ValidateUniformity:
-        case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
         case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
@@ -2853,7 +2969,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::LoopInversion:
         case OptionKind::UnscopedEnum:
         case OptionKind::PreserveParameters:
-        case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
             linkage->m_optionSet.set(optionKind, true);
             break;
@@ -3112,6 +3227,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.add(
                     OptionKind::DisableWarnings,
                     operand.value.getUnownedSlice());
+                break;
+            }
+        case OptionKind::DisableNotes:
+            {
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                linkage->m_optionSet.add(OptionKind::DisableNotes, operand.value.getUnownedSlice());
                 break;
             }
         case OptionKind::DisableWarning:

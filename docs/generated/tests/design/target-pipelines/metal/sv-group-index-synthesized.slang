@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeirformetal
-//META: doc_section_digest=4d7da86c9111decda82bc36fc42891b6498a808e7662d276403e78bf864b8dba
+//META: doc_section_digest=c3727df1965f029af14e2e456e6d63782afc6992632c8a3221e329344ec66468
 //META: purpose=`SV_GroupIndex` is synthesized in the kernel body from `[[thread_position_in_threadgroup]]` because Metal has no single builtin for the linear in-group index.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

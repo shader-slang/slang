@@ -295,6 +295,23 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
   becomes a plain HLSL `static T name_0` declaration but the
   initializer expression appears at function entry.
 
+## Empty-payload maintenance override
+
+The existing `legalize-empty-ray-payload-closesthit.slang` is a text-emit
+test: a closest-hit entry point compiled with `-target hlsl` needs
+neither a GPU nor DXC. Preserve that test despite the older compute-only
+guidance above. Its observable contract is a nonempty physical payload
+at the entry-point interface, not padding the original empty source type.
+
+Regenerate the test to capture the emitted `DummyRayPayload` type with
+any generated suffix, require its single `uint` dummy field, and require
+the closest-hit entry point's `inout` parameter to use the captured type.
+Do not accept an arbitrary struct plus an unrelated `main` function.
+Update the purpose and README coverage claim together. Record the
+outdated original-type padding description at
+`#legalizeemptyraypayloadsforhlsl` as a `drift-from-source` doc gap for
+the separate design-document regeneration workflow.
+
 ## Quality checklist (in addition to `_common.md`'s)
 
 - [ ] Every test's `doc_ref` resolves to an anchor in

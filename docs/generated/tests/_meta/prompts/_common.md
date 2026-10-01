@@ -896,14 +896,18 @@ These are not lint-enforced, but skip them only with a
   printf/atomic. A pure-internal computation is removed before the
   CHECK can see it.
 - **Identifier mangling varies per target.** A Slang local `a` may
-  appear as `a_0` in HLSL, `globalParams_0.a_0` in CUDA via param-
-  block lowering, or `__ldg(&...->a_0)` in CUDA via read-only buffer
-  lowering. Use FileCheck wildcards like `a_{{[0-9]+}}` rather than
-  literal `a_0`.
-- **CUDA factors `__ldg(&uniform)` reads into temporaries**,
-  splitting compound expressions on uniform operands. To observe a
-  binary expression on CUDA, derive operands from thread/dispatch
-  IDs (or locals holding them) rather than from `uniform` globals.
+  appear as `a_0` in HLSL or `globalParams_0->a_0` after CUDA
+  parameter-group lowering. A field loaded from a CUDA read-only
+  buffer may instead appear inside `__ldg(&...->a_0)`. Use FileCheck
+  wildcards like `a_{{[0-9]+}}` rather than literal `a_0`.
+- **CUDA `__ldg` is memory-space-sensitive.** Top-level `uniform`
+  values are fields of `SLANG_globalParams`, which CUDA emits in
+  `__constant__` memory, so the immutable-load pass must leave those
+  reads plain. `__ldg` lowers to `ld.global.nc` and is reserved for
+  eligible global-memory reads such as `StructuredBuffer<T>` or
+  `ConstantBuffer<T>` contents. Use one of those buffer types when a
+  positive test needs to observe `__ldg`; use a top-level `uniform`
+  with `CHECK-NOT: __ldg` when testing the exclusion.
 - **Metal `[[buffer(N)]]` indices are positional**, not driven by
   `vk::binding(...)` or HLSL `register(uN)`. Two struct fields bound
   via `vk::binding(7)` and `vk::binding(3)` may still emit as
@@ -1043,11 +1047,9 @@ emit behavior will often fail because the pass had nothing to do.
   literals, for any value the pass needs to see at runtime.
 - **Sink intermediate values into an `RWStructuredBuffer`** so DCE
   cannot remove them.
-- **Defeat compile-time literal recognition** when the value matters:
-  on CUDA `__ldg(&uniform)` reads, the optimizer can re-fold loads
-  into temporaries (see "CUDA factors `__ldg(&uniform)` reads into
-  temporaries" above). Use thread/dispatch IDs as operands when the
-  CHECK must observe a binary op on the result.
+- **Defeat compile-time literal recognition** when the value matters.
+  Use thread/dispatch IDs or buffer-fed values as operands when the
+  CHECK must observe a binary op rather than a folded constant.
 
 #### Tests must compile cleanly first
 

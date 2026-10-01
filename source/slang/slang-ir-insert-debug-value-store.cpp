@@ -103,6 +103,27 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
     return debuggable;
 }
 
+// True if `type` (after unwrapping attributed types) is a leaf opaque handle eligible for a
+// source-level debug variable: a texture or a sampler-state-family type. Deliberately narrower than
+// the broad isResourceType legalization classifier — no array unwrapping, no buffer / pointer-like
+// / subpass / builtin-generic shapes — because only these leaf handles get a DebugLocalVariable
+// with no backing OpVariable.
+static bool isSupportedOpaqueDebugHandleType(IRType* type)
+{
+    type = (IRType*)unwrapAttributedType(type);
+    return as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type);
+}
+
+// True if a function-local `var`/`let` of `type` should get a source-level DebugVar. Extends
+// isDebuggableType (scalars/vectors/matrices and aggregates of those) with the supported opaque
+// leaf handles: unlike plain data, a handle gets a DebugLocalVariable with no backing OpVariable
+// and is bound to its lowered SSA value by a DebugValue. This is a type decision only; whether the
+// concrete lowered value is a representable DebugValue operand is checked in SPIR-V legalization.
+bool DebugValueStoreContext::isDebugVarTypeSupported(IRType* type)
+{
+    return isDebuggableType(type) || isSupportedOpaqueDebugHandleType(type);
+}
+
 void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 {
     IRBuilder builder(func);
@@ -189,7 +210,7 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
                     builder.setInsertBefore(varInst);
-                    if (!isDebuggableType(varType))
+                    if (!isDebugVarTypeSupported(varType))
                         continue;
                     auto debugVar = builder.emitDebugVar(
                         varType,

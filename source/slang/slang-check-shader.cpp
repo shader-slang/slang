@@ -1779,6 +1779,24 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
+    // An entry point is invoked by the pipeline, which has no channel for returning an error, so
+    // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
+    // directly because it applies the declaration reference's substitutions, which matters for a
+    // generic entry point. Two sentinel types both mean "nothing was declared": the bottom type
+    // for an absent clause, and the error type for a clause whose type failed to check -- the
+    // latter has already been diagnosed, so reporting this as well would only add noise.
+    {
+        auto astBuilder = linkage->getASTBuilder();
+        auto errorCodeType = getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef());
+        if (!errorCodeType->equals(astBuilder->getBottomType()) &&
+            !errorCodeType->equals(astBuilder->getErrorType()))
+        {
+            sink->diagnose(Diagnostics::EntryPointCannotThrow{
+                .entryPoint = entryPointName,
+                .location = entryPointFuncDecl->loc});
+        }
+    }
+
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType)
@@ -1826,6 +1844,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         sink->diagnose(Diagnostics::EntryPointHasNoStage{
             .entryPoint = entryPointName->text,
             .location = entryPointFuncDecl->loc});
+
+        // The remaining entry-point contract cannot be validated without a concrete stage.
+        // In particular, system-semantic accessor resolution maps this value through
+        // `getAtomFromStage()`, where `Stage::Unknown` is an internal error, while later parameter
+        // classification and profile validation also use the stage to select their rules. Stop
+        // after the prerequisite diagnostic instead of emitting secondary diagnostics from an
+        // invented stage or entering those out-of-contract paths.
+        return;
     }
 
     if (stage == Stage::Hull)
@@ -2081,6 +2107,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 .conflictingSemantic = String(depthOutputSemantics[1]->name.getContent()),
                 .earlierSemantic = String(depthOutputSemantics[0]->name.getContent()),
                 .location = depthOutputSemantics[1]->loc});
+        }
+    }
+
+    // GLSL puts `layout(early_fragment_tests) in;` on a standalone EmptyDecl beside the entry
+    // point, not on the function; lift it onto the fragment entry point as the canonical
+    // EarlyDepthStencilAttribute (as the local_size_* -> NumThreadsAttribute lift below does).
+    // Resolve the scope with getParentDecl, not the raw parentDecl: a *specialized* generic
+    // fragment entry point's immediate parent is the GenericDecl, not the module scope holding the
+    // EmptyDecl, so the raw parentDecl would miss the marker and silently drop the mode. Require
+    // the `in` direction: the qualifier is input-only, so `out;`/bare forms stay inert.
+    if (stage == Stage::Fragment && !entryPointFuncDecl->findModifier<EarlyDepthStencilAttribute>())
+    {
+        if (auto parentDecl = getParentDecl(entryPointFuncDecl))
+        {
+            for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+            {
+                if (emptyDecl->findModifier<GLSLLayoutEarlyFragmentTestsAttribute>() &&
+                    emptyDecl->findModifier<InModifier>())
+                {
+                    addModifier(
+                        entryPointFuncDecl,
+                        getCurrentASTBuilder()->create<EarlyDepthStencilAttribute>());
+                    break;
+                }
+            }
         }
     }
 

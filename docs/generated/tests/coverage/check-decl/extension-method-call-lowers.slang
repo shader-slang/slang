@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T12:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#files-and-responsibilities
-//META: doc_section_digest=a3ca128124f08a4f3b66630a5a4d456463e6427c89255506f4853b27f329677e
+//META: doc_section_digest=d9357662d809198b672de964a655fbd41120a6b17b51411c05a2be64457de64f
 //META: purpose=Verifies a method added to a struct via `extension` is found by member lookup and its call lowers to HLSL.
 //META: intent=characterization
 //META: covers=source/slang/slang-check-decl.cpp

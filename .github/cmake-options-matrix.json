@@ -4,6 +4,10 @@
       "option": "SLANG_DXC_BUILD_FROM_SOURCE",
       "value": "OFF"
     },
+    {
+      "option": "SLANG_DISABLED_NOTE_IDS",
+      "value": "88"
+    },
     { "option": "SLANG_EMBED_CORE_MODULE_SOURCE" },
     { "option": "SLANG_EMBED_CORE_MODULE" },
     { "option": "SLANG_ENABLE_DXIL" },
@@ -27,6 +31,7 @@
     },
     { "option": "SLANG_ENABLE_EXAMPLES" },
     { "option": "SLANG_ENABLE_REPLAYER" },
+    { "option": "SLANG_ENABLE_RECORD_REPLAY" },
     { "option": "SLANG_ENABLE_RELEASE_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_SPLIT_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_VALIDATION_IR" },
@@ -60,6 +65,11 @@
     },
     {
       "option": "SLANG_ENABLE_ASAN",
+      "skip_linux_aarch64": "true"
+    },
+    {
+      "option": "SLANG_ENABLE_TSAN",
+      "linux_only": "true",
       "skip_linux_aarch64": "true"
     },
     {

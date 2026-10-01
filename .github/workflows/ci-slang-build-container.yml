@@ -29,7 +29,7 @@ jobs:
       contents: read
       packages: read # CI container images are public, so this is not strictly required; kept for consistency and in case they revert to private
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.7.0
       # Drop --user root and -v /:/host_root mount; host cleanup step removed
       # below. If disk pressure resurfaces, slim the container image (issue
       # #11339) rather than bringing host-root access back. The UID:GID is an

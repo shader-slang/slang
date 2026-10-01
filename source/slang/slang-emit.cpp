@@ -99,6 +99,7 @@
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
+#include "slang-ir-ray-tracing-legalize.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
 #include "slang-ir-resolve-varying-input-ref.h"
@@ -429,6 +430,11 @@ void calcRequiredLoweringPassSet(
         if (attrType->findAttr<IRNoDiffAttr>())
             result.autodiff = true;
     }
+
+    // The replacement pass owns the opcode classification so this scan cannot silently omit a
+    // location-operand role that the pass knows how to consume.
+    if (isRayTracingLocationOperand(inst->getOp()))
+        result.rayTracingLocationOperand = true;
 
     switch (inst->getOp())
     {
@@ -1864,6 +1870,11 @@ Result linkAndOptimizeIR(
     // selector is not yet a phi the pass finds nothing to thread and is a no-op.
     SLANG_PASS(threadSwitchOnConstantPhi);
 
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    {
+        SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
+    }
+
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
@@ -1941,6 +1952,11 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        // Give empty ray/callable payloads physical storage at native interfaces before type
+        // legalization erases their logical values. Ordinary helper signatures/copies are left
+        // untouched. CPU/CUDA require no artificial payload and skip this legalization block.
+        SLANG_PASS(legalizeRayTracingPayloads, targetProgram);
+
         if (isMetalTarget(targetRequest))
         {
             // Metal is a special target in that we want to legalize constant buffer
@@ -1984,34 +2000,6 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
-        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
-        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
-        {
-            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
-        }
-
-        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
-        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
-        if (isD3DTarget(targetRequest))
-        {
-            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
-
-            // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
-            // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
-            // only covers payload structs reached through a `TraceRay`-style call, so a
-            // user-authored struct with one-sided PAQ that only reaches a hit shader
-            // (e.g. a per-stage-compiled shader library) would slip through. Fill any
-            // missing per-side PAQs structurally on every `[raypayload]` struct.
-            auto profile = getEffectiveTargetProfile(
-                targetProgram->getTargetReq(),
-                targetProgram->getOptionSet());
-            if (profile.getFamily() == ProfileFamily::DX &&
-                profile.getVersion() >= ProfileVersion::DX_6_7)
-            {
-                SLANG_PASS(legalizeRayPayloadAccessQualifiersForHLSL);
-            }
-        }
-
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -2752,9 +2740,10 @@ Result linkAndOptimizeIR(
         }
     }
 
-    if (isKhronosTarget(targetRequest) && emitSpirvDirectly)
+    if (isKhronosTarget(targetRequest) && emitSpirvDirectly &&
+        requiredLoweringPassSet.rayTracingLocationOperand)
     {
-        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, targetProgram, sink);
+        SLANG_PASS(replaceLocationIntrinsicsWithRaytracingObject, sink);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

@@ -2,8 +2,8 @@
 // When the shader imports another module the DebugCompilationUnit and
 // DebugSource were associated with the imported file instead of the main file,
 // causing the debugger to report the wrong filename for breakpoints and
-// source locations.
-//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute
+// source locations. Its breakpoint sequence relies on the standard -O1 optimization pipeline.
+//TEST:SPVDB_DEBUGGER(filecheck=SPVDB): -entry main -stage compute -O1
 
 import debug_import_helper;
 

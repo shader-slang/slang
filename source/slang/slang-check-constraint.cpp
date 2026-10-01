@@ -302,7 +302,8 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
 Type* SemanticsVisitor::TryJoinTypes(
     GenericInferenceContext* constraints,
     QualType left,
-    QualType right)
+    QualType right,
+    bool allowEnumScalarJoin)
 {
     // Easy case: they are the same type!
     if (left->equals(right))
@@ -357,6 +358,40 @@ Type* SemanticsVisitor::TryJoinTypes(
         if (auto rightBasic = as<BasicExpressionType>(right))
         {
             return TryJoinVectorAndScalarType(constraints, leftVector, rightBasic);
+        }
+    }
+
+    // For common-type inference (see `allowEnumScalarJoin`), an enum joins with a
+    // scalar by decaying to its tag type. We only *nominate* the tag type as the
+    // candidate common type; overload applicability (the normal coercion path)
+    // remains the sole arbiter of whether each arm actually converts to it.
+    // Enum-with-enum is intentionally unhandled: two enums share no natural
+    // scalar to decay to.
+    if (allowEnumScalarJoin)
+    {
+        if (as<BasicExpressionType>(right))
+        {
+            if (auto leftEnumDeclRef = isDeclRefTypeOf<EnumDecl>(left))
+            {
+                if (auto tagType = getTagType(m_astBuilder, leftEnumDeclRef))
+                    return TryJoinTypes(
+                        constraints,
+                        QualType(tagType, left.isLeftValue),
+                        right,
+                        allowEnumScalarJoin);
+            }
+        }
+        if (as<BasicExpressionType>(left))
+        {
+            if (auto rightEnumDeclRef = isDeclRefTypeOf<EnumDecl>(right))
+            {
+                if (auto tagType = getTagType(m_astBuilder, rightEnumDeclRef))
+                    return TryJoinTypes(
+                        constraints,
+                        left,
+                        QualType(tagType, right.isLeftValue),
+                        allowEnumScalarJoin);
+            }
         }
     }
 
@@ -1977,8 +2012,11 @@ private:
 
         // Non-exact type constraints use the join path. This preserves existing
         // common-type behavior for ordinary call inference, such as picking a
-        // type that several arguments can convert to.
-        auto joinType = m_visitor->TryJoinTypes(&m_context, ioType, cType);
+        // type that several arguments can convert to. This is the one place an
+        // enum may decay to its tag type to join with a scalar, since here the
+        // join proposes a type both arguments will be coerced to.
+        auto joinType =
+            m_visitor->TryJoinTypes(&m_context, ioType, cType, /*allowEnumScalarJoin*/ true);
         if (!joinType)
         {
             // If no join exists, priority decides whether a newer constraint
