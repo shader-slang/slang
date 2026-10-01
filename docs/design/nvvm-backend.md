@@ -227,6 +227,14 @@ key and qualified parent, not pointee type alone. Indexed children retain the pa
 access/storage proof. Constant-memory parameter-group loads remain ordinary loads; invariant global
 buffer recipes require their separate immutable-location contract.
 
+Collected conventional globals admit direct Int32/UInt32/Float32 vectors of widths2–4. Their
+layout-qualified field pointers come from shared buffer-layout fixing and retain the exact field
+key and immutable root. Global field classification owns admission; executable selection excludes
+comparison samplers and unsized sampler arrays that have storage-only contracts. Checked loads
+reuse the parameter-group compact-vector conversion for width3: twelve bytes of scalar-array
+storage become a three-lane SSA vector. Widths2/4 retain their native representation. This does not
+authorize stores through uniforms or broaden ordinary device-pointer and resource-storage roles.
+
 Explicit Std430/Scalar/C Device pointers to finite copyable records use a byte-address representation.
 Shared buffer-layout selection owns the layout; preflight queries its stride once and retains the
 current function's root, exact pointer type and signed index in an offset plan. Emission uses global

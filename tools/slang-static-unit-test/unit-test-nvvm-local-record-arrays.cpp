@@ -619,6 +619,119 @@ SLANG_UNIT_TEST(nvvmLayoutPointerReinterpretPreservesProducerChecks)
         }
 }
 
+// Collected globals use compact three-lane storage without making their fields writable.
+SLANG_UNIT_TEST(nvvmConventionalGlobalVectorsUseCheckedStorage)
+{
+    enum class Case
+    {
+        Load,
+        Store,
+        ForgedRoot
+    };
+    for (auto elementOp : {kIROp_IntType, kIROp_UIntType, kIROp_FloatType})
+    {
+        for (uint32_t width : {2u, 3u, 4u})
+        {
+            for (auto testCase : {Case::Load, Case::Store, Case::ForgedRoot})
+            {
+                // One representative vector is enough to check the shared permission/root gates.
+                if (testCase != Case::Load && (elementOp != kIROp_UIntType || width != 3))
+                    continue;
+                _resetDirectNVVMFakes();
+                NVVMStaticTestContext context(unitTestContext);
+                auto module = IRModule::create(context.env.getSessionImpl());
+                IRBuilder builder(module);
+                builder.setInsertInto(module);
+                auto globals = builder.createStructType();
+                if (testCase != Case::ForgedRoot)
+                    builder.addSynthesizedParameterGroupDecoration(globals);
+                builder.createStructField(
+                    globals,
+                    builder.createStructKey(),
+                    builder.getUIntType());
+                auto vector = builder.getVectorType(builder.getType(elementOp), width);
+                auto field = builder.createStructField(globals, builder.createStructKey(), vector);
+                builder.createStructField(
+                    globals,
+                    builder.createStructKey(),
+                    builder.getUIntType());
+                auto global =
+                    builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
+                auto entry = builder.createFunc();
+                entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+                builder.addEntryPointDecoration(
+                    entry,
+                    Profile(Stage::Compute),
+                    toSlice("computeMain"),
+                    toSlice("test"));
+                builder.setInsertInto(entry);
+                builder.emitBlock();
+                auto pointer = builder.getPtrType(
+                    vector,
+                    AccessQualifier::ReadWrite,
+                    AddressSpace::Generic,
+                    builder.getType(kIROp_ScalarBufferLayoutType));
+                auto address = builder.emitFieldAddress(pointer, global, field->getKey());
+                auto loaded = builder.emitLoad(vector, address);
+                if (testCase == Case::Store)
+                    builder.emitStore(address, loaded);
+                builder.emitReturn();
+                LinkedIR linked = {};
+                linked.module = module;
+                linked.entryPoints.add(entry);
+                NVVMOperationRequirements requirements;
+                const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+                const auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
+                const auto expected = testCase == Case::Store
+                                          ? toSlice("immutable struct field access: consumer=store")
+                                          : toSlice("global_param");
+                if ((testCase == Case::Load && SLANG_FAILED(result)) ||
+                    (testCase != Case::Load && diagnostic.indexOf(expected) < 0))
+                {
+                    getTestReporter()->message(
+                        TestMessageType::Info,
+                        context.sink.outputBuffer.getBuffer());
+                }
+                if (testCase == Case::Load)
+                {
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+                    const auto selected =
+                        requirements.emissionPlan.addresses.findFieldAddress(address);
+                    SLANG_CHECK_ABORT(selected);
+                    SLANG_CHECK(selected->source == address && selected->base == global);
+                    SLANG_CHECK(selected->root == global && selected->selection.field == field);
+                    SLANG_CHECK(selected->selection.fieldIndex == 1);
+                    SLANG_CHECK(selected->selection.isConventionalGlobal);
+                    SLANG_CHECK(!selected->selection.isMutable && !selected->isLayoutStorage);
+                    SLANG_CHECK_ABORT(requirements.emissionPlan.loads.getCount() == 1);
+                    const auto& load = requirements.emissionPlan.loads[0];
+                    SLANG_CHECK(load.source == loaded && load.pointer == address);
+                    SLANG_CHECK(load.flags == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+                    SLANG_CHECK(load.alignment == (width == 3 ? 4 : width * 4));
+                    SLANG_CHECK(
+                        load.conversion.kind == (width == 3
+                                                     ? NVVMStorageConversionKind::CompactVector
+                                                     : NVVMStorageConversionKind::Identity));
+                    if (width == 3)
+                    {
+                        SLANG_CHECK(load.conversion.type == vector);
+                        SLANG_CHECK(load.conversion.laneCount == 3);
+                    }
+                }
+                else
+                {
+                    SLANG_CHECK(SLANG_FAILED(result));
+                    SLANG_CHECK(diagnostic.indexOf(toSlice("E52017")) >= 0);
+                    SLANG_CHECK(diagnostic.indexOf(expected) >= 0);
+                }
+                SLANG_CHECK(requirements.emissionPlan.stores.getCount() == 0);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+            }
+        }
+    }
+}
+
 // A loaded pointer is a root only when checked records prove the direct conventional-cbuffer
 // chain. Loads need not be in the first block; unrelated nested group loads stay unqualified.
 SLANG_UNIT_TEST(nvvmParameterGroupLayoutPointerLoadsKeepCheckedRoots)

@@ -2087,7 +2087,8 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     SlangNVVMValueTypeDesc physicalType = {};
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           isNVVMAccelerationStructureType(type) || asNVVMSupportedResourceStructType(type) ||
+           asNVVMSupported32BitNumericVectorType(type) || isNVVMAccelerationStructureType(type) ||
+           asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
            asNVVMSupportedParameterGroupType(type) ||

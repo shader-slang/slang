@@ -201,6 +201,57 @@
         "tests/cuda/nvvm-texture-descriptor-conversion.slang"
       ],
       "rationale": "Exact fresh working cell plus reviewed authored/discovery mode equivalence; existing nvvm-texture-descriptor-words feature and runtime gate retained as context in input_review.previous_feature."
+    },
+    {
+      "id": "cuda/nvvm-conventional-global-vectors.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-conventional-global-vectors",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-conventional-global-vectors.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-conventional-global-vectors.slang"
+      ],
+      "rationale": "Reviewed candidate ordinal0 adaptation matches authored ordinals0/1/2 respectively: same shaderobj command, SM80, source and exact36-word oracle; only route/optimization differ."
+    },
+    {
+      "id": "cuda/nvvm-conventional-global-vectors.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-conventional-global-vectors",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-conventional-global-vectors.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-conventional-global-vectors.slang"
+      ],
+      "rationale": "Reviewed candidate ordinal0 adaptation matches authored ordinals0/1/2 respectively: same shaderobj command, SM80, source and exact36-word oracle; only route/optimization differ."
+    },
+    {
+      "id": "cuda/nvvm-conventional-global-vectors.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-conventional-global-vectors",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-conventional-global-vectors.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-conventional-global-vectors.slang"
+      ],
+      "rationale": "Reviewed candidate ordinal0 adaptation matches authored ordinals0/1/2 respectively: same shaderobj command, SM80, source and exact36-word oracle; only route/optimization differ."
     }
   ],
   "smoke": [

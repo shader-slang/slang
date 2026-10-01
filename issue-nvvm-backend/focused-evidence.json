@@ -84959,6 +84959,306 @@
         "NVVM triangle explicit-layout uint2 global-field rejection remains unresolved; later PrimitiveIndex support is not established.",
         "No Slang compiler/provider change or full baseline/accepted-identity advancement in this workflow feature."
       ]
+    },
+    "nvvm-conventional-global-vectors": {
+      "status": "accepted-focused",
+      "scope": "Readonly direct conventional-global Int32/UInt32/Float32 vector fields, widths 2/3/4, using checked field addresses and existing compact three-lane storage conversion.",
+      "identity": {
+        "revision": "0e0e7252abaceb513fbb43e5bf905656b6bfe603",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "71c1cb1f6830e9fb328ef6c256ea78d4c155d46e4f53fd3de281406043bdaeb4",
+          "source/slang/slang-emit-nvvm.cpp": "a7fad57a958b805ce1a7d6c8bfeb10d391c72836e2dc6bd6fca243e594457111",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "d3190f2181d58e1b2e0225595cf42c6a2525244b090986ba73fe7116f7d7d843",
+          "tests/cuda/nvvm-conventional-global-vectors.slang": "ccfef8aab0889b70030c01b8e5cda59f2a0a4be86b182848758da74f7280c9cc",
+          "tests/cuda/nvvm-compact-vector-storage.slang": "d94447399a2c09e3099e68cac1354e16b2d5dab6b2432e0ff23f1946628adfe6"
+        },
+        "source_patch_sha256": "839fafcd8b284e61e3622b33c23f5aa9103f49f50e2c4eb67753f738b30378a6",
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "4a7ebf7a46d21485f92756ec71d7a1ca0a9c1b9a16b3d6e96b7625d5362cd9b2",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9bb095303845b795c9fbade9ce674cb8d869dae103331535788a2b3ea4298fba",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "fc4a698273b05de7026f8de5ee6d023fe39e031a64f375d8c40d7c1e4f2460a5",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "39b2d9a667364641677b4771a5d9e6bbfdf6b8858be9f4a8022d5d658476aa7c"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "static_sha256": {
+          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "3faeb8527052b1dba4f2de69b464fec0fed80231aba4c3917806f65bd14a6e6d",
+          "build/nvvm-local-record-arrays/static-unit-build/CMakeCache.txt": "e1fd59dbfc11ebed26c6c7b67a897c0cd2c9dab033b68a37f15e1ba415a8ad4e"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "before_identity": {
+          "path": "build/nvvm-global-vectors/before-identity.json",
+          "sha256": "3d8d87d3cf862a226833e43778e71b6127d1a71da9e4f7f33ec2299c2c63b848"
+        },
+        "smoke_provenance": {
+          "path": "build/nvvm-global-vectors/smoke-1/provenance.json",
+          "sha256": "1482fc0e8abc73f174f2529fb14a8626cf2bd1600c683c495d08896c7da9078d"
+        },
+        "meaning": "Current source and matching shared/static artifacts after conventional-global vector implementation; configured version unchanged. RHI target selection follows actual-device capabilities, not the SM80 focused fixture capability.",
+        "target_policy": "Slang focused/runtime smoke target SM80; RHI follows actual CUDA device capabilities."
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-global-vectors/build.json",
+          "sha256": "ed43acec52d91a8f28d1e95108bafdeee9d050e2171b487d556fedebd5b4786e",
+          "return_code": 0,
+          "elapsed_seconds": 32.28629970550537
+        },
+        "static_build": {
+          "path": "build/nvvm-global-vectors/static-build.json",
+          "sha256": "1d1dc3161e60a6343799601955cdf1e38df28dad0a9ddd635c0cf88a835e8efc",
+          "return_code": 0,
+          "elapsed_seconds": 28.508244276046753
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-global-vectors/focused.json",
+            "sha256": "a0046782395b1a5c5b8c8df86440b645af83f8f3e02996e14bd39e7b907ab265",
+            "return_code": 0,
+            "elapsed_seconds": 5.385159492492676
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-compact-vector-storage.slang (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-compact-vector-storage.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-conventional-global-vectors.slang (cuda)": "passed",
+            "tests/cuda/nvvm-conventional-global-vectors.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-conventional-global-vectors.slang.2 (cuda)": "passed"
+          },
+          "meaning": "Six exact authored CUDA runtime outcomes: new nine-vector fixture plus existing compact parameter-group control, each NVRTC O3/NVVM O0/O3."
+        },
+        "shared_units": {
+          "record": {
+            "path": "build/nvvm-global-vectors/focused.json",
+            "sha256": "a0046782395b1a5c5b8c8df86440b645af83f8f3e02996e14bd39e7b907ab265",
+            "return_code": 0,
+            "elapsed_seconds": 5.385159492492676
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangCompactParameterGroupVectorsUseDistinctStorageRepresentation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangConventionalSamplerStorageUsesDirectPipeline.internal": "passed"
+          }
+        },
+        "static": {
+          "record": {
+            "path": "build/nvvm-global-vectors/static.json",
+            "sha256": "b6ac60b33d28477306d673ff5dffcbe71392434488339d9be958eb95e46fd251",
+            "return_code": 0,
+            "elapsed_seconds": 7.074594259262085
+          },
+          "outcomes": {
+            "nvvmConventionalGlobalVectorsUseCheckedStorage": "passed"
+          },
+          "coverage": "Nine type/width load plans; keyed field/root/index, invariant load, alignment, compact conversion; immutable-store and forged-root rejection before provider module/program creation."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-global-vectors/smoke.json",
+            "sha256": "eec93079b52a61ad610fb9fc0dca2c3c5fbf2fb1b0e19e56d71aa7b5209454d5",
+            "return_code": 0,
+            "elapsed_seconds": 21.75320839881897
+          },
+          "selection": {
+            "path": "build/nvvm-global-vectors/smoke-1/selection.json",
+            "sha256": "502454f119e1d4d5f5d2000d0c7e95bf18eb55a0bed9e274d2ca283f7e140a1c"
+          },
+          "provenance": {
+            "path": "build/nvvm-global-vectors/smoke-1/provenance.json",
+            "sha256": "1482fc0e8abc73f174f2529fb14a8626cf2bd1600c683c495d08896c7da9078d"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "reflection": {
+          "record": {
+            "path": "build/nvvm-global-vectors/layout-before-retry.json",
+            "sha256": "8f8e0f2b823a3de4093a21cb50932546a4e4082445a8cdffafa9034d2db3ef73",
+            "return_code": 0,
+            "elapsed_seconds": 0.2924492359161377
+          },
+          "output": {
+            "path": "build/nvvm-global-vectors/reflection.json",
+            "sha256": "0b4773519f5806d02bdfecea6e1b8226fb625ca8edad09e9dc6007de82f2f203"
+          },
+          "bindings": {
+            "prefix": {
+              "kind": "uniform",
+              "offset": 0,
+              "size": 4,
+              "elementStride": 0
+            },
+            "i2": {
+              "kind": "uniform",
+              "offset": 8,
+              "size": 8,
+              "elementStride": 4
+            },
+            "i3": {
+              "kind": "uniform",
+              "offset": 16,
+              "size": 12,
+              "elementStride": 4
+            },
+            "guardi": {
+              "kind": "uniform",
+              "offset": 28,
+              "size": 4,
+              "elementStride": 0
+            },
+            "firstResource": {
+              "kind": "uniform",
+              "offset": 32,
+              "size": 16,
+              "elementStride": 0
+            },
+            "i4": {
+              "kind": "uniform",
+              "offset": 48,
+              "size": 16,
+              "elementStride": 4
+            },
+            "u2": {
+              "kind": "uniform",
+              "offset": 64,
+              "size": 8,
+              "elementStride": 4
+            },
+            "u3": {
+              "kind": "uniform",
+              "offset": 72,
+              "size": 12,
+              "elementStride": 4
+            },
+            "guardu": {
+              "kind": "uniform",
+              "offset": 84,
+              "size": 4,
+              "elementStride": 0
+            },
+            "secondResource": {
+              "kind": "uniform",
+              "offset": 88,
+              "size": 16,
+              "elementStride": 0
+            },
+            "u4": {
+              "kind": "uniform",
+              "offset": 112,
+              "size": 16,
+              "elementStride": 4
+            },
+            "f2": {
+              "kind": "uniform",
+              "offset": 128,
+              "size": 8,
+              "elementStride": 4
+            },
+            "f3": {
+              "kind": "uniform",
+              "offset": 136,
+              "size": 12,
+              "elementStride": 4
+            },
+            "guardf": {
+              "kind": "uniform",
+              "offset": 148,
+              "size": 4,
+              "elementStride": 0
+            },
+            "f4": {
+              "kind": "uniform",
+              "offset": 160,
+              "size": 16,
+              "elementStride": 4
+            },
+            "outputBuffer": {
+              "kind": "uniform",
+              "offset": 176,
+              "size": 16,
+              "elementStride": 0
+            }
+          },
+          "meaning": "Unchanged source reflection confirms compact 12-byte width-three fields and neighboring scalar/resource bindings."
+        }
+      },
+      "runtime_contract": {
+        "fixture": "tests/cuda/nvvm-conventional-global-vectors.slang",
+        "words": 36,
+        "meaning": "27 exact lane bits across all nine combinations, three adjacent scalar guards, two resource values, prefix/completion/end guards; no numerical tolerance."
+      },
+      "resolved_failures": [
+        {
+          "before": {
+            "path": "build/nvvm-global-vectors/before.json",
+            "sha256": "cdb11017739e862b0120ec31a56aae5edd4ffa5b6cbc537aad9b153074ed588d",
+            "return_code": 1,
+            "elapsed_seconds": 2.8318467140197754
+          },
+          "identity": {
+            "path": "build/nvvm-global-vectors/before-identity.json",
+            "sha256": "3d8d87d3cf862a226833e43778e71b6127d1a71da9e4f7f33ec2299c2c63b848"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-conventional-global-vectors.slang (cuda)": "passed",
+            "tests/cuda/nvvm-conventional-global-vectors.slang.1 (cuda)": "backend-preflight-failure",
+            "tests/cuda/nvvm-conventional-global-vectors.slang.2 (cuda)": "backend-preflight-failure"
+          },
+          "diagnostic": "E52017: struct field address result Ptr<vector<int,2>, Generic, ScalarLayout>",
+          "resolution": "Admit the canonical vector field family through the shared classifier and retain existing checked compact-storage conversion."
+        }
+      ],
+      "unresolved_failures": [
+        {
+          "case": "ray-tracing-triangle-intersection.cuda",
+          "before": {
+            "path": "build/nvvm-rhi-cuda/nvvm-triangle-final.json",
+            "sha256": "698592836d4340fab4c9e30136b8a204fc1d6a94bb0c0d8779b69734c97f80b9"
+          },
+          "current": {
+            "path": "build/nvvm-global-vectors/rhi-triangle.json",
+            "sha256": "f34c70ad9af77c8f118177cadec6de2b2267d8b49560c8a68527ac65cb9e293c",
+            "return_code": 1,
+            "elapsed_seconds": 1.398972511291504
+          },
+          "before_shape": "Ptr<vector<uint,2>, Generic, ScalarLayout> global field address",
+          "current_shape": "GenericAsm assembly=optixGetPrimitiveIndex, signature=uint()",
+          "classification": "backend-preflight",
+          "status": "unresolved",
+          "meaning": "Global-vector rejection cleared; complete RHI triangle remains unqualified."
+        }
+      ],
+      "validation_incidents": [
+        {
+          "record": {
+            "path": "build/nvvm-global-vectors/layout-before.json",
+            "sha256": "ee16f67989bbf843ff5935ee67b32fb98c515442dc3ef703f6c2400623d8b42a",
+            "return_code": 1,
+            "elapsed_seconds": 0.2629363536834717
+          },
+          "diagnostic": "E00014 unknown profile 'sm_80'",
+          "resolution": "Use canonical cuda_sm_8_0 capability in the successful reflection retry."
+        }
+      ],
+      "qualification": [
+        "No new ABI, module version, physical pointer role, aggregate family or math policy.",
+        "Existing sampler storage-only exclusions remain executable-value rejections.",
+        "No full working/full corpus refresh; all 70 earlier features and full accepted baseline/identity remain unchanged."
+      ]
     }
   }
 }

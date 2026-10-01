@@ -485,22 +485,12 @@ bool _getNVVMStructFieldAddress(
     IRType* fieldType = outAddress.field->getFieldType();
     if (isConventionalGlobal)
     {
-        NVVMRawBufferType rawBufferType;
-        NVVMSurfaceType surfaceType;
-        NVVMReadOnlyTextureType sampledTextureType;
-        SlangNVVMValueTypeDesc physicalType = {};
-        return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
-               isNVVMAccelerationStructureType(fieldType) ||
-               asNVVMSupportedResourceStructType(fieldType) ||
-               asNVVMSupportedDeviceCopyableValuePointerType(fieldType) ||
-               asNVVMSupportedDevicePhysicalStoragePointerType(fieldType) ||
-               asNVVMSupportedParameterGroupType(fieldType) ||
-               getNVVMSupportedSurfaceField(outAddress.field, surfaceType, physicalType) ||
-               getNVVMSupportedReadOnlyTextureType(fieldType, sampledTextureType) ||
-               asNVVMSupportedDescriptorHandleType(fieldType) ||
-               asNVVMSupportedSamplerValueType(fieldType) ||
-               getNVVMSupportedRawBufferType(fieldType, rawBufferType) ||
-               asNVVMSupportedAggregateStorageArrayType(fieldType);
+        // Global storage also contains comparison samplers and unsized sampler arrays. Those
+        // storage-only fields are not executable values, but all other fields share admission.
+        return isNVVMSupportedConventionalGlobalFieldType(outAddress.field) &&
+               (!asNVVMSupportedSamplerStorageType(fieldType) ||
+                asNVVMSupportedSamplerValueType(fieldType)) &&
+               !asNVVMSupportedUnsizedSamplerArrayStorageType(fieldType);
     }
 
     if (outAddress.isMutable || outAddress.isLocalSubstandardRecordStorage)
@@ -5779,7 +5769,9 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
         if (!address.localBFloat16Vector && field->selection.isLocalSubstandardRecordStorage)
             address.localBFloat16Vector =
                 asNVVMBFloat16VectorType(field->selection.field->getFieldType());
-        hasCompactStorage = field->selection.isParameterGroupStorage && !field->selection.isMutable;
+        hasCompactStorage =
+            (field->selection.isParameterGroupStorage || field->selection.isConventionalGlobal) &&
+            !field->selection.isMutable;
     }
     else if (pointer->getOp() == kIROp_GetElementPtr)
     {

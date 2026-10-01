@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 70 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Twenty-five feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 71 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -95,9 +95,9 @@ implementation iterations; working runs every three to five iterations or sooner
 Explore application-relevant failures in bounded batches and preserve intentional semantic differences.
 The previous four-item stop is superseded. Approximate Half policies remain separate work.
 
-The tier selector is implemented and reviewed: 1,708 working configurations, 455 exploratory
+The tier selector is implemented and reviewed: 1,711 working configurations, 455 exploratory
 configurations and a 15-cell smoke subset. Its 43 CPU contracts and all 15 smoke cells pass;
-the first smoke run took 22.16 seconds. The integration run below now qualifies this inventory.
+the first smoke run took 22.16 seconds. The integration run below and reviewed focused admissions qualify this inventory.
 The three descriptor-conversion input changes are reviewed: their stronger UInt2/guard oracle
 preserves the original UInt64 checks, and all three current configurations pass.
 OptiX raygen is accepted: O0/O3 each pass two changed launches with complete 170-word output,
@@ -192,26 +192,16 @@ the local compiler/provider. The CUDA listing has262registrations (261unique nam
 and remains on demand outside automatic smoke/working cadence. Custom device/session paths and
 internal direct NVRTC kernels retain their documented compiler owners.
 
-**Active work:** qualify conventional-global Int/UInt/Float32 vector fields (widths2/3/4) through
-existing checked address/storage conversions. The bounded RHI triangle probe passes NVRTC but first
-rejects its conventional-global `uint2` field address in NVVM. That ScalarLayout pointer is canonical;
-fix the owning field admission/conversion, not its spelling. `PrimitiveIndex` is another known
-missing operation behind this boundary. Smoke has passed after every implementation iteration;
-the working cadence restarted at the repaired checkpoint. The prior full baseline retains its identity.
+Conventional-global Int32/UInt32/Float32 vectors of widths 2/3/4 are qualified through existing
+checked storage plans. The canonical ScalarLayout field pointer retains its producer-owned key;
+three-lane values occupy 12 bytes and use the existing compact-storage conversion. Six focused
+runtime cells and two compiler units pass, along with the static plan/provenance test and all
+15 smoke cells (21.75s). The new fixture's three modes are reviewed working-corpus admissions.
+The RHI triangle now passes global-vector admission and rejects the next missing operation,
+`PrimitiveIndex`; it is still a failed application test, not an accepted triangle result.
 
-## Retained boundaries
-
-Module43 requires older user modules and separately supplied built-ins to be recompiled for every
-backend. Metadata inspection and source fallback remain available. The active NVVM semantic-tag
-extension is removed; inert serialized slots and ordinary explicit intrinsic arguments remain.
-
-Preserve all 36 main gaps and focused NVRTC narrow-bit/nested-array failures and timeouts.
-Packed/normalized surfaces, general aliases, broader resource provenance and three-channel
-transfers remain outside current physical legalization. Checked address/memory plans
-remain authoritative; structured-buffer load/store conversions are planned, while other resource
-family planning and broader aggregate admission remain feature work.
-Barrier convergence, external Half ABI, numeric sweep, material-runtime and performance conclusions
-retain prior qualifications. Snapshot caching remains non-atomic with external libdevice replacement.
-The earlier repeated-static fixture and link-option cache failures are resolved with focused
-evidence; retain their original failure records.
-CUDA `dim3 == uint3` source emission remains unsupported.
+**Next work:** add the related OptiX primitive index, instance index and custom instance ID queries
+through exact named UInt32 calls, with closest-hit stage admission. Use the existing RHI triangle
+and a small two-instance identity test so nonzero indices and distinct custom IDs are observed.
+The working cadence restarted at the repaired checkpoint; one implementation iteration has since
+passed. The optional full RHI suite remains on demand and the prior full baseline retains its identity.
