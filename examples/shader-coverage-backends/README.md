@@ -10,12 +10,12 @@ workflow — compile, discover the hidden counter buffer through
 through `ICoverageTracingMetadata` — is identical everywhere, and that
 only the binding step's shape changes per backend:
 
-| Backend  | Binding model exercised                                                                              |
-| -------- | ---------------------------------------------------------------------------------------------------- |
-| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset`  |
-| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol    |
-| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set         |
-| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit                |
+| Backend  | Binding model exercised                                                                             |
+| -------- | --------------------------------------------------------------------------------------------------- |
+| `cpu`    | host-callable kernel; `(pointer, count)` pair written into the parameter payload at `uniformOffset` |
+| `cuda`   | same marshaling contract with a device pointer; payload copied to the `SLANG_globalParams` symbol   |
+| `vulkan` | storage buffer at the descriptor `(space, binding)`; auto-allocation adds one descriptor set        |
+| `metal`  | `[[buffer(N)]]` index from `binding`; MSL compiled at runtime, counters always 32-bit               |
 
 Each path is a compact implementation of the corresponding recipe in
 [`docs/design/shader-coverage-host-interface.md`](../../docs/design/shader-coverage-host-interface.md).
@@ -71,6 +71,18 @@ open coverage-html/index.html    # macOS; Linux: xdg-open, Windows: start
 `genhtml` has no common Windows distribution; where it is unavailable,
 `python3 tools/coverage-html/slang-coverage-html.py cpu.lcov --output-dir coverage-html`
 produces an equivalent report.
+
+### Shared counter decoding
+
+After each backend has completed its dispatch and made the counter bytes
+host-visible, `report()` in [`main.cpp`](main.cpp) calls
+[`decodeCoverageCounters()`](../shader-coverage-common/coverage-counters.h).
+This example helper converts little-endian 32- or 64-bit slots to `uint64_t`
+values without an alignment requirement. It uses the effective
+`CoverageBufferInfo::elementByteWidth`, not the requested width.
+The report then iterates metadata entries and reads `hits[entry.counterIndex]`;
+entry indices and counter indices are not interchangeable. The saved
+`.counters.bin` still contains the original bytes at the original width.
 
 ## Options
 

@@ -53,6 +53,7 @@
 
 #endif
 
+#include "shader-coverage-common/coverage-counters.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 
@@ -322,14 +323,6 @@ void checkOutputs(const float* outputs, const char* backendName)
     }
 }
 
-// Reads counter slot `index` at the effective element width.
-uint64_t readCounter(const void* counters, uint32_t elementByteWidth, uint32_t index)
-{
-    if (elementByteWidth == 8)
-        return reinterpret_cast<const uint64_t*>(counters)[index];
-    return reinterpret_cast<const uint32_t*>(counters)[index];
-}
-
 // ## Reporting
 //
 // The same ending for every backend: attribute the raw counters to
@@ -339,6 +332,12 @@ uint64_t readCounter(const void* counters, uint32_t elementByteWidth, uint32_t i
 
 void report(const CompiledProgram& program, const void* counters, const std::string& backendName)
 {
+    // Decode once, independently of the backend's counter width or buffer alignment.
+    auto hits = coverageDemo::decodeCoverageCounters(
+        counters,
+        size_t(program.counterCount) * program.elementByteWidth,
+        program.elementByteWidth);
+
     // Aggregate line entries by source line, the same way LCOV export
     // does. (Multiple statements on one line get distinct counters.)
     std::map<uint32_t, uint64_t> hitsByLine;
@@ -362,8 +361,7 @@ void report(const CompiledProgram& program, const void* counters, const std::str
             continue;
         if (entry.counterIndex >= program.counterCount)
             fail("coverage entry has a counter index outside the counter buffer");
-        hitsByLine[entry.line] +=
-            readCounter(counters, program.elementByteWidth, entry.counterIndex);
+        hitsByLine[entry.line] += hits[entry.counterIndex];
     }
 
     std::cout << "\n[" << backendName << "] line coverage of hello-coverage.slang:\n";

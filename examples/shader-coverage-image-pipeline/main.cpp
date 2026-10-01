@@ -13,6 +13,7 @@
 // unchanged. See `vk_compute_demo.h`'s file-level comment for the
 // step-by-step swap procedure.
 
+#include "shader-coverage-common/coverage-counters.h"
 #include "vk_compute_demo.h"
 
 #include <charconv>
@@ -32,6 +33,7 @@
 #include <vector>
 
 using Slang::ComPtr;
+using coverageDemo::decodeCoverageCounters;
 
 namespace
 {
@@ -941,15 +943,7 @@ int main(int argc, char** argv)
         // consume the manifest's `element_stride` see consistent layout.
         std::vector<uint8_t> rawBytes((size_t)counterCount * counterByteWidth);
         ctx.download(coverageBuf, rawBytes.data(), coverageBuf.size);
-        std::vector<uint64_t> hits(counterCount, 0);
-        for (uint32_t i = 0; i < counterCount; ++i)
-        {
-            uint64_t value = 0;
-            const uint8_t* slot = rawBytes.data() + (size_t)i * counterByteWidth;
-            for (uint32_t b = 0; b < counterByteWidth; ++b)
-                value |= (uint64_t)slot[b] << (b * 8);
-            hits[i] = value;
-        }
+        auto hits = decodeCoverageCounters(rawBytes.data(), rawBytes.size(), counterByteWidth);
 
         auto summary = summarize(shader.coverageMetadata, hits);
         printSummary(mode.c_str(), summary);

@@ -62,7 +62,7 @@ add_dependencies(shader-coverage-bvh-traversal ${_copy_target})
 
 target_include_directories(
     shader-coverage-bvh-traversal
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${slang_SOURCE_DIR}/examples
 )
 target_link_libraries(
     shader-coverage-bvh-traversal

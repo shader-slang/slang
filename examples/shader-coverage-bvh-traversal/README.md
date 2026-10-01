@@ -128,13 +128,13 @@ python3 path/to/slang/tools/coverage-html/slang-coverage-html.py \
 
 The five stages `main.cpp` walks through for each run:
 
-| Stage | What happens | Key API |
-|---|---|---|
-| **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`, and `-trace-coverage-binding 0 1`. The compiler places `__slang_coverage` at the declared slot and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
-| **2. Fix binding** | No runtime discovery step — the slot was dictated by `TraceCoverageBinding` at compile time. The host uses the same constants (`kCoverageBinding`, `kCoverageSet`) on the Vulkan side. | `CompilerOptionName::TraceCoverageBinding` |
-| **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources (rays/tris/nodes/globals/output) on set 0 and the coverage buffer at `(kCoverageSet, kCoverageBinding)` on set 1. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
-| **4. Dispatch** | Submit at most 262144 rays per batch in full mode or a single dispatch in smoke mode; `--batch-size=N` overrides this. Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches. | `vkCmdDispatch` |
-| **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
+| Stage                  | What happens                                                                                                                                                                                                                                                                                                                         | Key API                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| **1. Compile**         | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`, and `-trace-coverage-binding 0 1`. The compiler places `__slang_coverage` at the declared slot and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode`  |
+| **2. Fix binding**     | No runtime discovery step — the slot was dictated by `TraceCoverageBinding` at compile time. The host uses the same constants (`kCoverageBinding`, `kCoverageSet`) on the Vulkan side.                                                                                                                                               | `CompilerOptionName::TraceCoverageBinding`                                  |
+| **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources (rays/tris/nodes/globals/output) on set 0 and the coverage buffer at `(kCoverageSet, kCoverageBinding)` on set 1.                                                                                            | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets`                     |
+| **4. Dispatch**        | Submit at most 262144 rays per batch in full mode or a single dispatch in smoke mode; `--batch-size=N` overrides this. Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches.                                                          | `vkCmdDispatch`                                                             |
+| **5. Readback**        | Download the raw counter bytes, call `decodeCoverageCounters()` for the console summary, and write the manifest + raw binary for offline LCOV conversion.                                                                                                                                                                            | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
 ### Raw Vulkan host
 
@@ -178,6 +178,14 @@ where the compiler picks the slot and the host discovers it after
 compilation via `ISyntheticResourceMetadata`.
 
 ### Counter readback and LCOV
+
+For the in-process console summary, [`main.cpp`](main.cpp) calls the shared
+[`decodeCoverageCounters()`](../shader-coverage-common/coverage-counters.h) example
+helper after `ctx.download()`. It widens the effective 32- or 64-bit counter slots
+to `uint64_t`; `summarize()` then reads `hits[entry.counterIndex]` while iterating
+metadata entries. The raw bytes remain unchanged for the offline converter.
+See the [image-pipeline readback example](../shader-coverage-image-pipeline/README.md#counter-readback-and-lcov)
+for the corresponding in-process LCOV path.
 
 After dispatch the host downloads the raw counter buffer and writes two
 artifact files: a coverage manifest JSON and the raw counters binary.

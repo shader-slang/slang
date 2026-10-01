@@ -97,7 +97,7 @@ set_default_compile_options(shader-coverage-backends USE_FEWER_WARNINGS)
 add_dependencies(shader-coverage-backends shader-coverage-backends-copy-assets)
 target_include_directories(
     shader-coverage-backends
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${slang_SOURCE_DIR}/examples
 )
 target_compile_definitions(shader-coverage-backends PRIVATE ${_defines})
 target_link_libraries(shader-coverage-backends PRIVATE ${_libs})
