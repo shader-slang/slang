@@ -80,8 +80,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Sixteen feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 58 feature objects, preserving all prior objects and the full baseline. Each feature's
+Seventeen feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 59 feature objects, preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 Continue bounded reviewed work with eight-job builds and economical focused validation.
 
@@ -97,6 +97,8 @@ Current additions beyond the full checkpoint are:
   layer-first provider calls, Half arrays/volumes, and explicit signed/unsigned 8/16 storage with
   matching logical 32-bit values across 1D/2D/1DArray/2DArray/3D, widths 1/2/4. Narrow integer stores
   retain the D3D-based saturation policy; Vulkan out-of-range write equivalence is unqualified.
+  Native logical signed/unsigned 8/16 values now use matching inferred or explicit integer formats
+  across the same geometries and widths, preserving native bits without narrowing conversions.
 - Coherent pointer memory supports naturally aligned Int/UInt32/64 for exactly Device/global
   and Workgroup/shared with scoped relaxed operations. Actual SM70 admission, canonical memory
   attributes and checked producer spaces remain required; qualification is at SM80.
@@ -106,20 +108,20 @@ Current additions beyond the full checkpoint are:
   inverse reconstruction or AnyValue expansion is implied. CUDA rejects Std430 and uses 40 for
   Scalar/C; its three nonzero Scalar mismatches remain recorded.
 
-The latest batch is `features.nvvm-layout-pointer-helpers`, raw evidence under
-`build/nvvm-layout-pointer-helpers/`. Four shared units, three direct static units, twelve
-compile/diagnostic cells and eight allocated-address O0/O3 cases pass. Both modes retain six
-noinline helpers/calls; caller and nested offsets are checked independently, with full guards and
-unchanged inputs. Every call actual proves its origin before exact-type admission. A synthetic
-valid-call-then-invalid-call test rejects a same-typed global producer before provider creation.
-The shared build took 34 seconds; refreshing the older isolated static build took 334 seconds, both
-with eight jobs. Its first test regenerated the cached core module; final static identity records
-that transition separately. The fixture's initial unknown `[__noinline]` attribute and correction
-to `[noinline]` are retained. No production fix or test retry was needed for this batch.
+The latest batch is `features.nvvm-native-narrow-surfaces`, raw evidence under
+`build/nvvm-native-narrow-surfaces/`. All thirty new NVVM O0/O3 physical cells pass. Across the
+51 selected cells there are 39 passes and 12 retained CUDA compile failures: five new CUDA whole
+rows pass, ten component rows fail unchanged, and six prior controls retain exact outcomes.
+Two focused units, four negative cells, 121 harness contracts and 22 report contracts pass.
+Ten existing PTX outputs contain the expected raw 8/16-bit scalar/vector surface instructions.
+The eight-job build took 26 seconds. Provider primitives, provider binary and canonical surface
+legalizer are unchanged, so their accepted primitive tests are reused. No production repair or
+retry was needed. Representative high-bit loads, independent native marker stores and full guards
+are qualified; exhaustive narrow decoding is not claimed.
 
 The full checkpoint remains unchanged: its 36 main gaps and 249 surface cells retain their original
 identities. Focused records supersede specifically resolved texture-handle, dynamic-surface and
-coherent-groupshared cells. The surface harness currently has 106 rows; 23 new grouped rows (69 cells)
+coherent-groupshared cells. The surface harness currently has 121 rows; 38 new grouped rows (114 cells)
 need reviewed adoption at the next deliberately selected full checkpoint. No automatic full run.
 
 Keep these open distinctions visible:
@@ -137,11 +139,12 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-Next: native logical signed/unsigned 8/16 surface values, widths 1/2/4 across the five qualified
-geometries, using canonical matching integer formats. Design review confirms existing provider
-primitives and identity conversion suffice. Preserve logical 32-bit saturation; reject native width,
-signedness or channel mismatches before physical lowering. Reuse the physical harness in one grouped
-batch with representative high-bit loads, independent native marker stores and exact guards.
+Next: investigate checked parameter-group loads of address-only Std430/Scalar/C record pointers.
+Freeze IR, reflection and an allocated binding fixture before implementation. Admission must belong
+to parameter-group storage and a checked load plan; arbitrary loaded pointers must not acquire an
+assumed global root. Keep general pointer storage, dereferences, pointer results, inverse casts and
+AnyValue outside this bounded step. The original pointer fixture remains unresolved until its
+specific contracts are independently demonstrated.
 
 ## Retained boundaries
 

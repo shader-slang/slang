@@ -81997,6 +81997,399 @@
         "last_targeted": "layout-pointer-helpers",
         "implementations_since_full": 16
       }
+    },
+    "nvvm-native-narrow-surfaces": {
+      "status": "accepted-focused",
+      "scope": "Native logical signed/unsigned 8/16-bit surface values, widths 1/2/4 across 1D/2D/1DArray/2DArray/non-array 3D, whole/static/in-range dynamic components. Module43/providerABI46/container2 unchanged.",
+      "contract": "Canonical inferred or exact matching integer formats preserve native bits through existing identity conversion. Explicit observed32 casts sign/zero extend. Logical32 narrowing retains its separate saturating conversion. Raw8 provider registers remain i16.",
+      "identity": {
+        "revision": "ca9f9327528904fea54cbce1d8e4c21e4e394746",
+        "patch_sha256": "74ffe1c272d6ca871ef57681f7d47a8619e1f37955c720f6aed39d2a7cbd822b",
+        "source_sha256": {
+          "extras/validate-nvvm-surfaces.py": "63b73ac3a945160ef68f0763f7c846d12dbecfca129f4a9691b44903629cbf86",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "43f5f6f2fb3750a6866fc6a6f3fc62b886d3ce42cdb03cd9f68d7be3c182942e",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "0647af0e26e1f86ccb233e1a15ae9257daf1f44ed22c01336af8b44d6eb99c8f",
+          "tests/cuda/nvvm-surface-physical-native-narrow.slang": "a776ccd83c9b2282d467e883dc8ba2ba3dcafda1b6bb4e8797448e97276a512c"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "7a1c5955249bc186d2d504215f50d845ccb090c8c67699420dad648950e4038d",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "24a153a95d39ce621008ee85917590744c392345b76cc258b49b0ff886bc57c1",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "0f3ee0afc0acf7e5cbb1e1f36d612663db0f54bd3e934be2b5fe7a97bfe7f1da"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-native-narrow-surfaces/build.json",
+        "sha256": "7708e0335487a63c0349295e503e89ae53f350387d42c5f51a3c259a10716500"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-native-narrow-surfaces/units.json",
+            "sha256": "2074157151bdbb598166c4cf4c8b83f4bd117b93e252a71491ebcae7ea64459e"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation.internal": "passed"
+          },
+          "counts": {
+            "passed": 2
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-native-narrow-surfaces/negatives.json",
+            "sha256": "7d8cd2becdb02872bbd2ed208017993a1e1acacce3460213a47118e2d97eb2b4"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-formatted-surface-provenance.slang": "passed",
+            "tests/cuda/nvvm-native-float-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "physical": {
+          "gate": {
+            "path": "build/nvvm-native-narrow-surfaces/physical.json",
+            "sha256": "ec489ba481c9bc16e6c9f899e9391d285ebbdb831aea8cda336e3a025974136a"
+          },
+          "validated": {
+            "path": "build/nvvm-native-narrow-surfaces/physical-validation.json",
+            "sha256": "e5be8aebb8e6e3831b50c0801484c1ea0be871a51e0fc199f6c66d17c4201f90"
+          },
+          "requested_cells": 51,
+          "counts": {
+            "compile-failed": 12,
+            "passed": 39
+          },
+          "outcomes": {
+            "half-3d-components|nvrtc-o3": "compile-failed",
+            "half-3d-components|nvvm-o0": "passed",
+            "half-3d-components|nvvm-o3": "passed",
+            "integer-format-2d-dynamic-components|nvrtc-o3": "compile-failed",
+            "integer-format-2d-dynamic-components|nvvm-o0": "passed",
+            "integer-format-2d-dynamic-components|nvvm-o3": "passed",
+            "native-narrow-1d-array-dynamic-components|nvrtc-o3": "compile-failed",
+            "native-narrow-1d-array-dynamic-components|nvvm-o0": "passed",
+            "native-narrow-1d-array-dynamic-components|nvvm-o3": "passed",
+            "native-narrow-1d-array-static-components|nvrtc-o3": "compile-failed",
+            "native-narrow-1d-array-static-components|nvvm-o0": "passed",
+            "native-narrow-1d-array-static-components|nvvm-o3": "passed",
+            "native-narrow-1d-array-whole|nvrtc-o3": "passed",
+            "native-narrow-1d-array-whole|nvvm-o0": "passed",
+            "native-narrow-1d-array-whole|nvvm-o3": "passed",
+            "native-narrow-1d-dynamic-components|nvrtc-o3": "compile-failed",
+            "native-narrow-1d-dynamic-components|nvvm-o0": "passed",
+            "native-narrow-1d-dynamic-components|nvvm-o3": "passed",
+            "native-narrow-1d-static-components|nvrtc-o3": "compile-failed",
+            "native-narrow-1d-static-components|nvvm-o0": "passed",
+            "native-narrow-1d-static-components|nvvm-o3": "passed",
+            "native-narrow-1d-whole|nvrtc-o3": "passed",
+            "native-narrow-1d-whole|nvvm-o0": "passed",
+            "native-narrow-1d-whole|nvvm-o3": "passed",
+            "native-narrow-2d-array-dynamic-components|nvrtc-o3": "compile-failed",
+            "native-narrow-2d-array-dynamic-components|nvvm-o0": "passed",
+            "native-narrow-2d-array-dynamic-components|nvvm-o3": "passed",
+            "native-narrow-2d-array-static-components|nvrtc-o3": "compile-failed",
+            "native-narrow-2d-array-static-components|nvvm-o0": "passed",
+            "native-narrow-2d-array-static-components|nvvm-o3": "passed",
+            "native-narrow-2d-array-whole|nvrtc-o3": "passed",
+            "native-narrow-2d-array-whole|nvvm-o0": "passed",
+            "native-narrow-2d-array-whole|nvvm-o3": "passed",
+            "native-narrow-2d-dynamic-components|nvrtc-o3": "compile-failed",
+            "native-narrow-2d-dynamic-components|nvvm-o0": "passed",
+            "native-narrow-2d-dynamic-components|nvvm-o3": "passed",
+            "native-narrow-2d-static-components|nvrtc-o3": "compile-failed",
+            "native-narrow-2d-static-components|nvvm-o0": "passed",
+            "native-narrow-2d-static-components|nvvm-o3": "passed",
+            "native-narrow-2d-whole|nvrtc-o3": "passed",
+            "native-narrow-2d-whole|nvvm-o0": "passed",
+            "native-narrow-2d-whole|nvvm-o3": "passed",
+            "native-narrow-3d-dynamic-components|nvrtc-o3": "compile-failed",
+            "native-narrow-3d-dynamic-components|nvvm-o0": "passed",
+            "native-narrow-3d-dynamic-components|nvvm-o3": "passed",
+            "native-narrow-3d-static-components|nvrtc-o3": "compile-failed",
+            "native-narrow-3d-static-components|nvvm-o0": "passed",
+            "native-narrow-3d-static-components|nvvm-o3": "passed",
+            "native-narrow-3d-whole|nvrtc-o3": "passed",
+            "native-narrow-3d-whole|nvvm-o0": "passed",
+            "native-narrow-3d-whole|nvvm-o3": "passed"
+          },
+          "scope": "All30 new NVVM cells pass, with24 independent resources per cell, high-bit load anchors, independently generated native marker stores, full guards and unselected channels. Five CUDA whole rows pass; ten component rows retain compile failures.",
+          "comparison": {
+            "path": "build/nvvm-native-narrow-surfaces/control-comparison.json",
+            "sha256": "7e2c950b3fd70c0866094497cfa1128577f8a12e12cc97b56bfac92bc430eb32"
+          }
+        },
+        "cpu": {
+          "harness": {
+            "path": "build/nvvm-native-narrow-surfaces/harness-contracts.json",
+            "sha256": "63699249050030f1de940a9695b2f220783a94b671afed956e06123b6f2d510c"
+          },
+          "harness_case_count": 121,
+          "report_validator": {
+            "path": "build/nvvm-native-narrow-surfaces/report-contracts.json",
+            "sha256": "1f22d44513591841e9682813953a85ec92f04f2ab71f4421ccdafca1bedf1d2e"
+          },
+          "report_contract_tests": 22,
+          "original_case_oracle_preservation": {
+            "path": "build/nvvm-native-narrow-surfaces/harness-freeze.json",
+            "sha256": "046a9f91cfd0213298e6d6be2307a065e2c7294353a0cda38ba48d737300728a"
+          }
+        },
+        "ptx": {
+          "path": "build/nvvm-native-narrow-surfaces/ptx-inspection.json",
+          "sha256": "71cb6fb08e7da48feb1489b024189022130d503bca17eb126680f8fcee253ed3"
+        },
+        "inferred_formats": {
+          "path": "build/nvvm-native-narrow-surfaces/inferred-formats.json",
+          "sha256": "f3a101d992fc9b5af1b276301af757371f3df0646957f61390f5ee4f7a0c0d25"
+        },
+        "provider_reuse": {
+          "path": "build/nvvm-native-narrow-surfaces/provider-reuse.json",
+          "sha256": "3f2854dd37dc7a43451029522253d782d448ef7258493cd6066b4fa5492d8991"
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-native-narrow-surfaces/before-validation.json",
+          "sha256": "55b8632bf40b47706ed290b54cf4483856f2583ebaf9c7805042ff4bcbf92e6d"
+        },
+        "transitions": [
+          {
+            "case": "native-narrow-1d-array-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-array-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-array-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-array-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-array-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-array-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-1d-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-array-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-array-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-array-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-array-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-array-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-array-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-2d-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-3d-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-3d-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-3d-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-3d-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-3d-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native-narrow-3d-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          }
+        ],
+        "comparison": "30 NVVM compile-failed to passed; all15 new CUDA outcomes and all6 prior control outcomes exactly unchanged."
+      },
+      "retained_failures": {
+        "cuda_components": "Ten native narrow static/dynamic component rows retain invalid CUDA surface-component pointer expressions. Two prior control CUDA failures unchanged.",
+        "unannotated_packed": "Historical unannotated logical int4/signed8x4 mismatch remains outside native exact-width admission."
+      },
+      "preservation": {
+        "prior_feature_count": 58,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "original_surface_rows_sources_oracles": 106,
+        "canonical_surface_legalizer_sha256": "3743a52bb91f3e06749a05be8acca3d67b3e0eca45b14cb59467f7a3d3ed095d",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_surface_expansion": "Full baseline249 cells unchanged;38 new grouped rows since full require reviewed adoption of114 cells at next full checkpoint."
+      },
+      "limitations": [
+        "Representative patterns and bounded matched-plane permutation checks, not exhaustive decoding or universal address proof.",
+        "Native width/sign/channel mismatch, normalized/packed-bitfield formats, logical three-channel or64-bit values remain rejected.",
+        "Existing logical32 D3D-based saturation unchanged; Vulkan out-of-range storage-write equivalence unqualified.",
+        "Dynamic stores remain non-atomic whole-texel RMW with in-range selectors.",
+        "Focused SM80 correctness only; no full campaign, performance claim or fresh provider primitive test."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "native-narrow-surfaces",
+        "implementations_since_full": 17
+      }
     }
   }
 }

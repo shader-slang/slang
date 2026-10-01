@@ -921,8 +921,15 @@ Nine spatial integer rows extend the same formats and three store styles to 1DAr
 using the existing driver. Depth4 has two active planes and two guarded planes; height5 distinguishes
 Y from Z. Independent plane-sensitive stores and host input markers prevent the tested coordinate
 permutations from cancelling through matching reads/writes. Existing 97 inputs/oracles stay exact.
-The current harness has 106 rows; the retained full baseline has 83. Preserve its 249 cells and use
-the focused array/volume/integer evidence when reviewing the sixty-nine-cell expansion at the next full checkpoint.
+Fifteen native-narrow rows cover signed/unsigned8/16 logical values across the five geometries and
+three store styles. Each groups twelve native resources and twelve independent 32-bit observation
+outputs. Canonical inferred formats must agree with native scalar width/sign/channels in reflection.
+Original raw inputs are independently sign/zero-extended; stores use in-range unsigned marker bits
+and same-width signed bitcasts, with no surface narrowing/clamp. Require every selected marker
+pattern per lane, untouched-channel/outer guards and bounded spatial permutation checks. Existing
+106 source/spec/oracle contracts stay exact.
+The current harness has 121 rows; the retained full baseline has 83. Preserve its 249 cells and use
+the focused array/volume/integer evidence when reviewing the 114-cell expansion at the next full checkpoint.
 The four new CUDA Half-array compile failures remain explicit comparison limitations.
 
 A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires

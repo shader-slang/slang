@@ -1756,9 +1756,20 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
             laneCount = uint32_t(count->getValue());
         }
         uint32_t bitWidth = 0;
-        if (!isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) || bitWidth != 16)
+        bool isSigned = false;
+        if (isNVVMSupportedIntegerScalarType(scalarType, &bitWidth, &isSigned) &&
+            (bitWidth == 8 || bitWidth == 16))
+        {
+            elementType = {
+                isSigned ? SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER
+                         : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+                bitWidth,
+                laneCount};
+        }
+        else if (isNVVMSupportedFloatingPointScalarType(scalarType, &bitWidth) && bitWidth == 16)
+            elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, bitWidth, laneCount};
+        else
             return false;
-        elementType = {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, bitWidth, laneCount};
     }
 
     outType.textureType = textureType;
@@ -1791,11 +1802,13 @@ bool getNVVMSupportedSurfaceField(
     const bool isSigned = outType.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
     if (isSigned || outType.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER)
     {
+        const auto logicalWidth = outType.elementType.bitWidth;
         if (formatInfo.scalarType ==
             (isSigned ? SLANG_SCALAR_TYPE_INT32 : SLANG_SCALAR_TYPE_UINT32))
-            return true;
+            return logicalWidth == 32;
         // Normalized formats also use UINT8/UINT16 metadata. Only these exact integer formats
         // select integer conversion; matching scalar width alone would silently admit UNORM.
+        // Logical32 can convert to narrower storage; native narrow values require matching width.
         switch (formatDecoration->getFormat())
         {
         case ImageFormat::r8i:
@@ -1805,8 +1818,9 @@ bool getNVVMSupportedSurfaceField(
         case ImageFormat::rg8ui:
         case ImageFormat::rgba8ui:
             outPhysicalType.bitWidth = 8;
-            return formatInfo.scalarType ==
-                   (isSigned ? SLANG_SCALAR_TYPE_INT8 : SLANG_SCALAR_TYPE_UINT8);
+            return (logicalWidth == 32 || logicalWidth == 8) &&
+                   formatInfo.scalarType ==
+                       (isSigned ? SLANG_SCALAR_TYPE_INT8 : SLANG_SCALAR_TYPE_UINT8);
         case ImageFormat::r16i:
         case ImageFormat::rg16i:
         case ImageFormat::rgba16i:
@@ -1814,8 +1828,9 @@ bool getNVVMSupportedSurfaceField(
         case ImageFormat::rg16ui:
         case ImageFormat::rgba16ui:
             outPhysicalType.bitWidth = 16;
-            return formatInfo.scalarType ==
-                   (isSigned ? SLANG_SCALAR_TYPE_INT16 : SLANG_SCALAR_TYPE_UINT16);
+            return (logicalWidth == 32 || logicalWidth == 16) &&
+                   formatInfo.scalarType ==
+                       (isSigned ? SLANG_SCALAR_TYPE_INT16 : SLANG_SCALAR_TYPE_UINT16);
         default:
             return false;
         }

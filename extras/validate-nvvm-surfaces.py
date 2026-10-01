@@ -5,7 +5,8 @@
 
 This bounded harness uses 1D/2D Float32, Half and native integer32 storage with
 1/2/4 channels, including independently initialized mixed-format resources and
-explicit signed/unsigned8/16 formats with logical32 values and saturating stores.
+explicit signed/unsigned8/16 formats with logical32 values and saturating stores,
+plus native narrow integer values with bit-preserving stores.
 It records failures as failures, including NVRTC component compilation and formatted
 store rounding differences. NaN conversions require class only; untouched bits are exact.
 Run --self-test for CPU oracle/ABI/reflection contracts without a compiler or GPU.
@@ -27,7 +28,7 @@ import time
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered",
-            "half-layered", "half-volume", "integer-formats", "integer-spatial"]
+            "half-layered", "half-volume", "integer-formats", "integer-spatial", "native-narrow"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
 FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4),
@@ -190,6 +191,15 @@ def cases():
                 1 if shape == 1 else 5, 4, False, shape,
                 dict(SURFACE_DIM=shape, SURFACE_OPERATION=operation))
             rows[-1]["volume_depth" if shape == 3 else "array_layers"] = 4
+    for shape, is_array, geometry in ((1, False, "1d"), (2, False, "2d"),
+                                      (1, True, "1d-array"), (2, True, "2d-array"),
+                                      (3, False, "3d")):
+        for operation, label in enumerate(("whole", "static-components", "dynamic-components")):
+            add(f"native-narrow-{geometry}-{label}", "native-narrow", "exercise", 67,
+                1 if shape == 1 else 5, 4, False, shape,
+                dict(SURFACE_DIM=shape, SURFACE_ARRAY=int(is_array), SURFACE_OPERATION=operation))
+            if is_array or shape == 3:
+                rows[-1]["array_layers" if is_array else "volume_depth"] = 4
     return rows
 
 
@@ -220,9 +230,9 @@ def resource_specs(row):
                 for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
                 for prefix in ("source", "result")] + [
                     spec("sourceFloat", "float32", 4), spec("resultFloat", "float32", 4)]
-    if row["fixture"] in ("integer-formats", "integer-spatial"):
+    if row["fixture"] in ("integer-formats", "integer-spatial", "native-narrow"):
         return [spec(prefix + family + suffix, storage if prefix == "surface" else scalar,
-                     lanes, scalar)
+                     lanes, storage if row["fixture"] == "native-narrow" and prefix == "surface" else scalar)
                 for family, storage, scalar in (("Signed8", "int8", "int32"),
                                                 ("Unsigned8", "uint8", "uint32"),
                                                 ("Signed16", "int16", "int32"),
@@ -439,21 +449,22 @@ def widen_integer(value, bits, signed):
 
 
 def integer_format_oracle(row):
-    """Observe original narrow inputs and independently predict saturated component stores."""
+    """Observe original narrow inputs; native stores preserve bits, formatted32 stores saturate."""
     width, height = row["width"], row["height"]
-    spatial = row["fixture"] == "integer-spatial"
+    spatial = "volume_depth" in row or "array_layers" in row
+    native = row["fixture"] == "native-narrow"
     depth = row.get("volume_depth", row.get("array_layers", 1))
     operation = row["defines"]["SURFACE_OPERATION"]
     resources = []
     for resource, spec in enumerate(resource_specs(row)[::2]):
         lanes, bits = spec["lanes"], FORMATS[spec["storage"]][1] * 8
-        signed = spec["scalar"] == "int32"
+        signed = spec["storage"].startswith("int")
         mask, midpoint = (1 << bits) - 1, 1 << (bits - 1)
         pattern = [0, 1, midpoint - 1, midpoint, midpoint + 1, mask, mask - 1, 2,
                    0x55, 0xAA, mask // 3, (mask // 3) * 2, 3, mask - 2, 7, mask - 7]
         initial, expected, observed, output = [], [], [], []
         active = 0
-        edges = integer_store_edges(bits, signed)
+        edges = pattern if native else integer_store_edges(bits, signed)
         for z in range(depth):
             for y in range(height):
                 for x in range(width):
@@ -479,7 +490,8 @@ def integer_format_oracle(row):
                                     (operation == 2 and lane == (x - 1) % lanes))
                         edge = (x - 1) // 4 if operation == 2 else x - 1
                         value = edges[(edge + z * 5 + y * 7 + resource * 3 + lane * 5) % 16]
-                        expected.append(narrow_integer(value, bits, signed) if live and selected else raw)
+                        stored = value if native else narrow_integer(value, bits, signed)
+                        expected.append(stored if live and selected else raw)
         for before, after, size in ((initial, expected, bits // 8), (observed, output, 4)):
             resources.append(dict(initial=b"".join(v.to_bytes(size, "little") for v in before),
                                   expected=b"".join(v.to_bytes(size, "little") for v in after),
@@ -492,7 +504,7 @@ def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
     if row["fixture"] == "layered":
         return layered_oracle(row)
-    if row["fixture"] in ("integer-formats", "integer-spatial"):
+    if row["fixture"] in ("integer-formats", "integer-spatial", "native-narrow"):
         return integer_format_oracle(row)
     if row["fixture"] in ("half-layered", "half-volume"):
         return half_surface_oracle(row)
@@ -850,7 +862,7 @@ def self_test():
     # Each added resource has independent storage, including source-only arrays and guard texels.
     for row in (x for x in cases() if x["fixture"] in
                 ("integers", "mixed", "layered", "half-layered", "half-volume",
-                 "integer-formats", "integer-spatial")):
+                 "integer-formats", "integer-spatial", "native-narrow")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -905,11 +917,14 @@ def self_test():
                 pass
             else:
                 raise ValueError("Surface array role substitution was ignored")
-            if row["fixture"] in ("integer-formats", "integer-spatial"):
+            if row["fixture"] in ("integer-formats", "integer-spatial", "native-narrow"):
+                scalar = specs[index]["scalar"]
+                opposite = scalar[1:] if scalar.startswith("u") else "u" + scalar
+                wrong_width = ("uint" if scalar.startswith("u") else "int") + (
+                    "16" if scalar.endswith("32") else "32")
                 for invalid_type in (dict(kind="scalar", scalarType="float32"),
-                                     dict(kind="scalar", scalarType="int16"),
-                                     dict(kind="scalar", scalarType=("uint32" if
-                                          specs[index]["scalar"] == "int32" else "int32"))):
+                                     dict(kind="scalar", scalarType=wrong_width),
+                                     dict(kind="scalar", scalarType=opposite)):
                     damaged = copy.deepcopy(reflection)
                     result = damaged["parameters"][index]["type"]["resultType"]
                     if specs[index]["lanes"] > 1:
@@ -934,12 +949,13 @@ def self_test():
             (0x8000, 16, True, 0xFFFF8000), (0x8000, 16, False, 0x8000),
             (0xFFFF, 16, True, 0xFFFFFFFF), (0xFFFF, 16, False, 0xFFFF)):
         require(widen_integer(value, bits, signed) == expected, "Integer extension anchor failed")
-    for row in (x for x in cases() if x["fixture"] in ("integer-formats", "integer-spatial")):
+    for row in (x for x in cases() if x["fixture"] in
+                ("integer-formats", "integer-spatial", "native-narrow")):
         buffers = oracle(row)
         specs, data = resource_specs(row), resource_buffers(row, buffers)
         operation = row["defines"]["SURFACE_OPERATION"]
         y = 0 if row["shape"] == 1 else 1
-        z = 1 if row["fixture"] == "integer-spatial" else 0
+        z = 1 if "volume_depth" in row or "array_layers" in row else 0
         require(len(specs) == 24 and len(data) == 24, "Integer format resource inventory changed")
         for resource in range(12):
             spec, result = specs[resource * 2], data[resource * 2]
@@ -974,14 +990,15 @@ def self_test():
                 damaged[untouched[0]] ^= 1
                 require(compare(row, buffers, resource * 2, damaged)["mismatch_count"] == 1,
                         "Untouched integer lane corruption was ignored")
-            # Original input differs from independent saturated stores, and every observed
+            # Original input differs from independent stores, and every observed
             # array contains widened input bits rather than narrowed-store readback.
             require(compare(row, buffers, resource * 2, result["initial"])["mismatch_count"] > 0,
                     "Integer store oracle permits a kernel that performs no stores")
             observed = data[resource * 2 + 1]
             require(compare(row, buffers, resource * 2 + 1, observed["initial"])["mismatch_count"] > 0,
                     "Integer load oracle permits a kernel that performs no loads")
-    for row in (x for x in cases() if x["fixture"] == "integer-spatial"):
+    for row in (x for x in cases() if x["fixture"] in ("integer-spatial", "native-narrow") and
+                ("volume_depth" in x or "array_layers" in x)):
         buffers = oracle(row)
         specs, data = resource_specs(row), resource_buffers(row, buffers)
         width, height = row["width"], row["height"]
@@ -1250,7 +1267,8 @@ def main():
                                 sha256=sha((provider / "libslang-llvm-nvvm.so").read_bytes())),
                   ptxas=dict(path=str(ptxas), sha256=sha(ptxas.read_bytes())),
                   semantic_contract="RN-even finite Half conversions; converted NaN class only; "
-                                    "explicit narrow integers extend on load and saturate on store; untouched bits exact",
+                                    "logical32 explicit narrow formats extend on load and saturate on store; "
+                                    "native narrow integer stores preserve bits; untouched bits exact",
                   requested_cells=len(rows) * len(args.modes), cells=[])
     for row in rows:
         source = REPO / "tests/cuda" / ("nvvm-surface-physical-" + row["fixture"] + ".slang")

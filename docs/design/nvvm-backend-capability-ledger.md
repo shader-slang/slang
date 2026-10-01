@@ -517,7 +517,13 @@ agree on load interpretation; out-of-range Vulkan storage-image encoding equival
 established. Normalized formats and mixed signedness remain excluded.
 The static annotation owns physical interpretation; opaque handles do not infer runtime formats.
 
-The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 106 cases,
+Native signed/unsigned 8/16-bit logical values support these same shapes and widths 1/2/4.
+Canonical format inference supplies matching integer formats; explicit annotations must match native
+width, signedness and channels. Native stores preserve bits without the logical32 clamp.
+[Native narrow fixtures](../../tests/cuda/nvvm-surface-physical-native-narrow.slang) independently
+observe original loads through 32-bit outputs before writing native marker bits.
+
+The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 121 cases,
 including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
 nonzero guards and zero-boundary accesses. Native signed/unsigned32 cases exercise 1D/2D scalar,
 two- and four-channel loads, whole stores and component stores with exact integer bits. Four mixed

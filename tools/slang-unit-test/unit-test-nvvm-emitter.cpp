@@ -11473,10 +11473,27 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
         SlangNVVMValueTypeKind kind;
         uint32_t width;
         uint32_t lanes;
+        bool native = false;
     };
     for (const auto& test :
          {IntegerCase{"rg8i", "int2", SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER, 8, 2},
-          IntegerCase{"rgba16ui", "uint4", SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, 4}})
+          IntegerCase{"rgba16ui", "uint4", SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, 4},
+          IntegerCase{nullptr, "int8_t", SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER, 8, 1, true},
+          IntegerCase{
+              "rg8ui",
+              "vector<uint8_t,2>",
+              SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+              8,
+              2,
+              true},
+          IntegerCase{
+              nullptr,
+              "vector<int16_t,4>",
+              SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+              16,
+              4,
+              true},
+          IntegerCase{"r16ui", "uint16_t", SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, 1, true}})
     {
         _resetDirectNVVMFakes();
         ComPtr<slang::IGlobalSession> session;
@@ -11485,20 +11502,26 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
-        source << "[format(\"" << test.format << "\")] RWTexture2D<" << test.type
-               << "> image; RWStructuredBuffer<" << test.type << "> output;" << R"SLANG(
+        if (test.format)
+            source << "[format(\"" << test.format << "\")] ";
+        source << "RWTexture2D<" << test.type << "> image; RWStructuredBuffer<" << test.type
+               << "> output;" << R"SLANG(
             [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             {
-                output[0] = image.Load(int2(tid.xy));
-                image[int2(tid.xy)] = output[1];
-            })SLANG";
+                let value = image.Load(int2(tid.xy));
+                output[0] = value;
+                image[int2(tid.xy)] = )SLANG"
+               << (test.native ? "value" : "output[1]") << "; }";
         ComPtr<slang::IBlob> code, diagnostics;
         const auto result =
             _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
         if (SLANG_FAILED(result))
+        {
+            getTestReporter()->message(TestMessageType::Info, source.getBuffer());
             getTestReporter()->message(
                 TestMessageType::Info,
                 _getBlobText(diagnostics).getBuffer());
+        }
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
         SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
         for (Index i = 0; i < 2; ++i)
@@ -11509,6 +11532,15 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
             SLANG_CHECK(access.elementType.kind == test.kind);
             SLANG_CHECK(access.elementType.bitWidth == test.width);
             SLANG_CHECK(access.elementType.laneCount == test.lanes);
+        }
+        if (test.native)
+        {
+            // Inferred and explicit matching formats preserve the native load's exact value.
+            // Inspect the store operand, not unrelated casts used by coordinates or observations.
+            const auto stored = gFakeNVVMBuilder.surfaceOperationOperands[1][2];
+            SLANG_CHECK(stored.kind == FakeNVVMBuilderValueKind::SurfaceOperation);
+            SLANG_CHECK(stored.index == 0);
+            continue;
         }
         bool sawWidening = false;
         for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
@@ -11834,7 +11866,15 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCre
          {RejectedFormat{"r8", "2D", "uint", "int2(0)"},
           RejectedFormat{"r8ui", "2D", "int", "int2(0)"},
           RejectedFormat{"rgba16i", "1DArray", "int3", "int2(0)"},
-          RejectedFormat{"rgba8ui", "3D", "uint3", "int3(0)"}})
+          RejectedFormat{"rgba8ui", "3D", "uint3", "int3(0)"},
+          RejectedFormat{"r8", "2D", "uint8_t", "int2(0)"},
+          RejectedFormat{"r8i", "2D", "uint8_t", "int2(0)"},
+          RejectedFormat{"r16i", "2D", "int8_t", "int2(0)"},
+          RejectedFormat{"r32ui", "2D", "uint8_t", "int2(0)"},
+          RejectedFormat{"r8i", "2D", "int16_t", "int2(0)"},
+          RejectedFormat{"r32ui", "2D", "uint16_t", "int2(0)"},
+          RejectedFormat{"rgba8i", "2D", "vector<int8_t,3>", "int2(0)"},
+          RejectedFormat{"r64ui", "2D", "uint64_t", "int2(0)"}})
     {
         _resetDirectNVVMFakes();
         ComPtr<slang::IGlobalSession> session;
