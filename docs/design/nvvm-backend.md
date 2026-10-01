@@ -188,12 +188,23 @@ Shared buffer-layout selection owns the layout; preflight queries its stride onc
 current function's root, exact pointer type and signed index in an offset plan. Emission uses global
 byte pointers, signed 64-bit scaling and non-inbounds byte offsets. Canonical `CastPtrToInt` observes
 the address as UInt64. Internal first-block helper parameters are conditional roots: every call
-checks the actual's exact type and entry/formal/planned-offset producer before the general type-match
+checks the actual's exact type and checked producer before the general type-match
 path, then checks availability and dominance. The existing finite direct-call closure validates all
 bodies before provider mutation. No interprocedural provenance walk or new pointer representation is
 needed. Foreign-function and block parameters cannot supply a root.
 
-This representation grants no record dereference, exported helper ABI, pointer result/storage or
+A direct field of a conventional constant buffer can store an address-only record pointer. Its role is
+separate from ordinary aggregate storage and from whole-group value representation. The checked
+field/load plan proves the buffer came from collected global parameters and retains the loaded
+pointer as a root; a pointer-shaped load alone does not prove
+its origin. The field load may occur in any current-function block when availability and dominance
+hold. The invariant flag protects the stored pointer field, not the memory reached through it.
+Pointer arrays and whole pointer-bearing group values remain outside this contract. Ordinary
+struct-storage admission is checked before cache lookup, including when a parameter-group request
+already populated the shared representation cache. Synthesized global structs retain their distinct
+producer-owned field rules.
+
+This representation grants no record dereference, exported helper ABI, pointer result, general storage or
 inverse integer conversion. Existing numeric pointer roles keep their own representations and
 exclude Std430 storage. The mandatory shared storage-lowering boundary rejects live Std430 types
 for actual CUDA source before layout operands can disappear; source capability upgrades alone do

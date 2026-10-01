@@ -82390,6 +82390,249 @@
         "last_targeted": "native-narrow-surfaces",
         "implementations_since_full": 17
       }
+    },
+    "nvvm-parameter-group-layout-pointers": {
+      "status": "accepted-focused",
+      "scope": "Direct immutable fields of conventional constant buffers may store Std430/Scalar/C Device address-only record pointers for checked loads, signed32 offsets, UInt64 observations and existing internal helper calls. Module43/providerABI46/container2 unchanged.",
+      "contract": "ParameterGroupStorage grants direct layout-pointer fields only. Ordinary records/arrays and whole-group values remain excluded. Load planning proves the direct collected-global cbuffer chain before selecting pointer alignment/root; current-function loads may be in later blocks under availability/dominance. Ordinary Storage roles are checked before cache lookup, preserving selected struct families and synthesized-global field policy.",
+      "identity": {
+        "revision": "b5d1bce66cb33a68c3c2e27382afbab6c1c29014",
+        "patch_sha256": "db6fb7e73f7cb9b5ae7cb18f5f00c00ab5b14b4515c29f9fc2199fe04222b54f",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm-plan.h": "fd397aad0e915ef3818b96eb1c70057a8915c4e49c01f4390a62f391c396a623",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "cd75f755af5ae072358fb46c9064ed77db890083d6981d2b1e6e893b751421cc",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "51921772b652a348351341781735f40d890f3d864945d67361c45cb79ee65e69",
+          "source/slang/slang-emit-nvvm.cpp": "3e358122b5ffffc1d521623346785eae4cc922cc76a95512186d45889a447eb4",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "8c3cbb47dc6ff2315d48f1351ff49c66a9e9b960dd6f4280f044b6aad7aba580",
+          "tools/slang-static-unit-test/unit-test-nvvm-type-lowering.cpp": "4a6dc9283d19478a6cee4a166ed679941be78091f6e06fbfee466fb805c8e032",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "eacdb38c66a34c04e6742738c0f6b0223ddc74f2ab02731e7a6fd92ea392b39a",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "a90482dc0eaf208426a42f193eb2ba14de4b7c53199560ad9433f63a7c7d168c",
+          "tests/cuda/nvvm-parameter-group-layout-pointers.slang": "80e53fecd4852d91e06a51adf362698714032de14f406c34236aa6bb2e5d4559"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "3289d7dab3835de10d92e9d65ff4bf579bb0fcc35d2e6fe47a6c40f8205c7712",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "0b978e33bb0276082c893911a2b8183c9823718a2a342d4e4ac7c8d964bac833",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "10211846727ac9b785444fcd1a2070d9d9dbf580befe11957d6d36e636dfdc44"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-parameter-group-layout-pointers/build-cache-fix.json",
+        "sha256": "6f7942f67f2d5497e55a3e562a35ebdc7fcbccbd411c8e2210ef205182584f5c"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/units-cache-final.json",
+            "sha256": "c2b4af8355049116588111b9484441bd59db1df65dc57ff7a1e8651826e190ec"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangMatrixMemoryUsesSequentialPointerContract.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLoadedParameterGroupValueUsesExactImmutablePointer.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangConventionalSamplerStorageUsesDirectPipeline.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangResourceStructsCrossLocalAndHelperBoundaries.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangAggregateValueArraysAndMutableHelpersUseGenericOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangParameterGroupLayoutPointersUseCheckedLoads.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLayoutPointersUseCheckedByteOffsets.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal": "passed"
+          },
+          "counts": {
+            "passed": 8
+          }
+        },
+        "compile_diagnostics": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/compile-final.json",
+            "sha256": "3788aa8228f41c668b0595fcfe159646d4960913ad442b17ff863d15b6aa5068"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-layout-pointer-helpers.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-helpers.slang.1": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.3": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.4": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.5": "passed",
+            "tests/cuda/nvvm-parameter-group-layout-pointers.slang": "passed",
+            "tests/cuda/nvvm-parameter-group-layout-pointers.slang.1": "passed",
+            "tests/cuda/nvvm-std430-pointer-transport.slang": "passed",
+            "tests/cuda/nvvm-std430-pointer-transport.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 12
+          }
+        },
+        "static": {
+          "build": {
+            "path": "build/nvvm-parameter-group-layout-pointers/build-static-cache-fix.json",
+            "sha256": "8f763c7edad9f315e4a188adc16b1958d327565902f89ae9ea0609f819b822a6"
+          },
+          "identity": {
+            "path": "build/nvvm-parameter-group-layout-pointers/static-tested-identity.json",
+            "sha256": "537d2d084c11774bd8daa32ea074f4875edca0eb5042a63849f05d6f262ed118"
+          },
+          "new": {
+            "path": "build/nvvm-parameter-group-layout-pointers/static-final.json",
+            "sha256": "0f5114983df03a1eff3c6f17b9b10fd77927fe035cd6578ed1b37437cc1c28ec"
+          },
+          "helper_control": {
+            "path": "build/nvvm-parameter-group-layout-pointers/static-helper-control.json",
+            "sha256": "5392e1849ac81dd18eaa3cb935ebb1e9f3f04a7746d6ae3b8ee5ac5b9bf68ac2"
+          },
+          "storage_controls": {
+            "path": "build/nvvm-parameter-group-layout-pointers/static-storage-controls.json",
+            "sha256": "e187c6a3938b776145767162da665e031c92ee0d65d05f25ec85c90d9735ad4d"
+          },
+          "outcomes": {
+            "nvvmParameterGroupLayoutPointerLoadsKeepCheckedRoots": "passed",
+            "nvvmParameterGroupLayoutPointerStorageKeepsRolesSeparate": "passed",
+            "nvvmLayoutPointerHelpersCheckEveryCallProducer": "passed",
+            "nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder": "passed",
+            "nvvmLocalRecordArrayAddressesRequireLocalProducer": "passed"
+          },
+          "scope": "Three layouts reject forbidden roles before/after shared cache population; later-block direct root accepted, same-typed nested group load rejected before acquiring root; existing every-call/local-array controls preserved."
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/runtime-final.json",
+            "sha256": "c5ce2ac39d385e953ba0e909d0fc3701b08e0163cc20dfd9ca55162801bd61f1"
+          },
+          "results": {
+            "path": "build/nvvm-parameter-group-layout-pointers/runtime-final-results.json",
+            "sha256": "bd71f45e6a0c4fe67609c2f25ebafbf8a04c689211380d02fbd8dd8fc8f3e413"
+          },
+          "passed_cases": 8,
+          "indices": [-1, 0, 1, 2],
+          "strides": [64, 48, 40],
+          "scope": "Three1024-byte initialized allocations, interior aligned bases and two checked offset steps; all128 output words and3072 input bytes exact, plus24-byte cbuffer and8-byte global pointer unchanged."
+        },
+        "binding": {
+          "path": "build/nvvm-parameter-group-layout-pointers/binding-gate.json",
+          "sha256": "d1a30fe9d5260049b7734ee1d2511433d6a1c374b37bb0de5cfeea39e8ed118d"
+        },
+        "ptx": {
+          "path": "build/nvvm-parameter-group-layout-pointers/code-inspection-final.json",
+          "sha256": "0cada79e28d81329a552429310b9249bcbb77dcc0cfb0ff5c74396c8b03fd535"
+        },
+        "source": {
+          "path": "tests/cuda/nvvm-parameter-group-layout-pointers.slang",
+          "sha256": "80e53fecd4852d91e06a51adf362698714032de14f406c34236aa6bb2e5d4559"
+        },
+        "host": {
+          "path": "build/nvvm-parameter-group-layout-pointers/run-pointer-transport.py",
+          "sha256": "79a49be09f53d41cef3b4ee3bee6d6d517c118ba1f0909c9ba03a41bde4606d5"
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-parameter-group-layout-pointers/before-nvvm.json",
+          "sha256": "eb9db17603e234745592ee7e96ef7432f3b47cd05e6e88ac922259ac694c79df"
+        },
+        "transition": "Dedicated fixture E52017 cbuffer field-address/noPTX to strict O0/O3 compile and eight allocated runtime passes. Six noinline helpers/calls retained. Original corpus row is not resolved."
+      },
+      "validation_incidents": {
+        "load_admission": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/units.json",
+            "sha256": "e8580de4421f775263341993e8e65998604ed16fb0c6d11ee003ce11779f3d5a"
+          },
+          "identity": {
+            "path": "build/nvvm-parameter-group-layout-pointers/initial-tested-identity.json",
+            "sha256": "e4168b390fed909151255fced69fe9dcff96e6c4e28565f55a0aee652099857a"
+          },
+          "history": "3/4 shared units passed; positive exposed missing load-result type/alignment admission. Moved existing result gate into fallible checked load planner after direct root proof, granting8-byte alignment only to that load."
+        },
+        "fake_struct": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/units-fix.json",
+            "sha256": "9d6c90b6a328f83e771f262be9d9cdd278bbd598ddf3740071e2735e8132bea0"
+          },
+          "identity": {
+            "path": "build/nvvm-parameter-group-layout-pointers/production-tested-identity.json",
+            "sha256": "fd5f9f9ddb99422a7033b91ec0fa27f802dbbf8d4d5cf213eeab04ea71aa5f43"
+          },
+          "history": "3/4 shared units passed; E52018 struct-type error was fake-only while real O0/O3 compiled. Existing fake scalar-pointer fields and outer parameter-group resource pointer now use separate existing record tables; typed assertions retained.",
+          "retry": {
+            "path": "build/nvvm-parameter-group-layout-pointers/units-final.json",
+            "sha256": "b556b03a9009819438059f6bf889d4d10c34f15c5fe8bae35fc2eb006da95349"
+          },
+          "historical_reuse": {
+            "path": "build/nvvm-parameter-group-layout-pointers/production-reuse.json",
+            "sha256": "ab7b9433f590173a8d0a53349c7fc713d96732c509113c40fa2b4b822214a22d"
+          }
+        },
+        "cache_admission": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/static-new.json",
+            "sha256": "64bff31ffd5a91e06722fef174e0c4b25bd2bb9fd280a4d91b62c67107ea82df"
+          },
+          "identity": {
+            "path": "build/nvvm-parameter-group-layout-pointers/initial-static-tested-identity.json",
+            "sha256": "c110b9a11f27e15d03f38c59fa78a03d6243b23141a63b66c70acc09ea096839"
+          },
+          "history": "1/2 static units passed. Raw struct Storage acceptance let a prior ParameterGroupStorage representation bypass field-role rejection. Corrected supports(Storage) using existing selected struct families and producer-marked conventional globals; exact null/failure assertions retained.",
+          "retry": {
+            "path": "build/nvvm-parameter-group-layout-pointers/static-final.json",
+            "sha256": "0f5114983df03a1eff3c6f17b9b10fd77927fe035cd6578ed1b37437cc1c28ec"
+          }
+        }
+      },
+      "retained_failures": {
+        "original_fixture": {
+          "gate": {
+            "path": "build/nvvm-parameter-group-layout-pointers/original-final-compile-only.json",
+            "sha256": "e68db783b099c577b4902ea1e0e24f19738023ffa3df767943532208dcb40dae"
+          },
+          "prior": {
+            "path": "build/nvvm-layout-pointer-helpers/original-nvvm-compile-only.json",
+            "sha256": "9ea10a4e4ed9c62b6525577fe5df35306917713ed1477b16f9d5c4b90f51d611"
+          },
+          "transition": "Original data-layouts source advances from cbuffer field address to E52017 pointer-to-UInt64 bitCast; unspecified bindings never executed. No reinterpret/AnyValue qualification."
+        },
+        "cuda": "Existing six CUDA Std430 rejection cells still pass; earlier Scalar stride40 vs48 difference retained."
+      },
+      "preservation": {
+        "prior_feature_count": 59,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "provider_binary_unchanged": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40"
+      },
+      "limitations": [
+        "No record dereference, whole pointer-bearing value/helper result, ordinary pointer storage, pointer arrays, arbitrary nested loaded root, inverse integer cast or AnyValue expansion.",
+        "Invariant applies to the cbuffer pointer field, not its pointee.",
+        "Focused SM80 correctness; no full campaign or performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "parameter-group-layout-pointers",
+        "implementations_since_full": 18
+      },
+      "stopping_condition": "Maintainer requested finishing this slice then stopping for discussion. No automatic next feature."
     }
   }
 }

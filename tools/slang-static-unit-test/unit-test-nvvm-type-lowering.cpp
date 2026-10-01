@@ -136,3 +136,80 @@ SLANG_UNIT_TEST(nvvmHalfHelperABIClassifierUsesExactValueTypes)
         SLANG_CHECK(getNVVMHalfHelperABILaneCount(array) == 0);
     }
 }
+
+// Parameter-group storage may contain direct pointer fields without creating a value ABI for
+// their enclosing record. Cache order must not authorize ordinary storage or helper values.
+SLANG_UNIT_TEST(nvvmParameterGroupLayoutPointerStorageKeepsRolesSeparate)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    auto record = ir.createStructType();
+    ir.createStructField(record, ir.createStructKey(), ir.getUIntType());
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    const NVVMTypeUse forbidden[] = {
+        NVVMTypeUse::Value,
+        NVVMTypeUse::Storage,
+        NVVMTypeUse::HelperValue,
+        NVVMTypeUse::HelperParameter,
+        NVVMTypeUse::HelperResult,
+        NVVMTypeUse::StructuredBufferStorage,
+    };
+    for (auto layoutOp :
+         {kIROp_Std430BufferLayoutType, kIROp_ScalarBufferLayoutType, kIROp_CBufferLayoutType})
+    {
+        auto pointer = ir.getPtrType(
+            record,
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            ir.getType(layoutOp));
+        auto fields = ir.createStructType();
+        ir.createStructField(fields, ir.createStructKey(), pointer);
+        auto nested = ir.createStructType();
+        ir.createStructField(nested, ir.createStructKey(), fields);
+        auto pointerArray =
+            ir.getArrayTypeBase(kIROp_ArrayType, pointer, ir.getIntValue(ir.getIntType(), 2));
+        auto recordArray =
+            ir.getArrayTypeBase(kIROp_ArrayType, fields, ir.getIntValue(ir.getIntType(), 2));
+        SLANG_CHECK(isNVVMSupportedParameterGroupElementStorageType(fields));
+        SLANG_CHECK(!hasNVVMParameterGroupStorageValueRepresentation(fields));
+        for (IRType* excluded :
+             {static_cast<IRType*>(nested),
+              static_cast<IRType*>(pointerArray),
+              static_cast<IRType*>(recordArray)})
+            SLANG_CHECK(!isNVVMSupportedParameterGroupElementStorageType(excluded));
+
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &provider;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            provider.createModule(toSlice("parameter-group-pointer-roles"), scope.module)));
+        NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+        for (Index pass = 0; pass < 2; ++pass)
+        {
+            for (auto use : forbidden)
+            {
+                SlangNVVMTypeHandle actual = nullptr;
+                const auto result = lowering.lowerType(fields, use, actual);
+                if (SLANG_SUCCEEDED(result) || actual)
+                {
+                    StringBuilder message;
+                    message << "layout " << getIROpInfo(layoutOp).name << ", role " << int(use)
+                            << ", cache pass " << pass;
+                    getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+                }
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(actual == nullptr);
+            }
+            SlangNVVMTypeHandle storage = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                lowering.lowerType(fields, NVVMTypeUse::ParameterGroupStorage, storage)));
+            SLANG_CHECK(storage != nullptr);
+            SlangNVVMTypeHandle leaf = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                lowering.lowerType(pointer, NVVMTypeUse::ParameterGroupStorage, leaf)));
+            SLANG_CHECK(leaf != nullptr);
+        }
+    }
+}

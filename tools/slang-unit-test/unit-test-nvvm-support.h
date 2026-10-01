@@ -3441,7 +3441,13 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
                 vectorElementCount,
                 vectorElementTypeKind) &&
             vectorElementTypeKind != FakeNVVMBuilderScalarTypeKind::Boolean;
-        isCopyableStruct = fieldTypes[i] == _getFakeNVVMBuilderBooleanType() ||
+        // Pointer fields have an existing typed load representation. Keep their enclosing
+        // record separate from the collected globals that hold its parameter-group handle.
+        const bool isScalarPointer = fieldTypes[i] == _getFakeNVVMBuilderPointerType() ||
+                                     fieldTypes[i] == _getFakeNVVMBuilderHalfPointerType() ||
+                                     fieldTypes[i] == _getFakeNVVMBuilderFloatPointerType() ||
+                                     fieldTypes[i] == _getFakeNVVMBuilderDoublePointerType();
+        isCopyableStruct = isScalarPointer || fieldTypes[i] == _getFakeNVVMBuilderBooleanType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderIntegerType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderHalfType() ||
                            fieldTypes[i] == _getFakeNVVMBuilderFloatType() ||
@@ -3455,7 +3461,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderGetStructType(
         FakeNVVMBuilderScalarTypeKind globalResourceElementTypeKind;
         FakeNVVMBuilderScalarTypeKind pointerElementTypeKind;
         FakeNVVMBuilderScalarTypeKind fieldTypeKind;
-        if (_getFakeNVVMBuilderResourceViewElementTypeKind(
+        if (fieldTypes[i] == _getFakeNVVMBuilderScalarStructPointerType() ||
+            _getFakeNVVMBuilderResourceViewElementTypeKind(
                 fieldTypes[i],
                 globalResourceElementTypeKind))
         {

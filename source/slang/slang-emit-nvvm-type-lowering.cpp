@@ -341,7 +341,8 @@ IRVectorType* asNVVMSupportedCompactParameterGroupVectorType(IRInst* type)
 static bool _isNVVMSupportedAggregateStorageType(
     IRInst* type,
     HashSet<IRInst*>& activeTypes,
-    bool allowZeroStateStructs);
+    bool allowZeroStateStructs,
+    bool allowLayoutPointerFields = false);
 
 static IRArrayType* _asNVVMSupportedAggregateStorageArrayType(
     IRInst* type,
@@ -403,8 +404,11 @@ IRArrayType* asNVVMSupportedAggregateStorageArrayType(IRInst* type, uint32_t* ou
 static bool _isNVVMSupportedAggregateStorageType(
     IRInst* type,
     HashSet<IRInst*>& activeTypes,
-    bool allowZeroStateStructs)
+    bool allowZeroStateStructs,
+    bool allowLayoutPointerFields)
 {
+    if (allowLayoutPointerFields && asNVVMSupportedLayoutTransportPointerType(type))
+        return true;
     if (isNVVMSupportedIntegerScalarType(type) || isNVVMBoolType(type) || isNVVMFloat16Type(type) ||
         isNVVMFloat32Type(type) || asNVVMSupported32BitNumericVectorType(type) ||
         asNVVMSupportedCompactParameterGroupVectorType(type))
@@ -448,6 +452,7 @@ static bool _isNVVMSupportedAggregateStorageType(
         const bool isSupported = _isNVVMSupportedAggregateStorageType(
             parameterGroupType->getElementType(),
             activeTypes,
+            true,
             true);
         activeTypes.remove(type);
         return isSupported;
@@ -475,7 +480,9 @@ static bool _isNVVMSupportedAggregateStorageType(
         if (!_isNVVMSupportedAggregateStorageType(
                 field->getFieldType(),
                 activeTypes,
-                allowZeroStateStructs))
+                allowZeroStateStructs,
+                allowLayoutPointerFields &&
+                    asNVVMSupportedLayoutTransportPointerType(field->getFieldType())))
         {
             activeTypes.remove(type);
             return false;
@@ -502,10 +509,11 @@ bool isNVVMSupportedParameterGroupElementStorageType(IRInst* type)
     //
     // CUDA global-parameter collection retains a pointer to `Parameters`, so its pointee needs an
     // exact provider type even though the nested `Empty` field contributes no bytes. Start the
-    // recursive storage proof with the parameter-group-only zero-state permission; the ordinary
-    // aggregate entry point above deliberately starts the same proof without that permission.
+    // recursive storage proof with parameter-group-only permissions. Layout-pointer leaves may
+    // occur directly in its record fields; nested ordinary records and arrays do not inherit that
+    // permission. Nested parameter groups remain pointer leaves with their own storage context.
     HashSet<IRInst*> activeTypes;
-    return _isNVVMSupportedAggregateStorageType(type, activeTypes, true);
+    return _isNVVMSupportedAggregateStorageType(type, activeTypes, true, true);
 }
 
 IRStructType* asNVVMSupportedAggregateStorageStructType(IRInst* type)
@@ -2016,7 +2024,10 @@ static bool _hasNVVMParameterGroupStorageValueRepresentation(
 
     // A UserPointer leaf is intentionally global in parameter-group storage and generic as an
     // ordinary value. Whole-value loads need an explicit conversion before that family is legal.
-    if (!type || asNVVMSupportedDeviceCopyableValuePointerType(type) || activeTypes.contains(type))
+    // Layout-pointer fields are address-only even though their storage and value LLVM types agree.
+    // Their admission does not authorize whole pointer-bearing record loads or helper values.
+    if (!type || asNVVMSupportedDeviceCopyableValuePointerType(type) ||
+        asNVVMSupportedLayoutTransportPointerType(type) || activeTypes.contains(type))
     {
         return false;
     }
@@ -2509,7 +2520,7 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 
     if (layoutTransportPointer)
         return use == NVVMTypeUse::EntryPointParameter || use == NVVMTypeUse::Value ||
-               use == NVVMTypeUse::HelperParameter;
+               use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::ParameterGroupStorage;
 
     // Scalar BF16 has a qualified i16 representation in local and helper roles only.
     // Do not add it to recursive copyable/storage predicates: that would also admit
@@ -2552,8 +2563,28 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                isSurface || isSampledTexture || samplerValue || resourceElementPointer ||
                sharedElementPointer || sharedHelperPointer || atomicType;
     case NVVMTypeUse::Storage:
+        if (structType)
+        {
+            // A parameter-group request may already have cached this exact struct. Prove its
+            // ordinary storage role independently before any representation cache lookup.
+            if (isHelperValue || resourceStructType || physicalArrayStructType ||
+                asNVVMSupportedAggregateStorageStructType(structType))
+                return true;
+            // Collected globals have a distinct producer-owned field algebra, including physical
+            // device pointers and unsized sampler arrays. Reuse that policy for this marked record.
+            if (!structType->findDecoration<IRSynthesizedParameterGroupDecoration>())
+                return false;
+            bool hasField = false;
+            for (auto field : structType->getFields())
+            {
+                if (!isNVVMSupportedConventionalGlobalFieldType(field))
+                    return false;
+                hasField = true;
+            }
+            return hasField;
+        }
         return isInteger || isFloat32 || isFloat16 || numeric32VectorType ||
-               compactParameterGroupVectorType || structType || aggregateStorageArrayType ||
+               compactParameterGroupVectorType || aggregateStorageArrayType ||
                deviceCopyablePointer || devicePhysicalStoragePointer || isRawBuffer ||
                parameterGroup || isSurface || isSampledTexture || samplerStorage ||
                unsizedSamplerArrayStorage || atomicType || descriptorHandle;

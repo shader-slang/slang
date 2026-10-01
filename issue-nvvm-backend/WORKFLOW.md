@@ -36,6 +36,10 @@ restore full campaigns after every small change. Preserve exact failures, rerun 
 after fixes, and complete the checkpoint before returning to bounded reviewed feature batches.
 Continue until a recorded stopping condition actually requires human input.
 
+The maintainer added a stopping condition on 2026-10-01: finish the current parameter-group
+layout-pointer slice, including focused validation and reviewed local commit, then stop for
+discussion. Do not resume feature selection or implementation without a new maintainer instruction.
+
 Use one implementation owner and an independent reviewer when available. The lead owns scope,
 acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight
 build jobs** on the upgraded eight-CPU host. Use focused test selections and existing runners;

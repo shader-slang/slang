@@ -5766,6 +5766,73 @@ SLANG_UNIT_TEST(nvvmSlangPreservesFunctionContracts)
     SLANG_CHECK(gFakeNVVM.liveLibraryCount == 0);
 }
 
+SLANG_UNIT_TEST(nvvmSlangParameterGroupLayoutPointersUseCheckedLoads)
+{
+    _resetDirectNVVMFakes();
+    ComPtr<slang::IGlobalSession> session;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+    session->setSharedLibraryLoader(loader);
+    const char* source = R"SLANG(
+        struct A { uint64_t f0; uint f1; };
+        struct B { float3 f; };
+        struct C { A a; uint test1; B b; uint test2; bool c; bool d; bool e; };
+        cbuffer Globals
+        {
+            LayoutPtr<C, Std430DataLayout> d;
+            LayoutPtr<C, ScalarDataLayout> s;
+            LayoutPtr<C, CDataLayout> c;
+        }
+        [CUDAKernel] void computeMain(uniform int index, uniform Ptr<uint64_t> output)
+        {
+            output[0] = uint64_t(d + index);
+            output[1] = uint64_t(s + index);
+            output[2] = uint64_t(c + index);
+        }
+    )SLANG";
+    ComPtr<slang::IBlob> code, diagnostics;
+    const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+    if (SLANG_FAILED(result))
+        getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(code != nullptr);
+    SLANG_CHECK_ABORT(gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() == 3);
+    SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 3);
+    const int64_t strides[] = {64, 48, 40};
+    for (Index offset = 0; offset < 3; ++offset)
+    {
+        const auto base = gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs[offset];
+        SLANG_CHECK_ABORT(base.kind == FakeNVVMBuilderValueKind::Load);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[base.index] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+        const auto field = gFakeNVVMBuilder.loadPointerValueRefs[base.index];
+        SLANG_CHECK_ABORT(field.kind == FakeNVVMBuilderValueKind::StructFieldPointer);
+        const auto layoutIndex = gFakeNVVMBuilder.structFieldPointerIndices[field.index];
+        SLANG_CHECK_ABORT(layoutIndex < 3);
+        const auto group = gFakeNVVMBuilder.structFieldPointerBaseValueRefs[field.index];
+        SLANG_CHECK_ABORT(group.kind == FakeNVVMBuilderValueKind::Load);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[group.index] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+        const auto scaled = gFakeNVVMBuilder.byteOffsetPointerOffsetValueRefs[offset];
+        SLANG_CHECK_ABORT(scaled.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+        const auto& multiply = gFakeNVVMBuilder.scalarOperations[scaled.index];
+        SLANG_CHECK(multiply.key.operation == SLANG_NVVM_VALUE_OP_MULTIPLY);
+        SLANG_CHECK_ABORT(multiply.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant);
+        SLANG_CHECK(
+            gFakeNVVMBuilder.integerConstantValues[multiply.operands[1].index] ==
+            strides[layoutIndex]);
+        SLANG_CHECK_ABORT(multiply.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+        const auto& widen = gFakeNVVMBuilder.scalarOperations[multiply.operands[0].index];
+        SLANG_CHECK(widen.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
+        SLANG_CHECK(NVVMSemantics::areSameType(widen.resultType, NVVMSemantics::kSignedI64));
+        SLANG_CHECK(NVVMSemantics::areSameType(widen.operandTypes[0], NVVMSemantics::kSignedI32));
+        const auto stored = gFakeNVVMBuilder.storeValueRefs[layoutIndex];
+        SLANG_CHECK_ABORT(stored.kind == FakeNVVMBuilderValueKind::BitCast);
+        const auto pointer = gFakeNVVMBuilder.bitCastValueRefs[stored.index];
+        SLANG_CHECK(pointer.kind == FakeNVVMBuilderValueKind::ByteOffsetPointer);
+        SLANG_CHECK(pointer.index == offset);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
 {
     _resetDirectNVVMFakes();
@@ -5974,6 +6041,27 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission)
             [CUDAKernel] void computeMain(
                 uniform Ptr<R, Access::ReadWrite, AddressSpace::GroupShared, Std430DataLayout> p,
                 uniform Ptr<uint64_t> output) { output[0] = uint64_t(p); }
+        )SLANG",
+        R"SLANG(
+            struct R { float3 value; bool flag; };
+            struct Fields { LayoutPtr<R, SelectedLayout> pointer; };
+            ConstantBuffer<Fields> input;
+            [noinline] uint64_t observe(Fields value) { return uint64_t(value.pointer); }
+            [CUDAKernel] void computeMain(uniform Ptr<uint64_t> output)
+            { output[0] = observe(input); }
+        )SLANG",
+        R"SLANG(
+            struct R { float3 value; bool flag; };
+            struct Fields { LayoutPtr<R, SelectedLayout> pointer; };
+            StructuredBuffer<Fields> input;
+            [CUDAKernel] void computeMain(uniform Ptr<uint64_t> output)
+            { output[0] = uint64_t(input[0].pointer); }
+        )SLANG",
+        R"SLANG(
+            struct R { float3 value; bool flag; };
+            cbuffer Globals { LayoutPtr<R, SelectedLayout> pointers[2]; }
+            [CUDAKernel] void computeMain(uniform int index, uniform Ptr<uint64_t> output)
+            { output[0] = uint64_t(pointers[index]); }
         )SLANG",
     };
     for (const char* sourceBody : sources)

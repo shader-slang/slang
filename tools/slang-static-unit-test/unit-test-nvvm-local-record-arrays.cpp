@@ -50,6 +50,99 @@ struct LocalRecordArrayIR
 
 } // namespace
 
+// A loaded pointer is a root only when checked records prove the direct conventional-cbuffer
+// chain. Loads need not be in the first block; unrelated nested group loads stay unqualified.
+SLANG_UNIT_TEST(nvvmParameterGroupLayoutPointerLoadsKeepCheckedRoots)
+{
+    for (bool nested : {false, true})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto record = builder.createStructType();
+        builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+        auto pointer = builder.getPtrType(
+            record,
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            builder.getType(kIROp_ScalarBufferLayoutType));
+        auto fields = builder.createStructType();
+        auto pointerField = builder.createStructField(fields, builder.createStructKey(), pointer);
+        auto groupType = builder.getType(kIROp_ConstantBufferType, fields);
+        IRStructField* nestedField = nullptr;
+        IRType* outerGroupType = groupType;
+        if (nested)
+        {
+            auto wrapper = builder.createStructType();
+            nestedField = builder.createStructField(wrapper, builder.createStructKey(), groupType);
+            outerGroupType = builder.getType(kIROp_ConstantBufferType, wrapper);
+        }
+        auto globals = builder.createStructType();
+        builder.addSynthesizedParameterGroupDecoration(globals);
+        auto groupField =
+            builder.createStructField(globals, builder.createStructKey(), outerGroupType);
+        auto global = builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        auto first = builder.emitBlock();
+        auto body = builder.createBlock();
+        builder.emitBranch(body);
+        builder.insertBlock(body);
+        auto groupAddress = builder.emitFieldAddress(global, groupField->getKey());
+        auto group = builder.emitLoad(outerGroupType, groupAddress);
+        if (nested)
+            group =
+                builder.emitLoad(groupType, builder.emitFieldAddress(group, nestedField->getKey()));
+        auto fieldAddress = builder.emitFieldAddress(group, pointerField->getKey());
+        auto loaded = builder.emitLoad(pointer, fieldAddress);
+        auto offset =
+            builder.emitGetOffsetPtr(loaded, builder.getIntValue(builder.getIntType(), 1));
+        builder.emitIntrinsicInst(builder.getUInt64Type(), kIROp_CastPtrToInt, 1, &offset);
+        builder.emitReturn();
+        SLANG_CHECK(loaded->getParent() != first);
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const auto text = context.sink.outputBuffer.getUnownedSlice();
+        if ((!nested && SLANG_FAILED(result)) ||
+            (nested && text.indexOf(toSlice("load result type")) < 0))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        if (nested)
+        {
+            SLANG_CHECK(SLANG_FAILED(result));
+            SLANG_CHECK(text.indexOf(toSlice("load result type")) >= 0);
+        }
+        else
+        {
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            bool sawRoot = false;
+            for (const auto& load : requirements.emissionPlan.loads)
+                if (load.source == loaded)
+                {
+                    sawRoot = true;
+                    SLANG_CHECK(load.isLayoutPointerRoot);
+                    SLANG_CHECK(load.flags == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+                }
+            SLANG_CHECK(sawRoot);
+            SLANG_CHECK(requirements.emissionPlan.layoutPointerOffsets[offset].root == loaded);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
 // A valid first call does not establish provenance for later actuals of the same canonical type.
 SLANG_UNIT_TEST(nvvmLayoutPointerHelpersCheckEveryCallProducer)
 {

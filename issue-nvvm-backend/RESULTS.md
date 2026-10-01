@@ -806,6 +806,7 @@ build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-re
   tests/cuda/nvvm-layout-pointer-transport.slang \
   tests/cuda/nvvm-std430-pointer-transport.slang \
   tests/cuda/nvvm-layout-pointer-helpers.slang \
+  tests/cuda/nvvm-parameter-group-layout-pointers.slang \
   tests/cuda/nvvm-layout-pointer-transport-unsupported.slang
 ```
 
@@ -836,6 +837,16 @@ checks the nested helper's independent offset. Require the second-step address t
 and aligned. Both O0/O3 outputs must retain the six specialized helper bodies and their calls;
 `[noinline]` is the recognized attribute. The first probe's unknown `[__noinline]` warnings and
 corrected before capture are retained as a fixture incident.
+
+Parameter-group qualification uses `tests/cuda/nvvm-parameter-group-layout-pointers.slang` and
+`build/nvvm-parameter-group-layout-pointers/run-pointer-transport.py`. The three pointer values move
+into a separately allocated 24-byte buffer, at offsets 0/8/16 and alignment 8. The eight-byte
+`SLANG_globalParams` symbol holds that buffer's address; only index:i32 and output:u64 remain
+kernel parameters. Verify reflection and emitted LLVM/PTX against this binding before launch.
+Reuse the eight allocated helper cases, additionally requiring every parameter-buffer byte and the
+module-global pointer to remain unchanged. Invariant pointer-field loads do not permit record
+loads. Keep whole-group value, ordinary storage, pointer-array and unproven-root negatives, with
+role checks before/after representation-cache population and preflight no-mutation assertions.
 
 Run the direct static `nvvmLayoutPointerHelpersCheckEveryCallProducer` test in the existing isolated
 static build, alongside the two `nvvmLocalRecordArray` controls. It places a same-typed unapproved

@@ -507,7 +507,9 @@ bool _getNVVMStructFieldAddress(
                (outAddress.isLocalSubstandardRecordStorage && asNVVMBFloat16VectorType(fieldType));
     }
 
-    return isNVVMSupportedAggregateStorageType(fieldType);
+    return isNVVMSupportedAggregateStorageType(fieldType) ||
+           (outAddress.isParameterGroupStorage &&
+            asNVVMSupportedLayoutTransportPointerType(fieldType));
 }
 
 IRVectorType* _getNVVMLocalBFloat16VectorPointer(const NVVMAddressPlan& addresses, IRInst* pointer)
@@ -1486,7 +1488,7 @@ bool _getNVVMAggregateStorageLayout(
     IRType* type,
     IRSizeAndAlignment& outLayout,
     IRTypeLayout* canonicalTypeLayout = nullptr,
-    bool allowZeroStateStructs = false,
+    bool isParameterGroupStorage = false,
     bool allowLocalSubstandardRecords = false)
 {
     outLayout = {};
@@ -1536,7 +1538,7 @@ bool _getNVVMAggregateStorageLayout(
     }
 
     IRArrayType* arrayType =
-        allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(type)
+        isParameterGroupStorage && isNVVMSupportedParameterGroupElementStorageType(type)
             ? as<IRArrayType>(type)
             : asNVVMSupportedAggregateStorageArrayType(type);
     if (!arrayType && allowLocalSubstandardRecords)
@@ -1554,7 +1556,7 @@ bool _getNVVMAggregateStorageLayout(
                     arrayType->getElementType(),
                     elementLayout,
                     canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr,
-                    allowZeroStateStructs,
+                    isParameterGroupStorage,
                     allowLocalSubstandardRecords))
             {
                 return false;
@@ -1579,9 +1581,9 @@ bool _getNVVMAggregateStorageLayout(
                 arrayType->getElementType(),
                 elementLayout,
                 canonicalArrayLayout ? canonicalArrayLayout->getElementTypeLayout() : nullptr,
-                allowZeroStateStructs,
+                isParameterGroupStorage,
                 allowLocalSubstandardRecords) ||
-            (elementLayout.size <= 0 && !(allowZeroStateStructs && elementLayout.size == 0)) ||
+            (elementLayout.size <= 0 && !(isParameterGroupStorage && elementLayout.size == 0)) ||
             elementLayout.alignment <= 0)
         {
             return false;
@@ -1608,7 +1610,7 @@ bool _getNVVMAggregateStorageLayout(
     }
 
     IRStructType* structType =
-        allowZeroStateStructs && isNVVMSupportedParameterGroupElementStorageType(type)
+        isParameterGroupStorage && isNVVMSupportedParameterGroupElementStorageType(type)
             ? as<IRStructType>(type)
             : asNVVMSupportedAggregateStorageStructType(type);
     if (!structType && allowLocalSubstandardRecords)
@@ -1635,9 +1637,9 @@ bool _getNVVMAggregateStorageLayout(
                     field->getFieldType(),
                     fieldLayout,
                     canonicalFieldLayout ? canonicalFieldLayout->getTypeLayout() : nullptr,
-                    allowZeroStateStructs,
+                    isParameterGroupStorage,
                     allowLocalSubstandardRecords) ||
-                (fieldLayout.size <= 0 && !(allowZeroStateStructs && fieldLayout.size == 0)) ||
+                (fieldLayout.size <= 0 && !(isParameterGroupStorage && fieldLayout.size == 0)) ||
                 fieldLayout.alignment <= 0)
             {
                 return false;
@@ -1692,7 +1694,8 @@ bool _getNVVMAggregateStorageLayout(
         getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
         asNVVMSupportedSamplerStorageType(type) ||
         asNVVMSupportedDeviceCopyableValuePointerType(type) ||
-        asNVVMSupportedDevicePhysicalStoragePointerType(type))
+        asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
+        (isParameterGroupStorage && asNVVMSupportedLayoutTransportPointerType(type)))
     {
         outLayout.size = kNVVMPointerAlignment;
         outLayout.alignment = kNVVMPointerAlignment;
@@ -1717,7 +1720,7 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
     CodeGenContext* codeGenContext,
     IRType* type,
     IRTypeLayout* canonicalTypeLayout = nullptr,
-    bool allowZeroStateStructs = false,
+    bool isParameterGroupStorage = false,
     bool allowLocalSubstandardRecords = false)
 {
     IRSizeAndAlignment providerLayout;
@@ -1727,7 +1730,7 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
             type,
             providerLayout,
             canonicalTypeLayout,
-            allowZeroStateStructs,
+            isParameterGroupStorage,
             allowLocalSubstandardRecords);
 
     IRSizeAndAlignment cudaLayout;
@@ -1736,7 +1739,7 @@ bool _hasNVVMCompatibleAggregateStorageLayout(
                type,
                providerLayout,
                nullptr,
-               allowZeroStateStructs,
+               isParameterGroupStorage,
                allowLocalSubstandardRecords) &&
            SLANG_SUCCEEDED(getSizeAndAlignment(
                codeGenContext->getTargetReq(),
@@ -5652,10 +5655,10 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
     return address;
 }
 
-// Address-only pointers originate at the current function's first-block parameter or a checked
-// offset. Internal formals are conditional roots: every direct call validates its actual producer
-// before accepting an exact type match, and all bodies are checked before provider mutation.
-IRParam* _getNVVMLayoutPointerRoot(
+// Address-only pointers originate at a current-function formal, a proved parameter-group load,
+// or a checked offset. Internal formals are conditional roots: every direct call validates its
+// actual producer before accepting an exact type match, before any provider mutation.
+IRInst* _getNVVMLayoutPointerRoot(
     const NVVMEmissionPlan& plan,
     IRFunc* entryPoint,
     IRFunc* function,
@@ -5674,8 +5677,11 @@ IRParam* _getNVVMLayoutPointerRoot(
             return nullptr;
         return parameter;
     }
+    if (const auto load = _findPlannedNVVMOperation(plan.loads, value))
+        return load->isLayoutPointerRoot && value->getParent()->getParent() == function ? value
+                                                                                        : nullptr;
     if (auto offset = plan.layoutPointerOffsets.tryGetValue(value))
-        return offset->root->getParent() == function->getFirstBlock() ? offset->root : nullptr;
+        return offset->root->getParent()->getParent() == function ? offset->root : nullptr;
     return nullptr;
 }
 
@@ -5771,7 +5777,7 @@ SlangResult _planNVVMScopedMemory(
 // Plans the complete ordinary-load decision before any provider mutation. Access flags and
 // physical representation are independent: `read(__constref Payload p) { return p.value; }`
 // keeps a native float3, while the same semantic field in a parameter group is compact storage.
-void _planNVVMLoad(
+SlangResult _planNVVMLoad(
     CodeGenContext* codeGenContext,
     NVVMOperationRequirements& requirements,
     IRLoad* load,
@@ -5780,6 +5786,26 @@ void _planNVVMLoad(
     outLoad = {};
     outLoad.source = load;
     outLoad.pointer = load->getPtr();
+    if (asNVVMSupportedLayoutTransportPointerType(load->getDataType()))
+    {
+        // Consider `cbuffer Globals { LayoutPtr<Record, ScalarDataLayout> p; }`.
+        // The loaded cbuffer and its selected field already have checked records. Only this
+        // direct immutable field path grants the loaded address a root; matching types alone do
+        // not.
+        const auto field = requirements.emissionPlan.addresses.findFieldAddress(load->getPtr());
+        const auto groupLoad =
+            field ? _findPlannedNVVMOperation(requirements.emissionPlan.loads, field->base)
+                  : nullptr;
+        const auto groupField =
+            groupLoad ? requirements.emissionPlan.addresses.findFieldAddress(groupLoad->pointer)
+                      : nullptr;
+        NVVMConventionalGlobalParams globals;
+        outLoad.isLayoutPointerRoot = field && field->selection.isParameterGroupStorage &&
+                                      !field->selection.isMutable && groupLoad &&
+                                      as<IRConstantBufferType>(groupLoad->source->getDataType()) &&
+                                      groupField && groupField->selection.isConventionalGlobal &&
+                                      _getNVVMConventionalGlobalParams(groupField->base, globals);
+    }
     const auto address = _getNVVMMemoryAddress(requirements.emissionPlan, load->getPtr());
     IRType* storageType = address.structuredStorageType;
     auto localBFloat16Vector = address.localBFloat16Vector;
@@ -5797,7 +5823,7 @@ void _planNVVMLoad(
             _planNVVMBFloat16StorageConversion(localBFloat16Vector, NVVMTypeUse::Value);
     }
     if (!outLoad.alignment)
-        outLoad.alignment = valueAlignment;
+        outLoad.alignment = outLoad.isLayoutPointerRoot ? kNVVMPointerAlignment : valueAlignment;
     if (storageType)
     {
         outLoad.alignment = _getNVVMStructuredBufferMemoryAlignment(codeGenContext, storageType);
@@ -5828,18 +5854,25 @@ void _planNVVMLoad(
     {
         outLoad.alignment = kNVVMPointerAlignment;
     }
+    if (!storageType && !localBFloat16Vector && !physicalAlignment && !valueAlignment &&
+        !asNVVMSupportedParameterGroupType(load->getDataType()) && !outLoad.isLayoutPointerRoot)
+    {
+        return _diagnoseUnsupportedIRType(codeGenContext, "load result type", load->getDataType());
+    }
     SLANG_RELEASE_ASSERT(outLoad.alignment);
     IRType* parameterGroupElementType = nullptr;
     const bool isParameterGroupPointer = _getNVVMParameterGroupPointer(
         requirements.emissionPlan.addresses,
         load->getPtr(),
         parameterGroupElementType);
-    outLoad.flags = isParameterGroupPointer || isPointerToImmutableLocation(address.root)
+    outLoad.flags = outLoad.isLayoutPointerRoot || isParameterGroupPointer ||
+                            isPointerToImmutableLocation(address.root)
                         ? SLANG_NVVM_LOAD_FLAG_INVARIANT
                         : SLANG_NVVM_LOAD_FLAG_NONE;
     outLoad.isGlobalUserPointer =
         asNVVMSupportedDeviceCopyableValuePointerType(load->getDataType()) &&
         address.isConventionalGlobal;
+    return SLANG_OK;
 }
 
 // Retains the exact store ABI and storage conversion selected from the admitted address root.
@@ -6570,23 +6603,9 @@ SlangResult _validateNVVMFunction(
                             codeGenContext,
                             toSlice("structured-buffer load type"));
                     }
-                    if (!storageType &&
-                        !_getNVVMLocalBFloat16VectorPointer(
-                            requirements.emissionPlan.addresses,
-                            inst->getOperand(0)) &&
-                        !_getNVVMPhysicalAggregateStorageAlignment(
-                            codeGenContext,
-                            inst->getDataType()) &&
-                        !_getNVVMExecutableValueAlignment(inst->getDataType()) &&
-                        !asNVVMSupportedParameterGroupType(inst->getDataType()))
-                    {
-                        return _diagnoseUnsupportedIRType(
-                            codeGenContext,
-                            "load result type",
-                            inst->getDataType());
-                    }
                     NVVMPlannedLoad plannedLoad;
-                    _planNVVMLoad(codeGenContext, requirements, load, plannedLoad);
+                    SLANG_RETURN_ON_FAIL(
+                        _planNVVMLoad(codeGenContext, requirements, load, plannedLoad));
                     SLANG_RETURN_ON_FAIL(_planNVVMScopedMemory(
                         codeGenContext,
                         requirements.emissionPlan,

@@ -262,6 +262,7 @@ struct NVVMPlannedLoad
     uint32_t alignment = 0;
     SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
     bool isGlobalUserPointer = false;
+    bool isLayoutPointerRoot = false;
     bool isScoped = false;
     SlangNVVMMemoryOperationDesc memoryOperation = {};
 };
@@ -395,12 +396,12 @@ struct NVVMPlannedNamedIntrinsic
     }
 };
 
-/// Retains the authoritative storage stride and proven entry root for one address-only offset.
+/// Retains the authoritative storage stride and proven parameter/load root for an address offset.
 struct NVVMPlannedLayoutPointerOffset
 {
     IRInst* base = nullptr;
     IRInst* index = nullptr;
-    IRParam* root = nullptr;
+    IRInst* root = nullptr;
     IRPtrTypeBase* resultType = nullptr;
     uint64_t stride = 0;
     NVVMValueRecipeStep widenIndex;
