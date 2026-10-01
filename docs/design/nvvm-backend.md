@@ -1,873 +1,367 @@
 # Direct NVVM backend architecture
 
-The experimental direct backend compiles linked Slang IR to PTX through libNVVM. It removes the
-CUDA C++ emission step while sharing semantic checking and common lowering with the established
-NVRTC route. NVRTC remains the default. Correctness, compile-time benefit and generated-code quality
-are separate acceptance questions; selecting the direct route does not establish any of them.
+The experimental direct backend compiles linked Slang IR to PTX through libNVVM. It shares
+semantic checking and common lowering with the CUDA C++/NVRTC route; NVRTC remains the default.
+Correctness, compilation cost and generated-code quality are separate qualifications.
 
-This document describes current ownership and invariants. The [feature matrix](nvvm-backend-capability-ledger.md)
-describes qualified combinations and exclusions. [STATUS](../../issue-nvvm-backend/STATUS.md) owns
-current acceptance and loop authority; [RESULTS](../../issue-nvvm-backend/RESULTS.md) owns reproduction
-commands. Historical experiments live in Git, rather than as additional architecture sections.
+This document describes ownership and invariants. The [capability ledger](nvvm-backend-capability-ledger.md)
+defines qualified combinations and exclusions. [STATUS](../../issue-nvvm-backend/STATUS.md) owns
+current acceptance and work authority; [RESULTS](../../issue-nvvm-backend/RESULTS.md) owns validation
+commands and maintained numerical contracts. [HISTORY](../../issue-nvvm-backend/HISTORY.md) and Git
+provide recovery of superseded experiments and narratives.
 
-## Pipeline and source ownership
+## Pipeline and ownership
 
 ```text
 Slang source → semantic checking → linked IR and shared lowering
     ├─ CUDA source legalization → CUDA C++ → NVRTC → PTX
-    └─ NVVM legalization → preflight and emission plan → typed provider → libNVVM → PTX
+    └─ NVVM legalization → preflight and owned plan → typed provider → libNVVM → PTX
 ```
 
-The public target remains `SLANG_PTX`. Target-scoped `-emit-cuda-via-nvrtc` and
-`-emit-cuda-via-nvvm` select one canonical option; the last explicit selector wins. The direct route
-uses an internal NVVM artifact, not the CPU LLVM target. CUDA-family semantics, CUDA C++ preparation
-and NVVM representation must have distinct owners when changing shared pipeline branches.
+The public target is `SLANG_PTX`. Target-scoped `-emit-cuda-via-nvrtc` and
+`-emit-cuda-via-nvvm` select one canonical option; the last explicit selector wins. The direct
+route uses an internal NVVM artifact, separate from the CPU LLVM target. When `linkWithOptions`
+changes the route, the linked target program owns a copy of the effective target request before
+capability computation. Layout, specialization and emission use that same request; other programs
+and the shared session keep their original requests.
 
-Direct PTX selects the `nvvm` capability, a refinement of `cuda`. An explicit `case nvvm` therefore
-wins over `case cuda`, while existing CUDA device/SM requirements and unmigrated CUDA helper bodies
-remain available. This is a transitional backend refinement, including inherited `textualTarget`,
-not a pair of mutually exclusive source targets. CUDA source/header and NVRTC PTX select `cuda`;
-requesting the `nvvm` capability alone cannot override that route. When `linkWithOptions` changes
-the PTX backend, the linked `TargetProgram` owns a copy of the target request with that effective
-selector before capability computation. Layout, specialization and emission use that same request;
-the shared session request and its other programs retain their original capabilities.
+The `nvvm` capability refines `cuda`, so an explicit `case nvvm` wins over `case cuda`. CUDA device
+and SM requirements remain applicable. CUDA source/header output and NVRTC PTX select `cuda`;
+requesting a capability alone cannot override the selected emission route. The refinement still
+inherits `textualTarget`, but no NVVM operation interprets a CUDA target-switch assembly template.
 
-Execution-register helpers use ordinary intrinsic assembly with an explicit LLVM intrinsic name:
+| Boundary                                                       | Owner                                                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Linking, specialization and shared pass order                  | [slang-emit.cpp](../../source/slang/slang-emit.cpp)                                                          |
+| Core operation composition                                     | [hlsl.meta.slang](../../source/slang/hlsl.meta.slang) and the core modules                                   |
+| Static surface formats and component updates                   | [slang-ir-nvvm-surface-legalize.cpp](../../source/slang/slang-ir-nvvm-surface-legalize.cpp)                  |
+| NVVM-ready IR and legalization postconditions                  | [slang-ir-nvvm-legalize.cpp](../../source/slang/slang-ir-nvvm-legalize.cpp)                                  |
+| Canonical type classification and role-specific representation | [slang-emit-nvvm-type-lowering.cpp](../../source/slang/slang-emit-nvvm-type-lowering.cpp)                    |
+| Preflight, diagnostics and provider emission                   | [slang-emit-nvvm.cpp](../../source/slang/slang-emit-nvvm.cpp)                                                |
+| Owned operation recipes and source index                       | [slang-emit-nvvm-plan.h](../../source/slang/slang-emit-nvvm-plan.h)                                          |
+| Numeric descriptor admission                                   | [slang-nvvm-semantic-catalog.h](../../source/compiler-core/slang-nvvm-semantic-catalog.h)                    |
+| Versioned provider boundary                                    | [slang-nvvm-ir-builder-api.h](../../source/compiler-core/slang-nvvm-ir-builder-api.h) and its builder facade |
+| LLVM construction and NVVM adaptation                          | [slang-llvm-nvvm.cpp](../../source/slang-llvm-nvvm/slang-llvm-nvvm.cpp)                                      |
+| Toolkit selection and vendor program lifecycle                 | [slang-nvvm-compiler.cpp](../../source/compiler-core/slang-nvvm-compiler.cpp)                                |
 
-```slang
-[require(nvvm)]
-uint readThreadX()
-{
-    __intrinsic_asm "llvm.nvvm.read.ptx.sreg.tid.x";
-}
-```
+Shared producer defects belong before this boundary. For example, aggregate argument snapshots
+must be established before deferred resource loads: emission cannot recover an earlier SSA value
+by rereading storage after a write. Likewise, legal source spelling of a canonical `SwizzleSet`
+belongs to the shared source emitter. These are not reasons to teach NVVM about accidental source
+or IR representations.
 
-The core module builds `uint3` values from scalar calls in its NVVM branches. Entry-point varying
-legalization constructs the same scalar helper shape for system values and reads it separately in
-each entry block; the backend no longer recognizes CUDA `threadIdx`/`blockIdx` globals. Named calls
-admit the twelve scalar i32 execution-register reads (tid, ctaid, ntid and nctaid, all axes), three
-void synchronization operations (`llvm.nvvm.barrier0`, `llvm.nvvm.membar.cta` and
-`llvm.nvvm.membar.gl`), and four scalar integer intrinsics (`llvm.ctpop`, `llvm.bitreverse`,
-`llvm.ctlz` and `llvm.cttz`), scalar Float32/Float64 `llvm.sqrt`, and the zero-operand
-`llvm.nvvm.read.ptx.sreg.clock`/`clock64` observations. The provider resolves exact
-base names through LLVM's registry and validates the complete signature and dialect admission before
-module creation. Ordinary calls retain LLVM's intrinsic attributes; validated clocks use the
-side-effecting PTX implementation described below. Void calls have no result handle; emission adds an ordinary LLVM void return
-for the helper. This does not admit arbitrary LLVM snippets or arbitrary registry intrinsics.
+`legalizeIRForNVVM` runs after linking and late bitcast normalization. It folds typed layout
+queries, handles the selected derivative and bounds policies, removes the canonical read-none
+`unmodified` check, performs cleanup and verifies postconditions. Zero-index bounds policy becomes
+typed compare/select arithmetic using each access's own extent and index type; the direct route
+does not preprocess the CUDA prelude. Selected local Boolean-vector lane writes become SSA lane
+updates, without admitting escaping or external packed-lane references.
 
-Ordinary comma-separated `__intrinsic_asm` operands are canonical checked IR values. For example,
-`__intrinsic_asm "llvm.ctlz", value, false;` carries both operands explicitly; helper parameters
-never supply implicit arguments. The owned emission plan retains those IR values and their type
-and constant-kind descriptors. Each provider call borrows a freshly constructed descriptor view,
-so moving the plan cannot leave pointers into its former storage. ABI 46 transports the descriptors
-and actual value handles. LLVM's signature matcher supplies overload types and its `ImmArg`
-attributes require constant operands during the pure support query. Emission separately checks
-actual types, constant promises, provenance and dominance before creating a declaration or call.
-Conflicting intrinsic symbols reject before mutation.
+Typed layout queries retain the semantic fact that optimization could otherwise erase. `OffsetOf`
+carries the exact canonical field key as part of IR identity, so equal-valued fields keep distinct
+offsets. NVVM folds that key using CUDA layout and signed-Int32 range checks; other targets restore
+the original call with single argument evaluation. Size/alignment use canonical layout types and
+overflow checks. Legalization does not reconstruct field paths from optimized values, and arbitrary
+GenericAsm, `RequirePrelude` or execution requirements are not general no-ops.
 
-Named libdevice calls reuse these explicit operands. The boundary admits the Float32/Float64
-names for `round`, `ceil`, `floor`, `trunc`, `rsqrt`, `exp`, `exp2`, `log`, `log2`, `log10`,
-`sin`, `cos`, `acos`, `asin`, `atan`, `atan2`, `pow`, `tan`, `sinh`, `cosh`, `tanh`, `fma`, `fmod`,
-`fabs`, `fmin` and `fmax`
-(`__nv_roundf`/`__nv_round`, and the corresponding pairs for the other operations).
-Complete signatures come from definitions in the selected immutable
-library; there is no parallel name-to-signature table. Core scalar bodies select these names in
-NVVM branches. Half preserves its existing evaluation through canonical casts, for example
-`__realCast<T>(floor(__realCast<float>(x)))`: widen exactly, evaluate in Float32 and narrow once.
-Existing vector and matrix mappings call the scalar bodies. Round retains NVVM ties away from
-zero and CUDA Half `hrint` ties to even. Numeric operations 42/54/57/64 are reserved, and their
-semantic tags, lowering-name entries and CUDA-text recognizers are removed. Shared promotion
-recipes remain for other math.
+## Operation boundaries and compatibility
 
-The ordinary trigonometric, hyperbolic, power, fused multiply-add and public remainder calls use
-the same selected-definition boundary. Each Half operand widens to Float32 before the call, and
-the result narrows once. Core `sincos(x, s, c)` evaluates `sin(x)` and then `cos(x)`, assigning
-`s` before `c`; the separate backend SinCos recipe is removed. Floating `mad` calls `fma`, while
-integer `mad` uses ordinary multiply/add. Scalar Half `sincos` and integer `mad` are newly supported
-through those compositions. Numeric IDs 40/41/50/51/52/53/63/66/73/74/75/76 are reserved, and all
-thirteen public tag/text routes are removed. Numeric FMOD 58 remains for canonical `kIROp_FRem`
-lowering, which has a real backend consumer independent of the public `fmod` body. Module version
-43 and provider ABI 46 remain unchanged; direct retired-ID rejection does not depend on a version gate.
+Core bodies own ordinary composition and explicit operands. The backend accepts canonical IR,
+selected named interfaces, and the few primitives that require a provider implementation:
 
-Half bit transport, packed Half conversion and double word conversion also belong to the core.
-Core scalar `abs`, `min`, `max` and `sign` now own their compositions. Integer abs uses an
-ordinary comparison and wrapping negate, including INT_MIN in the emitted LLVM semantics;
-unsigned abs is identity. The provider normalizes semantic 16-bit integer operands before
-comparisons, division/remainder, right shifts, widening and integer-to-float conversion. PTX can
-retain excess high bits in promoted 16-bit arithmetic; an explicit signed or unsigned widen/narrow
-pair restores the low bits' intended interpretation. Inline assembly prevents LLVM from folding
-that pair away. Shift counts normalize around their existing width conversion, and vector lanes
-follow the same rule. Low-bit arithmetic, storage and same-width casts remain unchanged; the
-consumer's descriptor determines signedness. This resolves the retained CUDA 12.9 O3 signed16
-INT_MIN comparison/widening failure without an abs-specific workaround. Both original core-values
-cells and the focused narrow-integer regression now pass; historical failures remain in accepted
-evidence. Physical Half/BF16 transport is not treated as semantic integer arithmetic. Half abs
-clears bit 15 directly, preserving NaN payload bits. Float32/64 abs and min/max use the selected
-libdevice definitions; Half min/max widens both inputs and narrows the selected Float32 result
-once. Floating min/max is not replaced by a ternary comparison. Integer min/max uses ordinary
-comparison/selection. Sign subtracts the two ordered comparisons, so NaN and either zero return
-zero; signed integer sign is also supported. Numeric IDs 49/68 and their scalar tags/text are
-retired. MIN 43/MAX 44 are also retired after their final masked-wave consumers moved to core.
+| Interface                                                          | Contract authority                                                                       |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Canonical arithmetic, conversions, memory, atomics and resource IR | Compiler admission and typed provider descriptors                                        |
+| Named `llvm.*` calls                                               | Explicit admitted intrinsic families; LLVM registry signatures, overloads and attributes |
+| Named `__nv_*` calls                                               | Exact definitions in the selected immutable libdevice snapshot                           |
+| Qualified primitive PTX                                            | Explicit provider recipe, target requirement and focused tests                           |
 
-The nine atomic reduction families in both `Atomic<T>` methods and HLSL helpers select existing
-canonical Atomic IR operations. Their discarded result does not need a tagged CUDA helper body.
-Both inc/dec APIs forward the requested memory order; the unconstrained HLSL producers assert an
-integer type before constructing integer increments. Canonical admission retains Relaxed ordering,
-global/shared signed and unsigned 32/64-bit integers, and the existing global floating ADD forms.
-Shared integer reductions and 64-bit inc/dec are newly exposed; inc/dec wraps through ordinary
-addition, without CUDA bounded atomicInc semantics. Private pointers and unsupported orders still
-reject before emission. Float32 ByteAddress add and UInt64 compare-exchange reuse existing typed
-structured views at naturally aligned offsets, retaining low-address calculation, expected/desired
-operand order and the old-result store. Nine old reduction tags and two ByteAddress text recipes
-are removed; reserved semantic holes retain their historical numeric identity.
+For example, `__intrinsic_asm "llvm.ctlz", value, false;` carries both checked operands in IR.
+Helper parameters are not an implicit forwarding convention. The owned plan retains operand
+values and type/constant-kind descriptors; each API call borrows a fresh descriptor view so moving
+the plan cannot invalidate pointers into its old storage. LLVM's signature matcher determines
+overload types, and `ImmArg` attributes require constants during the pure support query. Emission
+separately validates actual values, types, constant promises, provenance, dominance and conflicting
+symbols before creating a declaration or call. This does not admit arbitrary LLVM snippets or all
+intrinsics registered by LLVM.
 
-NVVM `asfloat16`/`asuint16` use ordinary bit casts; `f16tof32` truncates to unsigned low 16 bits,
-decodes Half and widens, while `f32tof16` narrows once, reinterprets as uint16 and zero-extends.
-`asdouble(low, high)` combines unsigned words before a bit cast. Double `asuint` uses a uint64
-bit cast, stores the low word, then shifts and stores the high word. These reuse the existing LLVM
-core compositions and ordinary provider cast/shift/store operations; their CUDA-text recipes are gone.
-Core `isinf` and `isnan` compare unsigned IEEE magnitude bits against the infinity encoding for
-Half/Float32/Float64. `isfinite` composes their Boolean results. This avoids floating comparisons
-whose NaN behavior could depend on fast-math assumptions. Numeric NaN operation 67 and the old
-classification text/recipe paths are retired; shared physical Half ABI bit casts remain unchanged.
+Libdevice signatures come from selected definitions, not a parallel production name table.
+Pointer-output calls such as frexp/modf use OUT_POINTER descriptors carrying the pointee type.
+Compiler preflight requires qualified writable local numeric pointers; the provider uses the same
+typed AS0 pointer mapping for query and emission. LLVM registry calls do not inherit this role.
+The [compute/value ledger](nvvm-backend-capability-ledger.md#compute-values-and-memory) records the
+supported public operations, widths and pointer-output qualifications.
 
-Public `frac` expresses `x - floor(x)` in its NVVM core body. The checked source produces the
-existing named floor call and ordinary subtraction; no provider-specific frac operation remains.
-Half uses `__realCast<T>(frac(__realCast<float>(x)))`, preserving the whole Float32 expression
-before one final narrowing. Vector/matrix `frac` and scalar/vector `fract` map to this scalar body.
-Operation 59 is reserved, and its tag, lowering-name entry and CUDA-text recognizer are retired.
-Frac adds no library symbol; it reuses named floor and ordinary subtraction.
+`resolveValueOperationFamily` is the single admission/diagnostic authority for numeric operation
+descriptors. Its exact catalog retains five hardware-wave signatures: active mask, ballot and
+three match payload types. Arithmetic, conversion and reinterpretation families do not have
+duplicate exact catalog rows. Compiler and provider consume this authority; physical operand and
+ownership checks still belong to emission.
 
-For finite Half inputs, the exact residual `x - floor(x)` is an integer multiple of 2^-24 in
-[0, 1), hence exactly representable in Float32. The NVVM promoted expression and CUDA's direct
-Half subtraction therefore have identical finite RN-even results. The rounded result may equal
-one for tiny negative inputs; it must not be clamped. Both signed-zero inputs and finite integers
-produce positive zero. Either infinity and NaN inputs produce NaN; payload and sign are not
-promised. These numerical contracts concern the qualified default math mode.
+Tests keep their model separate from those production authorities. Immutable source fixtures live
+in [unit-test-nvvm-source-fixtures.h](../../tools/slang-unit-test/unit-test-nvvm-source-fixtures.h);
+constants consumed by support-owned operation tables remain with those tables. The support header
+retains one isolated fake state per translation unit. Its conventional libdevice signature table
+is test-only, independent of public-operation expected-name assertions; real-provider tests also
+bind unconventional signatures to familiar names to prove selected definitions remain authoritative.
 
-Public `rsqrt` selects `__nv_rsqrtf` or `__nv_rsqrt` through explicit NVVM core bodies. Half uses
-canonical `__realCast<T>(rsqrt(__realCast<float>(x)))`, preserving selected Float32 evaluation
-before one narrowing. Vector and matrix mappings call the scalar body. Numeric operation 65, its
-tag and CUDA-text recognizer are retired. The selected immutable definition owns the signature;
-reciprocal division, `llvm.sqrt` and approximate PTX do not replace the selected operation.
+Retired numeric identities remain reserved holes. They must not be renumbered, reused or accepted
+through a fallback just because their source algorithms now live in core. The removed semantic-tag
+extension has no active parser/lowering route; serialized AST token and stable IR slots remain
+reserved so module43 layout is unchanged. Old tags/tokens diagnose rather than reviving the retired
+semantics. Ordinary comma-separated intrinsic operands remain supported.
 
-Numerical qualification uses an explicit union around the same-width RN-even reference: a radius
-of N times its larger adjacent spacing, or N encoding steps (Float32 N = 2, Float64 N = 1). This is a
-bounded empirical test convention, not a vendor-defined ULP metric or universal guarantee. NVVM
-Half uses the exact RN16 image of that Float32 set; CUDA Half uses the exact Float32 PTX
-relative-error set with epsilon 2^-22.9 before narrowing. The selected Half corpus's sets agree,
-but the policies remain distinct. Signed zeros return signed infinities; positive infinity returns
-positive zero; negative nonzero inputs and NaNs require NaN classification.
+The prototype writes and accepts semantic **module43**, with **provider ABI46** and **container2**
+as separate contracts. Older user modules and built-ins require recompilation for every backend.
+Version guards reject incompatible serialized content before AST/IR decoding; metadata inspection
+and speculative import fallback to source remain available. Direct retired-operation rejection is
+independent of the module guard. See [module compatibility](backwards-compat-for-ir-modules.md#current-prototype-boundary).
 
-Public `exp` selects `__nv_expf` or `__nv_exp` in the NVVM core body. Half uses canonical
-`__realCast<T>(exp(__realCast<float>(x)))`; vectors and matrices map to this scalar body. Numeric
-operation 55, its semantic tag and CUDA-text recognizer are retired. The actual selected definition
-owns the signature through the existing library boundary.
+## Preflight and the emission plan
 
-Default-mode exp qualification uses a test-defined union around the same-width RN-even reference:
-N times the larger adjacent spacing or N nonnegative encoding steps (Float32 N = 2, Float64 N = 1).
-The library table is empirical and non-guaranteed. Zero uses minsubnormal spacing; maximum finite
-uses the conceptual next finite binade for upper spacing; infinity uses only encoding neighbors,
-ordered immediately after maximum finite. No arithmetic subtracts infinity. Exact special-input
-rules override this approximate union: either zero returns one, negative infinity returns positive
-zero, positive infinity returns positive infinity, and NaNs require only NaN classification.
-
-NVVM Half applies one RN16 narrowing to the selected Float32 library admission set. CUDA Half
-instead widens, multiplies by encoded Float32 `0x3fb8aa3b` with FMA RN and negative-zero addend,
-applies `ex2.approx.ftz.f32`, narrows, then executes all four Half FMA correction stages. The
-original-input matches/corrections are `0x1f79/0x9400`, `0x25cf/0x9400`, `0xc13b/0x0400`
-and `0xc1ef/0x0200`.
-Both input and result FTZ and every discrete correction image are retained in the oracle. The
-PTX 2-ULP interpretation is separately test-defined; it is not the empirical expf table. Frozen
-baseline scalar outputs at Half inputs `0x1f79` and `0x25cf` differ between targets intentionally.
-Per-mode raw byte preservation, including unpromised NaN payloads, is a separate requirement.
-
-Public `exp2` selects `__nv_exp2f` or `__nv_exp2` with the same canonical Half widening and
-single narrowing. Numeric operation 56, its semantic tag and text recognizer are retired. Its
-independent default-mode contract uses the same endpoint convention and special classifications
-as exp, applied to certified references for `2^x`. Exact integer powers include the true underflow
-midpoint ties at -25, -150 and -1075 for Half, Float32 and Float64.
-
-CUDA Half exp2 widens, applies `ex2.approx.ftz.f32`, then computes `fma.rn.f32(q, 2^-24, q)`
-before narrowing to Half. The Float32 bias multiplier is `0x33800000`. Each admitted PTX candidate
-passes through output FTZ, the exact FMA rounding and RN16; neither a prematurely rounded multiplier
-`1 + 2^-24` nor an FMA after narrowing preserves that sequence. NVVM Half directly narrows the
-selected Float32 library result. Their candidate sets agree on the qualified finite corpus, but a
-synthetic midpoint candidate distinguishes the policies. No universal target equivalence follows.
-
-Public `log`, `log2` and `log10` select their Float32/Float64 `__nv_log*` definitions in explicit
-NVVM core bodies. Half widens exactly, calls the Float32 operation and narrows once; existing
-vector/matrix maps retain scalar ownership. Numeric operations 60/61/62, their semantic tags and
-CUDA-text recognizers are retired. The selected definitions own signatures through the unchanged
-named-library boundary.
-
-Independent signed logarithm references qualify the default-mode library calls using the same
-test-defined spacing/encoding union, reflected for negative results. Float32 radii are 1, 1 and 2
-for log, log2 and log10; Float64 uses 1. Exact special-input rules override approximation: either
-zero returns negative infinity, one returns positive zero, negative nonzero inputs produce NaN,
-positive infinity returns positive infinity, and NaNs require only NaN classification. NVVM Half
-narrows the Float32 admission set. CUDA Half has a finite-corpus check against the ideal RN-even
-Half result, plus bounded controls for the installed approximation/correction sequence; this does
-not certify every possible PTX approximation output.
-
-CUDA Half log2 corrections inspect the evolving result. For log/log10, an encoded Float32
-multiplication and Half narrowing precede corrections keyed by the original input.
-These remain distinct source paths.
-CUDA double log10 also retains an existing limitation: `F64_log10(float)` narrows its double input,
-evaluates Float32 log10 and widens the result. Its preservation contract models that sequence;
-NVVM evaluates true double log10. Preserving CUDA's output does not establish double accuracy.
-
-Public `sqrt` selects a named `llvm.sqrt` call in its NVVM branch. LLVM's registry owns arity,
-matching operand/result types, overloads and attributes; admission permits only scalar Float32/64
-VALUE operands. Floating descriptors cannot claim INTEGER_CONSTANT metadata. Half uses canonical
-`__realCast<T>(sqrt(__realCast<float>(x)))` evaluation, and vector/matrix mappings use the scalar
-body. This path needs no libdevice load or query. Numeric operation 36, its semantic tag and CUDA-text
-recognizer are retired; LLVM sqrt serialization remains shared infrastructure. CUDA Half keeps its
-existing approximate Float32 square root before Half narrowing. That policy has a separate bounded
-oracle from NVVM's precise Float32 evaluation in the qualified default math mode. Observed
-agreement on those inputs does not make the policies equivalent.
-
-The integer primitive boundary admits signed/unsigned scalar widths 8, 16, 32 and 64. Core
-`countbits` converts the same-width population count to uint; its existing pre-switch conversion
-of 8-bit inputs to uint32 remains, including sign extension for negative int8 values. `reversebits`
-returns the same-width primitive result. `firstbithigh` complements negative signed values, then
-subtracts the leading-zero count from width minus one. Both scan primitives receive literal false,
-so zero has a defined width result; the public APIs preserve the uint(-1) sentinel. Existing vector
-mappings call the scalar bodies. Numeric semantic IDs 45/46/47/48 are retired; both public bit
-operations and masked-wave algorithms use the named LLVM primitives.
-
-Public lane indices/counts, indexed shuffles, ballot/votes and raw-bit matching use eight named
-NVVM registry intrinsics. Registry matching owns the complete signature and attributes; indexed
-shuffle passes mask, payload, lane and clamp 31 explicitly. Core bit casts and word decomposition
-transport Boolean, integer 8/16/32/64, Half, Float32 and Float64 values without numerical conversion.
-Vector/matrix helpers call those scalar bodies. Read-first, first-lane and ballot counts use ordinary
-core composition. Numeric IDs 16/19/20/21/22/23 and all nine old wave tags are retired, along with
-compound shuffle/all-equal/count and aggregate-shuffle text recognizers.
-
-All-equal compares the intersection of raw-word match masks with `WaveMaskBallot(mask, true)`.
-This counts non-exited participants even when the supplied mask still names exited lanes. Each
-word/component collective executes before its results are combined; Boolean short-circuiting
-cannot skip a collective. Identical NaN payloads compare equal and positive/negative zero remain
-distinct. This composition exposes narrow and 64-bit matching/equality without an aggregate-return
-provider ABI. CUDA's existing `_waveMatchScalar` uses match-all, whereas NVVM matching uses match-any;
-differing-value `WaveMaskMatch` results across those targets remain an inherited distinction.
-
-Hardware and logical masks have distinct IR identities. `WaveGetConvergedMask` is effectful stable
-IR opcode 909, lowered through existing numeric operation 79 to convergent, side-effecting PTX
-`activemask`. It is not eligible for CSE or hoisting. `WaveGetActiveMask` retains its logical
-active-mask synthesis. Implicit matrix lane transport captures one hardware mask, ballots its
-participants and reuses that ballot for all components. Numeric 18/71/79 remain for genuine
-canonical ballot/match/hardware-mask IR. Numeric 15/17 are retired after the final algorithm
-consumers switched to named lane and shuffle primitives.
-
-Masked reductions and prefixes now use one core `__nvvmWaveFold<T, Op, mode>` algorithm. Seven
-small typed algebras provide identity and combination, with arithmetic or logical generic bounds;
-`__NVVMWaveMode` distinguishes reduction, exclusive prefix and inclusive prefix. Scalar admission
-is unchanged: sum/product admit Int32/UInt32/Float32/Float64, bitwise operations Int32/UInt32,
-and min/max integer 8/16/32/64 plus Half/Float32/Float64. Aggregate bodies map to scalar components.
-The old CUDA-text table, scalar/aggregate recipes and deferred-phi graph construction are removed.
-
-Ordinary folds visit partition bits in increasing lane order. Floating min/max reductions retain
-ordered compare/select with the right operand winning ties and NaNs. Low-bit contiguous masks with
-power-of-two population retain their XOR butterfly; shifted contiguous masks use the sparse path.
-Half/Double min/max prefixes retain ascending offsets and separate inclusive transmitted state
-from the returned accumulator. Half exclusive seeds remain finite ±65504; Float32 prefixes keep
-numeric fmin/fmax. Double arithmetic reductions preserve the original singleton operand, and Double
-sum retains its mask-dependent negative-zero seed. This is the existing NVVM algorithm, whose
-ordinary arithmetic fold need not equal CUDA's general butterfly evaluation order.
-
-QuadAny/QuadAll core bodies perform four unconditional indexed reads and bitwise accumulation.
-Their SPIR-V requirement markers are constructed only for other target arms; arbitrary standalone
-markers still reject on NVVM. Rotation selects its existing SM7 core lane formula explicitly.
-Scalar all/any select canonical Boolean casts, including floating NaN=true and either zero=false;
-the `bool($0)` text recognizer is removed, while ordinary language numeric-to-Boolean planning remains.
-Numeric IDs 43/44/45/48 are reserved alongside 15/17. Named LLVM/libdevice calls and provider ABI 46
-remain unchanged.
-
-Target-switch specialization selects available branches across the linked module before diagnosing
-compatible but unavailable cases. A helper referenced only by an unselected NVVM arm is valid IR
-and must become unreachable before its switch is checked for CUDA. The pass keeps unresolved
-switches in their existing IR form, uses ordinary dead-code elimination, then diagnoses survivors.
-The linker temporarily roots its externally held global layout during this pruning and removes
-that reference afterward, preserving later removal of unused resource parameters.
-
-Core `asfloat`, `asint` and `asuint` NVVM bodies use canonical `BitCast` instructions. Half-value
-`f16tof32` and `f32tof16_` bodies use canonical `FloatCast`, including vectors. The existing typed
-provider conversion operations remain shared consumers of this IR and of ABI/compound recipes;
-removing source tags does not make those operations obsolete. Runtime narrowing retains the
-qualified `llvm.nvvm.f2h.rn` selection, while literal casts use the shared constant folder. The vector
-APIs use the same canonical constructors for CUDA. Its existing `FloatCast` emitter converts each
-lane, and CUDA Half construction/conversion uses the scalar CUDA intrinsics. Passing a whole vector
-to those scalar functions is not a valid producer shape.
-
-Synchronization helpers remain effectful in Slang IR. The provider retains `convergent` and
-`nounwind` on the barrier intrinsic, and `nounwind` on the two memory fences; it does not mark them
-pure. The existing subgroup and WithGroupSync mappings still use a workgroup barrier, and the
-migration does not add a separate device fence to WithGroupSync. Generated helper declarations do
-not currently propagate transitive LLVM convergence metadata. Direct intrinsic attributes and
-bounded helper behavior are distinct contracts; arbitrary control-flow transformations across
-nested helpers remain outside that qualification.
-
-Numeric operation descriptors have one owner: `resolveValueOperationFamily` supplies their typed
-admission and diagnostic category to the compiler and provider. The exact catalog contains only
-five hardware-wave signatures: active mask, ballot, and three mask-match payload types. There are
-no duplicate exact arithmetic, conversion or reinterpretation rows. Fake-provider dispatch follows
-the same ownership and records each admitted family attempt once before physical operand checks;
-its counters do not depend on numeric width or catalog membership. Complete descriptor preflight
-still precedes provider module creation.
-
-Helper signature preflight and type lowering share `classifyNVVMType`, a provider-independent
-classification of canonical IR types. `NVVMTypeInfo::supports` owns the parameter/result/storage
-role distinctions, including substandard record and reference exceptions. Type lowering caches
-that record but checks the requested role before reusing a physical representation. Actual argument
-provenance, export restrictions and CUDA/LLVM layout compatibility remain separate checks.
-
-| Boundary                               | Owner and responsibility                                                                                                                                                      |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linked IR and shared transformations   | [slang-emit.cpp](../../source/slang/slang-emit.cpp): `linkAndOptimizeIR`, specialization, shared semantic lowering and pass ordering                                          |
-| Physical surface IR                    | [slang-ir-nvvm-surface-legalize.cpp](../../source/slang/slang-ir-nvvm-surface-legalize.cpp): static storage types, conversion, component masks and byte-X coordinates         |
-| NVVM-ready IR                          | [slang-ir-nvvm-legalize.cpp](../../source/slang/slang-ir-nvvm-legalize.cpp): `legalizeIRForNVVM`, layout queries, selected bounds policy and cleanup                          |
-| Type and representation classification | [slang-emit-nvvm-type-lowering.cpp](../../source/slang/slang-emit-nvvm-type-lowering.cpp): `NVVMTypeInfo`, use-specific provider types and caches                             |
-| Preflight and provider emission        | [slang-emit-nvvm.cpp](../../source/slang/slang-emit-nvvm.cpp): reachable functions, exact operations/signatures, addresses, layout proofs, diagnostics and emitted operations |
-| Immutable plan                         | [slang-emit-nvvm-plan.h](../../source/slang/slang-emit-nvvm-plan.h): owned recipes and checked instruction index                                                              |
-| Semantic operation authority           | [slang-nvvm-semantic-catalog.h](../../source/compiler-core/slang-nvvm-semantic-catalog.h): typed operation and overload contracts                                             |
-| Provider interface                     | [slang-nvvm-ir-builder-api.h](../../source/compiler-core/slang-nvvm-ir-builder-api.h) and builder facade: exact version negotiation and opaque handles                        |
-| Physical LLVM construction             | [slang-llvm-nvvm.cpp](../../source/slang-llvm-nvvm/slang-llvm-nvvm.cpp): LLVM 14 typed pointers, NVVM metadata, generic instructions and qualified recipes                    |
-| Vendor compiler lifecycle              | [slang-nvvm-compiler.cpp](../../source/compiler-core/slang-nvvm-compiler.cpp): coherent toolkit discovery, verification, compilation and diagnostics                          |
-
-`legalizeIRForNVVM` runs after common linking and late bitcast normalization. It folds the typed
-field-offset query, removes the canonical read-none `unmodified` check, discharges the selected CUDA derivative
-requirement, applies the requested zero-index bounds policy, runs DCE and checks its postconditions.
-Selected local Boolean-vector lane addresses are normalized to SSA lane updates before preflight;
-this does not authorize escaping lane references.
-`SLANG_ENABLE_BOUND_ZERO_INDEX` must become typed compare/select arithmetic because the direct route
-does not preprocess the CUDA prelude. It preserves each access's own resource extent and index type.
-
-Core resource producers use existing `Sample`, `ImageLoad` and `ImageStore` operations plus
-`SampleLevel`, `TextureFetch`, `TextureGather` and `TextureQuerySize`. Texture preflight keys each
-requirement by its instruction and validates the resource, sampler, coordinates and result before
-using the existing provider descriptors. Core splits packed fetch coordinates, assigns dimension
-outputs in order and preserves CUDA's ignored gather offsets and zero array-count output. No
-resource operation depends on a CUDA spelling or whole-helper recognizer.
-
-The semantic-tag extension has no active producer, parser acceptance, lowering table or legalization
-route. Its serialized AST token field and stable IR terminator/decoration slots remain reserved so
-module 43 layout does not change; old tagged source or decoded tokens diagnose rather than revive
-those semantics. Ordinary comma-separated intrinsic-assembly arguments and named calls remain.
-No NVVM operation interprets a CUDA target-switch assembly template. `__offsetOf` is identified by
-the existing KnownBuiltin mechanism and lowers to a source `OffsetOf` query before value folding.
-Its operands retain the original callee, base, field value and exact field key; an unavailable key
-denotes a call outside NVVM's direct same-base field contract. The key participates in ordinary IR
-identity, so equal-valued fields retain distinct offsets. NVVM folds that key through CUDA layout
-rules with the existing signed Int32 range check. Other targets restore the original call directly
-after linking, retaining the unchanged CPP/CUDA bodies and single argument evaluation. Source
-capture inspects only the immediate field-extract/address and load forms emitted by argument
-lowering; legalization does not reconstruct a field path from optimized values.
-`RequirePrelude`, arbitrary GenericAsm and standalone execution requirements are not general no-ops.
-
-Pointer-output math uses the real selected `__nv_frexp[f]` and `__nv_modf[f]` definitions. The named
-operand descriptor's OUT_POINTER kind carries the pointee type without changing ABI 46's layout.
-Compiler preflight reuses the writable generic local numeric pointer classifier; one provider
-mapping supplies the same typed AS0 pointer to signature queries and emission. Exact selected
-function types, calling convention, linkage, visibility and attribute rejection remain authoritative.
-LLVM registry calls do not admit this role. Core passes `&exp`/`&ip`, promotes Half to Float32 and
-narrows floating results once; frexp's integer exponent is unchanged. Shared uninitialized-use analysis treats an explicit assembly address
-under its existing opaque write policy; explicit ordinary values still read their contents.
-Numeric projection IDs 69/70/77/78 are reserved and their paired-call recipes are gone.
-
-CUDA size/alignment helpers select ordinary `SizeOf`/`AlignOf` with the existing CUDALayout type.
-A hidden ordinary core struct exposes that IR type through IBufferDataLayout conformance, without
-adding an AST type class. Shared folding refuses signed Int32 overflow. CUDA layout represents an
-unsized array as a 16-byte wrapper aligned to 8 bytes. General zero size remains valid; the NVVM
-helpers keep their stricter positive-result assertion. ForceInline removes these metadata wrappers
-before aggregate parameter lowering, including at O0; opaque CPP/CUDA assembly arms remain protected
-by ordinary inlining eligibility. No size/alignment CUDA text is interpreted.
-
-A shared producer fix belongs before this boundary when its IR shape or semantics are wrong. For
-example, aggregate receiver snapshots must be established before deferred buffer loading. Flattening
-aggregate parameters before `deferBufferLoad` preserves the original value across subsequent resource
-writes; emission must not reread storage to reconstruct a saved semantic value.
-
-Canonical IR can also need different legal source spellings. SSA promotion turns a local vector's
-`SwizzledStore` into a pure `SwizzleSet`, preserving the old value and untouched lanes. For example,
-`v.xyz = -v.zwx` must read all replacement lanes from the original value. The shared CLike emitter
-copies the base and emits scalar component assignments for CPU/CUDA/WGPU, which lack writable
-multi-lane swizzles. Ordinary replacement expressions retain their SSA temporary; scalar updates
-and HLSL/GLSL keep their supported spelling. This is source-language emission responsibility, not
-an NVVM representation or shared SSA legalization change.
-
-The prototype writes and accepts only semantic module version 43. Older user modules and built-ins
-must be recompiled for every backend: earlier versions contain incompatible capability identities
-or retired numeric NVVM operations, including log/log2/log10 in version 42. Existing guards reject these
-before decoding AST or IR; metadata inspection and speculative import fallback to source remain
-available. Source modules that explicitly used retired semantic tags need current core calls or
-supported explicit intrinsic bodies. Container format 2 and provider ABI 46 are separate contracts.
-See the [module compatibility design](backwards-compat-for-ir-modules.md#current-prototype-boundary).
-
-## Preflight is a contract, not a trial emission
-
-Preflight validates reachable functions, entry and helper signatures, typed operations, operand
-relationships, layout and target requirements before provider module/program mutation. Unsupported
-forms return a source diagnostic. Unit tests assert both rejection and zero provider/module/program
-creation for important negative boundaries.
+Preflight validates reachable functions, helper/entry signatures, exact operations, operands,
+layout, address relationships and target requirements before output-module or vendor-program
+mutation. Unsupported forms return diagnostics. Important negative tests assert no output and
+zero creation/mutation counters; a failed trial emission is not the support query.
 
 `NVVMEmissionPlan` owns reachable function order, collision-checked physical names and source-keyed
-records for ordinary value operations and several compound scalar, memory and resource families.
-`NVVMEmissionPlanIndex` enforces unique sources and supplies typed lookups to emission. Provider
-requirements are deduplicated by exact overload; emission records remain one per canonical source
-instruction. Requirements are checked before constructing a module.
-
-Ordinary local allocations, loads and stores have required source-keyed plan records. Allocation
-planning owns the admitted type use and physical alignment. After pointer/value/dominance validation,
-load/store planning owns alignment, load flags, storage conversion and pointer-value ABI/provenance
-choices. Emission consumes these records without repeating those decisions. BF2 uses an identity
-recipe; BF3/BF4 recipes carry the canonical vector, lane count and conversion result use. Compact
-parameter-group vector recipes remain distinct from readonly native-vector access. A Generic Read
-borrow may refer to mutable caller storage and therefore does not imply invariant-load metadata;
-that requires the separate immutable-location contract.
-
-Field and indexed-element addresses also have required source-keyed recipes. `NVVMAddressPlan`
-records canonical field selection, admitted storage/access roles and the raw-offset or sequential
-pointer operation. Its source-to-index dictionaries serve both preflight and immutable emission,
-without scanning unrelated module addresses. Pointer validation and ordinary memory planning reuse
-these records; selected address emission does not rerun the recognizers. Canonical IR pointer types
-remain authoritative for pointee, access qualifier and address space.
-
-The operand pass validates parent/index availability in dominance order, then records complete
-field and element facts. Children inherit the checked parent's canonical root and storage/access
-roles without recursively reclassifying ancestor instructions. Raw buffer views retain their own
-access permission even when a derived pointer has a more permissive spelling. Read-only selection
-permits reads but does not itself authorize invariant-load metadata.
-
-Direct structured-buffer loads retain their buffer/index, exact raw view, alignment, flags and
-conversion recipe. Preflight plans both storage directions over canonical types, collecting the
-exact Boolean conversion requirements in the same traversal. Recipes preserve physical-array-struct
-identity and vector3's aggregate storage versus vector value construction. Explicit-stride array
-construction uses that same planned converter. Emission follows child recipe indices rather than
-classifying types again. Field-value extraction and other dedicated resource operations remain
-outside this completed storage family; this is not a general transforming storage pass.
-
-## Canonical types and use-specific representation
-
-Canonical Slang types, field keys and instructions remain the semantic source of truth. Physical
-LLVM equality does not imply semantic equality: Half and BF16 both occupy 16 bits; the two FP8
-formats both occupy 8 bits. Their conversions and operation admission remain distinct.
-
-`NVVMTypeLoweringContext` caches an `NVVMTypeInfo` for each canonical linked-IR type. Its nine uses are:
-entry result, helper result, entry parameter, helper parameter, helper value, ordinary value, local
-storage, parameter-group storage and structured-buffer storage. `supports` owns admission for
-provider type lowering. Other helper/address gates still contain overlapping role proofs.
-
-Role validation happens before a cache lookup. Value, helper and the different storage representations
-have separate caches; a helper pointer key includes its pointee use. A successful storage lookup must
-never authorize a previously unsupported value, resource, exported signature or reference role.
-
-Half helper parameters and results use physical i16 scalars or `<N x i16>` vectors for the
-already-admitted widths 2–4. Canonical body values remain Half: caller arguments are encoded, callee
-parameters decoded, returns encoded, and call results decoded with bit-preserving reinterpretation.
-The common return path includes specialized helper bodies. Native Half-vector call transport can
-lose argument/result transfers under libNVVM O3 despite live uses in the supplied LLVM IR; integer
-transport avoids that boundary defect without changing arithmetic, storage or type admission.
-`getNVVMHalfHelperABILaneCount` selects the same shapes for type lowering and all four crossings.
-Preflight requires both exact conversion directions for every parameter/result width before provider
-mutation. Copyable HelperValue requests redirect to Value before cache access, keeping canonical
-Half values separate from the existing physical helper ABI cache regardless of request order.
-
-Exported Half helpers retain their existing direct-NVVM PTX symbols and parameter/result layout.
-An independently authored PTX caller checks widths 2–4 and a half4-to-half3 boundary against frozen
-before-repair ABI declarations; semantic lane offsets are checked while unspecified return padding
-is ignored. This is a direct PTX contract, not CUDA-prelude binary interoperability: the captured
-NVRTC helper has different symbol and parameter/result packing.
-
-The recursive copyable/helper domains support selected finite arrays and records. Specialized local
-substandard-float records have a narrower proof. Broadening a general recursive predicate to admit
-one local type can also admit device, shared or external storage: changes must name the intended role.
-
-### Address provenance and layout
-
-Address-space 0 is generic/code, 1 global, 3 shared, 4 constant and 5 local. Address-space conversion
-uses `addrspacecast`, preserving pointer provenance. Integer round trips cannot replace it.
-Immutable loads from constant-memory parameter-group fields remain ordinary loads; read-only global
-load recipes apply only to their qualified device-buffer pointers.
-
-Canonical pointer shapes carry access, address space and sometimes physical-layout operands.
-A field address is resolved by its canonical key and qualified parent, not by pointee type alone.
-Array element addressing must retain the same proof through its index and element type. A physically
-representable leaf does not establish permission for every pointer that names it.
-
-The exact one-operand Generic `Ptr`, `OutParam` and `BorrowInOutParam` roots qualify selected local
-mutable substandard storage. Readonly references, exported signatures and resource/shared/device
-storage have independent boundaries. Public pointer results often become `UserPointer`; they do not
-exercise the same shape as synthetic Generic pointer results.
-
-Natural, CUDA and physical LLVM layout are separate contracts. AnyValue uses Natural payload packing.
-Internal copyable locals and helper borrows may use native LLVM value layout; for example, native
-float3 storage has alignment 16. External CUDA storage boundaries and explicitly qualified local
-BF16/physical-storage families use their selected CUDA-compatible representations. Internal helper
-storage is not a general CUDA ABI. `getSizeAndAlignment` caches layout rules separately. Qualified
-aggregate-storage layout checks verify offsets, size and alignment for the selected role before
-allocation. Increasing allocation alignment cannot repair wrong member offsets or array stride in
-a physical type.
-
-Storage conversion is explicit where representations differ: Boolean storage, compact numeric
-vectors, physical matrices and BF16 vectors cannot inherit register layout without proof. BF16,
-compact-vector and recursive structured-storage conversions execute checked plan recipes. Shared
-[buffer-element lowering](../../source/slang/slang-ir-lower-buffer-element-type.cpp) already provides
-physical types and packing/unpacking operations. Its discovery currently selects resources and
-UserPointer/Input/Output roots, not Generic local Ptr/Out/BorrowInOut roots. Reuse for local storage
-needs explicit root selection and preserved semantic-role admission; globally replacing Generic
-pointer types with ordinary arrays could erase the exclusions that preflight must enforce.
-
-### BF16 and FP8 contracts
-
-| Semantic value   | Register/internal value                  | Qualified local storage     | CUDA size/alignment |
-| ---------------- | ---------------------------------------- | --------------------------- | ------------------- |
-| BF16 scalar      | `i16`                                    | `i16`                       | 2 / 2               |
-| BF16 vector2     | `<2 x i16>`                              | `<2 x i16>`                 | 4 / 4               |
-| BF16 vector3     | `<3 x i16>`                              | `[3 x i16]`                 | 6 / 2               |
-| BF16 vector4     | `<4 x i16>`                              | `[4 x i16]`                 | 8 / 2               |
-| E4M3/E5M2 scalar | distinct semantic formats, physical `i8` | selected record fields only | 1 / 1               |
-
-BF3/BF4 CUDA forms are component structs. LLVM value-vector alignment would change containing
-record layout; using a scalar array for BF2 would instead lose its required alignment. Whole local
-BF-vector loads/stores convert by extracting and constructing raw lanes, without numerical conversion.
-The internal BF-vector helper ABI is not an external CUDA helper ABI. Explicit vector Select,
-component-pointer access and aggregate membership need their own proof; branch/phi transport alone
-does not qualify all three.
-
-Canonical equal-size vector bitcasts are lowered by the existing bitcast producer into scalar
-bitcasts, extraction and reconstruction. No synthetic source i48 type or second BF16 semantic type
-is needed. Both AST and IR CUDA layout queries retain canonical BF16 element identity; Half3/Half4,
-ushort vectors and Natural layout keep their distinct rules.
-
-BF16↔Float32 uses the qualified SM80 conversion recipe. Narrowing is nearest-even
-`cvt.rn.bf16.f32`; widening shifts the payload into Float32's high word. Raw transport and widening
-preserve payload bits on the qualified target; narrowing NaNs promise classification only. Canonical
-literal recovery uses the shared producer's bits, including signed encodings at the integer builder
-boundary. This does not license integer→BF16 through Float32: that can double round. For example,
-integer 16842753 should narrow to BF16 bits `0x4b81`, while nearest Float32 then BF16 gives `0x4b80`.
-
-BF16 dot core composition for widths 2–4 starts at positive zero and rounds each product and sum separately in source
-lane order. Two BF16 FMA instructions per lane implement those separately rounded operations on SM80.
-Unrestricted Float32 accumulation or a fused product-plus-accumulator changes the contract. General
-BF16 arithmetic, comparison, integer and Half/double conversions remain separate admissions.
-The core loop invokes canonical scalar Fma (stable IR 914, provider operation 83) twice per lane:
-`fma(x, y, -0)` then `fma(product, 1, sum)`. The provider only emits the qualified scalar BF16
-instruction; retired numeric dot 82 and its CUDA spelling no longer own the algorithm. Existing
-zero/one-lane source branches remain distinct from the qualified dot2/3/4 runtime contract.
-
-FP8 transport preserves all bytes, including nonfinite encodings. Same-width signed/unsigned and
-cross-format bitcasts preserve bits; same-format Select preserves semantic type. Runtime widening to
-Float32 is exact for finite values and E5M2 infinities; NaN sign/payload are unspecified. E4M3 maximum
-is 448, minimum subnormal 2^-9, with magnitude byte 127 NaN; E5M2 maximum finite is 57344, minimum
-subnormal 2^-16, with exponent 31 reserved for infinities/NaNs. The provider uses integer decoding and
-exact powers of two, without native FP8 instructions on SM80.
-
-Shared finite FP8 folding uses nearest-even subnormal rounding and exact widening. Its overflow
-policy is intentionally not CUDA constructor SATFINITE: E4M3 values above 448 become signed NaN;
-E5M2 retains the rounded overflow boundary 61440 and infinity behavior. Nonfinite FP8 literals are
-rejected before provider discovery. Runtime Float32→FP8 narrowing is research-only; the backend must
-not hide this producer-policy distinction by reconstructing literals.
-
-### Local records and AnyValue
-
-Whole internal record values admit finite nonempty record trees whose leaves are integer scalars,
-FP8 scalars, BF16 scalar or BF2, with at least one substandard descendant. Integer-only child records
-may accompany them. Value and local storage agree for these leaves. A separate local-only flat BF16
-record family also permits BF3/BF4 fields, with component-array storage; it does not grant whole-record
-value or nested BF3/BF4 membership.
-
-For example, `{uint16_t before; BF2 value; uint16_t after;}` has Natural offsets 0/2/6 and size 8,
-alignment 2, but CUDA offsets 0/4/8 and size 12, alignment 4. AnyValue unpacking uses canonical field
-keys to create a CUDA local record from Natural payload bytes. A mutating interface wrapper unpacks,
-invokes the concrete method, reloads and repacks the result. An earlier interface copy retains its
-saved payload. Runtime-selected nested regressions explicitly qualify both concrete conformers and
-those mutation/snapshot paths.
-
-Ordinary nonempty fixed arrays of these identity records support local mutable allocation, dynamic
-indexing, field/component mutation and whole-array SSA snapshots. Their direct element satisfies the
-same record proof; wrapper records containing arrays and multidimensional arrays remain excluded.
-`NVVMTypeInfo::supports` permits array Value/Storage and internal HelperParameter before cache lookup.
-Reference, result and external roles remain rejected even when an allowed representation is cached.
-Array size uses CUDA element stride (24 bytes for two of the padded BF2 records above), not Natural
-payload size.
-
-The array address proof requires an actual ordinary mutable Generic `Var`; a matching pointer type
-on a parameter or external producer is insufficient. Checked element selection passes local record
-provenance into the existing field plan, including nested fields and BF2 lane access. Ordinary memory
-emission retains identity conversion and checked alignment. Selected records can use the existing
-by-value helper contract. Whole arrays can also cross internal value-parameter boundaries using the
-same canonical SSA array representation. A source mutation of that parameter initializes a separate
-callee Var, so existing checked plans preserve the caller snapshot. CUDA-exported array parameters
-are explicitly rejected; general recursive helper and pointer predicates do not inherit this role.
-
-Array results and out/inout/read-only borrowed array parameters remain separate, excluded contracts. In
-particular, `legalizeArrayReturnType` rewrites source array results to an OutParam before NVVM
-preflight; supporting input values does not authorize that writable address. External array storage
-remains excluded. No new physical IR type, conversion recipe or provider operation is needed.
-
-BF3/BF4's physical lane arrays and successful layout metadata queries do not establish BF3/BF4
-record-array runtime support. Generic local-record pointer helper results remain excluded;
-the exact synthetic Generic result boundary has source-review evidence rather than canonical-source
-execution coverage.
-
-## Provider and downstream compiler
-
-The optional `slang-llvm-nvvm` provider owns an isolated LLVM 14.0.6 typed-pointer construction path.
-It exports a versioned Slang C ABI with opaque handles and one generic operation surface. Current
-provider ABI is 46; compiler and provider must negotiate the exact required interface/capabilities.
-Raw LLVM objects and symbols must not cross into the CPU LLVM provider or the host compiler.
-Output handles belong to their creating live module; destroying it invalidates subordinate handles.
-ABI 46 also exposes a separate input-library handle owning its byte copy, LLVM context and eagerly
-parsed, verified module. Definition queries create neither output IR nor a vendor program. Loading
-reports parse/verification failures through an optional synchronous callback; callback text and
-userData are never retained, and the host copies the diagnostic immediately. A failed load leaves
-no handle. Unsupported signatures return support=false without a parse diagnostic. Serialization
-uses a size-query/write protocol with caller-owned buffers. The host retains
-the provider library, validates returned handles and copies output into its own blob.
-The separate LLVM build is statically linked with hidden/excluded LLVM symbols, avoiding a competing
-process-visible dynamic `libLLVM` dependency. BitReader supplies the input-library parser.
-
-Selected definitions must have external linkage, default visibility, C calling convention, a fixed
-parameter list and no return/parameter attributes. The requested function type must exactly match
-the selected definition. Emission separately checks actual operand types, ownership and dominance,
-and rejects incompatible output symbols before inserting a declaration or call. Library function
-attributes are not copied to the output declaration; named LLVM calls retain their registry policy.
-
-NVVM uses 64-bit `nvptx64-nvidia-cuda`, the specified NVVM DataLayout, explicit `nvvmir.version` and
-kernel annotations. A calling convention alone does not mark a kernel. A valid LLVM module may still
-be invalid NVVM: libNVVM verification remains mandatory. The current direct emitter explicitly serializes verified NVVM IR 2.0 assembly through the
-provider's audited compatibility writer. LLVM verification runs before serialization and vendor
-verification remains a separate gate. The provider also exposes assembly/bitcode serialization, but
-that does not make native bitcode the current direct-emission format. Text input is deprecated by
-the vendor, so a qualified production bitcode path remains a readiness concern. Compatibility is
-constrained by actual toolkit/dialect evidence, not the CPU LLVM version or a toolkit folder name.
-
-The downstream compiler accepts exact `Assembly + LLVMIR + Kernel` or
-`ObjectCode + LLVMIR + Kernel` artifacts. It does not infer the format by sniffing bytes. Each compile
-creates a fresh `nvvmProgram`, adds the user module, optionally adds coherent libdevice, verifies,
-compiles, retrieves logs/PTX and destroys the program on all paths. Verification and compilation use
-the same options. Failed vendor diagnostics stay failed artifacts; an empty vendor log falls back to
-its error string. The API trailing NUL is removed from successful PTX and invalid payloads are rejected.
-
-libNVVM and libdevice must come from the same selected toolkit root. An explicit NVVM path wins;
-logical loader discovery and deterministic filesystem candidates retain actual loaded identity.
-`nvvmVersion` and `nvvmIRVersion` are queried; `nvvmLLVMVersion` is optional and target-dependent.
-A rootless loaded compiler may compile without libdevice, but requested libdevice requires a proven
-coherent root. There is no fallback to another toolkit's file. The selected library and coherent
-libdevice identities belong in provenance and cache decisions.
-
-When linked requirements need libdevice, the direct route retains the selected compiler and obtains
-a per-compilation snapshot through its optional `INVVMCUDADeviceLibraryProvider` extension. The
-snapshot owns immutable bytes, path and a strong reference to its origin; the compiler retains no
-snapshot cache. A private token identity proves that origin. Live named-library plans parse this
-snapshot once and query every requested definition before output-module creation. Dead helpers do
-not request it; LLVM-only calls preserve their existing support-query ordering without libdevice.
-
-The same compiler and token reach downstream compilation through a dedicated appended options field.
-Token provenance is checked before `nvvmProgram` creation, then eager/lazy library addition consumes
-the snapshot bytes without reopening the path. Old-size options default the field to null; legacy
-callers use the same selected-path loader when a library is required. Generic artifact libraries
-keep their existing contract. Queries and vendor compilation therefore consume identical bytes even
-if the file changes afterward. The earlier timestamp-based cache hash is unchanged and is not an
-atomic snapshot of the filesystem.
-
-The direct route passes an explicit virtual architecture and optimization 0 or 3. Floating policy
-and Float32 denormal policy are independent:
-
-| Policy                             | libNVVM options                                        |
-| ---------------------------------- | ------------------------------------------------------ |
-| Default floating mode              | leave precise division/sqrt and FMA at vendor defaults |
-| Precise                            | `-prec-div=1 -prec-sqrt=1 -fma=0`                      |
-| Fast                               | `-prec-div=0 -prec-sqrt=0 -fma=1`                      |
-| Preserve / flush Float32 denormals | `-ftz=0` / `-ftz=1`                                    |
-
-Nondefault FP16/FP64 denormal policy and duplicate overrides of managed options are rejected before
-program creation. NVRTC's option aggregation differs; differential experiments record effective
-options instead of assuming that similarly named optimization levels imply identical math policy.
-NVRTC comparison uses O3 in the maintained three-mode corpus; NVVM runs O0 and O3.
-
-## Target-specific exceptions that must remain explicit
-
-**Nested stores.** Installed libNVVM 12.9 can combine narrow fields across nested-record padding,
-also for integer-only records. Provider `_emitStore` validates the original operation, then splits
-at direct nested-struct boundaries using canonical LLVM field types and DataLayout. Child alignment
-comes from the actual parent guarantee via `commonAlignment`.
-
-Arrays stay whole. `_containsNestedStructLayout` follows canonical array/struct types and stops at
-pointers; a terminal whole store containing a remaining struct-in-struct boundary gets conservative
-alignment 1. Allocation/load alignment, signatures and the saved SSA value remain unchanged. This
-avoids element unrolling and source rereads. Flat-record arrays retain their alignment. Tests include
-root/wrapped/multidimensional integer arrays and 39 serialized shape/alignment combinations. Large
-65,536-element O3 experiments hit the same 120-second/4-GiB bound with and without the annotation;
-there is no scalability or speed claim. NVRTC's optimized integer-array copy defect remains open.
-
-**Clocks and masks.** Core clock helpers use named registry-validated integer32/64 signatures.
-The provider emits the shared side-effecting inline PTX implementation before creating an ordinary
-LLVM declaration or call; numeric IDs 80/81 and CUDA clock text recipes are retired. The tested plain intrinsic path
-merged/hoisted live observations. They are per-SM wrapping cycle counters, not a global wall clock or
-memory fence. Hardware `activemask` is distinct from logical participation synthesis. CUDA quad
-helpers preserve complete-source-quad/matching-shuffle semantics; partial quads have no defined oracle.
-Masked floating MIN/MAX retains source comparison order and identities, including Half's finite
-exclusive seeds ±65504 and payload-preserving ordered selection. Algebraic reassociation is unsafe.
-
-**Surface storage formats.** An undecorated `RWTexture<int4>` selects native four-lane 32-bit
-surface access. The opaque CUDA surface handle does not make the runtime allocation's format a
-compiler-visible property. Binding RGBA8Sint therefore does not request an implicit conversion:
-byte-X scaling remains 16, although a physical RGBA8 texel occupies four bytes. Independent host
-array readback observes whole and component writes affecting neighboring packed texels; matching
-RGBA32Sint bindings pass. Shader reads through the same access convention can conceal this mismatch.
-The original texture-subscript corpus result is a shader self-check, not packed-format qualification.
-
-`legalizeNVVMSurfaceOperations` runs only for direct NVVM, after specialization and global-parameter
-collection, before shared image-subscript expansion would discard component masks. It rewrites logical
-image loads/stores and component updates at each use, using the format decoration on the canonical
-collected field. Equal logical types may therefore access different static formats in the same shader. Arbitrary
-user-helper resource parameters still lack authoritative format provenance and remain unsupported.
-
-`NVVMSurfaceLoad` and `NVVMSurfaceStore` carry physical payload types and byte-X coordinates; other
-coordinates retain their dimension/layer units. Matching Float32 accesses remain Float32. Annotated
-Half storage uses Half accesses and ordinary `FloatCast` instructions. The provider performs only
-mechanical intrinsic bitcasts; it does not select a storage format, scale X, widen a formatted load,
-or emit `sust.p`. Provider ABI43 makes this changed operation contract explicit.
-
-Half stores now use ordinary round-to-nearest, ties-to-even conversion. This intentionally differs
-from the old formatted store's observed truncation toward zero, including subnormal and overflow
-boundaries. Float-to-float rounding is implementation-defined in Slang. Converted NaNs promise a NaN
-result, not a payload or sign. The existing NVRTC surface-format conversion path remains unchanged.
-The shared `FloatToHalf` constant folder uses RN-even with full discarded-bit information, so literal
-conversions agree with runtime narrowing; this correction also applies to other backends' Half
-constants. Generic NVVM Float32-to-Half conversion selects `llvm.nvvm.f2h.rn` and mechanically
-bitcasts its integer result to Half. This avoids libNVVM 12.9 O3 folding low-payload signaling NaNs
-through ordinary `fptrunc` into infinity. It is a general conversion selection, not surface-specific
-NaN handling; Half widening, Double conversion and BF16 keep their separate implementations.
-
-For `image[p].xz = value`, legalization loads the physical texel, converts only replacement lanes,
-and merges them before the physical store. Untouched lanes preserve their exact bits, including
-NaN payloads and signed zero. These updates remain non-atomic. Dynamic component indexing is outside
-this bounded surface lowering. New operations conservatively retain memory effects so reads cannot
-be reused across writes. Unsupported logical accesses remain diagnosable before provider mutation;
-there is no fallback to provider-owned format conversion.
-
-Static format annotations and matching runtime allocations are required. This pass does not infer
-formats from an opaque handle, test values, comments, or arbitrary caller graphs. Packed/normalized
-formats and generic runtime format conversion remain outside the current contract.
-
-**Typed texture operations.** Sample/SampleLevel preserve Float32 scalar/vector2/vector4 sampling
-and existing shape admission. Fetch retains 2D/3D/2D-array integer coordinates and a separate mip.
-Ordinary 2D gather retains constant component selection and four result lanes; its offset overload
-continues to ignore the offset as CUDA does. Samplers stay typed and validated even though CUDA
-texture objects own sampling state. Direct `RWTexture2DArray.Store` now reaches the same supported
-native32 physical operation already available through canonical image stores; no provider shape
-or Half-array admission changes.
-
-**Texture queries.** `TextureQuerySize` returns base spatial extents as uint/uint2/uint3; core
-GetDimensions assigns signed/unsigned output parameters and writes the existing array-count zero.
-Float-output, mip, MS and 1D-array query variants are not newly admitted. Selected non-mip geometry
-has direct lowering. Full mip, array-count and
-allocated/view-level-count semantics remain unresolved. CUDA source helpers ignore requested mip and
-write zero for some counts. A length-one declared cube array may bind a nonlayered cube. Texture and
-surface handles refer to different resources/mip contracts; opaque handle internals are not metadata.
-`txq.level.width` executed in research, while array-size/level-count query cubins failed driver lookup
-on the qualified stack despite assembling. Geometry cannot reconstruct allocated level count.
-Research observed layer count in 1D-array height and 2D-array depth, and cube count in cubemap-array
-depth (host array depth counts faces). These observations do not resolve length-one binding or every
-subresource view. Full and partial mip chains can have identical base dimensions.
-
-**Host packing and process lifetime.** The column-major `float3x2` CUDA layout is compact stride 12,
-size 24; graphics-packed host words do not implement that contract. The permanent
-[compact-column fixture](../../tests/cuda/nvvm-column-major-compact.slang) checks all six elements
-and multiplication in three modes, with fresh 24-byte reflection. Raw test-buffer uploads preserve
-their authored bytes; do not silently repack them for a different target. Keep the original mismatches.
-NVRTC automatic PCH directories are private to each compiler owner; shared persistent paths can
-outlive compatible state. Owned-process cleanup must account for surviving descendants after a leader
-exits, and temporary observers must restore compiler/module/configuration bytes before acceptance.
-
-## Remaining refactoring direction
-
-Ordinary allocation/load/store planning and checked field/index recipes establish an analysis and
-backend-recipe boundary. They do not rewrite physical storage into Slang IR or consolidate every
-address proof. Canonical IR
-types remain the source of semantic identity, while planned type uses and conversions describe their
-physical roles. A successful physical-type lookup still cannot authorize another role.
-
-A future transforming pass should reuse existing physical-storage lowering after defining per-root
-selection/specialization and retained semantic admission. Field/index recipes already supply checked
-facts to pointer validation, ordinary memory planning and emission, deriving child roles from checked
-parents in dominance order. A broader address analysis could extend that authority to other address
-producers and consumers. It must not invent a second type hierarchy. Remaining compound recipes can move
-into the existing immutable plan as their families are touched. File separation should follow these
-ownership boundaries.
-
-A transforming local-storage pass is deferred. A one-record rewrite would leave the existing
-BF3/BF4 conversion path necessary while adding explicit root selection, callee specialization,
-original semantic admission and generated-helper cleanup. The shared lowerer's current type-wide
-entry and fallback for unrecognized pointer uses do not establish safe per-root isolation. Revisit
-this when a real workload motivates retiring a complete representation family; an isolated passing
-rewrite alone would not demonstrate that architectural benefit.
-
-These remaining proposals are not implemented support or authorization to resume general feature
-work. Qualified local record arrays now exercise the revised boundary through existing checked
-type/address plans without another transforming pass.
-
-Material runtime qualification has a separate contract from compile/assembly and static resource
-measurements. The maintained tiled-brass validator runs the unchanged `eval_buffer` and
-`sample_buffer` with two live synthetic textures and independent scalar references in all three
-modes. One CUDA driver owns textures, buffers and cleanup; an explicit entry contract selects
-packing, inputs and output checks. Installed-header assertions and fresh PTX review establish the
-168-byte global block and input/output strides (40/16 for eval, 24/32 for sample). Execution requires
-byte-identical reviewed PTX and frozen oracle hashes. Full texture handles must fit the application's
-low30 encoding without truncation. Repeats, wrapped UVs and untouched tail sentinels are checked.
-
-Input profiles own fixed coordinates, sampled inputs, independent oracles and preparation identity.
-The default texel-center profile preserves original bytes and measurement inputs. The separately
-qualified linear-filtering profile uses four dyadic locations for axis, bilinear and wrap-seam
-footprints. Its scalar reference interpolates uploaded encoded RGB before the graph decodes sRGB,
-and filters roughness before nonlinear material arithmetic. Profile identity and frozen oracle
-hashes prevent cross-profile preparation reuse even when the shader and ABI bytes agree.
-
-Sampling returns selected-layer throughput, not the collapsed full-material eval/PDF estimator.
-Cancellation in the source's artistic-IOR calculation affects average Fresnel and selection weights.
-The sample oracle therefore has two independently derived source-arithmetic candidates, fixed before
-GPU execution. One candidate must explain every record in a mode within the unchanged residual
-budget; components cannot choose candidates independently. This finite qualification does not prove
-a unique generated instruction sequence or cover every legal optimization. Exact flags and an
-early-rejection zero record complement the numerical checks. The shared driver preserves eval's
-original inputs, oracle and tolerance. Original assets, live LUT reads, arbitrary graph/input
-composition, sampling-distribution accuracy and application performance remain separate qualifications.
-See [the validator](../../extras/validate-nvvm-material-runtime.py) and
-[commands](../../issue-nvvm-backend/RESULTS.md#material-runtime-correctness).
-
-The synthetic device-event runner reuses that driver and oracle at 65,537 and 1,048,577 records.
-Each input is the original record at `index % 65`; the shader uses dispatch identity only for bounds
-and indexing, so every output must repeat its independently verified tile exactly. Six small and
-twelve enlarged correctness cells precede timing. A full qualified reference is bound to entry,
-count, backend, cubin, input and oracle hashes; measurement rechecks those bindings and correctness.
-Every warmup and measured launch resets active output and guards, then checks all downloaded bytes
-against that reference. Failed launches, cleanup, comparisons or observed competing processes cannot
-produce accepted timing summaries.
-
-CUDA events bracket one kernel on the same stream. Compilation, allocation, reset and readback are
-excluded; host submission gaps can still contribute to the interval. Three warmups and nine samples
-per cell run in two rounds with reversed complete order. All samples remain available; intervals
-below the predeclared 0.1 ms threshold have no throughput summary. Tiny hot textures, periodic inputs,
-known sample rejections and correctness transfers between launches limit the result to this
-synthetic protocol. Clock observations are recorded without changing device configuration. See the
-[measurement runner](../../extras/measure-nvvm-material-runtime.py) and
-[protocol](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement).
-
-The measured eval gap does not currently motivate another NVVM lowering pass. Both optimized PTX
-paths already contain no helper calls, and NVVM O3 reports no local stack. A scoped diagnostic that
-removes only NVRTC stores to proven never-read local byte ranges lets `ptxas` eliminate that path's
-local stack and removes most of its measured gap. The correct receiver snapshots remain part of
-language value semantics. A source-derived CUDA reduction isolates bounded dynamic indexing:
-eight constant-index variants eliminate local storage, while eight bounded-index variants retain
-27 stores to proven never-read bytes alongside live stack data. Initialization spelling, receiver
-snapshot size and branch spelling produce identical PTX within each group. Three full-material
-force-inline controls produce the original PTX unchanged. These are static optimization findings,
-not reduced-kernel runtime or performance evidence, and do not identify a particular vendor pass.
-Keep a source-level reproducer and general field-liveness proof; do not turn the diagnostic's
-exact-PTX deletion rule into an emitter workaround. The measured control covers deletion plus
-downstream reoptimization without identifying a unique hardware bottleneck. Current measurements
-and proof provenance remain in
-[focused evidence](../../issue-nvvm-backend/focused-evidence.json).
+operation recipes. `NVVMEmissionPlanIndex` enforces unique sources and supplies typed emission
+lookups. Requirements are deduplicated by exact overload; emitted operations retain one record per
+canonical source instruction. Querying a selected input library can allocate its isolated parsed
+representation, but creates neither output IR nor a vendor program.
+
+Ordinary allocation/load/store recipes retain the admitted role, alignment, conversion, load flags
+and pointer-value ABI/provenance decisions. Field and indexed-address records retain canonical
+field selection and qualified parent/storage/access facts. Diagnostic order and operand dominance
+remain part of preflight; provisional records cannot reach emission incomplete. A read-only borrow
+may reference mutable caller storage and does not itself authorize invariant-load metadata.
+
+Structured-buffer loads retain the exact raw view, buffer/index, alignment, flags and conversion.
+Raw roots and child field/index facts are recorded after parent/index availability checks; children
+inherit canonical root identity and resource-view permissions independently of pointer spelling.
+No recursive ancestor discovery is needed for this family. Preflight plans structured conversion
+strategies and exact Boolean requirements together. Emission follows retained child indices,
+preserving physical-array-struct identity and vector3 aggregate-storage/vector-value operations;
+explicit-stride constructors share the same planned converter. Field-value extraction and other
+dedicated resource operations remain outside this completed family. This is not a general
+transforming physical-storage pass.
+
+## Canonical types, storage roles and helper ABI
+
+Canonical IR types, field keys and instructions remain the semantic source of truth. Equal physical
+LLVM types do not imply equal Slang semantics: Half/BF16 both occupy 16 bits, and the two FP8 formats
+both occupy 8 bits. `classifyNVVMType` provides provider-independent canonical analysis shared by
+helper signature preflight and type lowering. `NVVMTypeInfo::supports` owns role distinctions.
+Actual argument provenance, export restrictions and CUDA/LLVM layout compatibility remain separate
+proofs.
+
+The nine type uses are entry result, helper result, entry parameter, helper parameter, helper value,
+ordinary value, local storage, parameter-group storage and structured-buffer storage. Support is
+checked **before** cache access. Value/helper/storage representations have distinct caches; a helper
+pointer key includes its pointee use. A successful storage lookup cannot authorize a previously
+unsupported value, external reference or exported signature. Copyable HelperValue requests redirect
+to Value before cache access, preserving request-order independence.
+
+Half helper parameters/results use physical i16 scalars or `<N x i16>` vectors for admitted widths
+2–4, while body values remain canonical Half. Callers encode arguments, callees decode parameters,
+returns encode results and callers decode them, using bit-preserving reinterpretation.
+`getNVVMHalfHelperABILaneCount` selects the same shapes at all four crossings. Preflight requires
+both exact conversion directions before provider mutation. This avoids a qualified libNVVM O3
+Half-vector call-transfer defect without changing arithmetic or storage admission.
+
+Exported Half helpers retain the tested direct-NVVM PTX symbols and layout, including a half4-to-half3
+boundary. The independent PTX caller checks semantic lanes and ignores unspecified return padding.
+This is not CUDA-prelude binary interoperability: the captured NVRTC helper has different symbols
+and packing. See [language composition evidence](nvvm-backend-capability-ledger.md#language-composition-and-application-evidence).
+
+Address spaces are generic/code0, global1, shared3, constant4 and local5. `addrspacecast` preserves
+provenance; integer round trips cannot substitute for it. Field selection uses the canonical field
+key and qualified parent, not pointee type alone. Indexed children retain the parent's independent
+access/storage proof. Constant-memory parameter-group loads remain ordinary loads; invariant global
+buffer recipes require their separate immutable-location contract.
+
+Natural payload layout, CUDA layout and physical LLVM layout are distinct. AnyValue packs Natural
+payloads; internal copyable locals and borrows can use native value layout, including float3
+alignment16. External storage and qualified BF16/compact families use their proven representations.
+Layout caches distinguish rules, and aggregate checks verify member offsets, size and alignment.
+Increasing allocation alignment cannot repair incorrect field offsets or array stride.
+
+| Value                | Internal representation                | Qualified local storage / CUDA size and alignment |
+| -------------------- | -------------------------------------- | ------------------------------------------------- |
+| BF16 scalar          | i16                                    | i16 / 2,2                                         |
+| BF16 vector2         | `<2 x i16>`                            | `<2 x i16>` / 4,4                                 |
+| BF16 vector3         | `<3 x i16>`                            | `[3 x i16]` / 6,2                                 |
+| BF16 vector4         | `<4 x i16>`                            | `[4 x i16]` / 8,2                                 |
+| FP8 E4M3/E5M2 scalar | Distinct semantic formats, physical i8 | Selected record fields / 1,1                      |
+
+BF3/BF4 whole-storage conversions extract/reconstruct raw lanes; BF2 keeps its required alignment.
+Canonical equal-size vector bitcasts use scalar bitcasts and reconstruction, not synthetic i48 or
+a second BF16 type. The [BF16/FP8 matrix](nvvm-backend-capability-ledger.md#bf16-and-fp8-role-specific-matrix)
+owns exact role admissions, numerical conversion/overflow policies and exclusions. In particular,
+integer-to-BF16 cannot silently round through Float32, FP8 literal overflow is not CUDA SATFINITE,
+and runtime Float32-to-FP8 narrowing remains research-only.
+
+Selected finite local records and their direct fixed arrays have narrower admission than general
+recursive values. Natural AnyValue payloads are unpacked through canonical field keys into qualified
+CUDA locals and repacked after mutation; earlier snapshots retain their bytes. Array value parameters
+can use a separate callee Var without changing the caller snapshot. External/exported arrays,
+array results rewritten to OutParam, borrowed/out/inout array roles, wrapper/multidimensional forms
+and BF3/BF4 record-array combinations do not inherit support from a cached layout or a neighboring
+positive test. Their exact boundaries remain in the role matrix.
+
+General per-root physical-storage rewriting is not implemented by these plans. Shared buffer-element
+lowering already owns physical types and packing, but its selected roots do not include every Generic
+local Ptr/Out/BorrowInOut form. Any reuse must preserve root selection and original semantic admission;
+a global type replacement can erase the distinction between local, shared and external storage.
+
+## Provider and vendor compilation
+
+The optional provider owns isolated LLVM14.0.6 typed-pointer construction behind ABI46 opaque
+handles. LLVM objects/symbols cannot cross into the CPU LLVM provider or host compiler. The separate
+LLVM build is statically linked with hidden/excluded symbols. Handles belong to their live module;
+destroying it invalidates subordinate handles. Serialization follows a caller-owned size-query/write
+protocol, and the host copies outputs while retaining the provider library.
+
+LLVM modules use `nvptx64-nvidia-cuda`, the specified DataLayout, `nvvmir.version` and kernel
+annotations; a calling convention alone does not mark a kernel. The current direct emitter writes
+verified **NVVM IR2.0 assembly** through the provider's audited compatibility writer. LLVM validation
+and libNVVM verification are separate gates. Available assembly/bitcode serialization does not make
+native bitcode the current direct-emission format. Vendor text-input deprecation leaves a qualified
+production bitcode path as a readiness concern; compatibility follows actual dialect/toolkit evidence.
+
+The downstream compiler accepts exact `Assembly + LLVMIR + Kernel` or `ObjectCode + LLVMIR + Kernel`
+artifacts without byte sniffing. Each invocation creates a fresh `nvvmProgram`, adds the user module
+and required coherent libdevice, verifies, compiles, retrieves diagnostics/PTX and destroys the program
+on every path. Verification/compilation receive the same options. Failed diagnostics remain failed
+artifacts; an empty vendor log falls back to its error string. Successful PTX drops the API trailing
+NUL and rejects invalid payloads.
+
+LibNVVM and libdevice must come from the same selected toolkit root. An explicit path wins;
+discovery retains the actual loaded identity and queries NVVM/IR versions. A rootless loaded compiler
+can work without libdevice, but a requested library requires a proven coherent root, with no fallback
+to another toolkit's file.
+
+For live named-library requirements, `INVVMCUDADeviceLibraryProvider` supplies a per-compilation
+snapshot owning immutable bytes, path, origin reference and a private provenance token. It is parsed
+once in an isolated input-library handle and every definition is queried before output creation.
+Definitions require external linkage, default visibility, C convention, a fixed parameter list and
+no return/parameter attributes. Failed loads return no handle; synchronous diagnostics are copied
+immediately, and unsupported signatures return support=false without pretending to be parse errors.
+
+The same compiler/token reaches downstream compilation through the appended options field. Provenance
+is checked before vendor-program creation, and library addition consumes snapshot bytes without
+reopening the path. Older option sizes default the field to null; legacy callers keep selected-path
+loading. Dead helpers do not request a library, and LLVM-only calls need no libdevice. The older
+timestamp-based cache hash is not an atomic filesystem snapshot. Named LLVM attributes are preserved;
+library definition attributes are not copied onto output declarations.
+
+The route passes explicit virtual architecture and O0/O3. Floating mode and Float32 denormal mode
+are independent:
+
+| Policy                           | libNVVM options                            |
+| -------------------------------- | ------------------------------------------ |
+| Default floating mode            | Vendor defaults for division, sqrt and FMA |
+| Precise                          | `-prec-div=1 -prec-sqrt=1 -fma=0`          |
+| Fast                             | `-prec-div=0 -prec-sqrt=0 -fma=1`          |
+| Preserve/flush Float32 denormals | `-ftz=0` / `-ftz=1`                        |
+
+Nondefault FP16/FP64 denormal policies and duplicate managed overrides reject before program creation.
+NVRTC option aggregation differs; comparisons record effective options rather than equating labels.
+The maintained three-mode corpus uses NVRTC O3 and NVVM O0/O3.
+
+## Numerical and target-specific boundaries
+
+CUDA output is comparison evidence, not a universal mathematical oracle. Core composition determines
+evaluation order and intermediate precision; changing a named call or choosing a direct Half
+instruction must preserve or explicitly revise that operation's contract. The current accepted
+ordinary Half math paths generally widen to Float32 and narrow once; Half-specific bit transport,
+BF16 operations and physical helper ABI are separate mechanisms.
+
+| Maintained contract                                                                                                                                                                               | Limit that matters to implementation                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Round and directed rounding](../../issue-nvvm-backend/RESULTS.md#rounding-signature-and-numerical-contracts)                                                                                     | NVVM round retains ties-away; CUDA Half round uses ties-even. Directed functions preserve zero/Inf bits and compare NaN class.                                                                                                            |
+| [Square root](../../issue-nvvm-backend/RESULTS.md#square-root-signature-and-numerical-contracts) and [fraction](../../issue-nvvm-backend/RESULTS.md#fraction-composition-and-numerical-contracts) | Selected intermediate evaluation and composition are part of the contract; bounded agreement is not universal equivalence.                                                                                                                |
+| [Reciprocal square root](../../issue-nvvm-backend/RESULTS.md#reciprocal-square-root-numerical-contracts)                                                                                          | Independent references and explicit special/accuracy rules qualify the selected policies.                                                                                                                                                 |
+| [Exp](../../issue-nvvm-backend/RESULTS.md#exponential-numerical-contracts) and [exp2](../../issue-nvvm-backend/RESULTS.md#base-two-exponential-numerical-contracts)                               | Test-defined spacing/encoding admission has explicit zero/maxfinite/infinity endpoints; empirical library tables are not guaranteed universal ULP bounds. CUDA Half FTZ/FMA/correction images differ from NVVM narrowing.                 |
+| [Log family](../../issue-nvvm-backend/RESULTS.md#logarithm-family-numerical-contracts)                                                                                                            | CUDA Half ideal-RN checks are finite-corpus qualifications. CUDA double log10 narrows its input to Float32; preservation is not true-double accuracy. Negative tiny doubles narrowing to -0 are outside the common-classification corpus. |
+
+The policies/checkers own exact constants, reference construction, correction images and negative
+controls. Preserve the distinction between NaN-class accuracy and byte-for-byte baseline preservation,
+including unpromised payloads. Do not fit tolerances to a new implementation's observed outputs or
+overwrite historical failure outcomes when correcting a policy or implementation.
+
+Several implementation exceptions carry independent contracts:
+
+- **Narrow integers:** libNVVM/PTX can retain excess high bits in promoted16 arithmetic. Qualified
+  signed/unsigned normalization at exact-width comparison/division/shift/widening/conversion consumers
+  restores semantic low bits; physical Half/BF16 transport is not integer arithmetic. The retained
+  signed16 O3 failure and correction remain in focused evidence.
+- **Half conversion:** runtime Float32 narrowing uses `llvm.nvvm.f2h.rn` plus mechanical bitcast;
+  ordinary fptrunc on the qualified stack could turn low-payload signaling NaNs into infinity.
+  Shared literal narrowing is RN-even with discarded-bit information. NaNs promise class, not payload.
+- **Waves and synchronization:** raw-bit all-equal distinguishes signed zeros and compares NaN payloads.
+  Collectives execute before combining component predicates. Hardware activemask is effectful and
+  distinct from logical participation; masked MIN/MAX preserves source order and finite Half seeds.
+  CUDA match-all versus NVVM match-any remains a qualified distinction. Direct barrier/fence attributes
+  do not establish transitive convergence metadata through arbitrary helpers. See [wave contracts](nvvm-backend-capability-ledger.md#waves-synchronization-and-observations).
+- **Clocks:** selected side-effecting PTX prevents observed merging/hoisting of plain intrinsic reads.
+  These are wrapping per-SM cycle counters, not global time or memory fences.
+- **Nested stores:** a qualified libNVVM12.9 padding defect requires splitting at direct nested-struct
+  boundaries with alignment derived from the parent guarantee. Arrays stay whole; terminal aggregates
+  retaining struct-in-struct boundaries use conservative alignment1. The saved SSA value and layout
+  stay unchanged. This does not prove scalability, and the NVRTC optimized integer-array copy failure
+  remains open.
+
+## Resources and evidence boundaries
+
+Surface legalization runs before shared subscript expansion discards component masks. The canonical
+collected field's static format selects physical payload types, explicit conversion and byte-X
+coordinates; equal logical types can therefore access different formats. The provider emits typed
+operations and mechanical bitcasts, not format discovery or implicit storage conversion. Component
+updates preserve untouched raw lanes and remain non-atomic. Arbitrary resource-helper provenance,
+dynamic components, additional packed/normalized formats and general aliases remain outside the
+qualified boundary.
+
+An undecorated `RWTexture<int4>` requires matching native32 four-channel storage. An opaque CUDA
+handle does not make an RGBA8 allocation visible to the compiler, and shader reads using the same
+wrong convention can conceal corrupt neighboring writes. The [physical surface contract](../../issue-nvvm-backend/RESULTS.md#physical-surface-correctness)
+uses independent host readback and preserves existing NVRTC compile/rounding failures. Half stores
+use RN-even, including subnormal/overflow boundaries; the NVRTC formatted-store truncation behavior
+is separate. [The resource ledger](nvvm-backend-capability-ledger.md#texture-surface-and-descriptor-contracts)
+owns exact shapes, native/Half format admissions and retained exclusions.
+
+Texture operations use canonical sample/fetch/gather/query IR with typed resources, samplers,
+coordinates and results. Existing ignored gather offsets and zero array-count outputs are not full
+API repairs. Base geometry cannot determine allocated/view mip count. Opaque handles are not an
+undocumented metadata interface; research driver-lookup failures remain evidence, even where ptxas
+accepted the code. Texture/surface and length-one cube-array binding distinctions remain unresolved.
+
+Host packing is part of each test/application contract. For example, CUDA column-major float3x2 uses
+stride12/size24; graphics-packed inputs cannot silently be repacked to make a comparison pass.
+NVRTC PCH ownership and subprocess cleanup must respect compiler/process lifetime. Preserve original
+packing/process failures and the identity of any restored artifacts.
+
+Compilation, physical readback, application runtime and performance qualify different claims:
+
+- [Material runtime correctness](../../issue-nvvm-backend/RESULTS.md#material-runtime-correctness)
+  uses explicit eval/sample entry layouts, two live synthetic textures and independent scalar oracles.
+  Frozen oracle/PTX/profile identity, complete handle encoding, repeats/wraps and untouched sentinels
+  remain required. Texel-center and linear-filtering profiles are distinct. Sampling's selected-layer
+  throughput is not a full-material eval/PDF or distribution guarantee; independently frozen
+  source-arithmetic candidates cannot be selected per component to fit output.
+- [Original-input runtime](../../issue-nvvm-backend/RESULTS.md#original-input-corpus-dispatch-timing),
+  [code quality](../../issue-nvvm-backend/RESULTS.md#original-input-corpus-code-quality) and
+  [material measurement](../../issue-nvvm-backend/RESULTS.md#material-device-event-measurement)
+  retain their own inputs, correctness prerequisites, timing scope and excluded claims. A compile
+  pass or attractive PTX is not runtime correctness; faster compilation is not faster GPU execution.
+- [Accepted baseline](../../issue-nvvm-backend/accepted-baseline.json),
+  [accepted identity](../../issue-nvvm-backend/accepted-identity.json) and
+  [focused evidence](../../issue-nvvm-backend/focused-evidence.json) retain actual tested identities,
+  outcomes and resolved/unresolved failure transitions. New focused acceptance does not relabel an
+  older full checkpoint as newly executed. STATUS and WORKFLOW determine the current economical
+  validation scope; architecture does not impose a second campaign cadence.
+
+Future changes should retire a complete duplicated ownership path with a demonstrated workload and
+bounded validation. Generic physical-storage transformation, broader texture metadata semantics,
+transitive convergence qualification and a production native-bitcode path remain separate work;
+they are not implied by adjacent passing tests or by this document.

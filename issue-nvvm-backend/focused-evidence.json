@@ -77580,6 +77580,104 @@
         "No full native/corpus/surface/numerical/material campaign in this focused batch. User-authorized full checkpoint follows all queued cleanup and Float16 work.",
         "All39 earlier feature records and full baseline/identity retained; diagnostic failure and before/after identities preserved."
       ]
+    },
+    "nvvm-fake-maintenance": {
+      "status": "accepted-focused",
+      "scope": "Separate186immutable source declarations from fake recording infrastructure; consolidate56test-only libdevice signatures with independent public expectations and real selected-definition tests. Condense architecture around surviving invariants; preserve numerical policy details in RESULTS. No compiler/provider or numerical policy changes.",
+      "identity": {
+        "revision": "c3b448788ffa65f138673ec41c7d55cae3cf7808",
+        "test_patch_sha256": "859641d5e6e0038a30b64a637e587da9190cfae5b73324a9fa4b89be5a0b1a16",
+        "files": {
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "c8183dfe4bc9ebec189f1a49e0a5bf8cff3f642394c15392b8275e1937766364",
+          "tools/slang-unit-test/unit-test-nvvm-source-fixtures.h": "4d0e569fe35218867fa4ac4e2999cf6235bd939edc4f73a157f3348e36b4fd9d",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "2ade2394f0b9cc2636117329ade48eca3fcf3b1d1f3626e34fa89eca6dfae270",
+          "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "d08d97d2bcd6f038819dc9e4ad68aea4057cb1a17570a5855c3b81a6add94c01"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "42e1d1106cbe72d3333e88a48d703077c1ba5bb2df0ec1d5a0ca559ed2fef756",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "f6c6bc9079b7f654be12afc52cec8e950dfbce32491e58f903f99c44342db664"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "production_identity": "features.nvvm-structured-storage-planning.identity",
+        "reuse": "Compiler/provider and runner binaries unchanged; only test plugin rebuilt.",
+        "record": {
+          "path": "build/nvvm-fake-maintenance/tested-identity.json",
+          "sha256": "492a364881f82b07e7870e1e99a1f07c4fdc31d634f0465572726bf0b86c3b71"
+        }
+      },
+      "build": {
+        "path": "build/nvvm-fake-maintenance/build-tests.json",
+        "sha256": "447e15d0bb2b772f6f986ab454b163017a614cc6a77accdb2d987b072696bb9a",
+        "return_code": 0,
+        "elapsed_seconds": 22.105227947235107
+      },
+      "units": {
+        "passed": 10,
+        "record": {
+          "path": "build/nvvm-fake-maintenance/units.json",
+          "sha256": "4ed7a7a014ba1dfaa62277dc75d090574dbda52ccf6068d78d7903ae9010af9c",
+          "return_code": 0,
+          "elapsed_seconds": 14.98887038230896
+        },
+        "outcomes": {
+          "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryPointerOutputs.internal": "passed",
+          "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryUsesSelectedDefinitions.internal": "passed",
+          "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryRejectsUnsupportedABI.internal": "passed",
+          "slang-unit-test-tool/nvvmIRBuilderDeviceLibraryEmitsAndRejectsWithoutMutation.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangScalarMathHelpersRequestTypedOperations.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangDeviceLibraryDeadHelpersNeedNoLibrary.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangPublicRoundUsesNamedDeviceLibrary.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangPublicDirectedRoundingUsesNamedDeviceLibrary.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangCoreMathUsesNamedCalls.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation.internal": "passed"
+        }
+      },
+      "preservation": {
+        "moved_declarations": 186,
+        "retained_support_declarations": 22,
+        "registered_nvvm_units": 435,
+        "generated_fixtures": 2,
+        "artifacts": [
+          {
+            "path": "build/nvvm-fake-maintenance/fixture-audit.json",
+            "sha256": "e4c0f8f356c93f62a19b9cbd149fb9c0291e859892a6a7566fe566f4599e0242"
+          },
+          {
+            "path": "build/nvvm-fake-maintenance/fixture-extraction.json",
+            "sha256": "16681f4f734be95ce0f6329f2b8aba98ed872da5ed63e274b20f42174328b577"
+          },
+          {
+            "path": "build/nvvm-fake-maintenance/before-unit-inventory.json",
+            "sha256": "5d9a95dbc265c1ac4e8fdc86aeaaa7303e0d99b36b67925b0bd3c1ca4879b442"
+          },
+          {
+            "path": "build/nvvm-fake-maintenance/generated-fixtures.json",
+            "sha256": "ea06d5998ffde222c9ee02111bacdfa63d8e2e1db18b72d0f0accd40b1b9d2a4"
+          },
+          {
+            "path": "build/nvvm-fake-maintenance/support-scope-audit.json",
+            "sha256": "86899cbafd83b37831da23a67db6a99ff495946b110c2c62eff0c4de80dfaa1d"
+          },
+          {
+            "path": "build/nvvm-fake-maintenance/matcher-name-audit.json",
+            "sha256": "b2719fcfcd874acaea264590e27ed745518f45a2a04e4059cb03dd500f743eb0"
+          },
+          {
+            "path": "build/nvvm-fake-maintenance/fixture-consumers.json",
+            "sha256": "5ba18a045e3c4c6f4dddc0f5e282baeafa3d0b9e9f694f2c5ba80e6a2e8ce4f2"
+          }
+        ]
+      },
+      "validation_incidents": [],
+      "limitations": [
+        "Fake signature table models conventional test signatures only; production still reads actual selected bitcode definitions.",
+        "No fresh GPU,numerical,material or full compiler campaign warranted; all40priorfeatureobjects and fullbaseline/identity preserved. User-authorized full checkpoint remains queued after Float16."
+      ]
     }
   }
 }

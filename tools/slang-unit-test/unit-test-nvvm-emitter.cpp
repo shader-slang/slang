@@ -1,5 +1,6 @@
 // unit-test-nvvm-emitter.cpp
 
+#include "unit-test-nvvm-source-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
 // Gives fake-emitter tests that intentionally request a libdevice operation the same coherent
@@ -11265,6 +11266,78 @@ SLANG_UNIT_TEST(nvvmSlangNamedSynchronizationRejectsBeforeModuleCreation)
 SLANG_UNIT_TEST(nvvmSlangDeviceLibraryPreflightsBeforeOutputCreation)
 {
 #if SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY
+    // These expectations are independent of the fake's admission table. In particular, an
+    // output-pointer role cannot become an ordinary value merely because its pointee matches.
+    const SlangNVVMNamedIntrinsicOperandKind value = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+    const SlangNVVMNamedIntrinsicOperandKind output =
+        SLANG_NVVM_NAMED_INTRINSIC_OPERAND_OUT_POINTER;
+    struct SignatureCase
+    {
+        const char* name;
+        SlangNVVMValueTypeDesc result;
+        size_t count;
+        SlangNVVMNamedIntrinsicOperandDesc operands[3];
+    };
+    const SignatureCase signatures[] = {
+        {"__nv_roundf", NVVMSemantics::kFloat32, 1, {{NVVMSemantics::kFloat32, value}}},
+        {"__nv_pow",
+         NVVMSemantics::kFloat64,
+         2,
+         {{NVVMSemantics::kFloat64, value}, {NVVMSemantics::kFloat64, value}}},
+        {"__nv_fmaf",
+         NVVMSemantics::kFloat32,
+         3,
+         {{NVVMSemantics::kFloat32, value},
+          {NVVMSemantics::kFloat32, value},
+          {NVVMSemantics::kFloat32, value}}},
+        {"__nv_frexpf",
+         NVVMSemantics::kFloat32,
+         2,
+         {{NVVMSemantics::kFloat32, value}, {NVVMSemantics::kSignedI32, output}}},
+        {"__nv_modf",
+         NVVMSemantics::kFloat64,
+         2,
+         {{NVVMSemantics::kFloat64, value}, {NVVMSemantics::kFloat64, output}}},
+    };
+    _resetDirectNVVMFakes();
+    SlangNVVMDeviceLibraryHandle library = nullptr;
+    const uint8_t fakeBytes[] = {0x42, 0x43};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_fakeNVVMBuilderLoadDeviceLibrary(
+        fakeBytes,
+        sizeof(fakeBytes),
+        &library,
+        nullptr,
+        nullptr)));
+    for (const auto& signature : signatures)
+    {
+        for (int variant = 0; variant < 6; ++variant)
+        {
+            auto test = signature;
+            SlangNVVMNamedIntrinsicDesc desc =
+                {test.name, strlen(test.name), test.result, test.operands, test.count};
+            if (variant == 1)
+                desc.resultType.bitWidth = desc.resultType.bitWidth == 32 ? 64 : 32;
+            else if (variant == 2)
+                --desc.operandCount;
+            else if (variant == 3)
+                test.operands[0].type.bitWidth = test.operands[0].type.bitWidth == 32 ? 64 : 32;
+            else if (variant == 4)
+                test.operands[test.count - 1].kind =
+                    test.operands[test.count - 1].kind == output
+                        ? value
+                        : SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT;
+            else if (variant == 5)
+                ++desc.nameSize;
+            uint32_t supported = 99;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                _fakeNVVMBuilderIsDeviceLibraryFunctionSupported(library, &desc, &supported)));
+            SLANG_CHECK(supported == (variant == 0 ? 1u : 0u));
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+    }
+    _fakeNVVMBuilderDestroyDeviceLibrary(library);
+
     struct Case
     {
         const char* name;

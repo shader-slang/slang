@@ -1,5 +1,6 @@
 // unit-test-nvvm-integration.cpp
 
+#include "unit-test-nvvm-source-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
 SLANG_UNIT_TEST(nvvmTestArchitectureSelection)

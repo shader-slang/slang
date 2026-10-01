@@ -325,13 +325,17 @@ host-checked scalar admission and zero high words for Half/Float32.
 Library admission is the explicit test-defined spacing/encoding union, N = 2 for Float32 or
 N = 1 for Float64, centered on independently certified same-width RN-even references. Zero uses minsubnormal spacing;
 maximum finite uses the conceptual next binade for adjacent spacing; infinity admits only itself
-and N finite predecessors by ordered encoding steps. Special inputs have exact classification rules.
+and N finite predecessors by ordered encoding steps. Exact special-input rules override the
+approximate set: either signed zero returns one, negative infinity returns positive zero, positive
+infinity returns positive infinity, and NaNs require only NaN classification.
 These endpoint extensions are not a vendor-defined ULP metric or a universal accuracy guarantee.
 The library table is empirical and non-guaranteed; PTX ex2 has its separate source contract.
 
 NVVM Half narrows the admitted Float32 expf set once. CUDA Half preserves the exact encoded-FMA
-constant `0x3fb8aa3b`, ex2 input/output FTZ, narrowing and four Half correction FMAs, including
-inactive stages. The checker preserves every discrete image. Half baseline scalar results at
+constant `0x3fb8aa3b` with RN FMA and a negative-zero addend, ex2 input/output FTZ, narrowing and
+four Half correction FMAs, including inactive stages. The original-input match/correction pairs
+are `0x1f79/0x9400`, `0x25cf/0x9400`, `0xc13b/0x0400` and `0xc1ef/0x0200`.
+The checker preserves every discrete image. Half baseline scalar results at
 `0x1f79` and `0x25cf` intentionally differ between targets; compare each mode to its own immutable
 baseline rather than requiring cross-target identity. Preserve all nine complete buffers byte for
 byte before/after migration, including NaN payloads that admission only checks by classification.
@@ -358,8 +362,8 @@ Half adds policy marker `56042` for NVVM or `1209` for CUDA. Require exact lengt
 zero errors, scalar candidate admission and zero high words for Half/Float32. Compare all nine raw
 buffers to their own immutable baseline bytes, including unpromised NaN payloads.
 
-Use the exp endpoint convention above with exact references for `2^x`: Float32 N = 2, Float64 N = 1,
-and exact special-input overrides. The generator and independent checker certify integer powers,
+Use the exp endpoint convention and exact special-input rules above with references for `2^x`:
+Float32 N = 2 and Float64 N = 1. The generator and independent checker certify integer powers,
 including exact underflow halfway ties, or bound ln2 and exponential endpoints for noninteger inputs.
 NVVM Half narrows selected Float32 library candidates. CUDA Half applies ex2 input/output FTZ,
 then exact `fma.rn.f32(q, 2^-24, q)`, then RN16. The multiplier bits are `0x33800000`; rounding
@@ -392,11 +396,17 @@ including NaNs.
 
 The checker independently encloses signed logarithms using directed integer recurrence and
 same-width IEEE midpoint cells. Library admission reflects the existing empirical spacing/encoding
-union for negative results: Float32 radii 1/1/2 for log/log2/log10, Float64 radius 1, with exact
-special-input overrides. NVVM Half narrows the Float32 admission set once. CUDA Half checks the
-ideal RN-even result on this finite corpus; bounded source/correction controls distinguish its
-installed sequence without a complete PTX approximation model. A failed API check remains a
+union for negative results: Float32 radii 1/1/2 for log/log2/log10, Float64 radius 1. Exact
+special-input rules override approximation: either signed zero returns negative infinity, one
+returns positive zero, negative nonzero inputs produce NaN, positive infinity returns positive
+infinity, and NaNs require only NaN classification. NVVM Half narrows the Float32 admission set once.
+CUDA Half checks the ideal RN-even result on this finite corpus. Bounded source/correction controls
+distinguish its installed sequence without a complete PTX approximation model. A failed API check remains a
 failure; do not fit tolerances to observed results.
+
+CUDA Half log2 applies corrections to the evolving result. For log/log10, an encoded Float32
+multiplication and Half narrowing precede corrections keyed by the original input. Preserve those
+different evaluation orders; the installed-header checker owns their exact constants and stages.
 
 CUDA double log10 separately models RN32 input conversion, Float32 log10 and widening because the
 existing wrapper takes float. This is preservation evidence, not true-double accuracy. The selected
