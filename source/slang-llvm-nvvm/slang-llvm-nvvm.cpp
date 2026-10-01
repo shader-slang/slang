@@ -4212,7 +4212,8 @@ static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& op
     if ((operation.operation != SLANG_NVVM_SURFACE_OP_LOAD &&
          operation.operation != SLANG_NVVM_SURFACE_OP_STORE) ||
         !isSupportedShape || operation.isArray > 1 ||
-        (operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
+        (operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D &&
+         operation.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
         (operation.elementType.laneCount != 1 && operation.elementType.laneCount != 2 &&
          operation.elementType.laneCount != 4) ||
         operation.boundaryMode != SLANG_NVVM_SURFACE_BOUNDARY_ZERO)
@@ -4277,15 +4278,21 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
          llvm::Intrinsic::nvvm_sust_b_3d_v2i32_zero,
          llvm::Intrinsic::nvvm_sust_b_3d_v4i32_zero},
     };
-    static const llvm::Intrinsic::ID kLoadI32Array2D[3] = {
-        llvm::Intrinsic::nvvm_suld_2d_array_i32_zero,
-        llvm::Intrinsic::nvvm_suld_2d_array_v2i32_zero,
-        llvm::Intrinsic::nvvm_suld_2d_array_v4i32_zero,
+    static const llvm::Intrinsic::ID kLoadI32Array[2][3] = {
+        {llvm::Intrinsic::nvvm_suld_1d_array_i32_zero,
+         llvm::Intrinsic::nvvm_suld_1d_array_v2i32_zero,
+         llvm::Intrinsic::nvvm_suld_1d_array_v4i32_zero},
+        {llvm::Intrinsic::nvvm_suld_2d_array_i32_zero,
+         llvm::Intrinsic::nvvm_suld_2d_array_v2i32_zero,
+         llvm::Intrinsic::nvvm_suld_2d_array_v4i32_zero},
     };
-    static const llvm::Intrinsic::ID kStoreI32Array2D[3] = {
-        llvm::Intrinsic::nvvm_sust_b_2d_array_i32_zero,
-        llvm::Intrinsic::nvvm_sust_b_2d_array_v2i32_zero,
-        llvm::Intrinsic::nvvm_sust_b_2d_array_v4i32_zero,
+    static const llvm::Intrinsic::ID kStoreI32Array[2][3] = {
+        {llvm::Intrinsic::nvvm_sust_b_1d_array_i32_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_array_v2i32_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_array_v4i32_zero},
+        {llvm::Intrinsic::nvvm_sust_b_2d_array_i32_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_array_v2i32_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_array_v4i32_zero},
     };
 
     const uint32_t laneIndex = operation.elementType.laneCount == 1   ? 0
@@ -4301,8 +4308,9 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
     }
     if (operation.isArray)
     {
-        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD ? kLoadI32Array2D[laneIndex]
-                                                                 : kStoreI32Array2D[laneIndex];
+        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                   ? kLoadI32Array[dimensionIndex][laneIndex]
+                   : kStoreI32Array[dimensionIndex][laneIndex];
     }
     return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD ? kLoadI32[dimensionIndex][laneIndex]
                                                              : kStoreI32[dimensionIndex][laneIndex];
@@ -4375,11 +4383,17 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
 
     llvm::SmallVector<llvm::Value*, 7> arguments;
     arguments.push_back(surface);
+    // Physical IR keeps (byteX, y, layer), but NVVM array intrinsics take the layer first.
+    // Keep this calling convention conversion here so coordinate planning stays shape-independent.
+    if (operation->isArray)
+        arguments.push_back(
+            state->builder.CreateExtractElement(coordinate, coordinateLaneCount - 1));
     llvm::Value* x = coordinateLaneCount == 1
                          ? coordinate
                          : state->builder.CreateExtractElement(coordinate, uint64_t(0));
     arguments.push_back(x);
-    for (uint32_t dimension = 1; dimension < coordinateLaneCount; ++dimension)
+    const uint32_t spatialLaneCount = coordinateLaneCount - operation->isArray;
+    for (uint32_t dimension = 1; dimension < spatialLaneCount; ++dimension)
         arguments.push_back(state->builder.CreateExtractElement(coordinate, dimension));
 
     if (operation->operation == SLANG_NVVM_SURFACE_OP_STORE)

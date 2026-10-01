@@ -812,6 +812,12 @@ can preserve known negatives, but cannot pass checkpoint comparison without comp
 Converted NaN payloads are compared by class only; finite values, untouched channels and guards stay
 exact. Known wrong-output signatures stay exact too.
 
+Layered native32 rows are `native32-1d-array` and `uint32-2d-array-order`. The first groups
+Float32/SInt32/UInt32 scalar, two- and four-channel resources; the second isolates array coordinate
+order with aligned, in-bounds asymmetric coordinates. Array depth is independent of spatial height.
+The current harness has 85 rows; the retained full baseline has 83. Preserve its 249 cells and use
+the focused layered evidence when reviewing the six-cell expansion at the next full checkpoint.
+
 A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires
 review. Bootstrap or expansion is a separate reviewed adoption of validated outcomes, never an
 automatic allow-failures list. Preserve the old inventory and failure history during that adoption.

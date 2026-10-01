@@ -5622,7 +5622,8 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderDeclareGlobalStorage(
                                   valueType == _getFakeNVVMBuilderArrayType()) &&
                                  linkage == SLANG_NVVM_LINKAGE_INTERNAL &&
                                  addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
-    const bool isConstantStruct = valueType == _getFakeNVVMBuilderStructType() &&
+    const bool isConstantStruct = (valueType == _getFakeNVVMBuilderStructType() ||
+                                   valueType == _getFakeNVVMBuilderScalarStructType()) &&
                                   linkage == SLANG_NVVM_LINKAGE_EXTERNAL &&
                                   addressSpace == SLANG_NVVM_ADDRESS_SPACE_CONSTANT;
     if (module != _getFakeNVVMBuilderModule() || (!isSharedInteger && !isConstantStruct) ||
@@ -6400,7 +6401,8 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     if ((operation.operation != SLANG_NVVM_SURFACE_OP_LOAD &&
          operation.operation != SLANG_NVVM_SURFACE_OP_STORE) ||
         !isSupportedShape || operation.isArray > 1 ||
-        (operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
+        (operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D &&
+         operation.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
         (operation.elementType.laneCount != 1 && operation.elementType.laneCount != 2 &&
          operation.elementType.laneCount != 4) ||
         operation.boundaryMode != SLANG_NVVM_SURFACE_BOUNDARY_ZERO)

@@ -11009,6 +11009,89 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
 {
     _resetDirectNVVMFakes();
     {
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        const char* source = R"SLANG(
+            RWTexture1DArray<uint4> image;
+            [numthreads(1,1,1)] void computeMain()
+            {
+                image[int2(3,7)] = image.Load(int2(1,5));
+            }
+        )SLANG";
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
+        for (Index i = 0; i < 2; ++i)
+        {
+            const auto& operation = gFakeNVVMBuilder.surfaceOperations[i];
+            const bool store = i == 1;
+            SLANG_CHECK(
+                operation.operation ==
+                (store ? SLANG_NVVM_SURFACE_OP_STORE : SLANG_NVVM_SURFACE_OP_LOAD));
+            SLANG_CHECK(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_1D && operation.isArray == 1);
+            SLANG_CHECK(operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+            SLANG_CHECK(
+                operation.elementType.bitWidth == 32 && operation.elementType.laneCount == 4);
+            const auto coordinate = gFakeNVVMBuilder.surfaceOperationOperands[i][1];
+            SLANG_CHECK_ABORT(coordinate.kind == FakeNVVMBuilderValueKind::VectorConstruct);
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.vectorConstructElementCounts[coordinate.index] == 2);
+            const Index offset = gFakeNVVMBuilder.vectorConstructElementOffsets[coordinate.index];
+            const auto byteX = gFakeNVVMBuilder.vectorConstructElementValueRefs[offset];
+            const auto layer = gFakeNVVMBuilder.vectorConstructElementValueRefs[offset + 1];
+            SLANG_CHECK_ABORT(layer.kind == FakeNVVMBuilderValueKind::VectorElement);
+            SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[layer.index] == 1);
+            const auto original = gFakeNVVMBuilder.vectorElementBaseValueRefs[layer.index];
+            if (!store)
+            {
+                // Load's literal X folds, while the unchanged layer remains a direct extraction.
+                SLANG_CHECK_ABORT(byteX.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+                SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[byteX.index] == 16);
+                SLANG_CHECK_ABORT(original.kind == FakeNVVMBuilderValueKind::VectorConstruct);
+                SLANG_CHECK_ABORT(
+                    gFakeNVVMBuilder.vectorConstructElementCounts[original.index] == 2);
+                const Index originalOffset =
+                    gFakeNVVMBuilder.vectorConstructElementOffsets[original.index];
+                const uint32_t expected[] = {1, 5};
+                for (Index lane = 0; lane < 2; ++lane)
+                {
+                    const auto value =
+                        gFakeNVVMBuilder.vectorConstructElementValueRefs[originalOffset + lane];
+                    SLANG_CHECK_ABORT(value.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+                    SLANG_CHECK(
+                        gFakeNVVMBuilder.integerConstantValues[value.index] == expected[lane]);
+                }
+            }
+            else
+            {
+                // Subscript conversion remains explicit. Scale X from that same coordinate;
+                // preserve its layer without evaluating or reconstructing the conversion.
+                SLANG_CHECK_ABORT(byteX.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                const auto& scale = gFakeNVVMBuilder.scalarOperations[byteX.index];
+                SLANG_CHECK(scale.key.operation == SLANG_NVVM_VALUE_OP_MULTIPLY);
+                SLANG_CHECK_ABORT(
+                    scale.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant);
+                SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[scale.operands[1].index] == 16);
+                const auto x = scale.operands[0];
+                SLANG_CHECK_ABORT(x.kind == FakeNVVMBuilderValueKind::VectorElement);
+                SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[x.index] == 0);
+                const auto xBase = gFakeNVVMBuilder.vectorElementBaseValueRefs[x.index];
+                SLANG_CHECK(
+                    xBase.kind == original.kind && xBase.index == original.index &&
+                    xBase.functionIndex == original.functionIndex);
+            }
+        }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+    _resetDirectNVVMFakes();
+    {
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
             slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);

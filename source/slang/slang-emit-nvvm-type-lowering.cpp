@@ -1713,7 +1713,7 @@ bool getNVVMSupportedSurfaceType(IRInst* type, NVVMSurfaceType& outType)
     }
 
     const bool isArray = textureType->isArray();
-    if (isArray && shape != SLANG_NVVM_TEXTURE_SHAPE_2D)
+    if (isArray && shape != SLANG_NVVM_TEXTURE_SHAPE_1D && shape != SLANG_NVVM_TEXTURE_SHAPE_2D)
         return false;
 
     SlangNVVMValueTypeDesc elementType = {};

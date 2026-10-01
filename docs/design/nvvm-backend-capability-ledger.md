@@ -489,13 +489,13 @@ The observed driver lookup failures for `txq.array_size` and `txq.num_mipmap_lev
 the qualified stack; `txq.level.width` loaded and executed. No full API repair is implemented.
 
 NVVM surface legalization supports the existing native 32-bit signed/unsigned/Float32 scalar, two-
-and four-channel transfers in admitted 1D/2D/3D and array shapes. Native Half and annotated Half
+and four-channel transfers in 1D/2D/3D and 1DArray/2DArray shapes. Native Half and annotated Half
 storage with Float32 shader values remain limited to non-array 1D/2D. Matching Float32 uses Float32
 payloads directly. Static component masks and in-range dynamic scalar indices update physical channels without
 re-encoding untouched NaN payloads. Dynamic indices use the existing non-atomic whole-texel merge;
 there is no new out-of-range lane guarantee. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
 
-The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 83 cases,
+The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 85 cases,
 including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
 nonzero guards and zero-boundary accesses. Native signed/unsigned32 cases exercise 1D/2D scalar,
 two- and four-channel loads, whole stores and component stores with exact integer bits. Four mixed
@@ -506,8 +506,16 @@ static controls at O0/O3, with unchanged physical oracles and guards. The dynami
 all four lanes in 2D Float32/Half storage and exact untouched NaN payloads; signed/two-lane shapes
 have compiler-unit coverage, not fresh physical runtime coverage. NVRTC's full checkpoint retains
 52 passes, 20 compile failures and 11 rounding mismatches.
-The recurring checkpoint replays physical readbacks and compares all 249 obligations against the
+Two additional [layered cases](../../tests/cuda/nvvm-surface-physical-layered.slang) group all nine
+native32 kind/width combinations in 1D arrays and isolate 2D-array coordinate ordering. Distinct
+resource/layer/coordinate/lane bits, independent stores and complete host readback prevent a matching
+wrong load/store address from hiding corruption. The original 83 case/oracle identities remain
+unchanged. Explicit array role selects layered allocation and copy depth, even for a singleton;
+CPU checks cover that role without claiming singleton GPU qualification.
+The recurring checkpoint replays physical readbacks and compares its complete inventory against the
 [current baseline](../../issue-nvvm-backend/accepted-baseline.json), preserving known failures.
+That full baseline still owns its original 249 cells; the six added layered cells require explicit
+reviewed adoption at the next full checkpoint.
 [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC
 formatted store's observed truncation. NVRTC component writes (including dynamic indexing), user resource-helper format provenance, three-channel transfers and additional packed/normalized formats

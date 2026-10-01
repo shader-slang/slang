@@ -25,7 +25,7 @@ import tempfile
 import time
 
 REPO = Path(__file__).resolve().parents[1]
-FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed"]
+FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
 FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4)}
@@ -161,6 +161,13 @@ def cases():
         for entry in ("wholeCopies", "componentCopies"):
             add(f"mixed-{shape}d-{entry}", "mixed", entry, 32,
                 1 if shape == 1 else 3, 4, False, shape, dict(SURFACE_DIM=shape))
+    # Keep old row dictionaries unchanged. Layers are a separate coordinate, never height.
+    add("native32-1d-array", "layered", "exercise", 11, 1, 1, False, 1,
+        dict(SURFACE_DIM=1))
+    rows[-1]["array_layers"] = 3
+    add("uint32-2d-array-order", "layered", "exercise", 11, 7, 1, False, 2,
+        dict(SURFACE_DIM=2))
+    rows[-1]["array_layers"] = 7
     return rows
 
 
@@ -178,6 +185,12 @@ def resource_specs(row):
                 for prefix in ("source", "result")
                 for suffix, storage, lanes in (("Native", "float32", 4), ("R", "half", 1),
                                                ("RG", "half", 2), ("RGBA", "half", 4))]
+    if row["fixture"] == "layered":
+        families = [(scalar, lanes) for scalar in ("float32", "int32", "uint32")
+                    for lanes in (1, 2, 4)] if row["shape"] == 1 else [("uint32", 1)]
+        return [spec(prefix + str(index), scalar, lanes, scalar)
+                for index, (scalar, lanes) in enumerate(families)
+                for prefix in ("source", "observed")]
     scalar = row.get("scalar", "float32")
     return [spec("surface", "half" if row["half"] else scalar, row["lanes"], scalar),
             spec("observed", scalar, row["lanes"], scalar)]
@@ -260,8 +273,45 @@ def expanded_oracle(row):
     return dict(resources=resources)
 
 
+def layered_oracle(row):
+    """Keep layer/address/resource identity independent of both shader reads and writes."""
+    specs = resource_specs(row)
+    width, height, layers = row["width"], row["height"], row["array_layers"]
+    initial, expected = [], []
+    for resource, spec in enumerate(specs):
+        base = 0x3F000000 if spec["scalar"] == "float32" else 0x80000000
+        words = [base | (resource << 16) | (layer << 12) | (y << 8) | (x << 2) | lane
+                 for layer in range(layers) for y in range(height) for x in range(width)
+                 for lane in range(spec["lanes"])]
+        initial.append(words)
+        expected.append(list(words))
+    active = 0
+    for layer in range(layers):
+        for y in range(height):
+            for x in range(width):
+                live = (1 <= x < 9) if row["shape"] == 1 else (x, y, layer) == (1, 4, 2)
+                if not live:
+                    continue
+                active += 1
+                for resource in range(0, len(specs), 2):
+                    spec = specs[resource]
+                    base = 0x40000000 if spec["scalar"] == "float32" else 0xA0000000
+                    for lane in range(spec["lanes"]):
+                        index = ((layer * height + y) * width + x) * spec["lanes"] + lane
+                        expected[resource + 1][index] = initial[resource][index]
+                        expected[resource][index] = (base | (resource << 16) | (layer << 12) |
+                                                     (y << 8) | (x << 2) | lane)
+    return dict(resources=[dict(initial=struct.pack("<" + "I" * len(a), *a),
+                                expected=struct.pack("<" + "I" * len(b), *b),
+                                nan_positions=set(), active_texels=active,
+                                guard_texels=width * height * layers - active)
+                           for a, b in zip(initial, expected)])
+
+
 def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
+    if row["fixture"] == "layered":
+        return layered_oracle(row)
     if row["fixture"] in ("integers", "mixed"):
         return expanded_oracle(row)
     n = row["width"] * row["height"] * row["lanes"]
@@ -368,6 +418,16 @@ class Copy2D(C.Structure):
                 ("WidthInBytes", SZ), ("Height", SZ)]
 
 
+class Copy3D(C.Structure):
+    _fields_ = [("srcXInBytes", SZ), ("srcY", SZ), ("srcZ", SZ), ("srcLOD", SZ),
+                ("srcMemoryType", I), ("srcHost", VP), ("srcDevice", U64), ("srcArray", VP),
+                ("reserved0", VP), ("srcPitch", SZ), ("srcHeight", SZ),
+                ("dstXInBytes", SZ), ("dstY", SZ), ("dstZ", SZ), ("dstLOD", SZ),
+                ("dstMemoryType", I), ("dstHost", VP), ("dstDevice", U64), ("dstArray", VP),
+                ("reserved1", VP), ("dstPitch", SZ), ("dstHeight", SZ),
+                ("WidthInBytes", SZ), ("Height", SZ), ("Depth", SZ)]
+
+
 def validate_host_abi():
     """Match the CUDA 64-bit Driver API structures before passing any foreign pointers."""
     require(sys.byteorder == "little" and C.sizeof(VP) == C.sizeof(SZ) == 8, "64-bit LE host required")
@@ -377,6 +437,13 @@ def validate_host_abi():
     require(C.sizeof(Copy2D) == 128 and Copy2D.srcHost.offset == 24 and
             Copy2D.dstMemoryType.offset == 72 and Copy2D.dstHost.offset == 80 and
             Copy2D.WidthInBytes.offset == 112 and Copy2D.Height.offset == 120, "Copy ABI mismatch")
+    require(C.sizeof(Copy3D) == 200 and Copy3D.srcZ.offset == 16 and
+            Copy3D.srcHost.offset == 40 and Copy3D.srcArray.offset == 56 and
+            Copy3D.srcPitch.offset == 72 and Copy3D.srcHeight.offset == 80 and
+            Copy3D.dstMemoryType.offset == 120 and Copy3D.dstHost.offset == 128 and
+            Copy3D.dstArray.offset == 144 and Copy3D.dstPitch.offset == 160 and
+            Copy3D.dstHeight.offset == 168 and Copy3D.WidthInBytes.offset == 176 and
+            Copy3D.Height.offset == 184 and Copy3D.Depth.offset == 192, "Layered copy ABI mismatch")
 
 
 def run_device(ptx, row, buffers, output):
@@ -403,6 +470,7 @@ def run_device(ptx, row, buffers, output):
             'cuSurfObjectCreate': [C.POINTER(U64), C.POINTER(ResourceDesc)],
             'cuSurfObjectGetResourceDesc': [C.POINTER(ResourceDesc), U64],
             'cuSurfObjectDestroy': [U64], 'cuMemcpy2D_v2': [C.POINTER(Copy2D)],
+            'cuMemcpy3D_v2': [C.POINTER(Copy3D)],
             'cuModuleLoadData': [C.POINTER(VP), VP],
             'cuModuleGetFunction': [C.POINTER(VP), VP, C.c_char_p],
             'cuModuleGetGlobal_v2': [C.POINTER(U64), C.POINTER(SZ), VP, C.c_char_p],
@@ -423,17 +491,22 @@ def run_device(ptx, row, buffers, output):
                 raise RuntimeError(f'{name}: {code} {label.value!r} {message.value!r}')
         def copy_array(array, data, spec, upload):
             host = C.create_string_buffer(data, len(data))
-            copy = Copy2D()
+            layers = row.get('array_layers', 1)
+            is_array = 'array_layers' in row
+            copy = Copy3D() if is_array else Copy2D()
             pitch = row['width'] * spec['lanes'] * FORMATS[spec['storage']][1]
-            require(len(data) == pitch * row['height'], 'Host array copy extent mismatch')
+            require(len(data) == pitch * row['height'] * layers, 'Host array copy extent mismatch')
             copy.WidthInBytes, copy.Height = pitch, row['height']
+            if is_array:
+                copy.Depth = layers
+                copy.srcHeight = copy.dstHeight = row['height']
             if upload:
                 copy.srcMemoryType, copy.srcHost, copy.srcPitch = 1, C.addressof(host), pitch
                 copy.dstMemoryType, copy.dstArray = 3, array.value
             else:
                 copy.srcMemoryType, copy.srcArray = 3, array.value
                 copy.dstMemoryType, copy.dstHost, copy.dstPitch = 1, C.addressof(host), pitch
-            check('cuMemcpy2D_v2', C.byref(copy))
+            check('cuMemcpy3D_v2' if is_array else 'cuMemcpy2D_v2', C.byref(copy))
             return host.raw
         check('cuInit', 0)
         device = I()
@@ -448,8 +521,11 @@ def run_device(ptx, row, buffers, output):
         result['actual_array_descriptors'] = []
         for i, spec in enumerate(specs):
             fmt = FORMATS[spec['storage']][0]
+            layers = row.get('array_layers', 1)
+            is_array = 'array_layers' in row
             desc = Array3DDesc(row['width'], row['height'] if row['shape'] == 2 else 0,
-                               0, fmt, spec['lanes'], 2)
+                               layers if is_array else 0, fmt, spec['lanes'],
+                               3 if is_array else 2)
             check('cuArray3DCreate_v2', C.byref(arrays[i]), C.byref(desc))
             actual_desc = Array3DDesc()
             check('cuArray3DGetDescriptor_v2', C.byref(actual_desc), arrays[i])
@@ -481,7 +557,7 @@ def run_device(ptx, row, buffers, output):
         result['global_surface_handles_uploaded'] = True
         function = VP()
         check('cuModuleGetFunction', C.byref(function), module, row['entry'].encode())
-        check('cuLaunchKernel', function, row['width'], row['height'], 1,
+        check('cuLaunchKernel', function, row['width'], row['height'], row.get('array_layers', 1),
               1, 1, 1, 0, None, None, None)
         check('cuCtxSynchronize')
         result['launched_and_synchronized'] = True
@@ -527,6 +603,8 @@ def validate_bindings(reflection, row, ptx, architecture):
                 binding["offset"] == offset and binding["size"] == 8, "Surface binding mismatch")
         require(ty["kind"] == "resource" and ty["baseShape"] == f'texture{row["shape"]}D' and
                 ty["access"] == "readWrite", "Surface shape/access mismatch")
+        require(ty.get("array", False) == ("array_layers" in row),
+                "Surface array role mismatch")
         result = ty["resultType"]
         if spec["lanes"] > 1:
             require(result["kind"] == "vector" and result["elementCount"] == spec["lanes"],
@@ -581,7 +659,7 @@ def self_test():
             require(compare(row, buffers, index, data["expected"])["mismatch_count"] == 0,
                     "Reference oracle rejected")
     # Each added resource has independent storage, including source-only arrays and guard texels.
-    for row in (x for x in cases() if x["fixture"] in ("integers", "mixed")):
+    for row in (x for x in cases() if x["fixture"] in ("integers", "mixed", "layered")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -600,11 +678,16 @@ def self_test():
                                binding=dict(kind="uniform", offset=index * 8, size=8),
                                type=dict(kind="resource", baseShape=f'texture{row["shape"]}D',
                                          access="readWrite", resultType=ty)))
+            if "array_layers" in row:
+                params[-1]["type"]["array"] = True
         reflection = dict(parameters=params, entryPoints=[dict(name=row["entry"],
                           stage="compute", threadGroupSize=[1, 1, 1])])
         ptx = f'.target sm_80\n.const .align 8 .b8 SLANG_globalParams[{len(specs) * 8}]\n'
         ptx += f'.entry {row["entry"]}()'
         validate_bindings(reflection, row, ptx, 80)
+        if "array_layers" in row:
+            # An explicit singleton keeps its array role, independently of extent.
+            validate_bindings(reflection, dict(row, array_layers=1), ptx, 80)
         for index in range(len(specs)):
             for field, value in (("name", "wrongResource"), ("format", "rgba8")):
                 damaged = copy.deepcopy(reflection)
@@ -615,6 +698,42 @@ def self_test():
                     pass
                 else:
                     raise ValueError("Resource binding/format substitution was ignored")
+            damaged = copy.deepcopy(reflection)
+            damaged["parameters"][index]["type"]["array"] = "array_layers" not in row
+            try:
+                validate_bindings(damaged, row, ptx, 80)
+            except ValueError:
+                pass
+            else:
+                raise ValueError("Surface array role substitution was ignored")
+    for row in (x for x in cases() if x["fixture"] == "layered"):
+        buffers = oracle(row)
+        specs = resource_specs(row)
+        data = resource_buffers(row, buffers)
+        for resource, (spec, result) in enumerate(zip(specs, data)):
+            lanes = spec["lanes"]
+            active_texel = 1 if row["shape"] == 1 else (2 * row["height"] + 4) * row["width"] + 1
+            for channel in (0, active_texel * lanes):
+                damaged = bytearray(result["expected"])
+                damaged[channel * 4] ^= 1
+                require(compare(row, buffers, resource, damaged)["mismatch_count"] == 1,
+                        "Layered active/guard corruption was ignored")
+            stride = row["width"] * row["height"] * lanes * 4
+            damaged = bytearray(result["expected"])
+            damaged[:stride], damaged[stride:2 * stride] = damaged[stride:2 * stride], damaged[:stride]
+            require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
+                    "Layer permutation was hidden by repeated input patterns")
+            if resource % 2 == 0:
+                require(compare(row, buffers, resource, data[resource + 1]["expected"])["mismatch_count"] > 0,
+                        "Source/observed resource substitution was ignored")
+            if lanes > 1:
+                damaged = bytearray(result["expected"])
+                # Model using scalar-sized X byte scaling for a vector texel write.
+                start = active_texel * lanes * 4
+                wrong = start - (lanes - 1) * 4
+                damaged[wrong:wrong + lanes * 4] = damaged[start:start + lanes * 4]
+                require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
+                        "Wrong vector X byte scale was ignored")
     literal = oracle(next(x for x in cases() if x["case"] == "half-1d-1-literal-store"))
     dynamic = oracle(next(x for x in cases() if x["case"] == "half-1d-1-wholeStore"))
     require(literal == dynamic, "Literal stores changed the frozen whole-store oracle")

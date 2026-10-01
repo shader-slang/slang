@@ -79659,6 +79659,274 @@
         "last_targeted": "texture-1d-array-layer-counts",
         "implementations_since_full": 7
       }
+    },
+    "nvvm-native-array-surfaces": {
+      "status": "accepted-focused",
+      "scope": "Native Float32/SInt32/UInt32 scalar/2/4-lane RWTexture1DArray loads/stores; correction of existing 2D-array physical argument order. Module 43/provider ABI 46/container 2 unchanged.",
+      "contract": "Canonical physical coordinates remain (byteX[,y],layer), with only X scaled by texel size. Real provider selects genuine array intrinsics and puts layer before spatial coordinates at the call boundary. Fake recording retains natural order.",
+      "identity": {
+        "revision": "b27730d9ed1e8220f8947bd8c63762669146e4ee",
+        "patch_sha256": "54956b2bc8661c22a51349186bcc5e091bb66420ef62420e401f7a518cef9a7a",
+        "source_sha256": {
+          "extras/validate-nvvm-surfaces.py": "5032a8adc0e31756f8e1d4753f92489d24aa9e302009475a010c964b7b9af9c5",
+          "issue-nvvm-backend/nvvm-surface-results.py": "ddd4201b3061e408d3d1730faaf3a0c6fafe96d43f0aafeb16366c82f76e0035",
+          "issue-nvvm-backend/test-nvvm-surface-results.py": "08dcb4890fba8adbf8dffa8e4819a9595b5a8681f2095ae139c8090ad579d598",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "51f865e15cdb535a0fc8e1eb5903749c9e8e37b4b188284f0bb35d7685a26ea4",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "cbb8b54aad5e21e28fa132ae97ad549f788464f75e6883d4c52849132aaa99c3",
+          "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "f5089685f45779f10fb0bd5729e143fa7400da886bf0cb078374495a441b9e6d",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "1e9e5fe2112961faf11162667d5c60eda8c1306be1ee1bf346bc397fbf10ed6e",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "933ded6a61bb8cfb5fe2df5309f95a7167f50e715b18fce524a83512105596bb",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "8b21422e5b60468ee4c39a0a31599e457437a1f66df6506aed643d22d1b7595e",
+          "tests/cuda/nvvm-surface-physical-layered.slang": "04e6f553ab2eb3a549ab63adc4caee122059856ff0cd38ad2e96ca39501e0807"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "8b11a5b1456b85165df4ef2c44908625d7f0e884ef7d43ce66622504bebf006b",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "2c6f6635a35d3862c1be7b14f526c5614b46d082d6c786d1cd984a098cb56d35",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "46bbf86b71511285a24d1a5a9fde5287062858b144f0407cc5d0606c6d07a4b1",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "32af52e498794d6a3d4383e72c5bcfaaba5b6c41329150db25c9ec235f91cf08"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "physical_test_identity": {
+        "path": "build/nvvm-surface-1d-array/tested-identity.json",
+        "sha256": "7d32cb63bc886f57039cfcf04ce96a4dab0f7636f114a4ceb814bb02ed56958a"
+      },
+      "test_only_repair": {
+        "changed_sources": [
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp",
+          "tools/slang-unit-test/unit-test-nvvm-support.h"
+        ],
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so"
+        ],
+        "production_runtime_configuration": "unchanged after physical validation"
+      },
+      "build": {
+        "path": "build/nvvm-surface-1d-array/build.json",
+        "sha256": "a67e743b8de5559efaeab7975e6c39b01f8d35a148407bc9847dc08963eb1546"
+      },
+      "validation": {
+        "units": {
+          "passed_unique": 4,
+          "initial": {
+            "path": "build/nvvm-surface-1d-array/units-selected.json",
+            "sha256": "d327cd4cb60cc1f469c05c5003b0825693d4755ec35721e97cd87d827761ade1"
+          },
+          "initial_outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderQueriesTypedSurfaceOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "FAILED",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation.internal": "passed"
+          },
+          "retry": {
+            "path": "build/nvvm-surface-1d-array/unit-complete.json",
+            "sha256": "a12f79d3203dbd88683f2d6f4943bb5e2c54aed331eddfaab7775d971cc85a29"
+          },
+          "retry_outcomes": {
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "passed"
+          },
+          "reuse": "Three initial passes retained; Repairs admit existing ScalarStruct in fake external constant storage and correct only the new coordinate assertion; real provider binaries and the other tested unit bodies are unchanged."
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-surface-1d-array/negatives.json",
+            "sha256": "3dba867b341e660ef634a5fc34682264f7531fddf4f2d35aeb57ed6042c90c5f"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-formatted-surface-provenance.slang": "passed",
+            "tests/cuda/nvvm-native-float-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 4
+          },
+          "scope": "Int3 retained; former native1D rejection replaced by unsupported Half-array. Formatted provenance and nativeFloat negative unchanged."
+        },
+        "physical": {
+          "gate": {
+            "path": "build/nvvm-surface-1d-array/physical.json",
+            "sha256": "56de11ad04009c9a9d81b92abe1d99b9972c6a3ff0e31c76e2aa99848dbe40cf"
+          },
+          "validated": {
+            "path": "build/nvvm-surface-1d-array/physical-validation.json",
+            "sha256": "8173f0c13b0e13aceb28bd680da9fb5632ca2b9fd88b9a98526a7b4f8e271444"
+          },
+          "requested_cells": 12,
+          "outcomes": {
+            "float32-2d-4-wholeStore|nvrtc-o3": "passed",
+            "float32-2d-4-wholeStore|nvvm-o0": "passed",
+            "float32-2d-4-wholeStore|nvvm-o3": "passed",
+            "half-1d-4-loadValues|nvrtc-o3": "passed",
+            "half-1d-4-loadValues|nvvm-o0": "passed",
+            "half-1d-4-loadValues|nvvm-o3": "passed",
+            "native32-1d-array|nvrtc-o3": "passed",
+            "native32-1d-array|nvvm-o0": "passed",
+            "native32-1d-array|nvvm-o3": "passed",
+            "uint32-2d-array-order|nvrtc-o3": "passed",
+            "uint32-2d-array-order|nvvm-o0": "passed",
+            "uint32-2d-array-order|nvvm-o3": "passed"
+          },
+          "scope": "Both new rows and non-array Float32 whole-store/Half-load controls at NVRTC O3, NVVM O0/O3; full independently replayed readbacks, guarded source/observed resources, descriptor/reflection/upload/launch/cleanup proof."
+        },
+        "cpu": {
+          "harness": {
+            "path": "build/nvvm-surface-1d-array/contracts.json",
+            "sha256": "d1f8975845c5bcbd57f7d3d2ddd870001b38ce548c0b35dba873ebf311c6b56e"
+          },
+          "harness_case_count": 85,
+          "report_validator": {
+            "path": "build/nvvm-surface-1d-array/report-contracts.json",
+            "sha256": "df10de34c0dc85152a8a4b0394b450a94a45e86df48030d583ee1cd2b8959683"
+          },
+          "report_contract_tests": 22,
+          "original_case_oracle_preservation": {
+            "path": "build/nvvm-surface-1d-array/harness-freeze.json",
+            "sha256": "c7727321419f917cc526bd12bb5df09535643ec378cfecd151da607667e6b4e3"
+          }
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-surface-1d-array/before-validation.json",
+          "sha256": "ac021d00545ce6204b50288b202ab2218f79cebfeab6c4fa6d638be92bfb5e70"
+        },
+        "transitions": [
+          {
+            "case": "native32-1d-array",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "native32-1d-array",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "uint32-2d-array-order",
+            "mode": "nvvm-o0",
+            "before": "runtime-mismatch",
+            "after": "passed"
+          },
+          {
+            "case": "uint32-2d-array-order",
+            "mode": "nvvm-o3",
+            "before": "runtime-mismatch",
+            "after": "passed"
+          }
+        ],
+        "two_dimensional_observation": "Logical (1,4,2) accessed physical (1,2,4), channels 199/331; two mismatches in each source/observed resource at both NVVM levels. Both addresses aligned/in bounds; no launch failure or OOB explanation."
+      },
+      "validation_incidents": [
+        {
+          "attempt": {
+            "path": "build/nvvm-surface-1d-array/units.json",
+            "sha256": "883285d04ddbb613406c8946a7d3d35b69074a4cb7c347acbbec8e03818df16b"
+          },
+          "status": "no-tests-selected",
+          "reason": "Initial unit selectors lacked required slang-unit-test-tool/ prefix. Exit 0 is not test evidence; corrected invocation executed four tests."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-surface-1d-array/units-selected.json",
+            "sha256": "d327cd4cb60cc1f469c05c5003b0825693d4755ec35721e97cd87d827761ade1"
+          },
+          "status": "resolved-fake-provider-rejection",
+          "reason": "Canonical handle-only global record is existing ScalarStruct; fake declareGlobalStorage only accepted its resource-containing Struct sentinel. Accept both record types under same external/constant linkage/address-space checks; no fixture padding or production change.",
+          "repair_build": {
+            "path": "build/nvvm-surface-1d-array/build-fake-repair.json",
+            "sha256": "f184381d9ec8d73c6e13a220254b1992f12063a0104fe6081334bb3a237e8c88"
+          },
+          "retry": {
+            "path": "build/nvvm-surface-1d-array/unit-retry.json",
+            "sha256": "99a109168ad3964f6b73711dbc67c2da4700e6735d2c304d2158a9f1a1f1ee88"
+          }
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-surface-1d-array/unit-retry.json",
+            "sha256": "99a109168ad3964f6b73711dbc67c2da4700e6735d2c304d2158a9f1a1f1ee88"
+          },
+          "status": "resolved-unit-shape-assertion",
+          "reason": "The initial assertion incorrectly required both coordinate lanes to be constants. An attempted multiplication-only correction then incorrectly assumed byte-X was the failed lane. Exact diagnostics show load X folded to16 with layer extracted from(1,5), while store X is a multiplication and its layer comes from the same original coordinate as X. Final assertions check these canonical roles, without an evaluator or production IR changes.",
+          "incorrect_assumption_attempt": {
+            "path": "build/nvvm-surface-1d-array/unit-final.json",
+            "sha256": "e5e25732ac4dd249479b037fc4e66d243433c63d6f8c6584f5d0056d352e7331"
+          },
+          "diagnostic_attempt": {
+            "path": "build/nvvm-surface-1d-array/unit-diagnostic.json",
+            "sha256": "3843bf54d40ec07932f2af2c6e9ea1e35c64534ad1d5543d05d5947275b08cac"
+          },
+          "repair_build": {
+            "path": "build/nvvm-surface-1d-array/build-unit-complete.json",
+            "sha256": "7ad8048ae225f99cda71fed12085e0eaea5628edf8dddc50783c0d81ca71dd46"
+          },
+          "retry": {
+            "path": "build/nvvm-surface-1d-array/unit-complete.json",
+            "sha256": "a12f79d3203dbd88683f2d6f4943bb5e2c54aed331eddfaab7775d971cc85a29"
+          }
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-surface-1d-array/build-unit-assertion.json",
+            "sha256": "13d5c495df159ca14d1e7a9164af72f1e18736370f0f30f7cc32d572b2254fc4"
+          },
+          "status": "superseded-source-overlap",
+          "reason": "Loop braces were formatted after the initial source freeze during the build. The affected unit translation unit was explicitly rebuilt from final frozen bytes before the retry. No GPU evidence used that test-only artifact.",
+          "source": {
+            "path": "build/nvvm-surface-1d-array/synchronized-source-identity.json",
+            "sha256": "e9365884824a86159becd9dbfc1c89d6ad1fc411c101e0fc507e13708568681a"
+          },
+          "replacement": {
+            "path": "build/nvvm-surface-1d-array/build-synchronized.json",
+            "sha256": "69395de20d534a12632b82e21ed82688689550e41910e828a5e4055b8adbaa95"
+          }
+        }
+      ],
+      "preservation": {
+        "prior_feature_count": 49,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "original_surface_rows_oracles": 83,
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_surface_expansion": "Last full retains 249 cells; the next full run must explicitly review adoption of six new cells."
+      },
+      "limitations": [
+        "Half arrays, three channels, 64 bits, Cube/3D arrays, atomics and new boundary modes remain excluded.",
+        "Singleton layered role is CPU-qualified; no singleton GPU claim. No new resource-helper provenance or alias contract.",
+        "Restricted Cube view selection mismatch and mip query linkage histories remain open and unchanged.",
+        "Focused correctness only; no full campaign or performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "native-array-surfaces",
+        "implementations_since_full": 8
+      }
     }
   }
 }

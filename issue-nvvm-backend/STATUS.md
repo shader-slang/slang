@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Seven bounded feature batches now pass focused validation after the full checkpoint:
+Eight bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -106,7 +106,8 @@ records supersede the affected cells without relabeling the full run. Current id
 precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references`,
 `features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
-`features.nvvm-texture-array-layer-counts` and `features.nvvm-texture-1d-array-layer-counts`. Seven
+`features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
+`features.nvvm-native-array-surfaces`. Eight
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -121,7 +122,18 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; seven feature implementations have passed focused validation since the full checkpoint.
+unchanged; eight feature implementations have passed focused validation since the full checkpoint.
+
+Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
+scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
+argument order: the layer precedes spatial coordinates only in the LLVM call. Before the fix,
+logical (1,4,2) accessed physical (1,2,4); exact O0/O3 failures are retained. Twelve focused physical
+cells, including non-array native/Half controls and CUDA comparisons, pass. Four distinct units,
+four retained diagnostics, 85 harness cases and 22 report contracts pass. The fake needed a valid
+constant-record admission fix, and new coordinate assertions needed correction; all attempts remain
+recorded. Production binaries stayed unchanged through those test-only retries. The eight-job build
+took 28 seconds. Original 83 surface case/oracle identities and the full 249-cell baseline are
+unchanged; two new grouped rows are recorded separately for the next reviewed full expansion.
 
 CubeArray binding remains unqualified. The first explicit-view probe returned depth 30/18
 instead of intended cube counts 5/3. A separate content probe then tested endpoint indices in cubes:

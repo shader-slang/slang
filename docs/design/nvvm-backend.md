@@ -338,6 +338,10 @@ operations and mechanical bitcasts, not format discovery or implicit storage con
 updates preserve untouched raw lanes and remain non-atomic. In-range dynamic scalar components
 select the converted replacement against each old physical lane; only the replacement is converted.
 This reuses the canonical index value and adds no out-of-range or concurrent-write guarantee.
+Array coordinates retain their logical order through legalization: `(byteX, layer)` or
+`(byteX, y, layer)`. Only the provider's physical intrinsic call moves the layer before spatial
+coordinates, as required by LLVM's array-surface interface. The descriptor retains the actual
+resource rank and array role; coordinate packing never disguises one resource shape as another.
 Arbitrary resource-helper provenance, additional packed/normalized formats and general aliases
 remain outside the qualified boundary.
 

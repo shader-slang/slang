@@ -64,12 +64,13 @@ class Contracts(unittest.TestCase):
                 ty={'kind':'scalar','scalarType':s['scalar']}
                 if s['lanes']>1:ty={'kind':'vector','elementCount':s['lanes'],'elementType':ty}
                 param={'name':s['name'],'binding':{'kind':'uniform','offset':8*i,'size':8},'type':{'kind':'resource','baseShape':f'texture{row["shape"]}D','access':'readWrite','resultType':ty}}
+                if 'array_layers' in row:param['type']['array']=True
                 if s['format']:param['format']=s['format']
                 params.append(param)
             self.save(d/'reflection.json', {'parameters':params,'entryPoints':[{'name':row['entry'],'stage':'compute','threadGroupSize':[1,1,1]}]})
             runtime=dict(status='passed',initial_host_copies_verified=True,surface_bindings_verified=True,
                          global_surface_handles_uploaded=True,launched_and_synchronized=True,
-                         actual_array_descriptors=[{'Width':row['width'],'Height':row['height'] if row['shape']==2 else 0,'Depth':0,'Format':self.h.FORMATS[s['storage']][0],'NumChannels':s['lanes'],'Flags':2} for s in specs],
+                         actual_array_descriptors=[{'Width':row['width'],'Height':row['height'] if row['shape']==2 else 0,'Depth':row.get('array_layers',0),'Format':self.h.FORMATS[s['storage']][0],'NumChannels':s['lanes'],'Flags':3 if 'array_layers' in row else 2} for s in specs],
                          cleanup=[dict(operation=op,return_code=0) for op in ['cuModuleUnload']+['cuSurfObjectDestroy']*len(specs)+['cuArrayDestroy']*len(specs)+['cuCtxDestroy_v2']],readbacks=[])
             for i,(s,b) in enumerate(zip(specs,data)):
                 (d/(s['name']+'-actual.bin')).write_bytes(b['expected'])
@@ -130,6 +131,51 @@ class Contracts(unittest.TestCase):
         block=self.validate()
         self.assertEqual(surfaces.compare(None,block)['status'],'review-required')
         self.assertEqual(surfaces.compare(block,block)['status'],'passed')
+
+    def test_layered_descriptors_and_array_role(self):
+        layered = [r for r in surfaces.load_harness().cases() if r['fixture'] == 'layered']
+        singleton = dict(next(r for r in layered if r['shape'] == 1),
+                         case='native32-1d-array-single-layer', array_layers=1)
+        for row in layered + [singleton]:
+            self.rows.append(row)
+            self.add_case(row)
+            self.report['requested_cells'] += 3
+        block = self.validate()
+        for outcome in block['fresh_cell_outcomes']:
+            row = next(r for r in self.rows if r['case'] == outcome['id'])
+            for resource in outcome['resources']:
+                descriptor = resource['descriptor']
+                self.assertEqual(descriptor['Depth'], row.get('array_layers', 0))
+                self.assertEqual(descriptor['Flags'], 3 if 'array_layers' in row else 2)
+
+        for row in layered + [singleton]:
+            cell = next(c for c in self.report['cells'] if c['case'] == row['case'])
+            runtime_path = self.root / cell['case'] / cell['mode'] / 'runtime.json'
+            descriptor = cell['runtime']['actual_array_descriptors'][0]
+            for field, wrong in (('Depth', 0), ('Depth', row['array_layers'] + 1), ('Flags', 2)):
+                with self.subTest(case=row['case'], field=field, wrong=wrong):
+                    correct = descriptor[field]
+                    descriptor[field] = wrong
+                    self.save(runtime_path, cell['runtime'])
+                    with self.assertRaisesRegex(ValueError, 'wrong actual resource descriptors'):
+                        self.validate()
+                    descriptor[field] = correct
+                    self.save(runtime_path, cell['runtime'])
+
+        # Rehash the modified reflection so rejection proves the array role, not file tampering.
+        for row in layered + [singleton, self.rows[0]]:
+            cell = next(c for c in self.report['cells'] if c['case'] == row['case'])
+            reflection_path = self.root / cell['case'] / cell['mode'] / 'reflection.json'
+            reflection = surfaces.read(reflection_path)
+            original = reflection_path.read_bytes()
+            reflection['parameters'][0]['type']['array'] = 'array_layers' not in row
+            self.save(reflection_path, reflection)
+            cell['reflection_sha256'] = surfaces.sha(reflection_path.read_bytes())
+            with self.subTest(case=row['case']):
+                with self.assertRaisesRegex(ValueError, 'Surface array role mismatch'):
+                    self.validate()
+            reflection_path.write_bytes(original)
+            cell['reflection_sha256'] = surfaces.sha(original)
 
     def test_inventory_faults(self):
         original=copy.deepcopy(self.report)
