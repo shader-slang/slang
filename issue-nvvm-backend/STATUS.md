@@ -7,7 +7,8 @@ Explicit LLVM/libdevice names and genuine primitive PTX remain intentional backe
 Module43, ABI46 and container2 are unchanged. The signed16 O3 failure is corrected by provider-side
 normalization at exact-width integer consumers. The consolidated integration checkpoint is accepted;
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
-and architecture refresh are accepted. Direct Half instruction selection is next.
+and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
+accepted. The requested full validation checkpoint is next.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -23,29 +24,31 @@ Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_upda
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
 [HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-fake-maintenance/`; earlier cleanup evidence remains in its recorded ignored paths,
+`build/nvvm-half-native/`; earlier cleanup evidence remains in its recorded ignored paths,
 and integration evidence remains under `build/nvvm-integration/run-1/`.
 Plans and reports remain uncommitted.
 
 ## Latest focused acceptance
 
-| Evidence                                                   | Result                                                                                                                 |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Build                                                      | Eight-job test-plugin build 22 seconds; compiler/provider reused unchanged                                             |
-| Focused units                                              | 10 pass in 15 seconds, including independent real-provider selected-definition and no-mutation tests                   |
-| Fixture preservation                                       | 186 declarations moved byte-for-byte; 22 support-owned declarations, 435 unit names and 2 generated fixtures unchanged |
-| Fake ownership                                             | One exact 56-signature test table; public semantic expectations remain independent                                     |
-| Architecture                                               | 367 lines focused on surviving invariants; numerical details retained in maintained RESULTS contracts                  |
-| Last full / targeted / compiler implementations since full | log-family / fake and architecture maintenance / 12                                                                    |
-| Historical evidence                                        | Full baseline/identity and all 40 earlier feature objects retained                                                     |
+| Evidence                                                   | Result                                                                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Build                                                      | Eight-job incremental builds; matching numerics modules and isolated static executable refreshed |
+| Focused units                                              | 8 distinct pass; affected provider unit rerun after the trunc transport correction               |
+| Runtime                                                    | 9 distinct pass: directed Half 3, exact FMA 4 including precise, core composition 2              |
+| Code generation                                            | 6 PTX/ptxas cells; all four native Half operations, no Float32 promotion in NVVM                 |
+| Independent oracle                                         | Existing directed checker unchanged/pass; 17 FMA cases derived independently                     |
+| Last full / targeted / compiler implementations since full | log-family / native Half math / 13                                                               |
+| Historical evidence                                        | Full baseline/identity and all 41 earlier feature objects retained                               |
 
-This maintenance changes test organization and documentation only. Production still reads signatures
-from the selected libdevice definitions. No numerical policy, ABI, role or resource admission changed.
-The preceding structured-storage batch passed 23 shared and 5 direct static units, 7 runtime cells
-and one PTX check; its diagnostic-order corrections and static cache transition remain recorded.
+FMA now uses RN16(exact(a*b+c)); the original 3e02 double-rounding result is corrected to 3e01.
+Ceil/floor/FMA use LLVM intrinsics. LibNVVM12.9 rejects llvm.trunc.f16 and Half-typed inline
+assembly, so the provider emits exact cvt.rzi.f16.f16 with mechanical Half/i16 bit transport after
+normal validation. Both failed attempts remain recorded; whole-module verification is preserved.
+Round ties and approximate exp2/tanh remain separate documented policies. The Half helper ABI,
+role boundaries and Float32/64 paths are unchanged. CUDA remains comparison evidence.
 
-The user-requested full checkpoint follows the remaining Float16 batch; then fix discovered issues
-and resume standard feature work. Economical focused validation remains the per-batch default.
+The user-requested full checkpoint follows now; fix regressions and then resume standard feature
+work. Economical focused validation remains the per-batch default.
 
 The bounded integration checkpoint is accepted in `features.nvvm-post-migration-integration`.
 Five native failures were outdated migration assertions: early-folded size/alignment constants,
@@ -69,17 +72,12 @@ covers AllEqual without claiming differing-value Match masks agree.
 
 ## Current tested identity
 
-Revision `18fbbf036995c502a5874beb465bcd00e20a7f5a` plus compiler patch
-`427b9e476dfd01462505b2c16f114f9d8f0b217a889d5763bda6bb2a62003d9b`; compiler version `2026.18.3-350-gdc0a9acc3`.
-Compiler SHA-256: `42e1d1106cbe72d3333e88a48d703077c1ba5bb2df0ec1d5a0ca559ed2fef756`.
-Provider SHA-256: `4294999dab9e0576f44b2d4c7823d68830ac3870fb6cfb1249f0ca9651f34a72`.
-Source/runtime/test/configuration hashes are in `features.nvvm-structured-storage-planning`.
-Static tests retain separate compiler/core/provider identities and explicit reuse after test-only fixes.
-Latest test-plugin revision `c3b448788ffa65f138673ec41c7d55cae3cf7808` plus test patch
-`859641d5e6e0038a30b64a637e587da9190cfae5b73324a9fa4b89be5a0b1a16` is recorded in `features.nvvm-fake-maintenance`;
-the compiler/provider identities above are unchanged.
-Later commits do not relabel these binaries. Earlier integration and failure evidence retain their
-actual identities, including the explicit signed16 resolution.
+Revision `593a686f79ea51e3248373f9aaf47e1593140e32` plus implementation patch
+`a8d5e12e3d2b5b795d17dfbe0fcd1eb9b645fb1cc1a7cc324ef42971f0998ce8`; compiler version `2026.18.3-350-gdc0a9acc3`.
+Compiler SHA-256: `1a9a6c04b7414f47fc74cdb0e0f13293085a2637f1e3e6ea8899af1bdd4547e9`.
+Provider SHA-256: `9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6`.
+Source/runtime/test/configuration hashes and precise reuse are in `features.nvvm-native-half-math`.
+Earlier evidence retains its actual identity and failure history. Later commits do not relabel binaries.
 
 The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
 still identify the earlier **full log-family checkpoint**, not these current binaries. That full
@@ -97,7 +95,7 @@ LLVM 14, target SM80. No performance claim follows from the upgrade.
 ## Next action
 
 The agreed migration and residual-text audit are finished. The maintainer authorized this sequence
-on 2026-09-30. Steps 1–7 are complete; step 8 is next:
+on 2026-09-30. Steps 1–8 are complete; the full checkpoint in step 9 is next:
 
 1. Fix the known signed16 O3 normalization failure at its responsible layer, retaining its failure
    history and avoiding an abs-specific workaround.
@@ -130,17 +128,17 @@ LLVM-dialect adaptation and the concrete ABI/layout boundaries remain intentiona
 
 CUDA C++ is a comparison backend, not an automatic semantic oracle. Prefer Slang behavior aligned
 with Vulkan and D3D12 contracts, verify the relevant specifications, and document deliberate differences.
-The maintainer's CUDA12.9/SM80 probes are leads to reproduce, not new accepted validation:
+The native Half batch is accepted; the following decisions and boundaries are retained:
 
-- First investigate direct `llvm.ceil.f16`, `llvm.floor.f16` and `llvm.trunc.f16`, reported to emit
-  `cvt.rpi/rmi/rzi.f16.f16` without Float32 promotion. Extend checked named-intrinsic admission as needed.
-- Then select direct Half FMA with an explicit rounding contract. The current promoted NVVM path
-  can double-round: a=1.0009765625, b=1.5, c=-2^-24 gives 1.501953125 through Float32 versus
+- Direct Half ceil/floor/trunc are implemented and qualified as `cvt.rpi/rmi/rzi.f16.f16` without
+  Float32 promotion. Trunc needs the checked provider dialect adaptation described above.
+- Direct Half FMA now rounds once, nearest-even. The former promoted NVVM path
+  double-rounded: a=1.0009765625, b=1.5, c=-2^-24 gives 1.501953125 through Float32 versus
   1.5009765625 with direct Half rounding. CUDA's `__hfma` already uses the direct form.
 - Treat approximate Half `exp2`/`tanh` as a separate accuracy/capability decision. The reported
   SM75+ PTX forms compile as inline assembly; named NVVM forms did not in the maintainer's probes.
-- Keep `round` separate: current NVVM ties-away and CUDA Half ties-even differ. Establish the
-  intended Slang/Vulkan/D3D12 contract instead of assuming CUDA is correct.
+- Keep `round` separate: Slang documents target-dependent ties. Existing NVVM ties-away and CUDA
+  Half ties-even remain; the maintained RESULTS contract records Vulkan/D3D12 comparison limits.
 - Do not assume a Half API implies Half instructions. CUDA sqrt/rsqrt/reciprocal widen; sin/cos/log/exp
   can require Float32 calculations and input-specific corrections. Preserve or change these policies
   only with explicit semantic and accuracy evidence.
@@ -159,7 +157,8 @@ extension is removed; inert serialized slots and ordinary explicit intrinsic arg
 Preserve all 36 main gaps and focused NVRTC narrow-bit/nested-array failures and timeouts.
 Packed/normalized surfaces, general aliases, resource provenance, dynamic components and
 three-channel transfers remain outside current physical legalization. Checked address/memory plans
-remain authoritative; recursive admission and structured/resource conversion debt remain.
+remain authoritative; structured-buffer load/store conversions are planned, while other resource
+family planning and broader aggregate admission remain feature work.
 Barrier convergence, external Half ABI, numeric sweep, material-runtime and performance conclusions
 retain prior qualifications. Snapshot caching remains non-atomic with external libdevice replacement.
 Repeated bare-static-state dispatch in nvvm-copyable-kernel-context remains unresolved. Relinking a

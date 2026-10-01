@@ -2337,6 +2337,13 @@ static bool _isSerializationFormat(SlangNVVMSerializationFormat format)
 
 static bool _isExecutionRegisterIntrinsic(llvm::Intrinsic::ID intrinsicID);
 
+// Selects the native Half math operations whose signatures are owned by LLVM's registry.
+static bool _isHalfMathIntrinsic(llvm::Intrinsic::ID intrinsicID)
+{
+    return intrinsicID == llvm::Intrinsic::ceil || intrinsicID == llvm::Intrinsic::floor ||
+           intrinsicID == llvm::Intrinsic::trunc || intrinsicID == llvm::Intrinsic::fma;
+}
+
 // Shares admission of the qualified scalar integer intrinsics with serialization validation.
 static bool _isIntegerBitIntrinsic(llvm::Intrinsic::ID intrinsicID)
 {
@@ -2575,18 +2582,21 @@ static SlangResult _writeLegacyNVVMAssembly(
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
         else if (
-            intrinsicID == llvm::Intrinsic::sqrt || intrinsicID == llvm::Intrinsic::nvvm_f2h_rn)
+            intrinsicID == llvm::Intrinsic::sqrt || intrinsicID == llvm::Intrinsic::nvvm_f2h_rn ||
+            (_isHalfMathIntrinsic(intrinsicID) && intrinsicID != llvm::Intrinsic::trunc))
         {
             const llvm::AttributeSet functionAttributes = function.getAttributes().getFnAttrs();
             llvm::Type* resultType = function.getReturnType();
             const bool isHalfConversion = intrinsicID == llvm::Intrinsic::nvvm_f2h_rn;
+            const bool isHalfMath = _isHalfMathIntrinsic(intrinsicID);
             const bool hasSelectedResult =
                 isHalfConversion ? resultType->isIntegerTy(16)
+                : isHalfMath     ? resultType->isHalfTy()
                                  : resultType->isFloatTy() || resultType->isDoubleTy();
             llvm::Type* operandType =
                 isHalfConversion ? llvm::Type::getFloatTy(state->context) : resultType;
-            if (!function.isDeclaration() || !hasSelectedResult || function.arg_size() != 1 ||
-                function.arg_begin()->getType() != operandType ||
+            if (!function.isDeclaration() || !hasSelectedResult ||
+                function.arg_size() != (intrinsicID == llvm::Intrinsic::fma ? 3u : 1u) ||
                 functionAttributes.getNumAttributes() != 6 ||
                 !function.hasFnAttribute(llvm::Attribute::NoFree) ||
                 !function.hasFnAttribute(llvm::Attribute::NoSync) ||
@@ -2596,6 +2606,11 @@ static SlangResult _writeLegacyNVVMAssembly(
                 !function.hasFnAttribute(llvm::Attribute::WillReturn))
             {
                 return SLANG_E_NOT_AVAILABLE;
+            }
+            for (const llvm::Argument& argument : function.args())
+            {
+                if (argument.getType() != operandType)
+                    return SLANG_E_NOT_AVAILABLE;
             }
             _addUniqueAttributeSet(semanticLegacyIntrinsicAttributeSets, functionAttributes);
         }
@@ -3220,15 +3235,18 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
     if (id == llvm::Intrinsic::not_intrinsic || llvm::Intrinsic::getBaseName(id) != name ||
         (!_isExecutionRegisterIntrinsic(id) && !_isSynchronizationIntrinsic(id) &&
          !_isIntegerBitIntrinsic(id) && !_isClockIntrinsic(id) && !_isWaveIntrinsic(id) &&
-         id != llvm::Intrinsic::sqrt))
+         !_isHalfMathIntrinsic(id) && id != llvm::Intrinsic::sqrt))
         return llvm::Intrinsic::not_intrinsic;
 
     const bool isSqrt = id == llvm::Intrinsic::sqrt;
+    const bool isHalfMath = _isHalfMathIntrinsic(id);
     const auto& result = intrinsic.resultType;
     const bool isIntegerResult = (result.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                                   result.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
                                  result.laneCount == 1;
     if ((isSqrt && !_isScalarFloat32Or64Type(result)) ||
+        (isHalfMath &&
+         !Slang::NVVMSemantics::areSameType(result, Slang::NVVMSemantics::kFloat16)) ||
         ((_isIntegerBitIntrinsic(id) || _isClockIntrinsic(id)) && !isIntegerResult) ||
         (_isExecutionRegisterIntrinsic(id) && (!isIntegerResult || result.bitWidth != 32)) ||
         (_isSynchronizationIntrinsic(id) &&
@@ -3242,10 +3260,13 @@ static llvm::Intrinsic::ID _resolveNamedIntrinsic(
     for (size_t i = 0; i < intrinsic.operandCount; ++i)
     {
         const auto& operand = intrinsic.operands[i];
-        if (isSqrt)
+        if (isSqrt || isHalfMath)
         {
             if (operand.kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE ||
-                !_isScalarFloat32Or64Type(operand.type))
+                (isHalfMath ? !Slang::NVVMSemantics::areSameType(
+                                  operand.type,
+                                  Slang::NVVMSemantics::kFloat16)
+                            : !_isScalarFloat32Or64Type(operand.type)))
                 return llvm::Intrinsic::not_intrinsic;
         }
         else
@@ -3357,6 +3378,22 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     if (_isClockIntrinsic(id))
     {
         *outValue = reinterpret_cast<SlangNVVMValueHandle>(_emitClockObservation(state, type));
+        return SLANG_OK;
+    }
+    if (id == llvm::Intrinsic::trunc)
+    {
+        // libNVVM 12.9 rejects llvm.trunc.f16 even though LLVM's registry admits it.
+        // The checked scalar Half operation maps directly to the pure PTX primitive, without
+        // creating an unsupported declaration or weakening whole-module verification.
+        // Its inline-assembly dialect also excludes Half values, so transport the same bits in
+        // i16 registers on both sides of the instruction. These are not numeric conversions.
+        auto bitsType = llvm::Type::getInt16Ty(state->context);
+        auto signature = llvm::FunctionType::get(bitsType, {bitsType}, false);
+        auto assembly = llvm::InlineAsm::get(signature, "cvt.rzi.f16.f16 $0, $1;", "=h,h", false);
+        auto bits = state->builder.CreateBitCast(values[0], bitsType);
+        auto resultBits = state->builder.CreateCall(assembly, {bits});
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
+            state->builder.CreateBitCast(resultBits, type->getReturnType()));
         return SLANG_OK;
     }
     auto declaration = llvm::Intrinsic::getDeclaration(state->module.get(), id, overloadTypes);

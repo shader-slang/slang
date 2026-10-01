@@ -96,8 +96,12 @@ The [oracle checker](../../extras/test-generators/check-nvvm-round-oracles.py) r
 expectations without a compiler; the [removed-tag control](../../tests/cuda/nvvm-round-removed-tag.slang)
 checks the source boundary. Current acceptance and compiler identity remain owned by STATUS.
 
-Public `ceil`, `floor` and `trunc` use the same named-library boundary and canonical Half promotion.
-Their six Float32/64 names come from selected definitions; IDs 42/54/57 and their tag/text paths are
+Public `ceil`, `floor` and `trunc` use direct scalar Half `llvm.ceil`/`llvm.floor`/`llvm.trunc`
+with signatures checked by the LLVM registry. Checked Half trunc lowers to the exact pure PTX
+`cvt.rzi.f16.f16` primitive with bit-preserving i16 assembly transport because libNVVM 12.9
+rejects its LLVM declaration and Half assembly operand types; ceil/floor keep their
+named declarations. Their six Float32/64 names still come from selected
+libdevice definitions; IDs 42/54/57 and their tag/text paths are
 retired. The combined
 [Float32](../../tests/cuda/nvvm-directed-rounding-32.slang),
 [Float64](../../tests/cuda/nvvm-directed-rounding-64.slang) and
@@ -211,8 +215,14 @@ and legacy-text preflight tests remain independent of old-module version rejecti
 
 Public `sin`, `cos`, `acos`, `asin`, `atan`, `atan2`, `pow`, `tan`, `sinh`, `cosh`, `tanh`, `fma`
 and `fmod` use 26 selected Float32/Float64 library names. Shared table-driven units cover their
-real-provider signatures, explicit argument order, Half widen/call/narrow composition and scalar/vector
-public paths. Twelve retired numeric IDs reject without module mutation; all thirteen legacy tag/text
+real-provider signatures, explicit argument order and scalar/vector public paths. Half `fma` uses
+`llvm.fma` with one nearest-even rounding of the exact product and sum; the remaining operations
+retain Half widen/call/narrow composition. The [Half FMA fixture](../../tests/cuda/nvvm-half-fma.slang)
+checks independent exact finite bits, signed zero/Inf, NaN class, helper and vector paths, including
+precise mode. This deliberately corrects the old Float32-intermediate double rounding.
+[RESULTS](../../issue-nvvm-backend/RESULTS.md#native-half-fused-multiply-add-contract) records its
+contract and graphics-backend limitations. Approximate Half exp2/tanh and round tie-policy changes
+remain separate work. Twelve retired numeric IDs reject without module mutation; all thirteen legacy tag/text
 routes and legacy `sincos` text reject before output. FMOD 58 remains for canonical `kIROp_FRem`.
 Core `sincos` assigns sine then cosine, floating `mad` calls `fma`, and integer `mad` uses multiply/add.
 The small [composition smoke](../../tests/cuda/nvvm-core-math-composition.slang) checks exact

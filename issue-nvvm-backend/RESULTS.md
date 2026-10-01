@@ -230,6 +230,57 @@ operation, completion words and end guards must match exactly. Expected constant
 arithmetic and are checked independently by integer IEEE bit operations. Preserve signed zeros and
 infinities exactly; NaNs promise classification only. Keep the separate round fixtures unchanged.
 
+### Native Half fused multiply-add contract
+
+`tests/cuda/nvvm-half-fma.slang` defines the NVVM Half contract as
+`RN16(exact(a*b+c))`: one nearest-even rounding, no FTZ and no saturation. Explicit `fma` remains
+fused in precise floating mode; this does not authorize contracting a separate `a*b+c` expression.
+Scalar Half `ceil`, `floor`, `trunc` and `fma` use the genuine LLVM registry intrinsics at f16 width.
+Float32/64 libdevice paths and the physical i16 Half helper ABI are unchanged. The qualified
+libNVVM 12.9 verifier rejects `llvm.trunc.f16`; after registry, physical operand and collision checks,
+the provider emits pure `cvt.rzi.f16.f16` with 16-bit constraints and no unsupported declaration.
+Mechanical Half→i16→Half bitcasts satisfy the verifier’s assembly operand rules without changing
+arithmetic precision.
+Ceil/floor/fma keep their genuine LLVM declarations. Whole-module verification remains enabled.
+
+The fixture has four cells: CUDA O3 comparison, NVVM O0, NVVM O3 and NVVM O3 precise. Seventeen
+live input triples each exercise scalar, noinline helper and four heterogeneous vector lanes.
+Require all six error bits clear, exact scalar bits (NaNs normalized only for class comparison),
+completion words 100–116 and endpoint guards: 53 uint words total. Signed zeros and infinities are
+exact; no NaN sign/payload is promised. Finite expectations were derived with exact rational
+arithmetic and nearest-even binary16 selection, independently of compiler or vendor output:
+
+| a    | b    | c    | Expected Half bits | Distinction                                |
+| ---- | ---- | ---- | ------------------ | ------------------------------------------ |
+| 3c01 | 3e00 | 8001 | 3e01               | Float32 intermediate instead produces 3e02 |
+| 3c01 | 3c01 | bc02 | 0010               | Fused cancellation residual                |
+| 7bff | 4000 | fbff | 7bff               | Recoverable product overflow               |
+| 0001 | 3800 | 0000 | 0000               | Underflow tie to even zero                 |
+| 0003 | 3800 | 0000 | 0002               | Underflow tie to even second subnormal     |
+| 8001 | 3800 | 8000 | 8000               | Negative underflow tie                     |
+| 03ff | 3c00 | 0001 | 0400               | Subnormal/normal boundary                  |
+| 7bff | 3c00 | 4c00 | 7c00               | Overflow tie to infinity                   |
+
+The remaining cases independently check opposite-sign zeros (positive zero), two negative zeros
+(negative zero), exact cancellation (positive zero), signed infinity plus a finite term, infinity
+times zero, opposite infinities, and quiet/signaling NaNs. Signed exact-zero rules are not inferred
+from a signless rational zero. Keep the existing 64-input directed-rounding fixture and its
+integer-bit checker unchanged; the direct instructions preserve that contract.
+
+The changed `3e02` to `3e01` result is an intentional correction, not byte-for-byte baseline
+preservation. CUDA agreement is comparison evidence. [GLSL.std.450 Fma](https://registry.khronos.org/SPIR-V/specs/unified1/GLSL.std.450.html)
+and the legacy [Vulkan GLSL Fma precision contract](https://docs.vulkan.org/spec/latest/appendices/spirvenv.html)
+do not provide a universal exact binary16 FMA oracle; Vulkan's distinct correctly rounded
+`OpFmaKHR` requires its own features. Slang's Half HLSL path uses
+[mad](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/mad), whose Direct3D contract
+permits fused or separate evaluation, and historical HLSL half need not be native 16-bit arithmetic.
+Cross-backend signed-zero/subnormal/NaN comparisons also depend on enabled floating-point controls.
+The selected non-FTZ [PTX Half FMA](https://docs.nvidia.com/cuda/archive/12.9.1/parallel-thread-execution/index.html#half-precision-floating-point-instructions)
+implements the explicit NVVM contract. Keep existing Slang target-dependent `round` ties-away
+unchanged; CUDA Half and HLSL ties-even are not an implicit policy change. Approximate Half
+exp2/tanh have separate accuracy/architecture contracts and remain deferred, without relaxing the
+default transcendental policies.
+
 ### Square-root signature and numerical contracts
 
 ```bash

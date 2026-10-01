@@ -9268,9 +9268,8 @@ T ceil(T x)
     case nvvm:
         static_assert(T is half || T is float || T is double,
             "NVVM ceil requires half, float, or double.");
-        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
         if (T is half)
-            return __realCast<T>(ceil(__realCast<float>(x)));
+            __intrinsic_asm "llvm.ceil", x;
         else if (T is float)
             __intrinsic_asm "__nv_ceilf", x;
         else
@@ -11672,9 +11671,8 @@ T floor(T x)
     case nvvm:
         static_assert(T is half || T is float || T is double,
             "NVVM floor requires half, float, or double.");
-        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
         if (T is half)
-            return __realCast<T>(floor(__realCast<float>(x)));
+            __intrinsic_asm "llvm.floor", x;
         else if (T is float)
             __intrinsic_asm "__nv_floorf", x;
         else
@@ -11741,9 +11739,9 @@ T fma(T a, T b, T c)
     case nvvm:
         static_assert(T is half || T is float || T is double,
             "NVVM fma requires half, float, or double.");
-        // Preserve Float32 evaluation before the single Half narrowing.
+        // A fused Half operation rounds the exact product and sum only once.
         if (T is half)
-            return __realCast<T>(fma(__realCast<float>(a), __realCast<float>(b), __realCast<float>(c)));
+            __intrinsic_asm "llvm.fma", a, b, c;
         else if (T is float)
             __intrinsic_asm "__nv_fmaf", a, b, c;
         else
@@ -16227,9 +16225,8 @@ T trunc(T x)
     case nvvm:
         static_assert(T is half || T is float || T is double,
             "NVVM trunc requires half, float, or double.");
-        // Preserve Half evaluation: widen exactly, evaluate in Float32, and narrow once.
         if (T is half)
-            return __realCast<T>(trunc(__realCast<float>(x)));
+            __intrinsic_asm "llvm.trunc", x;
         else if (T is float)
             __intrinsic_asm "__nv_truncf", x;
         else

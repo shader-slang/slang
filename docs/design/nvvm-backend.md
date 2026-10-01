@@ -274,8 +274,17 @@ The maintained three-mode corpus uses NVRTC O3 and NVVM O0/O3.
 CUDA output is comparison evidence, not a universal mathematical oracle. Core composition determines
 evaluation order and intermediate precision; changing a named call or choosing a direct Half
 instruction must preserve or explicitly revise that operation's contract. The current accepted
-ordinary Half math paths generally widen to Float32 and narrow once; Half-specific bit transport,
-BF16 operations and physical helper ABI are separate mechanisms.
+ordinary Half math paths generally widen to Float32 and narrow once. The exceptions `ceil`,
+`floor`, `trunc` and `fma` select scalar Half LLVM intrinsics directly; the registry owns their
+signatures. The provider lowers checked Half trunc to pure `cvt.rzi.f16.f16`, because the
+qualified libNVVM 12.9 verifier rejects `llvm.trunc.f16`. Mechanical Half/i16 bitcasts satisfy its
+inline-assembly operand rules; full module verification remains enabled.
+Half FMA rounds the exact product-plus-sum once to nearest-even, without FTZ or
+saturation, including in precise mode. This corrects Float32-intermediate double rounding.
+Half-specific bit transport, BF16 operations and physical helper ABI remain separate mechanisms.
+The [Half FMA contract](../../issue-nvvm-backend/RESULTS.md#native-half-fused-multiply-add-contract)
+records independent finite bits and the limits of cross-backend comparisons. Approximate Half
+exp2/tanh require separate accuracy-policy work; existing round ties-away remains unchanged.
 
 | Maintained contract                                                                                                                                                                               | Limit that matters to implementation                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

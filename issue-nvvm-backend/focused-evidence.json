@@ -77678,6 +77678,532 @@
         "Fake signature table models conventional test signatures only; production still reads actual selected bitcode definitions.",
         "No fresh GPU,numerical,material or full compiler campaign warranted; all40priorfeatureobjects and fullbaseline/identity preserved. User-authorized full checkpoint remains queued after Float16."
       ]
+    },
+    "nvvm-native-half-math": {
+      "status": "accepted-focused",
+      "scope": "Native Half ceil/floor/trunc and single-rounding FMA. Core explicit LLVM names use bounded scalar Half registry admission; trunc alone uses an exact pure PTX dialect adaptation after libNVVM12.9 verification rejected llvm.trunc.f16. Half helper ABI and other widths/policies remain unchanged.",
+      "identity": {
+        "revision": "593a686f79ea51e3248373f9aaf47e1593140e32",
+        "patch_sha256": "a8d5e12e3d2b5b795d17dfbe0fcd1eb9b645fb1cc1a7cc324ef42971f0998ce8",
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "39b863284fe46fba144df032b7cc98176e2aeb0d19b67406ff528705d907f820",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "39ce4722a3724e66b6747f23ac0bc650d527a18802069cad4c1fd17cdd5f4a65",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "bf72e4c7f7947a297e3aecf631e337cfe30634e87d8c017f031233dd66e2b44b",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "253ca2fc0b451943f771b51093fd9719d47904beb0128598faa4cbe6985d9172",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "2cd590a55b7b7a89f4728c5c393f3031535c6f32fd8c2cbf82c167d859434fc0",
+          "tests/cuda/nvvm-half-fma.slang": "3f9c7d29f4fb8d1143d10ec432d2829031c35e7198031f3a0e15b706d1511d34"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "1a9a6c04b7414f47fc74cdb0e0f13293085a2637f1e3e6ea8899af1bdd4547e9",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "6748f5b92cb4cb119207ef48e82a9b3e4fdb8ece5b446775e25dc7de1d512d29",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c51b826b4080fc3690b449ecec2fcb013d7c7350f633e09e0ba6d383c177845e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "75d3ab9556fd027a953b6c40864d124d06ad55dd46f2a601e093a2cabd2fe60c",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "e34e9035c4f49c5972f9dc41c3535837f8e8867d52cec39cc634702378623fcf",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "1038a0cccd485e487c0413da9d92fc8f714ea9cd1c739f16eb538d3c24381168"
+        },
+        "configuration_sha256": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+        "version": "2026.18.3-350-gdc0a9acc3",
+        "record": {
+          "path": "build/nvvm-half-native/transport-identity.json",
+          "sha256": "e57d69457cb879967fcbdd0f5fb534f1469bf844ade56b449fc61651695f6450"
+        }
+      },
+      "build": {
+        "path": "build/nvvm-half-native/build-transport.json",
+        "sha256": "1dc17bb95dc65f78f33870c545bfd63d9a22f5b7dde4bb4ce9eb7069ece79aed",
+        "return_code": 0,
+        "elapsed_seconds": 19.488609790802002
+      },
+      "units": {
+        "before_transport": {
+          "record": {
+            "path": "build/nvvm-half-native/units-final.json",
+            "sha256": "6f0f12181afc56bfed487529e96a531a8280224562e80b96594bd4555e633c95",
+            "return_code": 0,
+            "elapsed_seconds": 8.551687955856323
+          },
+          "passed": 8,
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderBuildsCoreMathNamedCalls.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedIntrinsicSignaturesArePure.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedHalfMathPreservesSignaturesAndCalls.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedSqrtSignaturesArePure.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderNamedSqrtPreservesTypedCallsAndOwnership.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangPublicDirectedRoundingUsesNamedDeviceLibrary.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreMathLegacyRoutesRejectBeforeOutput.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoreMathUsesNamedCalls.internal": "passed"
+          },
+          "failed": 0,
+          "ignored": 0
+        },
+        "affected_retry": {
+          "record": {
+            "path": "build/nvvm-half-native/unit-transport.json",
+            "sha256": "d7bca3b923f1a0ea0d61539baa41f889ecf4dbf15d94df9b5d039d201144bf00",
+            "return_code": 0,
+            "elapsed_seconds": 1.4618749618530273
+          },
+          "passed": 1,
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderNamedHalfMathPreservesSignaturesAndCalls.internal": "passed"
+          },
+          "failed": 0,
+          "ignored": 0
+        },
+        "accepted_unique": 8,
+        "reuse": "Seven unchanged tests reused; grouped provider unit rerun after bitcast-only transport fix."
+      },
+      "runtime": {
+        "before_transport": {
+          "record": {
+            "path": "build/nvvm-half-native/runtime-final.json",
+            "sha256": "d13af7a470936f933d7f1107ba514f8fffb3f07009cbbc163b2c4171045f07a8",
+            "return_code": 1,
+            "elapsed_seconds": 6.556758403778076
+          },
+          "passed": 7,
+          "outcomes": {
+            "tests/cuda/nvvm-core-math-composition.slang (cuda)": "passed",
+            "tests/cuda/nvvm-core-math-composition.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-directed-rounding-half.slang (cuda)": "passed",
+            "tests/cuda/nvvm-directed-rounding-half.slang.1 (cuda)": "FAILED",
+            "tests/cuda/nvvm-directed-rounding-half.slang.2 (cuda)": "FAILED",
+            "tests/cuda/nvvm-half-fma.slang (cuda)": "passed",
+            "tests/cuda/nvvm-half-fma.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-half-fma.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-half-fma.slang.3 (cuda)": "passed"
+          },
+          "failed": 2,
+          "ignored": 0
+        },
+        "affected_retry": {
+          "record": {
+            "path": "build/nvvm-half-native/runtime-transport.json",
+            "sha256": "df51e7cbc942be907ff38454d2e7568c392186e172431ad507b4545f6f142cc7",
+            "return_code": 0,
+            "elapsed_seconds": 2.9141926765441895
+          },
+          "passed": 2,
+          "outcomes": {
+            "tests/cuda/nvvm-directed-rounding-half.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-directed-rounding-half.slang.2 (cuda)": "passed"
+          },
+          "failed": 0,
+          "ignored": 0
+        },
+        "accepted_unique": 9,
+        "reuse": "Seven earlier runtime passes retained at final-identity.json; only two trunc-containing directed cells rerun after the isolated provider transport fix."
+      },
+      "ptx": {
+        "record": {
+          "path": "build/nvvm-half-native/ptx.json",
+          "sha256": "129df466b75f8bf64cbe031686627a4dca9cbe51be701a49bacc4ff967ad3fbd",
+          "return_code": 0,
+          "elapsed_seconds": 3.1507651805877686
+        },
+        "outcomes": [
+          {
+            "family": "directed",
+            "mode": "nvvm-o0",
+            "command": [
+              "build/RelWithDebInfo/bin/slangc",
+              "tests/cuda/nvvm-directed-rounding-half.slang",
+              "-entry",
+              "computeMain",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O0",
+              "-emit-cuda-via-nvvm",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvvm-o0.ptx"
+            ],
+            "assembly": [
+              "/usr/local/cuda-12.9/bin/ptxas",
+              "-arch=sm_80",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvvm-o0.ptx",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvvm-o0.cubin"
+            ],
+            "ptx_sha256": "6f7b66cd99d1b3bfb1cad820cfc2ecb5c2f27ddb295021350389699f40d5cd65",
+            "native_instruction_counts": {
+              "cvt.rpi.f16.f16": 1,
+              "cvt.rmi.f16.f16": 1,
+              "cvt.rzi.f16.f16": 1
+            },
+            "widened_instruction_counts": {
+              "cvt.f32.f16": 0,
+              "cvt.rn.f16.f32": 0,
+              "fma.rn.f32": 0
+            }
+          },
+          {
+            "family": "directed",
+            "mode": "nvvm-o3",
+            "command": [
+              "build/RelWithDebInfo/bin/slangc",
+              "tests/cuda/nvvm-directed-rounding-half.slang",
+              "-entry",
+              "computeMain",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvvm",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvvm-o3.ptx"
+            ],
+            "assembly": [
+              "/usr/local/cuda-12.9/bin/ptxas",
+              "-arch=sm_80",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvvm-o3.ptx",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvvm-o3.cubin"
+            ],
+            "ptx_sha256": "b5c5496201ee7d1c4d220d4d4c13ec5246bec830aa043ca5457e43e5ebcf4da0",
+            "native_instruction_counts": {
+              "cvt.rpi.f16.f16": 6,
+              "cvt.rmi.f16.f16": 6,
+              "cvt.rzi.f16.f16": 15
+            },
+            "widened_instruction_counts": {
+              "cvt.f32.f16": 0,
+              "cvt.rn.f16.f32": 0,
+              "fma.rn.f32": 0
+            }
+          },
+          {
+            "family": "directed",
+            "mode": "nvrtc-o3",
+            "command": [
+              "build/RelWithDebInfo/bin/slangc",
+              "tests/cuda/nvvm-directed-rounding-half.slang",
+              "-entry",
+              "computeMain",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvrtc-o3.ptx"
+            ],
+            "assembly": [
+              "/usr/local/cuda-12.9/bin/ptxas",
+              "-arch=sm_80",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvrtc-o3.ptx",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/directed-nvrtc-o3.cubin"
+            ],
+            "ptx_sha256": "ac114cd2415b2bec14a224c59145edf13d68e47cbb2e89d787df6de2fd680f17",
+            "native_instruction_counts": {
+              "cvt.rpi.f16.f16": 15,
+              "cvt.rmi.f16.f16": 15,
+              "cvt.rzi.f16.f16": 15
+            },
+            "widened_instruction_counts": {
+              "cvt.f32.f16": 0,
+              "cvt.rn.f16.f32": 0,
+              "fma.rn.f32": 0
+            }
+          },
+          {
+            "family": "fma",
+            "mode": "nvvm-o0",
+            "command": [
+              "build/RelWithDebInfo/bin/slangc",
+              "tests/cuda/nvvm-half-fma.slang",
+              "-entry",
+              "computeMain",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O0",
+              "-emit-cuda-via-nvvm",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvvm-o0.ptx"
+            ],
+            "assembly": [
+              "/usr/local/cuda-12.9/bin/ptxas",
+              "-arch=sm_80",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvvm-o0.ptx",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvvm-o0.cubin"
+            ],
+            "ptx_sha256": "96fd0ce46fbeddc3f6c4619bd97595e80f47fd5aa42bb24cc20ada64c1059b8b",
+            "native_instruction_counts": {
+              "fma.rn.f16": 1
+            },
+            "widened_instruction_counts": {
+              "cvt.f32.f16": 0,
+              "cvt.rn.f16.f32": 0,
+              "fma.rn.f32": 0
+            }
+          },
+          {
+            "family": "fma",
+            "mode": "nvvm-o3",
+            "command": [
+              "build/RelWithDebInfo/bin/slangc",
+              "tests/cuda/nvvm-half-fma.slang",
+              "-entry",
+              "computeMain",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-emit-cuda-via-nvvm",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvvm-o3.ptx"
+            ],
+            "assembly": [
+              "/usr/local/cuda-12.9/bin/ptxas",
+              "-arch=sm_80",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvvm-o3.ptx",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvvm-o3.cubin"
+            ],
+            "ptx_sha256": "8a265b7487ee1c3d27d3f032f86853cd75c52d9c0fc665c5ea4d4d9487d046f3",
+            "native_instruction_counts": {
+              "fma.rn.f16": 5
+            },
+            "widened_instruction_counts": {
+              "cvt.f32.f16": 0,
+              "cvt.rn.f16.f32": 0,
+              "fma.rn.f32": 0
+            }
+          },
+          {
+            "family": "fma",
+            "mode": "nvrtc-o3",
+            "command": [
+              "build/RelWithDebInfo/bin/slangc",
+              "tests/cuda/nvvm-half-fma.slang",
+              "-entry",
+              "computeMain",
+              "-stage",
+              "compute",
+              "-target",
+              "ptx",
+              "-capability",
+              "cuda_sm_8_0",
+              "-O3",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvrtc-o3.ptx"
+            ],
+            "assembly": [
+              "/usr/local/cuda-12.9/bin/ptxas",
+              "-arch=sm_80",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvrtc-o3.ptx",
+              "-o",
+              "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-half-native/fma-nvrtc-o3.cubin"
+            ],
+            "ptx_sha256": "e2e8a1bfa3a3906530784d245304b75a1958ccdee47ff8af632eef055ded1b40",
+            "native_instruction_counts": {
+              "fma.rn.f16": 6
+            },
+            "widened_instruction_counts": {
+              "cvt.f32.f16": 0,
+              "cvt.rn.f16.f32": 0,
+              "fma.rn.f32": 0
+            }
+          }
+        ]
+      },
+      "oracle": {
+        "path": "build/nvvm-half-native/directed-oracle.json",
+        "sha256": "6cdd005cb9d67d40011c6f425c394dfc30c48d769be4a95264b5b5d547cbe4fe",
+        "return_code": 0,
+        "elapsed_seconds": 0.03625941276550293
+      },
+      "before": {
+        "identity": {
+          "path": "build/nvvm-half-native/before-identity.json",
+          "sha256": "492a364881f82b07e7870e1e99a1f07c4fdc31d634f0465572726bf0b86c3b71"
+        },
+        "gate": {
+          "path": "build/nvvm-half-native/before-fma-corrected.json",
+          "sha256": "f3c006982568576686a9ad2917c11d290fa6b8539c8a69ea0c3f5fa597314e28",
+          "return_code": 1,
+          "elapsed_seconds": 4.066723108291626
+        },
+        "outcomes": {
+          "identity": "before-identity.json",
+          "fixture_sha256": "4faaf30332b86140462af96c7b54503e805fb5fd724ff96475948c6ffde7ccb6",
+          "gate": "before-fma-corrected.json",
+          "outcomes": [
+            {
+              "mode": "nvrtc-o3",
+              "words": [
+                324508639, 0, 15873, 100, 0, 16, 101, 0, 31743, 102, 0, 0, 103,
+                0, 2, 104, 0, 32768, 105, 0, 1024, 106, 0, 31744, 107, 0, 0,
+                108, 0, 32768, 109, 0, 0, 110, 0, 31744, 111, 0, 64512, 112, 0,
+                32256, 113, 0, 32256, 114, 0, 32256, 115, 0, 32256, 116,
+                3735928559
+              ],
+              "sha256": "b79dc3b45a978041f577002d4ec2bab48a6ee0017b921091b85dd1ded38df9f5",
+              "bad_lanes": [],
+              "first_result_hex": "0x3e01"
+            },
+            {
+              "mode": "nvvm-o0",
+              "words": [
+                324508639, 7, 15874, 100, 0, 16, 101, 0, 31743, 102, 0, 0, 103,
+                0, 2, 104, 0, 32768, 105, 0, 1024, 106, 0, 31744, 107, 0, 0,
+                108, 0, 32768, 109, 0, 0, 110, 0, 31744, 111, 0, 64512, 112, 0,
+                32256, 113, 32, 32256, 114, 16, 32256, 115, 8, 32256, 116,
+                3735928559
+              ],
+              "sha256": "f8b537629ccb47d9018f66ece015609b31ccc9036b002c7c5b0ee7b175a19972",
+              "bad_lanes": [0, 14, 15, 16],
+              "first_result_hex": "0x3e02"
+            },
+            {
+              "mode": "nvvm-o3",
+              "words": [
+                324508639, 7, 15874, 100, 0, 16, 101, 0, 31743, 102, 0, 0, 103,
+                0, 2, 104, 0, 32768, 105, 0, 1024, 106, 0, 31744, 107, 0, 0,
+                108, 0, 32768, 109, 0, 0, 110, 0, 31744, 111, 0, 64512, 112, 0,
+                32256, 113, 32, 32256, 114, 16, 32256, 115, 8, 32256, 116,
+                3735928559
+              ],
+              "sha256": "f8b537629ccb47d9018f66ece015609b31ccc9036b002c7c5b0ee7b175a19972",
+              "bad_lanes": [0, 14, 15, 16],
+              "first_result_hex": "0x3e02"
+            },
+            {
+              "mode": "nvvm-o3-precise",
+              "words": [
+                324508639, 7, 15874, 100, 0, 16, 101, 0, 31743, 102, 0, 0, 103,
+                0, 2, 104, 0, 32768, 105, 0, 1024, 106, 0, 31744, 107, 0, 0,
+                108, 0, 32768, 109, 0, 0, 110, 0, 31744, 111, 0, 64512, 112, 0,
+                32256, 113, 32, 32256, 114, 16, 32256, 115, 8, 32256, 116,
+                3735928559
+              ],
+              "sha256": "f8b537629ccb47d9018f66ece015609b31ccc9036b002c7c5b0ee7b175a19972",
+              "bad_lanes": [0, 14, 15, 16],
+              "first_result_hex": "0x3e02"
+            }
+          ],
+          "initial_incident": "before-fma.json: invalid bracket CHECK directives; shader and bit expectations unchanged in correction"
+        }
+      },
+      "validation_incidents": [
+        {
+          "kind": "fixture-check-syntax",
+          "record": {
+            "path": "build/nvvm-half-native/before-fma.json",
+            "sha256": "8888246c2f03067073aead7625f879a6d74ca98bec3a7f098bf5ea5bb860e5c9",
+            "return_code": 1,
+            "elapsed_seconds": 4.191030740737915
+          },
+          "resolution": "Replaced invalid bracket checks with consecutive anchored numeric lines; shader and expected words unchanged."
+        },
+        {
+          "kind": "test-build-syntax",
+          "record": {
+            "path": "build/nvvm-half-native/build-production.json",
+            "sha256": "7da4d88fd9bef43b988415d4ceea84f4090b332fc0f825eddafda3415aa25c7e",
+            "return_code": 1,
+            "elapsed_seconds": 68.56422686576843
+          },
+          "resolution": "Braced SLANG_CHECK conditional branches; successful incremental rebuild."
+        },
+        {
+          "kind": "libnvvm-dialect-rejection",
+          "record": {
+            "path": "build/nvvm-half-native/directed-runtime.json",
+            "sha256": "2676604290bb117f98f875af1470ffbdb9f1b81edcbaef910d71d9981b12751f",
+            "return_code": 1,
+            "elapsed_seconds": 3.0656678676605225
+          },
+          "identity": {
+            "path": "build/nvvm-half-native/pre-adaptation-identity.json",
+            "sha256": "2d69ac2e109ca166cbd37865d930710992ddf74f3698a62ecf59565ccacc0308"
+          },
+          "isolation": {
+            "path": "build/nvvm-half-native/isolated-rounding-results.json",
+            "sha256": "7d166f87bed0803f9f6100e9e18d3760a799b4fa31911056ddd08478518363b5"
+          },
+          "resolution": "Only llvm.trunc.f16 rejects verification; emit exact pure cvt.rzi.f16.f16 after checked registry/physical/collision admission. Whole-module verification retained."
+        },
+        {
+          "kind": "source-freeze-guard",
+          "resolution": "Final emitter expectations changed during initial build. Identity guard detected it; final build rebuilt the test plugin, and final units reran on the frozen source."
+        }
+      ],
+      "transport_incident": {
+        "record": {
+          "path": "build/nvvm-half-native/runtime-final.json",
+          "sha256": "d13af7a470936f933d7f1107ba514f8fffb3f07009cbbc163b2c4171045f07a8",
+          "return_code": 1,
+          "elapsed_seconds": 6.556758403778076
+        },
+        "identity": {
+          "path": "build/nvvm-half-native/final-identity.json",
+          "sha256": "d62c397b1aef8d42ddfafc5c134cabc1d33422287b64625698fc27eb8941a45d"
+        },
+        "resolution": "NVVM inline-assembly dialect rejects semantic Half operands; mechanical Half-to-i16 and i16-to-Half bitcasts preserve all bits around the same primitive. Only affected unit and two runtime cells rerun."
+      },
+      "prior_gates": {
+        "build_adaptation": {
+          "path": "build/nvvm-half-native/build-adaptation.json",
+          "sha256": "622f2ec4c553ab1179c08b0f02dea86d5f05af454fdcc8c92384ca6bc4868414",
+          "return_code": 0,
+          "elapsed_seconds": 19.053033113479614
+        },
+        "build_complete": {
+          "path": "build/nvvm-half-native/build-complete.json",
+          "sha256": "d115396c8242cdf962c62958f2af10dc22aaba372ee616ce2fbd4f546410a027",
+          "return_code": 0,
+          "elapsed_seconds": 23.206840991973877
+        },
+        "build_final_check": {
+          "path": "build/nvvm-half-native/build-final-check.json",
+          "sha256": "267caefd2e4c970e4b81652509127d1f65e9f5205ebe46d2666a8fc7834e439e",
+          "return_code": 0,
+          "elapsed_seconds": 18.87724471092224
+        },
+        "units": {
+          "path": "build/nvvm-half-native/units.json",
+          "sha256": "5bd848850e090ce9c52870671a623694d0534fd2ce50c8670091a15571e44dcb",
+          "return_code": 0,
+          "elapsed_seconds": 9.257000923156738
+        },
+        "fma_runtime": {
+          "path": "build/nvvm-half-native/fma-runtime.json",
+          "sha256": "9416f02928e04b86c46001b8b2c016ab98f5d1d3eb3799976cd25421abfe775e",
+          "return_code": 0,
+          "elapsed_seconds": 4.00885272026062
+        }
+      },
+      "limitations": [
+        "Seventeen FMA cases and64directed cases are bounded correctness evidence, not exhaustive all-triples qualification. PTX shape and ptxas are not performance measurements.",
+        "Round ties and approximate exp2/tanh are documented separate policies; default widened accurate paths remain. CUDA is comparison evidence, not a universal oracle.",
+        "Full user-requested checkpoint follows this commit; all41priorfeatureobjects and fullbaseline/identity remain unchanged."
+      ]
     }
   }
 }

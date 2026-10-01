@@ -10787,6 +10787,169 @@ SLANG_UNIT_TEST(nvvmIRBuilderFracRetainsFloorAndSubtract)
     }
 }
 
+SLANG_UNIT_TEST(nvvmIRBuilderNamedHalfMathPreservesSignaturesAndCalls)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const auto api = builder.getValueOperationsAPI();
+    for (const char* name : {"llvm.ceil", "llvm.floor", "llvm.trunc", "llvm.fma"})
+    {
+        const size_t count = String(name) == "llvm.fma" ? 3 : 1;
+        String control[2];
+        for (bool injectFailures : {false, true})
+        {
+            ScopedNVVMBuilderModule scope;
+            scope.builder = &builder;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.createModule(toSlice("half-math"), scope.module)));
+            SlangNVVMTypeHandle voidType = nullptr, halfType = nullptr, floatType = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 16, halfType)));
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.getFloatingPointType(scope.module, 32, floatType)));
+            SlangNVVMTypeHandle parameterTypes[] = {halfType, halfType, halfType, floatType};
+            SlangNVVMTypeHandle functionType = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.getFunctionType(scope.module, voidType, parameterTypes, 4, functionType)));
+            SlangNVVMValueHandle function = nullptr, parameters[4] = {};
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                scope.module,
+                functionType,
+                SLANG_NVVM_LINKAGE_EXTERNAL,
+                SLANG_NVVM_FUNCTION_FLAG_NONE,
+                toSlice("host"),
+                function)));
+            for (Index i = 0; i < 4; ++i)
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.getFunctionParameter(scope.module, function, i, parameters[i])));
+            SlangNVVMBlockHandle entry = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.createBlock(scope.module, function, toSlice("entry"), entry)));
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, entry)));
+            SlangNVVMNamedIntrinsicOperandDesc operands[4];
+            for (auto& operand : operands)
+                operand = {NVVMSemantics::kFloat16, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE};
+            SlangNVVMNamedIntrinsicDesc desc =
+                {name, strlen(name), NVVMSemantics::kFloat16, operands, count};
+            SLANG_CHECK(builder.supportsNamedIntrinsic(desc));
+            if (injectFailures)
+            {
+                // Descriptor rejection and live-block physical rejection must not create a
+                // declaration or call. The final serialization is compared with the control.
+                auto reject = [&](const SlangNVVMNamedIntrinsicDesc& invalid)
+                {
+                    SLANG_CHECK(!builder.supportsNamedIntrinsic(invalid));
+                    SlangNVVMValueHandle result =
+                        reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                    SLANG_CHECK(
+                        api->emitNamedIntrinsic(
+                            scope.module,
+                            &invalid,
+                            parameters,
+                            invalid.operandCount,
+                            &result) == SLANG_E_NOT_AVAILABLE);
+                    SLANG_CHECK(result == nullptr);
+                };
+                auto invalid = desc;
+                invalid.operandCount = 0;
+                reject(invalid);
+                invalid.operandCount = count + 1;
+                reject(invalid);
+                const SlangNVVMValueTypeDesc invalidTypes[] = {
+                    NVVMSemantics::kFloat32,
+                    NVVMSemantics::kFloat64,
+                    {SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, 2},
+                    {SLANG_NVVM_VALUE_TYPE_BFLOAT16, 16, 1},
+                    NVVMSemantics::kUnsignedI32};
+                for (auto type : invalidTypes)
+                {
+                    invalid = desc;
+                    invalid.resultType = type;
+                    reject(invalid);
+                    for (size_t i = 0; i < count; ++i)
+                        operands[i].type = type;
+                    reject(invalid);
+                    invalid.resultType = NVVMSemantics::kFloat16;
+                    reject(invalid);
+                    for (auto& operand : operands)
+                        operand.type = NVVMSemantics::kFloat16;
+                }
+                for (size_t i = 0; i < count; ++i)
+                {
+                    operands[i].kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT;
+                    reject(desc);
+                    operands[i].kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+                    SlangNVVMValueHandle values[] = {parameters[0], parameters[1], parameters[2]};
+                    values[i] = parameters[3];
+                    SlangNVVMValueHandle result =
+                        reinterpret_cast<SlangNVVMValueHandle>(uintptr_t(1));
+                    SLANG_CHECK(
+                        api->emitNamedIntrinsic(scope.module, &desc, values, count, &result) ==
+                        SLANG_E_INVALID_ARG);
+                    SLANG_CHECK(result == nullptr);
+                }
+                String suffixed = String(name) + ".f16";
+                invalid = desc;
+                invalid.name = suffixed.getBuffer();
+                invalid.nameSize = suffixed.getLength();
+                reject(invalid);
+            }
+            SlangNVVMValueHandle result = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                builder.emitNamedIntrinsic(scope.module, desc, parameters, count, result)));
+            SLANG_CHECK(result != nullptr);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+            Index formatIndex = 0;
+            for (auto format :
+                 {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                  SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+            {
+                ComPtr<ISlangBlob> assembly;
+                String diagnostics;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.serializeModule(scope.module, format, assembly, diagnostics)));
+                SLANG_CHECK(diagnostics.getLength() == 0);
+                const String text = _getBlobText(assembly);
+                StringBuilder call, declaration;
+                call << "call half @" << name << ".f16(half %slangParameter0";
+                if (count == 3)
+                    call << ", half %slangParameter1, half %slangParameter2";
+                call << ")";
+                declaration << "declare half @" << name << ".f16(half";
+                if (count == 3)
+                    declaration << ", half, half";
+                declaration << ")";
+                if (String(name) == "llvm.trunc")
+                {
+                    SLANG_CHECK(text.contains("bitcast half %slangParameter0 to i16"));
+                    SLANG_CHECK(text.contains("call i16 asm \"cvt.rzi.f16.f16 $0, $1;\", "
+                                              "\"=h,h\"(i16 %"));
+                    SLANG_CHECK(text.contains("bitcast i16") && text.contains("to half"));
+                    SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("bitcast")) == 2);
+                    SLANG_CHECK(!text.contains("llvm.trunc.f16"));
+                    SLANG_CHECK(!text.contains("asm sideeffect"));
+                }
+                else
+                {
+                    SLANG_CHECK(text.contains(call.getBuffer()));
+                    SLANG_CHECK(text.contains(declaration.getBuffer()));
+                }
+                SLANG_CHECK(!text.contains("fpext") && !text.contains("fptrunc"));
+                if (injectFailures)
+                {
+                    SLANG_CHECK(text == control[formatIndex]);
+                }
+                else
+                {
+                    control[formatIndex] = text;
+                }
+                ++formatIndex;
+            }
+        }
+    }
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderNamedSqrtSignaturesArePure)
 {
     NVVMIRBuilder builder;

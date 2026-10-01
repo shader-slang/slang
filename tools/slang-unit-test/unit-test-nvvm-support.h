@@ -6021,14 +6021,19 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsNamedIntrinsicSupported(
         }
         return SLANG_OK;
     }
-    if (name == toSlice("llvm.sqrt"))
+    const bool isHalfMath = name == toSlice("llvm.ceil") || name == toSlice("llvm.floor") ||
+                            name == toSlice("llvm.trunc") || name == toSlice("llvm.fma");
+    if (name == toSlice("llvm.sqrt") || isHalfMath)
     {
         const auto& result = intrinsic->resultType;
-        *outSupported = result.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                        result.laneCount == 1 && (result.bitWidth == 32 || result.bitWidth == 64) &&
-                        intrinsic->operandCount == 1 &&
-                        intrinsic->operands[0].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
-                        NVVMSemantics::areSameType(intrinsic->operands[0].type, result);
+        *outSupported =
+            result.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT && result.laneCount == 1 &&
+            (isHalfMath ? result.bitWidth == 16 : result.bitWidth == 32 || result.bitWidth == 64) &&
+            intrinsic->operandCount == (name == toSlice("llvm.fma") ? 3u : 1u);
+        for (size_t i = 0; *outSupported && i < intrinsic->operandCount; ++i)
+            *outSupported =
+                intrinsic->operands[i].kind == SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+                NVVMSemantics::areSameType(intrinsic->operands[i].type, result);
         return SLANG_OK;
     }
     const bool isScan = name == toSlice("llvm.ctlz") || name == toSlice("llvm.cttz");

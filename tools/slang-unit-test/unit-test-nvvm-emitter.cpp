@@ -11598,11 +11598,23 @@ SLANG_UNIT_TEST(nvvmSlangPublicDirectedRoundingUsesNamedDeviceLibrary)
             }
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
             SLANG_CHECK(code != nullptr);
-            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == 1);
-            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryDestroyCount == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryLoadCount == (variant != 0));
+            SLANG_CHECK(gFakeNVVMBuilder.deviceLibraryDestroyCount == (variant != 0));
             StringBuilder expectedName;
-            expectedName << "__nv_" << operationName << (variant == 2 ? "" : "f");
+            if (variant == 0)
+                expectedName << "llvm." << operationName;
+            else
+                expectedName << "__nv_" << operationName << (variant == 2 ? "" : "f");
             SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains(expectedName.getBuffer()));
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.intrinsicResultTypes.getCount() == 1);
+            const SlangNVVMValueTypeDesc expectedType = {
+                SLANG_NVVM_VALUE_TYPE_FLOATING_POINT,
+                variant == 0   ? 16u
+                : variant == 1 ? 32u
+                               : 64u,
+                1};
+            SLANG_CHECK(
+                NVVMSemantics::areSameType(gFakeNVVMBuilder.intrinsicResultTypes[0], expectedType));
             for (const uint32_t identity : {42u, 54u, 57u})
                 SLANG_CHECK(!gFakeNVVMBuilder.intrinsicOperations.contains(
                     SlangNVVMValueOperation(identity)));
@@ -11623,10 +11635,9 @@ SLANG_UNIT_TEST(nvvmSlangPublicDirectedRoundingUsesNamedDeviceLibrary)
                     NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16) &&
                     NVVMSemantics::areSameType(operation.operandTypes[0], NVVMSemantics::kFloat32);
             }
-            // The input/output use bit reinterpretation, so only the public Half recipe needs
-            // these.
-            SLANG_CHECK(widensHalf == (variant == 0));
-            SLANG_CHECK(narrowsHalf == (variant == 0));
+            // Bit transport and direct Half math need no floating-point conversion.
+            SLANG_CHECK(!widensHalf);
+            SLANG_CHECK(!narrowsHalf);
         }
 #else
     SLANG_IGNORE_TEST;
@@ -12511,9 +12522,11 @@ SLANG_UNIT_TEST(nvvmSlangCoreMathUsesNamedCalls)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
             SLANG_CHECK(code != nullptr);
             SLANG_CHECK_ABORT(gFakeNVVMBuilder.namedIntrinsicNames.getCount() == 1);
+            const bool isNativeHalfFma = width == 16 && String(testCase.name) == "fma";
             SLANG_CHECK(
-                gFakeNVVMBuilder.namedIntrinsicNames[0] ==
-                (width == 64 ? testCase.doubleName : testCase.floatName));
+                gFakeNVVMBuilder.namedIntrinsicNames[0] == (isNativeHalfFma ? "llvm.fma"
+                                                            : width == 64   ? testCase.doubleName
+                                                                            : testCase.floatName));
             SLANG_CHECK_ABORT(gFakeNVVMBuilder.intrinsicOperations.getCount() == 1);
             SLANG_CHECK(gFakeNVVMBuilder.intrinsicOperations[0] == UINT32_MAX);
             SLANG_CHECK(gFakeNVVMBuilder.intrinsicArgumentCounts[0] == testCase.operandCount);
@@ -12523,8 +12536,17 @@ SLANG_UNIT_TEST(nvvmSlangCoreMathUsesNamedCalls)
             const Index argumentOffset = gFakeNVVMBuilder.intrinsicArgumentOffsets[0];
             for (uint32_t i = 0; i < testCase.operandCount; ++i)
             {
-                const auto& argument =
-                    gFakeNVVMBuilder.intrinsicArgumentValueRefs[argumentOffset + i];
+                auto argument = gFakeNVVMBuilder.intrinsicArgumentValueRefs[argumentOffset + i];
+                if (isNativeHalfFma)
+                {
+                    // Ordinary helper ABI storage is i16; its body receives the exact Half bits.
+                    SLANG_CHECK_ABORT(argument.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+                    const auto& decode = gFakeNVVMBuilder.scalarOperations[argument.index];
+                    SLANG_CHECK(_isHalfVectorBoundaryBitcast(decode, 1, false));
+                    SLANG_CHECK(
+                        decode.callerBlockIndex == gFakeNVVMBuilder.intrinsicCallerBlockIndices[0]);
+                    argument = decode.operands[0];
+                }
                 SLANG_CHECK(argument.kind == FakeNVVMBuilderValueKind::Parameter);
                 SLANG_CHECK(argument.index == i && argument.functionIndex == namedFunction);
             }
@@ -12533,6 +12555,8 @@ SLANG_UNIT_TEST(nvvmSlangCoreMathUsesNamedCalls)
             {
                 // Public fmod also uses a named call; numeric58 is reserved for canonical FRem.
                 SLANG_CHECK(operation.key.operation != testCase.operation);
+                if (isNativeHalfFma)
+                    SLANG_CHECK(operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT);
                 if (operation.key.operation != SLANG_NVVM_VALUE_OP_FLOAT_CONVERT ||
                     !NVVMSemantics::areSameType(operation.resultType, NVVMSemantics::kFloat16))
                     continue;
@@ -12567,7 +12591,7 @@ SLANG_UNIT_TEST(nvvmSlangCoreMathUsesNamedCalls)
                     // may instead widen a vector lane. The direct call/cast edges are invariant.
                 }
             }
-            if (width == 16)
+            if (width == 16 && !isNativeHalfFma)
             {
                 // Require exactly one narrowing for every emitted call, including each inlined
                 // fmod composition. Counting just one body would reject its valid scalar map.
