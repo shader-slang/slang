@@ -712,7 +712,7 @@ SLANG_UNIT_TEST(PackageToolEditKeepsStableDependencyPath)
     dependency.version = "1.0.0";
     root.dependencies.add(dependency);
     root.workspace.depsDirectory = "third-party";
-    root.workspace.buildDirectory = "out";
+    root.workspace.outputDirectory = "out";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
 
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
@@ -2555,7 +2555,7 @@ SLANG_UNIT_TEST(PackageToolFetchStagesNewTagWithoutConfirmation)
     SLANG_CHECK(tagCommit == upstreamCommit);
 }
 
-SLANG_UNIT_TEST(PackageToolBuildFetchesMissingLockedCheckouts)
+SLANG_UNIT_TEST(PackageToolBundleFetchesMissingLockedCheckouts)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -2573,9 +2573,9 @@ SLANG_UNIT_TEST(PackageToolBuildFetchesMissingLockedCheckouts)
 
     StdoutCapture stdoutCapture;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.start()));
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SlangResult buildResult =
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error);
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error);
     String stdoutText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.finish(stdoutText)));
     SLANG_CHECK(SLANG_SUCCEEDED(buildResult));
@@ -2596,10 +2596,10 @@ SLANG_UNIT_TEST(PackageToolBuildFetchesMissingLockedCheckouts)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         getRepositoryHeadCommit(Path::combine(temp.path, "deps/noise"), headCommit, error)));
     SLANG_CHECK(headCommit == lockedCommit);
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/source/noise.slang")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/noise.slang")));
 }
 
-SLANG_UNIT_TEST(PackageToolBuildCreatesFirstLockViaFetch)
+SLANG_UNIT_TEST(PackageToolBundleCreatesFirstLockViaFetch)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -2611,9 +2611,9 @@ SLANG_UNIT_TEST(PackageToolBuildCreatesFirstLockViaFetch)
 
     StdoutCapture stdoutCapture;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.start()));
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SlangResult buildResult =
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error);
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error);
     String stdoutText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(stdoutCapture.finish(stdoutText)));
     SLANG_CHECK(SLANG_SUCCEEDED(buildResult));
@@ -2632,7 +2632,7 @@ SLANG_UNIT_TEST(PackageToolBuildCreatesFirstLockViaFetch)
     SLANG_CHECK(lock.packages.getCount() == 1);
     SLANG_CHECK(lock.packages[0].name == "noise");
     SLANG_CHECK(File::exists(Path::combine(temp.path, "deps/noise/src/noise.slang")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/source/noise.slang")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/noise.slang")));
 }
 
 SLANG_UNIT_TEST(PackageToolFetchRejectsIllegalGraphBeforeMaterialize)

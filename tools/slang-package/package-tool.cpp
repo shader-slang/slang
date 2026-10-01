@@ -59,19 +59,19 @@ static void _printHelp(bool experimental = false)
         "  tree              Print the selected dependency graph.\n"
         "  why <name>        Print every graph path that requires a package.\n"
         "\n"
-        "Build:\n"
-        "  build [--skip-validate]   Source bundle and docs; fetches if needed.\n"
+        "Bundle:\n"
+        "  bundle [--skip-validate]  Source bundle and docs; fetches if needed.\n"
         "  run [name] [args...]      Invoke the interpreter on the source bundle.\n"
-        "  docs [--print]            Open build/docs/index.md (--print writes the path).\n");
+        "  docs [--print]            Open out/docs/index.md (--print writes the path).\n");
     if (experimental)
     {
         fprintf(
             stdout,
             "\n"
             "Experimental:\n"
-            "  build            Also generate enabled modules and host executables.\n"
+            "  bundle           Also generate enabled modules and host executables.\n"
             "  run --binary [name] [args...]\n"
-            "                   Run a native host executable from the last experimental build.\n");
+            "                   Run a native host executable from the last experimental bundle.\n");
     }
     else
     {
@@ -190,7 +190,7 @@ static bool _commandRequiresPackageRoot(int argc, const char* const* argv)
         return false;
     String command = argv[index];
     return command == "fetch" || command == "update" || command == "validate" ||
-           command == "build" || command == "run" || command == "test" || command == "docs" ||
+           command == "bundle" || command == "run" || command == "test" || command == "docs" ||
            command == "status" || command == "tree" || command == "why" ||
            command == "dependency" || command == "override" || command == "edit" ||
            command == "unedit";
@@ -206,7 +206,7 @@ static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
     return nullptr;
 }
 
-/// Write `slang-package-includes.txt` with the same export roots `build` passes to `slangc`.
+/// Write `slang-package-includes.txt` with the same export roots `bundle` passes to `slangc`.
 ///
 /// Those roots come from `getLockedPackageRoot`, so Git checkouts, path dependencies, and local
 /// overrides are all workspace-rooted. A later `slangc -I` can use a line from this file even when
@@ -883,7 +883,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
         return SLANG_FAIL;
     }
 
-    static const char* const kDirectories[] = {"src", "tests", "docs", "deps", "build"};
+    static const char* const kDirectories[] = {"src", "tests", "docs", "deps", "out"};
     for (auto directory : kDirectories)
     {
         String path = Path::combine(projectRoot, directory);
@@ -897,7 +897,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
     manifest.exports.add("src");
     manifest.licenseFiles.add("LICENSE");
     manifest.workspace.depsDirectory = "deps";
-    manifest.workspace.buildDirectory = "build";
+    manifest.workspace.outputDirectory = "out";
     SemanticVersion installedToolchain;
     String installedToolchainText;
     String toolchainError;
@@ -925,7 +925,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
     static const char* const kIgnoredWorkspacePaths[] = {
         ".slang/",
         "deps/",
-        "build/",
+        "out/",
         "slang-package-overlay.json",
         "slang-package-includes.txt",
     };
@@ -1185,7 +1185,7 @@ static void _warnSkippedSourceValidation()
 
 /// Tell the user that this command is invoking another, and why.
 ///
-/// Build may run fetch, and fetch with no lock may run update. Those hand-offs are easy to miss
+/// Bundle may run fetch, and fetch with no lock may run update. Those hand-offs are easy to miss
 /// in a wall of resolver output, so each one prints a one-line notice first.
 static void _announceSubcommand(const char* because, const char* command)
 {
@@ -2488,7 +2488,7 @@ static String _getExecutableOutputPath(
     const String& executableName)
 {
     return Path::combine(
-        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest)),
+        Path::combine(projectRoot, getWorkspaceOutputDirectory(manifest)),
         "host",
         executableName + Process::getExecutableSuffix());
 }
@@ -2581,9 +2581,9 @@ static SlangResult _deployExecutableRuntime(
 /// Return whether a tool-owned Git checkout directory is absent.
 ///
 /// Path-only rows and active overrides are skipped: those trees are not fetch's to
-/// create. A missing `deps/NAME` for a Git pin is the case where build can invoke fetch without
+/// create. A missing `deps/NAME` for a Git pin is the case where bundle can invoke fetch without
 /// writing the lock. A directory that is present but not at the locked commit is left to fetch
-/// or fetch --clean; build does not try to replace it.
+/// or fetch --clean; bundle does not try to replace it.
 static bool _lockedGitCheckoutIsMissing(
     const String& projectRoot,
     const Manifest& manifest,
@@ -2609,14 +2609,14 @@ static bool _lockedGitCheckoutIsMissing(
     return false;
 }
 
-/// Copy exported source under `build/bundle/source`. With the experimental opt-in, also compile
+/// Copy exported source under `out/bundle/source`. With the experimental opt-in, also compile
 /// enabled `.slang-module` output and host executables into explicitly marked directories.
 ///
 /// If a locked Git checkout is missing, this runs fetch first (without `--clean`). If there is no
 /// lock and the manifest has dependencies, it also runs fetch, which runs update with `--yes` so
-/// a first clone can `slang package build` without a prompt. An existing lock is never rewritten.
+/// a first clone can `slang package bundle` without a prompt. An existing lock is never rewritten.
 /// Each of those hand-offs prints why it is running the inner command.
-static SlangResult _build(
+static SlangResult _bundle(
     const String& projectRoot,
     bool experimental,
     bool skipValidate,
@@ -2681,11 +2681,11 @@ static SlangResult _build(
         }
     }
 
-    String buildRoot = Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest));
-    String bundleRoot = Path::combine(buildRoot, "bundle");
+    String outputRoot = Path::combine(projectRoot, getWorkspaceOutputDirectory(manifest));
+    String bundleRoot = Path::combine(outputRoot, "bundle");
     String modulesRoot = Path::combine(bundleRoot, "modules");
     String sourceRoot = Path::combine(bundleRoot, "source");
-    String hostRoot = Path::combine(buildRoot, "host");
+    String hostRoot = Path::combine(outputRoot, "host");
     if (manifest.workspace.bundle.source)
     {
         SLANG_RETURN_ON_FAIL(copyBundleSource(sourceRoot, sourceFiles, outError));
@@ -2816,14 +2816,14 @@ static SlangResult _runSource(
     {
         outError =
             "The workspace does not configure a host executable. Add 'build.host.executables' to "
-            "slang-package.json and run 'slang package build'.";
+            "slang-package.json and run 'slang package bundle'.";
         return SLANG_FAIL;
     }
     if (!manifest.workspace.bundle.source)
     {
         outError =
             "Source run requires 'workspace.bundle.source'. Enable it and run 'slang package "
-            "build'.";
+            "bundle'.";
         return SLANG_FAIL;
     }
 
@@ -2833,7 +2833,7 @@ static SlangResult _runSource(
 
     String bundledSourcePath = Path::combine(
         Path::combine(
-            Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest)),
+            Path::combine(projectRoot, getWorkspaceOutputDirectory(manifest)),
             "bundle",
             "source"),
         executableName + ".slang");
@@ -2841,7 +2841,7 @@ static SlangResult _runSource(
     {
         outError = String("The configured source entry has not been built: ") + bundledSourcePath +
                    ". Source run requires that primary at an export root; move it there if needed, "
-                   "then run 'slang package build'.";
+                   "then run 'slang package bundle'.";
         return SLANG_FAIL;
     }
 
@@ -2872,7 +2872,7 @@ static SlangResult _runBinary(
     {
         outError =
             "The workspace does not configure a host executable. Add 'build.host.executables' to "
-            "slang-package.json and run 'slang package --experimental build'.";
+            "slang-package.json and run 'slang package --experimental bundle'.";
         return SLANG_FAIL;
     }
 
@@ -2884,7 +2884,7 @@ static SlangResult _runBinary(
     if (!File::exists(executablePath))
     {
         outError = String("The configured executable has not been built: ") + executablePath +
-                   ". Run 'slang package --experimental build'.";
+                   ". Run 'slang package --experimental bundle'.";
         return SLANG_FAIL;
     }
     List<String> executableArguments;
@@ -2946,18 +2946,18 @@ static SlangResult _openPathWithRegisteredApplication(const String& path, String
     return SLANG_OK;
 }
 
-/// Open `build/docs/index.md` with the host's registered Markdown handler, or print its path.
+/// Open `out/docs/index.md` with the host's registered Markdown handler, or print its path.
 static SlangResult _docs(const String& projectRoot, bool printOnly, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
     String indexPath = Path::combine(
-        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "docs"),
+        Path::combine(projectRoot, getWorkspaceOutputDirectory(manifest), "docs"),
         "index.md");
     if (!File::exists(indexPath))
     {
         outError = String("Generated documentation index is missing: ") + indexPath +
-                   ". Run 'slang package build' first.";
+                   ". Run 'slang package bundle' first.";
         return SLANG_FAIL;
     }
     String canonicalPath = indexPath;
@@ -3747,7 +3747,7 @@ SlangResult executeInDirectory(
             return _validateNamedPackage(projectRoot, name, outError);
         return _validate(projectRoot, outError);
     }
-    if (command == "build")
+    if (command == "bundle")
     {
         bool skipValidate = false;
         for (int i = 2; i < argc; ++i)
@@ -3757,11 +3757,11 @@ SlangResult executeInDirectory(
                 skipValidate = true;
             else
             {
-                outError = String("Unknown build option: ") + flag;
+                outError = String("Unknown bundle option: ") + flag;
                 return SLANG_FAIL;
             }
         }
-        return _build(projectRoot, experimental, skipValidate, outError);
+        return _bundle(projectRoot, experimental, skipValidate, outError);
     }
     if (command == "run")
     {

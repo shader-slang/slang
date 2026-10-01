@@ -51,7 +51,7 @@ struct Exclusion
     String reason;
 };
 
-/// Optional workspace outputs written under `workspace.build/bundle`.
+/// Optional workspace outputs written under `<workspace.output>/bundle` (`out/bundle` by default).
 ///
 /// Consider this example:
 ///
@@ -59,7 +59,7 @@ struct Exclusion
 /// "workspace": { "bundle": { "modules": true, "source": false } }
 /// ```
 ///
-/// `slang package build` then writes `.slang-module` files under `build/bundle/modules` and skips
+/// `slang package bundle` then writes `.slang-module` files under `out/bundle/modules` and skips
 /// the flattened source tree. Both flags default to true when `bundle` is omitted, so a workspace
 /// that never mentions the object still produces a complete bundle.
 struct BundleSettings
@@ -75,13 +75,13 @@ struct WorkspaceSettings
     /// Directory Git checkouts occupy. Written as `workspace.dependencies`; `init` defaults it to
     /// `deps`.
     String depsDirectory;
-    String buildDirectory;
+    String outputDirectory;
     BundleSettings bundle;
     List<Exclusion> exclusions;
 };
 
 /// Native host output from `build.host` in `slang-package.json`. Dependency manifests may
-/// declare this field, but only the workspace that starts a build produces executables.
+/// declare this field, but only the workspace that starts a bundle produces executables.
 ///
 /// Each entry in `executables` is both the output filename (without a platform suffix) and the
 /// stem of a workspace primary: `video-preview` requires an exported `video-preview.slang`.
@@ -95,7 +95,7 @@ struct HostSettings
 
 /// Root-only compilation settings from the top-level `build` object in `slang-package.json`.
 ///
-/// This is not `workspace.build`, which names the output directory (`build/` by default). `build`
+/// This is not `workspace.output`, which names the output directory (`out/` by default). `build`
 /// is how the package is compiled. Schema 1 only understands `host`; later keys (additional
 /// artifact kinds, compiler flags, and so on) belong here so they are never promoted to siblings
 /// of `workspace` and `dependencies`.
@@ -155,10 +155,10 @@ inline String getWorkspaceDepsDirectory(const Manifest& manifest)
     return manifest.workspace.depsDirectory.getLength() ? manifest.workspace.depsDirectory : "deps";
 }
 
-inline String getWorkspaceBuildDirectory(const Manifest& manifest)
+inline String getWorkspaceOutputDirectory(const Manifest& manifest)
 {
-    return manifest.workspace.buildDirectory.getLength() ? manifest.workspace.buildDirectory
-                                                         : "build";
+    return manifest.workspace.outputDirectory.getLength() ? manifest.workspace.outputDirectory
+                                                          : "out";
 }
 
 /// One package in `slang-package-lock.json`. Exactly one of these shapes is legal:

@@ -12,18 +12,18 @@ namespace PackageTool
 /// Recreate `path` as an empty directory, deleting any previous files.
 SlangResult resetDirectory(const String& path, String& outError);
 
-/// Write `build/bundle/modules/provenance.json` so a consumer can require the same unversioned
+/// Write `out/bundle/modules/provenance.json` so a consumer can require the same unversioned
 /// `.slang-module` toolchain that produced the experimental files beside it.
 SlangResult writeModuleProvenance(
     const String& modulesRoot,
     const String& slangcPath,
     String& outError);
 
-/// Write `build/host/EXPERIMENTAL.txt` so copied or archived host artifacts retain an explicit
+/// Write `out/host/EXPERIMENTAL.txt` so copied or archived host artifacts retain an explicit
 /// warning that their package workflow is not stable.
 SlangResult writeExperimentalHostMarker(const String& hostRoot, String& outError);
 
-/// Copy every exported `.slang` file into `build/bundle/source` using import-relative paths, so
+/// Copy every exported `.slang` file into `out/bundle/source` using import-relative paths, so
 /// that directory is a single compiler search path. Two files that would occupy the same name on a
 /// case-insensitive filesystem are an error.
 SlangResult copyBundleSource(

@@ -9,7 +9,7 @@ Slang Package Command Reference
 ## Name
 
 `slang package` — manage Slang source-package dependencies, local overrides, locked source trees,
-and package build outputs.
+and generated bundle output.
 
 `slang pkg` is an equivalent short form. The installed `slang-package` executable accepts the same
 arguments.
@@ -35,8 +35,8 @@ package therefore forms its own workspace.
 
 Package commands do not change Slang's `import` syntax. `fetch`, `update`, and local-registration
 commands regenerate `slang-package-includes.txt` for compiler sessions that consume the
-materialized graph. `build`
-creates a flattened source bundle and documentation. Experimental build mode can additionally
+materialized graph. `bundle`
+creates a flattened source bundle and documentation. Experimental bundle mode can additionally
 create `.slang-module` files and native host executables.
 
 ## Global option
@@ -46,11 +46,11 @@ create `.slang-module` files and native host executables.
 Enable experimental command behavior. This option must appear before the command:
 
 ```text
-slang package --experimental build
+slang package --experimental bundle
 slang package --experimental run --binary
 ```
 
-It enables `.slang-module` and host-executable output during `build`, and the `--binary` form of
+It enables `.slang-module` and host-executable output during `bundle`, and the `--binary` form of
 `run`. It does not change dependency resolution.
 
 ## Commands
@@ -69,8 +69,8 @@ The commands are:
 - [`validate`](#validate) — check that a package is suitable for sharing.
 - [`tree`](#tree) — print the selected dependency graph.
 - [`why`](#why) — explain why a package is in the selected graph.
-- [`build`](#build) — validate the graph and create package outputs.
-- [`run`](#run) — run a configured host program from existing build output.
+- [`bundle`](#bundle) — validate the graph and create package outputs.
+- [`run`](#run) — run a configured host program from existing bundle output.
 - [`docs`](#docs) — open or print the generated documentation index.
 - [`test`](#test) — reserved; package testing is not implemented.
 
@@ -87,7 +87,7 @@ slang package --experimental help
 
 ### Description
 
-Print a concise list of available commands. The experimental form also shows experimental build
+Print a concise list of available commands. The experimental form also shows experimental bundle
 and run behavior. There is currently no command-specific `help <command>` form.
 
 ## `init`
@@ -110,13 +110,13 @@ The directory name becomes the package name and must be a valid package name. Th
 
 `init`:
 
-- creates `src/`, `tests/`, `docs/`, `deps/`, and `build/`;
+- creates `src/`, `tests/`, `docs/`, `deps/`, and `out/`;
 - writes `slang-package.json` with `src` as its export and `LICENSE` as its license file;
-- sets the default workspace dependency and build directories to `deps/` and `build/`;
+- sets the default workspace dependency and output directories to `deps/` and `out/`;
 - records the installed Slang version as a minimum `tools.slang-toolchain` requirement when that
   version can be determined;
 - writes a placeholder `LICENSE` if one does not already exist; and
-- adds `.slang/`, `deps/`, `build/`, `slang-package-overlay.json`, and
+- adds `.slang/`, `deps/`, `out/`, `slang-package-overlay.json`, and
   `slang-package-includes.txt` to `.gitignore`.
 
 The generated license is intentionally a reminder, not a distributable license. Replace its
@@ -522,7 +522,7 @@ Like `git status`, reportable drift is information and does not itself make the 
 `status` returns failure only when required root, lock, or overlay JSON cannot be read and parsed
 well enough to produce a report.
 
-The command does not contact remotes, modify package state, inspect `build/`, or look for newer
+The command does not contact remotes, modify package state, inspect `out/`, or look for newer
 releases.
 
 ## `validate`
@@ -538,7 +538,7 @@ slang package validate --all
 ### Description
 
 Check that a package is suitable for sharing. Validation is stricter than buildability: local
-development state can be valid input to `build` while preventing a package or lock from being
+development state can be valid input to `bundle` while preventing a package or lock from being
 portable to another workspace. The command does not compile modules or run package tests.
 
 There are four related sets of checks:
@@ -667,51 +667,51 @@ incoming requirements. The package must be present and reachable in the current 
 This explains why a package is in the selected graph. It does not explain candidates that the
 resolver rejected during an earlier `update`, and it does not contact remotes.
 
-## `build`
+## `bundle`
 
 ### Synopsis
 
 ```text
-slang package build [--skip-validate]
-slang package --experimental build [--skip-validate]
+slang package bundle [--skip-validate]
+slang package --experimental bundle [--skip-validate]
 ```
 
 ### Description
 
 Validate the materialized graph as buildable and create distribution output under the configured
-workspace build directory (`build/` by default).
+workspace output directory (`out/` by default).
 
-If a locked Git checkout is missing, build runs `fetch` first without `--clean`. If dependencies
+If a locked Git checkout is missing, bundle runs `fetch` first without `--clean`. If dependencies
 exist without a lock, that fetch runs `update --yes` to create the first lock. An existing lock is
-never rewritten by build.
+never rewritten by bundle.
 
 A buildable graph requires legal lock identities and constraints, existing export directories,
 correct `module` and `implementing` declarations, and unique primary import paths across the
-closure. Build intentionally permits placeholder licenses, enabled overrides, and local path
+closure. Bundle intentionally permits placeholder licenses, enabled overrides, and local path
 dependencies because those do not prevent compilation.
 
 ### Stable output
 
-A normal build:
+A normal bundle:
 
-- copies every exported `.slang` file to `build/bundle/source/`, preserving its
+- copies every exported `.slang` file to `out/bundle/source/`, preserving its
   export-relative import path, when `workspace.bundle.source` is enabled; and
-- copies each package's Markdown files from `docs/` to `build/docs/<package-name>/` and writes
-  `build/docs/index.md`.
+- copies each package's Markdown files from `docs/` to `out/docs/<package-name>/` and writes
+  `out/docs/index.md`.
 
 `workspace.bundle.source` defaults to enabled. Existing source output is removed when it is
 disabled.
 
 ### Experimental output
 
-With the global `--experimental` option, build additionally:
+With the global `--experimental` option, bundle additionally:
 
-- compiles each primary module to `build/bundle/modules/<import-path>.slang-module` when
+- compiles each primary module to `out/bundle/modules/<import-path>.slang-module` when
   `workspace.bundle.modules` is enabled;
-- writes `build/bundle/modules/provenance.json`;
-- compiles configured workspace `build.host.executables` to `build/host/`; and
+- writes `out/bundle/modules/provenance.json`;
+- compiles configured workspace `build.host.executables` to `out/host/`; and
 - copies the required `slang-rt` runtime beside those native executables and writes
-  `build/host/EXPERIMENTAL.txt`.
+  `out/host/EXPERIMENTAL.txt`.
 
 The `.slang-module` format is unstable and tied to the producing compiler. Experimental host
 output requires a matching exported workspace primary and a supported downstream C++ compiler.
@@ -720,7 +720,7 @@ output requires a matching exported workspace primary and a supported downstream
 
 `--skip-validate`
 : Skip source declaration and import-uniqueness checks. The legal graph still runs, and export
-files are still inventoried for bundle output. If build invokes fetch, the option is passed
+files are still inventoried for bundle output. If bundle invokes fetch, the option is passed
 through and also skips new-release publish checks. A warning is printed.
 
 ## `run`
@@ -734,8 +734,8 @@ slang package --experimental run --binary [<name>] [<arguments>...]
 
 ### Description
 
-Run a host program configured by `build.host`. `run` consumes existing build output and does not
-run `build` automatically.
+Run a host program configured by `build.host`. `run` consumes existing bundle output and does not
+run `bundle` automatically.
 
 If `<name>` matches an entry in `build.host.executables`, that executable is selected and the
 remaining arguments are forwarded. Otherwise, the configured `build.host.default` is selected
@@ -745,15 +745,15 @@ manifests with multiple executables must name a default.
 ### Source mode
 
 Normal `run` invokes the sibling `slangi` interpreter on
-`build/bundle/source/<name>.slang`. The source bundle must be enabled and already built. Because
+`out/bundle/source/<name>.slang`. The source bundle must be enabled and already built. Because
 the interpreter searches from the input file's directory, the configured executable primary must
 be at an export root.
 
 ### Binary mode
 
 `--binary`
-: Run the native artifact under `build/host/`. This option must immediately follow `run` and
-requires the global `--experimental` option and a previous experimental build. Binary mode can
+: Run the native artifact under `out/host/`. This option must immediately follow `run` and
+requires the global `--experimental` option and a previous experimental bundle. Binary mode can
 run an executable primary nested below the export root.
 
 ## `docs`
@@ -767,10 +767,10 @@ slang package docs --print
 
 ### Description
 
-Use the documentation index from the last build. The command does not copy or regenerate
-documentation; run `build` first.
+Use the documentation index from the last bundle. The command does not copy or regenerate
+documentation; run `bundle` first.
 
-Without options, open `build/docs/index.md` with the platform's registered Markdown application.
+Without options, open `out/docs/index.md` with the platform's registered Markdown application.
 
 `--print`
 : Print the canonical path to the generated index instead of opening it. This form is suitable for
@@ -831,9 +831,9 @@ cache; offline resolution requires it.
 : Default materialization directory for locked Git checkouts. The path is configured by
 `workspace.dependencies`.
 
-`build/`
+`out/`
 : Default output directory for source bundles, documentation, and experimental artifacts. The
-path is configured by `workspace.build`.
+path is configured by `workspace.output`.
 
 ## Exit status
 

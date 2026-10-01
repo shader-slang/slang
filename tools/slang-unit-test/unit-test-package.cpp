@@ -158,7 +158,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         "  ],\n"
         "  \"workspace\": {\n"
         "    \"dependencies\": \"third-party\",\n"
-        "    \"build\": \"out\",\n"
+        "    \"output\": \"out\",\n"
         "    \"excludes\": [\n"
         "      {\"package\": \"noise\", \"version\": \"1.3.0\", \"reason\": \"Workspace "
         "regression\"}\n"
@@ -185,7 +185,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.dependencies[0].version == ">=1.2.0 <2.0.0");
     SLANG_CHECK(manifest.dependencies[0].ref.getLength() == 0);
     SLANG_CHECK(manifest.workspace.depsDirectory == "third-party");
-    SLANG_CHECK(manifest.workspace.buildDirectory == "out");
+    SLANG_CHECK(manifest.workspace.outputDirectory == "out");
     SLANG_CHECK(manifest.retractions.getCount() == 1);
     SLANG_CHECK(manifest.retractions[0].version == "1.1.0");
     SLANG_CHECK(manifest.retractions[0].reason == "Broken release");
@@ -337,38 +337,49 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     const String unsafeWorkspaceText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"../deps\",\"build\":\"build\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"../deps\",\"output\":\"build\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("unsafe-workspace.json", unsafeWorkspaceText, manifest, error)));
 
     const String overlappingWorkspaceText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"out\",\"build\":\"out\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"out\",\"output\":\"out\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("overlapping-workspace.json", overlappingWorkspaceText, manifest, error)));
 
     const String implicitDepsOverlapText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"build\":\"deps\"}}";
+        "\"dependencies\":{},\"workspace\":{\"output\":\"deps\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("implicit-deps-overlap.json", implicitDepsOverlapText, manifest, error)));
 
-    const String implicitBuildOverlapText =
+    const String implicitOutputOverlapText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"build\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"out\"}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText(
-        "implicit-build-overlap.json",
-        implicitBuildOverlapText,
+        "implicit-output-overlap.json",
+        implicitOutputOverlapText,
         manifest,
         error)));
+
+    const String legacyWorkspaceBuildText =
+        "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
+        "\"LICENSE\"],"
+        "\"dependencies\":{},\"workspace\":{\"build\":\"out\"}}";
+    SLANG_CHECK(SLANG_FAILED(readManifestText(
+        "legacy-workspace-build.json",
+        legacyWorkspaceBuildText,
+        manifest,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown field")) >= 0);
 
     const String nestedWorkspaceText =
         "{\"schema_version\":1,\"name\":\"root\",\"exports\":[\"src\"],\"license_files\":["
         "\"LICENSE\"],"
-        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"state/deps\",\"build\":\"state\"}}";
+        "\"dependencies\":{},\"workspace\":{\"dependencies\":\"state/deps\",\"output\":\"state\"}}";
     SLANG_CHECK(SLANG_FAILED(
         readManifestText("nested-workspace.json", nestedWorkspaceText, manifest, error)));
 
@@ -638,11 +649,11 @@ SLANG_UNIT_TEST(PackageToolDiscoversRootFromSubdirectory)
         Path::combine(temp.path, "src/main.slang"),
         "module main;\n"
         "public int value() { return 1; }\n")));
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK(
-        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(buildArguments), buildArguments) ==
+        executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(bundleArguments), bundleArguments) ==
         0);
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/source/main.slang")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/main.slang")));
     const char* docsArguments[] = {"slang-package", "docs", "--print"};
     SLANG_CHECK(
         executeFromStartDirectory(nestedSource, SLANG_COUNT_OF(docsArguments), docsArguments) == 0);
@@ -711,7 +722,7 @@ SLANG_UNIT_TEST(PackageToolInit)
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::writeAllText(Path::combine(temp.path, ".gitignore"), "node_modules\nbuild/\n")));
+        File::writeAllText(Path::combine(temp.path, ".gitignore"), "node_modules\nout/\n")));
 
     const char* initArguments[] = {"slang-package", "init"};
     String error;
@@ -721,22 +732,22 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(File::exists(Path::combine(temp.path, "tests")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "docs")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "deps")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "LICENSE")));
     String gitIgnore;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::readAllText(Path::combine(temp.path, ".gitignore"), gitIgnore)));
     SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice(".slang/")) >= 0);
     SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("deps/")) >= 0);
-    SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("build/")) >= 0);
+    SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("out/")) >= 0);
     SLANG_CHECK(
         gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-overlay.json")) >= 0);
     SLANG_CHECK(
         gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-includes.txt")) >= 0);
-    Index buildIgnoreCount = 0;
+    Index outputIgnoreCount = 0;
     for (auto line : LineParser(gitIgnore.getUnownedSlice()))
-        buildIgnoreCount += line.trim() == "build/";
-    SLANG_CHECK(buildIgnoreCount == 1);
+        outputIgnoreCount += line.trim() == "out/";
+    SLANG_CHECK(outputIgnoreCount == 1);
 
     Manifest manifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -745,7 +756,7 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(manifest.licenseFiles.getCount() == 1);
     SLANG_CHECK(manifest.licenseFiles[0] == "LICENSE");
     SLANG_CHECK(manifest.workspace.depsDirectory == "deps");
-    SLANG_CHECK(manifest.workspace.buildDirectory == "build");
+    SLANG_CHECK(manifest.workspace.outputDirectory == "out");
     SemanticVersion installedToolchain;
     String installedToolchainText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -857,7 +868,7 @@ SLANG_UNIT_TEST(PackageToolSlangToolchain)
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang-toolchain")) >= 0);
 }
 
-SLANG_UNIT_TEST(PackageToolBuild)
+SLANG_UNIT_TEST(PackageToolBundle)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -870,7 +881,7 @@ SLANG_UNIT_TEST(PackageToolBuild)
     Manifest manifest;
     String manifestPath = Path::combine(temp.path, "slang-package.json");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(manifestPath, manifest, error)));
-    manifest.workspace.buildDirectory = "out";
+    manifest.workspace.outputDirectory = "out";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_writeFile(
         Path::combine(temp.path, "src/acme/noise.slang"),
@@ -887,9 +898,9 @@ SLANG_UNIT_TEST(PackageToolBuild)
         "import acme.noise;\n"
         "public int getValue() { return getNoise(); }\n")));
 
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(
         !File::exists(Path::combine(temp.path, "out/bundle/modules/acme/noise.slang-module")));
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules/main.slang-module")));
@@ -899,11 +910,11 @@ SLANG_UNIT_TEST(PackageToolBuild)
         File::exists(Path::combine(temp.path, "out/bundle/source/acme/noise/helper.slang")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/main.slang")));
 
-    const char* experimentalBuildArguments[] = {"slang-package", "--experimental", "build"};
+    const char* experimentalBundleArguments[] = {"slang-package", "--experimental", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(experimentalBuildArguments),
-        experimentalBuildArguments,
+        SLANG_COUNT_OF(experimentalBundleArguments),
+        experimentalBundleArguments,
         error)));
     SLANG_CHECK(
         File::exists(Path::combine(temp.path, "out/bundle/modules/acme/noise.slang-module")));
@@ -921,7 +932,7 @@ SLANG_UNIT_TEST(PackageToolBuild)
     SLANG_CHECK(provenance.getUnownedSlice().indexOf(UnownedStringSlice("commit")) >= 0);
     SLANG_CHECK(provenance.getUnownedSlice().indexOf(UnownedStringSlice("dirty")) >= 0);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/main.slang")));
     String docsIndex;
@@ -938,13 +949,13 @@ SLANG_UNIT_TEST(PackageToolBuild)
         "int broken() { return missingValue; }\n")));
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(experimentalBuildArguments),
-        experimentalBuildArguments,
+        SLANG_COUNT_OF(experimentalBundleArguments),
+        experimentalBundleArguments,
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("undefined identifier")) >= 0);
 }
 
-SLANG_UNIT_TEST(PackageToolBuildRejectsCleanAndYes)
+SLANG_UNIT_TEST(PackageToolBundleRejectsCleanAndYes)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -953,17 +964,26 @@ SLANG_UNIT_TEST(PackageToolBuildRejectsCleanAndYes)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
 
-    const char* cleanArguments[] = {"slang-package", "build", "--clean"};
+    const char* cleanArguments[] = {"slang-package", "bundle", "--clean"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(cleanArguments), cleanArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown build option")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown bundle option")) >= 0);
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--clean")) >= 0);
 
-    const char* yesArguments[] = {"slang-package", "build", "--yes"};
+    const char* yesArguments[] = {"slang-package", "bundle", "--yes"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(yesArguments), yesArguments, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown build option")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("Unknown bundle option")) >= 0);
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("--yes")) >= 0);
+
+    const char* legacyBuildArguments[] = {"slang-package", "build"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(legacyBuildArguments),
+        legacyBuildArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("Invalid command or arguments")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageToolUneditRejectsConflictingOptions)
@@ -1015,13 +1035,12 @@ SLANG_UNIT_TEST(PackageToolBundleFlags)
         "module library;\n"
         "public int getValue() { return 1; }\n")));
 
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
-    SLANG_CHECK(
-        !File::exists(Path::combine(temp.path, "build/bundle/modules/library.slang-module")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/bundle/modules/provenance.json")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/bundle/source/library.slang")));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules/library.slang-module")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules/provenance.json")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/source/library.slang")));
 }
 
 SLANG_UNIT_TEST(PackageToolUpdateRejectsBundleCaseConflict)
@@ -1141,32 +1160,31 @@ SLANG_UNIT_TEST(PackageToolRun)
         executeInDirectory(temp.path, SLANG_COUNT_OF(runArguments), runArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("has not been built")) >= 0);
 
-    const char* stableBuildArguments[] = {"slang-package", "build"};
+    const char* stableBundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(stableBuildArguments),
-        stableBuildArguments,
+        SLANG_COUNT_OF(stableBundleArguments),
+        stableBundleArguments,
         error)));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/host")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/bundle/modules")));
-    SLANG_CHECK(
-        File::exists(Path::combine(temp.path, "build/bundle/source/package-run-test.slang")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/host")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/package-run-test.slang")));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
         SLANG_COUNT_OF(stableRunArguments),
         stableRunArguments,
         error)));
 
-    const char* buildArguments[] = {"slang-package", "--experimental", "build"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     String executablePath = Path::combine(
         temp.path,
-        String("build/host/package-run-test") + Process::getExecutableSuffix());
+        String("out/host/package-run-test") + Process::getExecutableSuffix());
     SLANG_CHECK(File::exists(executablePath));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/host/EXPERIMENTAL.txt")));
-    SLANG_CHECK(File::exists(
-        Path::combine(temp.path, "build/bundle/modules/package-run-test.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/host/EXPERIMENTAL.txt")));
+    SLANG_CHECK(
+        File::exists(Path::combine(temp.path, "out/bundle/modules/package-run-test.slang-module")));
 
     const char* binaryRunArguments[] =
         {"slang-package", "--experimental", "run", "--binary", "argument"};
@@ -1178,7 +1196,7 @@ SLANG_UNIT_TEST(PackageToolRun)
         binaryRunArguments,
         error)));
     SLANG_CHECK(SLANG_FAILED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not export")) >= 0);
 }
 
@@ -1208,7 +1226,7 @@ SLANG_UNIT_TEST(PackageToolRunModes)
     SLANG_CHECK(
         SLANG_FAILED(executeInDirectory(temp.path, SLANG_COUNT_OF(sourceRun), sourceRun, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("source entry")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang package build")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang package bundle")) >= 0);
 
     const char* experimentalSourceRun[] = {"slang-package", "--experimental", "run"};
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
@@ -1240,14 +1258,13 @@ SLANG_UNIT_TEST(PackageToolRunModes)
     manifest.workspace.bundle.source = true;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
 
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
-    SLANG_CHECK(
-        File::exists(Path::combine(temp.path, "build/bundle/source/package-run-test.slang")));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/source/package-run-test.slang")));
     SLANG_CHECK(!File::exists(Path::combine(
         temp.path,
-        String("build/host/package-run-test") + Process::getExecutableSuffix())));
+        String("out/host/package-run-test") + Process::getExecutableSuffix())));
 
     const char* namedSourceRun[] = {"slang-package", "run", "package-run-test"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -1298,16 +1315,16 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
         "    return argc == 2 ? 0 : 1;\n"
         "}\n")));
 
-    const char* buildArguments[] = {"slang-package", "--experimental", "build"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(File::exists(
-        Path::combine(temp.path, String("build/host/alpha") + Process::getExecutableSuffix())));
+        Path::combine(temp.path, String("out/host/alpha") + Process::getExecutableSuffix())));
     SLANG_CHECK(File::exists(
-        Path::combine(temp.path, String("build/host/beta") + Process::getExecutableSuffix())));
+        Path::combine(temp.path, String("out/host/beta") + Process::getExecutableSuffix())));
     String experimentalMarker;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(
-        Path::combine(temp.path, "build/host/EXPERIMENTAL.txt"),
+        Path::combine(temp.path, "out/host/EXPERIMENTAL.txt"),
         experimentalMarker)));
     SLANG_CHECK(
         experimentalMarker.getUnownedSlice().indexOf(UnownedStringSlice("EXPERIMENTAL")) >= 0);
@@ -1321,14 +1338,14 @@ SLANG_UNIT_TEST(PackageToolMultipleHostExecutables)
 
     manifest.build.host = HostSettings();
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(manifestPath, manifest, error)));
-    const char* stableBuildArguments[] = {"slang-package", "build"};
+    const char* stableBundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
         temp.path,
-        SLANG_COUNT_OF(stableBuildArguments),
-        stableBuildArguments,
+        SLANG_COUNT_OF(stableBundleArguments),
+        stableBundleArguments,
         error)));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/host")));
-    SLANG_CHECK(!File::exists(Path::combine(temp.path, "build/bundle/modules")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/host")));
+    SLANG_CHECK(!File::exists(Path::combine(temp.path, "out/bundle/modules")));
 }
 
 SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
@@ -1372,9 +1389,9 @@ SLANG_UNIT_TEST(PackageToolExecutableRequiresWorkspaceSource)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    const char* buildArguments[] = {"slang-package", "--experimental", "build"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
     SLANG_CHECK(SLANG_FAILED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("root-tool.slang")) >= 0);
 }
 
@@ -1457,11 +1474,11 @@ SLANG_UNIT_TEST(PackageToolDocsOpensIndex)
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(docsArguments), docsArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("index.md")) >= 0);
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("build")) >= 0);
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("out")) >= 0);
 
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     const char* printArguments[] = {"slang-package", "docs", "--print"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(printArguments), printArguments, error)));
@@ -2141,13 +2158,13 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
         "module main;\n"
         "import a;\n"
         "public int useA() { return aValue(); }\n")));
-    const char* buildArguments[] = {"slang-package", "--experimental", "build"};
+    const char* bundleArguments[] = {"slang-package", "--experimental", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/modules/a.slang-module")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/modules/b.slang-module")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/modules/c.slang-module")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/bundle/modules/main.slang-module")));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/modules/a.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/modules/b.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/modules/c.slang-module")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/bundle/modules/main.slang-module")));
 
     String shippedConsumerPath = Path::combine(temp.path, "shipped/consumer.slang");
     String shippedOutputPath = Path::combine(temp.path, "shipped/consumer.slang-module");
@@ -2159,7 +2176,7 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     List<String> slangcArguments;
     slangcArguments.add(shippedConsumerPath);
     slangcArguments.add("-I");
-    slangcArguments.add(Path::combine(temp.path, "build/bundle/modules"));
+    slangcArguments.add(Path::combine(temp.path, "out/bundle/modules"));
     slangcArguments.add("-o");
     slangcArguments.add(shippedOutputPath);
     ExecuteResult slangcResult;
@@ -2169,15 +2186,15 @@ SLANG_UNIT_TEST(PackageToolPathDependencies)
     SLANG_CHECK(slangcResult.resultCode == 0);
     SLANG_CHECK(File::exists(shippedOutputPath));
     SLANG_CHECK(
-        File::exists(Path::combine(Path::combine(temp.path, "build/docs", root.name), "guide.md")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/a/readme.md")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/b/reference/api.md")));
-    SLANG_CHECK(File::exists(Path::combine(temp.path, "build/docs/c/reference.md")));
+        File::exists(Path::combine(Path::combine(temp.path, "out/docs", root.name), "guide.md")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/docs/a/readme.md")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/docs/b/reference/api.md")));
+    SLANG_CHECK(File::exists(Path::combine(temp.path, "out/docs/c/reference.md")));
     SLANG_CHECK(!File::exists(
-        Path::combine(Path::combine(temp.path, "build/docs", root.name), "ignored.txt")));
+        Path::combine(Path::combine(temp.path, "out/docs", root.name), "ignored.txt")));
     String docsIndex;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(temp.path, "build/docs/index.md"), docsIndex)));
+        File::readAllText(Path::combine(temp.path, "out/docs/index.md"), docsIndex)));
     SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[a](#a)")) >= 0);
     SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[b](#b)")) >= 0);
     SLANG_CHECK(docsIndex.getUnownedSlice().indexOf(UnownedStringSlice("[c](#c)")) >= 0);
@@ -2383,9 +2400,9 @@ SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
     SLANG_CHECK(lock.packages[1].name == "noise");
     SLANG_CHECK(findLockedPackageIndex(lock, "helper") >= 0);
     SLANG_CHECK(findLockedPackageIndex(lock, "noise") >= 0);
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
 
     const char* disableNoiseArguments[] = {"slang-package", "override", "disable", "noise"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
@@ -2751,9 +2768,9 @@ SLANG_UNIT_TEST(PackageValidateStructureAndLicense)
         validateArguments,
         error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("license placeholder")) >= 0);
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
 
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Test license\n")));
@@ -2830,9 +2847,9 @@ SLANG_UNIT_TEST(PackageValidateRejectsEscapingPathDependency)
     const char* updateArguments[] = {"slang-package", "update", "--yes"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
 }
 
 SLANG_UNIT_TEST(PackageStatusReportsDriftButRejectsCorruptJSON)
@@ -3015,9 +3032,9 @@ SLANG_UNIT_TEST(PackageValidateIgnoresTransitiveAliasThatBuildRejects)
         SLANG_COUNT_OF(validateArguments),
         validateArguments,
         error)));
-    const char* buildArguments[] = {"slang-package", "build"};
+    const char* bundleArguments[] = {"slang-package", "bundle"};
     SLANG_CHECK(SLANG_FAILED(
-        executeInDirectory(temp.path, SLANG_COUNT_OF(buildArguments), buildArguments, error)));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(bundleArguments), bundleArguments, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("exported by both")) >= 0);
 }
 

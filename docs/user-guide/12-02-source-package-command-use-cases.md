@@ -40,7 +40,7 @@ view:
   `.gitignore`. `edit NAME` is shorthand for an override at `{workspace.dependencies}/NAME`. Do not commit
   this file.
 
-`slang package help` groups commands under those three files, then build, in pipeline order:
+`slang package help` groups commands under those three files, then bundle, in pipeline order:
 manifest, overlay, lock. That is the file each command primarily writes or reports. Most commands
 still _read_ the others. `unedit --adopt` drops the overlay and also writes the manifest and lock.
 
@@ -78,11 +78,11 @@ image-viewer/
 ├── tests/
 ├── docs/
 ├── deps/
-└── build/
+└── out/
 ```
 
 The last two directories are generated state and are ignored. The manifest initially exports
-`src`, names `LICENSE`, configures `workspace.dependencies` (`deps/`) and `workspace.build`, and records the installed Slang version as
+`src`, names `LICENSE`, configures `workspace.dependencies` (`deps/`) and `workspace.output` (`out/`), and records the installed Slang version as
 the minimum `tools.slang-toolchain` version when the version is available.
 
 The generated package is deliberately incomplete. It does not add a `build.host` section. Replace the
@@ -100,11 +100,11 @@ public float3 toneMap(float3 color)
 
 The filename uses a hyphen while the declaration uses the canonical underscore spelling.
 
-Run the package-quality gate and then build:
+Run the package-quality gate and then bundle:
 
 ```sh
 slang package validate
-slang package build
+slang package bundle
 ```
 
 Finally, initialize source control if needed and commit:
@@ -115,7 +115,7 @@ git add .
 git commit
 ```
 
-Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`, `deps/`, `build/`,
+Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`, `deps/`, `out/`,
 `slang-package-overlay.json`, or `slang-package-includes.txt`.
 
 ### Tool does
@@ -125,27 +125,27 @@ Commit source, the manifest, licenses, tests, and docs. Do not commit `.slang/`,
   module declarations, installed toolchain, and a portable lock with no active overrides.
   A package with no dependencies does not need a lock. `validate NAME` and `validate --all` apply
   the publishable-package rules to locked trees in this workspace.
-- `build` checks that the available graph is legal and buildable, emits the source bundle under
-  `build/bundle/source`, and collects Markdown under `build/docs/`. If a locked Git checkout is
+- `bundle` checks that the available graph is legal and buildable, emits the source bundle under
+  `out/bundle/source`, and collects Markdown under `out/docs/`. If a locked Git checkout is
   missing, it runs fetch first. If there is no
-  lock and the manifest has dependencies, fetch runs update `--yes` so the first clone can build
-  without a prompt. An existing lock is never rewritten. Build does not accept `--clean` or
+  lock and the manifest has dependencies, fetch runs update `--yes` so the first clone can bundle
+  without a prompt. An existing lock is never rewritten. Bundle does not accept `--clean` or
   `--yes`.
 
 ### Current gaps and pitfalls
 
 - `init` is intentionally scoped to the manifest, directories, ignore rules, and license reminder.
   It does not write a first source file, and its placeholder license makes the default `validate`,
-  fail until you choose a real license. The placeholder does not prevent a local `build`.
+  fail until you choose a real license. The placeholder does not prevent a local `bundle`.
 - `slang package test` is reserved but not implemented. The generated `tests/` directory is only a
   convention today.
-- `docs` does not regenerate documentation. Run `build` first.
+- `docs` does not regenerate documentation. Run `bundle` first.
 - An application that compiles shaders or modules with `slangc` passes
   `-search-path-list slang-package-includes.txt`. That is not how this package tool produces a
   host executable. An API host loads the same paths with `slang_readSearchPathsFile` and assigns
   them to `SessionDesc.searchPaths`; package state is not injected into arbitrary compiler
   sessions.
-- A `build.host` section has no effect on plain `build`; Journey 8 covers the explicit opt-in that
+- A `build.host` section has no effect on plain `bundle`; Journey 8 covers the explicit opt-in that
   produces its binary output.
 
 ### First checkpoint
@@ -156,7 +156,7 @@ At this point a new clone can reproduce the package without dependency resolutio
 git clone <image-viewer-url>
 cd image-viewer
 slang package validate
-slang package build
+slang package bundle
 ```
 
 There is no lock yet because the package has no dependencies. Once dependencies are added, the
@@ -215,13 +215,13 @@ considered. Reasons distinguish an incompatible version from a publisher retract
 exclusion. The final `Help:` line directs the workspace author back to the requirements and
 exclusions that can change the result.
 
-Apply the solve, then validate and build:
+Apply the solve, then validate and bundle:
 
 ```sh
 slang package update
 slang package validate
 slang package status
-slang package build
+slang package bundle
 ```
 
 Review and commit both files:
@@ -269,7 +269,7 @@ commit the manifest (and lock, if update rewrote it).
   `slang-package-lock.json`, and regenerates `slang-package-includes.txt`.
 - `status` prints one line when the workspace is current. When something is dirty, it lists
   missing checkouts, dirty or diverged pins, enabled overrides, and source
-  problems and missing cached upstream pins, without inspecting `build/` or contacting remotes. A missing lock or pin is
+  problems and missing cached upstream pins, without inspecting `out/` or contacting remotes. A missing lock or pin is
   `incomplete`; a present graph that fails the source check is `not buildable`. Reportable
   drift does not make status fail.
 - `fetch` subsequently reproduces that lock. It checks out each recorded `commit` and does not
@@ -279,7 +279,7 @@ commit the manifest (and lock, if update rewrote it).
 
   ```sh
   slang package fetch
-  slang package build
+  slang package bundle
   ```
 
   With an existing lock, fetch also regenerates `slang-package-includes.txt` without re-solving or
@@ -288,18 +288,18 @@ commit the manifest (and lock, if update rewrote it).
   `--clean` unless local checkout state should be discarded. With no lock, fetch delegates to
   `update --yes` and writes the initial lock.
 
-  This is the normal clean-clone and CI path. With a committed lock, `build` fetches any missing
-  locked trees first and does not rewrite that lock. With no lock, `build` runs fetch, which runs
+  This is the normal clean-clone and CI path. With a committed lock, `bundle` fetches any missing
+  locked trees first and does not rewrite that lock. With no lock, `bundle` runs fetch, which runs
   update `--yes` to write the first lock. `fetch` remains the command for prefetch, `--clean`, and
   CI that wants materialization without building. CI that already has a committed lock should not
   run `update`.
 
-From this point forward, a clone can start with build:
+From this point forward, a clone can start with bundle:
 
 ```sh
 git clone <image-viewer-url>
 cd image-viewer
-slang package build
+slang package bundle
 ```
 
 ### Current gaps and pitfalls
@@ -803,7 +803,7 @@ already editing.
 deps/color-math 1.0.0`, the same representation created by `edit`). A sidecar there is not in the
 application repository until that inner git has a remote.
 
-`slang package validate color-math` and root `build` use this workspace's lock pins. They do not
+`slang package validate color-math` and root `bundle` use this workspace's lock pins. They do not
 materialize a nested graph under the sidecar. When the sidecar origin exists, push tags, keep
 `git` pointed at that origin, then restore a portable lock:
 
@@ -851,7 +851,7 @@ application can consume it.
 - Root `update` resolves the path, override, or Git identity into one application graph.
 - Graph validation catches duplicate imports if the old file was not removed from the root export,
   and catches case-only collisions on case-insensitive filesystems.
-- `build` copies source from both root and dependencies and preserves export-relative import paths
+- `bundle` copies source from both root and dependencies and preserves export-relative import paths
   in the generated bundle.
 
 ### Current gaps and pitfalls
@@ -872,7 +872,7 @@ application can consume it.
 - Moving a module can expose accidental dependency direction or visibility problems. The package
   tool detects graph and layout errors, not architectural cycles in your intended API.
 
-## Journey 8: build binary artifacts (experimental)
+## Journey 8: bundle binary artifacts (experimental)
 
 Everything before this point uses stable commands. `.slang-module` generation, host executable
 compilation, and binary `run` are experimental, so they are separated here: the journeys above
@@ -888,15 +888,15 @@ accepting that the artifacts, command spelling, and features may change.
 Starting from the `image-viewer` package of Journey 1, opt in to module generation:
 
 ```sh
-slang package --experimental build
+slang package --experimental bundle
 ```
 
 When `workspace.bundle.modules` is enabled, this writes `.slang-module` files under
-`build/bundle/modules`. The command emits a warning every time because their binary format is not
+`out/bundle/modules`. The command emits a warning every time because their binary format is not
 stable. The adjacent `provenance.json` records that the format is experimental and unstable,
 along with the compiler version, source commit, tracked-source dirty state, and path.
 
-To build a host executable too, give the entry module a C++-visible entry point:
+To produce a host executable too, give the entry module a C++-visible entry point:
 
 ```slang
 // src/image-viewer.slang
@@ -919,11 +919,11 @@ Declare the executable in the `build.host` section of `slang-package.json`:
 }
 ```
 
-Plain `slang package build` still produces the stable source bundle and skips host and module
+Plain `slang package bundle` still produces the stable source bundle and skips host and module
 binaries. The stable run path interprets that source bundle:
 
 ```sh
-slang package build
+slang package bundle
 slang package run
 ```
 
@@ -931,7 +931,7 @@ Opt in to binary outputs and native execution with the global flag, which must a
 subcommand, and the run-specific `--binary` option:
 
 ```sh
-slang package --experimental build
+slang package --experimental bundle
 slang package --experimental run --binary
 ```
 
@@ -948,31 +948,31 @@ application flag in that position is still forwarded.
 
 ### Tool does
 
-- `build` performs the same validation, source-bundle, and documentation work as the stable path.
+- `bundle` performs the same validation, source-bundle, and documentation work as the stable path.
   When enabled in the manifest, it additionally compiles `.slang-module` files and emits a warning
   about their unstable binary format.
 - Module provenance records `experimental: true`, `format_stability: "unstable"`, and the
   compiler source commit and dirty state so copied artifacts retain their compatibility boundary.
-- Host executables and runtime libraries are written under `build/host`, which contains
-  `EXPERIMENTAL.txt` even when copied separately from the rest of the build tree.
-- `build` without `--experimental` produces source and documentation only, regardless of module or
-  host settings, and removes stale module and host directories from an earlier experimental build.
+- Host executables and runtime libraries are written under `out/host`, which contains
+  `EXPERIMENTAL.txt` even when copied separately from the rest of the output tree.
+- `bundle` without `--experimental` produces source and documentation only, regardless of module or
+  host settings, and removes stale module and host directories from an earlier experimental bundle.
 - `run` interprets the already-built source copy selected by the optional name, otherwise
   `build.host.default` or the only configured executable.
 - `--experimental run --binary` executes the corresponding already-built native artifact.
-- Neither mode builds or resolves packages.
-- `slang package --experimental help` documents the binary build and run options.
+- Neither mode bundles or resolves packages.
+- `slang package --experimental help` documents the binary bundle and run options.
 
 ### Current gaps and pitfalls
 
-- There is no package-level build script. Host executables need a supported C++ compiler and the
+- There is no package-level bundle script. Host executables need a supported C++ compiler and the
   sibling Slang tools available at runtime, and the tool does not check for the C++ compiler as
   part of the toolchain constraint.
-- Because `run` never builds, a stale source copy or native artifact runs silently after a source
-  edit. Run the corresponding build first.
-- If the selected output does not exist, `run` reports the missing path and build command instead
-  of attempting a build.
-- A stable build intentionally does not diagnose missing host toolchains or invalid executable
+- Because `run` never bundles, a stale source copy or native artifact runs silently after a source
+  edit. Run the corresponding bundle first.
+- If the selected output does not exist, `run` reports the missing path and bundle command instead
+  of attempting a bundle.
+- A stable bundle intentionally does not diagnose missing host toolchains or invalid executable
   entry points because it does not attempt those outputs.
 
 ## Lessons from established package workflows
@@ -1078,7 +1078,7 @@ without performing another update.
 Slang does not need npm-style hoisting, Gradle's opt-in locking model, or a registry-first
 publishing workflow to fix the journeys above. Remaining improvements include committed
 multi-package composition, package-content preview, testing, and transactional updates. Unlike
-Cargo's introductory loop, `run` should not be read as build-and-run; it deliberately executes
+Cargo's introductory loop, `run` should not be read as bundle-and-run; it deliberately executes
 only an existing source copy or native artifact.
 
 ## How flags change the journeys
@@ -1178,7 +1178,7 @@ their own workflow.
 
 **Combination:** `update --dry-run --clean` is rejected. Fetch may combine `--clean` with
 `--skip-validate`. When fetch would actually discard local checkout state, it lists every affected
-package and asks once. Pass `--yes` only when that destruction was pre-approved. Build does not
+package and asks once. Pass `--yes` only when that destruction was pre-approved. Bundle does not
 accept `--clean`.
 
 ### `fetch --yes`
@@ -1186,10 +1186,10 @@ accept `--clean`.
 **Use it when:** fetch has no lock and would run update, `--clean` would discard checkout state, or
 cache staging would move existing named refs, and there is no interactive terminal.
 
-**It does not change:** an existing lock. Build does not take `--yes`; a missing lock makes the
-nested update run as `update --yes` so a first clone can `slang package build` without a prompt.
+**It does not change:** an existing lock. Bundle does not take `--yes`; a missing lock makes the
+nested update run as `update --yes` so a first clone can `slang package bundle` without a prompt.
 
-### `fetch --skip-validate`, `update --skip-validate`, and `build --skip-validate`
+### `fetch --skip-validate`, `update --skip-validate`, and `bundle --skip-validate`
 
 **Use it when:** a validation bug or temporarily invalid source tree blocks an investigation and
 you accept that later compilation may fail. It is a workaround, not the CI path.
@@ -1202,8 +1202,8 @@ declaration rules, and graph-wide import uniqueness.
 other than source-layout and publish checks. It always prints a warning.
 
 **Combinations:** `update --dry-run --skip-validate` still runs the legal graph from cache and
-still cannot inspect remote source layout. `build --skip-validate` passes the flag through to
-fetch when build has to materialize missing locked trees. `validate` intentionally has no skip
+still cannot inspect remote source layout. `bundle --skip-validate` passes the flag through to
+fetch when bundle has to materialize missing locked trees. `validate` intentionally has no skip
 flag.
 
 ### `override add NAME PATH [AS]`
@@ -1236,7 +1236,7 @@ another workspace can fetch it.
 **Use it when:** you need `.slang-module` binaries or host executables. Journey 8 covers both
 workflows.
 
-**It changes:** `build` also compiles enabled `.slang-module` output and configured host
+**It changes:** `bundle` also compiles enabled `.slang-module` output and configured host
 executables, and `run --binary` becomes available. The flag is global and must appear before the
 subcommand. Source `run` stays available without it. Every other journey in this chapter is
 unaffected by it.
@@ -1248,11 +1248,11 @@ unaffected by it.
 `slang package help`, `-help`, and `--help` print stable package help, including source `run`.
 Commands are grouped by the file they primarily write or report: the manifest
 (`slang-package.json`), the overlay (`slang-package-overlay.json`), the lock
-(`slang-package-lock.json`), then build. `unedit --adopt` is listed under overlay because it
+(`slang-package-lock.json`), then bundle. `unedit --adopt` is listed under overlay because it
 drops that registration; it also writes the manifest and lock. Stable help says
 `--experimental` enables experimental options; `slang package --experimental help` lists
-`run --binary` and the extra `build` outputs. `init`, `status`, `tree`, and `edit` accept no
-additional arguments; `validate` accepts an optional package name or `--all`; `build` accepts
+`run --binary` and the extra `bundle` outputs. `init`, `status`, `tree`, and `edit` accept no
+additional arguments; `validate` accepts an optional package name or `--all`; `bundle` accepts
 only `--skip-validate` (not `--clean` or `--yes`); `unedit` accepts `--clean`, or `--adopt`
 with optional `--ref` and `--as`, plus `--yes`; and `docs` accepts `--print`. `test` is present
 but returns a not-implemented error.
@@ -1330,9 +1330,9 @@ dependencies therefore appear only in each consumer's root lock.
 
 ### Run, docs, and test do less than their names may imply
 
-`run` does not build, `docs` opens `build/docs/index.md` (or prints the path with `--print`), and
+`run` does not bundle, `docs` opens `out/docs/index.md` (or prints the path with `--print`), and
 `test` is
-unimplemented. Narrow side effects make commands predictable, but missing `build --run`,
+unimplemented. Narrow side effects make commands predictable, but missing `bundle --run`,
 documentation generation, and package testing leave common loops manual.
 
 ### One package name has one version
@@ -1343,9 +1343,9 @@ split that reuses an existing graph name must unify with it or choose a distinct
 
 ### Skip-validate is safe only within its stated boundary
 
-The flag lets a user materialize or build around source validation, while preserving manifest and
+The flag lets a user materialize or bundle around source validation, while preserving manifest and
 lock identity checks. That is a deliberate workaround boundary. It does not make an invalid graph
-publishable or suitable for CI, and it cannot guarantee build success.
+publishable or suitable for CI, and it cannot guarantee that bundling succeeds.
 
 ## Prioritized gaps
 
@@ -1392,19 +1392,19 @@ them or update this chapter and its regression tests in the same change.
 ### Bootstrap contract
 
 - `init` creates the manifest, conventional directories, placeholder license, and ignore entries.
-- Default `validate` rejects the workspace license placeholder. Build allows it, while update and
+- Default `validate` rejects the workspace license placeholder. Bundle allows it, while update and
   fetch reject it when it appears in a new or changed Git checkout or a changed local registration
   (an edit or enabled override). A vendored path package is not publish-checked by update or fetch,
   because consuming an in-repo tree through a path dependency is not a claim that the tree could be
   published. `validate NAME` and `validate --all` apply the publishable checks to any locked tree,
   including a path row, without requiring a portable workspace.
-- A dependency-free valid package can validate and build without a lock.
+- A dependency-free valid package can validate and bundle without a lock.
 
 ### Resolve and reproduce contract
 
 - `update` is the command that reselects versions and writes a graph lock. Fetch with an
   existing lock does not reselect. Fetch with dependencies and no lock delegates to update
-  (prompt, or `--yes`). Build never rewrites an existing lock; with no lock it delegates to
+  (prompt, or `--yes`). Bundle never rewrites an existing lock; with no lock it delegates to
   fetch, which delegates to update `--yes`.
 - `update --dry-run` writes neither lock nor dependency checkouts.
 - A real update reports one selected in-memory graph, confirms it when it differs from the
@@ -1412,7 +1412,7 @@ them or update this chapter and its regression tests in the same change.
   an error.
 - Fetch with an existing lock selects nothing and does not rewrite that lock. Fetch with
   dependencies and no lock announces that it is running update, then performs the confirmed
-  initial solve and writes the first lock. Build with no lock announces fetch, then that
+  initial solve and writes the first lock. Bundle with no lock announces fetch, then that
   nested fetch announces update `--yes`.
 - A real update writes the lock only after the candidate graph validates.
 - Every reachable dependency has one exact lock row; Git rows include ref and commit.
@@ -1420,7 +1420,7 @@ them or update this chapter and its regression tests in the same change.
 - Materialization leaves a tool-owned, clean Git checkout untouched when its origin and `HEAD`
   already match the lock. Missing, dirty, unowned, or out-of-date checkouts still follow the normal
   repair or safety path.
-- Fetch, validate, update, build, status, and local-registration changes reject a path-only lock
+- Fetch, validate, update, bundle, status, and local-registration changes reject a path-only lock
   row when the corresponding manifest edge requires Git. This prevents a lock edit from
   redirecting a published dependency to arbitrary local source.
 - Publisher retractions affect update selection but not an existing fetched lock.
@@ -1477,18 +1477,18 @@ them or update this chapter and its regression tests in the same change.
 
 - Fetch and update always enforce the legal graph **before** materialize, then publish-check
   changed Git and local selections and enforce source layout and import uniqueness across the
-  closure after materialize. `--skip-validate` skips only that second stage. Build never rewrites
-  an existing lock. If a tool-owned Git checkout is missing, build invokes fetch (without
+  closure after materialize. `--skip-validate` skips only that second stage. Bundle never rewrites
+  an existing lock. If a tool-owned Git checkout is missing, bundle invokes fetch (without
   `--clean`). If the lock itself is missing and the manifest has dependencies, that fetch runs
-  update `--yes` so a first clone can build without a prompt. Each hand-off prints why the inner
+  update `--yes` so a first clone can bundle without a prompt. Each hand-off prints why the inner
   command is running. Bare `validate` checks workspace publishability and lock portability.
   `validate NAME` and `validate --all` check locked trees against this workspace lock.
-- `--skip-validate` exists only on fetch, update, and build; it warns and keeps lock, manifest,
+- `--skip-validate` exists only on fetch, update, and bundle; it warns and keeps lock, manifest,
   closure, toolchain, export, and dirty-checkout checks.
 - `status` diagnoses lock, registration, checkout, and cached upstream state without mutation or
   remote access. A current workspace is one header line; observations appear only when something is dirty. Missing
   pins are `incomplete`; a present graph that fails the source check is `not buildable`. It never
-  inspects `build/` and is not the package-quality gate. Reportable drift returns success;
+  inspects `out/` and is not the package-quality gate. Reportable drift returns success;
   unreadable or malformed required JSON returns failure.
 
 ### Output and side-effect contract
@@ -1500,10 +1500,10 @@ them or update this chapter and its regression tests in the same change.
   from existing workspace and cache state without contacting remotes.
 - Materialization prints per-package source/checkout progress. A failure explains that the prior
   lock remains authoritative and how to recover potentially partial derived state.
-- `docs` opens `build/docs/index.md` with the registered application. `--print` writes the path
+- `docs` opens `out/docs/index.md` with the registered application. `--print` writes the path
   instead. It does not regenerate documentation.
 - `test` reports that package testing is not implemented.
-- A command failure must not claim that an update, fetch, or build succeeded.
+- A command failure must not claim that an update, fetch, or bundle succeeded.
 
 ### Experimental binary-artifact contract
 
@@ -1512,15 +1512,15 @@ artifacts ship in their current form.
 
 - `.slang-module` and host executable builds require the global `--experimental` flag before the
   subcommand.
-- Stable build distributes source and removes stale module and host output.
-- Every module build warns that the binary format is unstable. Module provenance records the
+- A stable bundle distributes source and removes stale module and host output.
+- Every experimental module bundle warns that the binary format is unstable. Module provenance records the
   experimental status, compiler source commit, and tracked-source dirty state.
-- Host output lives under `build/host` with an `EXPERIMENTAL.txt` marker.
-- `build` without the flag still emits source and docs, skips binary outputs, and removes stale
+- Host output lives under `out/host` with an `EXPERIMENTAL.txt` marker.
+- `bundle` without the flag still emits source and docs, skips binary outputs, and removes stale
   module and host directories.
 - Stable `run` interprets the bundled source; `--experimental run --binary` executes an existing
   native artifact.
-- `--experimental help` adds the binary build and run options.
+- `--experimental help` adds the binary bundle and run options.
 - Neither run mode silently builds or resolves.
 
 ## Executable test anchors
@@ -1563,11 +1563,11 @@ Start with these unit tests when changing a journey:
   `PackageResolverPinnedRefWithoutVersionConstraint`,
   `PackageToolRefAndAsDependencyWithoutVersionResolves`, `PackageToolDependencyPinFromLock`,
   `PackageToolDependencyPinPromotesTransitiveAndKeepsOverlay`.
-- Stable source build and experimental binary artifacts: `PackageToolBuild`, `PackageToolRun`,
+- Stable source bundle and experimental binary artifacts: `PackageToolBundle`, `PackageToolRun`,
   `PackageToolExecutableRequiresWorkspaceSource`,
-  `PackageToolBuildFetchesMissingLockedCheckouts`,
-  `PackageToolBuildCreatesFirstLockViaFetch`,
-  `PackageToolBuildRejectsCleanAndYes`.
+  `PackageToolBundleFetchesMissingLockedCheckouts`,
+  `PackageToolBundleCreatesFirstLockViaFetch`,
+  `PackageToolBundleRejectsCleanAndYes`.
 
 The upstream-add and upstream-split journeys do not yet have end-to-end command tests named after
 them. Add those anchors when the next resolver or command-lifecycle change touches those cases.
@@ -1577,7 +1577,7 @@ them. Add those anchors when the next resolver or command-lifecycle change touch
 Before merging a package-command change:
 
 1. Name the human journey it changes.
-2. List which of manifest, lock, workspace registration, checkouts, caches, search paths, and build
+2. List which of manifest, lock, workspace registration, checkouts, caches, search paths, and bundle
    outputs it reads or writes.
 3. State how every accepted flag changes that journey, including combinations.
 4. Check clean clone, dirty checkout, local override, dry-run, validation failure, and CI

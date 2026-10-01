@@ -8,7 +8,7 @@ Slang Source Packages
 
 The `slang package` command manages source dependencies stored in Git repositories. The short form
 `slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax;
-its stable build command distributes source for the resolved graph. Experimental build features
+its stable bundle command distributes source for the resolved graph. Experimental bundle features
 can additionally emit `.slang-module` files and native executables. A command-order walkthrough
 using the public `video-preview` demo is in
 [Using Source Packages](source-package-workflow). Expected success and failure for each command,
@@ -66,7 +66,7 @@ The manifest declares the package and its source dependencies:
   "license_files": ["LICENSE"],
   "workspace": {
     "dependencies": "deps",
-    "build": "build",
+    "output": "out",
     "excludes": [
       {
         "package": "noise",
@@ -112,23 +112,23 @@ non-empty license file inside the package repository. `slang package init` creat
 contents must be replaced before validation succeeds.
 
 The `workspace` object is read only from the manifest that starts the solve. `dependencies` is where Git
-dependency source is materialized, and `build` contains generated workspace output. Their defaults
-are `deps/` and `build/`; `slang package init` writes those defaults explicitly. The same fields in
-a dependency's manifest do not affect the enclosing workspace. `workspace.build` is a directory
+dependency source is materialized, and `output` contains generated workspace output. Their defaults
+are `deps/` and `out/`; `slang package init` writes those defaults explicitly. The same fields in
+a dependency's manifest do not affect the enclosing workspace. `workspace.output` is a directory
 name; it is not the top-level `build` object that configures compilation.
 
-`workspace.bundle` selects optional distribution outputs under `build/bundle/`. `modules` (default
-true) requests that experimental builds compile every primary to `build/bundle/modules/` and write
-`provenance.json` beside those artifacts. Stable builds do not generate modules regardless of this
-setting. `source` (default true) copies every exported `.slang` file into `build/bundle/source/`
+`workspace.bundle` selects optional distribution outputs under `out/bundle/`. `modules` (default
+true) requests that an experimental bundle compile every primary to `out/bundle/modules/` and write
+`provenance.json` beside those artifacts. A stable bundle does not generate modules regardless of this
+setting. `source` (default true) copies every exported `.slang` file into `out/bundle/source/`
 using the same import-relative layout, so that directory is one compiler search path. Two files
 that would occupy the same name on a case-insensitive filesystem are an error. Set either flag to
-`false` to skip that output when its build mode is active.
+`false` to skip that output.
 
 The optional top-level `build` object is how the package is compiled. Format version 1 only understands
 `build.host`, which requests native host executables. `executables` lists output filenames without
 directory separators; the package tool adds the platform executable suffix and writes each result
-under `workspace.build/host`. Each name must match an exported workspace primary whose source
+under `<workspace.output>/host`. Each name must match an exported workspace primary whose source
 filename is `<name>.slang`. When more than one executable is listed, `default` names the artifact
 `slang package run` selects if you do not pass an executable name.
 With a single executable, `default` may be omitted and that name is used. Dependency manifests may
@@ -149,7 +149,7 @@ the minimum compiler it needs to work correctly: a builtin such as `neural`, a s
 API, or a compiler fix that did not exist (or was broken) before that version. There is no
 separate way to depend on those builtins, so the toolchain version stands in for them.
 
-Every package in the graph may declare the field; `update`, `fetch`, `status`, and `build`
+Every package in the graph may declare the field; `update`, `fetch`, `status`, and `bundle`
 intersect those constraints against the installed compiler. `validate` checks the workspace
 package's constraint while checking that package for sharing, and verifies the materialized lock
 graph when it has dependencies. `slang package init` writes `>=` that installed version when it can
@@ -181,7 +181,7 @@ The root-only `workspace.excludes` array is committed consumer policy. Each entr
 `package`, a `version` constraint, and a non-empty `reason`. Dependency manifests' workspace
 settings, including exclusions, are ignored for the solve. If a reachable package lists
 `workspace.excludes` entries that this workspace does not copy (same `package` and `version`
-strings), `update`, `fetch`, `status`, `validate`, and `build` warn so those ignored excludes are
+strings), `update`, `fetch`, `status`, `validate`, and `bundle` warn so those ignored excludes are
 visible. Resolution skips excluded Git releases. Unlike a publisher retraction, adding an
 exclusion changes the workspace's declared resolution intent, so
 `fetch` rejects a lock that still selects an excluded release and asks for `slang package update`.
@@ -259,9 +259,9 @@ out-of-date checkouts are materialized as needed. Path dependencies remain at th
 locked relative locations. When dependencies exist
 but a fresh checkout has no lock, fetch performs the initial solve, shows the same selection report
 as update, confirms it, and writes the first lock. Later fetches reproduce that lock without
-reselecting versions. CI that already has a committed lock should `fetch` or `build`; `build`
+reselecting versions. CI that already has a committed lock should `fetch` or `bundle`; `bundle`
 fetches missing locked trees itself and never rewrites that lock. A first clone with no lock can
-start with `build`, which runs fetch and then update `--yes`. Use an explicit `fetch` to
+start with `bundle`, which runs fetch and then update `--yes`. Use an explicit `fetch` to
 materialize without building, to pass `--clean`, or to confirm a first lock interactively.
 
 Every lock row records selection identity only: an exact `version`, plus `git`/`ref`/`commit` for a
@@ -296,7 +296,7 @@ prints that report and asks before applying the exact graph it just resolved, un
 already matches the committed lock. In a terminal, declining that prompt leaves the workspace
 unchanged and still succeeds. Without a terminal the command does not prompt: it fails and tells
 you to re-run with `--yes`. Pass `--yes` for a non-interactive invocation. Reproducing a committed lock uses
-`slang package fetch` or `slang package build`; an inconsistent existing lock is an error.
+`slang package fetch` or `slang package bundle`; an inconsistent existing lock is an error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
 configuration therefore applies without separate package-tool authentication. Git locations
@@ -352,11 +352,11 @@ lock under `NAME`. `slang package validate --all` runs that library check on eve
 package's tree. Neither named form materializes packages or walks the legal graph again.
 Both refresh and validate the relevant upstream cache repositories.
 
-`build` requires a legal, buildable workspace. It deliberately permits the generated license
+`bundle` requires a legal, buildable workspace. It deliberately permits the generated license
 placeholder, overrides, and local path dependencies because those do not prevent
 compilation. If a tool-owned Git checkout is missing, or if there is no lock and the manifest
-has dependencies, build runs `fetch` first (without `--clean`). A missing lock makes fetch run
-`update --yes` so a first clone can build without a prompt. An existing lock is never rewritten.
+has dependencies, bundle runs `fetch` first (without `--clean`). A missing lock makes fetch run
+`update --yes` so a first clone can bundle without a prompt. An existing lock is never rewritten.
 Each of those hand-offs prints why the inner command is running. A dirty checkout that would
 require `--clean` still fails; run `slang package fetch --clean` yourself.
 
@@ -375,7 +375,7 @@ The closure check includes unchanged packages because a new module can
 collide with one already selected. `update --dry-run` runs that legal-graph check and still cannot
 claim source-layout success, because it does not materialize remote trees.
 
-Pass `--skip-validate` on `fetch`, `update`, or `build` only as an escape hatch. It skips
+Pass `--skip-validate` on `fetch`, `update`, or `bundle` only as an escape hatch. It skips
 source-layout and new-release publish checks **after** materialize. The legal graph still runs
 first. The command prints a warning. `slang package validate` has no skip flag.
 
@@ -389,7 +389,7 @@ Like
 `git status`, reportable drift does not make the command fail. Status returns nonzero only when
 required root manifest, existing lock, or overlay JSON cannot be read and parsed well enough to
 produce a report. It also reports when a locked ref or commit is absent from the existing cache.
-It does not inspect `build/`, modify package state, or contact remotes.
+It does not inspect `out/`, modify package state, or contact remotes.
 
 Use `slang package dependency add` and `dependency remove` to edit direct manifest edges, and
 `dependency list` to inspect them. Add accepts exactly one source shape:
@@ -420,12 +420,12 @@ relative to the primary (for example `__include "noise/hash";`), as shown in
 
 `slang package init` creates `slang-package.json` and the conventional directories in the current
 directory. It writes `tools.slang-toolchain` as `>=` the installed compiler version when that
-version can be parsed. It adds `.slang/`, `deps/`, `build/`, `slang-package-overlay.json`, and
+version can be parsed. It adds `.slang/`, `deps/`, `out/`, `slang-package-overlay.json`, and
 `slang-package-includes.txt` to
-`.gitignore`. `slang package help` lists commands under the manifest, overlay, lock, and build.
+`.gitignore`. `slang package help` lists commands under the manifest, overlay, lock, and bundle.
 `.slang/cache/` contains the Git repositories last refreshed from package origins. Resolution
 reads those caches, and fetch/update stage their objects and refs into the workspace repositories
-under `deps/`. Fetched source remains visible there; generated files go under `build/`.
+under `deps/`. Fetched source remains visible there; generated files go under `out/`.
 
 `slang package edit NAME` marks the existing `{workspace.dependencies}/NAME` checkout (by default
 `deps/NAME`) as editable without moving it. Under the covers this is an enabled override at that
@@ -494,65 +494,65 @@ registrations or committing a portable published resolution.
 Fetched package trees contain source only. Compilation output must be written outside these trees
 because the same source commit can be compiled against different resolved dependency graphs.
 
-`slang package build` validates the materialized package graph. Its stable distribution output is
+`slang package bundle` validates the materialized package graph. Its stable distribution output is
 source: when `workspace.bundle.source` is enabled, it copies every exported `.slang` file into
-`build/bundle/source/` at the same import-relative paths. The resulting tree is a single search
+`out/bundle/source/` at the same import-relative paths. The resulting tree is a single search
 path: `src/acme/noise.slang` and its companion `src/acme/noise/helper.slang` become
-`build/bundle/source/acme/noise.slang` and `build/bundle/source/acme/noise/helper.slang`. A
+`out/bundle/source/acme/noise.slang` and `out/bundle/source/acme/noise/helper.slang`. A
 case-insensitive name collision across packages is an error.
 
-With `--experimental`, build also honors `workspace.bundle.modules`. It compiles every primary
+With `--experimental`, bundle also honors `workspace.bundle.modules`. It compiles every primary
 module in the workspace and its resolved dependencies to a front-end `.slang-module` under
-`workspace.build/bundle/modules`, preserving its import path. For example, an exported
-`src/acme/noise.slang` becomes `build/bundle/modules/acme/noise.slang-module`, whether that source
+`<workspace.output>/bundle/modules`, preserving its import path. For example, an exported
+`src/acme/noise.slang` becomes `out/bundle/modules/acme/noise.slang-module`, whether that source
 belongs to the workspace or a dependency. Companion files included by that primary are compiled
 into the same artifact and do not produce separate files.
 
-The `.slang-module` binary format is unstable and has no compatibility guarantee. Every build that
-generates one prints a warning. `build/bundle/modules/provenance.json` records
+The `.slang-module` binary format is unstable and has no compatibility guarantee. Every bundle that
+generates one prints a warning. `out/bundle/modules/provenance.json` records
 `experimental: true`, `format_stability: "unstable"`, and the compiler's name, version, exact
 source commit when available, tracked-source `dirty` state, and path. Consumers must require the
 same Slang toolchain that produced the files. The module tree can be used as a source-free search
 path only with that constraint; it is not a stable distribution format.
 
-When `build.host.executables` is present, `slang package --experimental build` also compiles each matching
-workspace primary with the host executable target and writes `build/host/<executable-name>` (plus
+When `build.host.executables` is present, `slang package --experimental bundle` also compiles each matching
+workspace primary with the host executable target and writes `out/host/<executable-name>` (plus
 `.exe` on Windows). The `main` function in that file must use the native ABI, such as
-`export __extern_cpp int main()`, and a supported downstream C++ compiler must be available. Build
+`export __extern_cpp int main()`, and a supported downstream C++ compiler must be available. The command
 copies the matching `slang-rt` shared library beside the executables so the artifacts can locate
-their runtime support. It also writes `build/host/EXPERIMENTAL.txt`, so the status remains visible
+their runtime support. It also writes `out/host/EXPERIMENTAL.txt`, so the status remains visible
 when the host directory is copied independently. Configuring a host executable without a matching
 workspace `.slang` primary is an error.
 
 The same command copies every `.md` file below each materialized package's `docs/` directory to
-`build/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
+`out/docs/<package-name>/`, preserving paths below `docs/`. Namespacing the output by package
 keeps files such as `docs/README.md` from different packages distinct. Other file types are not
-copied. Build also writes `build/docs/index.md`: the workspace dependency tree, then an
+copied. The command also writes `out/docs/index.md`: the workspace dependency tree, then an
 alphabetized list of copied Markdown files per package. Every package in the graph is listed;
 only packages that contributed Markdown link from the tree into that file list.
 
 `slang package run` uses sibling `slangi` to interpret an existing primary in
-`build/bundle/source` and forwards trailing arguments. With no executable name, it selects
-`build.host.default`. It does not build first and fails with instructions when the manifest does
-not configure a host executable or `slang package build` has not produced the source bundle.
+`out/bundle/source` and forwards trailing arguments. With no executable name, it selects
+`build.host.default`. It does not bundle first and fails with instructions when the manifest does
+not configure a host executable or `slang package bundle` has not produced the source bundle.
 Because `slangi` derives its only source search path from the input filename, this stable mode
 requires the configured primary to be at an export root, and therefore at the root of the
 flattened source bundle. Nested executable primaries require binary mode.
 
 `slang package --experimental run --binary` instead executes the selected native artifact under
-`build/host`. The global `--experimental` option must appear immediately after `slang package`,
+`out/host`. The global `--experimental` option must appear immediately after `slang package`,
 and `--binary` must immediately follow `run`. This mode requires output from
-`slang package --experimental build`; without `--binary`, experimental `run` still uses `slangi`
+`slang package --experimental bundle`; without `--binary`, experimental `run` still uses `slangi`
 and the source bundle.
 
 `slang package test` is reserved and currently reports that it is not implemented. It does not
 invoke `slang-test`. Package testing will get a dedicated model; `slang-test` remains an internal
 compiler harness and is not part of the package command surface.
 
-`slang package docs` opens `build/docs/index.md` with the application registered for Markdown
+`slang package docs` opens `out/docs/index.md` with the application registered for Markdown
 on this machine. `--print` writes that path instead of launching, which is what scripts should
-use. The command does not copy or regenerate documentation; run `slang package build` for that,
-or `slang package --experimental build` when the manifest configures host executables.
+use. The command does not copy or regenerate documentation; run `slang package bundle` for that,
+or `slang package --experimental bundle` when the manifest configures host executables.
 
 ## Possible future enhancements
 

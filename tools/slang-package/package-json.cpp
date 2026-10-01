@@ -576,7 +576,7 @@ static SlangResult _readWorkspace(
     for (auto pair : container->getObject(workspace))
     {
         String key = container->getStringFromKey(pair.key);
-        if (key != "dependencies" && key != "build" && key != "excludes" && key != "bundle")
+        if (key != "dependencies" && key != "output" && key != "excludes" && key != "bundle")
         {
             outError = String("Unknown field in 'workspace': ") + key;
             return SLANG_FAIL;
@@ -588,8 +588,12 @@ static SlangResult _readWorkspace(
         "dependencies",
         outWorkspace.depsDirectory,
         outError));
-    SLANG_RETURN_ON_FAIL(
-        _readOptionalString(container, workspace, "build", outWorkspace.buildDirectory, outError));
+    SLANG_RETURN_ON_FAIL(_readOptionalString(
+        container,
+        workspace,
+        "output",
+        outWorkspace.outputDirectory,
+        outError));
     SLANG_RETURN_ON_FAIL(_readExclusions(container, workspace, outWorkspace.exclusions, outError));
     JSONValue bundle = _find(container, workspace, "bundle");
     if (bundle.isValid())
@@ -625,24 +629,25 @@ static SlangResult _readWorkspace(
     }
     if (outWorkspace.depsDirectory.getLength())
         outWorkspace.depsDirectory = Path::simplify(outWorkspace.depsDirectory);
-    if (outWorkspace.buildDirectory.getLength())
-        outWorkspace.buildDirectory = Path::simplify(outWorkspace.buildDirectory);
+    if (outWorkspace.outputDirectory.getLength())
+        outWorkspace.outputDirectory = Path::simplify(outWorkspace.outputDirectory);
     if ((outWorkspace.depsDirectory.getLength() &&
          (outWorkspace.depsDirectory == "." || !_isSafeRelativePath(outWorkspace.depsDirectory))) ||
-        (outWorkspace.buildDirectory.getLength() &&
-         (outWorkspace.buildDirectory == "." || !_isSafeRelativePath(outWorkspace.buildDirectory))))
+        (outWorkspace.outputDirectory.getLength() &&
+         (outWorkspace.outputDirectory == "." ||
+          !_isSafeRelativePath(outWorkspace.outputDirectory))))
     {
         outError =
-            "Workspace 'dependencies' and 'build' must be relative paths inside the workspace.";
+            "Workspace 'dependencies' and 'output' must be relative paths inside the workspace.";
         return SLANG_FAIL;
     }
     String effectiveDeps =
         outWorkspace.depsDirectory.getLength() ? outWorkspace.depsDirectory : "deps";
-    String effectiveBuild =
-        outWorkspace.buildDirectory.getLength() ? outWorkspace.buildDirectory : "build";
-    if (_workspacePathsOverlap(effectiveDeps, effectiveBuild))
+    String effectiveOutput =
+        outWorkspace.outputDirectory.getLength() ? outWorkspace.outputDirectory : "out";
+    if (_workspacePathsOverlap(effectiveDeps, effectiveOutput))
     {
-        outError = "Workspace 'dependencies' and 'build' directories must not overlap.";
+        outError = "Workspace 'dependencies' and 'output' directories must not overlap.";
         return SLANG_FAIL;
     }
     return SLANG_OK;
@@ -1009,7 +1014,7 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
         writer.endArray(SourceLoc());
     }
     if (manifest.workspace.depsDirectory.getLength() ||
-        manifest.workspace.buildDirectory.getLength() || manifest.workspace.exclusions.getCount())
+        manifest.workspace.outputDirectory.getLength() || manifest.workspace.exclusions.getCount())
     {
         _writeKey(writer, "workspace");
         writer.startObject(SourceLoc());
@@ -1018,10 +1023,12 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
             _writeKey(writer, "dependencies");
             writer.addStringValue(manifest.workspace.depsDirectory.getUnownedSlice(), SourceLoc());
         }
-        if (manifest.workspace.buildDirectory.getLength())
+        if (manifest.workspace.outputDirectory.getLength())
         {
-            _writeKey(writer, "build");
-            writer.addStringValue(manifest.workspace.buildDirectory.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "output");
+            writer.addStringValue(
+                manifest.workspace.outputDirectory.getUnownedSlice(),
+                SourceLoc());
         }
         _writeKey(writer, "bundle");
         writer.startObject(SourceLoc());

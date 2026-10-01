@@ -234,7 +234,7 @@ static SlangResult _copyMarkdownFilesRec(
             !isCanonicalPathWithin(canonicalDestinationRoot, canonicalDestinationDirectory))
         {
             outError =
-                String("Documentation output directory escapes build/docs: ") + destinationPath;
+                String("Documentation output directory escapes out/docs: ") + destinationPath;
             return SLANG_FAIL;
         }
         if (File::exists(destinationPath))
@@ -243,8 +243,7 @@ static SlangResult _copyMarkdownFilesRec(
             if (SLANG_FAILED(Path::getCanonical(destinationPath, canonicalDestinationPath)) ||
                 !isCanonicalPathWithin(canonicalDestinationRoot, canonicalDestinationPath))
             {
-                outError =
-                    String("Documentation output file escapes build/docs: ") + destinationPath;
+                outError = String("Documentation output file escapes out/docs: ") + destinationPath;
                 return SLANG_FAIL;
             }
         }
@@ -310,7 +309,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
     }
 
     String destinationRoot =
-        Path::combine(projectRoot, getWorkspaceBuildDirectory(manifest), "docs");
+        Path::combine(projectRoot, getWorkspaceOutputDirectory(manifest), "docs");
     if (!Path::createDirectoryRecursive(destinationRoot))
     {
         outError = String("Cannot create documentation output directory: ") + destinationRoot;
@@ -342,7 +341,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
         }
         if (isCanonicalPathWithin(canonicalSourceRoot, canonicalDestinationRoot))
         {
-            outError = "Workspace build/docs must not be inside a package documentation directory.";
+            outError = "Workspace out/docs must not be inside a package documentation directory.";
             return SLANG_FAIL;
         }
 
@@ -360,7 +359,7 @@ SlangResult buildDocumentation(const String& projectRoot, String& outError)
             !isCanonicalPathWithin(canonicalDestinationRoot, canonicalPackageDestination))
         {
             outError =
-                String("Package documentation output escapes build/docs: ") + packageDestination;
+                String("Package documentation output escapes out/docs: ") + packageDestination;
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(_copyMarkdownFilesRec(
