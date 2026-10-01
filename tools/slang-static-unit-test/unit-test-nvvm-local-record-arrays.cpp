@@ -51,6 +51,206 @@ struct LocalRecordArrayIR
 
 } // namespace
 
+// Explicit-layout memory uses checked field keys and scalar payload lanes, never native record GEP.
+SLANG_UNIT_TEST(nvvmLayoutPointerFieldsKeepLayoutAndProvenance)
+{
+    enum class Case
+    {
+        Valid,
+        ForgedRoot,
+        WrongLayout,
+        WrongAccess,
+        WholeRecord,
+        Scoped
+    };
+    for (auto layoutOp :
+         {kIROp_Std430BufferLayoutType, kIROp_ScalarBufferLayoutType, kIROp_CBufferLayoutType})
+        for (auto testCase :
+             {Case::Valid,
+              Case::ForgedRoot,
+              Case::WrongLayout,
+              Case::WrongAccess,
+              Case::WholeRecord,
+              Case::Scoped})
+        {
+            _resetDirectNVVMFakes();
+            NVVMStaticTestContext context(unitTestContext);
+            context.targetProgram->getOptionSet().set(
+                CompilerOptionName::EmitCUDAMethod,
+                SLANG_EMIT_CUDA_VIA_NVVM);
+            context.targetProgram->getTargetReq()->getOptionSet().addCapabilityAtom(
+                Slang::CapabilityName::cuda_sm_8_0);
+            auto module = IRModule::create(context.env.getSessionImpl());
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            auto a = builder.createStructType();
+            auto f0 =
+                builder.createStructField(a, builder.createStructKey(), builder.getUInt64Type());
+            auto f1 =
+                builder.createStructField(a, builder.createStructKey(), builder.getUIntType());
+            auto b = builder.createStructType();
+            auto vectorType = builder.getVectorType(builder.getFloatType(), 3);
+            auto vectorField = builder.createStructField(b, builder.createStructKey(), vectorType);
+            auto record = builder.createStructType();
+            auto aField = builder.createStructField(record, builder.createStructKey(), a);
+            auto test1 =
+                builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+            auto bField = builder.createStructField(record, builder.createStructKey(), b);
+            auto test2 =
+                builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+            IRStructField* boolFields[3];
+            for (auto& field : boolFields)
+                field = builder.createStructField(
+                    record,
+                    builder.createStructKey(),
+                    builder.getBoolType());
+            auto layout = builder.getType(layoutOp);
+            auto pointer = builder.getPtrType(
+                record,
+                AccessQualifier::ReadWrite,
+                AddressSpace::UserPointer,
+                layout);
+            IRInst* global = nullptr;
+            if (testCase == Case::ForgedRoot)
+            {
+                global = builder.createGlobalVar(record);
+                global->setFullType(pointer);
+            }
+            IRType* parameters[] = {pointer};
+            auto entry = builder.createFunc();
+            entry->setFullType(builder.getFuncType(1, parameters, builder.getVoidType()));
+            builder.addEntryPointDecoration(
+                entry,
+                Profile(Stage::Compute),
+                toSlice("computeMain"),
+                toSlice("test"));
+            builder.setInsertInto(entry);
+            builder.emitBlock();
+            auto formal = builder.emitParam(pointer);
+            IRInst* root = global ? global : formal;
+            auto aAddress = builder.emitFieldAddress(root, aField->getKey());
+            if (testCase == Case::WrongLayout || testCase == Case::WrongAccess)
+                aAddress->setFullType(builder.getPtrType(
+                    a,
+                    testCase == Case::WrongAccess ? AccessQualifier::Read
+                                                  : AccessQualifier::ReadWrite,
+                    AddressSpace::UserPointer,
+                    testCase == Case::WrongLayout ? builder.getDefaultBufferLayoutType() : layout));
+            auto bAddress = builder.emitFieldAddress(root, bField->getKey());
+            IRInst* addresses[] = {
+                builder.emitFieldAddress(aAddress, f0->getKey()),
+                builder.emitFieldAddress(aAddress, f1->getKey()),
+                builder.emitFieldAddress(root, test1->getKey()),
+                builder.emitFieldAddress(bAddress, vectorField->getKey()),
+                builder.emitFieldAddress(root, test2->getKey()),
+                builder.emitFieldAddress(root, boolFields[0]->getKey()),
+                builder.emitFieldAddress(root, boolFields[1]->getKey()),
+                builder.emitFieldAddress(root, boolFields[2]->getKey())};
+            for (auto address : addresses)
+            {
+                auto type = cast<IRPtrTypeBase>(address->getDataType())->getValueType();
+                auto loaded = builder.emitLoad(type, address);
+                builder.emitStore(address, loaded);
+            }
+            auto component = builder.emitElementAddress(
+                addresses[3],
+                builder.getIntValue(builder.getIntType(), 1));
+            builder.emitStore(component, builder.getFloatValue(builder.getFloatType(), -6.5));
+            if (testCase == Case::WholeRecord)
+                builder.emitLoad(a, aAddress);
+            if (testCase == Case::Scoped)
+                builder.emitStore(
+                    addresses[2],
+                    builder.getIntValue(builder.getUIntType(), 7),
+                    builder.getIntValue(builder.getIntType(), 4),
+                    builder.getIntValue(builder.getIntType(), int(MemoryScope::Device)));
+            builder.emitReturn();
+            LinkedIR linked = {};
+            linked.module = module;
+            linked.entryPoints.add(entry);
+            NVVMOperationRequirements requirements;
+            const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+            const auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
+            if ((testCase == Case::Valid) != SLANG_SUCCEEDED(result))
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    context.sink.outputBuffer.getBuffer());
+            if (testCase != Case::Valid)
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(diagnostic.indexOf(toSlice("E52017")) >= 0);
+                if (testCase == Case::Scoped)
+                {
+                    SLANG_CHECK(diagnostic.indexOf(toSlice("scoped memory access")) >= 0);
+                    SLANG_CHECK(diagnostic.indexOf(toSlice("requires SM")) < 0);
+                }
+            }
+            else
+            {
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+                const bool isC = layoutOp == kIROp_CBufferLayoutType;
+                const bool isStd430 = layoutOp == kIROp_Std430BufferLayoutType;
+                const uint64_t expectedOffsets[] = {
+                    0,
+                    8,
+                    isC || isStd430 ? 16u : 12u,
+                    0,
+                    isStd430 ? 48u
+                    : isC    ? 32u
+                             : 28u,
+                    isStd430 ? 52u
+                    : isC    ? 36u
+                             : 32u,
+                    isStd430 ? 56u
+                    : isC    ? 37u
+                             : 36u,
+                    isStd430 ? 60u
+                    : isC    ? 38u
+                             : 40u};
+                const auto& plan = requirements.emissionPlan;
+                for (Index i = 0; i < SLANG_COUNT_OF(addresses); ++i)
+                {
+                    auto field = plan.addresses.findFieldAddress(addresses[i]);
+                    SLANG_CHECK_ABORT(field && field->isLayoutStorage);
+                    SLANG_CHECK(field->root == formal && field->byteOffset == expectedOffsets[i]);
+                    SLANG_CHECK(field->layoutStorage.laneCount == (i == 3 ? 3 : 1));
+                }
+                auto selectedB = plan.addresses.findFieldAddress(bAddress);
+                SLANG_CHECK_ABORT(selectedB && selectedB->isLayoutStorage);
+                SLANG_CHECK(selectedB->byteOffset == (isStd430 ? 32 : isC ? 20 : 16));
+                SLANG_CHECK(!selectedB->layoutStorage.valueType);
+                auto selectedComponent = plan.addresses.findElementAddress(component);
+                SLANG_CHECK_ABORT(selectedComponent && selectedComponent->isLayoutStorage);
+                SLANG_CHECK(
+                    selectedComponent->root == formal && selectedComponent->byteOffset == 4);
+                SLANG_CHECK(plan.loads.getCount() == 8 && plan.stores.getCount() == 9);
+                for (const auto& load : plan.loads)
+                {
+                    SLANG_CHECK(load.flags == SLANG_NVVM_LOAD_FLAG_NONE && !load.isScoped);
+                    if (load.layoutBoolConversion.operation)
+                    {
+                        SLANG_CHECK(
+                            load.layoutBoolConversion.operation == SLANG_NVVM_VALUE_OP_NOT_EQUAL);
+                        SLANG_CHECK(load.layoutStorage.scalarSize == (isC ? 1 : 4));
+                        SLANG_CHECK(
+                            load.layoutBoolConversion.operandTypes[0].bitWidth == (isC ? 8 : 32));
+                    }
+                }
+                for (const auto& store : plan.stores)
+                    if (store.layoutBoolConversion.operation)
+                    {
+                        SLANG_CHECK(
+                            store.layoutBoolConversion.operation ==
+                            SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
+                        SLANG_CHECK(
+                            store.layoutBoolConversion.resultType.bitWidth == (isC ? 8 : 32));
+                    }
+            }
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+}
+
 // Canonicalization preserves the actual producer. An address-only bitcast cannot turn a
 // same-typed global into an entry parameter or another approved pointer root.
 SLANG_UNIT_TEST(nvvmLayoutPointerReinterpretPreservesProducerChecks)

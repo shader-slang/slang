@@ -253,12 +253,25 @@ struct NVVMPlannedLocalStorage
     uint32_t alignment = 0;
 };
 
+/// Selects the finite scalar lanes stored at a checked explicit-layout field address.
+/// Logical Bool has a layout-selected integer width; vectors use scalar lanes without padding.
+struct NVVMLayoutStorage
+{
+    IRType* valueType = nullptr;
+    IRType* scalarType = nullptr;
+    uint32_t scalarSize = 0;
+    uint32_t alignment = 0;
+    uint32_t laneCount = 0;
+};
+
 /// Owns a load's storage conversion, alignment, flags and resulting pointer provenance.
 struct NVVMPlannedLoad
 {
     IRInst* source = nullptr;
     IRInst* pointer = nullptr;
     NVVMPlannedStorageConversion conversion;
+    NVVMLayoutStorage layoutStorage;
+    NVVMValueRecipeStep layoutBoolConversion;
     uint32_t alignment = 0;
     SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
     bool isGlobalUserPointer = false;
@@ -274,6 +287,8 @@ struct NVVMPlannedStore
     IRInst* pointer = nullptr;
     IRInst* value = nullptr;
     NVVMPlannedStorageConversion conversion;
+    NVVMLayoutStorage layoutStorage;
+    NVVMValueRecipeStep layoutBoolConversion;
     uint32_t alignment = 0;
     bool usesHelperPointerValue = false;
     bool isScoped = false;
@@ -300,6 +315,9 @@ struct NVVMPlannedFieldAddress
     IRInst* base = nullptr;
     IRInst* root = nullptr;
     NVVMStructFieldSelection selection;
+    bool isLayoutStorage = false;
+    uint64_t byteOffset = 0;
+    NVVMLayoutStorage layoutStorage;
 };
 
 struct NVVMRawBufferDataPointer
@@ -338,6 +356,9 @@ struct NVVMPlannedElementAddress
     IRType* aggregateType = nullptr;
     IRPtrTypeBase* resultType = nullptr;
     NVVMElementAddressKind kind = NVVMElementAddressKind::Pending;
+    bool isLayoutStorage = false;
+    uint64_t byteOffset = 0;
+    NVVMLayoutStorage layoutStorage;
     bool isReadOnly = false;
     bool isParameterGroupStorage = false;
     bool isLocalSubstandardRecordStorage = false;

@@ -808,6 +808,7 @@ build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-re
   tests/cuda/nvvm-layout-pointer-helpers.slang \
   tests/cuda/nvvm-parameter-group-layout-pointers.slang \
   tests/cuda/nvvm-pointer-reinterpret.slang \
+  tests/cuda/nvvm-layout-pointer-fields.slang \
   tests/cuda/nvvm-layout-pointer-transport-unsupported.slang
 ```
 
@@ -845,7 +846,7 @@ into a separately allocated 24-byte buffer, at offsets 0/8/16 and alignment 8. T
 `SLANG_globalParams` symbol holds that buffer's address; only index:i32 and output:u64 remain
 kernel parameters. Verify reflection and emitted LLVM/PTX against this binding before launch.
 Reuse the eight allocated helper cases, additionally requiring every parameter-buffer byte and the
-module-global pointer to remain unchanged. Invariant pointer-field loads do not permit record
+module-global pointer to remain unchanged. Invariant pointer-field loads do not make the pointed-to fields immutable or permit whole-record
 loads. Keep whole-group value, ordinary storage, pointer-array and unproven-root negatives, with
 role checks before/after representation-cache population and preflight no-mutation assertions.
 
@@ -861,6 +862,25 @@ that normalization preserves rejection of an unproven root before provider mutat
 The original three-layout corpus fixture has its exact compile-only result in the focused record. Its unspecified bindings are
 not an allocated-address oracle. Do not execute it or declare its corpus failure resolved from the
 dedicated helper fixture.
+
+Field-memory qualification uses `tests/cuda/nvvm-layout-pointer-fields.slang` and
+`build/nvvm-layout-pointer-fields/run-pointer-transport.py --source` with that permanent source.
+The binding and four signed indices remain the same. The host initializes four complete records
+in each allocation, observes all ten scalar leaves per selected record before writes, and compares
+all 3,072 pointee bytes after parity-selected stores. Even indices write the UInt64 field, selected
+UInt32 fields, whole float3 and middle Bool; odd indices write the other UInt32 field, float3.y and
+the outer Bool fields. Every padding byte, untouched neighbor and output guard must match.
+
+The independent scalar leaf offsets (a.f0, a.f1, test1, b.x/y/z, test2, c/d/e) are
+Std430 `0,8,16,32,36,40,48,52,56,60`, Scalar `0,8,12,16,20,24,28,32,36,40`, and
+C `0,8,16,20,24,28,32,36,37,38`. Bool uses four/four/one bytes respectively. Inspect actual O0/O3
+LLVM for the preserved kernel/group ABI, six noinline helpers, signed strides and scalar float3
+payload accesses; a whole vector store must not touch a padding lane. Run the direct static
+`nvvmLayoutPointerFieldsKeepLayoutAndProvenance` test and affected existing pointer/cache controls.
+Its access negative proves exact qualifier preservation; readonly layout roots are not admitted.
+The scoped negative selects actual SM80 and must fail at scoped-memory admission, not the SM floor.
+GPU qualification covers the nested UInt64/UInt32/Float32/float3/Bool fixture; this is not an
+exhaustive runtime qualification of every admitted numeric leaf combination.
 
 ## Physical surface correctness
 

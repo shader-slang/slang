@@ -183,7 +183,7 @@ key and qualified parent, not pointee type alone. Indexed children retain the pa
 access/storage proof. Constant-memory parameter-group loads remain ordinary loads; invariant global
 buffer recipes require their separate immutable-location contract.
 
-Explicit Std430/Scalar/C Device pointers to finite copyable records have an address-only role.
+Explicit Std430/Scalar/C Device pointers to finite copyable records use a byte-address representation.
 Shared buffer-layout selection owns the layout; preflight queries its stride once and retains the
 current function's root, exact pointer type and signed index in an offset plan. Emission uses global
 byte pointers, signed 64-bit scaling and non-inbounds byte offsets. Canonical `CastPtrToInt` observes
@@ -195,7 +195,7 @@ path, then checks availability and dominance. The existing finite direct-call cl
 bodies before provider mutation. No interprocedural provenance walk or new pointer representation is
 needed. Foreign-function and block parameters cannot supply a root.
 
-A direct field of a conventional constant buffer can store an address-only record pointer. Its role is
+A direct field of a conventional constant buffer can store a layout-qualified record pointer. Its role is
 separate from ordinary aggregate storage and from whole-group value representation. The checked
 field/load plan proves the buffer came from collected global parameters and retains the loaded
 pointer as a root; a pointer-shaped load alone does not prove
@@ -206,11 +206,25 @@ struct-storage admission is checked before cache lookup, including when a parame
 already populated the shared representation cache. Synthesized global structs retain their distinct
 producer-owned field rules.
 
-This representation grants no record dereference, exported helper ABI, pointer result, general storage or
-inverse integer conversion. Existing numeric pointer roles keep their own representations and
-exclude Std430 storage. The mandatory shared storage-lowering boundary rejects live Std430 types
-for actual CUDA source before layout operands can disappear; source capability upgrades alone do
-not grant CUDA support. Vulkan and LLVM retain their existing layout rules.
+Checked field plans extend those roots to selected nested record fields. Each plan keeps the
+canonical field key, matching access/address-space/layout operands and the byte offset from the
+shared layout rules. Child fields consume their parent's checked record. Constant vector component
+addresses retain a checked lane offset. These addresses are contextual memory operands; they do not
+become general helper arguments or independent record roots.
+
+Load/store plans select physical scalar lanes for Bool, Int/UInt32/64, Float32 and 2–4-lane
+Int/UInt32/Float32 vectors. Bool occupies one byte under C layout and four under Scalar/Std430;
+loads compare the stored integer with zero and stores encode canonical Boolean values. Vectors
+access only their payload lanes, so a float3 store preserves padding and neighboring fields.
+Emission executes these planned offsets and conversions rather than using LLVM's native record
+layout. Ordinary type-role caches and scoped-memory admission remain separate.
+
+Whole-record loads/stores, array/matrix leaves, dynamic vector component addresses, exported helper
+ABI, pointer results, general pointer storage and inverse integer conversion remain excluded.
+Existing ordinary numeric pointer roles keep their representations and exclude Std430 storage.
+The mandatory shared storage-lowering boundary rejects live Std430 types for actual CUDA source
+before layout operands can disappear; source capability upgrades alone do not grant CUDA support.
+Vulkan and LLVM retain their existing layout rules.
 
 Coherent pointer accesses retain canonical `MemoryScopeAttr` and `AlignedAttr` in checked load/store
 records. Naturally aligned Int/UInt32/64 use `ld/st.relaxed.gpu.global` for Device/global and

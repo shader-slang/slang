@@ -4662,6 +4662,17 @@ SlangResult _validateByteAddressValue(
     return _validateSelectedValue(codeGenContext, value, consumer, availableValues, dominatorTree);
 }
 
+// Finds only completed address records. A matching pointer type alone never grants layout
+// memory access, and nested record addresses remain navigable without whole-record loads.
+const NVVMLayoutStorage* _findNVVMLayoutStorage(const NVVMAddressPlan& addresses, IRInst* pointer)
+{
+    if (auto field = addresses.findFieldAddress(pointer))
+        return field->isLayoutStorage ? &field->layoutStorage : nullptr;
+    if (auto element = addresses.findElementAddress(pointer))
+        return element->isLayoutStorage ? &element->layoutStorage : nullptr;
+    return nullptr;
+}
+
 // Checks an available scalar pointer and enforces the source access qualifier for stores.
 SlangResult _validatePointerValue(
     CodeGenContext* codeGenContext,
@@ -4673,6 +4684,22 @@ SlangResult _validatePointerValue(
     bool requireWriteAccess,
     IRType* expectedPointeeType)
 {
+    if (auto storage = _findNVVMLayoutStorage(requirements.emissionPlan.addresses, value))
+    {
+        auto pointerType = as<IRPtrTypeBase>(value->getDataType());
+        if (!storage->valueType || !pointerType ||
+            !isTypeEqual(storage->valueType, expectedPointeeType) ||
+            (consumer->getOp() != kIROp_Load && consumer->getOp() != kIROp_Store) ||
+            (requireWriteAccess && pointerType->getAccessQualifier() != AccessQualifier::ReadWrite))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("layout field memory access"));
+        return _validateAvailableValue(
+            codeGenContext,
+            value,
+            consumer,
+            availableValues,
+            dominatorTree);
+    }
+
     IRType* loadedParameterGroupElementType = nullptr;
     if (_getNVVMParameterGroupPointer(
             requirements.emissionPlan.addresses,
@@ -5685,6 +5712,113 @@ IRInst* _getNVVMLayoutPointerRoot(
     return nullptr;
 }
 
+// Selects scalar lanes using the same layout rules that own record stride and field offsets.
+// For example, CDataLayout stores Bool in one byte, while Scalar/Std430 store four bytes;
+// Float3 always has three four-byte payload lanes even when its field alignment is sixteen.
+bool _getNVVMLayoutStorage(
+    CodeGenContext* context,
+    IRPtrTypeBase* pointerType,
+    NVVMLayoutStorage& storage)
+{
+    storage = {};
+    IRType* type = pointerType->getValueType();
+    IRType* scalar = type;
+    uint32_t lanes = 1;
+    if (auto vector = as<IRVectorType>(type))
+    {
+        if (!asNVVMSupported32BitNumericVectorType(type, &lanes))
+            return false;
+        scalar = vector->getElementType();
+    }
+    if (!isNVVMBoolType(scalar) && !isNVVMFloat32Type(scalar) &&
+        !(isNVVMSupportedIntegerScalarType(scalar) &&
+          (_getNVVMExecutableValueAlignment(scalar) == 4 ||
+           _getNVVMExecutableValueAlignment(scalar) == 8)))
+        return false;
+    auto rules = getTypeLayoutRuleForBuffer(context->getTargetProgram(), pointerType);
+    IRSizeAndAlignment layout;
+    if (SLANG_FAILED(getSizeAndAlignment(context->getTargetReq(), rules, scalar, &layout)) ||
+        layout.size <= 0 || layout.size > 8 || layout.alignment <= 0 ||
+        layout.alignment > layout.size ||
+        (isNVVMBoolType(scalar) && layout.size != 1 && layout.size != 4))
+        return false;
+    storage.valueType = type;
+    storage.scalarType = scalar;
+    storage.scalarSize = uint32_t(layout.size);
+    storage.alignment = uint32_t(layout.alignment);
+    storage.laneCount = lanes;
+    return true;
+}
+
+// Proves one canonical field from an admitted root or an already checked parent selection.
+// Retain actual field keys and shared-rule offsets; LLVM's native struct layout is not the ABI.
+bool _planNVVMLayoutField(
+    CodeGenContext* context,
+    const NVVMEmissionPlan& plan,
+    IRFunc* entryPoint,
+    IRFunc* function,
+    IRFieldAddress* field,
+    NVVMPlannedFieldAddress& selected)
+{
+    auto baseType = as<IRPtrTypeBase>(field->getBase()->getDataType());
+    auto resultType = as<IRPtrTypeBase>(field->getDataType());
+    auto record = baseType ? as<IRStructType>(baseType->getValueType()) : nullptr;
+    const auto parent = plan.addresses.findFieldAddress(field->getBase());
+    IRInst* root = parent && parent->isLayoutStorage
+                       ? parent->root
+                       : _getNVVMLayoutPointerRoot(plan, entryPoint, function, field->getBase());
+    if (!root || !record || !resultType || resultType->getOp() != kIROp_PtrType ||
+        resultType->getOperandCount() != 4 ||
+        resultType->getAddressSpace() != baseType->getAddressSpace() ||
+        resultType->getAccessQualifier() != baseType->getAccessQualifier() ||
+        resultType->getDataLayout() != baseType->getDataLayout() ||
+        !_findNVVMStructField(
+            record,
+            field->getField(),
+            selected.selection.field,
+            selected.selection.fieldIndex) ||
+        !isTypeEqual(selected.selection.field->getFieldType(), resultType->getValueType()))
+        return false;
+    IRIntegerValue offset = 0;
+    auto rules = getTypeLayoutRuleForBuffer(context->getTargetProgram(), baseType);
+    if (SLANG_FAILED(
+            getOffset(context->getTargetReq(), rules, selected.selection.field, &offset)) ||
+        offset < 0)
+        return false;
+    if (!asNVVMSupportedCopyableStructType(resultType->getValueType()) &&
+        !_getNVVMLayoutStorage(context, resultType, selected.layoutStorage))
+        return false;
+    selected.source = field;
+    selected.base = field->getBase();
+    selected.root = root;
+    selected.isLayoutStorage = true;
+    selected.byteOffset = uint64_t(offset);
+    selected.selection.isMutable = baseType->getAccessQualifier() == AccessQualifier::ReadWrite;
+    return true;
+}
+
+// Registers Bool conversion at the selected physical width before capability preflight.
+void _requireNVVMLayoutBoolConversion(
+    NVVMOperationRequirements& requirements,
+    const NVVMLayoutStorage& storage,
+    bool load,
+    NVVMValueRecipeStep& step)
+{
+    if (!isNVVMBoolType(storage.scalarType))
+        return;
+    const SlangNVVMValueTypeDesc physical = {
+        SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
+        storage.scalarSize * 8,
+        1};
+    step.operation = load ? SLANG_NVVM_VALUE_OP_NOT_EQUAL : SLANG_NVVM_VALUE_OP_INTEGER_CONVERT;
+    step.resultType = load ? NVVMSemantics::kBool : physical;
+    step.operandTypes[0] = load ? physical : NVVMSemantics::kBool;
+    step.operandTypes[1] = physical;
+    step.operandCount = load ? 2 : 1;
+    step.diagnosticName = "layout field Boolean conversion";
+    _requireValueOperation(requirements.valueOperations, step.getDesc(), step.diagnosticName);
+}
+
 // Resolves a physical space from already checked producers. A default `Ptr<int>` kernel
 // parameter is global, but the same type in a helper can carry a local address. Preserve that
 // distinction; field/element records and planned pointer loads already own their source roles.
@@ -5786,6 +5920,18 @@ SlangResult _planNVVMLoad(
     outLoad = {};
     outLoad.source = load;
     outLoad.pointer = load->getPtr();
+    if (auto storage = _findNVVMLayoutStorage(requirements.emissionPlan.addresses, load->getPtr()))
+    {
+        SLANG_RELEASE_ASSERT(storage->valueType);
+        outLoad.layoutStorage = *storage;
+        outLoad.alignment = storage->alignment;
+        _requireNVVMLayoutBoolConversion(
+            requirements,
+            *storage,
+            true,
+            outLoad.layoutBoolConversion);
+        return SLANG_OK;
+    }
     if (asNVVMSupportedLayoutTransportPointerType(load->getDataType()))
     {
         // Consider `cbuffer Globals { LayoutPtr<Record, ScalarDataLayout> p; }`.
@@ -5888,6 +6034,18 @@ void _planNVVMStore(
     outStore.source = store;
     outStore.pointer = store->getPtr();
     outStore.value = store->getVal();
+    if (auto storage = _findNVVMLayoutStorage(requirements.emissionPlan.addresses, store->getPtr()))
+    {
+        SLANG_RELEASE_ASSERT(storage->valueType);
+        outStore.layoutStorage = *storage;
+        outStore.alignment = storage->alignment;
+        _requireNVVMLayoutBoolConversion(
+            requirements,
+            *storage,
+            false,
+            outStore.layoutBoolConversion);
+        return;
+    }
     const auto address = _getNVVMMemoryAddress(requirements.emissionPlan, store->getPtr());
     IRType* storageType = address.structuredStorageType;
     IRInst* rootAddress = address.root;
@@ -7000,6 +7158,10 @@ SlangResult _validateNVVMFunction(
                     {
                         IRInst* argument = call->getArg(argumentIndex);
                         auto parameterType = callee->getParamType(argumentIndex);
+                        if (_findNVVMLayoutStorage(requirements.emissionPlan.addresses, argument))
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("layout field call argument"));
                         const bool isLayoutPointer =
                             asNVVMSupportedLayoutTransportPointerType(parameterType) != nullptr;
                         // A same-typed global or block parameter is not an admitted address root.
@@ -7389,6 +7551,41 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
+                    if (auto storage = _findNVVMLayoutStorage(
+                            requirements.emissionPlan.addresses,
+                            selected.base))
+                    {
+                        auto baseType = as<IRPtrTypeBase>(selected.base->getDataType());
+                        auto vector =
+                            storage->valueType ? as<IRVectorType>(storage->valueType) : nullptr;
+                        auto index = as<IRIntLit>(selected.index);
+                        if (!vector || !index || index->getValue() < 0 ||
+                            uint64_t(index->getValue()) >= storage->laneCount ||
+                            selected.resultType->getOp() != kIROp_PtrType ||
+                            selected.resultType->getOperandCount() != 4 ||
+                            selected.resultType->getValueType() != vector->getElementType() ||
+                            selected.resultType->getAddressSpace() != baseType->getAddressSpace() ||
+                            selected.resultType->getAccessQualifier() !=
+                                baseType->getAccessQualifier() ||
+                            selected.resultType->getDataLayout() != baseType->getDataLayout() ||
+                            !_getNVVMLayoutStorage(
+                                codeGenContext,
+                                selected.resultType,
+                                selected.layoutStorage))
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("layout vector component address"));
+                        selected.kind = NVVMElementAddressKind::Sequential;
+                        selected.isLayoutStorage = true;
+                        selected.byteOffset = uint64_t(index->getValue()) * storage->scalarSize;
+                        selected.root = requirements.emissionPlan.addresses.getRoot(selected.base);
+                        selected.aggregateType = vector;
+                        selected.isReadOnly =
+                            baseType->getAccessQualifier() != AccessQualifier::ReadWrite;
+                        requirements.emissionPlan.addresses.addElementAddress(selected);
+                        availableValues.add(inst);
+                        break;
+                    }
                     NVVMRawBufferElementPointer raw;
                     NVVMSequentialElementPointer sequential;
                     const bool isRaw = _getNVVMRawBufferElementPointer(
@@ -7545,6 +7742,26 @@ SlangResult _validateNVVMFunction(
                         availableValues,
                         dominatorTree));
                     NVVMPlannedFieldAddress address;
+                    const auto parent =
+                        requirements.emissionPlan.addresses.findFieldAddress(field->getBase());
+                    if (asNVVMSupportedLayoutTransportPointerType(
+                            field->getBase()->getDataType()) ||
+                        (parent && parent->isLayoutStorage))
+                    {
+                        if (!_planNVVMLayoutField(
+                                codeGenContext,
+                                requirements.emissionPlan,
+                                entryPoint,
+                                function,
+                                field,
+                                address))
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("layout field address"));
+                        requirements.emissionPlan.addresses.addFieldAddress(address);
+                        availableValues.add(inst);
+                        break;
+                    }
                     if (!_getNVVMStructFieldAddress(
                             requirements.emissionPlan.addresses,
                             field,
@@ -8815,6 +9032,145 @@ SlangResult _getNVVMRecipeIntegerConstant(
         codeGenContext,
         "scalar intrinsic recipe integer constant",
         builder.getIntegerConstant(module, integerType, value, outValue));
+}
+
+// Executes a retained byte displacement without interpreting the logical record layout.
+SlangResult _emitNVVMLayoutByteAddress(
+    CodeGenContext* context,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle base,
+    uint64_t offset,
+    SlangNVVMTypeHandle pointee,
+    SlangNVVMValueHandle& result)
+{
+    SlangNVVMValueHandle byteOffset = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        _getNVVMRecipeIntegerConstant(context, builder, module, 64, int64_t(offset), byteOffset));
+    if (!pointee)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            context,
+            "layout address byte type",
+            builder.getIntegerType(module, 8, pointee)));
+    }
+    return _requireBuilderOperation(
+        context,
+        "layout field byte address",
+        builder.emitByteOffsetPointer(module, base, byteOffset, pointee, result));
+}
+
+// Loads or stores the selected scalar payload lanes. Three-lane vectors never access a fourth
+// LLVM padding lane, and Bool conversion uses the selected one- or four-byte integer storage.
+SlangResult _emitNVVMLayoutMemory(
+    CodeGenContext* context,
+    const NVVMIRBuilder& builder,
+    SlangNVVMModuleHandle module,
+    NVVMTypeLoweringContext& types,
+    const NVVMLayoutStorage& storage,
+    const NVVMValueRecipeStep& boolConversion,
+    bool load,
+    SlangNVVMValueHandle pointer,
+    SlangNVVMValueHandle input,
+    SlangNVVMValueHandle& result)
+{
+    SlangNVVMTypeHandle scalarType = nullptr;
+    if (boolConversion.operation)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            context,
+            "layout Boolean storage type",
+            builder.getIntegerType(module, storage.scalarSize * 8, scalarType)));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(types.lowerType(storage.scalarType, NVVMTypeUse::Value, scalarType));
+    }
+    SlangNVVMValueHandle lanes[4] = {};
+    SLANG_RELEASE_ASSERT(storage.laneCount >= 1 && storage.laneCount <= SLANG_COUNT_OF(lanes));
+    for (uint32_t i = 0; i < storage.laneCount; ++i)
+    {
+        SlangNVVMValueHandle lanePointer = nullptr;
+        SLANG_RETURN_ON_FAIL(_emitNVVMLayoutByteAddress(
+            context,
+            builder,
+            module,
+            pointer,
+            uint64_t(i) * storage.scalarSize,
+            scalarType,
+            lanePointer));
+        if (load)
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "layout field load",
+                builder.emitLoad(
+                    module,
+                    lanePointer,
+                    storage.alignment,
+                    SLANG_NVVM_LOAD_FLAG_NONE,
+                    lanes[i])));
+            if (boolConversion.operation)
+            {
+                SlangNVVMValueHandle zero = nullptr, converted = nullptr;
+                SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                    context,
+                    "layout Boolean zero",
+                    builder.getIntegerConstant(module, scalarType, 0, zero)));
+                const SlangNVVMValueHandle operands[] = {lanes[i], zero};
+                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                    context,
+                    builder,
+                    module,
+                    boolConversion,
+                    operands,
+                    2,
+                    converted));
+                lanes[i] = converted;
+            }
+        }
+        else
+        {
+            SlangNVVMValueHandle lane = input;
+            if (as<IRVectorType>(storage.valueType))
+            {
+                SLANG_RETURN_ON_FAIL(
+                    _emitNVVMSequentialElementExtract(context, builder, module, input, i, lane));
+            }
+            if (boolConversion.operation)
+            {
+                SlangNVVMValueHandle converted = nullptr;
+                SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                    context,
+                    builder,
+                    module,
+                    boolConversion,
+                    &lane,
+                    1,
+                    converted));
+                lane = converted;
+            }
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "layout field store",
+                builder.emitStore(module, lane, lanePointer, storage.alignment)));
+        }
+    }
+    if (load)
+    {
+        result = lanes[0];
+        if (as<IRVectorType>(storage.valueType))
+        {
+            SlangNVVMTypeHandle vectorType = nullptr;
+            SLANG_RETURN_ON_FAIL(
+                types.lowerType(storage.valueType, NVVMTypeUse::Value, vectorType));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                context,
+                "layout vector reconstruction",
+                builder.emitVectorConstruct(module, vectorType, lanes, storage.laneCount, result)));
+        }
+    }
+    return SLANG_OK;
 }
 
 // Emits the CUDA prelude's four full-mask indexed reads. Every surviving source quad must be
@@ -10353,6 +10709,23 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
+                        if (load->layoutStorage.valueType)
+                        {
+                            SlangNVVMValueHandle result = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMLayoutMemory(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                load->layoutStorage,
+                                load->layoutBoolConversion,
+                                true,
+                                loweredPointer,
+                                nullptr,
+                                result));
+                            valueMap[inst] = result;
+                            break;
+                        }
                         SlangNVVMValueHandle loweredValue = nullptr;
                         if (load->isScoped)
                         {
@@ -10424,6 +10797,30 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 valueMap,
                                 typeContext,
                                 loweredValue));
+                        }
+                        if (store->layoutStorage.valueType)
+                        {
+                            SlangNVVMValueHandle pointer = nullptr, unused = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                store->pointer,
+                                valueMap,
+                                typeContext,
+                                pointer));
+                            SLANG_RETURN_ON_FAIL(_emitNVVMLayoutMemory(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                store->layoutStorage,
+                                store->layoutBoolConversion,
+                                false,
+                                pointer,
+                                loweredValue,
+                                unused));
+                            break;
                         }
                         SlangNVVMValueHandle storageValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMPlannedStorageConversion(
@@ -11477,6 +11874,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBasePointer));
+                        if (address->isLayoutStorage)
+                        {
+                            SlangNVVMValueHandle result = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMLayoutByteAddress(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                loweredBasePointer,
+                                address->byteOffset,
+                                nullptr,
+                                result));
+                            valueMap[inst] = result;
+                            break;
+                        }
                         SlangNVVMValueHandle loweredElementIndex = nullptr;
                         SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
                             codeGenContext,
@@ -11554,6 +11965,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredBasePointer));
+                        if (address->isLayoutStorage)
+                        {
+                            SlangNVVMValueHandle result = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMLayoutByteAddress(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                loweredBasePointer,
+                                address->byteOffset,
+                                nullptr,
+                                result));
+                            valueMap[inst] = result;
+                            break;
+                        }
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,

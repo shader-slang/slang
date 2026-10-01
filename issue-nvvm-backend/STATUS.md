@@ -84,8 +84,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Nineteen feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 61 feature objects, preserving all prior objects and the full baseline. Each feature's
+Twenty feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 62 feature objects, preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The newly authorized sequence is:
 
@@ -115,20 +115,23 @@ Current additions beyond the full checkpoint are:
 - Coherent pointer memory supports naturally aligned Int/UInt32/64 for exactly Device/global
   and Workgroup/shared with scoped relaxed operations. Actual SM70 admission, canonical memory
   attributes and checked producer spaces remain required; qualification is at SM80.
-- Std430/Scalar/C Device record pointers support address-only entry/internal-helper parameters and
-  checked direct fields of conventional constant buffers, signed32 offsets and explicit/reinterpret UInt64 address observation. Strides follow shared layout rules; the
-  motivating record has 64/48/40-byte strides. No dereference, export, pointer result/general storage,
-  inverse reconstruction or AnyValue expansion is implied. CUDA rejects Std430 and uses 40 for
+- Std430/Scalar/C Device record pointers support entry/internal-helper transport and
+  checked direct fields of conventional constant buffers, signed32 offsets and explicit/reinterpret
+  UInt64 address observation. Selected nested record fields now support load/store recipes with
+  shared offsets and exact scalar payload widths; the motivating record has64/48/40-byte strides.
+  Whole-record memory, exports, pointer results/general storage, scoped fields, inverse reconstruction
+  and AnyValue expansion remain excluded. CUDA rejects Std430 and uses 40 for
   Scalar/C; its three nonzero Scalar mismatches remain recorded.
 
-The latest batch is `features.nvvm-pointer-reinterpret`, with raw evidence under
-`build/nvvm-pointer-reinterpret/`. Exact layout-pointer-to-UInt64 BitCast operations now normalize
-to the existing checked CastPtrToInt path. The dedicated initialized fixture compares both
-spellings at cbuffer roots and signed helper offsets; O0/O3 allocated-address checks preserve
-64/48/40-byte strides, all guards and unchanged input/binding bytes. The original three-layout
-source now compiles, but its unspecified bindings are not executed. No inverse casts or new
-pointer roots are admitted. The parameter-group predecessor's three resolved validation incidents
-remain in its focused record, including the corrected storage-role cache admission.
+The latest batch is `features.nvvm-layout-pointer-fields`, raw evidence under
+`build/nvvm-layout-pointer-fields/`. Checked field/component address records select shared-rule byte
+offsets; load/store plans select scalar payloads and Bool integer conversion. The existing type-role
+caches and provider ABI are unchanged. O0/O3 allocated-memory checks cover nested UInt64/UInt32,
+Float32/float3 and Bool fields, with all3,072 pointee bytes, padding, guards and binding bytes checked.
+A grouped compile smoke also covers signed32/64 and integer vector widths2/4 across all layouts.
+Literal vector components are admitted; dynamic addresses and field-pointer helper arguments remain
+excluded. Readonly roots are not newly admitted. The predecessor's original pointer/data-layouts
+source now compiles, while its unspecified bindings remain unexecuted.
 
 The full checkpoint remains unchanged: its 36 main gaps and 249 surface cells retain their original
 identities. Focused records supersede specifically resolved texture-handle, dynamic-surface and
@@ -151,7 +154,8 @@ Keep these open distinctions visible:
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
 The parameter-group slice is complete. **Resumed for the four items above, then stop again.**
-Item 1 is complete; next: explicit-layout record field loads and stores.
+Item 1 is committed as `180094a4f`. Item 2 implementation and focused validation are complete;
+next: the retained static-state fixture and shared link-option cache ownership issues.
 
 ## Retained boundaries
 

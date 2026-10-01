@@ -5989,12 +5989,14 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission)
         R"SLANG(
             struct R { float3 value; bool flag; };
             [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
-                uniform Ptr<float> output) { output[0] = p[0].value.x; }
+                uniform int index, uniform Ptr<float> output)
+            { output[0] = *__getAddress(p[0].value[index]); }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
             [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
-                uniform float value) { p[0].value.x = value; }
+                uniform int index, uniform float value)
+            { *__getAddress(p[0].value[index]) = value; }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
