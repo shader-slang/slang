@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#makeexistential
-//META: doc_section_digest=3daf40cb35b02e6a2100ffd8b47cd886d07ea61a0d83fed32606bc5b122234d2
+//META: doc_section_digest=12fc3bdfdfd39992f73247a51ecf438875c6398134a12dce64d1e764d8adbf0f
 //META: purpose=A makeExistential whose concrete-type payload contains a vector field still produces a let %i : %IFoo with the two-operand value/witness shape.
 //META: intent=boundary
 //META: pipeline_stage=lower

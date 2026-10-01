@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:10:58Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: b05183b09ce7aed8128e45e31d4986249932ca45431a04b94d0ca99f3d163135
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: e3b167a7b5a8744a5ce8c1f92bde754b9f8fe285c549d34e941e9e49a45542f2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -146,7 +146,7 @@ Abstract intermediates: `ArithmeticExpressionType`, `Fp8Type`,
 | `BottomType` | `Type` | (operand-encoded) | (none) | The bottom/empty type that has no values; the result type of a function that can never return and the error type of one that cannot fail. |
 | `DeclRefType` | `Type` | `declRef: DeclRef<Decl>` | [type ref](../syntax-reference/grammar.md#types) | A type defined by reference to a declaration (`StructDecl`, `InterfaceDecl`, `EnumDecl`, ...). |
 | `TypeType` | `Type` | `type: Type*` | (none) | The type *of* a type expression (i.e. the "kind" `Type`); `float` in `float(2)` has type `TypeType(float)`. |
-| `NamedExpressionType` | `Type` | `declRef: DeclRef<TypeDefDecl>` | [typedef ref](../syntax-reference/grammar.md#types) | A `typedef` / `typealias` alias; it prints under the alias name, but `getCanonicalType()` resolves it away to the aliased type. |
+| `NamedExpressionType` | `Type` | `declRef: DeclRef<TypeDefDecl>` | [typedef ref](../syntax-reference/grammar.md#types) | A `typedef` / `typealias` alias. Its `_toTextOverride` ([slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line 1414) prints the alias's `declRef`, so any consumer that formats *this* node shows the alias name — but `_createCanonicalTypeOverride` (line 1422) resolves it to the aliased type, and a consumer that canonicalizes first shows the resolved type instead. The distinction is canonicalization, not two printing paths. Type-mismatch diagnostics and emitted target code are both in the second category: given `typealias Celsius = float`, they say `float`, never `Celsius`. |
 | `NamespaceType` | `Type` | `declRef: DeclRef<NamespaceDeclBase>` | (none) | The type of a namespace or module expression. |
 | `GenericDeclRefType` | `Type` | `declRef: DeclRef<GenericDecl>` | (none) | A reference to a generic declaration without its arguments applied. |
 | `FuncType` | `Type` | leading param `Type*` operands, then `result: Type*`, then `error: Type*` | [function type](../syntax-reference/grammar.md#types) | Function type with parameter types, result type, and error type. |
@@ -373,7 +373,17 @@ parameter-mode type (`OutParamType` for `out T`,
 `BorrowInOutParamType` for `inout T`, `RefParamType` for `ref T`), which
 a caller must unwrap to recover the plain type and the passing mode. The
 error-type slot is always present rather than optional: a callable that
-cannot fail records the bottom type `Never` there, so only the failure
+cannot fail records the bottom type there — spelled `never` when
+printed (`BottomType::_toTextOverride`,
+[slang-ast-type.cpp](../../../../source/slang/slang-ast-type.cpp) line
+124) and represented by the C++ class `BottomType`
+([slang-ast-type.h](../../../../source/slang/slang-ast-type.h) line
+50). Neither spelling is surface syntax: no declaration of the name
+exists in
+[core.meta.slang](../../../../source/slang/core.meta.slang), so writing
+it in a `.slang` program is just an undefined identifier. It is a type
+the compiler forms, not one a user names. With the bottom type in the
+error slot only the failure
 modes the type system models explicitly appear as a real error type.
 Function-typed values
 arise from `FuncTypeExpr`, from taking the address of a function, or

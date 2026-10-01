@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#conversion-costs
-//META: doc_section_digest=45a19e6a6506ddb836a3ebca70fa59e866619b52b9904fc36ec1843e2627f208
+//META: doc_section_digest=ac2c2ef8658efb348430e3e014feb776a1624731934544b00f6fa4d97ab710e8
 //META: purpose=kConversionCost_IntegerToFloatConversion (400) is cheaper than kConversionCost_IntegerToHalfConversion (500), so an int variable prefers the float overload over the half one.
 //META: intent=boundary
 //META: pipeline_stage=check

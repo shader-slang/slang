@@ -1,4 +1,5 @@
-//TEST:SIMPLE:-target dxil -entry computeMain -profile cs_6_2 -line-directive-mode source-map -o tests/feature/source-map/emit-source-map.zip
+//TEST:SIMPLE(filecheck=PRODUCE):-target dxil -entry computeMain -profile cs_6_2 -line-directive-mode source-map -o tests/feature/source-map/emit-source-map.zip
+//PRODUCE: note[E00088]
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -11,6 +12,6 @@ int doThing(int a)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int x = (int)dispatchThreadID.x;
-    
+
     outputBuffer[x] = doThing(x);
 }

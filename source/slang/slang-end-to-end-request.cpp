@@ -97,7 +97,13 @@ EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
     return SLANG_E_NO_INTERFACE;
 }
 
-// Try to infer a single common source language for a request
+// Infer a common input language only for slangc's convenience target selection.
+//
+// This deliberately uses the request-level language available before preprocessing. The
+// command-line tool's target inference is a best-effort DWIM policy layered above the compiler,
+// not part of source-language resolution. A later `#version` or `#language` compatibility override
+// therefore does not revise an already inferred target; users relying on such an override should
+// select their target explicitly.
 static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 {
     SourceLanguage language = SourceLanguage::Unknown;
@@ -124,6 +130,16 @@ static SourceLanguage inferSourceLanguage(FrontEndCompileRequest* request)
 SlangResult EndToEndCompileRequest::executeActionsInner()
 {
     SLANG_PROFILE_SECTION(endToEndActions);
+
+    // `-allow-glsl` used to enable an independent collection of parser, semantic, and IR
+    // behaviors without changing the declared language of any translation unit. Reduce it to the
+    // single meaning that this request's input translation units are GLSL. The compatibility bit
+    // is request-local because source modules loaded during semantic checking share the linkage
+    // but are not additional inputs governed by this option. `parseTranslationUnit()` separately
+    // handles the session-owned spelling stored in the front-end option set; the front-end
+    // request's once-only diagnostic guard makes both paths safe when a session supplies both.
+    if (getLegacyAllowGLSLInput())
+        getFrontEndReq()->applyLegacyAllowGLSLInputOptionToAllTranslationUnits();
 
     // If no code-generation target was specified, then try to infer one from the source language,
     // just to make sure we can do something reasonable when invoked from the command line.
@@ -1012,6 +1028,12 @@ SlangResult EndToEndCompileRequest::maybeCreateContainer()
             getSink()->diagnose(Diagnostics::UnableToCreateModuleContainer{});
             return res;
         }
+
+        // Emit only for command-line compiles. maybeCreateContainer() is also reached by the
+        // programmatic compile API, where adding a diagnostic to every module compile would be
+        // unexpected output for an embedder and could trip a diagnostic-count assertion.
+        if (m_isCommandLineCompile)
+            getSink()->diagnose(Diagnostics::ModuleFormatNotFinalized{});
 
         // Need to turn into a blob
         List<uint8_t> blobData;
@@ -1915,7 +1937,7 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 
 void EndToEndCompileRequest::setAllowGLSLInput(bool value)
 {
-    getOptionSet().set(CompilerOptionName::AllowGLSL, value);
+    setLegacyAllowGLSLInput(value);
 }
 
 SlangResult EndToEndCompileRequest::compile()
@@ -1940,11 +1962,12 @@ SlangResult EndToEndCompileRequest::compile()
     // TODO: Consider supporting Windows "Structured Exception Handling"
     // so that we can also recover from a wider class of crashes.
 
-    try
+    SLANG_EXCEPTION_TRY
     {
         SLANG_PROFILE_SECTION(compileInner);
         res = executeActions();
     }
+#if SLANG_HAS_EXCEPTIONS
     catch (const AbortCompilationException& e)
     {
         // This situation indicates a fatal (but not necessarily internal) error
@@ -1977,6 +2000,7 @@ SlangResult EndToEndCompileRequest::compile()
         // and not some other component in their system.
         getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
+#endif
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
 #else

@@ -153,7 +153,8 @@ IRFunc* emitWitnessTableWrapper(
     IRModule* module,
     IRInst* funcInst,
     IRFuncType* effectiveFuncType,
-    IRFuncType* interfaceRequirementVal)
+    IRFuncType* interfaceRequirementVal,
+    TargetRequest* targetReq)
 {
     auto funcTypeInInterface = interfaceRequirementVal;
     auto targetFuncType = effectiveFuncType;
@@ -167,6 +168,31 @@ IRFunc* emitWitnessTableWrapper(
     if (auto func = as<IRFunc>(funcInst))
         if (auto name = _getWitnessTableWrapperFuncName(module, func))
             builder->addNameHintDecoration(wrapperFunc, name);
+
+    // This wrapper only marshals arguments between the interface's `AnyValue`-based
+    // signature and the concrete implementation's signature -- it is compiler-synthesized
+    // glue, not a call the downstream target compiler has any reason to keep as a distinct
+    // function. Every other synthesized marshalling helper in the compiler (e.g. the
+    // pack/unpack storage helpers in slang-ir-lower-buffer-element-type.cpp) is force-inlined
+    // the same way for the same reason. Without this, whether the wrapper (and, transitively,
+    // the switch-based dispatch function built around it in `createDispatchFunc`) survives to
+    // the final target output is left entirely to the downstream compiler's own heuristic
+    // inliner, which can decline once the wrapped method body is non-trivial (observed on the
+    // CUDA/NVRTC backend specifically).
+    //
+    // Excluded on the CPU/LLVM-JIT target: force-inlining a wrapper that declares a local
+    // (the pack-after-call temp `maybeUnpackArg` creates for by-reference/setter-style
+    // parameters) into a caller that also force-inlines a sibling wrapper from a different
+    // concrete-type case corrupts that target's own debug-info generation -- confirmed via a
+    // real crash (LLVM's DwarfDebug::finalizeModuleInfo, on conflicting IRLocalVariable
+    // metadata for the two inlined instances) in
+    // tests/language-feature/dynamic-dispatch/special-members-setter.slang's property/subscript
+    // setter case. This is a latent bug in that target's own debug-info emission
+    // (source/slang-llvm/slang-llvm-builder.cpp), not something this pass can fix -- skipping
+    // force-inline here is a target-specific carve-out, not a claim that force-inlining itself
+    // is wrong.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder->addForceInlineDecoration(wrapperFunc);
 
     builder->setInsertInto(wrapperFunc);
     auto block = builder->emitBlock();
@@ -247,7 +273,8 @@ UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 //
 IRFunc* createDispatchFunc(
     IRFuncType* dispatchFuncType,
-    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping)
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
+    TargetRequest* targetReq)
 {
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
@@ -264,6 +291,16 @@ IRFunc* createDispatchFunc(
     auto func = builder.createFunc();
     builder.setInsertInto(func);
     func->setFullType(dispatchFuncType);
+
+    // Same reasoning as `emitWitnessTableWrapper`'s force-inline decoration above: this
+    // function only exists because `mapping` is a closed, statically-enumerable set of
+    // concrete-type implementations (that's the only case this pass runs for), so the
+    // `switch` built below is itself the already-resolved dispatch. Leaving it as a separate,
+    // non-force-inlined function defeats that resolution by handing the decision back to a
+    // downstream heuristic inliner. Same CPU/LLVM-JIT exclusion as `emitWitnessTableWrapper`
+    // -- see the comment there.
+    if (!isCPUTargetViaLLVM(targetReq))
+        builder.addForceInlineDecoration(func);
 
     auto entryBlock = builder.emitBlock();
     builder.setInsertInto(entryBlock);
@@ -312,7 +349,8 @@ IRFunc* createDispatchFunc(
             funcInst->getModule(),
             funcInst,
             effectiveFuncType,
-            innerDispatchFuncType);
+            innerDispatchFuncType,
+            targetReq);
 
         // Create case block
         auto caseBlock = builder.emitBlock();
@@ -1679,42 +1717,31 @@ struct ExistentialLoweringContext : public InstPassBase
         return true;
     }
 
-    // Dynamic-dispatch handles are 64-bit, so they need a 64-bit integer carrier.
-    // That carrier is `uint2` (chosen in PR #9386 to avoid requiring the SPIR-V
-    // Int64 capability), except on Metal: MSL cannot cast a vector to a pointer, so
-    // there the carrier is a scalar `ulong` (which can be cast to a `device T*`).
-    // The helpers below own this choice so call sites need not know it. See #11313.
-    bool useUInt64HandleRepresentation() { return isMetalTarget(targetProgram->getTargetReq()); }
+    // Dynamic-dispatch handles are 64-bit values stored as a uint2 on all targets.
+    // This avoids needing 64-bit integer support and keeps existential layouts
+    // the same across targets.
 
-    // Return the lowered IR type that carries a dynamic-dispatch handle: a scalar
-    // `ulong` on Metal, or a `uint2` elsewhere.
+    // Return the lowered IR type that carries a dynamic-dispatch handle: a `uint2`.
     IRType* getLoweredHandleType(IRBuilder& builder)
     {
-        if (useUInt64HandleRepresentation())
-            return builder.getUInt64Type();
         return builder.getVectorType(
             builder.getUIntType(),
             builder.getIntValue(builder.getIntType(), 2));
     }
 
     // Build a lowered handle value carrying the 32-bit `id` in its low bits, to
-    // match getLoweredHandleType(): zero-extend `id` into a `ulong` on Metal, or
-    // pack it into element 0 of a `uint2` (element 1 = 0) elsewhere.
+    // match getLoweredHandleType(): pack it into element 0 of a `uint2`
+    // (element 1 = 0).
     IRInst* makeHandleFromID(IRBuilder& builder, IRInst* id)
     {
-        if (useUInt64HandleRepresentation())
-            return builder.emitCast(builder.getUInt64Type(), id);
         IRInst* args[] = {id, builder.getIntValue(builder.getUIntType(), 0)};
         return builder.emitMakeVector(getLoweredHandleType(builder), 2, args);
     }
 
     // Read the 32-bit id back out of a lowered handle value produced by
-    // makeHandleFromID(): truncate the `ulong` to `uint` on Metal, or extract
-    // element 0 of the `uint2` elsewhere.
+    // makeHandleFromID(): extract element 0 of the `uint2`.
     IRInst* getIDFromHandle(IRBuilder& builder, IRInst* handle)
     {
-        if (useUInt64HandleRepresentation())
-            return builder.emitCast(builder.getUIntType(), handle);
         UInt index = 0;
         return builder.emitSwizzle(builder.getUIntType(), handle, 1, &index);
     }

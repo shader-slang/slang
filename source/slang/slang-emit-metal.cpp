@@ -132,6 +132,16 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     m_writer->emit(">");
 }
 
+// Return the resource type of a `DescriptorHandle<T>`, or `type` itself otherwise.
+// A handle is bindless on Metal and has T's layout, so binding attributes are
+// chosen from T.
+static IRType* unwrapDescriptorHandle(IRType* type)
+{
+    if (auto handleType = as<IRDescriptorHandleType>(type))
+        return handleType->getResourceType();
+    return type;
+}
+
 void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
 {
     auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
@@ -145,18 +155,26 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     if (!layout)
         return;
 
-    // DescriptorHandle<T> is bindless on Metal and has T's layout, so unwrap
-    // it before the per-kind type tests below.
-    IRType* paramType = param->getDataType();
-    if (auto handleType = as<IRDescriptorHandleType>(paramType))
-        paramType = handleType->getResourceType();
+    IRType* paramType = unwrapDescriptorHandle(param->getDataType());
+
+    // MSL accepts a fixed-size array of textures or samplers as an entry-point
+    // argument and binds it to consecutive slots from one base index (MSL 4.1
+    // section 2.12.1), so the texture and sampler cases test the element type
+    // of such an array. We unwrap only one sized array level, because the
+    // element of an MSL resource array must itself be a texture or sampler and
+    // an unsized array has no direct argument form. Nested and unsized arrays
+    // get no attribute: neither has a correct direct spelling in MSL.
+    IRType* textureOrSamplerType = paramType;
+    if (auto arrayType = as<IRArrayType>(paramType))
+        textureOrSamplerType = unwrapDescriptorHandle(arrayType->getElementType());
 
     for (auto rr : layout->getOffsetAttrs())
     {
         switch (rr->getResourceKind())
         {
         case LayoutResourceKind::MetalTexture:
-            if (as<IRTextureTypeBase>(paramType) || as<IRTextureBufferType>(paramType))
+            if (as<IRTextureTypeBase>(textureOrSamplerType) ||
+                as<IRTextureBufferType>(textureOrSamplerType))
             {
                 m_writer->emit(" [[texture(");
                 m_writer->emit(rr->getOffset());
@@ -164,6 +182,9 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::MetalBuffer:
+            // MSL has no direct kernel-argument form for an array of buffers, so
+            // we test the whole parameter type and leave buffer arrays unbound
+            // until they are routed through an argument buffer (#12291).
             if (as<IRPtrTypeBase>(paramType) || as<IRHLSLStructuredBufferTypeBase>(paramType) ||
                 as<IRByteAddressBufferTypeBase>(paramType) ||
                 as<IRUniformParameterGroupType>(paramType) ||
@@ -175,7 +196,7 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             }
             break;
         case LayoutResourceKind::SamplerState:
-            if (as<IRSamplerStateTypeBase>(paramType))
+            if (as<IRSamplerStateTypeBase>(textureOrSamplerType))
             {
                 m_writer->emit(" [[sampler(");
                 m_writer->emit(rr->getOffset());
@@ -785,12 +806,19 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         {
             if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
             {
-                // Metal does not support negate operator on matrices,
-                // we should emit "(matrix(0) - op0)" instead.
+                // Metal has no unary '-' on matrices, so lower matrix negation to
+                // "(matrix(0) - op0)". The explicit parentheses wrap the whole subtraction, so its
+                // outer context is effectively lowest-precedence: pass EmitOp::General (not the
+                // incoming outerPrec) and emit op0 as the subtraction's right-hand side. This wraps
+                // an operand that binds no tighter than '-' -- the additive "m1 + m2" (its
+                // left-associative RHS, at equal precedence) -- but not a tighter operand or an
+                // atomic.
                 m_writer->emit("(");
                 emitType(inst->getDataType());
                 m_writer->emit("(0) - ");
-                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                emitOperand(
+                    inst->getOperand(0),
+                    rightSide(getInfo(EmitOp::General), getInfo(EmitOp::Sub)));
                 m_writer->emit(")");
                 return true;
             }
@@ -1190,8 +1218,15 @@ void MetalSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
 
 void MetalSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
-    // Does not apply to metal.
-    SLANG_UNUSED(decoration);
+    switch (decoration->getOp())
+    {
+    case kIROp_NoInlineDecoration:
+        m_writer->emit("__attribute__((noinline))\n");
+        break;
+
+    default:
+        break;
+    }
 }
 
 void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)

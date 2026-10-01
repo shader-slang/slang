@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/tokens.md#special-case-lexing-rules
-//META: doc_section_digest=790d7f70b0af6fa58e0bbfe83b09c796ce08d85a7e54ec041d9c3c7dfdcfd61b
+//META: doc_section_digest=d3d4c02ac4dafd74393b443c556304f894229442554014fb013287b9cae88960
 //META: purpose=A bare `0` followed by a decimal exponent (`0e10`) lexes as a single FloatingPointLiteral, not as an integer literal with a bogus suffix.
 //META: intent=functional
 //META: pipeline_stage=lex

@@ -551,6 +551,27 @@ struct ForwardDiffTranslationContext
         auto origPtr = origLoad->getPtr();
         auto primalPtr = lookupPrimalInst(builder, origPtr, nullptr);
 
+        // Use the existing primal/differential storage mapping before interpreting a pair type.
+        // Consider this example:
+        //
+        //   [Differentiable] void square(float x, out float y) { y = x * x; }
+        //   [Differentiable] float derivative(float x)
+        //   {
+        //       DifferentialPair<float> y;
+        //       fwd_diff(square)(diffPair(x, 1.0), y);
+        //       return y.d;
+        //   }
+        //
+        // When differentiating derivative, translateVar creates separate primal and differential
+        // storage for y, both holding complete pairs. Load both values so that translating y.d
+        // can extract the differential field from each. Unwrapping the primal load here would
+        // discard a pair level and leave translateDifferentialPairGetElement accessing a scalar.
+        if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
+        {
+            auto primalLoad = maybeCloneForPrimalInst(builder, origLoad);
+            return InstPair(primalLoad, builder->emitLoad(diffPtr));
+        }
+
         if (auto primalPtrType = as<IRPtrTypeBase>(primalPtr->getFullType()))
         {
             if (auto diffPairType = as<IRDifferentialPairType>(primalPtrType->getValueType()))
@@ -586,14 +607,7 @@ struct ForwardDiffTranslationContext
             }
         }
 
-        auto primalLoad = maybeCloneForPrimalInst(builder, origLoad);
-        IRInst* diffLoad = nullptr;
-        if (auto diffPtr = lookupDiffInst(origPtr, nullptr))
-        {
-            // Default case, we're loading from a known differential inst.
-            diffLoad = as<IRLoad>(builder->emitLoad(diffPtr));
-        }
-        return InstPair(primalLoad, diffLoad);
+        return InstPair(maybeCloneForPrimalInst(builder, origLoad), nullptr);
     }
 
     InstPair translateStore(IRBuilder* builder, IRStore* origStore)
@@ -2694,7 +2708,8 @@ struct ForwardDiffTranslationContext
                     lookupDiffInst(matSwizzleStore->getDest(), nullptr) == nullptr);
                 return translateNonDiffInst(builder, matSwizzleStore);
             }
-            // Known non-differentiable insts.
+            // Known non-differentiable insts. (The atomic operations are too; they are matched by
+            // their base class after this switch.)
         case kIROp_Not:
         case kIROp_BitAnd:
         case kIROp_BitNot:
@@ -2798,6 +2813,14 @@ struct ForwardDiffTranslationContext
             SLANG_UNEXPECTED("MakeExistentialWithRTTI inst is not expected in autodiff pass.");
             break;
         }
+
+        // Atomic operations are non-differentiable: like the buffer loads and stores in the
+        // known non-differentiable cases of the switch above, they access memory that carries no
+        // derivative, so the primal side effect is kept and no differential is produced. They are
+        // matched by their base class here because a switch on the opcode would have to list all
+        // of them.
+        if (as<IRAtomicOperation>(origInst))
+            return translateNonDiffInst(builder, origInst);
 
         return InstPair(nullptr, nullptr);
     }

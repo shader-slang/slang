@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#logical
-//META: doc_section_digest=a02f1013f3939bcd733b43d3c9c2644ac90b70974d479007af65779a682e1e59
+//META: doc_section_digest=4ec87a95b6684df44e82a78d4c401239684ccd20af58505b78c23b92b5f3f073
 //META: purpose=The short-circuiting `&&` operator is NOT the lowering of `logicalAnd`; it lowers to an `ifElse` plus a join-block `param` so the right-hand side is evaluated only on the taken edge.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -1881,6 +1881,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_IsSignedInt:
         case kIROp_IsBool:
         case kIROp_IsVector:
+        case kIROp_IsBindlessTextureNVEncodable:
             {
                 auto type = inst->getOperand(0)->getDataType();
                 if (auto vectorType = as<IRVectorType>(type))
@@ -1916,6 +1917,9 @@ struct PeepholeContext : InstPassBase
                         break;
                     case kIROp_IsVector:
                         result = as<IRVectorType>(type);
+                        break;
+                    case kIROp_IsBindlessTextureNVEncodable:
+                        result = isBindlessTextureNVEncodableResourceType(type);
                         break;
                     }
                     inst->replaceUsesWith(builder.getBoolValue(result));

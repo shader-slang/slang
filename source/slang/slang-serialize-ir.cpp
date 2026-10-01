@@ -45,7 +45,10 @@ struct IRModuleInfo
     // IRModuleInst or IRConstants.
     // If we want to support back compat we'll need to change this to a list of
     // accepted values, and branch on that later down.
-    const static UInt64 kSupportedSerializationVersion = 1;
+    // Only this value is accepted, and mismatches are rejected before deserialization.
+    // Version 2 deliberately invalidates version 1 so modules written before
+    // format-version validation was added are rebuilt.
+    const static UInt64 kSupportedSerializationVersion = 2;
     FIDDLE() UInt64 serializationVersion = kSupportedSerializationVersion;
     // Include the specific compiler version in serialized output, in case we
     // ever need to do any version specific workarounds.
@@ -1238,6 +1241,18 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRInst** const insts = decoder->insts();
     insts[-1] = nullptr;
 
+    // Each instruction consumes one entry of `operandIndices` for its result type, followed by
+    // one entry per operand (see the traversal below), so the size of that table is an exact
+    // bound on the total operand count. We check that bound here, before allocating anything,
+    // because `operandCount` comes from untrusted input: an inflated value would otherwise size
+    // a tail-allocated operand array that the file has no data to fill, and on a 32-bit target
+    // (including WebAssembly) `operandCount * sizeof(IRUse)` can wrap `size_t` and produce an
+    // undersized allocation. This applies to every instruction regardless of on-demand deferral
+    // below: a deferred instruction is sized from the same `a.operandCount` once its body is
+    // finally materialized, so the bound must hold before any instruction -- eager or deferred
+    // -- is allocated.
+    Int64 usedOperandIndices = 0;
+
     // An on-demand load materializes only what a symbol index needs -- the module inst,
     // each module-scope global, and each global's decorations -- and leaves each
     // global's body encoded until something asks for its children.
@@ -1350,6 +1365,10 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         const auto& a = flat.instAllocInfo[instIndex];
         const IROp op = decoder->getInstOp(instIndex);
         const size_t minSizeInBytes = _takeInstMinSizeInBytes(op, flat, allocStringLengthCursor);
+
+        usedOperandIndices += Int64(a.operandCount) + 1;
+        SLANG_RELEASE_ASSERT(usedOperandIndices <= operandIndicesCount);
+
         // Under on-demand load the skipped instructions are never allocated; the
         // preorder walk below still consumes their operand and payload cursors so
         // that positions stay correct for the instructions that are kept.
@@ -1422,6 +1441,8 @@ void writeSerializedModuleIR(
     IRModule* irModule,
     SerialSourceLocWriter* sourceLocWriter)
 {
+    SLANG_PROFILE;
+
     // The flow here is very similar to writeSerializedModuleAST which is very
     // well documented.
 
@@ -1450,9 +1471,10 @@ void writeSerializedModuleIR(
 
 Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
-    String& compilerVersion,
-    UInt& version,
-    String& name)
+    String* compilerVersion,
+    UInt64& moduleVersion,
+    String* name,
+    UInt64* serializationVersion)
 {
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
@@ -1468,10 +1490,20 @@ Result readSerializedModuleInfo(
     }
 
     Fossilized<IRModuleInfo>* fossilizedModuleInfo = cast<Fossilized<IRModuleInfo>>(rootValPtr);
+    if (serializationVersion)
+        *serializationVersion = fossilizedModuleInfo->serializationVersion;
+    if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+        return SLANG_E_NOT_AVAILABLE;
+
     Fossilized<IRModule>* fossilizedModule = fossilizedModuleInfo->module;
-    version = fossilizedModule->m_version;
-    compilerVersion = fossilizedModuleInfo->fullVersion.get();
-    name = fossilizedModuleInfo->module->m_name.get();
+    if (!fossilizedModule)
+        return SLANG_FAIL;
+
+    moduleVersion = fossilizedModule->m_version;
+    if (compilerVersion)
+        *compilerVersion = fossilizedModuleInfo->fullVersion.get();
+    if (name)
+        *name = fossilizedModule->m_name.get();
     return SLANG_OK;
 }
 
@@ -1502,6 +1534,13 @@ Result readSerializedModuleInfo(
     // Only one version supported so far, if we had multiple versions to
     // support this is where we might branch
     if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
+        return SLANG_FAIL;
+
+    Fossilized<IRModule>* fossilizedModule = fossilizedModuleInfo->module;
+    if (!fossilizedModule)
+        return SLANG_FAIL;
+
+    if (!IRModule::isModuleVersionSupported(fossilizedModule->m_version))
         return SLANG_FAIL;
 
     IRModuleInfo info;

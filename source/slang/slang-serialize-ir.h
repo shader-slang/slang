@@ -39,16 +39,21 @@ void writeSerializedModuleIR(
     ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule);
 
-/// Reads a module's header info out of `chunk`.
-///
-/// `blobHoldingSerializedData` is forwarded to the shared `IRSerialReadContext` for
-/// symmetry with `readSerializedModuleIR`; this path decodes no instruction bodies, so it
-/// defers nothing and callers may always pass null.
+/// Reads module metadata without deserializing the IR or checking the semantic module version.
+/// `moduleVersion` is required and is written on success. `compilerVersion`, `name`, and
+/// `serializationVersion` are optional. `serializationVersion` is written as soon as the metadata
+/// record is available, including when an unsupported format causes `SLANG_E_NOT_AVAILABLE`;
+/// `compilerVersion` and `name` are written only on success. A well-formed metadata record with a
+/// null module pointer returns `SLANG_FAIL`. A non-data chunk or missing Fossil root triggers
+/// `SLANG_UNEXPECTED`. The distinct unsupported-format result lets metadata callers issue a
+/// specific diagnostic before attempting IR deserialization. This path decodes no instruction
+/// bodies, so the on-demand deferral `readSerializedModuleIR` performs never applies here.
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
-    String& compilerVersion,
-    UInt& version,
-    String& name);
+    String* compilerVersion,
+    UInt64& moduleVersion,
+    String* name,
+    UInt64* serializationVersion = nullptr);
 
 // Enable a mild optimization by putting instructions with payloads at the end
 // of the stream to make deserialization slightly faster
