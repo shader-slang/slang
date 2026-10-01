@@ -16,9 +16,15 @@ layout(shaderRecordEXT) ConstantBuffer<SbtData> gSbtRecordData;
 
 RWStructuredBuffer<float4> gOut;
 
+// The read sits in a helper, so the kernel reaches the record only through a call.
+float4 readColor()
+{
+    return gSbtRecordData.color;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void csMain()
 {
-    gOut[0] = gSbtRecordData.color;
+    gOut[0] = readColor();
 }
