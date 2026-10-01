@@ -12,6 +12,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
@@ -489,6 +490,7 @@ bool _getNVVMStructFieldAddress(
         NVVMReadOnlyTextureType sampledTextureType;
         SlangNVVMValueTypeDesc physicalType = {};
         return isNVVMSupportedIntegerScalarType(fieldType) || isNVVMFloat32Type(fieldType) ||
+               isNVVMAccelerationStructureType(fieldType) ||
                asNVVMSupportedResourceStructType(fieldType) ||
                asNVVMSupportedDeviceCopyableValuePointerType(fieldType) ||
                asNVVMSupportedDevicePhysicalStoragePointerType(fieldType) ||
@@ -3033,6 +3035,94 @@ bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function)
     return true;
 }
 
+// OptiX execution primitives are tied to the selected entry's complete reachable closure.
+// A helper containing a payload access is still illegal when called by a compute entry.
+bool _isNVVMOptixStage(Stage stage)
+{
+    return stage == Stage::RayGeneration || stage == Stage::Miss || stage == Stage::ClosestHit;
+}
+
+bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
+{
+    if (name == toSlice("_optix_get_payload") || name == toSlice("_optix_set_payload"))
+        return stage == Stage::Miss || stage == Stage::ClosestHit;
+    if (name.startsWith(toSlice("_optix_get_attribute_")))
+        return stage == Stage::ClosestHit;
+    return _isNVVMOptixStage(stage);
+}
+
+// The varying-parameter pass retains unsupported payloads as its existing pointer fallback.
+// Only canonical register/attribute instructions reach this exact SDK signature mapping.
+bool _planNVVMOptixRegister(IRInst* inst, Stage stage, NVVMPlannedNamedIntrinsic& plan)
+{
+    plan = {};
+    plan.source = inst;
+    plan.resultType = NVVMSemantics::kUnsignedI32;
+    const bool attribute = inst->getOp() == kIROp_GetOptiXHitAttribute;
+    const bool write = inst->getOp() == kIROp_SetOptiXPayloadRegister;
+    if (inst->getOperandCount() != (attribute || write ? 2u : 1u))
+        return false;
+    auto index = as<IRIntLit>(inst->getOperand(attribute ? 1 : 0));
+    if (!index || index->getValue() < 0 || index->getValue() >= (attribute ? 2 : 32))
+        return false;
+    if (attribute)
+    {
+        if (stage != Stage::ClosestHit || inst->getOperand(0) != inst->getDataType() ||
+            inst->getDataType()->getOp() != kIROp_UIntType)
+            return false;
+        plan.name = index->getValue() ? "_optix_get_attribute_1" : "_optix_get_attribute_0";
+        return true;
+    }
+    if (stage != Stage::Miss && stage != Stage::ClosestHit)
+        return false;
+    if (write)
+    {
+        if (inst->getDataType()->getOp() != kIROp_VoidType ||
+            inst->getOperand(1)->getDataType()->getOp() != kIROp_UIntType)
+            return false;
+        plan.resultType = NVVMSemantics::kVoid;
+    }
+    else if (inst->getDataType()->getOp() != kIROp_UIntType)
+        return false;
+    plan.name = write ? "_optix_set_payload" : "_optix_get_payload";
+    plan.operands.add(
+        {NVVMSemantics::kUnsignedI32, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT});
+    plan.operandValues.add(index);
+    if (write)
+    {
+        plan.operands.add({NVVMSemantics::kUnsignedI32, SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE});
+        plan.operandValues.add(inst->getOperand(1));
+    }
+    return true;
+}
+
+bool _planNVVMTraceRay(IRInst* inst, Stage stage, NVVMPlannedTraceRay& plan)
+{
+    plan = {};
+    if (stage != Stage::RayGeneration || inst->getOperandCount() < 17)
+        return false;
+    auto payloadType = as<IRType>(inst->getOperand(0));
+    UInt count = payloadType ? getNVVMOptixPayloadRegisterCount(payloadType) : 0;
+    auto result = as<IRArrayType>(inst->getDataType());
+    auto resultCount = result ? as<IRIntLit>(result->getElementCount()) : nullptr;
+    if (!count || inst->getOperandCount() != 16 + count || !resultCount ||
+        resultCount->getValue() != count || result->getElementType()->getOp() != kIROp_UIntType)
+        return false;
+    for (UInt i = 1; i < inst->getOperandCount(); ++i)
+    {
+        auto type = inst->getOperand(i)->getDataType();
+        IROp expected = i == 1    ? kIROp_RaytracingAccelerationStructureType
+                        : i <= 10 ? kIROp_FloatType
+                                  : kIROp_UIntType;
+        if (!type || type->getOp() != expected)
+            return false;
+        plan.operands.add(inst->getOperand(i));
+    }
+    plan.source = inst;
+    plan.desc.payloadCount = count;
+    return true;
+}
+
 // Captures the checked signature and explicit operands without interpreting the LLVM name.
 // Consider `uint scan(uint x) { __intrinsic_asm "llvm.ctlz", x, false; }`: lowering stores
 // the parameter and Boolean literal as GenericAsm operands. Preserve those values directly;
@@ -4955,8 +5045,17 @@ String _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
         auto entryPointDecoration = function->findDecoration<IREntryPointDecoration>();
         SLANG_RELEASE_ASSERT(entryPointDecoration);
         String name(entryPointDecoration->getName()->getStringSlice());
-        if (entryPointDecoration->getProfile().getStage() == Stage::RayGeneration)
+        switch (entryPointDecoration->getProfile().getStage())
+        {
+        case Stage::RayGeneration:
             return String("__raygen__") + name;
+        case Stage::Miss:
+            return String("__miss__") + name;
+        case Stage::ClosestHit:
+            return String("__closesthit__") + name;
+        default:
+            break;
+        }
         return name;
     }
     if (auto exportDecoration = function->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
@@ -6239,12 +6338,46 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_OptixTraceRayPayload:
+                {
+                    NVVMPlannedTraceRay trace;
+                    if (!_planNVVMTraceRay(
+                            inst,
+                            entryPoint->findDecoration<IREntryPointDecoration>()
+                                ->getProfile()
+                                .getStage(),
+                            trace))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("OptiX register trace"));
+                    requirements.emissionPlan.traceRays.add(_Move(trace));
+                }
+                break;
+
+            case kIROp_GetOptiXPayloadRegister:
+            case kIROp_SetOptiXPayloadRegister:
+            case kIROp_GetOptiXHitAttribute:
+                {
+                    NVVMPlannedNamedIntrinsic primitive;
+                    if (!_planNVVMOptixRegister(
+                            inst,
+                            entryPoint->findDecoration<IREntryPointDecoration>()
+                                ->getProfile()
+                                .getStage(),
+                            primitive))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("OptiX register primitive"));
+                    requirements.emissionPlan.namedIntrinsics.add(_Move(primitive));
+                }
+                break;
+
             case kIROp_GetOptiXSbtDataPtr:
                 {
                     IRType* storageType = nullptr;
-                    if (entryPoint->findDecoration<IREntryPointDecoration>()
-                                ->getProfile()
-                                .getStage() != Stage::RayGeneration ||
+                    if (!_isNVVMOptixStage(entryPoint->findDecoration<IREntryPointDecoration>()
+                                               ->getProfile()
+                                               .getStage()) ||
                         inst->getOperandCount() || !as<IRConstantBufferType>(inst->getDataType()) ||
                         !asNVVMSupportedParameterGroupType(inst->getDataType(), &storageType) ||
                         !_hasNVVMCompatibleAggregateStorageLayout(
@@ -6570,9 +6703,11 @@ SlangResult _validateNVVMFunction(
                     if (_getNVVMNamedIntrinsicDesc(genericAsm, function, namedIntrinsic))
                     {
                         if (namedIntrinsic.name.startsWith(toSlice("_optix_")) &&
-                            entryPoint->findDecoration<IREntryPointDecoration>()
+                            !_isNVVMOptixPrimitiveStage(
+                                namedIntrinsic.name.getUnownedSlice(),
+                                entryPoint->findDecoration<IREntryPointDecoration>()
                                     ->getProfile()
-                                    .getStage() != Stage::RayGeneration)
+                                    .getStage()))
                             return _diagnoseUnsupportedIR(
                                 codeGenContext,
                                 toSlice("OptiX primitive stage"));
@@ -6757,6 +6892,29 @@ SlangResult _validateNVVMFunction(
         {
             switch (inst->getOp())
             {
+            case kIROp_OptixTraceRayPayload:
+            case kIROp_GetOptiXPayloadRegister:
+            case kIROp_SetOptiXPayloadRegister:
+            case kIROp_GetOptiXHitAttribute:
+                {
+                    const auto trace =
+                        _findPlannedNVVMOperation(requirements.emissionPlan.traceRays, inst);
+                    const auto named =
+                        _findPlannedNVVMOperation(requirements.emissionPlan.namedIntrinsics, inst);
+                    SLANG_RELEASE_ASSERT(trace || named);
+                    const auto& operands = trace ? trace->operands : named->operandValues;
+                    for (auto value : operands)
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            value,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                    if (inst->getDataType()->getOp() != kIROp_VoidType)
+                        availableValues.add(inst);
+                }
+                break;
+
             case kIROp_GetOptiXSbtDataPtr:
             case kIROp_Var:
                 availableValues.add(inst);
@@ -9946,10 +10104,10 @@ SlangResult validateNVVMSupportedIR(
     if (!entryPointDecoration)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point decoration"));
     const auto stage = entryPointDecoration->getProfile().getStage();
-    if (stage != Stage::Compute && stage != Stage::RayGeneration)
+    if (stage != Stage::Compute && !_isNVVMOptixStage(stage))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point stage"));
-    if (stage == Stage::RayGeneration && entryPoint->getParamCount())
-        return _diagnoseUnsupportedIR(codeGenContext, toSlice("ray-generation entry parameters"));
+    if (_isNVVMOptixStage(stage) && entryPoint->getParamCount())
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("OptiX entry parameters"));
     if (!entryPointDecoration->getName()->getStringSlice().getLength())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point name"));
     if (!as<IRVoidType>(entryPoint->getResultType()))
@@ -10147,6 +10305,14 @@ SlangResult validateNVVMSupportedIR(
             }
         }
     }
+    // Packing a constant payload can eliminate every record-valued instruction while the
+    // trace still retains its original type for admission. This checked metadata operand is
+    // a type dependency just like a function signature; it does not require a storage witness.
+    for (const auto& trace : outRequirements.emissionPlan.traceRays)
+        _addNVVMReachableStructTypes(
+            cast<IRType>(trace.source->getOperand(0)),
+            selectedReachableStructTypes);
+
     // A group-shared global is also a canonical type root. Its pointer spelling does not make the
     // pointee reachable through ordinary SSA-type traversal, so collect the finite storage value
     // directly from the producer before auditing retained module-scope type declarations.
@@ -10264,6 +10430,14 @@ SlangResult emitNVVMIRFromLinkedIR(
                 name.getBuffer(),
                 SLANG_E_NOT_AVAILABLE);
         }
+    }
+    for (const auto& trace : requirements.emissionPlan.traceRays)
+    {
+        if (!builder.supportsTraceRay(trace.desc))
+            return _requireBuilderOperation(
+                codeGenContext,
+                "OptiX register trace",
+                SLANG_E_NOT_AVAILABLE);
     }
     for (const auto& requirement : requirements.valueOperations)
     {
@@ -10681,6 +10855,49 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 toSlice("slangLocal"),
                                 loweredStorage)));
                         valueMap[inst] = loweredStorage;
+                    }
+                    break;
+
+                case kIROp_OptixTraceRayPayload:
+                case kIROp_GetOptiXPayloadRegister:
+                case kIROp_SetOptiXPayloadRegister:
+                case kIROp_GetOptiXHitAttribute:
+                    {
+                        const auto trace = planIndex.findTraceRay(inst);
+                        const auto primitive = planIndex.findNamedIntrinsic(inst);
+                        SLANG_RELEASE_ASSERT(trace || primitive);
+                        List<SlangNVVMValueHandle> operands;
+                        for (auto operand : trace ? trace->operands : primitive->operandValues)
+                        {
+                            SlangNVVMValueHandle value = nullptr;
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                operand,
+                                valueMap,
+                                typeContext,
+                                value));
+                            operands.add(value);
+                        }
+                        SlangNVVMValueHandle value = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "OptiX register operation",
+                            trace ? builder.emitTraceRay(
+                                        moduleScope.module,
+                                        trace->desc,
+                                        operands.getBuffer(),
+                                        size_t(operands.getCount()),
+                                        value)
+                                  : builder.emitNamedIntrinsic(
+                                        moduleScope.module,
+                                        primitive->getDesc(),
+                                        operands.getBuffer(),
+                                        size_t(operands.getCount()),
+                                        value)));
+                        if (inst->getDataType()->getOp() != kIROp_VoidType)
+                            valueMap[inst] = value;
                     }
                     break;
 

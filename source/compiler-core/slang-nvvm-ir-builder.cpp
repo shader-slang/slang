@@ -172,6 +172,24 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
         memoryOperations = candidate;
     }
 
+    SlangNVVMBuilderTraceOperationsAPI traceOperations = {};
+    const void* traceOperationsRaw = nullptr;
+    const SlangResult traceResult =
+        api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS, &traceOperationsRaw);
+    if (traceResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(traceResult);
+        if (!traceOperationsRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate =
+            *static_cast<const SlangNVVMBuilderTraceOperationsAPI*>(traceOperationsRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_TRACE_OPERATIONS_VERSION ||
+            !candidate.isTraceRaySupported || !candidate.emitTraceRay)
+            return SLANG_E_NO_INTERFACE;
+        traceOperations = candidate;
+    }
+
     outBuilder.m_api = api;
     outBuilder.m_foundation = foundation;
     outBuilder.m_construction = construction;
@@ -181,6 +199,7 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
     outBuilder.m_textureOperations = textureOperations;
     // Older ABI46 providers may omit this interface. Ordinary programs must keep working.
     outBuilder.m_memoryOperations = memoryOperations;
+    outBuilder.m_traceOperations = traceOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
 }
@@ -433,6 +452,32 @@ SlangResult NVVMIRBuilder::emitAtomicOperation(
         return !outValue ? SLANG_OK : SLANG_FAIL;
     }
     return _validateHandleResult(result, outValue);
+}
+
+bool NVVMIRBuilder::supportsTraceRay(const SlangNVVMTraceRayDesc& operation) const
+{
+    if (!isInitialized() || !m_traceOperations.isTraceRaySupported)
+        return false;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(m_traceOperations.isTraceRaySupported(&operation, &supported)) &&
+           supported;
+}
+
+SlangResult NVVMIRBuilder::emitTraceRay(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMTraceRayDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsTraceRay(operation))
+        return SLANG_E_NOT_AVAILABLE;
+    return _validateHandleResult(
+        m_traceOperations.emitTraceRay(module, &operation, operands, operandCount, &outValue),
+        outValue);
 }
 
 bool NVVMIRBuilder::supportsMemoryOperation(const SlangNVVMMemoryOperationDesc& operation) const

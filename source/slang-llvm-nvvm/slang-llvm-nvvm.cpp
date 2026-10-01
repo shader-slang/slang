@@ -1074,6 +1074,98 @@ static SlangResult SLANG_NVVM_CALL _emitMemoryOperation(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL
+_isTraceRaySupported(const SlangNVVMTraceRayDesc* desc, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!desc || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = desc->payloadCount >= 1 && desc->payloadCount <= 32;
+    return SLANG_OK;
+}
+
+// TraceRay's canonical payload is a finite array of UInt32 words. The SDK primitive returns
+// a fixed 32-register tuple, so keep that ABI detail local and rebuild the requested array.
+// For example, a four-word payload supplies four inputs plus 28 zero words and extracts only
+// four returned registers. No pointer payload or semantic 32-lane vector is introduced.
+static SlangResult SLANG_NVVM_CALL _emitTraceRay(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMTraceRayDesc* desc,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    auto state = _getModule(module);
+    auto block = _getValidInsertionBlock(state);
+    uint32_t supported = 0;
+    if (SLANG_FAILED(_isTraceRaySupported(desc, &supported)) || !supported || !outValue || !block ||
+        !operands || operandCount != 15u + desc->payloadCount)
+        return SLANG_E_INVALID_ARG;
+    auto int32Type = llvm::Type::getInt32Ty(state->context);
+    auto int64Type = llvm::Type::getInt64Ty(state->context);
+    auto floatType = llvm::Type::getFloatTy(state->context);
+    llvm::SmallVector<llvm::Value*, 47> values;
+    for (size_t i = 0; i < operandCount; ++i)
+    {
+        auto value = _getValue(operands[i]);
+        auto expectedType = i == 0 ? int64Type : i < 10 ? floatType : int32Type;
+        if (!_isValueUsableAtInsertionPoint(state, block, value) ||
+            value->getType() != expectedType)
+            return SLANG_E_INVALID_ARG;
+        values.push_back(value);
+    }
+
+    // All physical inputs and insertion/ownership facts are checked before any instruction is
+    // emitted. Type ID zero selects the SDK's default payload type; count is the live word count.
+    llvm::SmallVector<llvm::Value*, 49> arguments;
+    arguments.push_back(llvm::ConstantInt::get(int32Type, 0));
+    arguments.append(values.begin(), values.begin() + 15);
+    arguments.push_back(llvm::ConstantInt::get(int32Type, desc->payloadCount));
+    arguments.append(values.begin() + 15, values.end());
+    while (arguments.size() < 49)
+        arguments.push_back(llvm::ConstantInt::get(int32Type, 0));
+    llvm::SmallVector<llvm::Type*, 49> parameters;
+    for (auto argument : arguments)
+        parameters.push_back(argument->getType());
+    llvm::SmallVector<llvm::Type*, 32> results(32, int32Type);
+    auto tupleType = llvm::StructType::get(state->context, results);
+    auto functionType = llvm::FunctionType::get(tupleType, parameters, false);
+    std::string assembly = "call (";
+    std::string constraints;
+    for (unsigned i = 0; i < 32; ++i)
+    {
+        if (i)
+        {
+            assembly += ",";
+            constraints += ",";
+        }
+        assembly += "$" + std::to_string(i);
+        constraints += "=r";
+    }
+    assembly += "), _optix_trace_typed_32, (";
+    for (unsigned i = 0; i < 49; ++i)
+    {
+        if (i)
+            assembly += ",";
+        assembly += "$" + std::to_string(i + 32);
+        constraints += i == 1 ? ",l" : i >= 2 && i <= 10 ? ",f" : ",r";
+    }
+    assembly += ");";
+    constraints += ",~{memory}";
+    auto primitive = llvm::InlineAsm::get(functionType, assembly, constraints, true);
+    auto call = state->builder.CreateCall(primitive, arguments);
+    auto arrayType = llvm::ArrayType::get(int32Type, desc->payloadCount);
+    llvm::Value* result = llvm::UndefValue::get(arrayType);
+    for (unsigned i = 0; i < desc->payloadCount; ++i)
+        result =
+            state->builder.CreateInsertValue(result, state->builder.CreateExtractValue(call, i), i);
+    *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMAtomicOperationDesc* operation,
@@ -3304,14 +3396,22 @@ static bool _isScalarFloat32Or64Type(const SlangNVVMValueTypeDesc& type)
            (type.bitWidth == 32 || type.bitWidth == 64);
 }
 
-// These are SDK-defined scalar PTX calls, not LLVM registry names or arbitrary externals.
-// The compiler admits them only in a ray-generation closure; the provider owns their exact ABI.
-static unsigned _getOptixIntrinsicWidth(const SlangNVVMNamedIntrinsicDesc& intrinsic)
+enum class OptixIntrinsicKind
 {
-    if (!intrinsic.name || intrinsic.operandCount ||
-        intrinsic.resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
-        intrinsic.resultType.laneCount != 1)
-        return 0;
+    None,
+    Query32,
+    Query64,
+    GetPayload,
+    SetPayload,
+};
+
+// These are SDK-defined calls, not LLVM registry names or arbitrary externals. The compiler
+// owns stage admission; this shared classifier owns their exact physical scalar signatures.
+static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDesc& intrinsic)
+{
+    using namespace Slang::NVVMSemantics;
+    if (!intrinsic.name || (!intrinsic.operands && intrinsic.operandCount))
+        return OptixIntrinsicKind::None;
     const llvm::StringRef name(intrinsic.name, intrinsic.nameSize);
     const char* queries[] = {
         "_optix_get_launch_index_x",
@@ -3319,14 +3419,31 @@ static unsigned _getOptixIntrinsicWidth(const SlangNVVMNamedIntrinsicDesc& intri
         "_optix_get_launch_index_z",
         "_optix_get_launch_dimension_x",
         "_optix_get_launch_dimension_y",
-        "_optix_get_launch_dimension_z"};
-    unsigned width = 0;
-    for (auto query : queries)
-        if (name == query)
-            width = 32;
-    if (name == "_optix_get_sbt_data_ptr_64")
-        width = 64;
-    return intrinsic.resultType.bitWidth == width ? width : 0;
+        "_optix_get_launch_dimension_z",
+        "_optix_get_attribute_0",
+        "_optix_get_attribute_1"};
+    if (!intrinsic.operandCount)
+    {
+        for (auto query : queries)
+            if (name == query && areSameType(intrinsic.resultType, kUnsignedI32))
+                return OptixIntrinsicKind::Query32;
+        if (name == "_optix_get_sbt_data_ptr_64" && areSameType(intrinsic.resultType, kUnsignedI64))
+            return OptixIntrinsicKind::Query64;
+        return OptixIntrinsicKind::None;
+    }
+    const bool get = name == "_optix_get_payload";
+    const bool set = name == "_optix_set_payload";
+    if ((!get && !set) || intrinsic.operandCount != (get ? 1u : 2u) ||
+        !areSameType(intrinsic.resultType, get ? kUnsignedI32 : kVoid) ||
+        intrinsic.operands[0].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT ||
+        !areSameType(intrinsic.operands[0].type, kUnsignedI32))
+        return OptixIntrinsicKind::None;
+    if (set &&
+        (!areSameType(intrinsic.operands[1].type, kUnsignedI32) ||
+         (intrinsic.operands[1].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE &&
+          intrinsic.operands[1].kind != SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT)))
+        return OptixIntrinsicKind::None;
+    return get ? OptixIntrinsicKind::GetPayload : OptixIntrinsicKind::SetPayload;
 }
 
 // Resolves a borrowed signature through LLVM's registry without creating any module state.
@@ -3427,7 +3544,7 @@ _isNamedIntrinsicSupported(const SlangNVVMNamedIntrinsicDesc* intrinsic, uint32_
         *outSupported = 0;
     if (!intrinsic || !outSupported || (!intrinsic->operands && intrinsic->operandCount))
         return SLANG_E_INVALID_ARG;
-    if (_getOptixIntrinsicWidth(*intrinsic))
+    if (_getOptixIntrinsicKind(*intrinsic) != OptixIntrinsicKind::None)
     {
         *outSupported = 1;
         return SLANG_OK;
@@ -3469,16 +3586,45 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     if (!intrinsic || !outValue || !block || (!intrinsic->operands && intrinsic->operandCount) ||
         (!operands && operandCount) || operandCount != intrinsic->operandCount)
         return SLANG_E_INVALID_ARG;
-    if (const unsigned width = _getOptixIntrinsicWidth(*intrinsic))
+    const auto optixKind = _getOptixIntrinsicKind(*intrinsic);
+    if (optixKind != OptixIntrinsicKind::None)
     {
-        auto type = llvm::FunctionType::get(llvm::IntegerType::get(state->context, width), false);
-        llvm::SmallString<96> assembly("call ($0), ");
+        llvm::SmallVector<llvm::Value*, 2> values;
+        llvm::SmallVector<llvm::Type*, 2> parameters;
+        for (size_t i = 0; i < operandCount; ++i)
+        {
+            auto value = _getValue(operands[i]);
+            auto parameterType = _getSemanticLLVMType(state->context, intrinsic->operands[i].type);
+            if (!_isValueUsableAtInsertionPoint(state, block, value) ||
+                value->getType() != parameterType ||
+                (intrinsic->operands[i].kind ==
+                     SLANG_NVVM_NAMED_INTRINSIC_OPERAND_INTEGER_CONSTANT &&
+                 !llvm::isa<llvm::ConstantInt>(value)))
+                return SLANG_E_INVALID_ARG;
+            values.push_back(value);
+            parameters.push_back(parameterType);
+        }
+        if (operandCount && llvm::cast<llvm::ConstantInt>(values[0])->getZExtValue() > 31)
+            return SLANG_E_INVALID_ARG;
+
+        const bool isSet = optixKind == OptixIntrinsicKind::SetPayload;
+        auto type = llvm::FunctionType::get(
+            _getSemanticLLVMType(state->context, intrinsic->resultType),
+            parameters,
+            false);
+        llvm::SmallString<96> assembly(isSet ? "call " : "call ($0), ");
         assembly.append(llvm::StringRef(intrinsic->name, intrinsic->nameSize));
-        assembly.append(", ();");
-        // Keep the SDK observation at its execution point without advertising a memory fence.
-        // No LLVM readnone/readonly contract is inferred for these runtime-owned calls.
-        auto primitive = llvm::InlineAsm::get(type, assembly, width == 32 ? "=r" : "=l", true);
-        *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(primitive));
+        assembly.append(isSet ? ", ($0, $1);" : operandCount ? ", ($1);" : ", ();");
+        const char* constraints = isSet                                      ? "r,r"
+                                  : operandCount                             ? "=r,r"
+                                  : optixKind == OptixIntrinsicKind::Query64 ? "=l"
+                                                                             : "=r";
+        // Keep SDK observations and register writes at their execution point. The trace
+        // operation separately clobbers memory because its callbacks can access user storage.
+        auto primitive = llvm::InlineAsm::get(type, assembly, constraints, true);
+        auto call = state->builder.CreateCall(primitive, values);
+        if (!isSet)
+            *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
         return SLANG_OK;
     }
     llvm::FunctionType* type = nullptr;
@@ -5148,6 +5294,13 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _emitMemoryOperation,
     };
 
+    static const SlangNVVMBuilderTraceOperationsAPI traceOperations = {
+        sizeof(SlangNVVMBuilderTraceOperationsAPI),
+        SLANG_NVVM_TRACE_OPERATIONS_VERSION,
+        _isTraceRaySupported,
+        _emitTraceRay,
+    };
+
     switch (interfaceID)
     {
     case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION:
@@ -5164,6 +5317,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS:
         *outInterface = &memoryOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS:
+        *outInterface = &traceOperations;
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS:
         *outInterface = &surfaceOperations;

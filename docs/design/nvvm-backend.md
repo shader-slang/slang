@@ -102,24 +102,37 @@ supported public operations, widths and pointer-output qualifications.
 
 ### OptiX entry and binding ownership
 
-Ray-generation entries reuse the shared OptiX uniform-collection pass. That producer moves entry
-uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`; it leaves compute parameters
-unchanged. NVVM preflight accepts a void, parameterless raygen entry after this lowering and owns its
-`__raygen__` symbol prefix. Conventional globals retain the existing `SLANG_globalParams` launch
-parameter representation. Stage admission is explicit; accepting raygen does not admit trace or
-hit-stage operations.
+Ray-generation, miss and closest-hit entries reuse the shared OptiX uniform-collection pass.
+That producer moves entry uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`;
+it leaves compute parameters unchanged. After payload/varying legalization, NVVM preflight accepts
+void, parameterless entries and owns their stage-specific SDK symbol prefixes. Conventional globals
+retain `SLANG_globalParams`. Acceleration structures are opaque UInt64 transport values with explicit
+value, local-storage and helper-parameter roles; this does not admit integer conversions, pointer
+roots or recursive resource aggregates.
 
-The core module composes launch index and dimensions from six scalar UInt32 SDK calls. The provider
-admits exactly those zero-argument signatures and the UInt64 SBT-address call, then emits the SDK's
-primitive PTX calls. Calls retain their observation position without a memory clobber or fence.
-Unknown names, wrong signatures and invalid insertion points fail before emission. This is a finite
-typed SDK interface, not an arbitrary external-call escape or CUDA text recognizer.
+The core module composes launch queries from exact typed SDK primitives. Canonical `GetOptiXSbtDataPtr`
+alone owns conversion of the SDK address to a validated constant-buffer representation. Its plan
+selects the primitive; existing field/layout and load lowering consume the pointer. Shader records
+are readonly to shader stores, but loads are not invariant because hosts can change SBT data between
+launches. The shared immutable-location policy owns that distinction.
 
-Only canonical `GetOptiXSbtDataPtr` owns conversion of the SDK address to its validated constant-buffer
-representation. Its checked plan selects the primitive; existing field/layout and load lowering
-consume the resulting pointer. This does not admit integer-derived public pointer roots. Shader
-record fields are readonly to shader stores, but their loads are not invariant: the host may change
-the SBT between launches. The shared immutable-location policy remains the owner of that distinction.
+`TraceRay` constructs a typed IR operation with explicit ray fields and the original payload type.
+Shared CUDA payload layout admits nonempty, padding-free Int32/UInt32/Float32 scalars, vectors and
+records totaling at most 32 words. Caller packing and callback unpacking reuse the same traversal;
+unsupported shapes retain an operation or pointer fallback that NVVM preflight rejects. The lowered
+trace keeps its original type and returns an ordinary UInt32 array. Checked plans validate this
+contract before provider mutation. The original payload type is an explicit type dependency even
+when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit;
+triangle attributes only in closest-hit. These stage checks cover the reachable helper closure.
+
+The optional versioned trace interface uses the existing provider query mechanism without changing
+ABI46 tables. The provider adapts finite payload arrays to the SDK's fixed 32-result/49-argument
+primitive, zeros unused inputs, and retains side effects and a compiler memory clobber. Exact named
+get/set payload calls require literal indices 0..31; triangle attributes admit indices 0 and 1.
+Unknown names, wrong signatures and invalid insertion points fail before emission. Missing trace
+support is diagnosed before module creation. This finite typed SDK boundary does not interpret CUDA
+text or admit arbitrary external calls. Any-hit, procedural intersection, callback tracing, callables
+and pointer payload transport remain outside this contract.
 
 `resolveValueOperationFamily` is the single admission/diagnostic authority for numeric operation
 descriptors. Its exact catalog retains five hardware-wave signatures: active mask, ballot and

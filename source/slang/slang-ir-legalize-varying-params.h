@@ -20,6 +20,10 @@ struct EntryPointInfo
     IREntryPointDecoration* entryPointDecor;
 };
 
+// Returns the register count for the padding-free 32-bit OptiX payload subset.
+// Both trace callers and callback parameters use this check before their type is erased.
+UInt getNVVMOptixPayloadRegisterCount(IRType* type);
+
 void legalizeEntryPointVaryingParamsForCPU(
     IRModule* module,
     TargetProgram* target,

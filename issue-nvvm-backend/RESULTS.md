@@ -96,6 +96,26 @@ entry lowering. The separate static-build selector
 `nvvmOptixSbtPlansKeepStageAndTypeBoundaries` checks SBT layout, stage admission and load flags before
 provider mutation. These checks qualify raygen only, not triangle tracing or payload transport.
 
+### OptiX triangle gate
+
+Build `render-test` alongside the compiler/provider/unit targets. The triangle fixture runs UInt and
+Float4 payloads at NVVM O0/O3 with selected NVRTC O3 controls; every case checks all output words and
+untouched storage against independent expectations. It uses the existing real triangle scene and
+conventional `missMain`/`closestHitMain` entries in the render-test pipeline.
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/pipeline/ray-tracing/nvvm-optix-triangle.slang \
+  slang-unit-test-tool/nvvmIRBuilderOptixPayloadRegistersRejectWithoutMutation.internal \
+  slang-unit-test-tool/nvvmIRBuilderOptixTracePreservesTupleAndRejectsWithoutMutation.internal
+```
+
+Require actual execution without skips. Retain the raygen gate and compute smoke after shared
+entry/payload changes. Static selectors `nvvmOptixTracePlansKeepPayloadAndStageBoundaries` and
+`nvvmAccelerationHandlesKeepOpaqueRoles` cover retained payload types, stage restrictions, absent
+provider support before mutation, and opaque handle roles. These tests do not qualify arbitrary
+OptiX stages, recursive rays or pointer payloads.
+
 ## Correctness baseline and comparison
 
 For an authorized migration after a host/driver change with unchanged verified compiler/toolkit

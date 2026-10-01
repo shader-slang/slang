@@ -417,6 +417,14 @@ struct NVVMPlannedNamedIntrinsic
     }
 };
 
+/// Retains the original payload admission and all scalar operands for one register trace.
+struct NVVMPlannedTraceRay
+{
+    IRInst* source = nullptr;
+    SlangNVVMTraceRayDesc desc = {};
+    List<IRInst*> operands;
+};
+
 /// Retains the authoritative storage stride and proven parameter/load root for an address offset.
 struct NVVMPlannedLayoutPointerOffset
 {
@@ -445,6 +453,7 @@ struct NVVMEmissionPlan
     List<String> functionNames;
     List<NVVMPlannedValueOperation> valueOperations;
     List<NVVMPlannedNamedIntrinsic> namedIntrinsics;
+    List<NVVMPlannedTraceRay> traceRays;
     List<NVVMPlannedUInt64WordConstruction> uint64WordConstructions;
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
@@ -508,6 +517,7 @@ public:
     const NVVMPlannedAggregateStorageConstruction* findAggregateStorageConstruction(
         IRInst* source) const;
     const NVVMPlannedNamedIntrinsic* findNamedIntrinsic(IRInst* source) const;
+    const NVVMPlannedTraceRay* findTraceRay(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
@@ -528,6 +538,7 @@ private:
     Dictionary<IRInst*, Index> m_aggregateStorageConstructions;
     Dictionary<IRInst*, Index> m_valueOperations;
     Dictionary<IRInst*, Index> m_namedIntrinsics;
+    Dictionary<IRInst*, Index> m_traceRays;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;
     Dictionary<IRInst*, Index> m_floatingRemainderOperations;

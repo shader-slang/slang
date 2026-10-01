@@ -1110,6 +1110,41 @@ protected:
 // turn our attention to the target-specific subtypes that handle
 // translation of "leaf" varying parameters.
 
+UInt getNVVMOptixPayloadRegisterCount(IRType* type)
+{
+    UInt count = 0;
+    if (type->getOp() == kIROp_IntType || type->getOp() == kIROp_UIntType ||
+        type->getOp() == kIROp_FloatType)
+        count = 1;
+    else if (auto vectorType = as<IRVectorType>(type))
+    {
+        auto lanes = as<IRIntLit>(vectorType->getElementCount());
+        if (!lanes || lanes->getValue() < 2 || lanes->getValue() > 4 ||
+            getNVVMOptixPayloadRegisterCount(vectorType->getElementType()) != 1)
+            return 0;
+        count = UInt(lanes->getValue());
+    }
+    else if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            UInt fieldCount = getNVVMOptixPayloadRegisterCount(field->getFieldType());
+            if (!fieldCount || count + fieldCount > 32)
+                return 0;
+            count += fieldCount;
+        }
+    }
+    if (!count || count > 32)
+        return 0;
+    // Shared CUDA layout includes internal and tail padding. Equality with the sum of
+    // positive-sized leaves proves that neither would need an uninitialized register.
+    IRSizeAndAlignment layout;
+    if (SLANG_FAILED(getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &layout)) ||
+        layout.size != count * 4)
+        return 0;
+    return count;
+}
+
 struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalizeContext
 {
     // CUDA compute kernels don't support user-defined varying
@@ -1120,6 +1155,29 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // `blockIdx`, and `blockDim` that we can make use of.
     //
     bool emitNVVMDirectly = false;
+    IRInst* payloadReadArray = nullptr;
+    List<IRInst*>* payloadWriteWords = nullptr;
+
+    // Reuses the callback's layout traversal for the caller's SSA register array.
+    IRInst* readPayloadWord(IRBuilder* builder, IRInst* index)
+    {
+        if (payloadReadArray)
+            return builder->emitElementExtract(builder->getUIntType(), payloadReadArray, index);
+        return builder
+            ->emitIntrinsicInst(builder->getUIntType(), kIROp_GetOptiXPayloadRegister, 1, &index);
+    }
+
+    void writePayloadWord(IRBuilder* builder, IRInst* index, IRInst* value)
+    {
+        if (payloadWriteWords)
+        {
+            (*payloadWriteWords)[as<IRIntLit>(index)->getValue()] = value;
+            return;
+        }
+        IRInst* args[] = {index, value};
+        builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, args);
+    }
+
     IRInst* threadIdxValue = nullptr;
     IRInst* blockIdxValue = nullptr;
     IRInst* blockDimValue = nullptr;
@@ -1359,21 +1417,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     // Direct read - register holds the value
                     ioByteOffset += 4;
-                    return builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
+                    auto word = readPayloadWord(builder, regIdxInst);
+                    return builder->emitBitCast(typeToFetch, word);
                 }
             case BaseType::Float:
                 {
                     // Read as uint, then bitcast to float
                     ioByteOffset += 4;
-                    auto uintVal = builder->emitIntrinsicInst(
-                        uintType,
-                        kIROp_GetOptiXPayloadRegister,
-                        1,
-                        &regIdxInst);
+                    auto uintVal = readPayloadWord(builder, regIdxInst);
                     return builder->emitBitCast(typeToFetch, uintVal);
                 }
             case BaseType::Bool:
@@ -1733,12 +1784,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
             if (uintVal)
             {
-                IRInst* args[] = {regIdxInst, uintVal};
-                builder->emitIntrinsicInst(
-                    builder->getVoidType(),
-                    kIROp_SetOptiXPayloadRegister,
-                    2,
-                    args);
+                writePayloadWord(builder, regIdxInst, uintVal);
                 ioByteOffset += 4;
             }
         }
@@ -2218,10 +2264,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             IRIntegerValue idx = ioBaseAttributeIndex;
             auto idxInst = builder->getIntValue(builder->getIntType(), idx);
             ioBaseAttributeIndex++;
-            IRInst* args[] = {typeToFetch, idxInst};
+            // NVVM's SDK attribute register is UInt32. Keep its bit interpretation in
+            // ordinary IR so the existing typed numeric operation owns validation/emission.
+            // Other scalar shapes stay explicit for NVVM preflight to reject.
+            const bool reinterpret = emitNVVMDirectly && (typeToFetch->getOp() == kIROp_FloatType ||
+                                                          typeToFetch->getOp() == kIROp_IntType);
+            IRType* registerType = reinterpret ? builder->getUIntType() : typeToFetch;
+            IRInst* args[] = {registerType, idxInst};
             IRInst* getAttr =
-                builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXHitAttribute, 2, args);
-            return getAttr;
+                builder->emitIntrinsicInst(registerType, kIROp_GetOptiXHitAttribute, 2, args);
+            return reinterpret ? builder->emitBitCast(typeToFetch, getAttr) : getAttr;
         }
 
         return nullptr;
@@ -2600,7 +2652,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 // Compute how many registers are required for this payload type
                 int registerCount = 0;
                 if (useRegisterBasedPayload)
-                    registerCount = computePayloadRegisterCount(info.type, &builder);
+                    registerCount = emitNVVMDirectly
+                                        ? getNVVMOptixPayloadRegisterCount(info.type)
+                                        : computePayloadRegisterCount(info.type, &builder);
 
                 if (!useRegisterBasedPayload || registerCount == 0 ||
                     registerCount > kMaxPayloadRegisters)
@@ -2674,6 +2728,70 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             }
         default:
             return diagnoseUnsupportedUserVal(info);
+        }
+    }
+    // Converts only the admitted typed producer. Unsupported payloads remain explicit IR
+    // for NVVM preflight, just like unsupported callback payload pointer fallbacks.
+    void legalizeNVVMTraceRays(IRModule* module)
+    {
+        List<IRInst*> traces;
+        for (auto global : module->getGlobalInsts())
+            if (auto func = as<IRFunc>(global))
+                for (auto block : func->getBlocks())
+                    for (auto inst : block->getOrdinaryInsts())
+                        if (inst->getOp() == kIROp_OptixTraceRay)
+                            traces.add(inst);
+        for (auto trace : traces)
+        {
+            auto payloadType = trace->getDataType();
+            UInt count = getNVVMOptixPayloadRegisterCount(payloadType);
+            if (!count || trace->getOperandCount() != 11)
+                continue;
+            IRBuilder builder(module);
+            builder.setInsertBefore(trace);
+            IRBuilderSourceLocRAII sourceLoc(&builder, trace->sourceLoc);
+            List<IRInst*> words;
+            words.setCount(count);
+            payloadWriteWords = &words;
+            int byteOffset = 0;
+            emitOptiXPayloadWrite(byteOffset, trace->getOperand(10), payloadType, &builder);
+            payloadWriteWords = nullptr;
+            SLANG_ASSERT(byteOffset == int(count * 4));
+            List<IRInst*> operands;
+            operands.add(payloadType);
+            operands.add(trace->getOperand(0));
+            for (UInt vectorIndex : {6u, 8u})
+                for (UInt lane = 0; lane < 3; ++lane)
+                    operands.add(builder.emitElementExtract(
+                        builder.getFloatType(),
+                        trace->getOperand(vectorIndex),
+                        builder.getIntValue(builder.getIntType(), lane)));
+            operands.add(trace->getOperand(7));
+            operands.add(trace->getOperand(9));
+            operands.add(builder.getFloatValue(builder.getFloatType(), 0.0));
+            operands.add(trace->getOperand(2));
+            operands.add(trace->getOperand(1));
+            for (UInt index = 3; index < 6; ++index)
+                operands.add(trace->getOperand(index));
+            for (auto word : words)
+            {
+                SLANG_ASSERT(word);
+                operands.add(word);
+            }
+            auto arrayType = builder.getArrayType(
+                builder.getUIntType(),
+                builder.getIntValue(builder.getIntType(), count));
+            payloadReadArray = builder.emitIntrinsicInst(
+                arrayType,
+                kIROp_OptixTraceRayPayload,
+                operands.getCount(),
+                operands.getBuffer());
+            byteOffset = 0;
+            auto value = emitOptiXPayloadRead(byteOffset, payloadType, &builder);
+            payloadReadArray = nullptr;
+            SLANG_ASSERT(value && byteOffset == int(count * 4));
+            trace->replaceUsesWith(value);
+            trace->removeAndDeallocate();
         }
     }
 };
@@ -2862,6 +2980,8 @@ void legalizeEntryPointVaryingParamsForCUDA(
     // ray terminates (issue #11658).
     context.inlineShaderTerminatingCalleesForRayEntryPoints(module, sink);
     context.processModule(module, sink);
+    if (emitNVVMDirectly)
+        context.legalizeNVVMTraceRays(module);
 }
 
 void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink)

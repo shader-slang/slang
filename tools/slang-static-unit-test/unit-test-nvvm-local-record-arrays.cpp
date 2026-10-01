@@ -2,6 +2,7 @@
 #include "nvvm-static-test-context.h"
 #include "slang-unit-test/unit-test-nvvm-support.h"
 #include "slang/slang-emit-nvvm.h"
+#include "slang/slang-ir-legalize-varying-params.h"
 #include "slang/slang-ir-nvvm-legalize.h"
 
 using namespace Slang;
@@ -58,12 +59,12 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
     {
         Valid,
         Compute,
-        Miss,
+        AnyHit,
         InvalidType,
         EntryParameter
     };
     for (auto testCase :
-         {Case::Valid, Case::Compute, Case::Miss, Case::InvalidType, Case::EntryParameter})
+         {Case::Valid, Case::Compute, Case::AnyHit, Case::InvalidType, Case::EntryParameter})
     {
         _resetDirectNVVMFakes();
         NVVMStaticTestContext context(unitTestContext);
@@ -84,9 +85,9 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
         builder.addEntryPointDecoration(
             entry,
             Profile(
-                testCase == Case::Compute ? Stage::Compute
-                : testCase == Case::Miss  ? Stage::Miss
-                                          : Stage::RayGeneration),
+                testCase == Case::Compute  ? Stage::Compute
+                : testCase == Case::AnyHit ? Stage::AnyHit
+                                           : Stage::RayGeneration),
             toSlice("raygenMain"),
             toSlice("test"));
         builder.setInsertInto(entry);
@@ -132,6 +133,205 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
         }
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+// Original payload types and stage ownership are checked before any optional provider call.
+SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
+{
+    enum class Case
+    {
+        Valid,
+        Float4,
+        Compute,
+        CallbackTrace,
+        Bool,
+        Padding,
+        WrongOperand
+    };
+    for (auto testCase :
+         {Case::Valid,
+          Case::Float4,
+          Case::Compute,
+          Case::CallbackTrace,
+          Case::Bool,
+          Case::Padding,
+          Case::WrongOperand})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto globals = builder.createStructType();
+        builder.addSynthesizedParameterGroupDecoration(globals);
+        auto handleType = builder.getType(kIROp_RaytracingAccelerationStructureType);
+        auto field = builder.createStructField(globals, builder.createStructKey(), handleType);
+        auto global = builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
+        auto payload = builder.createStructType();
+        IRType* leaf = testCase == Case::Float4
+                           ? static_cast<IRType*>(builder.getVectorType(builder.getFloatType(), 4))
+                       : testCase == Case::Bool ? static_cast<IRType*>(builder.getBoolType())
+                                                : builder.getUIntType();
+        builder.createStructField(payload, builder.createStructKey(), leaf);
+        if (testCase == Case::Padding)
+            builder.createStructField(
+                payload,
+                builder.createStructKey(),
+                builder.getVectorType(builder.getFloatType(), 4));
+        UInt count = testCase == Case::Float4 ? 4 : 1;
+        const bool valid = testCase == Case::Valid || testCase == Case::Float4;
+        SLANG_CHECK(
+            getNVVMOptixPayloadRegisterCount(payload) ==
+            (testCase == Case::Bool || testCase == Case::Padding ? 0 : count));
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(
+                testCase == Case::Compute         ? Stage::Compute
+                : testCase == Case::CallbackTrace ? Stage::Miss
+                                                  : Stage::RayGeneration),
+            toSlice("probe"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        auto handle =
+            builder.emitLoad(handleType, builder.emitFieldAddress(global, field->getKey()));
+        List<IRInst*> operands;
+        operands.add(payload);
+        operands.add(handle);
+        for (UInt i = 0; i < 9; ++i)
+            operands.add(builder.getFloatValue(builder.getFloatType(), 0));
+        for (UInt i = 0; i < 5 + count; ++i)
+            operands.add(builder.getIntValue(builder.getUIntType(), i));
+        if (testCase == Case::WrongOperand)
+            operands[2] = builder.getIntValue(builder.getUIntType(), 0);
+        auto array = builder.getArrayTypeBase(
+            kIROp_ArrayType,
+            builder.getUIntType(),
+            builder.getIntValue(builder.getIntType(), count));
+        auto trace = builder.emitIntrinsicInst(
+            array,
+            kIROp_OptixTraceRayPayload,
+            operands.getCount(),
+            operands.getBuffer());
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        if (valid != SLANG_SUCCEEDED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
+        if (valid)
+        {
+            SLANG_CHECK_ABORT(requirements.emissionPlan.traceRays.getCount() == 1);
+            const auto& planned = requirements.emissionPlan.traceRays[0];
+            SLANG_CHECK(planned.source == trace && planned.desc.payloadCount == count);
+            SLANG_CHECK(planned.operands.getCount() == 15 + count);
+            SLANG_CHECK(planned.operands[0] == handle);
+            NVVMIRBuilder provider;
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, provider)));
+            ComPtr<IArtifact> artifact;
+            SLANG_CHECK(SLANG_FAILED(emitNVVMIRFromLinkedIR(
+                &context.codeGen,
+                linked,
+                provider,
+                requirements,
+                artifact)));
+            SLANG_CHECK(!artifact);
+            SLANG_CHECK(
+                context.sink.outputBuffer.getUnownedSlice().indexOf(
+                    toSlice("OptiX register trace")) >= 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    for (auto stage : {Stage::Compute, Stage::RayGeneration, Stage::Miss, Stage::ClosestHit})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder
+            .addEntryPointDecoration(entry, Profile(stage), toSlice("callback"), toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        IRInst* index = builder.getIntValue(builder.getIntType(), 0);
+        auto word = builder.emitIntrinsicInst(
+            builder.getUIntType(),
+            kIROp_GetOptiXPayloadRegister,
+            1,
+            &index);
+        IRInst* args[] = {index, word};
+        builder.emitIntrinsicInst(builder.getVoidType(), kIROp_SetOptiXPayloadRegister, 2, args);
+        IRInst* attributeWords[2] = {};
+        IRInst* attributeValues[2] = {};
+        if (stage == Stage::ClosestHit)
+        {
+            for (UInt i = 0; i < 2; ++i)
+            {
+                IRInst* operands[] = {
+                    builder.getUIntType(),
+                    builder.getIntValue(builder.getIntType(), i)};
+                attributeWords[i] = builder.emitIntrinsicInst(
+                    builder.getUIntType(),
+                    kIROp_GetOptiXHitAttribute,
+                    2,
+                    operands);
+                IRType* resultType = builder.getFloatType();
+                if (i == 1)
+                    resultType = builder.getIntType();
+                attributeValues[i] = builder.emitBitCast(resultType, attributeWords[i]);
+            }
+        }
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const bool valid = stage == Stage::Miss || stage == Stage::ClosestHit;
+        SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
+        if (valid)
+        {
+            SLANG_CHECK(
+                requirements.emissionPlan.namedIntrinsics.getCount() ==
+                (stage == Stage::ClosestHit ? 4 : 2));
+            if (stage == Stage::ClosestHit)
+            {
+                UInt conversions = 0;
+                for (const auto& planned : requirements.emissionPlan.valueOperations)
+                    for (UInt i = 0; i < 2; ++i)
+                        if (planned.source == attributeValues[i])
+                        {
+                            ++conversions;
+                            SLANG_CHECK(planned.source->getOperand(0) == attributeWords[i]);
+                            SLANG_CHECK(
+                                planned.operation.operation == SLANG_NVVM_VALUE_OP_BIT_REINTERPRET);
+                            SLANG_CHECK(
+                                planned.operation.operandTypes[0].kind ==
+                                SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
+                            SLANG_CHECK(
+                                planned.operation.resultType.kind ==
+                                (i == 0 ? SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
+                                        : SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER));
+                        }
+                SLANG_CHECK(conversions == 2);
+            }
+            SLANG_CHECK(
+                requirements.emissionPlan.functionNames[0] ==
+                (stage == Stage::Miss ? "__miss__callback" : "__closesthit__callback"));
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     }
 }
 

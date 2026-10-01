@@ -21029,6 +21029,14 @@ __generic<Payload>
 __intrinsic_op($(kIROp_GetVulkanRayTracingPayloadLocation))
 int __rayPayloadLocation(__ref Payload payload);
 
+// NVVM preserves the payload type until the shared OptiX register-layout pass validates it.
+__generic<T>
+[require(nvvm)]
+__intrinsic_op($(kIROp_OptixTraceRay))
+T __nvvmTraceRay(RaytracingAccelerationStructure scene, uint flags, uint mask,
+    uint offset, uint stride, uint miss, float3 origin, float tmin,
+    float3 direction, float tmax, T payload);
+
 /// Traces a ray through the acceleration structure.
 /// @param AccelerationStructure The acceleration structure to traverse
 /// @param RayFlags Flags controlling ray behavior
@@ -21065,6 +21073,11 @@ void TraceRay(
             MissShaderIndex,
             Ray,
             __forceVarIntoRayPayloadStructTemporarily(Payload));
+        return;
+    case nvvm:
+        Payload = __nvvmTraceRay(AccelerationStructure, RayFlags, InstanceInclusionMask,
+            RayContributionToHitGroupIndex, MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, Payload);
         return;
     case cuda: __intrinsic_asm "optixTrace";
     case glsl:

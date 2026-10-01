@@ -1292,18 +1292,49 @@ SlangResult RenderTestApp::initialize(
 
         case Options::ShaderProgramType::RayTracing:
             {
+                // The compiler already discovers all [shader(...)] entries for -rt. A fixture
+                // with raygenMain, missMain and closestHitMain needs those callbacks in its
+                // pipeline and shader table as well. Keep raygen-only fixtures unchanged.
+                auto program = m_compilationOutput.output.slangProgram;
+                auto layout = program ? program->getLayout() : nullptr;
+                auto miss = layout ? layout->findEntryPointByName("missMain") : nullptr;
+                auto closestHit = layout ? layout->findEntryPointByName("closestHitMain") : nullptr;
+                if ((miss && miss->getStage() != SLANG_STAGE_MISS) ||
+                    (closestHit && closestHit->getStage() != SLANG_STAGE_CLOSEST_HIT))
+                {
+                    fprintf(
+                        stderr,
+                        "error: -rt requires missMain and closestHitMain to use their matching "
+                        "shader stages when present.\n");
+                    return SLANG_FAIL;
+                }
+
+                HitGroupDesc hitGroup = {};
+                hitGroup.hitGroupName = "triangleHitGroup";
+                hitGroup.closestHitEntryPoint = "closestHitMain";
                 RayTracingPipelineDesc desc;
                 desc.program = m_shaderProgram;
+                if (closestHit)
+                {
+                    desc.hitGroupCount = 1;
+                    desc.hitGroups = &hitGroup;
+                }
+                if (miss || closestHit)
+                {
+                    // This conventional path traces one level with at most a float4 payload.
+                    // Raygen-only tests retain their existing zero-depth pipeline configuration.
+                    desc.maxRecursion = 1;
+                    desc.maxRayPayloadSize = 16;
+                }
 
                 m_pipeline = device->createRayTracingPipeline(desc);
 
                 const char* raygenNames[] = {"raygenMain"};
 
-                // We don't define a miss shader for this test. OptiX allows
-                // passing nullptr to indicate no miss shader, but something in
-                // slang-rhi assumes that the miss shader always has a name. To
-                // work around that, use a dummy name.
-                const char* missNames[] = {"missNull"};
+                // Preserve the existing dummy miss record when no callback is authored. OptiX
+                // permits a null miss shader, but the RHI table still needs a named record.
+                const char* missNames[] = {miss ? "missMain" : "missNull"};
+                const char* hitGroupNames[] = {"triangleHitGroup"};
 
                 ShaderTableDesc shaderTableDesc = {};
                 shaderTableDesc.program = m_shaderProgram;
@@ -1311,6 +1342,11 @@ SlangResult RenderTestApp::initialize(
                 shaderTableDesc.rayGenShaderEntryPointNames = raygenNames;
                 shaderTableDesc.missShaderCount = 1;
                 shaderTableDesc.missShaderEntryPointNames = missNames;
+                if (closestHit)
+                {
+                    shaderTableDesc.hitGroupCount = 1;
+                    shaderTableDesc.hitGroupNames = hitGroupNames;
+                }
                 SLANG_RETURN_ON_FAIL(
                     device->createShaderTable(shaderTableDesc, m_shaderTable.writeRef()));
             }

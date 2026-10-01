@@ -101,6 +101,19 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
+    const SlangNVVMBuilderTraceOperationsAPI* getTraceOperationsAPI() const
+    {
+        return m_traceOperations.isTraceRaySupported ? &m_traceOperations : nullptr;
+    }
+
+    bool supportsTraceRay(const SlangNVVMTraceRayDesc& operation) const;
+    SlangResult emitTraceRay(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMTraceRayDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Returns the optional scoped-memory interface, or null for an older provider.
     const SlangNVVMBuilderMemoryOperationsAPI* getMemoryOperationsAPI() const
     {
@@ -427,6 +440,7 @@ private:
     SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
     SlangNVVMBuilderAtomicOperationsAPI m_atomicOperations = {};
     SlangNVVMBuilderMemoryOperationsAPI m_memoryOperations = {};
+    SlangNVVMBuilderTraceOperationsAPI m_traceOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;

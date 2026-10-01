@@ -76,8 +76,9 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-two feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 66 feature objects (including the latest bounded investigation, corpus tiers and OptiX raygen), preserving all prior objects and the full baseline. Each feature's
+Twenty-three feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 67 feature objects (including corpus tiers and OptiX raygen/triangle tracing),
+preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
 
@@ -102,9 +103,14 @@ OptiX raygen is accepted: O0/O3 each pass two changed launches with complete 170
 guards, reflected ABI and no skips. Provider signature/no-mutation, compute-stage rejection,
 static SBT stage/type/load checks and two PTX fixture cells pass. Initial test-only COM/CLI/output
 issues and their focused retries remain recorded. The same build passes all 15 compute smoke cells.
-The raw triangle trace/payload ABI probe now passes at O0/O3 with four hits, four misses and guards;
-this is mechanism evidence, not Slang TraceRay support. The next slice implements explicit TraceRay
-and bounded payload transport. Active plans remain uncommitted.
+OptiX triangle runtime now passes: UInt and Float4 at NVVM O0/O3, plus two NVRTC controls,
+each check four hits, four misses and all 34 words with unequal barycentrics and untouched storage.
+All 14 focused checks, three static admission checks and 15 compute smoke cells pass without
+skips. Final smoke took 22.08 seconds; focused OptiX took 7.03 seconds. This slice is accepted. Core capability, fixture syntax, assertion scope and
+attribute-bitcast failures are retained with their corrections; no failure was demoted or skipped.
+The next bounded slice adds world-ray observations needed for textured MaterialX dielectric execution
+in closest-hit. The prepared probe reuses existing material equations and the triangle harness;
+it has not been executed yet. Active plans remain uncommitted.
 
 Current additions beyond the full checkpoint are:
 
@@ -136,7 +142,7 @@ reinterpretation, planned explicit-layout field memory, independent linked-optio
 and explicit initialization of the repeated-dispatch fixture. The latter passes six focused checks
 and three launches in each of NVRTC O3/NVVM O0/NVVM O3. Historical failures remain retained.
 
-The latest record is `features.nvvm-texture-dimension-investigation`, raw evidence under
+The retained texture investigation is `features.nvvm-texture-dimension-investigation`, with raw evidence under
 `build/nvvm-texture-dimension-investigation/`. Restricted CubeArray faces 6..23 select the intended
 three source cubes but report 18 as depth through both runtime and direct driver creation. Mip-width
 queries execute correctly through PTX JIT/cubin for full and restricted views. Mip-count/array-size
@@ -165,9 +171,10 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-**Active work:** corpus tier selection, then the first executable OptiX ray-generation slice.
-Keep actual measured smoke duration and the working-suite cadence here as slices complete.
-No full checkpoint is automatically due; the prior full baseline remains authoritative for its identity.
+**Active work:** qualify textured material execution and its required world-ray query batch. Corpus selection and raygen are complete; compute
+smoke passed after each implementation. Run the working corpus at the next material integration
+checkpoint (three feature iterations since introducing tiers). The prior full baseline remains
+authoritative for its identity; this cadence does not request another full multi-suite campaign.
 
 ## Retained boundaries
 

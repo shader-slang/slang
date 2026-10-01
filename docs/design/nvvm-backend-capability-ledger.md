@@ -30,7 +30,7 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
-## OptiX ray generation
+## OptiX ray generation and triangle tracing
 
 The direct PTX route admits ray-generation entries, launch index/dimensions, conventional launch
 parameters and SBT uniforms. [The permanent fixture](../../tests/cuda/nvvm-optix-raygen.slang) compiles
@@ -39,11 +39,23 @@ and an independent host ABI/output oracle: each mode reuses one pipeline/SBT all
 asymmetric launches, changes launch parameters and SBT data, and checks all 170 output words,
 including guards and untouched trailing storage. Reflection must agree with the fixed host layout.
 
-Provider tests retain exact names/signatures and rejection without module mutation; compiler/static
-checks preserve compute-stage rejection, supported SBT layout and non-invariant loads. The existing
-CUDA raygen path is a comparison control. Qualification is CUDA12.9/OptiX SDK9, target SM80 on the
-recorded L4/595.71.05 host. TraceRay, payloads, hit/miss stages, callables and general OptiX application
-support remain separate work. PTX acceptance by libNVVM alone is not an OptiX execution claim.
+The [triangle fixture](../../tests/pipeline/ray-tracing/nvvm-optix-triangle.slang) qualifies TraceRay
+from raygen into miss/closest-hit at NVVM O0/O3, with UInt and Float4 payloads and NVRTC O3 controls.
+Each of six cases checks four hits, four misses and all 34 output words, including untouched storage.
+Both triangle attributes are consumed with unequal values (.125 and .25); Float4 lanes use independent
+exact IEEE bit expectations. The existing render-test scene provides real acceleration structures.
+
+Type admission is limited to padding-free Int32/UInt32/Float32 scalar/vector/record payloads of
+1..32 words; runtime numerical qualification is UInt and Float4. Opaque acceleration handles have
+value, local-storage and helper-parameter roles, without integer semantics or recursive resource
+aggregate admission. Provider tests cover 1/4/32 live words, exact SDK adaptation and rejection
+without mutation. Preflight enforces stages and rejects missing optional trace support before
+module creation. Static tests retain SBT layout/load and role/cache boundaries.
+
+Qualification is CUDA12.9/OptiX SDK9, target SM80 on the recorded L4/595.71.05 host. Pointer payloads,
+arrays/matrices, padded/subword payloads, any-hit, procedural intersection, callables and recursive
+callback tracing remain outside this contract. Ray-state queries and representative material
+execution are next. PTX acceptance by libNVVM alone is not an OptiX execution claim.
 
 ## Compute, values and memory
 
@@ -791,7 +803,7 @@ case studies. Existing semantic qualifications and failure histories remain unch
 - Toolkit/architecture compile-and-assembly matrices are separate from physical-device execution.
   Historical CUDA 12.9 SM70/80/90 and CUDA 13 SM80/90 results are not fresh qualification of every
   later feature. The manually defined container workflow was not dispatched in that evidence.
-- OptiX beyond the raygen qualification above, source-level debug support, relocatable device code,
+- OptiX beyond the raygen/triangle qualification above, source-level debug support, relocatable device code,
   device LTO, dynamic parallelism and
   device syscalls remain separate tracks. No general cooperative or autodiff support claim follows.
 

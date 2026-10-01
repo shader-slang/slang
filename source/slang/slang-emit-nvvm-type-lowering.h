@@ -9,6 +9,9 @@ namespace Slang
 
 struct CodeGenContext;
 
+/// Identifies the canonical opaque acceleration handle; role admission remains in NVVMTypeInfo.
+bool isNVVMAccelerationStructureType(IRInst* type);
+
 /// Returns whether `type` is the canonical signed 32-bit integer accepted by direct NVVM.
 bool isNVVMSignedI32Type(IRInst* type);
 
@@ -431,6 +434,7 @@ struct NVVMTypeInfo
     bool isLocalSubstandardRecordArray = false;
     IRPtrTypeBase* localRecordArrayReference = nullptr;
     bool isPointerBearingHelperValue = false;
+    bool isAccelerationStructure = false;
     bool isRawBuffer = false;
     bool isSurface = false;
     bool isSampledTexture = false;

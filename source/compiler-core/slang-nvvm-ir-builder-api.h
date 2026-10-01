@@ -98,6 +98,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_TEXTURE_OPERATIONS ((SlangNVVMBuilderInterfaceID)4u)
 #define SLANG_NVVM_BUILDER_INTERFACE_ATOMIC_OPERATIONS ((SlangNVVMBuilderInterfaceID)5u)
 #define SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS ((SlangNVVMBuilderInterfaceID)6u)
+#define SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS ((SlangNVVMBuilderInterfaceID)7u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -641,6 +642,33 @@ extern "C"
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderMemoryOperationsAPI;
+
+    /** The finite default-payload OptiX trace ABI; motion and pointer payload fallback are absent.
+     */
+    typedef struct SlangNVVMTraceRayDesc
+    {
+        uint32_t payloadCount; /**< Number of UInt32 payload words, in [1,32]. */
+    } SlangNVVMTraceRayDesc;
+
+    /** Optional interface; all existing ABI46 table layouts remain unchanged.
+        Operands: UInt64 handle; Float32 origin.xyz, direction.xyz, tmin, tmax, time;
+        UInt32 mask, flags, SBT offset, SBT stride, miss index; payloadCount UInt32 words.
+        Result: an ordinary array[payloadCount] of i32 values, not a vector or pointer. */
+    typedef struct SlangNVVMBuilderTraceOperationsAPI
+    {
+#define SLANG_NVVM_TRACE_OPERATIONS_VERSION 1u
+        uint32_t structureSize;
+        uint32_t version;
+        SlangNVVMResult(SLANG_NVVM_CALL* isTraceRaySupported)(
+            const SlangNVVMTraceRayDesc* operation,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitTraceRay)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMTraceRayDesc* operation,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderTraceOperationsAPI;
 
     typedef struct SlangNVVMBuilderSurfaceOperationsAPI
     {

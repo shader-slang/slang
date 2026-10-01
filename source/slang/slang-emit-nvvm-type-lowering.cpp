@@ -7,6 +7,11 @@
 namespace Slang
 {
 
+bool isNVVMAccelerationStructureType(IRInst* type)
+{
+    return as<IRRaytracingAccelerationStructureType>(type) != nullptr;
+}
+
 bool isNVVMSignedI32Type(IRInst* type)
 {
     auto basicType = as<IRBasicType>(type);
@@ -1566,6 +1571,11 @@ IRStructType* asNVVMSupportedResourceStructType(IRInst* type)
 
 uint32_t getNVVMResourceValueAlignment(IRInst* type)
 {
+    // A launch-bound acceleration handle is one opaque UInt64 value. Keep this leaf outside the
+    // recursive resource algebra: admitting it there would also open buffer elements, resource
+    // arrays and mutable record references, which have separate storage contracts.
+    if (isNVVMAccelerationStructureType(type))
+        return 8;
     HashSet<IRInst*> activeTypes;
     return _getNVVMResourceValueAlignment(type, activeTypes);
 }
@@ -2077,7 +2087,7 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
     SlangNVVMValueTypeDesc physicalType = {};
     IRType* type = field ? field->getFieldType() : nullptr;
     return isNVVMSupportedIntegerScalarType(type) || isNVVMFloat32Type(type) ||
-           asNVVMSupportedResourceStructType(type) ||
+           isNVVMAccelerationStructureType(type) || asNVVMSupportedResourceStructType(type) ||
            asNVVMSupportedDeviceCopyableValuePointerType(type) ||
            asNVVMSupportedDevicePhysicalStoragePointerType(type) ||
            asNVVMSupportedParameterGroupType(type) ||
@@ -2496,6 +2506,14 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
 
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
+    // Consider `RaytracingAccelerationStructure scene; TraceRay(scene, ...);`. Shared uniform
+    // collection stores the handle in the synthesized launch record, then loads and forwards it
+    // through an ordinary helper parameter. This does not establish a returned-handle ABI or
+    // permission to dereference, construct from integers, or store handles in resource aggregates.
+    if (isAccelerationStructure)
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperParameter ||
+               use == NVVMTypeUse::Storage;
+
     // Internal value parameters preserve the same array snapshot as ordinary SSA values. Reference
     // and result roles remain separate contracts, even after a value/storage lookup fills a cache.
     if (isLocalSubstandardRecordArray)
@@ -2600,6 +2618,7 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
 {
     NVVMTypeInfo info;
     info.canonicalType = type;
+    info.isAccelerationStructure = isNVVMAccelerationStructureType(type);
     info.isVoid = as<IRVoidType>(type) != nullptr;
     info.isInteger = isNVVMSupportedIntegerScalarType(type, &info.integerBitWidth);
     info.isFloatingPoint =
@@ -3077,6 +3096,12 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 : use == NVVMTypeUse::StructuredBufferStorage ? 8u
                                                               : 1u,
                 outType)));
+    }
+    else if (typeInfo.isAccelerationStructure)
+    {
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "OptiX acceleration handle type",
+            m_builder.getIntegerType(m_module, 64, outType)));
     }
     else if (typeInfo.isFloat8)
     {

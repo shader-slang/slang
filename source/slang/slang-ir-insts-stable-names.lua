@@ -889,5 +889,7 @@ return {
 	["textureQuerySize"] = 913,
 	["fma"] = 914,
 	["offsetOf"] = 915,
-	["textureQueryLayerCount"] = 916
+	["textureQueryLayerCount"] = 916,
+	["optixTraceRay"] = 917,
+	["optixTraceRayPayload"] = 918
 }

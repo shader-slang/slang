@@ -213,3 +213,85 @@ SLANG_UNIT_TEST(nvvmParameterGroupLayoutPointerStorageKeepsRolesSeparate)
         }
     }
 }
+
+// A real OptiX handle may be loaded from launch storage and forwarded to TraceRay. Caching its
+// UInt64 physical type must not grant integer semantics, returned handles, or aggregate storage.
+SLANG_UNIT_TEST(nvvmAccelerationHandlesKeepOpaqueRoles)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    auto handle = ir.getType(kIROp_RaytracingAccelerationStructureType);
+    auto record = ir.createStructType();
+    ir.createStructField(record, ir.createStructKey(), handle);
+    auto globals = ir.createStructType();
+    ir.addSynthesizedParameterGroupDecoration(globals);
+    auto field = ir.createStructField(globals, ir.createStructKey(), handle);
+    auto array = ir.getArrayTypeBase(kIROp_ArrayType, handle, ir.getIntValue(ir.getIntType(), 2));
+    SLANG_CHECK(isNVVMSupportedConventionalGlobalFieldType(field));
+    SLANG_CHECK(getNVVMResourceValueAlignment(handle) == 8);
+    SLANG_CHECK(getNVVMResourceValueAlignment(record) == 0);
+    SLANG_CHECK(getNVVMResourceValueAlignment(array) == 0);
+    SLANG_CHECK(!isNVVMSupportedIntegerScalarType(handle));
+    SLANG_CHECK(!asNVVMSupportedResourceStructType(record));
+    SLANG_CHECK(!asNVVMSupportedResourceArrayType(array));
+    SLANG_CHECK(!isNVVMSupportedStructuredBufferStorageType(record));
+    SLANG_CHECK(!asNVVMSupportedParameterGroupType(ir.getType(kIROp_ConstantBufferType, record)));
+
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    const NVVMTypeUse admitted[] = {
+        NVVMTypeUse::Value,
+        NVVMTypeUse::Storage,
+        NVVMTypeUse::HelperParameter,
+    };
+    const NVVMTypeUse excluded[] = {
+        NVVMTypeUse::HelperValue,
+        NVVMTypeUse::HelperResult,
+        NVVMTypeUse::EntryPointParameter,
+        NVVMTypeUse::EntryPointResult,
+        NVVMTypeUse::ParameterGroupStorage,
+        NVVMTypeUse::StructuredBufferStorage,
+    };
+    for (Index first = 0; first < SLANG_COUNT_OF(admitted); ++first)
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &provider;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            provider.createModule(toSlice("opaque-acceleration-handle"), scope.module)));
+        SlangNVVMTypeHandle integer = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getIntegerType(scope.module, 64, integer)));
+        NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+        for (Index i = 0; i < SLANG_COUNT_OF(admitted); ++i)
+        {
+            SlangNVVMTypeHandle actual = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(
+                handle,
+                admitted[(first + i) % SLANG_COUNT_OF(admitted)],
+                actual)));
+            SLANG_CHECK(actual == integer);
+        }
+        SlangNVVMTypeHandle actual = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(lowering.lowerType(globals, NVVMTypeUse::Storage, actual)));
+        for (auto role : excluded)
+        {
+            actual = integer;
+            SLANG_CHECK(SLANG_FAILED(lowering.lowerType(handle, role, actual)));
+            SLANG_CHECK(actual == nullptr);
+        }
+        for (auto type :
+             {static_cast<IRType*>(record),
+              static_cast<IRType*>(array),
+              static_cast<IRType*>(ir.getPtrType(kIROp_PtrType, handle))})
+        {
+            for (auto role : admitted)
+            {
+                actual = integer;
+                SLANG_CHECK(SLANG_FAILED(lowering.lowerType(type, role, actual)));
+                SLANG_CHECK(actual == nullptr);
+            }
+        }
+    }
+}
