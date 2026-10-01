@@ -945,51 +945,37 @@ void addModifier(ModifiableSyntaxNode* syntax, Modifier* modifier)
 //
 // '::'? identifier ('::' identifier)*
 //
-// Parses a (possibly qualified) attribute name and reports it two ways:
-//
-//   * the return value is a single token whose name is the flat, underscore-folded spelling
-//     (`a::b` becomes `a_b`, a leading `::` becomes a leading `_`). This fold is legacy: builtin
-//     qualified attributes such as `[vk::binding]` are registered under flat names (`vk_binding`),
-//     so the checker's legacy fallback resolves them by this name.
-//   * `outNameExpr` receives the name as an ordinary expression — a `VarExpr` for an unqualified
-//     `[Name]`, or a `StaticMemberExpr` chain for a qualified `[a::b::Name]` — so the checker can
-//     resolve it through the normal name-resolution path (which is how a user-defined attribute
-//     declared inside a namespace is found).
-static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Expr*& outNameExpr)
+// Parses a (possibly qualified) attribute name and returns it as an expression: a `VarExpr` for
+// `[Name]` or a `StaticMemberExpr` chain for `[a::b::Name]`, or null for a completion request or
+// when the first identifier is missing. `outLegacyToken` receives the legacy underscore-folded
+// spelling (`a::b` -> `a_b`), which the checker falls back to for builtin attributes registered
+// under flat names.
+static Expr* parseAttributeName(Parser* parser, Token& outOriginalLastToken, Token& outLegacyToken)
 {
     const SourceLoc scopedIdSourceLoc = parser->tokenReader.peekLoc();
 
     // Strip initial :: if there is one
-    const TokenType initialTokenType = parser->tokenReader.peekTokenType();
-    const bool isGlobalScoped = (initialTokenType == TokenType::Scope);
+    const bool isGlobalScoped = parser->tokenReader.peekTokenType() == TokenType::Scope;
     if (isGlobalScoped)
     {
         parser->ReadToken(TokenType::Scope);
     }
     if (parser->LookAheadToken(TokenType::CompletionRequest))
     {
-        // A completion request is resolved entirely by the legacy underscore-folded lookup, which
-        // populates the attribute completion suggestions from `keywordName`; `checkAttribute` skips
-        // the expression path for it, so leave `outNameExpr` unset.
-        return parser->ReadToken();
+        // Completion suggestions are produced by the legacy lookup from `keywordName`.
+        outLegacyToken = parser->ReadToken();
+        return nullptr;
     }
 
     const Token firstIdentifier = parser->ReadToken(TokenType::Identifier);
     outOriginalLastToken = firstIdentifier;
+    outLegacyToken = firstIdentifier;
 
-    // A malformed attribute name makes the identifier read above fail (e.g. `[]` or `[123]`),
-    // returning a non-identifier token. Do not synthesize a name expression from that error token:
-    // leave `outNameExpr` null so the checker uses the null-safe legacy lookup (which reports an
-    // unknown attribute) instead of type-checking a bogus `VarExpr` built from a token with no
-    // name.
+    // A failed identifier read (e.g. `[]`) returns the unexpected token, which has no name.
     if (firstIdentifier.type != TokenType::Identifier)
-        return firstIdentifier;
+        return nullptr;
 
-    // Build the leading `VarExpr` for the first segment. A leading `::` roots the name at the
-    // module (global) scope, exactly as ordinary `::`-qualified name parsing does (see the basic-
-    // type case), so a shadowing local does not capture `[::N::Foo]`. `currentModule` is null when
-    // a term string is parsed via the reflection API (`parseTermFromSourceFile` does not set it),
-    // so fall back to the current scope there rather than dereferencing null.
+    // `currentModule` is null when a term string is parsed via the reflection API.
     auto firstExpr = parser->astBuilder->create<VarExpr>();
     firstExpr->scope = (isGlobalScoped && parser->currentModule) ? parser->currentModule->ownedScope
                                                                  : parser->currentScope;
@@ -998,13 +984,8 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
     Expr* nameExpr = firstExpr;
 
     if (!isGlobalScoped && parser->tokenReader.peekTokenType() != TokenType::Scope)
-    {
-        // Unqualified `[Name]`: the folded name equals the identifier.
-        outNameExpr = nameExpr;
-        return firstIdentifier;
-    }
+        return nameExpr;
 
-    // Build up the underscore-folded legacy spelling alongside the `StaticMemberExpr` chain.
     StringBuilder scopedIdentifierBuilder;
     if (isGlobalScoped)
     {
@@ -1021,8 +1002,7 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
         outOriginalLastToken = nextIdentifier;
         scopedIdentifierBuilder.append(nextIdentifier.getContent());
 
-        // A malformed trailing segment (e.g. `[a::]`) makes this read fail; stop extending the name
-        // expression and keep the well-formed prefix rather than building a segment with no name.
+        // A malformed trailing segment (e.g. `[a::]`) keeps the well-formed prefix.
         if (nextIdentifier.type != TokenType::Identifier)
             break;
 
@@ -1033,21 +1013,14 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken, Exp
         memberExpr->name = nextIdentifier.getName();
         nameExpr = memberExpr;
     }
-    outNameExpr = nameExpr;
 
-    // Make a 'token'
     SourceManager* sourceManager = parser->sink->getSourceManager();
     const UnownedStringSlice scopedIdentifier(
         sourceManager->allocateStringSlice(scopedIdentifierBuilder.getUnownedSlice()));
-    Token token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
+    outLegacyToken = Token(TokenType::Identifier, scopedIdentifier, scopedIdSourceLoc);
+    outLegacyToken.setName(parser->getNamePool()->getName(outLegacyToken.getContent()));
 
-    // Get the name pool
-    auto namePool = parser->getNamePool();
-
-    // Since it's an Identifier have to set the name.
-    token.setName(namePool->getName(token.getContent()));
-
-    return token;
+    return nameExpr;
 }
 
 // Parse HLSL-style `[name(arg, ...)]` style "attribute" modifiers
@@ -1069,11 +1042,11 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
         //
 
         Token originalLastToken;
-        Expr* nameExpr = nullptr;
-        Token nameToken = parseAttributeName(parser, originalLastToken, nameExpr);
+        Token legacyNameToken;
+        Expr* nameExpr = parseAttributeName(parser, originalLastToken, legacyNameToken);
 
         UncheckedAttribute* modifier = parser->astBuilder->create<UncheckedAttribute>();
-        modifier->keywordName = nameToken.getName();
+        modifier->keywordName = legacyNameToken.getName();
         modifier->loc = originalLastToken.getLoc();
         modifier->scope = parser->currentScope;
         modifier->originalIdentifierToken = originalLastToken;

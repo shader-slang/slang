@@ -2422,9 +2422,9 @@ public:
     // null when the name does not resolve to a usable attribute.
     AttributeDecl* lookUpAttributeDeclFromNameExpr(Expr* attributeNameExpr);
 
-    // Resolve an attribute by its legacy flat, underscore-folded name (e.g. `vk_binding` for
-    // `[vk::binding]`). Used as the fallback when `lookUpAttributeDeclFromNameExpr` cannot resolve
-    // the name; scheduled for deprecation in language version 202c (see issue #12668).
+    // Resolve an attribute by its legacy underscore-folded name (`vk_binding` for `[vk::binding]`).
+    // Fallback for `lookUpAttributeDeclFromNameExpr`; deprecation in 202c is tracked by
+    // shader-slang/slang#13374.
     AttributeDecl* lookUpLegacyUnderscoreConcatenatedAttributeDecl(
         Name* attributeName,
         Scope* scope);

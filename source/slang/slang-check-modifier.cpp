@@ -274,17 +274,9 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDeclFromNameExpr(Expr* attribute
     return nullptr;
 }
 
-// Resolve an attribute by its legacy flat, underscore-folded name (e.g. `[vk::binding]` is parsed
-// as the single name `vk_binding`). This is how builtin qualified attributes are registered, and it
-// is the fallback used when `lookUpAttributeDeclFromNameExpr` cannot resolve the name as an
-// ordinary (possibly qualified) reference.
-//
-// This underscore fold is legacy: it discards the qualifier structure of a `::`-qualified name and
-// so cannot find a user-defined attribute declared in a namespace. It is scheduled for
-// deprecation/removal in language version `SLANG_LANGUAGE_VERSION_202C` (see shader-slang/slang
-// issue #12668), once builtin qualified attributes are registered under real namespaces; until then
-// it remains active for all language versions because builtins such as `[vk::binding]` still rely
-// on the flat registration.
+// Resolve an attribute by its legacy underscore-folded name (`[vk::binding]` -> `vk_binding`), the
+// spelling builtin qualified attributes are registered under. Deprecation in language version 202c
+// is tracked by shader-slang/slang#13374.
 AttributeDecl* SemanticsVisitor::lookUpLegacyUnderscoreConcatenatedAttributeDecl(
     Name* attributeName,
     Scope* scope)
@@ -1551,12 +1543,8 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     auto attrName = uncheckedAttr->getKeywordName();
 
-    // Prefer resolving the attribute name as an ordinary (possibly qualified) reference, so a
-    // user-defined attribute declared in a namespace resolves the same way any other qualified name
-    // does. A completion request is left to the legacy path below, which populates the attribute
-    // completion suggestions. `keywordName` carries the legacy underscore-folded spelling that the
-    // fallback needs (e.g. `vk_binding` for `[vk::binding]`), so it stays the single source of that
-    // name rather than reconstructing it from `attributeNameExpr`.
+    // We resolve the name as an ordinary (possibly qualified) reference first, and fall back to the
+    // legacy underscore-folded lookup, which also produces completion suggestions.
     AttributeDecl* attrDecl = nullptr;
     if (attrName != getSession()->getCompletionRequestTokenName())
         attrDecl = lookUpAttributeDeclFromNameExpr(uncheckedAttr->attributeNameExpr);
