@@ -90,6 +90,26 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     Dictionary<IRType*, LoadMethod> loadFuncs;
     TargetProgram* targetProgram;
 
+    // The buffer types this module uses to read an OptiX SBT record through `GetOptiXSbtDataPtr`.
+    // Consider:
+    // ```
+    // layout(shaderRecordEXT) ConstantBuffer<SbtData> gSbt;
+    // struct Holder { ConstantBuffer<SbtData> buffer; };
+    // uint readHolder(Holder h) { return h.buffer.id; }
+    // ```
+    // A shader-record handle stored in a struct field, returned from a function or picked by a
+    // `select` reaches its loads through a value that `isPointerToImmutableLocation` cannot trace
+    // back to `GetOptiXSbtDataPtr`, so it would be judged immutable by its `ConstantBuffer` type.
+    // IR types are deduplicated, so any handle of one of these types may point into the SBT, and
+    // we keep its loads off the read-only cache (shader-slang/slang#10188).
+    HashSet<IRType*> sbtRecordBufferTypes;
+
+    bool mayPointIntoOptiXShaderBindingTable(IRInst* rootAddr)
+    {
+        auto type = rootAddr->getDataType();
+        return type && sbtRecordBufferTypes.contains(type);
+    }
+
     IRFunc* createLoadFunc(IRBuilder& builder, IRType* valueType, IRParam*& outParam)
     {
         auto func = builder.createFunc();
@@ -335,6 +355,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 // GetOffsetPtr, so passing `rootAddr` here could stop short of `globalParam`
                 // and miss the exclusion.
                 if (!isAddressIntoCudaConstantParameterGroup(ptr) &&
+                    !mayPointIntoOptiXShaderBindingTable(rootAddr) &&
                     isPointerToImmutableLocation(rootAddr))
                 {
                     IRBuilder builder(load);
@@ -391,6 +412,12 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
 
     void processModule()
     {
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                if (inst->getOp() == kIROp_GetOptiXSbtDataPtr)
+                    sbtRecordBufferTypes.add(inst->getDataType());
+            });
         processAllInsts([&](IRInst* inst) { processInst(inst); });
     }
 

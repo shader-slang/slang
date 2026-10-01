@@ -52,7 +52,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         // coincidence (because the shader parameters are not
         // globals, there is no way for the specialization to
         // succeed), but eventually we should turn it off more
-        // carefully.
+        // carefully. The exception is a CUDA shader-record
+        // global, which stays a global until
+        // `lowerShaderRecordGlobalParamsForOptiX`; specializing
+        // it lets helpers read the OptiX SBT record directly.
         //
         if (as<IRUniformParameterGroupType>(type))
             return true;

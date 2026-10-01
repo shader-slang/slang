@@ -1388,7 +1388,7 @@ Result linkAndOptimizeIR(
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
-            SLANG_PASS(collectOptiXEntryPointUniformParams, sink);
+            SLANG_PASS(collectOptiXEntryPointUniformParams);
             validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
@@ -2489,6 +2489,9 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
         break;
     }
+
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+        SLANG_PASS(lowerShaderRecordGlobalParamsForOptiX, sink);
 
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,

@@ -2,15 +2,18 @@
 //TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -entry chsMain -stage closesthit -Xnvrtc -I"./external/optix-dev/include/"
 //TEST:SIMPLE(filecheck=CBUF): -target cuda -entry rgMain -stage raygeneration -DUSE_CBUFFER
 //TEST:REFLECTION(filecheck=REFL): -target cuda -entry chsMain -stage closesthit -no-codegen
+//TEST:SIMPLE(filecheck=TWO): -target cuda -entry chsMain -stage closesthit -entry missMain -stage miss
 
 // Regression test for shader-slang/slang#12628: on CUDA/OptiX a shader-record global must be read
 // from the shader binding table (SBT) via `optixGetSbtDataPointer()`, the way SPIR-V reads it from
 // `ShaderRecordBufferKHR`. It must not become a pointer field of the `GlobalParams` launch struct.
 // Ordinary globals keep their place in `GlobalParams`.
 
-// The helper, the `static` initializer (the second `id_0` read, before the kernel) and the kernel
-// each read the record through the SBT. SBT reads are not `__ldg`'d (the host may rewrite the SBT
-// between launches, #10188), so `CHECK-NOT: __ldg` is placed between every anchor.
+// Each body that uses the record reads it through the SBT: `readColor` gives the `color_0` anchor.
+// CUDA moves the `static` initializer into its own function, called at the start of the kernel and
+// emitted before it, which gives the first `id_0` anchor. The kernel's own read gives the second.
+// SBT reads are not `__ldg`'d (the host may rewrite the SBT between launches, #10188), so
+// `CHECK-NOT: __ldg` is placed between every anchor.
 
 //CHECK-NOT: __ldg
 //CHECK: struct GlobalParams_0
@@ -20,6 +23,7 @@
 //CHECK: };
 //CHECK-NOT: __ldg
 //CHECK: readColor_0()
+//CHECK-NOT: __ldg
 //CHECK: optixGetSbtDataPointer())->color_0
 //CHECK-NOT: __ldg
 //CHECK: optixGetSbtDataPointer())->id_0
@@ -30,6 +34,23 @@
 //CHECK-NOT: __ldg
 
 //CHECK-PTX: _optix_get_sbt_data_ptr_64
+
+// A helper shared by two ray tracing programs fetches the SBT pointer itself, so each program reads
+// its own record.
+
+//TWO-NOT: __ldg
+//TWO: readColor_0()
+//TWO-NOT: __ldg
+//TWO: optixGetSbtDataPointer())->color_0
+//TWO-NOT: __ldg
+//TWO: __closesthit__chsMain
+//TWO-NOT: __ldg
+//TWO: readColor_0()
+//TWO-NOT: __ldg
+//TWO: __miss__missMain
+//TWO-NOT: __ldg
+//TWO: readColor_0()
+//TWO-NOT: __ldg
 
 // The global is reflected as the shader record, and its contents keep CUDA's ordinary struct
 // layout (`float4` at 0, `uint` at 16, size padded to the 16-byte alignment of `float4`).
@@ -44,10 +65,16 @@
 
 // The `cbuffer` spelling of a shader record goes through the same path.
 
+//CBUF-NOT: __ldg
 //CBUF: struct GlobalParams_0
 //CBUF-NOT: ShaderRecord
+//CBUF: gScale
+//CBUF-NOT: ShaderRecord
 //CBUF: };
-//CBUF: optixGetSbtDataPointer
+//CBUF-NOT: __ldg
+//CBUF-DAG: optixGetSbtDataPointer())->shaderRecordID_0
+//CBUF-DAG: optixGetSbtDataPointer())->scale_0
+//CBUF-NOT: __ldg
 
 struct SbtData
 {
@@ -94,6 +121,12 @@ void chsMain(inout float4 payload, in BuiltInTriangleIntersectionAttributes attr
 {
     payload = readColor() * gScale + float(gSbtRecordData.id + gCachedId);
     gOut[0] = payload;
+}
+
+[shader("miss")]
+void missMain(inout float4 payload)
+{
+    payload = readColor();
 }
 
 #endif
