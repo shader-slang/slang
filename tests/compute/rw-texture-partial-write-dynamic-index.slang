@@ -54,4 +54,5 @@ void computeMain()
 
 // PTX: .entry
 // PTX: suld
+// PTX-COUNT-4: selp.b32
 // PTX: sust

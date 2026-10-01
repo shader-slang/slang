@@ -608,8 +608,6 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'E':
         {
-            // The scale applied to a CUDA surface access's x coordinate; see
-            // `CUDASurfaceAccessInfo::xScale`.
             size_t xScale =
                 getCUDASurfaceAccessInfo(m_callInst->getArg(0), _isResourceWrite(m_callInst))
                     .xScale;
