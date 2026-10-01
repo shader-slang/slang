@@ -7,22 +7,38 @@
 namespace Slang
 {
 
-/// How a CUDA surface read or write (`surf*read`/`surf*write`) of a given resource is spelled.
+/// The facts that decide how a CUDA surface read or write (`surf*read`/`surf*write`) of a given
+/// resource is spelled, and whether the CUDA prelude provides it.
+///
+/// A CUDA surface access is spelled in two places: the `__intrinsic_asm` strings of the `RWTexture`
+/// `Load`/`Store` accessors in hlsl.meta.slang (through `$C` and `$E`), and
+/// `CUDASourceEmitter::_emitSurfaceAccess`, which spells the `kIROp_ImageLoad`/`kIROp_ImageStore`
+/// produced by `legalizeImageSubscript`. Both take the `_convert` suffix and the x scale from here.
+/// The function names, coordinate order and boundary mode are written out at both sites
+/// (shader-slang/slang#13364).
 struct CUDASurfaceAccessInfo
 {
     /// The access calls the `_convert` variant, because the resource's `[format(...)]` differs
     /// from its element type.
     bool isFormatConversion = false;
 
+    /// The CUDA prelude defines the `_convert` variant the access calls. It has converting reads
+    /// only from `r16f`, `rg16f` and `rgba16f` surfaces that are not layered, and its layered
+    /// converting writes are empty stubs. Always true when `isFormatConversion` is false.
+    bool isConversionAvailable = true;
+
+    /// The emitted call uses the CUDA `half` type, so the caller must enable it. Only converting
+    /// reads from half-based formats need it.
     bool requiresHalf = false;
 
-    /// The factor applied to the x coordinate, which CUDA surfaces address in bytes.
-    size_t xScale = 0;
+    /// The factor applied to the x coordinate. Surface reads and ordinary writes address x in
+    /// bytes, so this is the size of the backing element; a converting write (`sust.p`) addresses
+    /// x in elements, so it is 1.
+    size_t xScale = 1;
 };
 
-/// Return how a read (`isWrite == false`) or write of the CUDA surface `resourceInst` is spelled.
-/// The `$C` and `$E` intrinsic expansions and the CUDA emitter's `kIROp_ImageLoad` /
-/// `kIROp_ImageStore` handling both use it, so that every spelling of a surface access agrees.
+/// Return the `CUDASurfaceAccessInfo` of a read (`isWrite == false`) or write of the CUDA surface
+/// `resourceInst`.
 CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrite);
 
 /* Handles all the special case handling of expansions of intrinsics. In particular handles the

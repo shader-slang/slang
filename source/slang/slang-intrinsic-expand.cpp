@@ -317,22 +317,25 @@ CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrit
         return info;
 
     info.isFormatConversion = true;
+    auto textureType = as<IRTextureTypeBase>(resourceInst->getDataType());
+    const bool isLayered = textureType && textureType->isArray();
     if (isWrite)
     {
-        // A converting write (`sust.p`) is not byte addressed, so its x coordinate is not scaled.
+        info.isConversionAvailable = !isLayered;
         info.xScale = 1;
         return info;
     }
 
-    // A converting read from a half-based format goes through the `half` type.
     switch (formatDecoration->getFormat())
     {
     case ImageFormat::r16f:
     case ImageFormat::rg16f:
     case ImageFormat::rgba16f:
         info.requiresHalf = true;
+        info.isConversionAvailable = !isLayered;
         break;
     default:
+        info.isConversionAvailable = false;
         break;
     }
     return info;
@@ -605,15 +608,13 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
     case 'E':
         {
-            /// Sometimes accesses need to be scaled. For example in CUDA the x coordinate for
-            /// surface access is byte addressed. $E will return the byte size of the *backing
-            /// element*.
-
-            size_t elemSizeInBytes =
+            // The scale applied to a CUDA surface access's x coordinate; see
+            // `CUDASurfaceAccessInfo::xScale`.
+            size_t xScale =
                 getCUDASurfaceAccessInfo(m_callInst->getArg(0), _isResourceWrite(m_callInst))
                     .xScale;
-            SLANG_ASSERT(elemSizeInBytes > 0);
-            m_writer->emitUInt64(UInt64(elemSizeInBytes));
+            SLANG_ASSERT(xScale > 0);
+            m_writer->emitUInt64(UInt64(xScale));
             break;
         }
 

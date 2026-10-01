@@ -495,50 +495,47 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     }
 }
 
-void CLikeSourceEmitter::_emitSwizzleStorePerElement(IRInst* inst)
+void CLikeSourceEmitter::_emitSwizzleAssignmentPerElement(IRInst* inst)
 {
     auto subscriptOuter = getInfo(EmitOp::General);
     auto subscriptPrec = getInfo(EmitOp::Postfix);
 
-    // A `swizzledStore` writes through the pointer in its destination operand, while a
-    // `swizzleSet` updates the value it defines, which `emitInstResultDecl` has already
-    // initialized from its base.
     auto swizzledStore = as<IRSwizzledStore>(inst);
     auto swizzleSet = as<IRSwizzleSet>(inst);
     SLANG_RELEASE_ASSERT(swizzledStore || swizzleSet);
     IRInst* source = swizzledStore ? swizzledStore->getSource() : swizzleSet->getSource();
-    UInt elementCount =
-        swizzledStore ? swizzledStore->getElementCount() : swizzleSet->getElementCount();
+    ShortList<IRInst*, 4> elementIndices;
+    for (UInt ee = 0;
+         ee < (swizzledStore ? swizzledStore->getElementCount() : swizzleSet->getElementCount());
+         ++ee)
+    {
+        elementIndices.add(
+            swizzledStore ? swizzledStore->getElementIndex(ee) : swizzleSet->getElementIndex(ee));
+    }
 
-    UInt dstIndex = 0;
-    for (UInt ee = 0; ee < elementCount; ++ee)
+    char const* kComponents[] = {"x", "y", "z", "w"};
+    for (Index ee = 0; ee < elementIndices.getCount(); ++ee)
     {
         bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
-
         if (swizzledStore)
-            emitDereferenceOperand(swizzledStore->getDest(), leftSide(subscriptOuter, subscriptPrec));
+            emitDereferenceOperand(
+                swizzledStore->getDest(),
+                leftSide(subscriptOuter, subscriptPrec));
         else
             emitOperand(swizzleSet, leftSide(subscriptOuter, subscriptPrec));
         m_writer->emit(".");
 
-        IRInst* irElementIndex =
-            swizzledStore ? swizzledStore->getElementIndex(ee) : swizzleSet->getElementIndex(ee);
+        IRInst* irElementIndex = elementIndices[ee];
         SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
-
-        IRConstant* irConst = (IRConstant*)irElementIndex;
-
-        UInt elementIndex = (UInt)irConst->value.intVal;
+        UInt elementIndex = (UInt)((IRConstant*)irElementIndex)->value.intVal;
         SLANG_RELEASE_ASSERT(elementIndex < 4);
-
-        char const* kComponents[] = {"x", "y", "z", "w"};
         m_writer->emit(kComponents[elementIndex]);
-
         maybeCloseParens(needCloseSubscript);
 
         m_writer->emit(" = ");
         emitOperand(source, getInfo(EmitOp::General));
         m_writer->emit(".");
-        m_writer->emit(kComponents[dstIndex++]);
+        m_writer->emit(kComponents[ee]);
         m_writer->emit(";\n");
     }
 }
@@ -547,6 +544,17 @@ bool CLikeSourceEmitter::_doesTargetSupportSwizzleAssignment()
 {
     return !isCPUTarget(getTargetReq()) && !isCUDATarget(getTargetReq()) &&
            !isWGPUTarget(getTargetReq());
+}
+
+bool CLikeSourceEmitter::_isSwizzleAssignmentSpelledPerElement(IRInst* inst)
+{
+    if (_doesTargetSupportSwizzleAssignment())
+        return false;
+    if (auto swizzledStore = as<IRSwizzledStore>(inst))
+        return swizzledStore->getElementCount() > 1;
+    if (auto swizzleSet = as<IRSwizzleSet>(inst))
+        return swizzleSet->getElementCount() > 1;
+    return false;
 }
 
 void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
@@ -1860,19 +1868,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
         }
     }
 
-    // The cpp, cuda and wgsl targets don't support swizzle on the left-hand-side
-    // variable, e.g. vec4.xy = vec2 is not allowed.
-    // Therefore, we don't want to fold the right-hand-side expression.
-    // Instead, the right-hand-side expression should be generated as a separable
-    // statement and stored in a temporary varible, then assign to the left-hand-side
-    // variable per element. E.g. vec4.x = vec2.x; vec4.y = vec2.y.
-    auto swizzleSetUser = as<IRSwizzleSet>(user);
-    if (as<IRSwizzledStore>(user) ||
-        (swizzleSetUser && swizzleSetUser->getElementCount() > 1 &&
-         swizzleSetUser->getSource() == inst))
+    // A swizzle assignment spelled one component at a time emits its source once per component,
+    // and a `swizzledStore` its destination as well, so those operands are not folded.
+    if (_isSwizzleAssignmentSpelledPerElement(user) &&
+        (as<IRSwizzledStore>(user) || cast<IRSwizzleSet>(user)->getSource() == inst))
     {
-        if (!_doesTargetSupportSwizzleAssignment())
-            return false;
+        return false;
     }
 
     // We'd like to figure out if it is safe to fold our instruction into `user`
@@ -3399,9 +3400,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(";\n");
 
-            if (ii->getElementCount() > 1 && !_doesTargetSupportSwizzleAssignment())
+            if (_isSwizzleAssignmentSpelledPerElement(inst))
             {
-                _emitSwizzleStorePerElement(inst);
+                _emitSwizzleAssignmentPerElement(inst);
                 break;
             }
 
@@ -3434,9 +3435,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_SwizzledStore:
         {
-            if (!_doesTargetSupportSwizzleAssignment())
+            if (_isSwizzleAssignmentSpelledPerElement(inst))
             {
-                _emitSwizzleStorePerElement(inst);
+                _emitSwizzleAssignmentPerElement(inst);
             }
             else
             {

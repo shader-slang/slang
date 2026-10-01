@@ -6011,7 +6011,21 @@ warning(
     "texture-partial-write-is-read-modify-write",
     56006,
     "write to part of a texel is a non-atomic read-modify-write",
-    span { loc = "location", message = "on target '~target:CodeGenTarget', this write to part of a texel is lowered to a read-modify-write of the whole texel. A concurrent write by another thread to other components of the same texel can be lost, and on CUDA the read returns undefined data if the texel was already written earlier in the same kernel launch." }
+    span { loc = "location", message = "this write to part of a texel is lowered to a read of the whole texel followed by a write of the whole texel. On CUDA that read returns undefined data if the texel was already written earlier in the same kernel launch, so an earlier write to another component can be lost even within one thread. A concurrent write by another thread to another component of the texel can also be lost." }
+)
+
+err(
+    "cuda-surface-format-conversion-unavailable",
+    56007,
+    "CUDA surface access cannot convert this texture's format",
+    span { loc = "location", message = "this write to a texel is lowered to a CUDA surface ~access:String that converts between the texture's [format(...)] and its element type, which the CUDA prelude does not provide. It converts on read only from 'r16f', 'rg16f' and 'rgba16f', and converts neither reads nor writes for array textures." }
+)
+
+err(
+    "cuda-surface-shape-unsupported",
+    56008,
+    "CUDA has no surface access for this texture shape",
+    span { loc = "location", message = "this write to a texel is lowered to CUDA surface calls, which exist only for 1D, 2D and 3D textures and arrays of them." }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics

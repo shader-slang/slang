@@ -19,6 +19,8 @@ RWStructuredBuffer<uint> outputBuffer;
 void computeMain()
 {
     uint2 i = uint2(1, 2);
+    // The index comes from the input buffer so that it stays dynamic; it is echoed back as the
+    // first output value.
     uint k = outputBuffer[0];
 
     tex[i] = float4(1.0f, 2.0f, 3.0f, 4.0f);
@@ -37,17 +39,19 @@ void computeMain()
 // BUF-NEXT: 7
 // BUF-NEXT: 4
 
-// METAL: .read(
-// METAL: .write(
+// METAL: [[T:_S[0-9]+]] = {{.*}}.read(
+// METAL: .write(float4(select([[T]][int(0)], 7.0f, {{.*}} == 0U), select([[T]][int(1)], 7.0f, {{.*}} == 1U), select([[T]][int(2)], 7.0f, {{.*}} == 2U), select([[T]][int(3)], 7.0f, {{.*}} == 3U)),
 
-// GLSL: imageLoad(
-// GLSL: imageStore(
+// GLSL: vec4 [[T:_S[0-9]+]] = imageLoad(
+// GLSL: imageStore({{.*}}vec4({{.*}} == 0U ? 7.0 : [[T]][0], {{.*}} == 1U ? 7.0 : [[T]][1], {{.*}} == 2U ? 7.0 : [[T]][2], {{.*}} == 3U ? 7.0 : [[T]][3]))
 
 // SPIRV: OpImageRead
 // SPIRV: OpSelect
 // SPIRV: OpImageWrite
 
-// CUDA: surf2Dread<float4 >(
-// CUDA: surf2Dwrite<float4 >(make_float4 (_slang_select(
+// CUDA: float4 [[T:_S[0-9]+]] = surf2Dread<float4 >(
+// CUDA: surf2Dwrite<float4 >(make_float4 (_slang_select({{.*}} == 0U, 7.0f,[[T]].x), _slang_select({{.*}} == 1U, 7.0f,[[T]].y), _slang_select({{.*}} == 2U, 7.0f,[[T]].z), _slang_select({{.*}} == 3U, 7.0f,[[T]].w)),
 
 // PTX: .entry
+// PTX: suld
+// PTX: sust

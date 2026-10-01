@@ -715,17 +715,26 @@ void CUDASourceEmitter::_emitInitializerList(
 
 /// Emit a `kIROp_ImageLoad` or `kIROp_ImageStore` as a `surf*read`/`surf*write` call.
 ///
-/// `legalizeImageSubscript` produces these ops when it turns a write to part of a texel, such as
-/// `tex[i].w = v`, into a read-modify-write of the whole texel. We spell the call the same way the
-/// `RWTexture` `Load`/`Store` accessors in hlsl.meta.slang do, e.g.
+/// On CUDA these ops come only from `legalizeImageSubscript`, which turns a write through a texture
+/// subscript, such as `tex[i].w = v`, into whole-texel image ops whose texel type is the texture's
+/// element type, and which reports every access the CUDA prelude cannot express. We spell the call
+/// the same way the `RWTexture` `Load`/`Store` accessors in hlsl.meta.slang do (see
+/// `CUDASurfaceAccessInfo`), e.g.
 /// `surf2Dwrite<float4>(value, tex, (coord).x * 16, (coord).y, SLANG_CUDA_BOUNDARY_MODE)`.
 void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
 {
-    const bool isWrite = inst->getOp() == kIROp_ImageStore;
-    IRInst* image = inst->getOperand(0);
-    IRInst* coord = inst->getOperand(1);
+    auto imageStore = as<IRImageStore>(inst);
+    auto imageLoad = as<IRImageLoad>(inst);
+    SLANG_RELEASE_ASSERT(imageStore || imageLoad);
+    const bool isWrite = imageStore != nullptr;
+    IRInst* image = isWrite ? imageStore->getImage() : imageLoad->getImage();
+    IRInst* coord = isWrite ? imageStore->getCoord() : imageLoad->getCoord();
     auto textureType = as<IRTextureTypeBase>(image->getDataType());
     SLANG_RELEASE_ASSERT(textureType);
+    SLANG_RELEASE_ASSERT(!textureType->isMultisample());
+    IRType* texelType = textureType->getElementType();
+    SLANG_RELEASE_ASSERT(
+        (isWrite ? imageStore->getValue()->getDataType() : imageLoad->getDataType()) == texelType);
 
     const char* shapeName = nullptr;
     Index dimensionCount = 0;
@@ -744,25 +753,11 @@ void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
         dimensionCount = 3;
         break;
     default:
-        break;
+        SLANG_UNEXPECTED("CUDA surface access to an unsupported texture shape");
     }
     const bool isArray = textureType->isArray();
     const CUDASurfaceAccessInfo access = getCUDASurfaceAccessInfo(image, isWrite);
-
-    // The CUDA prelude only has converting reads from half-based formats and none from layered
-    // surfaces, and its converting layered writes do nothing.
-    const bool isConversionSupported =
-        !access.isFormatConversion || (!isArray && (isWrite || access.requiresHalf));
-    if (!shapeName || textureType->isMultisample() || !isConversionSupported)
-    {
-        emitUnsupportedTargetIntrinsicExpr(
-            this,
-            inst,
-            isWrite ? "RWTexture partial texel write (surface write)"
-                    : "RWTexture partial texel write (surface read)",
-            inst->sourceLoc);
-        return;
-    }
+    SLANG_RELEASE_ASSERT(access.isConversionAvailable);
 
     const Index coordCount = getIRVectorElementSize(coord->getDataType());
     SLANG_RELEASE_ASSERT(coordCount == dimensionCount + (isArray ? 1 : 0));
@@ -778,11 +773,11 @@ void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
     if (access.isFormatConversion)
         m_writer->emit("_convert");
     m_writer->emit("<");
-    emitType(textureType->getElementType());
+    emitType(texelType);
     m_writer->emit(">(");
     if (isWrite)
     {
-        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        emitOperand(imageStore->getValue(), getInfo(EmitOp::General));
         m_writer->emit(", ");
     }
     emitOperand(image, getInfo(EmitOp::General));
