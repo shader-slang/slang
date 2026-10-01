@@ -3,12 +3,16 @@ implementing raytracing;
 namespace rt
 {
 
-// Stage-input structs deliberately declare their public properties separately. Although several
-// stages expose the same native value, their complete property sets are different; a common public
-// base interface would make it too easy to expose a value in a stage where the target ABI does not
-// provide it. The internal helpers below share only the implementation of a native lookup. Keeping
-// them force-inlined leaves the intrinsic at its original use site, so capability and stage checks
-// still apply to the shader that reads the property.
+// Stage inputs are compiler-provided views of the current invocation, with no source storage.
+// Native targets expose much of that state through existing core-module intrinsics. The helpers
+// remain force-inlined so capability and stage checks apply at the shader's property access.
+//
+// TODO: Metal stage-input lowering must obtain these values from the generated intersection or
+// post-traversal dispatch parameters. Metal has no corresponding set of implicit DXR-style stage
+// intrinsics, so these implementations cannot simply call the core-module intrinsics there.
+// The default target-switch arms below are frontend placeholders, not meaningful zero-valued
+// Metal implementations. Structural adapter/operation checks currently reject target code
+// generation until the compiler can synthesize those parameters and replace the placeholders.
 
 /// Returns the minimum valid distance for the current ray.
 [ForceInline]
@@ -299,37 +303,23 @@ internal float4x3 getStageInputWorldToObject()
     }
 }
 
-/// Provides the payload, record, hit data, and ray state available to a closest-hit stage.
+/// Identifies the stage views that share ray and geometry state.
 ///
-/// This is a compiler-provided zero-storage view. Its properties map directly to native stage
-/// parameters or built-in state and therefore do not add fields to the generated entry point.
-[require(structural_raytracing_closesthit)]
-public struct ClosestHitInput<Context>
-    where Context : IHitContext
+/// This internal contract shares implementations without introducing an erased public stage-input
+/// type. Concrete input types retain their stage restrictions and context-dependent properties.
+internal interface ICommonHitInput
+{}
+
+/// Provides the properties available to closest-hit, any-hit, and intersection stages.
+///
+/// An intersection stage has not reported a hit yet, so `distance` and `hitKind` stay on the
+/// closest-hit and any-hit inputs. Primitive, motion, and instance-specific views likewise remain
+/// on their constrained concrete extensions.
+public extension<Input : ICommonHitInput> Input
 {
-    public property Context.Payload payload
-    {
-        ref;
-    }
-
-    public property Context.Record record
-    {
-        get;
-    }
-
     public property float minDistance
     {
         get { return getStageInputMinDistance(); }
-    }
-
-    public property float distance
-    {
-        get { return getStageInputCurrentDistance(); }
-    }
-
-    public property uint hitKind
-    {
-        get { return getStageInputHitKind(); }
     }
 
     public property uint rayFlags
@@ -365,6 +355,39 @@ public struct ClosestHitInput<Context>
     public property uint3 dispatchRaysDimensions
     {
         get { return getStageInputDispatchRaysDimensions(); }
+    }
+}
+
+/// Provides the payload, record, hit data, and ray state available to a closest-hit stage.
+///
+/// This is a compiler-provided zero-storage view. Adapter synthesis must map its properties to
+/// native stage parameters or built-in state without adding source fields to the entry point.
+[require(structural_raytracing_closesthit)]
+public struct ClosestHitInput<Context> : ICommonHitInput
+    where Context : IHitContext
+{
+    /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
+    /// TODO: The compiler must synthesize this accessor from the stage's payload parameter.
+    public property Context.Payload payload
+    {
+        ref;
+    }
+
+    /// Reads the host-provided data in the selected shader-binding-table record.
+    /// TODO: The compiler must synthesize this accessor from the target's record-data binding.
+    public property Context.Record record
+    {
+        get;
+    }
+
+    public property float distance
+    {
+        get { return getStageInputCurrentDistance(); }
+    }
+
+    public property uint hitKind
+    {
+        get { return getStageInputHitKind(); }
     }
 }
 
@@ -412,6 +435,8 @@ public extension<Context> ClosestHitInput<Context>
     where Context : IHitContext
     where Context.Primitive : ICustomIntersectionPrimitive
 {
+    /// Reads the attributes supplied by the procedural intersection shader's `reportHit` call.
+    /// TODO: The compiler must synthesize this accessor from the stage's hit-attribute parameter.
     public property Context.Primitive.Attributes attributes
     {
         get;
@@ -440,25 +465,24 @@ public extension<Context> ClosestHitInput<Context>
 
 /// Provides the candidate payload, record, hit data, and ray state available to an any-hit stage.
 ///
-/// Control methods on this zero-storage view map to native any-hit operations on portable targets
-/// and to the generated Metal candidate-dispatch contract.
+/// Control methods on this zero-storage view use native any-hit operations where available.
+/// TODO: Metal adapter synthesis must implement them in the generated candidate dispatch.
 [require(structural_raytracing_anyhit)]
-public struct AnyHitInput<Context>
+public struct AnyHitInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
+    /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
+    /// TODO: The compiler must synthesize this accessor from the stage's payload parameter.
     public property Context.Payload payload
     {
         ref;
     }
 
+    /// Reads the host-provided data in the selected shader-binding-table record.
+    /// TODO: The compiler must synthesize this accessor from the target's record-data binding.
     public property Context.Record record
     {
         get;
-    }
-
-    public property float minDistance
-    {
-        get { return getStageInputMinDistance(); }
     }
 
     public property float distance
@@ -469,41 +493,6 @@ public struct AnyHitInput<Context>
     public property uint hitKind
     {
         get { return getStageInputHitKind(); }
-    }
-
-    public property uint rayFlags
-    {
-        get { return getStageInputRayFlags(); }
-    }
-
-    public property uint primitiveIndex
-    {
-        get { return getStageInputPrimitiveIndex(); }
-    }
-
-    public property uint geometryIndex
-    {
-        get { return getStageInputGeometryIndex(); }
-    }
-
-    public property float3 worldSpaceOrigin
-    {
-        get { return getStageInputWorldSpaceOrigin(); }
-    }
-
-    public property float3 worldSpaceDirection
-    {
-        get { return getStageInputWorldSpaceDirection(); }
-    }
-
-    public property uint3 dispatchRaysIndex
-    {
-        get { return getStageInputDispatchRaysIndex(); }
-    }
-
-    public property uint3 dispatchRaysDimensions
-    {
-        get { return getStageInputDispatchRaysDimensions(); }
     }
 
     public void ignoreHit()
@@ -579,6 +568,8 @@ public extension<Context> AnyHitInput<Context>
     where Context : IHitContext
     where Context.Primitive : ICustomIntersectionPrimitive
 {
+    /// Reads the attributes supplied by the procedural intersection shader's `reportHit` call.
+    /// TODO: The compiler must synthesize this accessor from the stage's hit-attribute parameter.
     public property Context.Primitive.Attributes attributes
     {
         get;
@@ -608,60 +599,23 @@ public extension<Context> AnyHitInput<Context>
 /// Provides the record and ray state used by a procedural intersection stage.
 ///
 /// `reportHit` submits each candidate and its `Context.Primitive.Attributes` value. On D3D,
-/// Vulkan, and OptiX it maps to the native report-intersection operation; Metal lowering preserves
-/// the same candidate-filtering behavior in the generated intersection function.
+/// Vulkan, and OptiX it maps to the native report-intersection operation.
+/// TODO: Metal adapter synthesis must preserve the same candidate-filtering behavior in the
+/// generated intersection function.
 [require(structural_raytracing_intersection)]
-public struct IntersectionInput<Context>
+public struct IntersectionInput<Context> : ICommonHitInput
     where Context : IHitContext
 {
+    /// Reads the host-provided data in the selected shader-binding-table record.
+    /// TODO: The compiler must synthesize this accessor from the target's record-data binding.
     public property Context.Record record
     {
         get;
     }
 
-    public property float minDistance
-    {
-        get { return getStageInputMinDistance(); }
-    }
-
-    public property uint rayFlags
-    {
-        get { return getStageInputRayFlags(); }
-    }
-
     public property RayDesc objectSpaceRay
     {
         get { return getStageInputCandidateObjectSpaceRay(); }
-    }
-
-    public property uint primitiveIndex
-    {
-        get { return getStageInputPrimitiveIndex(); }
-    }
-
-    public property uint geometryIndex
-    {
-        get { return getStageInputGeometryIndex(); }
-    }
-
-    public property float3 worldSpaceOrigin
-    {
-        get { return getStageInputWorldSpaceOrigin(); }
-    }
-
-    public property float3 worldSpaceDirection
-    {
-        get { return getStageInputWorldSpaceDirection(); }
-    }
-
-    public property uint3 dispatchRaysIndex
-    {
-        get { return getStageInputDispatchRaysIndex(); }
-    }
-
-    public property uint3 dispatchRaysDimensions
-    {
-        get { return getStageInputDispatchRaysDimensions(); }
     }
 
     public bool reportHit(float distance, Context.Primitive.Attributes attributes)
@@ -733,17 +687,21 @@ public extension<Context> IntersectionInput<Context>
 
 /// Provides the payload, record, and ray state available to a miss stage.
 ///
-/// This zero-storage view lets one source contract map to native miss parameters on portable
-/// targets and to Metal's generated post-traversal dispatch.
+/// Adapter synthesis must map this zero-storage view to native miss parameters where available
+/// and to Metal's generated post-traversal dispatch.
 [require(structural_raytracing_miss)]
 public struct MissInput<Context>
     where Context : IPayloadContext
 {
+    /// Gives mutable access to the payload supplied by the originating `RayTracer.trace` call.
+    /// TODO: The compiler must synthesize this accessor from the stage's payload parameter.
     public property Context.Payload payload
     {
         ref;
     }
 
+    /// Reads the host-provided data in the selected shader-binding-table record.
+    /// TODO: The compiler must synthesize this accessor from the target's record-data binding.
     public property Context.Record record
     {
         get;
@@ -803,11 +761,15 @@ public extension<Context> MissInput<Context>
 public struct CallableInput<Context>
     where Context : ICallableContext
 {
+    /// Gives mutable access to the data supplied by the originating `RayTracer.callShader` call.
+    /// TODO: The compiler must synthesize this accessor from the callable-data parameter.
     public property Context.CallableData data
     {
         ref;
     }
 
+    /// Reads the host-provided data in the selected shader-binding-table record.
+    /// TODO: The compiler must synthesize this accessor from the target's record-data binding.
     public property Context.Record record
     {
         get;

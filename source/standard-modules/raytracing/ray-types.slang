@@ -27,7 +27,8 @@ public struct PrimitiveMotion : IEnabledRayMotion {}
 /// Selects instance motion and passes `RayTraversalDesc.time` to native traversal.
 ///
 /// Vulkan and OptiX carry the time in their motion trace operation. Metal uses it with a
-/// motion-enabled intersector.
+/// motion-enabled intersector. The D3D `TraceRay` operation has no ray-time parameter, so D3D
+/// programs use `NoMotion` instead; this capability requirement excludes D3D.
 [require(structural_raytracing_instance_motion)]
 public struct InstanceMotion : IEnabledRayMotion {}
 
@@ -37,8 +38,18 @@ public struct PrimitiveAndInstanceMotion : IEnabledRayMotion {}
 
 /// Describes a ray origin, interval, and direction.
 ///
-/// This alias reuses the existing native ray representation so portable trace calls need no data
-/// conversion and existing code keeps using its `Origin`, `TMin`, `Direction`, and `TMax` fields.
+/// This alias reuses the existing ray representation in the core module so trace calls need no
+/// data conversion. Its fields are defined as follows:
+///
+/// ```slang
+/// struct RayDesc
+/// {
+///     float3 Origin;
+///     float TMin;
+///     float3 Direction;
+///     float TMax;
+/// };
+/// ```
 public typealias RayDesc = RayDesc;
 
 /// Supplies the per-call traversal controls and native SBT selectors.
@@ -50,6 +61,22 @@ public struct RayTraversalDesc
 {
     public RayDesc ray;
     public float time;
+
+    /// Combines the core module's `RAY_FLAG` constants with bitwise OR; `RAY_FLAG` is a `uint`.
+    ///
+    /// `RAY_FLAG_NONE` selects default traversal. The other constants control:
+    /// - Opacity: `RAY_FLAG_FORCE_OPAQUE` disables any-hit execution;
+    ///   `RAY_FLAG_FORCE_NON_OPAQUE` treats geometry as non-opaque.
+    /// - Early exit: `RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH` accepts the first hit found.
+    /// - Stage execution: `RAY_FLAG_SKIP_CLOSEST_HIT_SHADER` skips the closest-hit stage.
+    /// - Face culling: `RAY_FLAG_CULL_BACK_FACING_TRIANGLES` and
+    ///   `RAY_FLAG_CULL_FRONT_FACING_TRIANGLES` exclude the selected triangle faces.
+    /// - Opacity culling: `RAY_FLAG_CULL_OPAQUE` and `RAY_FLAG_CULL_NON_OPAQUE` exclude the
+    ///   selected geometry opacity.
+    /// - Geometry culling: `RAY_FLAG_SKIP_TRIANGLES` and `RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES`
+    ///   exclude the selected geometry kind.
+    /// - Opacity micromaps: `RAY_FLAG_FORCE_OMM_2_STATE` treats unknown opaque and unknown
+    ///   transparent states as opaque and transparent, respectively, on supporting targets.
     public RAY_FLAG rayFlags;
     public uint instanceMask;
     public uint sbtOffset;
@@ -115,6 +142,7 @@ public struct TriangleData
 }
 
 /// Exposes Metal's built-in curve parameter as a zero-storage property view.
+[require(metallib_3_1)]
 public struct CurveData
 {
     public property float parameter
@@ -138,10 +166,17 @@ public interface IIntersectionPrimitive
 /// The interface is sealed so `NoIntersection` can use it to admit exactly the built-in triangle
 /// and curve primitives. A procedural bounding box must instead provide an intersection shader
 /// that reports an actual hit.
+/// For example, a context with `Primitive = TrianglePrimitive` can select `NoIntersection`;
+/// one with `Primitive = BoundingBoxPrimitive<MyAttributes>` fails that generic constraint.
 [sealed]
 public interface IBuiltinIntersectionPrimitive : IIntersectionPrimitive {}
 
 /// Marks procedural primitives whose intersection stage reports application-defined attributes.
+///
+/// `IIntersectionShader` requires this category, and the any-hit and closest-hit inputs expose
+/// their `attributes` property only for this category. A `BoundingBoxPrimitive<MyAttributes>`
+/// context satisfies those constraints; a `TrianglePrimitive` context does not. Keeping these
+/// categories distinct lets ordinary generic constraints enforce which operations are available.
 [sealed]
 public interface ICustomIntersectionPrimitive : IIntersectionPrimitive {}
 

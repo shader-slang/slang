@@ -29,9 +29,18 @@ public interface IAnyHitShader
 
 /// Represents either an intersection shader or the canonical `NoIntersection` placeholder.
 ///
-/// This public name is required by the associated-type contract on `IHitGroup`. The sealed
-/// conformance set keeps it compiler-owned: user code implements `IIntersectionShader` instead of
-/// implementing this common interface directly.
+/// `IHitGroup.Intersection` must accept both a procedural shader and `NoIntersection<Context>`
+/// for hardware-intersected triangles or curves, while checking that either choice uses the
+/// group's context. For example, a triangle group sets:
+///
+///     typealias Intersection = NoIntersection<Context>;
+///
+/// A procedural group instead names a struct implementing `IIntersectionShader`. Requiring that
+/// interface for both choices would force the hardware placeholder to implement `invoke` and
+/// satisfy its custom-primitive constraint, even though hardware intersection has neither.
+/// Keeping only `Context` here represents the shared requirement without inventing an executable
+/// intersection shader for a builtin primitive. Sealing this interface prevents user-defined
+/// placeholders from bypassing the procedural shader contract.
 [sealed]
 public interface IIntersectionStage
 {
@@ -40,8 +49,12 @@ public interface IIntersectionStage
 
 /// Represents the source implementation of a procedural-primitive intersection stage.
 ///
-/// `Context.Primitive` supplies the custom attributes reported by `input.reportHit`. The compiler
-/// lowers `invoke` to the native intersection mechanism for the selected target.
+/// `IIntersectionStage` supplies the same `Context` requirement used by `IHitGroup.Intersection`
+/// and the hardware-intersection placeholder. This executable branch additionally requires a
+/// custom primitive and an `invoke` implementation: `Context.Primitive` supplies the attributes
+/// reported by `input.reportHit`. Adapter synthesis must turn `invoke` into the target's native
+/// intersection mechanism. Closest-hit and any-hit need no corresponding split because their
+/// optional no-op implementations satisfy the same stage contract as an ordinary shader.
 [require(structural_raytracing_intersection)]
 public interface IIntersectionShader : IIntersectionStage
 {

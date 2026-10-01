@@ -72,10 +72,24 @@ public struct CallableShaderList<each Shader> : ICallableShaderList
 
 /// Selects a hit-group section that is completed when separately compiled modules are linked.
 ///
-/// `Group` names entries that are known by the schema's module. Every concrete type in the linked
-/// program that conforms to `Tag` joins the same section. The generic constraint states the entry
-/// contract, and the compiler additionally requires `Tag` itself to be an interface so a concrete
-/// entry type cannot accidentally stand in for a tag.
+/// Use `HitGroupList<A, B>` when the schema's module can enumerate every group. An open section
+/// instead lets independently compiled modules opt their groups into one application-owned tag:
+///
+///     public interface IMaterialHitGroup : rt::IHitGroup {}
+///     // In the schema: typealias HitGroups = rt::OpenHitGroups<IMaterialHitGroup>;
+///     // In a separately compiled material module: struct GlassHit : IMaterialHitGroup { ... }
+///
+/// The finalized section includes concrete conformers such as GlassHit from the modules the host
+/// links, without editing the shared schema to name each one. It does not discover unloaded code
+/// or permit arbitrary runtime shader registration. The tag selects this program's groups rather
+/// than every IHitGroup in the linked modules. The type is public because application schemas name
+/// it in their associated-type definitions; closed lists remain sufficient for centrally listed
+/// programs.
+///
+/// `Group` names optional entries known by the schema's module. The compiler additionally requires
+/// `Tag` itself to be an interface so a concrete group cannot accidentally stand in for a tag.
+/// TODO: implement linked-conformer collection in the schema-completion slice. This frontend slice
+/// validates the tag and explicitly listed entries; `knownCount` counts only those listed entries.
 public struct OpenHitGroups<Tag, each Group> : IHitGroupList
     where Tag : IHitGroup
     where expand each Group : IHitGroup
@@ -85,8 +99,12 @@ public struct OpenHitGroups<Tag, each Group> : IHitGroupList
 
 /// Selects a miss-shader section that is completed when separately compiled modules are linked.
 ///
+/// This is the miss-stage counterpart of `OpenHitGroups`: a shared schema can name an application
+/// tag such as `IEnvironmentMiss : IMissShader`, while separately compiled modules provide its
+/// concrete stages. Use `MissShaderList` when every stage can be named directly.
 /// Listed shaders retain declaration order. Linked shaders conforming to `Tag` follow them in
-/// qualified-type-name order within each payload partition.
+/// qualified-type-name order within each payload partition. TODO: collect those conformers in the
+/// schema-completion slice; `knownCount` currently describes only the explicitly listed stages.
 public struct OpenMissShaders<Tag, each Shader> : IMissShaderList
     where Tag : IMissShader
     where expand each Shader : IMissShader
@@ -96,9 +114,12 @@ public struct OpenMissShaders<Tag, each Shader> : IMissShaderList
 
 /// Selects a callable-shader section completed from conformances in the linked program.
 ///
-/// The generic constraint states the callable contract, and the compiler additionally requires
-/// `Tag` itself to be an interface. Linked callables follow the listed shaders in
-/// qualified-type-name order in the program-wide callable table.
+/// This is the callable-stage counterpart of `OpenHitGroups`: independently compiled modules can
+/// contribute stages through an application tag such as `IMaterialCallable : ICallableShader`.
+/// Use `CallableShaderList` when the schema's module can name every callable directly.
+/// The compiler additionally requires `Tag` itself to be an interface. Linked callables follow the
+/// listed shaders in qualified-type-name order in the program-wide callable table. TODO: collect
+/// those conformers in the schema-completion slice; `knownCount` counts only the listed stages.
 public struct OpenCallableShaders<Tag, each Shader> : ICallableShaderList
     where Tag : ICallableShader
     where expand each Shader : ICallableShader
