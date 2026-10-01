@@ -15,9 +15,7 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    // When set (CUDA only), a call argument that is an entry-point by-value uniform aggregate
-    // parameter is forwarded by address instead of via a temporary copy. See the header comment on
-    // `transformParamsToConstRef`.
+    // Set on CUDA targets; see `retypeEntryPointUniformAggregateParams`.
     bool forwardEntryPointUniformAddress;
 
     TransformParamsToConstRefContext(
@@ -221,120 +219,6 @@ struct TransformParamsToConstRefContext
         return nullptr;
     }
 
-    // True if the address of `arg` can be forwarded into the `borrow in` callee at a call site,
-    // instead of copying the whole aggregate into a per-thread temporary (the #11774 slowdown).
-    //
-    // Retyping the parameter to a pointer is all-or-nothing across it, so this only holds when
-    // every call use lands in a callee slot this pass also rewrites to `borrow in` - otherwise that
-    // callee would be handed a pointer for a by-value `T`. An already-forwarded parameter (the
-    // multi-forward case) trivially qualifies; it is the pointer to forward again.
-    //
-    // Returns the validated `IRParam`, or null when `arg` is not forwardable.
-    IRParam* findForwardableParamStorage(IRInst* arg)
-    {
-        auto param = as<IRParam>(arg);
-        if (!param)
-            return nullptr;
-        // Already forwarded, so the loop below already ran and passed for it:
-        // `forwardParamStorageAddress` is the only producer of this address space, and
-        // `updateCallSites` only rebuilds existing calls, so no unseen callee can have appeared.
-        if (isCudaKernelParamBorrowInType(param->getDataType()))
-            return param;
-        if (!isEntryPointByValueUniformAggregateParam(param))
-            return nullptr;
-
-        for (auto use = param->firstUse; use; use = use->nextUse)
-        {
-            auto call = as<IRCall>(use->getUser());
-            // Non-call uses need no check here: `param` is by-value, so as an SSA value it cannot
-            // be a store destination or have its address taken, leaving plain value reads that
-            // `forwardParamStorageAddress` redirects through the one hoisted load.
-            if (!call)
-                continue;
-            // Test the callee, not the slot the argument lands in: `shouldTransformParam` is a
-            // pre-transform predicate that returns false once a slot is already `borrow in`, and
-            // functions are processed in arbitrary order, so a slot query would depend on visit
-            // order. Declining keeps a by-value callee from being handed a `Big_0 *`; covered by
-            // cuda-forward-uniform-signature-preserved-callee.slang and
-            // cuda-forward-uniform-unprocessed-callee.slang.
-            auto callee = as<IRFunc>(call->getCallee());
-            if (!callee || !shouldProcessFunction(callee) || hasSignaturePreservingUse(callee))
-                return nullptr;
-        }
-        return param;
-    }
-
-    // Forward the address of an entry-point uniform aggregate parameter into a `borrow in` callee.
-    // An `IRParam` is an SSA value with no storage to take `GetAddress` of, so instead the
-    // parameter is retyped to `ConstRef<T, CudaKernelParam>` and *is* the pointer value to forward;
-    // its in-kernel value reads are redirected through one inserted `IRLoad` so they still observe
-    // a `T`. Returns `param` itself, not a freshly-built address instruction.
-    //
-    // Precondition: `param` came from `findForwardableParamStorage`, which guarantees no surviving
-    // call use reads the parameter by value.
-    //
-    // The argument ends up `ConstRef<T, CudaKernelParam>` while the callee slot stays
-    // `ConstRef<T, Generic>`. Do not "fix" that by giving both the same atom: this atom is what
-    // makes the emitter print a parameter as by-value `T p` instead of `T*`, so a callee carrying
-    // it would declare `readsum_0(Big_0 b_0, ...)` yet still be called as `readsum_0(&big_0, ...)`,
-    // which NVRTC rejects. `cuda-forward-uniform-struct-forward.slang` pins both spellings.
-    IRInst* forwardParamStorageAddress(IRParam* param)
-    {
-        auto valueType = param->getDataType();
-        SLANG_ASSERT(valueType);
-        // Idempotency guard for the multi-forward case: a parameter forwarded to a second call site
-        // is already the pointer, so reuse it without a second retype or load. See
-        // `cuda-forward-uniform-multi-forward.slang`.
-        if (isCudaKernelParamBorrowInType(valueType))
-            return param;
-
-        // Collect the value reads before changing anything. Call arguments are excluded: they
-        // either forward the pointer or belong to the old calls `updateCallSites` is about to
-        // discard, and the precondition guarantees none of them reads the parameter by value -
-        // `findForwardableParamStorage` returned it, which means every call use of `param`
-        // lands in a callee slot this pass rewrites to a `borrow in` pointer, so no surviving call
-        // reads it as a `T`.
-        List<IRUse*> readUses;
-        for (auto use = param->firstUse; use; use = use->nextUse)
-        {
-            if (!as<IRCall>(use->getUser()))
-                readUses.add(use);
-        }
-
-        param->setFullType(builder.getBorrowInParamType(valueType, AddressSpace::CudaKernelParam));
-
-        // Retyping the parameter changed the entry function's signature, so rebuild the parent
-        // function's type from its (now-updated) parameter types. `processFunc` only calls
-        // `fixUpFuncType` for the transformed callee; the entry point is skipped there, so the fix
-        // must happen here or the function type would keep saying `T` while the param says
-        // `ConstRef<T, CudaKernelParam>`.
-        auto entryBlock = as<IRBlock>(param->getParent());
-        auto entryFunc = as<IRFunc>(entryBlock->getParent());
-        SLANG_ASSERT(entryFunc);
-
-        // One load suffices for all reads: every value read of an entry-point parameter is an
-        // ordinary inst, and the entry block's first ordinary inst dominates every ordinary inst in
-        // the function, so this single load dominates all the uses it replaces.
-        //
-        // Save and restore the shared builder's insert location: the sole caller
-        // (`updateCallSites`) sets it to the original call and then rebuilds that call after this
-        // returns, so leaking the entry-block insert point here would mis-place the rebuilt call at
-        // the top of the entry block - before the definitions of its own arguments (use-before-def
-        // / broken SSA).
-        if (readUses.getCount())
-        {
-            auto savedLoc = builder.getInsertLoc();
-            builder.setInsertBefore(entryBlock->getFirstOrdinaryInst());
-            auto loaded = builder.emitLoad(valueType, param);
-            builder.setInsertLoc(savedLoc);
-            for (auto use : readUses)
-                use->set(loaded);
-        }
-
-        fixUpFuncType(entryFunc);
-        return param;
-    }
-
     // Update call sites to pass an address instead of value for each updated-param
     void updateCallSites(IRFunc* func, HashSet<IRParam*>& updatedParams)
     {
@@ -363,17 +247,6 @@ struct TransformParamsToConstRefContext
                     // If existing argument is a load from an immutable buffer address,
                     // we can pass in the address as is, without making a temporary copy.
                     newArgs.add(addr);
-                }
-                else if (
-                    auto forwardable = forwardEntryPointUniformAddress
-                                           ? findForwardableParamStorage(arg)
-                                           : nullptr)
-                {
-                    // Forward the aggregate by address instead of copying it into a per-thread
-                    // temporary - the #11774 slowdown. See `forwardParamStorageAddress` for why the
-                    // argument's address space deliberately differs from the callee slot's, and why
-                    // no write can reach the forwarded storage.
-                    newArgs.add(forwardParamStorageAddress(forwardable));
                 }
                 else
                 {
@@ -436,15 +309,15 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
-    // True if `func` is used in a way that requires its signature to survive this pass unchanged,
-    // i.e. anything beyond being annotated, called, or named by a specialization-dictionary entry.
-    // Taken as a function value or passed as a callback counts.
-    //
-    // Widening the benign set below relaxes a correctness decision, not just an optimization:
-    // `findForwardableParamStorage` also consults this to decline forwarding an address into a
-    // function that kept by-value parameters, which would be an ABI mismatch.
-    bool hasSignaturePreservingUse(IRFunc* func)
+    // Process a single function
+    void processFunc(IRFunc* func)
     {
+        HashSet<IRParam*> updatedParams;
+
+        // If the function is used in any way that is not understood by the
+        // compiler, do not modify it.
+        // For example, if the function is used as callback, we must preserve
+        // its signature.
         for (auto use = func->firstUse; use; use = use->nextUse)
         {
             auto user = use->getUser();
@@ -460,20 +333,10 @@ struct TransformParamsToConstRefContext
                 if (call->getCalleeUse() == use)
                     continue;
             }
-            return true;
-        }
-        return false;
-    }
-
-    // Process a single function
-    void processFunc(IRFunc* func)
-    {
-        HashSet<IRParam*> updatedParams;
-
-        // If the function is used in any way that is not understood by the compiler (e.g. as a
-        // callback), we must preserve its signature, so do not modify it.
-        if (hasSignaturePreservingUse(func))
+            // If we reach here, we encountered a non-call use of the func,
+            // we will stop processing.
             return;
+        }
 
         // First pass: Transform parameter types
         for (auto param = func->getFirstParam(); param; param = param->getNextParam())
@@ -544,8 +407,50 @@ struct TransformParamsToConstRefContext
         functionsToProcess.add(root);
     }
 
+    // Retype each entry-point by-value uniform aggregate parameter to
+    // `ConstRef<T, CudaKernelParam>` and turn its value uses into loads through it. Consider:
+    //
+    //     [noinline] float readsum(Big b, uint i);         // rewritten to take `Big_0*`
+    //     [CudaDeviceExport] float exported(Big b, uint i); // keeps its by-value signature
+    //     void computeMain(uniform Big big, ...) { readsum(big, i) + exported(big, i) + big.v[0]; }
+    //
+    // Every argument is now `load(big)`, a load from an immutable address, so `updateCallSites`
+    // passes `big` itself to `readsum` instead of copying it into a per-thread temporary (#11774),
+    // while `exported` still receives the loaded value. The parameter is still declared as the
+    // by-value `Big_0 big_0`, and a load of it emits as `big_0`, so the kernel emits
+    // `readsum_0(&big_0, i)`, `exported(big_0, i)` and `big_0.v_0[0]`.
+    void retypeEntryPointUniformAggregateParams()
+    {
+        for (auto inst : module->getModuleInst()->getChildren())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func || !func->findDecoration<IREntryPointDecoration>())
+                continue;
+            bool retyped = false;
+            for (auto param = func->getFirstParam(); param; param = param->getNextParam())
+            {
+                if (!isEntryPointByValueUniformAggregateParam(param))
+                    continue;
+                param->setFullType(builder.getBorrowInParamType(
+                    param->getDataType(),
+                    AddressSpace::CudaKernelParam));
+                rewriteValueUsesToAddrUses(param);
+                retyped = true;
+            }
+            if (retyped)
+            {
+                fixUpFuncType(func);
+                changed = true;
+            }
+        }
+    }
+
     SlangResult processModule()
     {
+        // Must precede `processFunc`, so that `updateCallSites` sees the loads.
+        if (forwardEntryPointUniformAddress)
+            retypeEntryPointUniformAggregateParams();
+
         // Collect all functions that need processing.
         // Process all callee's before callers; otherwise we introduce bugs
 
@@ -574,11 +479,9 @@ SlangResult transformParamsToConstRef(
     TargetRequest* targetReq,
     DiagnosticSink* sink)
 {
-    // The entry-point uniform address-forward (the #11774 fix) is specific to how CUDA lowers a
-    // by-value kernel parameter, so it is enabled only for the CUDA family. Other targets keep the
-    // temp-copy path, leaving their codegen unchanged.
-    const bool forwardEntryPointUniformAddress = isCUDATarget(targetReq);
-    TransformParamsToConstRefContext context(module, sink, forwardEntryPointUniformAddress);
+    // Only CUDA copies a by-value kernel parameter into per-thread local memory when its address
+    // is taken, so only CUDA needs the entry-point uniform forward.
+    TransformParamsToConstRefContext context(module, sink, isCUDATarget(targetReq));
     return context.processModule();
 }
 
