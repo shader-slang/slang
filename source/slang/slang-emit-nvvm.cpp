@@ -3044,6 +3044,21 @@ bool _isNVVMOptixStage(Stage stage)
 
 bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
 {
+    // Ray state exists only while servicing a ray in the selected callback stages.
+    // Match the complete SDK names so launch queries retain their separate stage contract.
+    const char* rayStateQueries[] = {
+        "_optix_get_world_ray_origin_x",
+        "_optix_get_world_ray_origin_y",
+        "_optix_get_world_ray_origin_z",
+        "_optix_get_world_ray_direction_x",
+        "_optix_get_world_ray_direction_y",
+        "_optix_get_world_ray_direction_z",
+        "_optix_get_ray_tmin",
+        "_optix_get_ray_tmax",
+    };
+    for (auto query : rayStateQueries)
+        if (name == UnownedStringSlice(query))
+            return stage == Stage::Miss || stage == Stage::ClosestHit;
     if (name == toSlice("_optix_get_payload") || name == toSlice("_optix_set_payload"))
         return stage == Stage::Miss || stage == Stage::ClosestHit;
     if (name.startsWith(toSlice("_optix_get_attribute_")))

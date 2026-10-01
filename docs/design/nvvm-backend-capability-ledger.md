@@ -54,8 +54,15 @@ module creation. Static tests retain SBT layout/load and role/cache boundaries.
 
 Qualification is CUDA12.9/OptiX SDK9, target SM80 on the recorded L4/595.71.05 host. Pointer payloads,
 arrays/matrices, padded/subword payloads, any-hit, procedural intersection, callables and recursive
-callback tracing remain outside this contract. Ray-state queries and representative material
-execution are next. PTX acceptance by libNVVM alone is not an OptiX execution claim.
+callback tracing remain outside this contract. World-ray origin/direction and minimum/current distance are qualified in miss/closest-hit.
+The [material fixture](../../tests/pipeline/ray-tracing/nvvm-optix-material.slang) samples all four
+texel centers of a 2x2 texture and evaluates the unchanged imported MaterialX dielectric BSDF.
+NVVM O0/O3 and NVRTC O3 each check 202 words: 16 material lanes against the maintained finite-input
+budget, all remaining state/texture/status/guard words exactly. A separate host oracle verifies the
+same complete outputs. Non-unit miss directions are preserved, and hit/miss distances are distinct.
+NVVM O0 differs from CUDA in 12 bounded material words; O3 matches all words for these selected inputs.
+This qualifies one textured normal-incidence BSDF path, not the full generated material graph or its
+packed texture-handle convention. PTX acceptance by libNVVM alone is not an OptiX execution claim.
 
 ## Compute, values and memory
 

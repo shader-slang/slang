@@ -34,6 +34,96 @@ SLANG_UNIT_TEST(nvvmSlangOptixPrimitivesRejectComputeBeforeEmission)
     }
 }
 
+// Raw named helpers bypass public source-stage restrictions, so these cases exercise the
+// backend's complete reachable-closure check before provider module creation.
+SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
+{
+    const char* names[] = {
+        "_optix_get_world_ray_origin_x",
+        "_optix_get_world_ray_origin_y",
+        "_optix_get_world_ray_origin_z",
+        "_optix_get_world_ray_direction_x",
+        "_optix_get_world_ray_direction_y",
+        "_optix_get_world_ray_direction_z",
+        "_optix_get_ray_tmin",
+        "_optix_get_ray_tmax",
+    };
+    for (const char* name : names)
+        for (SlangStage stage : {SLANG_STAGE_COMPUTE, SLANG_STAGE_RAY_GENERATION})
+        {
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> globalSession;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            globalSession->setSharedLibraryLoader(loader);
+            slang::CompilerOptionEntry options[2] = {};
+            options[0].name = slang::CompilerOptionName::EmitCUDAMethod;
+            options[0].value.kind = slang::CompilerOptionValueKind::Int;
+            options[0].value.intValue0 = SLANG_EMIT_CUDA_VIA_NVVM;
+            options[1].name = slang::CompilerOptionName::Capability;
+            options[1].value.kind = slang::CompilerOptionValueKind::Int;
+            options[1].value.intValue0 = globalSession->findCapability("cuda_sm_8_0");
+            slang::TargetDesc target = {};
+            target.format = SLANG_PTX;
+            target.compilerOptionEntries = options;
+            target.compilerOptionEntryCount = SLANG_COUNT_OF(options);
+            slang::SessionDesc desc = {};
+            desc.targets = &target;
+            desc.targetCount = 1;
+            ComPtr<slang::ISession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
+            StringBuilder source;
+            source << "[require(nvvm)] [NonUniformReturn] float primitive() { __target_switch { "
+                      "case nvvm: __intrinsic_asm \""
+                   << name
+                   << "\"; } } [noinline] float indirect() { return primitive(); } "
+                      "RWStructuredBuffer<float> output; "
+                   << (stage == SLANG_STAGE_COMPUTE ? "[numthreads(1,1,1)] "
+                                                    : "[shader(\"raygeneration\")] ")
+                   << "void main() { output[0] = indirect(); }";
+            ComPtr<slang::IBlob> diagnostics, code;
+            ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+                "optixRayStateStage",
+                "optix-ray-state-stage.slang",
+                source.getBuffer(),
+                diagnostics.writeRef()));
+            SLANG_CHECK_ABORT(module);
+            ComPtr<slang::IEntryPoint> entry;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
+                "main",
+                stage,
+                entry.writeRef(),
+                diagnostics.writeRef())));
+            slang::IComponentType* components[] = {module.get(), entry.get()};
+            ComPtr<slang::IComponentType> program, linked;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
+                components,
+                SLANG_COUNT_OF(components),
+                program.writeRef(),
+                diagnostics.writeRef())));
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(program->link(linked.writeRef(), diagnostics.writeRef())));
+            const auto result =
+                linked->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+            if (SLANG_SUCCEEDED(result) || !diagnostics ||
+                !_getBlobText(diagnostics).contains("OptiX primitive stage"))
+            {
+                getTestReporter()->message(TestMessageType::Info, source.getBuffer());
+                if (diagnostics)
+                    getTestReporter()->message(
+                        TestMessageType::Info,
+                        _getBlobText(diagnostics).getBuffer());
+            }
+            SLANG_CHECK(SLANG_FAILED(result));
+            SLANG_CHECK(!code);
+            SLANG_CHECK(diagnostics && _getBlobText(diagnostics).contains("OptiX primitive stage"));
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+}
+
 SLANG_UNIT_TEST(nvvmSlangCoherentMemoryUsesCheckedDescriptors)
 {
     const struct TypeCase

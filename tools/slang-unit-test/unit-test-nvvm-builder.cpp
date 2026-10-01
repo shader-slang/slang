@@ -7,16 +7,28 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
 {
     NVVMIRBuilder builder;
     _requireRealNVVMBuilder(unitTestContext, builder);
-    const char* names[] = {
-        "_optix_get_launch_index_x",
-        "_optix_get_launch_index_y",
-        "_optix_get_launch_index_z",
-        "_optix_get_launch_dimension_x",
-        "_optix_get_launch_dimension_y",
-        "_optix_get_launch_dimension_z",
-        "_optix_get_sbt_data_ptr_64",
-        "_optix_get_attribute_0",
-        "_optix_get_attribute_1"};
+    const struct
+    {
+        const char* name;
+        SlangNVVMValueTypeDesc resultType;
+    } queries[] = {
+        {"_optix_get_launch_index_x", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_launch_index_y", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_launch_index_z", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_launch_dimension_x", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_launch_dimension_y", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_launch_dimension_z", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_sbt_data_ptr_64", NVVMSemantics::kUnsignedI64},
+        {"_optix_get_attribute_0", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_1", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_world_ray_origin_x", NVVMSemantics::kFloat32},
+        {"_optix_get_world_ray_origin_y", NVVMSemantics::kFloat32},
+        {"_optix_get_world_ray_origin_z", NVVMSemantics::kFloat32},
+        {"_optix_get_world_ray_direction_x", NVVMSemantics::kFloat32},
+        {"_optix_get_world_ray_direction_y", NVVMSemantics::kFloat32},
+        {"_optix_get_world_ray_direction_z", NVVMSemantics::kFloat32},
+        {"_optix_get_ray_tmin", NVVMSemantics::kFloat32},
+        {"_optix_get_ray_tmax", NVVMSemantics::kFloat32}};
     String control[2];
     for (bool reject : {false, true})
     {
@@ -40,25 +52,21 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
         SLANG_CHECK_ABORT(
             SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
-        for (Index i = 0; i < SLANG_COUNT_OF(names); ++i)
+        for (const auto& query : queries)
         {
-            const SlangNVVMNamedIntrinsicDesc desc = {
-                names[i],
-                strlen(names[i]),
-                i == 6 ? NVVMSemantics::kUnsignedI64 : NVVMSemantics::kUnsignedI32,
-                nullptr,
-                0};
+            const SlangNVVMNamedIntrinsicDesc desc =
+                {query.name, strlen(query.name), query.resultType, nullptr, 0};
             SLANG_CHECK(builder.supportsNamedIntrinsic(desc));
             if (reject)
             {
-                for (int mismatch = 0; mismatch < 4; ++mismatch)
+                for (int mismatch = 0; mismatch < 8; ++mismatch)
                 {
                     auto invalid = desc;
                     SlangNVVMNamedIntrinsicOperandDesc operand = {};
                     operand.kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
                     operand.type = NVVMSemantics::kUnsignedI32;
                     if (mismatch == 0)
-                        invalid.resultType.bitWidth = i == 6 ? 32 : 64;
+                        invalid.resultType.bitWidth = desc.resultType.bitWidth == 64 ? 32 : 64;
                     if (mismatch == 1)
                         invalid.resultType.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
                     if (mismatch == 2)
@@ -71,6 +79,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
                         invalid.operands = &operand;
                         invalid.operandCount = 1;
                     }
+                    if (mismatch == 4)
+                        invalid.resultType.kind =
+                            desc.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
+                                ? SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
+                                : SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+                    if (mismatch == 5)
+                        invalid.resultType.laneCount = 2;
+                    if (mismatch == 6)
+                        invalid.resultType.bitWidth = 16;
+                    if (mismatch == 7)
+                        invalid.resultType = NVVMSemantics::kVoid;
                     SLANG_CHECK(!builder.supportsNamedIntrinsic(invalid));
                     SlangNVVMValueHandle rejected = function;
                     SLANG_CHECK(SLANG_FAILED(
@@ -94,14 +113,18 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
             SLANG_CHECK_ABORT(
                 SLANG_SUCCEEDED(builder.serializeModule(scope.module, formats[i], blob)));
             const String text = _getBlobText(blob);
-            for (auto name : names)
+            for (const auto& query : queries)
                 SLANG_CHECK(
-                    _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(name)) == 1);
+                    _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(query.name)) == 1);
             SLANG_CHECK(
                 _countOccurrences(text.getUnownedSlice(), toSlice("asm sideeffect")) ==
-                SLANG_COUNT_OF(names));
+                SLANG_COUNT_OF(queries));
             SLANG_CHECK(text.contains("=l"));
             SLANG_CHECK(text.contains("=r"));
+            SLANG_CHECK(
+                _countOccurrences(text.getUnownedSlice(), toSlice("call float asm sideeffect")) ==
+                8);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("\"=f\"()")) == 8);
             if (reject)
             {
                 SLANG_CHECK(text == control[i]);

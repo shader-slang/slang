@@ -21462,6 +21462,86 @@ uint3 DispatchRaysDimensions()
 
 // 10.4.2 - Ray System Values
 
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixWorldRayOriginX()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_world_ray_origin_x";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixWorldRayOriginY()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_world_ray_origin_y";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixWorldRayOriginZ()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_world_ray_origin_z";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixWorldRayDirectionX()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_world_ray_direction_x";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixWorldRayDirectionY()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_world_ray_direction_y";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixWorldRayDirectionZ()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_world_ray_direction_z";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixRayTMin()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_ray_tmin";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixRayTCurrent()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_ray_tmax";
+    }
+}
+
 /// Returns the origin of the current ray in world space.
 /// @return World-space position where the ray originated
 /// @remarks Available in any-hit, closest-hit, intersection, and miss shaders
@@ -21474,6 +21554,8 @@ float3 WorldRayOrigin()
     {
     case hlsl:  __intrinsic_asm "WorldRayOrigin";
     case glsl: __intrinsic_asm "(gl_WorldRayOriginEXT)";
+    case nvvm:
+        return float3(__nvvmOptixWorldRayOriginX(), __nvvmOptixWorldRayOriginY(), __nvvmOptixWorldRayOriginZ());
     case cuda: __intrinsic_asm "optixGetWorldRayOrigin";
     case spirv:
         return spirv_asm
@@ -21484,7 +21566,7 @@ float3 WorldRayOrigin()
 }
 
 /// Returns the direction of the current ray in world space.
-/// @return Normalized world-space direction vector of the ray
+/// @return World-space ray direction, without implicit normalization
 /// @remarks Available in any-hit, closest-hit, intersection, and miss shaders
 /// @category raytracing
 [NonUniformReturn]
@@ -21495,6 +21577,8 @@ float3 WorldRayDirection()
     {
     case hlsl:  __intrinsic_asm "WorldRayDirection";
     case glsl: __intrinsic_asm "(gl_WorldRayDirectionEXT)";
+    case nvvm:
+        return float3(__nvvmOptixWorldRayDirectionX(), __nvvmOptixWorldRayDirectionY(), __nvvmOptixWorldRayDirectionZ());
     case cuda: __intrinsic_asm "optixGetWorldRayDirection";
     case spirv:
         return spirv_asm
@@ -21516,6 +21600,7 @@ float RayTMin()
     {
     case hlsl:  __intrinsic_asm "RayTMin";
     case glsl: __intrinsic_asm "(gl_RayTminEXT)";
+    case nvvm: return __nvvmOptixRayTMin();
     case cuda: __intrinsic_asm "optixGetRayTmin";
     case spirv:
         return spirv_asm
@@ -21548,6 +21633,7 @@ float RayTCurrent()
     {
     case hlsl:  __intrinsic_asm "RayTCurrent";
     case glsl: __intrinsic_asm "(gl_RayTmaxEXT)";
+    case nvvm: return __nvvmOptixRayTCurrent();
     case cuda: __intrinsic_asm "optixGetRayTmax";
     case spirv:
         return spirv_asm

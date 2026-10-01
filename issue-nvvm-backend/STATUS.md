@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-three feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 67 feature objects (including corpus tiers and OptiX raygen/triangle tracing),
+Twenty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 68 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -108,9 +108,14 @@ each check four hits, four misses and all 34 words with unequal barycentrics and
 All 14 focused checks, three static admission checks and 15 compute smoke cells pass without
 skips. Final smoke took 22.08 seconds; focused OptiX took 7.03 seconds. This slice is accepted. Core capability, fixture syntax, assertion scope and
 attribute-bitcast failures are retained with their corrections; no failure was demoted or skipped.
-The next bounded slice adds world-ray observations needed for textured MaterialX dielectric execution
-in closest-hit. The prepared probe reuses existing material equations and the triangle harness;
-it has not been executed yet. Active plans remain uncommitted.
+The textured MaterialX dielectric slice is now accepted: eight exact Float32 world-ray queries,
+Miss/ClosestHit-only admission, and a live texture/BSDF/payload path. All seven focused checks and
+15 smoke cells pass (9.53s and 21.84s respectively). All three modes pass the independent 202-word
+host oracle. NVVM O0 differs from CUDA in 12 material words within the retained numerical budget;
+O3 matches every word for these finite inputs. The initial sampler warning-only failure is retained.
+No full generated-material, packed texture-handle or performance claim is made.
+The working-corpus integration run is due now after raygen, triangle and material iterations.
+Active plans remain uncommitted.
 
 Current additions beyond the full checkpoint are:
 
@@ -171,10 +176,11 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-**Active work:** qualify textured material execution and its required world-ray query batch. Corpus selection and raygen are complete; compute
-smoke passed after each implementation. Run the working corpus at the next material integration
-checkpoint (three feature iterations since introducing tiers). The prior full baseline remains
-authoritative for its identity; this cadence does not request another full multi-suite campaign.
+**Active work:** run the working corpus at this material integration checkpoint, review actual
+regressions and the three retained descriptor input changes, then use bounded exploratory failures
+to choose application-relevant work. Smoke has passed after every implementation iteration.
+The prior full baseline remains authoritative for its identity; the working tier is not another
+full multi-suite campaign.
 
 ## Retained boundaries
 

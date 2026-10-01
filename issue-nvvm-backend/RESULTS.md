@@ -116,6 +116,22 @@ entry/payload changes. Static selectors `nvvmOptixTracePlansKeepPayloadAndStageB
 provider support before mutation, and opaque handle roles. These tests do not qualify arbitrary
 OptiX stages, recursive rays or pointer payloads.
 
+### OptiX material and ray-state gate
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/pipeline/ray-tracing/nvvm-optix-material.slang \
+  slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal \
+  slang-unit-test-tool/nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission.internal
+```
+
+The fixture checks 202 words per mode, including all eight world-ray observations in both callbacks,
+texture channels, material value/PDF lanes and guards. Material values use the retained dielectric
+absolute/relative budget; CUDA output is comparison evidence. The grouped negative unit calls all
+eight raw SDK helpers from compute and raygen to prove backend rejection before provider creation.
+Use compute smoke and raygen binding controls after this named-query batch. Unchanged triangle
+storage/type/IR contracts retain their earlier static evidence; no new static rebuild is needed.
+
 ## Correctness baseline and comparison
 
 For an authorized migration after a host/driver change with unchanged verified compiler/toolkit

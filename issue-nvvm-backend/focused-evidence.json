@@ -84017,6 +84017,176 @@
         "meaning": "ExactSDK32output49input trace and callback primitives compile/execute independently atO0/O3 before production. Ten exact words including guards; mechanism evidence only."
       },
       "qualification": "CUDA12.9/OptiX SDK9, LLVM14, targetSM80, L4/driver595.71.05. Optional queryInterface v1 leaves ABI46 tables unchanged; absent interface rejects trace before module creation. Module43/container2 unchanged. No pointer payloads, padded/subword/array/matrix payloads, any-hit, intersection, callables, recursive callback trace, full-application, performance or full-suite claim."
+    },
+    "nvvm-optix-material": {
+      "status": "accepted-focused",
+      "scope": "Eight exact Float32 world-ray origin/direction/tmin/current SDK queries in Miss/ClosestHit. Textured imported MaterialX dielectric evaluation through the qualified real triangle path.",
+      "identity": {
+        "revision": "a04590e8db2f57ec93ed0de59e411784d4c44dce",
+        "patch_sha256": "dda68d34c0fe10ec8974c6251c7d6409738f7140f5bbb87c2ca57e7fe6b485ab",
+        "source_sha256": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "18ced6453ce2aece10a21b59b1e1f54e17ad3db4e99d81815435ab6204e9c807",
+          "source/slang/hlsl.meta.slang": "ae654f07b59030e53bc8d781a498553b9bb85a43db370038e7d276555cc7ba02",
+          "source/slang/slang-emit-nvvm.cpp": "aeb28341545856bb68a3310569f208c598d28861c424c6e229d30443a4069257",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "0fca98f6446c1ef15fd3a6dfa3104f63dd9e101aa90cb1a777b8d614ddcfa603",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "3e4dd00701c0231faf62051637358a2b9aca0d2362e3d37331f7cf10d651c603",
+          "tests/pipeline/ray-tracing/nvvm-optix-material.slang": "98482d1ea55f93ce600861d71c6647241a29ce4440d087fa968f87aac685a5f2",
+          "tests/cuda/complex/tiled_brass_material.slang": "b0a74f8603fa4dfcfa204ff4974ca56994dd5dd0a42765022fdb71e2d0e04d92",
+          "tools/render-test/render-test-main.cpp": "edc5dcdf15f4d5e3009181d842658fee9ee6acfd99a5c17a6da7d59c3af9c4d9",
+          "external/optix-dev/include/internal/optix_device_impl.h": "be4266ff8d04ed9e43e0524a85b43fc947121fd6fb874317490f1a407135fc61"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "b1a0d2909f2df9aca4f7f5b0a1aac23fb7dc1d62d2e277ed423c1f07d858b17e",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9bb095303845b795c9fbade9ce674cb8d869dae103331535788a2b3ea4298fba",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "fc4a698273b05de7026f8de5ee6d023fe39e031a64f375d8c40d7c1e4f2460a5",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "01290e8ea65a48336f71cab1735a2e4c0286ba3fac011a9c3ca98db8b4f60a3b"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "optix_library_sha256": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05, targetSM80",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "meaning": "Matching ray-state compiler/provider/runtime and imported material identity; no new static build because IR/API/storage/type roles are unchanged."
+      },
+      "validation": {
+        "gates": {
+          "build": {
+            "path": "build/nvvm-optix-material/build.json",
+            "sha256": "ccb84c978f142c1accf9320f6ae99a9ccb4be84ec2bb884f55a503c23001a4a7"
+          },
+          "focused": {
+            "path": "build/nvvm-optix-material/focused.json",
+            "sha256": "16618ea1959917086899eb07c86139b90e1cf5ca59a78ef005935031c64ea7a7"
+          },
+          "smoke": {
+            "path": "build/nvvm-optix-material/smoke.json",
+            "sha256": "85675b5c0c5671f063a36d90266df33c7f4e559d48ce6339996e758a4835bd0b"
+          },
+          "oracle-nvvm-o0": {
+            "path": "build/nvvm-optix-material/oracle-nvvm-o0.json",
+            "sha256": "cc875965cc0cbe40ec456a60c44f2956d28f8c424e241fa0c58e551fda9f9b24"
+          },
+          "oracle-nvvm-o3": {
+            "path": "build/nvvm-optix-material/oracle-nvvm-o3.json",
+            "sha256": "dbb2bcf2d9c1b32adf4d7eb26dd7b39e24f78ac61ba060743655c32eaf97eeea"
+          },
+          "oracle-nvrtc-o3": {
+            "path": "build/nvvm-optix-material/oracle-nvrtc-o3.json",
+            "sha256": "da6be38946522b28a7fe858b7a4d04549e8ca0ff3b318346ebd80225c80edf4f"
+          }
+        },
+        "outcomes": {
+          "tests/pipeline/ray-tracing/nvvm-optix-material.slang (cuda)": "passed",
+          "tests/pipeline/ray-tracing/nvvm-optix-material.slang.1 (cuda)": "passed",
+          "tests/pipeline/ray-tracing/nvvm-optix-material.slang.2 (cuda)": "passed",
+          "slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangOptixPrimitivesRejectComputeBeforeEmission.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission.internal": "passed",
+          "slang-unit-test-tool/nvvmOptixRaygenBindings.internal": "passed"
+        },
+        "smoke": {
+          "selection": {
+            "path": "build/nvvm-optix-material/smoke-1/selection.json",
+            "sha256": "484db1c898b97ba0d89bbfc287d0ce64d7f622d8c6527349686355876e943549"
+          },
+          "provenance": {
+            "path": "build/nvvm-optix-material/smoke-1/provenance.json",
+            "sha256": "ad693d59185722cdda77f87f0cdc89a7c39732402d5df999f05bec3ca9c8bd80"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0,
+          "elapsed_seconds": 21.839999675750732
+        },
+        "static_reuse": "nvvm-optix-triangle retains matching prior static role/payload/SBT evidence. This batch changes no IR/API/cache/storage roles; new query signature and stage contracts use shared provider/emitter tests."
+      },
+      "runtime_contract": {
+        "fixture": "tests/pipeline/ray-tracing/nvvm-optix-material.slang",
+        "modes": ["nvvm-o0", "nvvm-o3", "nvrtc-o3"],
+        "rays_per_mode": 8,
+        "hits_per_mode": 4,
+        "misses_per_mode": 4,
+        "words_per_mode": 202,
+        "bounded_material_words": 16,
+        "exact_other_words": 186,
+        "guards": {
+          "per_ray": 8,
+          "trailing": 2
+        },
+        "texture": "2x2 gradient, four exact texel centers from distinct triangle barycentrics; all sampled channels checked independently. Ordinary reflected Texture2D; no packed material handles.",
+        "ray_state": "All8queries observed in both callbacks. Hitcurrentdistance=.5; misscurrentdistance=originalTMax. Nonunit miss direction is preserved.",
+        "material": "Existing MxDielectricNoCompensationBSDF, normal incidence, anisotropic roughness(.5,.25),eta2, textured reflection tint and nonzero transmission tint; Float4(value,pdf) payload.",
+        "numerical_contract": {
+          "reuses_feature": "material-dielectric-eval-pdf",
+          "rgb": "R*2/(9*pi)",
+          "pdf": "17/(72*pi)",
+          "absolute_tolerance": 1e-6,
+          "relative_tolerance": 1e-5,
+          "oracle": {
+            "path": "build/nvvm-optix-material/oracle.py",
+            "sha256": "c73f1e107ad960381fbcfb4e4c5e30b55d0a7f250fa0c477d0b0edc8acc37f45"
+          },
+          "cuda_is_oracle": false
+        },
+        "outputs": {
+          "nvvm-o0": {
+            "path": "build/nvvm-optix-material/nvvm-o0-output.txt",
+            "sha256": "8a61d06b4c0ff8d1f742fa4f1423cfd44267a26b8ff7910b289c7492b062bde6"
+          },
+          "nvvm-o3": {
+            "path": "build/nvvm-optix-material/nvvm-o3-output.txt",
+            "sha256": "02f664051b39d280d0f27eb92898feec8c98632d6b0de42caccd903e47dda995"
+          },
+          "nvrtc-o3": {
+            "path": "build/nvvm-optix-material/nvrtc-o3-output.txt",
+            "sha256": "02f664051b39d280d0f27eb92898feec8c98632d6b0de42caccd903e47dda995"
+          }
+        },
+        "exact_word_differences_vs_cuda": {
+          "nvvm-o0": [0, 1, 2, 3, 51, 52, 53, 100, 102, 103, 152, 153],
+          "nvvm-o3": []
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-optix-material/before.json",
+          "sha256": "5151dff3991430a8f050bb2ade7bc47c194617a97e4e5b8cde0a661b3a44fa53"
+        },
+        "source": {
+          "path": "build/nvvm-optix-material/material.slang",
+          "sha256": "6aa10df79122b576672813ffa020afdebc2c3c27cdeb5d9c4bf3541936d41bc2"
+        },
+        "identity": {
+          "path": "build/nvvm-optix-material/before-identity.json",
+          "sha256": "810a4dd277c3b455c079ca67548003e60fe2d91b3618cf975d13c80532d93624"
+        },
+        "meaning": "Both pre-change NVVM modes reject GenericAsm optixGetWorldRayOrigin. Typed core composition and exact SDK query emission now execute full material output."
+      },
+      "validation_incidents": {
+        "before_warning": "CUDA originally executed202 correct words but its intentional local sampler placeholder emitted E41016 despite source pragma. Explicit existing warning forwarding fixes harness diagnostics only; shader body/oracle unchanged.",
+        "corrected_cuda_control": {
+          "path": "build/nvvm-optix-material/cuda-warning-control.json",
+          "sha256": "cd887265e8c8fe8561e558a83f3abb3ce3e88a4b38bfe9cbcbc1f059a184ef8c"
+        },
+        "independent_cuda_oracle": {
+          "path": "build/nvvm-optix-material/cuda-oracle.json",
+          "sha256": "d5fdc9a2260c7b01a1693f663927a374b35c47f9c0c1d9cd7135b6fe11ec45dd"
+        }
+      },
+      "qualification": "CUDA12.9/SDK9,LLVM14,targetSM80,L4/driver595.71.05. Eight names/signatures independently asserted with both serializers and rejection/no-mutation; all8 through noinline helpers reject compute/raygen before provider creation. Effects preserve observation position. Module43/ABI46/container2 unchanged. No full tiled-brass graph, bindless handle integration, any-hit/intersection/callable/recursion/object-transform/performance/universal numerical or full-checkpoint claim."
     }
   }
 }

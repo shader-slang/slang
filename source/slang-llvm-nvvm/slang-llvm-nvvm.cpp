@@ -3401,6 +3401,7 @@ enum class OptixIntrinsicKind
     None,
     Query32,
     Query64,
+    QueryFloat32,
     GetPayload,
     SetPayload,
 };
@@ -3429,6 +3430,18 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
                 return OptixIntrinsicKind::Query32;
         if (name == "_optix_get_sbt_data_ptr_64" && areSameType(intrinsic.resultType, kUnsignedI64))
             return OptixIntrinsicKind::Query64;
+        const char* rayQueries[] = {
+            "_optix_get_world_ray_origin_x",
+            "_optix_get_world_ray_origin_y",
+            "_optix_get_world_ray_origin_z",
+            "_optix_get_world_ray_direction_x",
+            "_optix_get_world_ray_direction_y",
+            "_optix_get_world_ray_direction_z",
+            "_optix_get_ray_tmin",
+            "_optix_get_ray_tmax"};
+        for (auto query : rayQueries)
+            if (name == query && areSameType(intrinsic.resultType, kFloat32))
+                return OptixIntrinsicKind::QueryFloat32;
         return OptixIntrinsicKind::None;
     }
     const bool get = name == "_optix_get_payload";
@@ -3615,10 +3628,11 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
         llvm::SmallString<96> assembly(isSet ? "call " : "call ($0), ");
         assembly.append(llvm::StringRef(intrinsic->name, intrinsic->nameSize));
         assembly.append(isSet ? ", ($0, $1);" : operandCount ? ", ($1);" : ", ();");
-        const char* constraints = isSet                                      ? "r,r"
-                                  : operandCount                             ? "=r,r"
-                                  : optixKind == OptixIntrinsicKind::Query64 ? "=l"
-                                                                             : "=r";
+        const char* constraints = isSet                                           ? "r,r"
+                                  : operandCount                                  ? "=r,r"
+                                  : optixKind == OptixIntrinsicKind::Query64      ? "=l"
+                                  : optixKind == OptixIntrinsicKind::QueryFloat32 ? "=f"
+                                                                                  : "=r";
         // Keep SDK observations and register writes at their execution point. The trace
         // operation separately clobbers memory because its callbacks can access user storage.
         auto primitive = llvm::InlineAsm::get(type, assembly, constraints, true);

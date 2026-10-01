@@ -129,6 +129,11 @@ The optional versioned trace interface uses the existing provider query mechanis
 ABI46 tables. The provider adapts finite payload arrays to the SDK's fixed 32-result/49-argument
 primitive, zeros unused inputs, and retains side effects and a compiler memory clobber. Exact named
 get/set payload calls require literal indices 0..31; triangle attributes admit indices 0 and 1.
+World-ray origin/direction and ray-range queries use eight exact Float32 zero-argument SDK calls
+in miss/closest-hit. Core composes the vector queries; the provider uses Float32 register transport.
+Direction retains the traced value without normalization. Current distance is the closest-hit
+distance or the original maximum in miss. Queries retain their observation position; the trace
+operation owns the callback memory clobber.
 Unknown names, wrong signatures and invalid insertion points fail before emission. Missing trace
 support is diagnosed before module creation. This finite typed SDK boundary does not interpret CUDA
 text or admit arbitrary external calls. Any-hit, procedural intersection, callback tracing, callables
