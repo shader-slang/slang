@@ -28,7 +28,7 @@ struct GlobalInstInliningContextGeneric
     bool isLegalGlobalInst(IRInst* inst);
 
     // Opcodes that can be inlined into function bodies.
-    bool isInlinableGlobalInst(IRInst* inst);
+    virtual bool isInlinableGlobalInst(IRInst* inst);
 
     bool shouldInlineInstImpl(IRInst* inst);
 

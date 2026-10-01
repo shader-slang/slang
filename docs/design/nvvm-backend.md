@@ -64,6 +64,14 @@ descriptor conversions between UInt2 and handles become unsigned low/high word o
 the existing UInt64 handle conversion. The canonical descriptor resource type selects this lowering;
 it does not grant integer conversion to buffer, sampler or writable-resource handles.
 
+The last NVVM legalization step localizes pure numeric module expressions through
+`GlobalInstInliningContextGeneric`. Its target policy places arithmetic, casts, vector projections
+and dependent constructors at function uses; the shared traversal owns dependency order and cloning.
+No simplification pass follows this placement step. Calls and loads remain module-owned and reject
+preflight, including read-none synthesized constructor calls; numeric operation and type admission
+still belong to preflight. This is placement adaptation, not global expression evaluation or a new
+constant representation.
+
 Typed layout queries retain the semantic fact that optimization could otherwise erase. `OffsetOf`
 carries the exact canonical field key as part of IR identity, so equal-valued fields keep distinct
 offsets. NVVM folds that key using CUDA layout and signed-Int32 range checks; other targets restore

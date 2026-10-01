@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty-one feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 77 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty-two feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 78 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -95,7 +95,7 @@ implementation iterations; working runs every three to five iterations or sooner
 Explore application-relevant failures in bounded batches and preserve intentional semantic differences.
 The previous four-item stop is superseded. Approximate Half policies remain separate work.
 
-The tier selector is implemented and reviewed: 1,711 working configurations, 455 exploratory
+The tier selector is implemented and reviewed: 1,713 working configurations, 459 exploratory
 configurations and a 15-cell smoke subset. Its 43 CPU contracts and all 15 smoke cells pass;
 the first smoke run took 22.16 seconds. The integration run below and reviewed focused admissions qualify this inventory.
 The three descriptor-conversion input changes are reviewed: their stronger UInt2/guard oracle
@@ -259,12 +259,26 @@ cases and 15 smoke cells pass (21.65s). A test-only static build typo was correc
 poison builder; production/runtime evidence is unchanged. Exact identities and retry history are
 in focused evidence; raw evidence is under build/nvvm-optix-array-payload.
 
-**Next work:** localize module-scope constant expressions through the existing shared IR pass.
-The unchanged four matrix tests now fail at vector `add`, after passing array payload admission;
-an isolated O3 raygen dump confirms the module expression. A separate closest-hit dump rejects
-the CUDA-only matrix wrapper, so transform-query support remains a subsequent contract. Their
-NVRTC control passes all four tests (162 assertions); no NVVM matrix execution is claimed.
+Pure module-expression placement is now qualified through the existing shared dependency-localization
+pass at the final NVVM legalization boundary. The permanent
+[fixture](../tests/cuda/nvvm-global-constant-expressions.slang) passes NVVM O0/O3 with all 30 words
+checked (2.616s). The static dependency/no-mutation unit passes, including scalar and reordered-vector
+Swizzle cases (6.935s); all 15 smoke cells pass (21.334s). Calls, loads, pointer/resource operations
+and unknown effects remain outside the placement policy. The original source's global synthesized
+record-constructor Calls remain unresolved; the qualified source constructs records locally. NVRTC
+still rejects its dynamic device initializer and has no admitted runtime cell. Initial constructor,
+NVRTC, Swizzle and CLI invocation failures retain their exact source identities in the raw evidence
+under build/nvvm-global-expressions.
+
+The original matrix raygen now compiles to PTX. All four complete RHI matrix cases advance to
+E52017 for their exact CUDA-only ObjectToWorld/WorldToObject wrappers; no NVVM matrix runtime is
+claimed. Their earlier NVRTC control passes four tests (162 assertions) on its recorded identity.
+**Next work:** prepare transform queries using the SDK's full active-transform-list composition
+contract, with checked primitive signatures, stage ownership and matrix orientation. A single-instance
+shortcut is not an implementation of the public matrix APIs. The existing RHI pipeline's single-level,
+non-motion qualification does not establish general transform support.
 Raw SDK object-ray queries remain AnyHit/Intersection-only, and GeometryIndex is distinct from
 SBT record index. Motion, procedural/callable ABI and recursive callback tracing remain separate.
-This is two small iterations after the 1,711-cell working checkpoint at `0762f003c`; that checkpoint
+This is the third small iteration after the 1,711-cell working checkpoint at `0762f003c`; run the
+next working checkpoint by the fifth iteration, or sooner for a broad change. The earlier checkpoint
 was not rerun or relabeled. Full RHI remains on demand.

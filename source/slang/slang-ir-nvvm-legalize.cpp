@@ -6,6 +6,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-global-values.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -620,6 +621,90 @@ void _legalizeNVVMLayoutPointerObservations(LinkedIR& linkedIR)
     }
 }
 
+// Localizes executable constant expressions without changing which operations NVVM supports.
+// Consider `static const float3 sum = a + b;`: replacing the global constant exposes a
+// module-owned Add. The shared inliner clones that expression before each function use,
+// including enclosing constructors and read-only vector projections, so ordinary operation
+// and dominance checks can own it.
+// Calls and loads must remain module-owned even beneath such constructors; cloning either
+// could duplicate an effect or change when memory is observed.
+struct NVVMGlobalInstInliningContext : GlobalInstInliningContextGeneric
+{
+    bool isLegalGlobalInstForTarget(IRInst* inst) override
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeVector:
+        case kIROp_MakeVectorFromScalar:
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool isInlinableGlobalInst(IRInst* inst) override
+    {
+        if (isLegalGlobalInstForTarget(inst))
+            return true;
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_Fma:
+        case kIROp_FRem:
+        case kIROp_IRem:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_BitNot:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_Not:
+        case kIROp_Neg:
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Less:
+        case kIROp_Leq:
+        case kIROp_Greater:
+        case kIROp_Geq:
+        case kIROp_Select:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+        case kIROp_BitCast:
+        case kIROp_Swizzle:
+            break;
+        default:
+            return false;
+        }
+        // This is a placement policy, not a second numeric type/operation catalog. In
+        // particular, a pointer-to-bits cast is not numeric placement; checked provenance
+        // remains with its original producer. Exact widths and signatures are preflight's job.
+        auto type = inst->getDataType();
+        if (!as<IRBasicType>(type) && !as<IRVectorType>(type))
+            return false;
+        for (UInt i = 0; i < inst->getOperandCount(); ++i)
+        {
+            auto operandType = inst->getOperand(i)->getDataType();
+            if (!as<IRBasicType>(operandType) && !as<IRVectorType>(operandType))
+                return false;
+        }
+        return true;
+    }
+
+    bool isInlinableGlobalInstForTarget(IRInst*) override { return false; }
+    bool shouldBeInlinedForTarget(IRInst*) override { return false; }
+    IRInst* getOutsideASM(IRInst* inst) override { return inst; }
+};
+
 SlangResult _verifyNVVMReadyIR(CodeGenContext* codeGenContext, const LinkedIR& linkedIR)
 {
     for (auto globalInst : linkedIR.module->getGlobalInsts())
@@ -661,6 +746,12 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     _legalizeNVVMLocalBooleanVectorAddresses(linkedIR);
     _legalizeNVVMTextureDescriptorWordConversions(linkedIR);
     _legalizeNVVMLayoutPointerObservations(linkedIR);
+
+    // No simplifying/hoisting pass follows this target handoff. Ordinary clones stay in
+    // their consuming blocks without introducing GlobalValueRef wrappers.
+    NVVMGlobalInstInliningContext globalValues;
+    globalValues.wrapReferences = false;
+    globalValues.inlineGlobalValuesAndRemoveIfUnused(linkedIR.module);
 
     IRDeadCodeEliminationOptions options;
     options.keepLayoutsAlive = true;

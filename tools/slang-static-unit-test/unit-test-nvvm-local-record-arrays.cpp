@@ -483,6 +483,228 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
     }
 }
 
+// Pure global dependencies become ordinary local SSA values at every consuming use.
+SLANG_UNIT_TEST(nvvmGlobalExpressionsLocalizeWithoutCloningEffects)
+{
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto vectorType = builder.getVectorType(builder.getFloatType(), 3);
+        IRInst* a[] = {
+            builder.getFloatValue(builder.getFloatType(), 0.25),
+            builder.getFloatValue(builder.getFloatType(), 0.25),
+            builder.getFloatValue(builder.getFloatType(), 1)};
+        IRInst* b[] = {
+            builder.getFloatValue(builder.getFloatType(), 1),
+            builder.getFloatValue(builder.getFloatType(), 2),
+            builder.getFloatValue(builder.getFloatType(), 3)};
+        auto vector = builder.emitAdd(
+            vectorType,
+            builder.emitMakeVector(vectorType, 3, a),
+            builder.emitMakeVector(vectorType, 3, b));
+        uint32_t scalarIndex[] = {1};
+        auto scalarProjection = builder.emitSwizzle(builder.getFloatType(), vector, 1, scalarIndex);
+        auto projectedNegation = builder.emitNeg(builder.getFloatType(), scalarProjection);
+        uint32_t vectorIndices[] = {2, 0};
+        auto vectorProjection = builder.emitSwizzle(
+            builder.getVectorType(builder.getFloatType(), 2),
+            vector,
+            2,
+            vectorIndices);
+        auto sum = builder.emitAdd(
+            builder.getUIntType(),
+            builder.getIntValue(builder.getUIntType(), 5),
+            builder.getIntValue(builder.getUIntType(), 7));
+        auto converted =
+            builder.emitIntrinsicInst(builder.getFloatType(), kIROp_CastIntToFloat, 1, &sum);
+        auto arrayType = builder.getArrayTypeBase(
+            kIROp_ArrayType,
+            builder.getFloatType(),
+            builder.getIntValue(builder.getIntType(), 2));
+        IRInst* arrayValues[] = {converted, builder.getFloatValue(builder.getFloatType(), 9)};
+        auto array = builder.emitMakeArray(arrayType, 2, arrayValues);
+        auto recordVectorType = builder.getVectorType(builder.getFloatType(), 2);
+        auto recordVector = builder.emitMakeVector(recordVectorType, 2, arrayValues);
+        auto recordType = builder.createStructType();
+        auto vectorField =
+            builder.createStructField(recordType, builder.createStructKey(), recordVectorType);
+        auto arrayField =
+            builder.createStructField(recordType, builder.createStructKey(), arrayType);
+        IRInst* fields[] = {recordVector, array};
+        auto record = builder.emitMakeStruct(recordType, 2, fields);
+        auto helper = builder.createFunc();
+        helper->setFullType(builder.getFuncType(0, nullptr, recordType));
+        builder.setInsertInto(helper);
+        auto helperBlock = builder.emitBlock();
+        auto helperReturn = builder.emitReturn(record);
+
+        builder.setInsertInto(module);
+        auto outputType = builder.getPtrType(
+            builder.getFloatType(),
+            AccessQualifier::ReadWrite,
+            AddressSpace::UserPointer,
+            builder.getDefaultBufferLayoutType());
+        IRType* parameters[] = {outputType};
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(1, parameters, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.addKeepAliveDecoration(entry);
+        builder.setInsertInto(entry);
+        auto entryBlock = builder.emitBlock();
+        auto output = builder.emitParam(outputType);
+        auto directLane = builder.emitElementExtract(vector, IRIntegerValue(0));
+        builder.emitStore(output, directLane);
+        auto projectedStore = cast<IRStore>(builder.emitStore(output, projectedNegation));
+        auto projectedLane = builder.emitElementExtract(vectorProjection, IRIntegerValue(0));
+        builder.emitStore(output, projectedLane);
+        auto directArray = builder.emitFieldExtract(record, arrayField->getKey());
+        builder.emitStore(output, builder.emitElementExtract(directArray, IRIntegerValue(0)));
+        auto call = builder.emitCallInst(recordType, helper, 0, nullptr);
+        auto returnedVector = builder.emitFieldExtract(call, vectorField->getKey());
+        builder.emitStore(output, builder.emitElementExtract(returnedVector, IRIntegerValue(1)));
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(legalizeIRForNVVM(&context.codeGen, linked)));
+        auto localNegation = projectedStore->getVal();
+        SLANG_CHECK(localNegation->getOp() == kIROp_Neg);
+        SLANG_CHECK(localNegation->getParent() == entryBlock);
+        auto scalarSwizzle = localNegation->getOperand(0);
+        auto vectorSwizzle = projectedLane->getOperand(0);
+        for (auto projection : {scalarSwizzle, vectorSwizzle})
+        {
+            SLANG_CHECK(projection->getOp() == kIROp_Swizzle);
+            SLANG_CHECK(projection->getParent() == entryBlock);
+            SLANG_CHECK(projection->getOperand(0)->getOp() == kIROp_Add);
+            SLANG_CHECK(projection->getOperand(0)->getParent() == entryBlock);
+        }
+        SLANG_CHECK(cast<IRIntLit>(scalarSwizzle->getOperand(1))->getValue() == 1);
+        SLANG_CHECK(cast<IRIntLit>(vectorSwizzle->getOperand(1))->getValue() == 2);
+        SLANG_CHECK(cast<IRIntLit>(vectorSwizzle->getOperand(2))->getValue() == 0);
+        auto localRecord = directArray->getOperand(0);
+        auto returnedRecord = helperReturn->getOperand(0);
+        SLANG_CHECK(localRecord->getOp() == kIROp_MakeStruct);
+        SLANG_CHECK(localRecord->getParent() == entryBlock);
+        SLANG_CHECK(returnedRecord->getOp() == kIROp_MakeStruct);
+        SLANG_CHECK(returnedRecord->getParent() == helperBlock);
+        SLANG_CHECK(localRecord != returnedRecord);
+        auto localVector = directLane->getOperand(0);
+        SLANG_CHECK(localVector->getOp() == kIROp_Add);
+        SLANG_CHECK(localVector->getParent() == entryBlock);
+        for (auto local : {localRecord, returnedRecord})
+        {
+            auto localBlock = local->getParent();
+            SLANG_CHECK(local->getOperand(0)->getOp() == kIROp_MakeVector);
+            SLANG_CHECK(local->getOperand(0)->getParent() == localBlock);
+            auto localArray = local->getOperand(1);
+            SLANG_CHECK(localArray->getOp() == kIROp_MakeArray);
+            SLANG_CHECK(localArray->getParent() == localBlock);
+            auto localCast = localArray->getOperand(0);
+            SLANG_CHECK(localCast->getOp() == kIROp_CastIntToFloat);
+            SLANG_CHECK(localCast->getParent() == localBlock);
+            SLANG_CHECK(local->getOperand(0)->getOperand(0) == localCast);
+            SLANG_CHECK(localCast->getOperand(0)->getOp() == kIROp_Add);
+            SLANG_CHECK(localCast->getOperand(0)->getParent() == localBlock);
+        }
+        // Existing checked SSA validation proves dependencies dominate each use.
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(SLANG_SUCCEEDED(result));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    for (bool useCall : {false, true})
+        for (bool inConstructor : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            NVVMStaticTestContext context(unitTestContext);
+            auto module = IRModule::create(context.env.getSessionImpl());
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            IRInst* excluded = nullptr;
+            if (useCall)
+            {
+                auto helper = builder.createFunc();
+                helper->setFullType(builder.getFuncType(0, nullptr, builder.getFloatType()));
+                builder.setInsertInto(helper);
+                builder.emitBlock();
+                builder.emitReturn(builder.getFloatValue(builder.getFloatType(), 7));
+                builder.setInsertInto(module);
+                excluded = builder.emitCallInst(builder.getFloatType(), helper, 0, nullptr);
+            }
+            else
+                excluded = builder.emitLoad(builder.createGlobalVar(builder.getFloatType()));
+            IRInst* value = excluded;
+            if (inConstructor)
+            {
+                auto sum = builder.emitAdd(
+                    builder.getFloatType(),
+                    builder.getFloatValue(builder.getFloatType(), 2),
+                    builder.getFloatValue(builder.getFloatType(), 3));
+                IRInst* lanes[] = {excluded, sum};
+                value = builder.emitMakeVector(
+                    builder.getVectorType(builder.getFloatType(), 2),
+                    2,
+                    lanes);
+            }
+            auto outputType = builder.getPtrType(
+                builder.getFloatType(),
+                AccessQualifier::ReadWrite,
+                AddressSpace::UserPointer,
+                builder.getDefaultBufferLayoutType());
+            IRType* parameters[] = {outputType};
+            auto entry = builder.createFunc();
+            entry->setFullType(builder.getFuncType(1, parameters, builder.getVoidType()));
+            builder.addEntryPointDecoration(
+                entry,
+                Profile(Stage::Compute),
+                toSlice("computeMain"),
+                toSlice("test"));
+            builder.addKeepAliveDecoration(entry);
+            builder.setInsertInto(entry);
+            auto block = builder.emitBlock();
+            auto output = builder.emitParam(outputType);
+            auto selected =
+                inConstructor ? builder.emitElementExtract(value, IRIntegerValue(0)) : value;
+            auto store = cast<IRStore>(builder.emitStore(output, selected));
+            builder.emitReturn();
+            LinkedIR linked = {};
+            linked.module = module;
+            linked.entryPoints.add(entry);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(legalizeIRForNVVM(&context.codeGen, linked)));
+            SLANG_CHECK(excluded->getParent() == module->getModuleInst());
+            if (inConstructor)
+            {
+                auto localVector = selected->getOperand(0);
+                SLANG_CHECK(localVector->getParent() == block);
+                SLANG_CHECK(localVector->getOperand(0) == excluded);
+                SLANG_CHECK(localVector->getOperand(1)->getOp() == kIROp_Add);
+                SLANG_CHECK(localVector->getOperand(1)->getParent() == block);
+            }
+            else
+                SLANG_CHECK(store->getVal() == excluded);
+            NVVMOperationRequirements requirements;
+            SLANG_CHECK(
+                SLANG_FAILED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+            SLANG_CHECK(
+                context.sink.outputBuffer.getUnownedSlice().indexOf(toSlice("E52017")) >= 0);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+}
+
 // Explicit-layout memory uses checked field keys and scalar payload lanes, never native record GEP.
 SLANG_UNIT_TEST(nvvmLayoutPointerFieldsKeepLayoutAndProvenance)
 {

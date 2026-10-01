@@ -252,6 +252,40 @@
         "tests/cuda/nvvm-conventional-global-vectors.slang"
       ],
       "rationale": "Reviewed candidate ordinal0 adaptation matches authored ordinals0/1/2 respectively: same shaderobj command, SM80, source and exact36-word oracle; only route/optimization differ."
+    },
+    {
+      "id": "cuda/nvvm-global-constant-expressions.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-global-expressions",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-global-constant-expressions.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-global-constant-expressions.slang"
+      ],
+      "rationale": "Exact authored ordinal0, matching shaderobj SM80 options and independent30-word oracle. Other adapted modes remain exploratory; no NVRTC runtime qualification."
+    },
+    {
+      "id": "cuda/nvvm-global-constant-expressions.slang#cuda-2",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-global-expressions",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-global-constant-expressions.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-global-constant-expressions.slang"
+      ],
+      "rationale": "Exact authored ordinal1, matching shaderobj SM80 options and independent30-word oracle. Other adapted modes remain exploratory; no NVRTC runtime qualification."
     }
   ],
   "smoke": [

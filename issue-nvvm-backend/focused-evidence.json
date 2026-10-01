@@ -86861,6 +86861,322 @@
         "All76 earlier focused objects and historical full records preserved. Full RHI remains on demand and has not run."
       ],
       "rhi_oracle_commit": "b9554cd8ce7a6d5d983a4cfbfa688ad3efcc27b2"
+    },
+    "nvvm-global-expressions": {
+      "status": "accepted-focused",
+      "scope": "Localize pure module numeric expressions, casts and swizzles with dependent constructors through the existing shared inliner; keep calls/loads/pointer operations excluded.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "revision": "58546e34dc0e354af5b486343ba98dfef2468d4f",
+        "source_sha256": {
+          "source/slang/slang-ir-legalize-global-values.h": "1303af1cd257acba79721c84e2b5b38c40e8ccbf4359b0c4656372f8e5df7d42",
+          "source/slang/slang-ir-nvvm-legalize.cpp": "7b1c4088294c61560513508fce19ea0d78d44dbb9867f87bebb05adcc65cc94c",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "33c2f374058247614ba80a7f43c0a44c2a0a8dcd727fd9e45f4555234e6d6026",
+          "tests/cuda/nvvm-global-constant-expressions.slang": "c73c95f0dce4eeb8d98b9bfdf2ed8be8ecc267f325d48ae2137e2bd2ebe97912"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "63591f914cc6aaa2182413a02b8bcd436c45a3ac24375a562d502453d8d0ee4a",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "3a96fee0d76dc1f2ff379af452c223a10f4aa2615ad72348a6533ab15132a548",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "0ee60a0a2923d61771586ef5a293e1ef5f388ad6b55b6f608838b5cbdedc4897",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "3d0efd048caf9cde29598fc57f91f1226a30e23f26ef81670616501b7d476774"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "meaning": "Final pure numeric module-expression and Swizzle localization build; two NVVM runtime modes, CUDA unqualified.",
+        "patch_sha256": "a64d1186a65005a63168692ae0a0ac927b9f1897fca6e615a2d91cfa7bdb3983"
+      },
+      "shared_capture": {
+        "path": "build/nvvm-global-expressions/identity-final.json",
+        "sha256": "724f2ccb33ac22821ab64a19ecdaf8164495da2be8c6183958fd42388f3084e7"
+      },
+      "static_identity": {
+        "path": "build/nvvm-global-expressions/static-identity-final.json",
+        "sha256": "b268ae0e2547bbe97055d9aec33fcbfa1636c3aedd3a17b842fa44f941344327"
+      },
+      "before_identity": {
+        "path": "build/nvvm-global-expressions/before-identity.json",
+        "sha256": "1b523dd6c2b6b58c15cc7d2cb2baa3d86be510991d6806563c956875da8376ad"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-global-expressions/build-retry.json",
+          "sha256": "6d8f3b63d9869dc3721588f8d2ab5ea876a259e94c73be7df9a9bc2d78a29a1b",
+          "return_code": 0,
+          "elapsed_seconds": 23.000905990600586
+        },
+        "static_build": {
+          "path": "build/nvvm-global-expressions/static-build-retry.json",
+          "sha256": "83b13848db6111fe38e2ccf516cd8995c26602ef9c9d48b3cc03223699de2c63",
+          "return_code": 0,
+          "elapsed_seconds": 20.8839590549469
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-global-expressions/runtime-retry.json",
+            "sha256": "53d680212f931a8034e5890f7d2edf9fb2788809a42d78ea5659d4d585ab3180",
+            "return_code": 0,
+            "elapsed_seconds": 2.616483211517334
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-global-constant-expressions.slang (cuda)": "passed",
+            "tests/cuda/nvvm-global-constant-expressions.slang.1 (cuda)": "passed"
+          },
+          "optimization_levels": [0, 3],
+          "executed": 2,
+          "ignored": 0
+        },
+        "static": {
+          "record": {
+            "path": "build/nvvm-global-expressions/static-unit-retry.json",
+            "sha256": "348b6df3e855fc1f073826087116748dd941b96eeee819cf8107c10194fdfca9",
+            "return_code": 0,
+            "elapsed_seconds": 6.935400485992432
+          },
+          "outcomes": {
+            "nvvmGlobalExpressionsLocalizeWithoutCloningEffects": "passed"
+          },
+          "ignored": 0,
+          "coverage": "Float3 Add, scalar/vector swizzle with ordered lanes, nested constructors/casts, dependency sharing and separate function clones; four direct/nested Call/Load preflight rejections before module/program creation."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-global-expressions/smoke.json",
+            "sha256": "3e6b8c915f6d86e0d34cd4c4694b270f4d3bd9dfbc05ebcba4e00f8cce18bc2d",
+            "return_code": 0,
+            "elapsed_seconds": 21.333646297454834
+          },
+          "selection": {
+            "path": "build/nvvm-global-expressions/smoke-1/selection.json",
+            "sha256": "4a92170c1c906dc178c3989ddac23f5e0bb7419e7ecfdadbfc04c3c65fc1b2d8"
+          },
+          "provenance": {
+            "path": "build/nvvm-global-expressions/smoke-1/provenance.json",
+            "sha256": "b69c7082748b2b1dadb41778561aab36fdee8e4f69faec891b894cd1772764df"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "reuse": "Provider/core/API/ABI unchanged. Historical full baseline and 1711-cell working checkpoint retain their own identities; no full working or RHI run in this slice.",
+        "tier_contracts": {
+          "record": {
+            "path": "build/nvvm-global-expressions/tier-contracts.json",
+            "sha256": "1bb60fcf040a74a8551f5b6adce73c6e22a769e399e3334177c7e5211b5dc278"
+          },
+          "passed": 8,
+          "failed": 0
+        },
+        "inventory": {
+          "record": {
+            "path": "build/nvvm-global-expressions/working-inventory/selection.json",
+            "sha256": "1c1fddcb3d87bec4d6686b4217b612af608529e77b6ceeba19755093438e3c88"
+          },
+          "working": 1713,
+          "exploratory": 459,
+          "meaning": "List-only after two authored admissions; no fresh full working execution."
+        }
+      },
+      "runtime_contract": {
+        "fixture": "tests/cuda/nvvm-global-constant-expressions.slang",
+        "words": 30,
+        "meaning": "Exact independent Float32 bits and signed/unsigned integer values; shared global arithmetic/casts/arrays feed local records and noinline helpers. Two boundary guards and completion word. CUDA compilation is unqualified."
+      },
+      "failure_history": [
+        {
+          "record": {
+            "path": "build/nvvm-global-expressions/before.json",
+            "sha256": "fa8d6f85e697c9c4bdb42be00d684e2dff77104a10ae24a07feaca1a073f6de0",
+            "return_code": 1,
+            "elapsed_seconds": 2.495570421218872
+          },
+          "source": {
+            "path": "build/nvvm-global-expressions/fixture.slang",
+            "sha256": "028c3acc993515accc37727105550d0a8757e9d9062094f9d857b037002ec32c"
+          },
+          "source_identity": {
+            "path": "build/nvvm-global-expressions/fixture-identity.json",
+            "sha256": "7c95c93cf0f9527736dcf954142cfe2eaf767de0922e8088700efd56da9e961b"
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-global-expressions/before-identity.json",
+            "sha256": "1b523dd6c2b6b58c15cc7d2cb2baa3d86be510991d6806563c956875da8376ad"
+          },
+          "outcomes": {
+            "nvrtc-o3": "compile-failure: dynamic __device__ initialization",
+            "nvvm-o0": "E52017 call",
+            "nvvm-o3": "E52017 call"
+          },
+          "meaning": "Canonical synthesized readNone ExpressionRecord constructor Calls are outside this policy. Original source remains unresolved, not claimed fixed."
+        },
+        {
+          "record": {
+            "path": "build/nvvm-global-expressions/before-retry.json",
+            "sha256": "a3e311d2295cb5982af928f3cf3c5a7ddc0ba4d16567bbc6a27ebb03db55c356",
+            "return_code": 1,
+            "elapsed_seconds": 2.5616002082824707
+          },
+          "source": {
+            "path": "build/nvvm-global-expressions/fixture-retry.slang",
+            "sha256": "7fa2b18fc6a54cb2c00c1026a36306fa0b12391ce1e8130402cd88faadc419e6"
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-global-expressions/before-identity.json",
+            "sha256": "1b523dd6c2b6b58c15cc7d2cb2baa3d86be510991d6806563c956875da8376ad"
+          },
+          "outcomes": {
+            "nvrtc-o3": "compile-failure: dynamic __device__ kAdjusted initialization",
+            "nvvm-o0": "E52017 add",
+            "nvvm-o3": "E52017 add"
+          },
+          "resolution": "Record construction moved to existing blocks; component scalar casts preserve the independent oracle. NVRTC remains unsupported; final authored directives qualify NVVM only, shader/oracle unchanged from this retry."
+        },
+        {
+          "record": {
+            "path": "build/nvvm-global-expressions/runtime.json",
+            "sha256": "883aa4fd001a8e8c2a444481ebaa5241997c24277e716316706040df463ce6ec",
+            "return_code": 1,
+            "elapsed_seconds": 2.054943561553955
+          },
+          "source": {
+            "path": "build/nvvm-global-expressions/fixture-final.slang",
+            "sha256": "c73c95f0dce4eeb8d98b9bfdf2ed8be8ecc267f325d48ae2137e2bd2ebe97912"
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-global-expressions/identity.json",
+            "sha256": "b1940d737d66ac33e5ce25e714b80b653322b5b2f5f4d36180dbe6efd9edc9e2"
+          },
+          "static_identity": {
+            "path": "build/nvvm-global-expressions/static-identity.json",
+            "sha256": "e4ba5fb49b92bc94f065d08375da24f4b03964a1e856a9ae637fa04fa8f29bc8"
+          },
+          "outcomes": {
+            "nvvm-o0": "E52017 swizzle",
+            "nvvm-o3": "E52017 swizzle"
+          },
+          "initial_build": {
+            "path": "build/nvvm-global-expressions/build.json",
+            "sha256": "4d0f8b8017291b416c4f46ccbc2a571823cf9399d0ea49e8604d77ec52850d37",
+            "return_code": 0,
+            "elapsed_seconds": 29.979650497436523
+          },
+          "initial_static_build": {
+            "path": "build/nvvm-global-expressions/static-build.json",
+            "sha256": "849b28500a1498aca212edb4d4ddb5a1c7523b994da5ab93b5660afb1b1215bc",
+            "return_code": 0,
+            "elapsed_seconds": 27.01963233947754
+          },
+          "initial_static": {
+            "path": "build/nvvm-global-expressions/static-unit.json",
+            "sha256": "85675b704cebc4b63fd1f76f37494263c8ca3688c8245d35bccae3b13e015bf6",
+            "return_code": 0,
+            "elapsed_seconds": 6.915661811828613
+          },
+          "ir_probe": {
+            "path": "build/nvvm-global-expressions/fixture-after-ir.json",
+            "sha256": "35b3499c5d4705feee194d0c5aca59fa760078df6fb805142580447953ab5253",
+            "return_code": 255,
+            "elapsed_seconds": 0.2840754985809326
+          },
+          "resolution": "Admit canonical pure Swizzle through the same numeric placement guard; add scalar and reordered-vector static assertions. Final runtime and static retries pass."
+        }
+      ],
+      "validation_incidents": [
+        {
+          "record": {
+            "path": "build/nvvm-global-expressions/fixture-before-ir.json",
+            "sha256": "0e2e97bc85eff234b3a00c6bea58ce065a0df47a036cca30d34c7b250bb17baa",
+            "return_code": 255,
+            "elapsed_seconds": 0.2845029830932617
+          },
+          "diagnostic": "E38007: compute entry lacked explicit stage in CLI invocation. No IR/backend result.",
+          "retry": {
+            "path": "build/nvvm-global-expressions/fixture-before-ir-retry.json",
+            "sha256": "d12d711480d4e7d3baa7f2d6dc76a386128512f616a0aa6ea91b46e941479499",
+            "return_code": 255,
+            "elapsed_seconds": 0.2967839241027832
+          },
+          "retry_result": "Explicit -stage compute reveals module ExpressionRecord constructor Calls; no PTX."
+        }
+      ],
+      "unresolved_failures": [
+        {
+          "case": "Original module record constructor source",
+          "source": {
+            "path": "build/nvvm-global-expressions/fixture.slang",
+            "sha256": "028c3acc993515accc37727105550d0a8757e9d9062094f9d857b037002ec32c"
+          },
+          "diagnostic": "E52017 call",
+          "meaning": "ReadNone alone does not grant placement of module Calls; function-body records in final source are a narrower qualification."
+        },
+        {
+          "case": "CUDA comparison on revised source",
+          "source": {
+            "path": "build/nvvm-global-expressions/fixture-retry.slang",
+            "sha256": "7fa2b18fc6a54cb2c00c1026a36306fa0b12391ce1e8130402cd88faadc419e6"
+          },
+          "diagnostic": "NVRTC12.9 rejects dynamic __device__ kAdjusted initialization",
+          "meaning": "No CUDA runtime claim, output-based workaround or oracle weakening."
+        }
+      ],
+      "application_probe": {
+        "identity": {
+          "path": "build/nvvm-global-expressions/rhi-identity.json",
+          "sha256": "3f6c6fac21f8e10a313ae73086286724b8ebd3cdd8dafbc927ea6b6a3309d66b"
+        },
+        "prior_raygen": {
+          "path": "build/nvvm-optix-array-payload/matrix-raygen-ir.json",
+          "sha256": "b48efb9057bd4d8dc88e2a140dedc09bb2c8e4c141c9415e236f87dfe2bc99d2"
+        },
+        "raygen": {
+          "path": "build/nvvm-global-expressions/matrix-raygen.json",
+          "sha256": "20548cc8dd17231a28063dba9760d50097bd9884f7865ec8de8da97dae321c9f",
+          "return_code": 0,
+          "elapsed_seconds": 0.3048977851867676
+        },
+        "ptx": {
+          "path": "build/nvvm-global-expressions/matrix-raygen.ptx",
+          "sha256": "d6b51c3f000d26eca403d3f3ab4b1f4d10145f38b5e23eea5badcf83dc739287"
+        },
+        "pipeline": {
+          "path": "build/nvvm-global-expressions/matrix-pipeline.json",
+          "sha256": "eeab9b263109da775c6d548d8ae83d2b70a80f859fb19e8b863d5dfc290589ec",
+          "return_code": 1,
+          "elapsed_seconds": 1.4100098609924316
+        },
+        "pipeline_cases": 4,
+        "pipeline_passed": 0,
+        "assertions": {
+          "passed": 90,
+          "failed": 8
+        },
+        "diagnostics": [
+          "GenericAsm assembly=slangOptixGetObjectToWorldTransformMatrix, signature=Void(OutParam<Array<vector<float,4>, 3>>)",
+          "GenericAsm assembly=slangOptixGetObjectToWorldTransformMatrix4x3, signature=Void(OutParam<Array<vector<float,3>, 4>>)",
+          "GenericAsm assembly=slangOptixGetWorldToObjectTransformMatrix, signature=Void(OutParam<Array<vector<float,4>, 3>>)",
+          "GenericAsm assembly=slangOptixGetWorldToObjectTransformMatrix4x3, signature=Void(OutParam<Array<vector<float,3>, 4>>)"
+        ],
+        "meaning": "Original raygen advances from module Add rejection to O3/SM80 PTX success. Complete RHI pipelines now reject their separate transform-query wrappers before execution; RHI default optimization and actual-device targeting remain distinct from isolated CLI. No matrix runtime qualification."
+      },
+      "qualification": [
+        "Placement policy only; existing preflight owns operation/type/dominance admission. No new global evaluator, ABI, module version or provider operation.",
+        "Only authored #cuda-1/nvvm-o0 and #cuda-2/nvvm-o3 are admitted. Other discovered adaptations remain exploratory, including CUDA.",
+        "Third small iteration since the 1711-cell working checkpoint at 0762f003c. Scheduled broader working validation remains due within three to five iterations; full RHI stays on demand."
+      ]
     }
   }
 }

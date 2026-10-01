@@ -94,11 +94,21 @@ instances, distinct custom IDs, primitive indices 0/1/2, one miss and all 44 wor
 NVRTC controls use the same independent host oracle. Both triangle windings and incoming flags 0/1
 are checked, including nonzero flags in miss. The original RHI triangle test also passes.
 
-The four unchanged RHI ObjectToWorld/WorldToObject matrix tests pass their NVRTC control (162
-assertions) but remain unqualified on NVVM. Array admission advances their failure from
-`optixTraceRay` to module-scope vector `add`. Separate O3/SM80 CLI probes identify raygen global
-expression localization and the callback's CUDA-only matrix wrapper as distinct missing contracts.
-Neither diagnostic is a runtime matrix result.
+Pure global numeric expressions and dependent constructors now use the existing dependency-localization
+pass at the final NVVM legalization boundary. The
+[global-expression fixture](../../tests/cuda/nvvm-global-constant-expressions.slang) checks all 30 output
+words at NVVM O0/O3; the static unit covers dependency ownership, scalar/reordered-vector projections
+and direct/nested Call/Load rejection. Calls, loads, pointer/resource operations and unknown effects
+remain excluded. The original global record-constructor Call variant remains unresolved; the qualified
+fixture constructs records locally. Its NVRTC dynamic device-initializer failures remain unadmitted,
+alongside the earlier NVVM constructor/projection failures and corrected CLI invocation history.
+
+The original RHI matrix raygen now compiles to PTX, advancing beyond module-scope vector `add`.
+All four complete ObjectToWorld/WorldToObject cases still reject with E52017 at their exact CUDA-only
+matrix wrappers. Their earlier NVRTC control passes 162 assertions, but no NVVM matrix runtime is
+qualified. Future matrix support must preserve SDK composition of the full active transform list,
+forward/inverse orientation and the transposed 4x3 forms. The RHI single-level, non-motion pipeline
+alone cannot qualify general transform semantics or justify a single-instance shortcut.
 These application tests use RHI's actual-device target policy, separate from the SM80 fixtures above.
 Compute/raygen calls to ray state and compute/raygen/miss calls to hit-only helpers reject before
 provider module creation.
