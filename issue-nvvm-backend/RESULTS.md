@@ -205,10 +205,39 @@ through caller, AnyHit, ClosestHit and miss, including complete output buffers a
 both names with the same compiler/device options. Their local geometry prevents duplicate AnyHit
 invocations; they do not require matrix queries or a full-suite run.
 
-Only when the broader suite is requested, run the same command with `--test-case='*.cuda'`.
-Keep NVVM and NVRTC logs separate, retain initial failures, and inspect executed/failed/skipped
-counts and individual diagnostics. A zero-test filter or skipped test is not runtime qualification.
-Use focused retries for investigated failures; do not rerun the entire suite after each fix.
+When the broader suite is requested, capture the registered inventory and run all CUDA cases:
+
+```bash
+"$RHI_BUILD/RelWithDebInfo/slang-rhi-tests" --select-devices=cuda --require-devices=cuda \
+  --cuda-compiler=nvvm --test-case='*.cuda' --no-colors=true --list-test-cases
+"$RHI_BUILD/RelWithDebInfo/slang-rhi-tests" --select-devices=cuda --require-devices=cuda \
+  --cuda-compiler=nvvm --test-case='*.cuda' --no-colors=true --abort-after=0
+```
+
+An additional **listing-only** `--no-skip=true --list-test-cases` identifies decorator-disabled
+registrations; do not silently enable them for execution. Preserve duplicate registrations as a
+multiset. Keep NVVM and NVRTC logs separate and retain initial failures. The custom reporter overrides
+JUnit selection and its skip text can hide an earlier assertion failure. Reconcile named terminal
+outcomes with assertion/exception records and the inventory; doctest headline passes include runtime
+skips, while its skipped total includes filtered-out cases. Retain interrupted and unrun cases
+separately. A zero-test filter or skip is not runtime qualification. Use focused family retries;
+do not rerun the entire suite after each fix.
+
+The current [RHI manifest](rhi-cuda-status.json) owns registration outcomes, failure families,
+comparison results, route ownership and unresolved/resolved histories. Raw logs and identities stay
+under ignored build paths. Update it in place after reviewed runs, preserving original failures;
+Git retains superseded snapshots. List current NVVM failures with:
+
+```bash
+python3 - <<'PYCODE'
+import json
+with open('issue-nvvm-backend/rhi-cuda-status.json') as stream:
+    manifest = json.load(stream)
+for case in manifest['registrations']:
+    if case['current_status']['nvvm'] == 'failed':
+        print(case['id'])
+PYCODE
+```
 
 The compiler selector covers CUDA availability and the shared `createTestingDevice` path.
 Tests constructing custom devices or Slang sessions can bypass it, and RHI's internal CUDA clear

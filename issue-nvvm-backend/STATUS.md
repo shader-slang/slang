@@ -77,7 +77,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Thirty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 80 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 81 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -188,8 +188,9 @@ local Slang compiler/provider. The selector is committed as `318c2588` on siblin
 `nvvm-cuda-workflow`; its existing `build-all` is unchanged. Four NVVM compute/raygen cases, five
 NVRTC controls and a default compute case pass. Three malformed selectors reject; old headers
 disable explicit selection and old-runtime probes reject unsupported flags. Library tracing verifies
-the local compiler/provider. The initial CUDA listing had 262 registrations (261 unique names); the full suite has **not** run
-and remains on demand outside automatic smoke/working cadence. Custom device/session paths and
+the local compiler/provider. The initial CUDA listing had 262 registrations (261 unique names);
+that setup did not run the full suite. The later complete application checkpoint is recorded below
+and remains separate from automatic smoke/working cadence. Custom device/session paths and
 internal direct NVRTC kernels retain their documented compiler owners.
 
 Conventional-global Int32/UInt32/Float32 vectors of widths 2/3/4 are qualified through existing
@@ -239,7 +240,8 @@ checked; the separate query batch below adds runtime observation. No ABI/module 
 
 The scheduled working checkpoint after five implementations passes all 1,711 configurations,
 with no regressions or changed inputs on the compiler accepted as `0762f003c`, before the query
-extension below. The historical full baseline retains its own identity. The optional full RHI suite has not run.
+extension below. The historical full baseline retains its own identity. The full RHI suite had not run at that
+checkpoint; its later application results are recorded below.
 Raw evidence is under build/nvvm-anyhit; source and artifacts remained frozen throughout the run.
 
 The AnyHit query extension is accepted: thirteen existing physical queries now pass the owning
@@ -300,15 +302,41 @@ in 1066.593s, with zero regressions and zero changed inputs on the matching inst
 The earlier 1,711-cell checkpoint and historical full baseline retain their own identities. Current
 inventory: 1,713 working / 459 exploratory /15 smoke. Sources and binaries stayed frozen for the run.
 
-**Next work:** the maintainer explicitly requested the full slang-rhi CUDA suite across all feature
-areas, with a durable failing-test inventory. Run it now using the local NVVM compiler and selected
-NVRTC controls; preserve failures, explicit skips, route exceptions and interrupted/unrun cases.
-Subsequent full application runs remain on demand. Implement complete feature families, including
-related variants and shared prerequisites, chosen from these results. The narrow nonzero-raygen
-probe was superseded before execution and will be included in the full selection.
+The requested complete RHI CUDA checkpoint has now run on local Slang `52509c728` and sibling RHI
+`f48fee6e`. All 269 registrations (268 unique names, one duplicate preserved) have reconciled outcomes:
+
+| Selection     | Passed | Failed | Runtime skipped | Wall time |
+| ------------- | -----: | -----: | --------------: | --------: |
+| NVVM          |    198 |     61 |              10 |   25.755s |
+| NVRTC control |    259 |      0 |              10 |   89.312s |
+
+All 61 NVVM failures are E52017 compiler rejections and pass the same NVRTC tests. These wall times
+include different failure/execution outcomes and are not a performance comparison. Named outcomes
+and assertions are reconciled; doctest's headline passed counts include runtime skips. There are no
+interrupted or unrun registrations. Sources and binaries stayed unchanged. The maintained
+[RHI test manifest and failure list](rhi-cuda-status.json) records every occurrence, exact initial
+diagnostic, comparison, skip reason, compiler-route exception and unresolved family. Raw evidence:
+`build/nvvm-rhi-full`. No RHI results were added to the Slang working corpus.
+
+| Initial failure group                                                                                        |  Tests |
+| ------------------------------------------------------------------------------------------------------------ | -----: |
+| HitObject representation                                                                                     |     26 |
+| Compute entry-point parameters                                                                               |     20 |
+| Full active-list matrix composition                                                                          |      4 |
+| Combined sampler helper values                                                                               |      3 |
+| Trace payload boundary                                                                                       |      2 |
+| Pointer-bearing record, bindless fetch, typed-buffer global, cluster query, callable ABI, intersection stage | 1 each |
+
+These groups identify the first observed rejection, not necessarily the complete root cause.
+**Next work:** scope and implement the complete resource-parameter transport family, including
+related texture/sampler variants and shared storage/binding prerequisites, guided by the entry-point
+failures. Refine the manifest as deeper causes emerge. The maintainer requires complete families;
+do not declare completion from an isolated operation. Use focused family retries and smoke, with
+working checkpoints every three to five implementation batches. Further full RHI runs remain on demand.
 
 Public composite ObjectToWorld/WorldToObject matrices remain unsupported; their complete family
-requires static/motion transform semantics and full direction-dependent list composition. Single-level
-application evidence cannot justify a first-instance shortcut. Raw SDK object-ray queries remain
-AnyHit/Intersection-only, and GeometryIndex is distinct from SBT record index. Procedural/callable
-ABI and recursive callback tracing remain separate. The full RHI run has not yet executed.
+requires static/motion semantics and full direction-dependent list composition. A single-instance
+shortcut is not sufficient. Raw SDK object-ray queries remain AnyHit/Intersection-only, and
+GeometryIndex is distinct from SBT record index. Procedural/callable ABI and recursive callback
+tracing remain separate. Custom RHI devices/sessions and internal NVRTC kernels retain the route
+ownership documented in the manifest; passing all resource-only tests would not prove NVVM compilation.

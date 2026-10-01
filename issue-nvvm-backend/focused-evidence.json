@@ -87700,6 +87700,122 @@
         "Public full active-list ObjectToWorld/WorldToObject matrices remain unsupported. Static/motion transform kinds and complete direction-dependent composition require separate implementation and oracles."
       ],
       "rhi_oracle_commit": "f48fee6ef3f13ecf61e187dffc46721845c3d0ce"
+    },
+    "nvvm-rhi-cuda-suite": {
+      "status": "recorded-with-open-gaps",
+      "scope": "Complete registered CUDA application suite in the tested sibling RHI binary, across all registered feature areas. Initial full NVVM/NVRTC comparison and maintained failure inventory; not full NVVM acceptance.",
+      "manifest": {
+        "path": "issue-nvvm-backend/rhi-cuda-status.json",
+        "sha256": "4a4d98fbacca0ff14c12d389e2d55d6b57e23900aa622b869670b1d935b06abe"
+      },
+      "identity": {
+        "path": "build/nvvm-rhi-full/identity.json",
+        "sha256": "2a08646036747017ac81829f83debecb28a3a3c4d95897225f87bff33db0725c"
+      },
+      "compiler_accepted_commit": "52509c728",
+      "rhi_revision": "f48fee6e",
+      "inventory": {
+        "normal": {
+          "path": "build/nvvm-rhi-full/inventory.log",
+          "sha256": "0b9a3360a750ce33b36709a042cc441794b68e2c039ca4159f3e75e090488e54"
+        },
+        "including_disabled": {
+          "path": "build/nvvm-rhi-full/inventory-including-disabled.log",
+          "sha256": "0b9a3360a750ce33b36709a042cc441794b68e2c039ca4159f3e75e090488e54"
+        },
+        "normal_gate": {
+          "path": "build/nvvm-rhi-full/inventory.json",
+          "sha256": "b0557c96ef3508716dda457cbc654e12c6854d2586c22be41e619a8bd4ab85ce"
+        },
+        "including_disabled_gate": {
+          "path": "build/nvvm-rhi-full/inventory-including-disabled.json",
+          "sha256": "717bcdba9615eaa811f93dbb0b577375af9906abb14e3f731c194377f0b2b67a"
+        }
+      },
+      "validation": {
+        "nvvm-full": {
+          "gate": {
+            "path": "build/nvvm-rhi-full/nvvm-full.json",
+            "sha256": "1a81836d489b70854aef63e910a1d293c4718d2918aabd61398a59b2f6cb2548"
+          },
+          "log": {
+            "path": "build/nvvm-rhi-full/nvvm-full.log",
+            "sha256": "7635b63b0a2c500c17794cc6a1e54fecb401d0e4db46a47c51a0971842802857"
+          },
+          "return_code": 1,
+          "elapsed_seconds": 25.754624605178833,
+          "compiler_selection": "nvvm",
+          "counts": {
+            "passed": 198,
+            "failed": 61,
+            "runtime_skipped": 10
+          }
+        },
+        "nvrtc-full": {
+          "gate": {
+            "path": "build/nvvm-rhi-full/nvrtc-full.json",
+            "sha256": "705097c5af7e0d7872c3ca3f56c03d8645413a8f13a6209c0cbdc1580fe5da60"
+          },
+          "log": {
+            "path": "build/nvvm-rhi-full/nvrtc-full.log",
+            "sha256": "a35574a9f2738ff24628a4fc34ded9a9aa0dc8aa84aab4c884726aa31c74c1da"
+          },
+          "return_code": 0,
+          "elapsed_seconds": 89.31189441680908,
+          "compiler_selection": "nvrtc",
+          "counts": {
+            "passed": 259,
+            "failed": 0,
+            "runtime_skipped": 10
+          }
+        }
+      },
+      "reconciliation": {
+        "exact_terminal_multiset": true,
+        "missing_registrations": [],
+        "extra_registrations": [],
+        "interrupted_registrations": [],
+        "hidden_assertion_failures_in_passed_or_skipped": [],
+        "nvvm_failed_assertions": 122,
+        "nvvm_failed_cases": 61,
+        "nvvm_assertions_total": 71856902,
+        "nvrtc_failed_assertions": 0,
+        "nvrtc_assertions_total": 71977486,
+        "all_61_nvvm_failures_pass_nvrtc": true,
+        "same_10_runtime_skips": true,
+        "doctest_passed_includes_runtime_skips": {
+          "nvvm": 208,
+          "nvrtc": 269
+        },
+        "doctest_filtered_out_count": 670,
+        "duplicate_name_policy": "Two cmd-copy-texture-offset-mip1.cuda registrations remain separate occurrences; source line assignment is ambiguous and is not inferred.",
+        "benchmark_terminal": "benchmark-command.cuda includes an inline Duration message before PASSED; it is counted.",
+        "raw_audit": {
+          "path": "build/nvvm-rhi-full/outcome-reconciliation.json",
+          "sha256": "5c625f1c18076b3f156a171ba3b61e7a7723e5a2c5c0a6f8201bf611d0d7f372"
+        }
+      },
+      "failure_family_counts": {
+        "nested_pointer_record_field": 1,
+        "combined_sampler_values": 3,
+        "texture_fetch": 1,
+        "compute_entry_parameters": 20,
+        "typed_buffer_global": 1,
+        "hitobject_representation": 26,
+        "cluster_query": 1,
+        "callable_abi": 1,
+        "trace_payload_boundary": 2,
+        "intersection_stage": 1,
+        "active_list_matrix_composition": 4
+      },
+      "qualification": [
+        "269 registration occurrences/268unique names. The duplicate copy name is retained; normal and no-skip listing agree. No interrupted, missing or extra outcomes.",
+        "NVVM198passed61failed10runtime skips; NVRTC259passed0failed10same skips. All61NVVM failures are E52017 compiler rejections and pass their matching NVRTC control. These are application gaps, not regressions of the passing1713-cell admitted compiler corpus.",
+        "Doctest headline passes include runtime skips; exact named terminal/assertion outcomes own accounting. All122failed NVVM assertions belong to61failed registrations; no hidden pass/skip assertion failures.",
+        "Custom devices/sessions and internal utilities retain documented compiler ownership. Default authored optimization is not universal O0/O3 qualification; RHI derives architecture from the actual device.",
+        "NVVM25.755s and NVRTC89.312s are fresh-process suite wall times with different failure/execution outcomes, not a performance comparison.",
+        "Historical full Slang baseline/identity and all80prior feature objects remain unchanged; no RHI corpus admissions. Future full RHI runs remain on demand; complete families guide focused repairs."
+      ]
     }
   }
 }

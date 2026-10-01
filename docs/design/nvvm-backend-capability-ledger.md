@@ -139,7 +139,12 @@ These application tests use RHI's actual-device target policy, separate from the
 Compute/raygen calls to ray state and compute/raygen/miss calls to hit-only helpers reject before
 provider module creation.
 See [the optional application workflow](../../issue-nvvm-backend/RESULTS.md#optional-slang-rhi-cuda-suite)
-for commands and compiler-selector scope; this does not qualify the full RHI CUDA suite.
+for commands and compiler-selector scope. The separate full application checkpoint covers all 269
+CUDA registrations in the tested binary: NVVM 198 pass / 61 compiler rejections / 10 runtime skips;
+NVRTC 259 pass / 0 failures / the same 10 skips. All 61 rejected NVVM cases pass their NVRTC controls.
+The [current application manifest](../../issue-nvvm-backend/rhi-cuda-status.json) retains exact names,
+diagnostics, route exceptions and complete-family work candidates. This is a measured application
+baseline with open gaps, not full NVVM suite acceptance or an admission to the Slang working corpus.
 
 ## Compute, values and memory
 
