@@ -458,6 +458,7 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::WarningsAsErrors:
     case CompilerOptionName::DisableWarning:
     case CompilerOptionName::DisableWarnings:
+    case CompilerOptionName::DisableNotes:
     case CompilerOptionName::EnableWarning:
     case CompilerOptionName::WarningLevel:
     case CompilerOptionName::Capability:
@@ -653,6 +654,16 @@ void applySettingsToDiagnosticSink(
             outputSink,
             element.stringValue.getUnownedSlice(),
             Severity::Warning,
+            Severity::Disable);
+    }
+    disableArray = options.getArray(CompilerOptionName::DisableNotes);
+    for (auto& element : disableArray)
+    {
+        overrideDiagnostics(
+            targetSink,
+            outputSink,
+            element.stringValue.getUnownedSlice(),
+            Severity::Note,
             Severity::Disable);
     }
     auto enableArray = options.getArray(CompilerOptionName::EnableWarning);

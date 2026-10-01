@@ -22,6 +22,26 @@ A **smoke** run dispatches one operator/boundary/gamma combination;
 a **full** run sweeps the full 4×4×3 = 48 configuration matrix.
 The coverage delta between the two runs is the demo's headline.
 
+Both modes default to **320x180 pixels** to keep execution counting practical.
+`--width=1920 --height=1080` selects **1920x1080** for performance experiments
+without changing the 48-configuration matrix. The large counting sweep can
+exceed process timeouts even when individual GPU submissions are tiled.
+
+## Workload and dispatch sizing
+
+Set `--width=N` and `--height=N` to choose the image dimensions independently
+(defaults: 320 and 180; each must be 1–65535, with at most INT32_MAX pixels
+total). For example, `--width=640 --height=360` selects a 640x360 image.
+
+`--tile-rows=N` controls rows per submission, not image size. It must be 0
+(whole image) or a multiple of the shader's 8-row thread-group height, so
+tiles do not overlap. Full mode defaults to 128 rows; smoke mode defaults
+to 0. A tile taller than the image uses one submission, and the final tile
+is clipped to the remaining rows. Arbitrary image dimensions are supported.
+Increasing width also increases work per tile. Smaller tiles help with GPU
+watchdog limits but add submission overhead; reduce image dimensions to
+reduce total runtime. Very small images may exercise fewer coverage paths.
+
 ## Run
 
 ```bash
@@ -31,6 +51,12 @@ The coverage delta between the two runs is the demo's headline.
 # Compile-time disable coverage instrumentation (baseline for overhead
 # measurement):
 ./shader-coverage-image-pipeline --mode=full --no-coverage
+
+# Use a smaller workload with 32-row tiles:
+./shader-coverage-image-pipeline --mode=full --width=160 --height=90 --tile-rows=32
+
+# Restore the original benchmark size:
+./shader-coverage-image-pipeline --mode=full --width=1920 --height=1080 --no-coverage
 
 # Tune the tile height (full mode already tiles into 128-row bands by
 # default to avoid GPU watchdog resets under count mode on the hot
@@ -87,13 +113,13 @@ preserves). Pick `count` when you need exact execution counts; pick
 
 `--tile-rows=N` splits each config dispatch into horizontal bands of N
 rows. The shader recovers the real pixel row as `tid.y + tileOriginY`.
-Full mode defaults to 128-row bands; smoke mode (quick enough not to
-need tiling) and `--tile-rows=0` dispatch the whole image per config,
+Full mode defaults to 128-row bands; smoke mode and `--tile-rows=0`
+dispatch the whole image per config,
 a single submission with `tileOriginY = 0`.
 
 The bilateral filter's inner loop creates heavy atomic contention on a
 handful of counter slots — millions of threads all increment the same
-few counters. This makes coverage count mode 20–30× slower than
+few counters. Coverage count mode can be substantially slower than
 uninstrumented code, and a whole-image dispatch can run long enough to
 trip the GPU watchdog timeout (Windows TDR / `VK_ERROR_DEVICE_LOST`)
 on the 48-config `--mode=full` sweep.
@@ -102,16 +128,17 @@ Tiling caps per-submission GPU time without affecting coverage results:
 bands partition the image, every pixel is processed exactly once, and
 counters accumulate across all bands and configs.
 
-The default `--tile-rows=128` is a safe height on any GPU; reduce it if
-you still observe TDR. Alternatives:
+The default `--tile-rows=128` limits per-submission work; reduce it if
+you still observe TDR. Tiling does not reduce total work or guarantee that a
+large run finishes within a process timeout. Alternatives:
 
 - `--coverage-mode=boolean`: removes all atomic contention (non-atomic
-  stores of `1`), so whole-image dispatch is safe without tiling.
+  stores of `1`), but does not guarantee a timeout-free large run.
 - `--no-coverage`: baseline timing with no instrumentation overhead.
 
 ## End-to-end wrapper
 
-`run_coverage.py` (in this directory) is a convenience wrapper that
+`run_coverage.py` forwards the workload and batch sizing options to the runner. It is a convenience wrapper that
 compiles, dispatches, converts the raw counters to a rich LCOV, renders
 an HTML report and opens it — all in one command:
 
@@ -154,7 +181,7 @@ The five stages `main.cpp` walks through for each run:
 | **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`. The compiler injects `__slang_coverage` at IR time and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
 | **2. Discover binding** | Query `ISyntheticResourceMetadata::getResourceInfo(0)` on the post-link metadata object to read back `(space, binding)` — the slot the compiler auto-assigned for `__slang_coverage`. | `IMetadata::castAs<ISyntheticResourceMetadata>` |
 | **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources on set 0 and the coverage buffer at the discovered `(space, binding)`. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
-| **4. Dispatch** | Submit whole-image dispatch per config (default), or horizontal-band batches if `--tile-rows=N` is set. The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
+| **4. Dispatch** | Submit 128-row tiles in full mode or a whole image in smoke mode; `--tile-rows=N` overrides this. The shader atomically increments counters as branches/lines execute. | `vkCmdDispatch` |
 | **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
 ### Raw Vulkan host

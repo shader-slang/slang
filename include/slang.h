@@ -1347,6 +1347,8 @@ typedef uint32_t SlangSizeT;
 
         BitfieldPackingRules = 160, // intValue0: slang::BitfieldPackingRules
 
+        DisableNotes = 161, // stringValue0: comma-separated note codes or names.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
