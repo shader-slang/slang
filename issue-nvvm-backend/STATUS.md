@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Thirteen bounded feature batches now pass focused validation after the full checkpoint:
+Fourteen bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -109,7 +109,8 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
 `features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
 `features.nvvm-half-volume-surfaces`, `features.nvvm-coherent-pointer-memory` and
-`features.nvvm-layout-pointer-transport` and `features.nvvm-integer-surface-formats`. Thirteen
+`features.nvvm-layout-pointer-transport`, `features.nvvm-integer-surface-formats` and
+`features.nvvm-integer-array-volume-surfaces`. Fourteen
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -124,7 +125,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; thirteen feature implementations have passed focused validation since the full checkpoint.
+unchanged; fourteen feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -206,9 +207,17 @@ and 22 report checks pass. The build initially caught a misspelled enum in a tes
 correcting that token completed the eight-job build in21 seconds. Production needed no build fix.
 D3D's narrower-integer clamp contract owns this policy; Vulkan load interpretation agrees, while
 out-of-range storage-image encoding equivalence remains unqualified. Raw evidence is under
-`build/nvvm-integer-surface-formats/`. Unannotated packed bindings, normalized formats and narrow
-integer array/volume accesses retain their separate boundaries. Thirteen focused feature batches
-are now accepted since the full checkpoint.
+`build/nvvm-integer-surface-formats/`. Unannotated packed bindings and normalized formats retain their separate boundaries.
+
+The same explicit integer formats now also pass for 1DArray/2DArray/non-array3D, completing the
+existing native32/Half geometry family without changing conversion code. Eighteen new O0/O3
+physical cells and four retained control cells pass; nine new CUDA compile failures match before,
+and both control CUDA failures remain exact. Four units, four diagnostics, 106 harness contracts
+and 22 report contracts pass. All 97 prior source/oracle identities are preserved. The eight-job
+build took37 seconds with no retry. Evidence is under
+`build/nvvm-integer-array-volume-surfaces/`. Fourteen feature batches are now accepted since the
+full checkpoint; its 249 surface cells remain unchanged, with 69 new cells awaiting reviewed
+adoption at the next deliberately selected full checkpoint.
 
 Next, select the next bounded feature from the remaining physical surface/type contracts. Std430
 source admission, CubeArray restricted views and mip queries retain their separate research gaps.

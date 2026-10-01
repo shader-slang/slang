@@ -11719,8 +11719,8 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCre
     for (const auto& test :
          {RejectedFormat{"r8", "2D", "uint", "int2(0)"},
           RejectedFormat{"r8ui", "2D", "int", "int2(0)"},
-          RejectedFormat{"r16i", "1DArray", "int", "int2(0)"},
-          RejectedFormat{"r8ui", "3D", "uint", "int3(0)"}})
+          RejectedFormat{"rgba16i", "1DArray", "int3", "int2(0)"},
+          RejectedFormat{"rgba8ui", "3D", "uint3", "int3(0)"}})
     {
         _resetDirectNVVMFakes();
         ComPtr<slang::IGlobalSession> session;

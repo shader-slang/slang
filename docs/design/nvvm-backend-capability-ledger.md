@@ -509,15 +509,15 @@ re-encoding untouched NaN payloads. Dynamic indices use the existing non-atomic 
 there is no new out-of-range lane guarantee. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
 
 Explicit `r/rg/rgba` signed/unsigned 8/16-bit formats additionally use matching `int/uint`32
-shader values in non-array 1D/2D surfaces. Loads sign- or zero-extend; stores clamp in the logical
+shader values in 1D/2D/3D and 1DArray/2DArray surfaces. Loads sign- or zero-extend; stores clamp in the logical
 32-bit type before narrowing. This follows the [D3D narrower-integer conversion contract,
 §3.2.3.13](https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm).
 [Vulkan integer image reads](https://docs.vulkan.org/spec/latest/chapters/images.html#images-reads)
 agree on load interpretation; out-of-range Vulkan storage-image encoding equivalence has not been
-established. Normalized formats, mixed signedness and narrow integer arrays/volumes remain excluded.
+established. Normalized formats and mixed signedness remain excluded.
 The static annotation owns physical interpretation; opaque handles do not infer runtime formats.
 
-The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 97 cases,
+The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 106 cases,
 including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
 nonzero guards and zero-boundary accesses. Native signed/unsigned32 cases exercise 1D/2D scalar,
 two- and four-channel loads, whole stores and component stores with exact integer bits. Four mixed
@@ -553,9 +553,15 @@ each selected lane's sixteen store edges, complete guards and unchanged componen
 These tests are bounded patterns, not exhaustive integer decode. All six CUDA comparison cells fail
 compilation because integer surface-conversion helpers are missing; component generation also has
 existing subscript limitations. Their failure identities are unchanged from the before run.
+Nine [integer spatial cases](../../tests/cuda/nvvm-surface-physical-integer-spatial.slang) extend the
+same twelve formats and three write styles to 1DArray/2DArray/non-array3D. All eighteen new NVVM
+cells pass. Explicit array flags and volume depth, asymmetric Y/Z extents, guarded outer planes,
+coordinate-varying input bits and independent Z-phased stores exercise the geometry separately
+from conversion. CPU checks reject a bounded matching load/store plane permutation. All nine CUDA
+comparison cells retain missing integer read-conversion helpers; the numerical policy is unchanged.
 The recurring checkpoint replays physical readbacks and compares its complete inventory against the
 [current baseline](../../issue-nvvm-backend/accepted-baseline.json), preserving known failures.
-That full baseline still owns its original 249 cells; the forty-two added array/volume/integer cells require explicit
+That full baseline still owns its original 249 cells; the sixty-nine added array/volume/integer cells require explicit
 reviewed adoption at the next full checkpoint.
 [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC

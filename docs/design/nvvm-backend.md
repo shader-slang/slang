@@ -377,8 +377,8 @@ coordinates, as required by LLVM's array-surface interface. The descriptor retai
 resource rank and array role; coordinate packing never disguises one resource shape as another.
 Non-array volumes retain `(byteX, y, z)` at the intrinsic boundary. Native Half and formatted
 Half storage reuse the same explicit conversion and bit-transport paths across these shapes.
-Explicit signed/unsigned8/16 formats in non-array1D/2D surfaces use matching-signedness32-bit
-shader values. Legalization widens loads and clamps stores to the destination range before ordinary
+Explicit signed/unsigned8/16 formats use matching-signedness32-bit shader values across these
+non-array and array shapes. Legalization widens loads and clamps stores to the destination range before ordinary
 integer narrowing. Exact format enums distinguish integer encodings from normalized formats with
 similar channel metadata. LLVM's raw8-bit surface calls transport16-bit registers; the provider
 truncates loads and zero-extends store bits, leaving signed interpretation to the canonical IR casts.

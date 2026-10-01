@@ -4310,8 +4310,7 @@ static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& op
     const bool isNarrowInteger =
         (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
          operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
-        (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16) &&
-        !operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
+        (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16);
     return is32BitNumeric || isNarrowInteger ||
            (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
             operation.elementType.bitWidth == 16);
@@ -4332,21 +4331,43 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
 {
     if (!_isSurfaceOperationSupported(operation))
         return llvm::Intrinsic::not_intrinsic;
-    static const llvm::Intrinsic::ID kLoadI8[2][3] = {
+    static const llvm::Intrinsic::ID kLoadI8[3][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_i8_zero,
          llvm::Intrinsic::nvvm_suld_1d_v2i8_zero,
          llvm::Intrinsic::nvvm_suld_1d_v4i8_zero},
         {llvm::Intrinsic::nvvm_suld_2d_i8_zero,
          llvm::Intrinsic::nvvm_suld_2d_v2i8_zero,
          llvm::Intrinsic::nvvm_suld_2d_v4i8_zero},
+        {llvm::Intrinsic::nvvm_suld_3d_i8_zero,
+         llvm::Intrinsic::nvvm_suld_3d_v2i8_zero,
+         llvm::Intrinsic::nvvm_suld_3d_v4i8_zero},
     };
-    static const llvm::Intrinsic::ID kStoreI8[2][3] = {
+    static const llvm::Intrinsic::ID kLoadI8Array[2][3] = {
+        {llvm::Intrinsic::nvvm_suld_1d_array_i8_zero,
+         llvm::Intrinsic::nvvm_suld_1d_array_v2i8_zero,
+         llvm::Intrinsic::nvvm_suld_1d_array_v4i8_zero},
+        {llvm::Intrinsic::nvvm_suld_2d_array_i8_zero,
+         llvm::Intrinsic::nvvm_suld_2d_array_v2i8_zero,
+         llvm::Intrinsic::nvvm_suld_2d_array_v4i8_zero},
+    };
+    static const llvm::Intrinsic::ID kStoreI8[3][3] = {
         {llvm::Intrinsic::nvvm_sust_b_1d_i8_zero,
          llvm::Intrinsic::nvvm_sust_b_1d_v2i8_zero,
          llvm::Intrinsic::nvvm_sust_b_1d_v4i8_zero},
         {llvm::Intrinsic::nvvm_sust_b_2d_i8_zero,
          llvm::Intrinsic::nvvm_sust_b_2d_v2i8_zero,
          llvm::Intrinsic::nvvm_sust_b_2d_v4i8_zero},
+        {llvm::Intrinsic::nvvm_sust_b_3d_i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_3d_v2i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_3d_v4i8_zero},
+    };
+    static const llvm::Intrinsic::ID kStoreI8Array[2][3] = {
+        {llvm::Intrinsic::nvvm_sust_b_1d_array_i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_array_v2i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_array_v4i8_zero},
+        {llvm::Intrinsic::nvvm_sust_b_2d_array_i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_array_v2i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_array_v4i8_zero},
     };
     static const llvm::Intrinsic::ID kLoadI16[3][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_i16_zero,
@@ -4431,9 +4452,15 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
     const uint32_t dimensionIndex = operation.shape - SLANG_NVVM_TEXTURE_SHAPE_1D;
     const uint32_t physicalBitWidth = operation.elementType.bitWidth;
     if (physicalBitWidth == 8)
+    {
+        if (operation.isArray)
+            return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                       ? kLoadI8Array[dimensionIndex][laneIndex]
+                       : kStoreI8Array[dimensionIndex][laneIndex];
         return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
                    ? kLoadI8[dimensionIndex][laneIndex]
                    : kStoreI8[dimensionIndex][laneIndex];
+    }
     if (physicalBitWidth == 16)
     {
         if (operation.isArray)

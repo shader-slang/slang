@@ -27,7 +27,7 @@ import time
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered",
-            "half-layered", "half-volume", "integer-formats"]
+            "half-layered", "half-volume", "integer-formats", "integer-spatial"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
 FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4),
@@ -184,6 +184,12 @@ def cases():
             add(f"integer-format-{shape}d-{label}", "integer-formats", "exercise", 67,
                 1 if shape == 1 else 5, 4, False, shape,
                 dict(SURFACE_DIM=shape, SURFACE_OPERATION=operation))
+    for shape, geometry in ((1, "1d-array"), (2, "2d-array"), (3, "3d")):
+        for operation, label in enumerate(("whole", "static-components", "dynamic-components")):
+            add(f"integer-format-{geometry}-{label}", "integer-spatial", "exercise", 67,
+                1 if shape == 1 else 5, 4, False, shape,
+                dict(SURFACE_DIM=shape, SURFACE_OPERATION=operation))
+            rows[-1]["volume_depth" if shape == 3 else "array_layers"] = 4
     return rows
 
 
@@ -214,7 +220,7 @@ def resource_specs(row):
                 for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
                 for prefix in ("source", "result")] + [
                     spec("sourceFloat", "float32", 4), spec("resultFloat", "float32", 4)]
-    if row["fixture"] == "integer-formats":
+    if row["fixture"] in ("integer-formats", "integer-spatial"):
         return [spec(prefix + family + suffix, storage if prefix == "surface" else scalar,
                      lanes, scalar)
                 for family, storage, scalar in (("Signed8", "int8", "int32"),
@@ -435,6 +441,8 @@ def widen_integer(value, bits, signed):
 def integer_format_oracle(row):
     """Observe original narrow inputs and independently predict saturated component stores."""
     width, height = row["width"], row["height"]
+    spatial = row["fixture"] == "integer-spatial"
+    depth = row.get("volume_depth", row.get("array_layers", 1))
     operation = row["defines"]["SURFACE_OPERATION"]
     resources = []
     for resource, spec in enumerate(resource_specs(row)[::2]):
@@ -446,28 +454,37 @@ def integer_format_oracle(row):
         initial, expected, observed, output = [], [], [], []
         active = 0
         edges = integer_store_edges(bits, signed)
-        for y in range(height):
-            for x in range(width):
-                live = 1 <= x <= 64 and (row["shape"] == 1 or 1 <= y <= 3)
-                active += int(live)
-                for lane in range(lanes):
-                    raw = (pattern[(x + y * 7 + resource * 3 + lane * 5) % 16] if live else
-                           ((0x55 + resource * 13 + x * 3 + y * 7 + lane * 17) & mask) or 1)
-                    sentinel = 0x13579BDF ^ (resource << 16) ^ (y << 12) ^ (x << 4) ^ lane
-                    initial.append(raw)
-                    observed.append(sentinel)
-                    output.append(widen_integer(raw, bits, signed) if live else sentinel)
-                    selected = (operation == 0 or lanes == 1 or
-                                (operation == 1 and lane in ((1, 3) if lanes == 4 else (1,))) or
-                                (operation == 2 and lane == (x - 1) % lanes))
-                    edge = (x - 1) // 4 if operation == 2 else x - 1
-                    value = edges[(edge + y * 7 + resource * 3 + lane * 5) % 16]
-                    expected.append(narrow_integer(value, bits, signed) if live and selected else raw)
+        for z in range(depth):
+            for y in range(height):
+                for x in range(width):
+                    live = (1 <= x <= 64 and (row["shape"] == 1 or 1 <= y <= 3) and
+                            (not spatial or 1 <= z <= 2))
+                    active += int(live)
+                    for lane in range(lanes):
+                        raw = (pattern[(x + y * 7 + resource * 3 + lane * 5) % 16] if live else
+                               ((0x55 + resource * 13 + x * 3 + y * 7 + z * 61 + lane * 17) & mask) or 1)
+                        if live and spatial:
+                            # Alternate fixed extension anchors and coordinate markers. These
+                            # are bounded patterns, not a uniqueness claim for 8-bit channels.
+                            raw = ((resource * 29 + z * 61 + y * 17 + x * 3 + lane * 7) & mask
+                                   if (x - 1) % 2 else
+                                   pattern[((x - 1) // 2 + resource * 3 + lane * 5) % 16])
+                        sentinel = (0x13579BDF ^ (resource << 16) ^ (z << 20) ^
+                                    (y << 12) ^ (x << 4) ^ lane)
+                        initial.append(raw)
+                        observed.append(sentinel)
+                        output.append(widen_integer(raw, bits, signed) if live else sentinel)
+                        selected = (operation == 0 or lanes == 1 or
+                                    (operation == 1 and lane in ((1, 3) if lanes == 4 else (1,))) or
+                                    (operation == 2 and lane == (x - 1) % lanes))
+                        edge = (x - 1) // 4 if operation == 2 else x - 1
+                        value = edges[(edge + z * 5 + y * 7 + resource * 3 + lane * 5) % 16]
+                        expected.append(narrow_integer(value, bits, signed) if live and selected else raw)
         for before, after, size in ((initial, expected, bits // 8), (observed, output, 4)):
             resources.append(dict(initial=b"".join(v.to_bytes(size, "little") for v in before),
                                   expected=b"".join(v.to_bytes(size, "little") for v in after),
                                   nan_positions=set(), active_texels=active,
-                                  guard_texels=width * height - active))
+                                  guard_texels=width * height * depth - active))
     return dict(resources=resources)
 
 
@@ -475,7 +492,7 @@ def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
     if row["fixture"] == "layered":
         return layered_oracle(row)
-    if row["fixture"] == "integer-formats":
+    if row["fixture"] in ("integer-formats", "integer-spatial"):
         return integer_format_oracle(row)
     if row["fixture"] in ("half-layered", "half-volume"):
         return half_surface_oracle(row)
@@ -832,7 +849,8 @@ def self_test():
                     "Reference oracle rejected")
     # Each added resource has independent storage, including source-only arrays and guard texels.
     for row in (x for x in cases() if x["fixture"] in
-                ("integers", "mixed", "layered", "half-layered", "half-volume", "integer-formats")):
+                ("integers", "mixed", "layered", "half-layered", "half-volume",
+                 "integer-formats", "integer-spatial")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -887,7 +905,7 @@ def self_test():
                 pass
             else:
                 raise ValueError("Surface array role substitution was ignored")
-            if row["fixture"] == "integer-formats":
+            if row["fixture"] in ("integer-formats", "integer-spatial"):
                 for invalid_type in (dict(kind="scalar", scalarType="float32"),
                                      dict(kind="scalar", scalarType="int16"),
                                      dict(kind="scalar", scalarType=("uint32" if
@@ -916,11 +934,12 @@ def self_test():
             (0x8000, 16, True, 0xFFFF8000), (0x8000, 16, False, 0x8000),
             (0xFFFF, 16, True, 0xFFFFFFFF), (0xFFFF, 16, False, 0xFFFF)):
         require(widen_integer(value, bits, signed) == expected, "Integer extension anchor failed")
-    for row in (x for x in cases() if x["fixture"] == "integer-formats"):
+    for row in (x for x in cases() if x["fixture"] in ("integer-formats", "integer-spatial")):
         buffers = oracle(row)
         specs, data = resource_specs(row), resource_buffers(row, buffers)
         operation = row["defines"]["SURFACE_OPERATION"]
         y = 0 if row["shape"] == 1 else 1
+        z = 1 if row["fixture"] == "integer-spatial" else 0
         require(len(specs) == 24 and len(data) == 24, "Integer format resource inventory changed")
         for resource in range(12):
             spec, result = specs[resource * 2], data[resource * 2]
@@ -930,7 +949,7 @@ def self_test():
             untouched = []
             for x in range(1, 65):
                 for lane in range(lanes):
-                    channel = (y * row["width"] + x) * lanes + lane
+                    channel = ((z * row["height"] + y) * row["width"] + x) * lanes + lane
                     position = channel * size
                     before = result["initial"][position:position + size]
                     high_bits[lane].add(bool(before[-1] & 0x80))
@@ -939,7 +958,7 @@ def self_test():
                                 (operation == 2 and lane == (x - 1) % lanes))
                     if selected:
                         edge = (x - 1) // 4 if operation == 2 else x - 1
-                        covered[lane].add((edge + y * 7 + resource * 3 + lane * 5) % 16)
+                        covered[lane].add((edge + z * 5 + y * 7 + resource * 3 + lane * 5) % 16)
                     else:
                         require(result["expected"][position:position + size] == before,
                                 "Component oracle overwrote an unselected lane")
@@ -962,6 +981,71 @@ def self_test():
             observed = data[resource * 2 + 1]
             require(compare(row, buffers, resource * 2 + 1, observed["initial"])["mismatch_count"] > 0,
                     "Integer load oracle permits a kernel that performs no loads")
+    for row in (x for x in cases() if x["fixture"] == "integer-spatial"):
+        buffers = oracle(row)
+        specs, data = resource_specs(row), resource_buffers(row, buffers)
+        width, height = row["width"], row["height"]
+        operation = row["defines"]["SURFACE_OPERATION"]
+        for resource, (spec, result) in enumerate(zip(specs, data)):
+            lanes, size = spec["lanes"], FORMATS[spec["storage"]][1]
+            plane_size = width * height * lanes * size
+            # Both entire exterior planes must retain their nonzero initialized bytes.
+            for plane in (0, 3):
+                start = plane * plane_size
+                require(result["expected"][start:start + plane_size] ==
+                        result["initial"][start:start + plane_size], "Integer guard plane changed")
+                damaged = bytearray(result["expected"])
+                damaged[start] ^= 1
+                require(compare(row, buffers, resource, damaged)["mismatch_count"] == 1,
+                        "Integer guard plane corruption was ignored")
+            y = 0 if row["shape"] == 1 else 1
+            start = ((height + y) * width + 1) * lanes * size
+            damaged = bytearray(result["expected"])
+            damaged[start] ^= 1
+            require(compare(row, buffers, resource, damaged)["mismatch_count"] == 1,
+                    "Integer active plane corruption was ignored")
+            if lanes > 1:
+                damaged = bytearray(result["expected"])
+                wrong = start - (lanes - 1) * size
+                damaged[wrong:wrong + lanes * size] = damaged[start:start + lanes * size]
+                require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
+                        "Integer scalar-sized X byte scaling was ignored")
+            if height > 1:
+                damaged = bytearray(result["expected"])
+                row_size = width * lanes * size
+                a, b = plane_size + row_size, plane_size + 2 * row_size
+                damaged[a:a + row_size], damaged[b:b + row_size] = (
+                    damaged[b:b + row_size], damaged[a:a + row_size])
+                require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
+                        "Integer spatial row permutation was ignored")
+            if resource % 2:
+                continue
+            damaged = bytearray(result["expected"])
+            for z in (1, 2):
+                for y in range(height):
+                    if row["shape"] != 1 and not 1 <= y <= 3:
+                        continue
+                    covered = [set() for _ in range(lanes)]
+                    for x in range(1, 65):
+                        for lane in range(lanes):
+                            selected = (operation == 0 or lanes == 1 or
+                                        (operation == 1 and lane in ((1, 3) if lanes == 4 else (1,))) or
+                                        (operation == 2 and lane == (x - 1) % lanes))
+                            if not selected:
+                                continue
+                            edge = (x - 1) // 4 if operation == 2 else x - 1
+                            covered[lane].add((edge + z * 5 + y * 7 + resource // 2 * 3 + lane * 5) % 16)
+                            target = (((z * height + y) * width + x) * lanes + lane) * size
+                            other = ((((3 - z) * height + y) * width + x) * lanes + lane) * size
+                            # Model a shared load/output/store plane permutation: observed
+                            # original values can cancel, but generated source stores cannot.
+                            damaged[target:target + size] = result["expected"][other:other + size]
+                    for lane in range(lanes):
+                        wanted = set(range(16)) if (operation != 1 or lanes == 1 or
+                                    lane in ((1, 3) if lanes == 4 else (1,))) else set()
+                        require(covered[lane] == wanted, "Integer plane edge/lane coverage incomplete")
+            require(compare(row, buffers, resource, damaged)["mismatch_count"] > 0,
+                    "Matching integer load/store plane permutation escaped independent stores")
     for row in (x for x in cases() if x["fixture"] == "layered"):
         buffers = oracle(row)
         specs = resource_specs(row)

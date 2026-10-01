@@ -81293,6 +81293,310 @@
         "last_targeted": "integer-surface-formats",
         "implementations_since_full": 13
       }
+    },
+    "nvvm-integer-array-volume-surfaces": {
+      "status": "accepted-focused",
+      "scope": "Explicit signed/unsigned8/16 surface formats, widths1/2/4, matching logical Int/UInt32, 1DArray/2DArray/non-array3D whole/static/dynamic-component accesses. Module43/providerABI46/container2 unchanged.",
+      "contract": "Reuse existing exact-format admission and canonical load extension/store saturation. LLVM raw8 uses i16 registers. Arrays keep logical byteX[,y],layer until provider layer-first call; volumes retain byteX,y,z. Array role and spatial depth remain explicit.",
+      "identity": {
+        "revision": "adf9237b1b441a5b1a98363099fb4d6d6a7c4e40",
+        "patch_sha256": "8301eb6f57a74a7c5e8efc651085aec4934cfd4cb042cdeb4129412bbbaac6bd",
+        "source_sha256": {
+          "extras/validate-nvvm-surfaces.py": "5798f5067bee21aea646c7790e5ca1d0c033cbe9dbdd4a430a5044831b97195b",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "862e8963cf0d43fb3f0ba5e6d8042c52955fd7dcda6f1999e36fcca4e6d79fb6",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "9d7c240695da0aa67038b4921fcdf1150417b89737db23d14186c4ac0f678cc7",
+          "source/slang/slang-emit-nvvm.cpp": "c160b7e1a278fa01b69e38313d7cadbc87cdee8223c33b609c18d7a2982ee13a",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "88343f10253d4ce979f61d2c9e83bfef6c96be30f9b8c9ed6f0e48aec642f99a",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "81f665e1533f50f6c1d43c022435ec02e1d45b857d5aac8cf9a388f53d0e6669",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "77dfed16467ccb6121f636d426c4ecfbbb5efd984ce1f923d27b340c7694de5c",
+          "tests/cuda/nvvm-surface-physical-integer-spatial.slang": "d0b2ce88a093bbe146d4a68468d13435beb3697735ad8149f93f41d351b64a22"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "36934af331c67fb300a47f41d87f838c4c5f8e291b0be30826f22f4879c192fb",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "8f383eedf162194d23d9772e4834641a0e941815e816a478d36551bed282ae20",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "ae3e2ef544368553493a273e4186ff3681e330f3aecd10fbabcee50de0f623bc"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-integer-array-volume-surfaces/build.json",
+        "sha256": "9eed302acf85a51ab4d173e41720cabb7bbdbe76d8cdd5755ddc036fa7a212ab"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-integer-array-volume-surfaces/units.json",
+            "sha256": "3c72e7f9aafd50e92cd74a006547b715a40cfaedcee35160e03d4c6846934506"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderQueriesTypedSurfaceOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "passed",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation.internal": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-integer-array-volume-surfaces/negatives.json",
+            "sha256": "54df1994356a53dbba945192a5042f18ad6bfadb1f2dab366d71ed2020367b65"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-formatted-surface-provenance.slang": "passed",
+            "tests/cuda/nvvm-native-float-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang": "passed",
+            "tests/cuda/nvvm-native-integer-surface-unsupported.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "physical": {
+          "gate": {
+            "path": "build/nvvm-integer-array-volume-surfaces/physical.json",
+            "sha256": "49b3c62f58b74ea0bbd3513e2055cc68518c5bcd2ad242858f15a9e7c919e512"
+          },
+          "validated": {
+            "path": "build/nvvm-integer-array-volume-surfaces/physical-validation.json",
+            "sha256": "ea319c3797d0662ee769c0e80299221be53eb1e70397ff92b7b7b03f326e084d"
+          },
+          "requested_cells": 33,
+          "counts": {
+            "compile-failed": 11,
+            "passed": 22
+          },
+          "outcomes": {
+            "half-3d-components|nvrtc-o3": "compile-failed",
+            "half-3d-components|nvvm-o0": "passed",
+            "half-3d-components|nvvm-o3": "passed",
+            "integer-format-1d-array-dynamic-components|nvrtc-o3": "compile-failed",
+            "integer-format-1d-array-dynamic-components|nvvm-o0": "passed",
+            "integer-format-1d-array-dynamic-components|nvvm-o3": "passed",
+            "integer-format-1d-array-static-components|nvrtc-o3": "compile-failed",
+            "integer-format-1d-array-static-components|nvvm-o0": "passed",
+            "integer-format-1d-array-static-components|nvvm-o3": "passed",
+            "integer-format-1d-array-whole|nvrtc-o3": "compile-failed",
+            "integer-format-1d-array-whole|nvvm-o0": "passed",
+            "integer-format-1d-array-whole|nvvm-o3": "passed",
+            "integer-format-2d-array-dynamic-components|nvrtc-o3": "compile-failed",
+            "integer-format-2d-array-dynamic-components|nvvm-o0": "passed",
+            "integer-format-2d-array-dynamic-components|nvvm-o3": "passed",
+            "integer-format-2d-array-static-components|nvrtc-o3": "compile-failed",
+            "integer-format-2d-array-static-components|nvvm-o0": "passed",
+            "integer-format-2d-array-static-components|nvvm-o3": "passed",
+            "integer-format-2d-array-whole|nvrtc-o3": "compile-failed",
+            "integer-format-2d-array-whole|nvvm-o0": "passed",
+            "integer-format-2d-array-whole|nvvm-o3": "passed",
+            "integer-format-2d-dynamic-components|nvrtc-o3": "compile-failed",
+            "integer-format-2d-dynamic-components|nvvm-o0": "passed",
+            "integer-format-2d-dynamic-components|nvvm-o3": "passed",
+            "integer-format-3d-dynamic-components|nvrtc-o3": "compile-failed",
+            "integer-format-3d-dynamic-components|nvvm-o0": "passed",
+            "integer-format-3d-dynamic-components|nvvm-o3": "passed",
+            "integer-format-3d-static-components|nvrtc-o3": "compile-failed",
+            "integer-format-3d-static-components|nvvm-o0": "passed",
+            "integer-format-3d-static-components|nvvm-o3": "passed",
+            "integer-format-3d-whole|nvrtc-o3": "compile-failed",
+            "integer-format-3d-whole|nvvm-o0": "passed",
+            "integer-format-3d-whole|nvvm-o3": "passed"
+          },
+          "scope": "Nine new grouped rows across3modes, all18NVVMcells pass with24 independent resources each. Activeplanes1/2of4, asymmetricY/Zextents, representative loadanchors+coordinatebits and independentZ-phased saturated stores. Fullguards and untouchedchannels exact. Two controls retain6exact outcomes.",
+          "control_comparison": {
+            "path": "build/nvvm-integer-array-volume-surfaces/control-comparison.json",
+            "sha256": "566af43bab724547a9510e2d3a35b5cab184059182574668517501d16dea60fa"
+          }
+        },
+        "cpu": {
+          "harness": {
+            "path": "build/nvvm-integer-array-volume-surfaces/harness-contracts.json",
+            "sha256": "2cedc48e60fca1b105945cb85c27d1bfff00121971964675f0bd53cb54c297d6"
+          },
+          "harness_case_count": 106,
+          "report_validator": {
+            "path": "build/nvvm-integer-array-volume-surfaces/report-contracts.json",
+            "sha256": "c7a45687b3a2f8e0a18405cb68be21292b7fdee554ca0ed2358cec4a26ad5976"
+          },
+          "report_contract_tests": 22,
+          "original_case_oracle_preservation": {
+            "path": "build/nvvm-integer-array-volume-surfaces/harness-freeze.json",
+            "sha256": "b109004006d3428219d92f7d97242212759e030330fd9f72cb42027c8ece8ad3"
+          },
+          "scope": "All16storeedges perselectedlane/activerow/plane, role/extent/guard mutation checks and bounded matching-load/store plane permutation rejected by independent stores."
+        },
+        "ptx": {
+          "path": "build/nvvm-integer-array-volume-surfaces/ptx-inspection.json",
+          "sha256": "502f9c4de40bf8fe3014559eb2fbb48579f3efbdd90963a6c202cf140f87686b"
+        }
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-integer-array-volume-surfaces/before-validation.json",
+          "sha256": "1f272cc1cfd191fa891f91d8aa94ac3958071a963ce345e18cecb226edc4c28f"
+        },
+        "transitions": [
+          {
+            "case": "integer-format-1d-array-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-1d-array-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-1d-array-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-1d-array-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-1d-array-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-1d-array-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-2d-array-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-2d-array-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-2d-array-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-2d-array-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-2d-array-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-2d-array-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-3d-dynamic-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-3d-dynamic-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-3d-static-components",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-3d-static-components",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-3d-whole",
+            "mode": "nvvm-o0",
+            "before": "compile-failed",
+            "after": "passed"
+          },
+          {
+            "case": "integer-format-3d-whole",
+            "mode": "nvvm-o3",
+            "before": "compile-failed",
+            "after": "passed"
+          }
+        ],
+        "comparison": "All27before/after source/case/oracle identities exact;9CUDA normalized failures unchanged."
+      },
+      "retained_failures": {
+        "new_cuda": "All9 spatial fixtures retain missing integer surf1DLayered/2DLayered/3Dread_convert compilation failures, with additional component-source limitations. No CUDA runtime equivalence claim.",
+        "controls": "Existing narrow nonarray dynamic and Half volume component CUDA failures unchanged.",
+        "unannotated_packed": "Historical unannotated int4/signed8x4 mismatch remains outside explicit-format admission."
+      },
+      "preservation": {
+        "prior_feature_count": 55,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "original_surface_rows_sources_oracles": 97,
+        "canonical_surface_legalizer_sha256": "3743a52bb91f3e06749a05be8acca3d67b3e0eca45b14cb59467f7a3d3ed095d",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_surface_expansion": "Fullbaseline249cells unchanged;23newgroupedrows sincefull require reviewedadoption of69cells at nextfullcheckpoint."
+      },
+      "limitations": [
+        "Existing D3D-based saturation policy unchanged; Vulkan out-of-range storage-image equivalence unqualified.",
+        "Representative integer patterns and bounded permutation checks, not exhaustive decode/addressproof.",
+        "No normalized/packedbitfield/mixedsignedness/nativenarrowlogical/3Darray/CubeMS/threechannel/newprovenance admission.",
+        "Dynamic stores remain non-atomic and inrange; no new OOB/concurrency guarantee.",
+        "Focused correctness atSM80; no fullcampaign or performanceclaim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "integer-array-volume-surfaces",
+        "implementations_since_full": 14
+      }
     }
   }
 }

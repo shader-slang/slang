@@ -1782,9 +1782,6 @@ bool getNVVMSupportedSurfaceField(
         if (formatInfo.scalarType ==
             (isSigned ? SLANG_SCALAR_TYPE_INT32 : SLANG_SCALAR_TYPE_UINT32))
             return true;
-        if (outType.isArray || outType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
-            return false;
-
         // Normalized formats also use UINT8/UINT16 metadata. Only these exact integer formats
         // select integer conversion; matching scalar width alone would silently admit UNORM.
         switch (formatDecoration->getFormat())

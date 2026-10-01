@@ -1240,11 +1240,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
                         {
                             auto narrow = native32;
                             narrow.elementType.bitWidth = width;
-                            SLANG_CHECK(!builder.supportsSurfaceOperation(narrow));
-                            narrow.isArray = 0;
                             SLANG_CHECK(
                                 builder.supportsSurfaceOperation(narrow) ==
                                 (shape != SLANG_NVVM_TEXTURE_SHAPE_3D));
+                            narrow.isArray = 0;
+                            SLANG_CHECK(builder.supportsSurfaceOperation(narrow));
                         }
                     }
                 }
@@ -1276,6 +1276,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedSurfaceOperations)
     unsupported.elementType.kind = SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER;
     SLANG_CHECK(builder.supportsSurfaceOperation(unsupported));
     unsupported.isArray = 1;
+    SLANG_CHECK(builder.supportsSurfaceOperation(unsupported));
+    unsupported.shape = SLANG_NVVM_TEXTURE_SHAPE_3D;
     SLANG_CHECK(!builder.supportsSurfaceOperation(unsupported));
 }
 
@@ -1331,16 +1333,17 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
                 coordinateCount,
                 coordinate)));
             for (uint32_t lanes : {1u, 2u, 4u})
-                for (uint32_t bitWidth : {32u, 16u})
+                for (const auto& physicalType :
+                     {SlangNVVMValueTypeDesc{SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 32, lanes},
+                      SlangNVVMValueTypeDesc{SLANG_NVVM_VALUE_TYPE_FLOATING_POINT, 16, lanes},
+                      SlangNVVMValueTypeDesc{SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER, 8, lanes},
+                      SlangNVVMValueTypeDesc{SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, lanes}})
                 {
                     SlangNVVMSurfaceOperationDesc operation = {
                         SLANG_NVVM_SURFACE_OP_LOAD,
                         SlangNVVMTextureShape(dimensions),
                         uint32_t(isArray),
-                        {bitWidth == 16 ? SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
-                                        : SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER,
-                         bitWidth,
-                         lanes},
+                        physicalType,
                         SLANG_NVVM_SURFACE_BOUNDARY_ZERO};
                     SlangNVVMValueHandle operands[] = {surface, coordinate, nullptr};
                     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitSurfaceOperation(
@@ -1384,7 +1387,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
                             rejected)));
                         SLANG_CHECK(rejected == nullptr);
                         invalid = operation;
-                        invalid.elementType = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, lanes};
+                        invalid.elementType = {SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 64, lanes};
                         SLANG_CHECK(SLANG_FAILED(builder.emitSurfaceOperation(
                             module.module,
                             invalid,
@@ -1479,7 +1482,7 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsArraySurfaceCoordinatesWithoutMutation)
             const String assembly = _getBlobText(blob);
             for (uint32_t dimensions : {1u, 2u, 3u})
                 for (uint32_t lanes : {1u, 2u, 4u})
-                    for (uint32_t bitWidth : {32u, 16u})
+                    for (uint32_t bitWidth : {32u, 16u, 8u})
                         for (bool store : {false, true})
                         {
                             StringBuilder call;

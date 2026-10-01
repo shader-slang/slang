@@ -894,8 +894,12 @@ twelve independent native32 observation arrays. Representative signedness patter
 extension; sixteen logical store edges per selected lane establish saturation before narrowing.
 Full readback checks every untouched channel and guard. The oracle uses mathematical integer clamp,
 not shader roundtrips or CUDA output. These rows do not qualify unannotated packed bindings.
-The current harness has 97 rows; the retained full baseline has 83. Preserve its 249 cells and use
-the focused array/volume/integer evidence when reviewing the forty-two-cell expansion at the next full checkpoint.
+Nine spatial integer rows extend the same formats and three store styles to 1DArray/2DArray/3D,
+using the existing driver. Depth4 has two active planes and two guarded planes; height5 distinguishes
+Y from Z. Independent plane-sensitive stores and host input markers prevent the tested coordinate
+permutations from cancelling through matching reads/writes. Existing 97 inputs/oracles stay exact.
+The current harness has 106 rows; the retained full baseline has 83. Preserve its 249 cells and use
+the focused array/volume/integer evidence when reviewing the sixty-nine-cell expansion at the next full checkpoint.
 The four new CUDA Half-array compile failures remain explicit comparison limitations.
 
 A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires

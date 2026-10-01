@@ -6569,8 +6569,7 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     const bool isNarrowInteger =
         (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
          operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
-        (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16) &&
-        !operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
+        (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16);
     return is32BitNumeric || isNarrowInteger ||
            (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
             operation.elementType.bitWidth == 16);
