@@ -1,0 +1,6 @@
+# Run thread 14 — near the right edge of the buffer.
+# When k=+2 the kernel tries to read index 14+2=16, which clamp(16, 0, kCount)
+# returns as 16 — one past the end of a 16-element buffer.  Panics.
+set input 0 0 [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
+set input 0 1 [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+set builtin GlobalInvocationID 14 0 0

@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:57:34Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: aea6c67df76f1024b3cea1726b279a8ddc00bda3f01d9c6a25e65b7c80d11490
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: f9f1edaba5787454d468a3ca6e414e1eeed2f925728c05ed389b5f2d6fd1e008
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -410,8 +410,8 @@ construction site funnels through
 (line 531), which just forwards to `ASTBuilder::getTypeEqualityWitness`.
 Its callers are in
 [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp):
-line 699 builds the self facet of a non-decl-ref type, and lines 2024
-and 2084 build the extracted and projected types of an opened
+line 712 builds the self facet of a non-decl-ref type, and lines 2037
+and 2097 build the extracted and projected types of an opened
 existential.
 
 ### SubtypeWitness across packs

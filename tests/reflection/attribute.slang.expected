@@ -302,6 +302,45 @@ standard output = {
                     {"kind": "uniform", "value": 4, "alignment": 4}
                 ]
             }
+        },
+        {
+            "name": "po",
+            "type": {
+                "kind": "struct",
+                "name": "StructWithPointer",
+                "fields": [
+                    {
+                        "name": "attrib",
+                        "type": {
+                            "kind": "pointer",
+                            "valueType": {
+                                "kind": "struct",
+                                "name": "StructWithAttribute",
+                                "fields": [
+
+                                ],
+                                "userAttribs": [
+                                    {
+                                        "name": "ReflectThroughPointer",
+                                        "arguments": [
+
+                                        ]
+                                    }
+                                ],
+                                "sizes": [
+
+                                ]
+                            },
+                            "sizes": [
+
+                            ]
+                        }
+                    }
+                ],
+                "sizes": [
+
+                ]
+            }
         }
     ],
     "globalScope": {
@@ -603,6 +642,28 @@ standard output = {
                     "scalarType": "int32",
                     "sizes": [
                         {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                }
+            },
+            {
+                "name": "po",
+                "type": {
+                    "kind": "struct",
+                    "name": "StructWithPointer",
+                    "fields": [
+                        {
+                            "name": "attrib",
+                            "type": {
+                                "kind": "pointer",
+                                "valueType": "StructWithAttribute",
+                                "sizes": [
+
+                                ]
+                            }
+                        }
+                    ],
+                    "sizes": [
+
                     ]
                 }
             }

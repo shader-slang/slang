@@ -27,16 +27,29 @@ The traversal kernel has several rarely-fired branches:
 
 ## Run
 
-The host driver generates a procedural mesh, builds a BVH on CPU,
-uploads, and dispatches 4096×4096 = 16.7M rays from a synthetic camera.
-`--batch-size=N` splits the rays into batches of N per submission, which
-keeps each batch short and avoids OS watchdog resets (Windows TDR /
-`VK_ERROR_DEVICE_LOST`) under coverage instrumentation. Full mode
-defaults to batches of 262144 (512×512) — a safe value on any GPU —
-because its single 16.7M-ray coverage-instrumented dispatch is long
-enough to trip the watchdog; smoke mode defaults to a single dispatch.
-Pass an explicit value to tune, or `--batch-size=0` for a single
-dispatch in full mode.
+The host generates the same procedural mesh and BVH, but defaults to
+**256x256 = 65,536 rays**. Pass **`--ray-grid-size=4096`** to select
+**4096x4096 = 16,777,216 rays** for benchmarking. Scene complexity, materials,
+and the smoke/full distinctions remain unchanged.
+
+`--batch-size=N` limits rays per GPU submission. Full mode defaults to at most
+262144 rays per batch, so the small default grid fits in one batch. Smoke mode
+and explicit `--batch-size=0` use a single dispatch. Batching helps with GPU
+watchdog limits; it does not reduce total work or guarantee that large runs
+finish before a process timeout.
+
+Set `--ray-grid-size=N` to choose an N×N grid (default: 256; range: 2–65535).
+For example, `--ray-grid-size=128` uses 128×128 rays.
+Halving the grid dimension quarters the ray count without changing the scene.
+Very small grids may miss scene features and exercise fewer coverage paths.
+
+A nonzero `--batch-size=N` must be a multiple of the shader's 64-ray
+thread-group size, so batches do not overlap. A batch larger than the grid's
+ray count uses one submission; the final batch is clipped to the remaining
+rays. Grid dimensions need not be multiples of 64. Smaller batches reduce
+work per submission but add overhead; reduce the grid size to reduce total
+runtime. Large workloads remain subject to available GPU memory and dispatch
+limits.
 
 ```bash
 ./shader-coverage-bvh-traversal --mode=smoke    # clean icosphere, Diffuse only
@@ -44,6 +57,12 @@ dispatch in full mode.
 
 # Compile-time disable coverage instrumentation (baseline):
 ./shader-coverage-bvh-traversal --mode=full --no-coverage
+
+# Use a smaller workload split into four batches:
+./shader-coverage-bvh-traversal --mode=full --ray-grid-size=128 --batch-size=4096
+
+# Restore the original ray grid for benchmarking:
+./shader-coverage-bvh-traversal --mode=full --ray-grid-size=4096 --no-coverage
 
 # Hit/miss mode — non-atomic, no execution counts but same coverage map:
 ./shader-coverage-bvh-traversal --mode=full --coverage-mode=boolean
@@ -79,7 +98,7 @@ Each coverage run writes:
 
 ## End-to-end wrapper
 
-`run_coverage.py` (in this directory) compiles, dispatches, converts,
+`run_coverage.py` forwards the workload and batch sizing options to the runner and compiles, dispatches, converts,
 renders, and opens the HTML report in one step:
 
 ```bash
@@ -114,7 +133,7 @@ The five stages `main.cpp` walks through for each run:
 | **1. Compile** | `compileShader()` creates a Slang session with `-trace-coverage`, `-trace-coverage-function`, `-trace-coverage-branch`, and `-trace-coverage-binding 0 1`. The compiler places `__slang_coverage` at the declared slot and emits SPIR-V with `OpAtomicIAdd` (count mode) or plain stores (boolean mode) at every instrumented point. | `slang::ISession::loadModule`, `IComponentType::link`, `getEntryPointCode` |
 | **2. Fix binding** | No runtime discovery step — the slot was dictated by `TraceCoverageBinding` at compile time. The host uses the same constants (`kCoverageBinding`, `kCoverageSet`) on the Vulkan side. | `CompilerOptionName::TraceCoverageBinding` |
 | **3. Allocate & bind** | Allocate a zeroed `counterCount × counterByteWidth` storage buffer. Build a Vulkan descriptor layout with app resources (rays/tris/nodes/globals/output) on set 0 and the coverage buffer at `(kCoverageSet, kCoverageBinding)` on set 1. | `vkCreateDescriptorSetLayout`, `vkUpdateDescriptorSets` |
-| **4. Dispatch** | Submit rays in batches (if `--batch-size=N` is set) or as a single dispatch (default). Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches. | `vkCmdDispatch` |
+| **4. Dispatch** | Submit at most 262144 rays per batch in full mode or a single dispatch in smoke mode; `--batch-size=N` overrides this. Each batch re-uploads `globals.rayBatchOffset`; the shader adds it to `tid.x` to recover the true ray index. Counters accumulate across all batches. | `vkCmdDispatch` |
 | **5. Readback** | Download the raw counter bytes, widen each slot to `uint64_t`, call `getEntryInfo` per counter to map slot → file/line, write manifest + LCOV + binary. | `ICoverageTracingMetadata::getEntryInfo`, `slang_writeCoverageManifestJson` |
 
 ### Raw Vulkan host

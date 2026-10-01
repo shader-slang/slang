@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b57e81781278bd6752bd817f50c238aae4f56d4fda646e22befd826b34d6cab4
+//META: doc_section_digest=7b8fdedc5a4069b7a10da3f6dcaf8b3268c6f74fbb85dd4ea2edff960fab2b8b
 //META: purpose=A function body parsed after the declaration pass resolves names against the scope chain that was live at its declaration site, not at file scope.
 //META: intent=functional
 //META: pipeline_stage=check

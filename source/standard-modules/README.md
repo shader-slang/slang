@@ -36,9 +36,16 @@ source/standard-modules/
 │   ├── CMakeLists.txt                      # Neural module build logic
 │   ├── neural.slang                        # Neural module entry point
 │   └── *.slang                             # Other neural module files
-└── experimental/                           # Experimental module subdirectory
-    ├── CMakeLists.txt                      # Experimental module build logic
-    └── workgraph.slang                     # Workgraph module entry point
+├── experimental/                           # Experimental module subdirectory
+│   ├── CMakeLists.txt                      # Experimental module build logic
+│   └── workgraph.slang                     # Workgraph module entry point
+├── numerics/                               # Experimental numeric interface modules
+│   ├── CMakeLists.txt                      # Numeric module build logic
+│   ├── numerics.slang                      # `slang.numerics` entry point
+│   └── differentiable.slang                # Differentiable annex entry point
+└── functional/                             # Experimental higher-order operations
+    ├── CMakeLists.txt                      # Functional module build logic
+    └── functional.slang                    # `slang.functional` entry point
 ```
 
 ## Files Involved
@@ -50,9 +57,12 @@ source/standard-modules/
 - `build/source/standard-modules/slang-standard-module-config-header/slang-standard-module-config.h` - Generated configuration header (internal only)
 
 ### CMake Files
-- `source/standard-modules/CMakeLists.txt` - Defines configuration variables for all standard modules and generates the header
+- `source/standard-modules/CMakeLists.txt` - Defines configuration variables for all standard
+  modules and generates the header
 - `source/standard-modules/neural/CMakeLists.txt` - Neural module specific build logic
 - `source/standard-modules/experimental/CMakeLists.txt` - Experimental module specific build logic
+- `source/standard-modules/numerics/CMakeLists.txt` - Experimental numeric module build logic
+- `source/standard-modules/functional/CMakeLists.txt` - Experimental functional module build logic
 - `source/slang/CMakeLists.txt` - Uses the standard module config header internally for the slang library
 
 ### C++ Code
@@ -92,8 +102,12 @@ To change the standard module paths:
 
 For example, `import slang.neural;` resolves to `slang/neural.slang-module`, and
 `import experimental.workgraph;` resolves to `experimental/workgraph.slang-module`.
+The experimental numeric imports resolve to `slang/numerics.slang-module` and
+`slang/numerics/differentiable.slang-module`.
+The experimental functional import resolves to `slang/functional.slang-module`.
 
-This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same path configuration, while keeping the implementation details internal to the slang library.
+This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same
+path configuration, while keeping the implementation details internal to the slang library.
 
 The standard modules are automatically co-located with the slang library for easy discovery at runtime.
 

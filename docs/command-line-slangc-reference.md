@@ -32,6 +32,7 @@ slangc -help-style markdown -h
 * [optimization-level](#optimization-level)
 * [debug-level](#debug-level)
 * [file-system-type](#file-system-type)
+* [bitfield-packing-rules](#bitfield-packing-rules)
 * [source-embed-style](#source-embed-style)
 * [target](#target-1)
 * [stage](#stage)
@@ -60,7 +61,9 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 **-depfile &lt;path&gt;**
 
-Save the source file dependency list in a file. 
+Save the dependency list in a file. Lists source files and any imported precompiled 
+
+.slang-module files. 
 
 Uses Makefile dependency syntax: &lt;output&gt;: &lt;dep&gt; &lt;dep...&gt; 
 
@@ -255,7 +258,15 @@ all - Treat all warnings as errors.
 
 **-warnings-disable &lt;id&gt;\[,&lt;id&gt;...\]**
 
-Disable specific warning ids. 
+Disable specific warnings, given by numeric id or name. A numeric id that this compiler version does not recognize is silently ignored, so one option value can be shared across compiler versions that do not all define the warning; an unrecognized warning name is still reported as an error. 
+
+
+<a id="notes-disable"></a>
+### -notes-disable
+
+**-notes-disable &lt;id&gt;\[,&lt;id&gt;...\]**
+
+Disable specific notes, given by numeric id or name. 
 
 
 <a id="wall"></a>
@@ -314,7 +325,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. Statements that provably execute together share one counter and one runtime probe, which keeps instrumented shader code small without changing reported per-line results; the manifest therefore reports no more counters than source entries, and fewer whenever a straight-line region is coalesced. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-function-coverage"></a>
@@ -324,7 +335,7 @@ Instrument the shader with per-function-entry coverage counters. Shares the synt
 
 <a id="trace-branch-coverage"></a>
 ### -trace-branch-coverage
-Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths, and for the true/false arms of scalar `?:` conditions and short-circuiting `&amp;&amp;` / `||` left operands. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
 
 
 <a id="trace-coverage-boolean"></a>
@@ -338,6 +349,14 @@ Record boolean coverage instead of exact execution counts: each counter slot is 
 **-trace-coverage-binding &lt;index&gt; &lt;space&gt;**
 
 Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time before any host metadata reads run. Implies `-trace-coverage`. 
+
+
+<a id="trace-coverage-bindless-index"></a>
+### -trace-coverage-bindless-index
+
+**-trace-coverage-bindless-index &lt;index&gt;**
+
+Synthesize `__slang_coverage` as an unbounded descriptor array of structured buffers rather than a single buffer, and index it with &lt;index&gt;: `__slang_coverage\[&lt;index&gt;\]\[slot\]`. Many separately compiled shaders sharing one pipeline then occupy a single descriptor binding rather than one binding each, and each shader's buffer is sized independently by the host. Place the array with `-trace-coverage-binding &lt;index&gt; &lt;space&gt;`, or leave it to auto-allocation. If the host declares the descriptor array with a VARIABLE descriptor count, Vulkan requires it to be the highest-numbered binding in its set; a fixed descriptor count carries no such restriction. That is the host's layout to satisfy, and the compiler cannot see it. &lt;index&gt; is a compile-time constant and so becomes part of the compiled output: a host that keys a shader cache on that output must derive &lt;index&gt; from a stable shader identity rather than from load order, or an unchanged shader recompiles whenever that order shifts. SPIR-V and GLSL only. Implies `-trace-coverage`. 
 
 
 <a id="trace-coverage-reserved-space"></a>
@@ -435,9 +454,17 @@ Include additional type conformance during linking for dynamic dispatch.
 Emit reflection data in JSON format to a file. 
 
 
+<a id="bitfield-packing-rules-1"></a>
+### -bitfield-packing-rules
+
+**-bitfield-packing-rules &lt;[bitfield-packing-rules](#bitfield-packing-rules)&gt;**
+
+Select the rules to use for packing bitfields. The value must be one of the [&lt;bitfield-packing-rules&gt;](#bitfield-packing-rules) documented below. Cannot be combined with [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing). 
+
+
 <a id="msvc-style-bitfield-packing"></a>
 ### -msvc-style-bitfield-packing
-Pack bitfields according to MSVC rules (msb first, new field when underlying type size changes) rather than gcc-style (lsb first) 
+Deprecated. Uses the same packing rules as [-bitfield-packing-rules](#bitfield-packing-rules-1) legacy-msb-first-msvc. Use [-bitfield-packing-rules](#bitfield-packing-rules-1) msvc for MSVC's bit order and type-size grouping on little-endian platforms. Cannot be combined with [-bitfield-packing-rules](#bitfield-packing-rules-1). 
 
 
 
@@ -725,12 +752,12 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 
-<a id="none-version"></a>
-### -&lt;compiler&gt;-version
+<a id="get-none-path"></a>
+### -get-&lt;compiler&gt;-path
 
-**-&lt;[compiler](#compiler)&gt;-version**
+**-get-&lt;[compiler](#compiler)&gt;-path**
 
-Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
+Print the on-disk path of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located, or "not available" if it has no recoverable shared-library path. Takes no value. 
 
 
 
@@ -972,7 +999,7 @@ Perform uniformity validation analysis.
 
 <a id="allow-glsl"></a>
 ### -allow-glsl
-Enable GLSL as an input language. 
+Deprecated. Treat every input translation unit as GLSL. Use a GLSL file-name extension or `-lang glsl` for each GLSL input instead. 
 
 
 <a id="enable-experimental-passes"></a>
@@ -1253,6 +1280,15 @@ File System Type
 * `default` : Default file system. 
 * `load-file` : Just implements loadFile interface, so will be wrapped with CacheFileSystem internally. 
 * `os` : Use the OS based file system directly (without file system caching) 
+
+<a id="bitfield-packing-rules"></a>
+## bitfield-packing-rules
+
+Bitfield Packing Rules 
+
+* `default` : Bits are packed LSB-first; fields with different underlying type sizes may share a storage unit. 
+* `msvc` : Bits are packed LSB-first, and a new storage unit starts when the underlying type size changes. Use for MSVC-compatible bitfield packing on little-endian platforms. Zero-width bitfields are not supported. 
+* `legacy-msb-first-msvc` : Bits are packed MSB-first, and a new storage unit starts when the underlying type size changes. Not recommended; use only when the layout produced by [-msvc-style-bitfield-packing](#msvc-style-bitfield-packing) is required. This bit order differs from MSVC on little-endian platforms. 
 
 <a id="source-embed-style"></a>
 ## source-embed-style
@@ -1862,6 +1898,7 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_position_raygen_closesthit_miss` 
 * `ser_nv_raygen` 
 * `ser_nv_raygen_closesthit_miss` 
 * `ser_nv_motion_raygen_closesthit_miss` 
@@ -1934,6 +1971,7 @@ Available help categories for the [-h](#h) option
 * `optimization-level` : Optimization Level 
 * `debug-level` : Debug Level 
 * `file-system-type` : File System Type 
+* `bitfield-packing-rules` : Bitfield Packing Rules 
 * `source-embed-style` : Source Embed Style 
 * `target` : Target 
 * `stage` : Stage 

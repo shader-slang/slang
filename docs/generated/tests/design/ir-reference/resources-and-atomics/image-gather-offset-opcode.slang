@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#imagegatheroffset
-//META: doc_section_digest=0e987db459d6585b402818e888f7feb042e67c1424ead62468638b9bd3c00973
+//META: doc_section_digest=5eeb11340927fb3d46b9091b182fe1e4d7413ea586367c46c238bda7d8431e23
 //META: purpose=`Texture2D::GatherRed(sampler, uv, offset)` reaches the IR as `imageGatherOffset(sampledImage, location, component, offset)` inside the core-module gather body pulled into the dump.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -16,7 +16,7 @@
 // the user call specializes; the operand names in that body (`location`,
 // `component`, `offset`) are what the CHECK pins.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform Texture2D<float4> tex;
 uniform SamplerState samp;

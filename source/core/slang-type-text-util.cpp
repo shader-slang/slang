@@ -197,6 +197,25 @@ static const NamesDescriptionValue s_fpDenormalModes[] = {
     {SLANG_FP_DENORM_MODE_FTZ, "ftz", "Flush denormals to zero"},
 };
 
+static const NamesDescriptionValue s_bitfieldPackingRules[] = {
+    {ValueInt(slang::BitfieldPackingRules::Default),
+     "default",
+     "Bits are packed LSB-first; fields with different underlying type sizes may share a storage "
+     "unit."},
+    {ValueInt(slang::BitfieldPackingRules::MSVC),
+     "msvc",
+     "Bits are packed LSB-first, and a new storage unit starts when the underlying type size "
+     "changes. "
+     "Use for MSVC-compatible bitfield packing on little-endian platforms. Zero-width bitfields "
+     "are not supported."},
+    {ValueInt(slang::BitfieldPackingRules::LegacyMSBFirstMSVC),
+     "legacy-msb-first-msvc",
+     "Bits are packed MSB-first, and a new storage unit starts when the underlying type size "
+     "changes. "
+     "Not recommended; use only when the layout produced by -msvc-style-bitfield-packing is "
+     "required. This bit order differs from MSVC on little-endian platforms."},
+};
+
 static const NamesDescriptionValue s_optimizationLevels[] = {
     {SLANG_OPTIMIZATION_LEVEL_NONE, "0,none", "Disable all optimizations"},
     {SLANG_OPTIMIZATION_LEVEL_DEFAULT,
@@ -285,6 +304,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getFpDenormalModeInfos()
 {
     return makeConstArrayView(s_fpDenormalModes);
+}
+
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getBitfieldPackingRulesInfos()
+{
+    return makeConstArrayView(s_bitfieldPackingRules);
 }
 
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getOptimizationLevelInfos()

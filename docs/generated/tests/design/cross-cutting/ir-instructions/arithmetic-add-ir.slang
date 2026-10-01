@@ -15,7 +15,7 @@
 // the same source emits the C-like `a + b` on every text target that
 // lowers `add` to `+`.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main

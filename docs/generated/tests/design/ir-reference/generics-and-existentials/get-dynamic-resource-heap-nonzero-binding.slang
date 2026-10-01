@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#runtime-type-information
-//META: doc_section_digest=10ae9cc79d86ded1f6703277629437a1410db2756cb171fadd23944d8b2ba02f
+//META: doc_section_digest=112d0fd617dabf9645fb61aab20200af19e655a7b95509d8501289ff25a1abb0
 //META: purpose=A non-default binding index reaches GetDynamicResourceHeap as its literal operand rather than being normalised to zero.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -11,7 +11,7 @@
 // Boundary on the binding-index operand, whose default is zero. Requesting
 // binding 2 must survive into the inst's operand list; the CHECK pins the
 // literal `2 : UInt`, so a dropped or defaulted index would fail.
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform int inVal;
 uniform RWStructuredBuffer<int> buf;

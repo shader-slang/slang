@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:08:24Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 8f8f11ba3fefd6f5527363f5b7ce223022ccac1773c5e77ca1ff8000d572a91d
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 2464030004e84d0c0aa0884184d6030f75a67784d237bd0c6558593236696070
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -48,7 +48,7 @@ depends on nothing else in the project.
 | Command-line parsing | `slang-command-line.h`, `slang-command-options.h`, `slang-command-options-writer.h` | Generic option parsing reused by `slangc` and tools |
 | Allocation | `slang-allocator.h`, `slang-free-list.h`, `slang-memory-arena.h`, `slang-virtual-object-pool.h` | Arena and free-list allocators used by the AST and IR, plus a virtual free-list for index-space object pools |
 | Built-in module cache | `slang-builtin-module-cache.h`, `slang-builtin-module-cache.cpp` | Reads and writes the timestamp-prefixed on-disk cache of serialized built-in modules (`[uint64 library timestamp][module bytes]`), so a non-embedded build can load the core module instead of recompiling it |
-| More containers | `slang-linked-list.h`, `slang-internally-linked-list.h`, `slang-short-list.h`, `slang-uint-set.h`, `slang-range.h`, `slang-offset-container.h`, `slang-relative-ptr.h` | Bit sets, list and small-vector variants, and offset-based containers for position-independent data |
+| More containers | `slang-linked-list.h`, `slang-internally-linked-list.h`, `slang-short-list.h`, `slang-short-dictionary.h`, `slang-uint-set.h`, `slang-range.h`, `slang-offset-container.h`, `slang-relative-ptr.h` | Bit sets, list and small-vector variants (`slang-short-dictionary.h` is an add-only map that keeps its first few entries in an inline array and promotes to `Dictionary` only past that), and offset-based containers for position-independent data |
 | I/O and streams | `slang-io.h`, `slang-stream.h`, `slang-text-io.h`, `slang-writer.h`, `slang-std-writers.h` | Path manipulation, file and memory streams, and the writer interfaces behind redirected stdout/stderr |
 | Further file systems | `slang-memory-file-system.h`, `slang-riff-file-system.h`, `slang-zip-file-system.h` | `ISlangMutableFileSystem` implementations backed by memory, RIFF containers, and zip archives |
 | RIFF containers | `slang-riff.h`, `slang-riff.cpp` | Reading and writing the chunked RIFF format used by the serialized containers |
@@ -190,8 +190,8 @@ One file per checking concern; all collaborate through
 
 ### IR passes
 
-The `slang-ir-*` family contains roughly 160 `.cpp` files — about 320
-files counting their headers — that implement analyses and
+The `slang-ir-*` family contains 163 `.cpp` files — 326 files counting
+their headers — that implement analyses and
 transformations on the IR. **Do not enumerate them
 here**; the pass categories and per-pass entries belong in
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md). Examples
@@ -223,6 +223,11 @@ of the categories visible from filenames:
   `slang-ir-metal-legalize`, `slang-ir-wgsl-legalize`), plus
   target-specific helper headers such as `slang-ir-util-hlsl`, which
   holds the HLSL `Barrier` flag-validation helpers rather than a pass.
+- Control-flow restructuring (`slang-ir-simplify-cfg`,
+  `slang-ir-loop-inversion`, `slang-ir-loop-unroll`,
+  `slang-ir-thread-switch-on-constant-phi`, which jump-threads a
+  `switch` whose selector is a block parameter carrying a distinct
+  constant on every incoming edge).
 - Shared utilities (`slang-ir-clone`, `slang-ir-dominators`,
   `slang-ir-call-graph`, `slang-ir-deduplicate`).
 
@@ -316,6 +321,7 @@ See [../cross-cutting/core-module.md](../cross-cutting/core-module.md).
 | Configuration | `slang-standard-module-config.h.in` | CMake-templated configuration header |
 | Neural module | [neural/](../../../../source/standard-modules/neural) | Standard module for neural / ML workloads |
 | Experimental modules | [experimental/](../../../../source/standard-modules/experimental) | Modules not yet promoted to the stable set; currently the work-graph module (`workgraph.slang`) |
+| Numerics module | [numerics/](../../../../source/standard-modules/numerics) | Representation-independent numeric interfaces and generic operations, split across `interfaces.slang`, the `*-conformances.slang` files, `wrappers.slang`, and a parallel `differentiable-*` set; marked `[ExperimentalModule]`, so importers must enable experimental features |
 
 ## prelude/ — per-target prelude headers
 
@@ -342,7 +348,7 @@ output can be compiled by the downstream toolchain.
 
 | Logical unit | Files | Responsibility |
 | --- | --- | --- |
-| glslang shim | [slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp), `slang-glslang.h` | Bridge to Khronos glslang for SPIR-V via GLSL |
+| glslang shim | [slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp), `slang-glslang.h`, `slang-glslang.version-script` | Bridge to Khronos glslang for SPIR-V via GLSL; the version script is the export list both the ELF and macOS builds derive from, so a new entry point must be added there as well as in the C++ |
 
 ## source/slang-dispatcher/ — downstream-tool dispatcher
 

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#option-set-toggles
-//META: doc_section_digest=7c951a88b67c0d94a6d4504f2d7616fdfe324b58f96f2245c67178d693892a88
+//META: doc_section_digest=af8456e51bdb3fb57f8ddeaae70da165649c7adf3497efb5a4038eb6995a71a1
 //META: purpose=The DebugInfoIncludeSource toggle widens A4 so IRDebugSource carries the source text at Minimal debug-info level, without promoting the debug-info level itself.
 //META: intent=boundary
 //META: pipeline_stage=lower
@@ -19,8 +19,8 @@
 // raise the level; the INC run cannot repeat that assertion because the
 // embedded source text itself now contains the inst's name.
 
-//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
-//TEST:SIMPLE(filecheck=INC):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1 -debug-info-include-source
+//TEST:SIMPLE(filecheck=MIN):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=INC):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1 -debug-info-include-source
 
 uniform int a;
 uniform RWStructuredBuffer<int> buf;

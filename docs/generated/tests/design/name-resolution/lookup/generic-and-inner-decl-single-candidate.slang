@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#container-level-overload-accumulation
-//META: doc_section_digest=cb7e905b70ffaa021ce6c0239be16311c8162dfb5969fc52c7a9db96f2aa7905
+//META: doc_section_digest=69c935392c65511a1d292e4dc9dbed44566370e6aa182465fec6e7084de65954
 //META: purpose=The same-name chain skips a generic's inner decl, so a generic and its inner declaration do not both answer to the generic's name and a same-named plain overload still resolves.
 //META: intent=boundary
 //META: pipeline_stage=check

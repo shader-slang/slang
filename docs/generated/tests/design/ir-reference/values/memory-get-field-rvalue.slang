@@ -14,7 +14,7 @@
 // reading its fields surfaces `get_field` (the cross-cutting bundle
 // covers `get_field_addr` via a local struct).
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 struct Mixed { int x; float y; bool z; }
 

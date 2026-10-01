@@ -162,12 +162,17 @@ the reason.
   `visitRenamedEntryPoint`, `visitExistentialSpecializedType`** — driven by
   the `IComponentType` specialization / type-conformance API, not by any
   `slangc` command line. Needs a C++ unit test, not a `.slang` file.
-- **`visitGLSLInterfaceBlockDecl` non-`buffer` arm and the
-  `SynthesizedStructDecl` operand arms of `visitAggTypeDecl`** — probed with
-  `-allow-glsl` `buffer` / `uniform` blocks; the decl is resolved to an alias
-  earlier in `visitAggTypeDecl` and never reaches the else-if chain. The
-  synthesized-struct arms are fed by internal (autodiff intermediate-context)
-  decls with no user spelling.
+- **Both arms of the `GLSLInterfaceBlockDecl` branch of `visitAggTypeDecl`
+  (`:12752`) and the `SynthesizedStructDecl` operand arms of the same
+  function** — probed with `-allow-glsl` `buffer` / `uniform` blocks and never
+  reached. The reason is upstream of lowering: the only code that constructs a
+  `GLSLInterfaceBlockDecl` is `Parser::ParseGLSLInterfaceBlock`
+  (`slang-parser.cpp:6463-6479`), and that function has no caller anywhere in
+  `source/`. GLSL interface blocks are parsed by `ParseBufferBlockDecl`
+  instead, so no user spelling produces the decl this branch switches on — see
+  the matching row in [`coverage/parser`](../parser/README.md), which flags the
+  parser function as dead code. The synthesized-struct arms are fed by internal
+  (autodiff intermediate-context) decls, which likewise have no user spelling.
 - **`visitNamedExpressionType`** — `typealias` / `typedef` sugar is
   canonicalized before lowering; probed with both spellings in variable,
   parameter, and generic-argument positions and never reached.
@@ -187,3 +192,23 @@ the reason.
 ## Doc gaps observed
 
 NA
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 33 commits touched its watched paths in between; all
+19 existing tests still pass.
+
+No diagnostic new since the base commit is raised from
+`slang-lower-to-ir.cpp`, and the 33 commits in the window are refactors
+(`SLANG_UNUSED` to if-init, include-traversal removal, `Val` memoization) or
+fixes whose observable surface is owned by other bundles. No test was added.
+
+One entry in `Unreachable gaps` named a function that does not exist. There is
+no `visitGLSLInterfaceBlockDecl`; GLSL interface blocks are handled by an
+`as<GLSLInterfaceBlockDecl>` arm of `visitAggTypeDecl` (`:12752`). The stated
+reason was wrong too -- the arm is not reached because the decl is "resolved to
+an alias earlier", but because the only function that constructs the decl,
+`Parser::ParseGLSLInterfaceBlock`, has no caller anywhere in `source/`. The
+entry has been rewritten against the real code and now cross-references the
+matching dead-code row in `coverage/parser`.
