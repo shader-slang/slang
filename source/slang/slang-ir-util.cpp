@@ -1407,6 +1407,14 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
+            // Consider `payload.x = 11; maybeIgnoreHit(); payload.x = 91;`. A shader exit
+            // observes the current payload even when the callee has no pointer arguments.
+            // Preserve the first store until entry legalization makes that writeback explicit.
+            if (mayInvokeShaderTerminatingIntrinsic(
+                    call->getCallee(),
+                    ShaderTerminationQueryMode::IncludeUnresolvedCalls))
+                return true;
+
             // If addr is a global variable, calling a function may change its value.
             // So we need to return true here to be conservative.
             if (!isChildInstOf(getRootAddr(addr), func))
@@ -2362,6 +2370,52 @@ KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee)
     if (!decor)
         return KnownBuiltinDeclName::COUNT; // Use COUNT as invalid value
     return decor->getName();
+}
+
+// Canonical builtin identity survives linkage, specialization and removal of name hints.
+bool isShaderTerminatingIntrinsic(IRInst* callee)
+{
+    if (!callee)
+        return false;
+    switch (getBuiltinFuncEnum(callee))
+    {
+    case KnownBuiltinDeclName::IgnoreHit:
+    case KnownBuiltinDeclName::AcceptHitAndEndSearch:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool mayInvokeShaderTerminatingIntrinsic(IRInst* callee, ShaderTerminationQueryMode mode)
+{
+    HashSet<IRInst*> visited;
+    List<IRInst*> workList;
+    if (callee)
+        workList.add(callee);
+    while (workList.getCount())
+    {
+        auto current = getResolvedInstForDecorations(workList.getLast());
+        workList.removeLast();
+        if (!visited.add(current))
+            continue;
+        if (isShaderTerminatingIntrinsic(current))
+            return true;
+        auto function = as<IRFunc>(current);
+        if (!function)
+        {
+            // Unknown behavior is a memory barrier, but not proof of a shader exit for
+            // transformations such as hoisting or recursive-termination diagnostics.
+            if (mode == ShaderTerminationQueryMode::IncludeUnresolvedCalls)
+                return true;
+            continue;
+        }
+        for (auto block : function->getBlocks())
+            for (auto inst : block->getOrdinaryInsts())
+                if (auto call = as<IRCall>(inst))
+                    workList.add(call->getCallee());
+    }
+    return false;
 }
 
 void hoistInstOutOfASMBlocks(IRBlock* block)

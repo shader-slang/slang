@@ -144,6 +144,17 @@ support is diagnosed before module creation. This finite typed SDK boundary does
 text or admit arbitrary external calls. Any-hit, procedural intersection, callback tracing, callables
 and pointer payload transport remain outside this contract.
 
+Shader termination has canonical declaration identity before optimization: the core
+IgnoreHit and AcceptHitAndEndSearch declarations carry existing KnownBuiltin metadata.
+The shared IR call-effect query follows resolved callees with fresh cycle-safe state; memory
+effect analysis conservatively includes unresolved calls, while termination-specific hoisting
+and recursion diagnostics require a known exit. This preserves writes to a shader payload that
+a nullary terminating helper implicitly observes, until varying legalization emits explicit
+payload-register writebacks. Conditional helpers can still return normally. The late legalizer
+uses the same identities instead of function names or CUDA target strings. Unsupported recursive
+termination still rejects; coverage accounting does not yet consume these identities. This
+shared correctness fix alone does not admit NVVM any-hit callbacks.
+
 `resolveValueOperationFamily` is the single admission/diagnostic authority for numeric operation
 descriptors. Its exact catalog retains five hardware-wave signatures: active mask, ballot and
 three match payload types. Arithmetic, conversion and reinterpretation families do not have

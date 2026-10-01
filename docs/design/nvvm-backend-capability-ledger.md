@@ -54,7 +54,10 @@ module creation. Static tests retain SBT layout/load and role/cache boundaries.
 
 Qualification is CUDA12.9/OptiX SDK9, target SM80 on the recorded L4/595.71.05 host. Pointer payloads,
 arrays/matrices, padded/subword payloads, any-hit, procedural intersection, callables and recursive
-callback tracing remain outside this contract. World-ray origin/direction and minimum/current distance are qualified in miss/closest-hit.
+callback tracing remain outside this contract. The shared payload-termination producer repair is separately
+qualified by nine CUDA/NVRTC modes at O0/O3 (231 assertions), a focused IR boundary unit and
+source regressions. It preserves writes before known exits but does not itself admit NVVM AnyHit.
+World-ray origin/direction and minimum/current distance are qualified in miss/closest-hit.
 The [material fixture](../../tests/pipeline/ray-tracing/nvvm-optix-material.slang) samples all four
 texel centers of a 2x2 texture and evaluates the unchanged imported MaterialX dielectric BSDF.
 NVVM O0/O3 and NVRTC O3 each check 202 words: 16 material lanes against the maintained finite-input

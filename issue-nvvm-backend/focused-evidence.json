@@ -85722,6 +85722,281 @@
         "All72 prior feature objects and full accepted baseline/identity unchanged."
       ],
       "rhi_accepted_commit": "271b273821a3d12f020eb032497fbde48b543d32"
+    },
+    "shared-optix-termination-effects": {
+      "status": "accepted-focused",
+      "scope": "Shared preservation of payload writes across direct/transitive/nested any-hit termination; NVVM callback admission is separate and remains unqualified.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "revision": "3898b398373b0fab39454a43440f7379f871c675",
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "d91f7b6427045e70d3c1dc3ed4e6e5886a6e7cd87d1f32c494111b7b53bbdcae",
+          "source/slang/slang-ast-support-types.h": "44d4f374855cef9e31e6153627655dcfdf50811c166efdd2a45e0abc99ebf697",
+          "source/slang/slang-ir-coverage-instrument.cpp": "96ef689e0a0148eaf405986124ee56a73e54b34e946a9296f3e4df32a0348b6d",
+          "source/slang/slang-ir-legalize-varying-params.cpp": "1b5eceb58026d8d2d1c501e89011190081c34e276c904e589f11c3bbcc4c2b02",
+          "source/slang/slang-ir-util.cpp": "bb077f2164a4b9bdcb51f60680257011552723cbc99b9fc1a1f7e83a88611bf4",
+          "source/slang/slang-ir-util.h": "a90080f2316ea7ca13ef3ce334e81ebb6e5b69233fa7083e3e1e78f2d67db4fe",
+          "tests/cuda/optix-terminate-effects.slang": "d751f15c32c5e27683754699e1a1616c90e3cdee30652629bae7acb630deab06",
+          "tools/slang-static-unit-test/unit-test-ir-shader-termination.cpp": "f56b426df76c2c31f8481f0f481aed488609efc86a5f9a8df4c6877e858fa927"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "4d7ba412fb8d939759e1895cf03dac288efe0414e4dde0333bc17d9616b71885",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7b1e4d75564ff70f62c994caa464f744dcbbbb7730f4f39b23500452f40163c0",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "152153fce84054204bfefb60bbf5778b2359617d391eba5805adca044dd722fc",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "f62fda2687b9d19ec98e2598b4684cf5af237621b02b4a36dd17fe5a8a5b6c7c"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "rhi_revision": "271b273821a3d12f020eb032497fbde48b543d32",
+        "rhi_sha256": {
+          "../slang-rhi/tests/test-ray-tracing-intrinsics.cpp": "0f8b39d9eeed30bd9dd214656c548ea1c5e6ffcb0eacb172862760899cb63716",
+          "../slang-rhi/tests/test-ray-tracing-intrinsics.slang": "6a54425576fcdf8efa1f03a4cef51a7bdc4b275082e2453109d946966d93dfc4",
+          "../slang-rhi/tests/test-ray-tracing-common.h": "f87ee670a02bc5fae89196aa334dea86266e74e399cef90788f8ea99f7b32693",
+          "build/nvvm-rhi-cuda/rhi-build/RelWithDebInfo/slang-rhi-tests": "0c00428f4527f61c8d67ca70d9757b20712d7e4e38eedf4d8ba1350462323599",
+          "build/nvvm-rhi-cuda/rhi-build/CMakeCache.txt": "952846509ea2e460599020d4464c260d941f4d8ae52c872665b0315bf4fd3c24"
+        },
+        "meaning": "Shared termination producer repair; captured after matching build and before focused qualification. No NVVM AnyHit admission.",
+        "patch_sha256": "cda51fb650121508bc56236803d0193abcc99568356c00423571f1042db42af0"
+      },
+      "before_identity": {
+        "path": "build/nvvm-anyhit-producer/before-identity.json",
+        "sha256": "d52bca6262e49120d40dc14fec8187b18a499675f40f43d771d38b9e6fc0428b"
+      },
+      "oracle": {
+        "source_patch": {
+          "path": "build/nvvm-anyhit-producer/rhi-oracle.patch",
+          "sha256": "2a791c28edeb7029c6feb170fcf044879b007e898065191958d2d1a7e97bfe79"
+        },
+        "rhi_build": {
+          "path": "build/nvvm-anyhit-producer/rhi-build.json",
+          "sha256": "46600c0b234d2beb225247921e0d0a30627345787cb849e6c513f21f1d7b072d"
+        },
+        "test": "ray-tracing-intrinsics-payload-termination.cuda",
+        "optimization_levels": [0, 3],
+        "modes": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+        "expected_values": [11, 12, 21, 21, 91, 31, 31, 93, 42],
+        "expected_phases": [1, 2, 1, 2, 1, 1, 2, 1, 1],
+        "marker": "64+mode",
+        "output_words": 5,
+        "payload_words": 3,
+        "guards": [324508639, 610839776],
+        "policy": "Independent source writes/control flow; one compiled pipeline per optimization and nine runtime-uniform launches. Qualified namespaced ordinary overloads are normal-return controls."
+      },
+      "proposed_solution": "Existing KnownBuiltin identity marks shader exits before optimization. One fresh cycle-safe query conservatively includes unresolved calls for memory effects and requires known exits for late hoisting/recursion diagnostics. Conditional normal-return paths remain intact.",
+      "validation": {
+        "before": {
+          "record": {
+            "path": "build/nvvm-anyhit-producer/nvrtc-before.json",
+            "sha256": "9086213827d7e02b63a336249c599e6f5d743ce50f2678949a4b05a55b45fbc7"
+          },
+          "selected_cases": 1,
+          "failed_cases": 1,
+          "assertions": 231,
+          "passed_assertions": 219,
+          "failed_assertions": 12,
+          "filtered_out_cases": 930,
+          "failures": [
+            {
+              "optimization": 0,
+              "mode": 0,
+              "observed_value": 7,
+              "expected_value": 11
+            },
+            {
+              "optimization": 0,
+              "mode": 1,
+              "observed_value": 7,
+              "expected_value": 12
+            },
+            {
+              "optimization": 0,
+              "mode": 2,
+              "observed_value": 7,
+              "expected_value": 21
+            },
+            {
+              "optimization": 0,
+              "mode": 3,
+              "observed_value": 7,
+              "expected_value": 21
+            },
+            {
+              "optimization": 0,
+              "mode": 5,
+              "observed_value": 7,
+              "expected_value": 31
+            },
+            {
+              "optimization": 0,
+              "mode": 6,
+              "observed_value": 7,
+              "expected_value": 31
+            },
+            {
+              "optimization": 3,
+              "mode": 0,
+              "observed_value": 7,
+              "expected_value": 11
+            },
+            {
+              "optimization": 3,
+              "mode": 1,
+              "observed_value": 7,
+              "expected_value": 12
+            },
+            {
+              "optimization": 3,
+              "mode": 2,
+              "observed_value": 7,
+              "expected_value": 21
+            },
+            {
+              "optimization": 3,
+              "mode": 3,
+              "observed_value": 7,
+              "expected_value": 21
+            },
+            {
+              "optimization": 3,
+              "mode": 5,
+              "observed_value": 7,
+              "expected_value": 31
+            },
+            {
+              "optimization": 3,
+              "mode": 6,
+              "observed_value": 7,
+              "expected_value": 31
+            }
+          ],
+          "other_checks": "Markers, phases, guards and normal-return modes4/7/8 passed."
+        },
+        "build": {
+          "path": "build/nvvm-anyhit-producer/build.json",
+          "sha256": "6e86e6177ba458507a81fc4b5a6beed0d8c06991af441deace0c10d8c5317924"
+        },
+        "focused": {
+          "initial": {
+            "path": "build/nvvm-anyhit-producer/source-tests.json",
+            "sha256": "425a6f2d855bb0c6972279c937a3b326497ca9ad631613bf9ab22a7c131d8afa"
+          },
+          "initial_passed": 8,
+          "initial_failed": 2,
+          "retry": {
+            "path": "build/nvvm-anyhit-producer/source-retry.json",
+            "sha256": "2065c5e7017b0ca92fcc354713b9569094ad24c70a7e1207bc000cec23429577"
+          },
+          "retry_passed": 2,
+          "meaning": "Two new conditional checks expected the constant before the if. Only assertion ordering changed to require exact write inside the branch and exact normal-tail write. Shader bodies and compiler unchanged; eight initial passes are not relabeled as reruns."
+        },
+        "runtime": {
+          "path": "build/nvvm-anyhit-producer/nvrtc-after.json",
+          "sha256": "8b782c591071a186c31cb724fb57e5638e80aacd80d2e1d86d9f9ee83daafe5b"
+        },
+        "smoke": {
+          "path": "build/nvvm-anyhit-producer/smoke.json",
+          "sha256": "bd4af815151aa413f5667b40c286bcf9537fc05f2c03dcf6a5c0d6ea9caa0cff"
+        },
+        "static_build": {
+          "path": "build/nvvm-anyhit-producer/static-build.json",
+          "sha256": "3fb2b86f42dcb20cb9760688278536436ec8bd822ed72394849d5ed0a0b8beae"
+        },
+        "static": {
+          "path": "build/nvvm-anyhit-producer/static-test.json",
+          "sha256": "c3937eecd28bb5e95bdb8f36de63632a4ef4dd0dd8c2dea5bdacbf4228342bf5"
+        },
+        "runtime_result": {
+          "cases": 1,
+          "assertions": 231,
+          "passed": 231,
+          "failed": 0,
+          "optimization_levels": [0, 3]
+        },
+        "smoke_result": {
+          "selected": 15,
+          "passed": 15,
+          "elapsed_seconds": 22.747191190719604,
+          "selection": {
+            "path": "build/nvvm-anyhit-producer/smoke-1/selection.json",
+            "sha256": "6a7e700da1ceac386528ee3f0cf3d5892fb44e2b7a89b03fb917e580b2377e26"
+          },
+          "provenance": {
+            "path": "build/nvvm-anyhit-producer/smoke-1/provenance.json",
+            "sha256": "85fedfa03cf17cb32a6967e680338fcc5430e1fba3ae7f32f6d6907324d876e8"
+          }
+        },
+        "nvvm_ir": {
+          "record": {
+            "path": "build/nvvm-anyhit-producer/nvvm-ir-after.json",
+            "sha256": "b5d84e04306400a5cd8d80810749f624979bc19bb31ce78931b26df624a9fb18"
+          },
+          "final_ir": {
+            "path": "build/nvvm-anyhit-producer/nvvm-final-ir.txt",
+            "sha256": "9bbea0321857f04996763c728cc2da47a062c5e84e659e3448f247fb0378e077"
+          },
+          "meaning": "Store11 and explicit register write precede termination; poison91 follows. Expected exit255/E52017 entry-point-stage rejection and noPTX; no NVVM AnyHit execution."
+        }
+      },
+      "qualification": [
+        "Shared producer correctness; no NVVM AnyHit admission yet.",
+        "Only selected RHI test executed; full RHI remains on demand.",
+        "No routine ABI/module version bump. Existing full baseline and73priorfeatures unchanged.",
+        "Four implementation iterations since repaired working checkpoint; next bounded AnyHit slice is followed by the scheduled working corpus."
+      ],
+      "test_retry_identity": {
+        "path": "build/nvvm-anyhit-producer/test-retry-identity.json",
+        "sha256": "5d342d922f808eede0a2ac59c2ba61e9fe56886bd8bafef066758202e4f104e9"
+      },
+      "static_identity": {
+        "path": "build/nvvm-anyhit-producer/static-identity.json",
+        "sha256": "c53b5db69f31fb3eefcca222453ca108c930de6b87d538376fcf44fe279ef9e7"
+      },
+      "resolved_failures": [
+        {
+          "case": "ray-tracing-intrinsics-payload-termination.cuda",
+          "classification": "wrong-output",
+          "before": {
+            "path": "build/nvvm-anyhit-producer/nvrtc-before.json",
+            "sha256": "9086213827d7e02b63a336249c599e6f5d743ce50f2678949a4b05a55b45fbc7"
+          },
+          "description": "Incoming7 observed instead of the last value write before terminating modes0/1/2/3/5/6 at both optimization levels.",
+          "resolution": {
+            "record": {
+              "path": "build/nvvm-anyhit-producer/nvrtc-after.json",
+              "sha256": "8b782c591071a186c31cb724fb57e5638e80aacd80d2e1d86d9f9ee83daafe5b"
+            },
+            "meaning": "All12wrong values resolved at bothO0/O3; all231assertionspass."
+          }
+        },
+        {
+          "case": "conditionalAccept/conditionalIgnore source assertions",
+          "initial": {
+            "path": "build/nvvm-anyhit-producer/source-tests.json",
+            "sha256": "425a6f2d855bb0c6972279c937a3b326497ca9ad631613bf9ab22a7c131d8afa"
+          },
+          "retry": {
+            "path": "build/nvvm-anyhit-producer/source-retry.json",
+            "sha256": "2065c5e7017b0ca92fcc354713b9569094ad24c70a7e1207bc000cec23429577"
+          },
+          "meaning": "Test-only ordering error fixed; no production change or expected numerical value change."
+        }
+      ],
+      "rhi_oracle_commit": "3b128336f06658f3e74c02673130cf19234470fd"
     }
   }
 }

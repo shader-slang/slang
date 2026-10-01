@@ -917,15 +917,10 @@ static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
 // walk terminating without letting an optimistic answer escape into
 // other functions' cached results.
 //
-// Known gap: any core-module intrinsic that abandons the invocation —
-// the ray-tracing hit terminators `IgnoreHit` and `AcceptHitAndEndSearch`
-// are the concrete examples today — lowers to a `GenericAsm` terminator
-// like every other intrinsic, and `mayNotReturn` treats `GenericAsm` as
-// a normal exit (see the comment on that case below). So this is not a
-// gap specific to those two names: it is general to any present or
-// future abandoning intrinsic modeled the same way. Slang's IR has no
-// `[noreturn]` concept to key off instead. Marking them in the
-// core module is the principled fix and is tracked separately.
+// Known gap: this coverage analysis does not yet consume the KnownBuiltin identities for
+// IgnoreHit and AcceptHitAndEndSearch. Their bodies use GenericAsm, which mayNotReturn treats
+// as a normal exit (see that case below). The shared shader-termination effect query identifies
+// these operations, but integrating it into coverage accounting remains separate work.
 // Returns true when every block reachable from `func`'s entry can still
 // reach a normal exit — an `IRReturn`, or an `IRGenericAsm`, which is how
 // `__intrinsic_asm` lowers and which ends the function the same way.

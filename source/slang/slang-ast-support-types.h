@@ -241,6 +241,8 @@ FIDDLE() namespace Slang
         WaveIsFirstLane,
         WaveReadLaneFirst,
         OffsetOf,
+        IgnoreHit,
+        AcceptHitAndEndSearch,
         COUNT
     };
 

@@ -21314,6 +21314,7 @@ bool ReportHitOptix(float tHit, uint hitKind, expand each T attribs)
 /// Ignores the current intersection and continues traversal.
 /// @remarks Used in any-hit shaders to reject potential intersections
 /// @category raytracing
+[KnownBuiltin($((int)KnownBuiltinDeclName::IgnoreHit))]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
 {
@@ -21334,6 +21335,7 @@ void IgnoreHit()
 /// Accepts the current intersection and terminates further traversal.
 /// @remarks Used in any-hit shaders to immediately accept an intersection
 /// @category raytracing
+[KnownBuiltin($((int)KnownBuiltinDeclName::AcceptHitAndEndSearch))]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void AcceptHitAndEndSearch()
 {

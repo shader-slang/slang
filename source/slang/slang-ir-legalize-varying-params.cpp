@@ -1790,35 +1790,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         }
     }
 
-    // Check if a function is a shader-terminating intrinsic (IgnoreHit, AcceptHitAndEndSearch)
-    bool isShaderTerminatingIntrinsic(IRFunc* func)
-    {
-        if (!func)
-            return false;
-
-        // Check if function has targetIntrinsic decoration with IgnoreHit or AcceptHitAndEndSearch
-        for (auto decoration : func->getDecorations())
-        {
-            if (auto targetIntrinsic = as<IRTargetIntrinsicDecoration>(decoration))
-            {
-                auto definitionStr = targetIntrinsic->getDefinition();
-                if (definitionStr.indexOf(UnownedStringSlice("IgnoreHit")) != Index(-1) ||
-                    definitionStr.indexOf(UnownedStringSlice("AcceptHitAndEndSearch")) != Index(-1))
-                    return true;
-            }
-        }
-
-        // Also check function name hint
-        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-        {
-            auto name = nameHint->getName();
-            if (name == "IgnoreHit" || name == "AcceptHitAndEndSearch")
-                return true;
-        }
-
-        return false;
-    }
-
     // Find the TempCallArgVar with matching type in the first block.
     // This is the variable that actually gets modified by the function body.
     IRVar* findTempCallArgVar(IRType* payloadType)
@@ -1869,45 +1840,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // occur.
     static IRFunc* getResolvedCalleeFunc(IRCall* call)
     {
-        auto callee = call->getCallee();
-        if (auto func = as<IRFunc>(callee))
-            return func;
-        if (auto specialize = as<IRSpecialize>(callee))
-            return as<IRFunc>(specialize->getBase());
-        return nullptr;
-    }
-
-    // Return true if `func` itself calls, or transitively reaches through resolvable direct
-    // calls, a shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch). This decides which
-    // callees must be inlined into a ray entry point so that the payload write-back is emitted
-    // before the ray terminates.
-    //
-    // `visited` is recursion-internal scratch: callers must pass a freshly-constructed empty set.
-    // It only guards against call-graph cycles — a `func` already in `visited` short-circuits to
-    // false regardless of whether it reaches a terminating intrinsic, so the set is NOT a memo of
-    // the predicate and must not be shared across separate top-level queries.
-    bool funcReachesShaderTerminatingIntrinsic(IRFunc* func, HashSet<IRFunc*>& visited)
-    {
-        if (!func || !visited.add(func))
-            return false;
-        for (auto block : func->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                auto call = as<IRCall>(inst);
-                if (!call)
-                    continue;
-                auto callee = getResolvedCalleeFunc(call);
-                if (isShaderTerminatingIntrinsic(callee))
-                    return true;
-                // Only recurse into callees with a body; intrinsics and external declarations
-                // cannot themselves contain a terminating call.
-                if (callee && callee->getFirstBlock() &&
-                    funcReachesShaderTerminatingIntrinsic(callee, visited))
-                    return true;
-            }
-        }
-        return false;
+        return as<IRFunc>(getResolvedInstForDecorations(call->getCallee()));
     }
 
     // Return true if the terminate-reaching call subgraph reachable from `func` contains a cycle.
@@ -1978,9 +1911,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             // IgnoreHit/AcceptHitAndEndSearch are any-hit-only intrinsics (declared
             // `[require(..., raytracing_anyhit)]` in the core module), so a terminating call can
             // only legitimately appear in an `anyhit` entry point. Gating on Stage::AnyHit keeps
-            // every other entry point (including non-ray CUDA kernels) a strict no-op, and ensures
-            // an unrelated function that merely shares the name "IgnoreHit"/"AcceptHitAndEndSearch"
-            // — which isShaderTerminatingIntrinsic matches via name hint — is never disturbed.
+            // every other entry point (including non-ray CUDA kernels) a strict no-op. Canonical
+            // builtin identity also keeps unrelated functions with the same spelling untouched.
             if (entryPointDecor->getProfile().getStage() != Stage::AnyHit)
                 continue;
 
@@ -2014,16 +1946,17 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             HashSet<IRFunc*> terminateReaching;
             for (auto func : reachable)
             {
-                HashSet<IRFunc*> visited;
-                if (funcReachesShaderTerminatingIntrinsic(func, visited))
+                if (mayInvokeShaderTerminatingIntrinsic(
+                        func,
+                        ShaderTerminationQueryMode::KnownExitsOnly))
                     terminateReaching.add(func);
             }
 
             // If no terminating intrinsic is reachable from this entry point (e.g. a non-ray
             // kernel, or a ray shader that never terminates), there is nothing to do. If the only
-            // terminating calls are direct in the entry point's own blocks, no *callee* is
-            // terminate-reaching and the inlining loop below is a no-op, leaving the existing
-            // direct-call handling in emitPayloadWritebacks() untouched.
+            // terminating calls are direct in the entry point's own blocks, the inlining loop
+            // skips those primitives and is a no-op, leaving direct-call handling in
+            // emitPayloadWritebacks() untouched.
             if (!terminateReaching.contains(entryPoint))
                 continue;
 
@@ -2064,10 +1997,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                             if (auto call = as<IRCall>(inst))
                             {
                                 auto callee = getResolvedCalleeFunc(call);
-                                if (!callee || !callee->getFirstBlock())
+                                if (!callee || !callee->getFirstBlock() ||
+                                    isShaderTerminatingIntrinsic(callee))
                                     continue;
-                                HashSet<IRFunc*> visited;
-                                if (funcReachesShaderTerminatingIntrinsic(callee, visited))
+                                if (mayInvokeShaderTerminatingIntrinsic(
+                                        callee,
+                                        ShaderTerminationQueryMode::KnownExitsOnly))
                                     terminatingCalls.add(call);
                             }
                     for (auto call : terminatingCalls)
@@ -2093,10 +2028,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     if (!call)
                         continue;
                     auto callee = getResolvedCalleeFunc(call);
-                    if (!callee || !callee->getFirstBlock())
+                    if (!callee || !callee->getFirstBlock() || isShaderTerminatingIntrinsic(callee))
                         continue;
-                    HashSet<IRFunc*> visited;
-                    if (funcReachesShaderTerminatingIntrinsic(callee, visited))
+                    if (mayInvokeShaderTerminatingIntrinsic(
+                            callee,
+                            ShaderTerminationQueryMode::KnownExitsOnly))
                     {
                         residualCall = call;
                         break;

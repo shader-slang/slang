@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-seven feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 73 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Twenty-eight feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 74 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -217,11 +217,19 @@ in miss; the before-compiler NVRTC control passes the same oracle. The earlier 3
 qualification retains its original source/binary identity. Both affected compiler units and all
 15 smoke cells pass (22.05s). No storage or ABI expansion was needed.
 
-**Next work:** investigate a bounded any-hit path using existing RHI object-ray and traversal-control
-cases. Establish payload writeback before terminating callbacks in the shared legalization pass;
-name admission alone is insufficient. Read-only probes in `build/nvvm-anyhit-probe` show direct
-payload writes before termination removed by early redundancy elimination, in both NVVM IR and
-CUDA source. No any-hit implementation is accepted yet. Preserve nested/conditional semantics and explicit
-rejection of unsupported stages. The working cadence restarted at the repaired checkpoint; three
-implementation iterations have since passed. The optional full RHI suite remains on demand and
-the prior full baseline retains its identity.
+The shared termination producer repair is accepted separately from stage support. Existing
+KnownBuiltin metadata identifies IgnoreHit/AcceptHitAndEndSearch before redundancy elimination;
+shared call effects preserve implicitly observed payload writes, while late hoisting requires a
+known exit. CUDA text/name recognition is removed. The independent RHI nine-mode oracle initially
+returned incoming7 instead of11/12/21/31 in12 terminating cases at O0/O3; all231 assertions now pass.
+Ten source cells pass through eight initial passes and two retries after correcting only new
+assertion ordering. The focused unknown-call/cycle static unit and15 smoke cells pass (22.75s).
+NVVM final IR retains store11 and its register write before termination, then rejects the still
+unsupported AnyHit stage with E52017 and no PTX. Raw evidence is in build/nvvm-anyhit-producer.
+
+**Next work:** admit a bounded AnyHit path with exact ObjectRay queries and effectful termination
+primitives, preserving checked payload/attribute stages and recursive E55214 rejection. Strengthen
+existing RHI object-ray controls with a nonidentity transform and correct AnyHit payload write
+permissions. Four implementation iterations have passed since the repaired working checkpoint;
+run the scheduled working corpus after this next bounded slice. The optional full RHI suite remains
+on demand, and the prior full baseline retains its identity.

@@ -526,6 +526,21 @@ IRVarLayout* findVarLayout(IRInst* value);
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);
 
+// Identifies an intrinsic that exits the current shader while observing its outgoing payload.
+bool isShaderTerminatingIntrinsic(IRInst* callee);
+
+enum class ShaderTerminationQueryMode
+{
+    KnownExitsOnly,
+    IncludeUnresolvedCalls,
+};
+
+// Returns whether a callee can reach such an exit through calls. Conditional exits count;
+// this is an effect query, not a claim that every path fails to return. Each query uses fresh
+// cycle-safe state so callers may mutate or inline function bodies between queries. Conservative
+// memory effects include unresolved calls; transformations that require a known exit must not.
+bool mayInvokeShaderTerminatingIntrinsic(IRInst* callee, ShaderTerminationQueryMode mode);
+
 // Run an operation over every block in a module
 template<typename F>
 static void overAllBlocks(IRModule* module, F f)
