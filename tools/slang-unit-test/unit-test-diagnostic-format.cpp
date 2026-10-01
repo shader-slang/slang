@@ -258,5 +258,6 @@ SLANG_UNIT_TEST(diagnosticFormatEmptyMessages)
         {.format = SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO},
         diagnostic);
     SLANG_CHECK(
-        text == "error E00042: \n    primary label\nnote: \n    note label\nnote: following note\n");
+        text ==
+        "error E00042: \n    primary label\nnote: \n    note label\nnote: following note\n");
 }
