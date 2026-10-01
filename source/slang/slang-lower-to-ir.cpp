@@ -3460,7 +3460,9 @@ void addArg(
         addSimpleArg(context, ioArgs, argVal);
         break;
 
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         {
             // The next easiest case is the `ref` parameter passing
             // mode, because we always want to pass a pointer to
@@ -3648,7 +3650,9 @@ void addCallArgsForParam(
 {
     switch (paramPassingMode)
     {
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
     case ParamPassingMode::BorrowIn:
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
@@ -3681,7 +3685,11 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 {
     if (paramDecl->hasModifier<RefModifier>())
     {
-        return ParamPassingMode::Ref;
+        // A `const` on a by-value parameter only restricts the body, but on
+        // a `ref` parameter it restricts access to the caller's memory, so
+        // it is part of the mode.
+        return paramDecl->hasModifier<ConstModifier>() ? ParamPassingMode::RefReadOnly
+                                                       : ParamPassingMode::RefReadWrite;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
@@ -3861,7 +3869,7 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
     }
     if (declWithImplicitThisParam->hasModifier<RefAttribute>())
     {
-        return ParamPassingMode::Ref;
+        return ParamPassingMode::RefReadWrite;
     }
     //
     // The `[nonmutating]` attribute is really just another case of
@@ -4700,9 +4708,14 @@ void _lowerInfoFromFuncType(
                 // The `this` parameter is passed by value, so we
                 // don't need to do anything special here.
                 break;
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 // The `this` parameter is passed by reference, so we
-                thisType = context->astBuilder->getRefParamType(thisType);
+                thisType = getParamTypeWithModeWrapper(
+                    context->astBuilder,
+                    thisType,
+                    innerThisParamDirection);
                 break;
             case ParamPassingMode::BorrowIn:
                 // The `this` parameter is passed by const reference, so we
@@ -4779,8 +4792,12 @@ void _lowerInfoFromFuncParameters(
         case ParamPassingMode::BorrowInOut:
             irParamType = builder->getBorrowInOutParamType(irParamType);
             break;
-        case ParamPassingMode::Ref:
-            irParamType = builder->getRefParamType(irParamType, AddressSpace::Generic);
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+            irParamType = builder->getRefParamType(
+                irParamType,
+                getRefParamPassingModeAccess(paramInfo.actualParamPassingModeToUse),
+                AddressSpace::Generic);
             break;
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);

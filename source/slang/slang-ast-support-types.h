@@ -1887,8 +1887,8 @@ FIDDLE() namespace Slang
 
         /// Pass a reference to a mutable memory location.
         ///
-        /// Indicated by using the `ref` modifier on a parmater
-        /// (without also using the `readonly` or `writeonly` modifiers).
+        /// Indicated by using the `ref` modifier on a parameter
+        /// (without also using `const`).
         ///
         /// Must be implemented by directly passing a reference to
         /// the memory location of the argument. It is an error if
@@ -1907,8 +1907,57 @@ FIDDLE() namespace Slang
         /// This parameter-passing mode is more-or-less just syntactic
         /// sugar for a parameter of an explicit pointer type (`Ptr<T>`).
         ///
-        Ref,
+        RefReadWrite,
+
+        /// Pass a reference to a memory location that the callee may only read.
+        ///
+        /// Indicated by using the `ref` modifier on a parameter together
+        /// with `const`.
+        ///
+        /// The same rules as `RefReadWrite` apply to the argument and to
+        /// aliasing access paths; only the callee's access through the
+        /// parameter is restricted.
+        ///
+        RefReadOnly,
+
+        /// Pass a reference to a memory location that the callee may only write.
+        ///
+        /// No modifier currently produces this mode; it completes the set of
+        /// access-restricted `ref` modes. There is no corresponding
+        /// `AccessQualifier`, so it has no parameter type representation.
+        ///
+        RefWriteOnly,
     };
+
+    /// Is `mode` one of the `Ref*` modes, which always pass the address of
+    /// the argument's memory location?
+    inline bool isRefParamPassingMode(ParamPassingMode mode)
+    {
+        switch (mode)
+        {
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    /// Get the access qualifier that a parameter type wrapper (`RefParamType`
+    /// in the AST, `IRRefParamType` in the IR) records for a `Ref*` mode.
+    ///
+    /// `RefWriteOnly` is rejected because no `AccessQualifier` value
+    /// represents write-only access.
+    ///
+    AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode);
+
+    /// Get the `Ref*` mode for a reference whose access is `accessQualifier`.
+    ///
+    /// This is the inverse of `getRefParamPassingModeAccess`; `Immutable`
+    /// also maps to `RefReadOnly`, since it forbids writes through the reference.
+    ///
+    ParamPassingMode getRefParamPassingModeForAccess(AccessQualifier accessQualifier);
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);
 

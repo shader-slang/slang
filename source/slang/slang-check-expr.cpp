@@ -5910,7 +5910,9 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
 
                 break;
             }
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
+        case ParamPassingMode::RefReadOnly:
+        case ParamPassingMode::RefWriteOnly:
             {
                 // Not allowed..
                 SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");

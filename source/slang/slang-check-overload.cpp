@@ -764,7 +764,9 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
     {
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::Out:
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         isLVal = true;
         break;
     }
@@ -3895,7 +3897,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 {
                 case ParamPassingMode::Out:
                 case ParamPassingMode::BorrowInOut:
-                case ParamPassingMode::Ref:
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
                 case ParamPassingMode::BorrowIn:
                     break;
                 default:

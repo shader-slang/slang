@@ -885,6 +885,10 @@ class RefParamType : public ParamPassingModeType
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
+
+    /// Get the `Ref*` parameter-passing mode that this wrapper represents,
+    /// as determined by its access qualifier.
+    ParamPassingMode getParamPassingMode();
 };
 
 /// The type for a immutable borrow input parameter, e.g., `borrow T`

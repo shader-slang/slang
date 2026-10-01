@@ -835,7 +835,12 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 ParamPassingMode paramDirection = paramPassingModes[i];
                 switch (paramDirection)
                 {
-                case ParamPassingMode::Ref:
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
+                    // `doFunctionSignaturesMatch` treats the `ref` modes as one
+                    // signature, so a declaration and definition that differ only
+                    // in `const` must share a name.
                     emitRaw(context, "r_");
                     break;
                 case ParamPassingMode::BorrowIn:

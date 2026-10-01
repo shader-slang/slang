@@ -90,6 +90,35 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
     return UnownedStringSlice();
 }
 
+AccessQualifier getRefParamPassingModeAccess(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::RefReadWrite:
+        return AccessQualifier::ReadWrite;
+    case ParamPassingMode::RefReadOnly:
+        return AccessQualifier::Read;
+    default:
+        SLANG_UNEXPECTED("parameter-passing mode has no reference access qualifier");
+        UNREACHABLE_RETURN(AccessQualifier::ReadWrite);
+    }
+}
+
+ParamPassingMode getRefParamPassingModeForAccess(AccessQualifier accessQualifier)
+{
+    switch (accessQualifier)
+    {
+    case AccessQualifier::ReadWrite:
+        return ParamPassingMode::RefReadWrite;
+    case AccessQualifier::Read:
+    case AccessQualifier::Immutable:
+        return ParamPassingMode::RefReadOnly;
+    default:
+        SLANG_UNEXPECTED("unhandled access qualifier");
+        UNREACHABLE_RETURN(ParamPassingMode::RefReadWrite);
+    }
+}
+
 void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
 {
     switch (direction)
@@ -100,8 +129,14 @@ void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
     case ParamPassingMode::Out:
         sb << "out";
         break;
-    case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadWrite:
         sb << "ref";
+        break;
+    case ParamPassingMode::RefReadOnly:
+        sb << "const ref";
+        break;
+    case ParamPassingMode::RefWriteOnly:
+        sb << "writeonly ref";
         break;
     case ParamPassingMode::BorrowInOut:
         sb << "inout";

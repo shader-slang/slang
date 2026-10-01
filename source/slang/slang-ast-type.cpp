@@ -552,7 +552,9 @@ Val* BwdCallableFuncType::_resolveImplOverride()
                     newParamTypes.add(astBuilder->getBorrowInOutParamType(diffValueType));
                     break;
                 case ParamPassingMode::BorrowIn:
-                case ParamPassingMode::Ref:
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
                     // We can't handle ConstRef and Ref properly for differentiable
                     // values in differentiable methods so we return an error type,
                     // and rely on diagnostics instead.
@@ -664,8 +666,11 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
                 case ParamPassingMode::BorrowIn:
                     newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
                     break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
+                    newParamTypes.add(
+                        getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
                     break;
                 default:
                     SLANG_ASSERT(!"Unknown parameter direction");
@@ -758,8 +763,11 @@ Val* RematFuncType::_resolveImplOverride()
                 case ParamPassingMode::BorrowIn:
                     newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
                     break;
-                case ParamPassingMode::Ref:
-                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
+                case ParamPassingMode::RefReadWrite:
+                case ParamPassingMode::RefReadOnly:
+                case ParamPassingMode::RefWriteOnly:
+                    newParamTypes.add(
+                        getParamTypeWithModeWrapper(astBuilder, ptrPairType, paramInfo.mode));
                     break;
                 default:
                     SLANG_ASSERT(!"Unknown parameter direction");
@@ -925,7 +933,9 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                     }
                     break;
                 }
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 {
                     // Ref parameters not allowed in backward diff.
                     SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
@@ -1059,10 +1069,15 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     }
                     break;
                 }
-            case ParamPassingMode::Ref:
+            case ParamPassingMode::RefReadWrite:
+            case ParamPassingMode::RefReadOnly:
+            case ParamPassingMode::RefWriteOnly:
                 {
                     // do not differentiate ref params
-                    newParamTypes.add(getCurrentASTBuilder()->getRefParamType(paramInfo.type));
+                    newParamTypes.add(getParamTypeWithModeWrapper(
+                        getCurrentASTBuilder(),
+                        paramInfo.type,
+                        paramInfo.mode));
                     break;
                 }
             case ParamPassingMode::BorrowIn:
@@ -1400,7 +1415,19 @@ void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
 
 void RefParamType::_toTextOverride(StringBuilder& out)
 {
+    if (getParamPassingMode() == ParamPassingMode::RefReadOnly)
+        out << toSlice("const ");
     out << toSlice("ref ") << getValueType();
+}
+
+ParamPassingMode RefParamType::getParamPassingMode()
+{
+    // An access that is not a compile-time constant (possible only when code
+    // names `RefParam` directly) does not make the reference read-only.
+    auto accessQualifier = tryGetAccessQualifierValue();
+    if (!accessQualifier)
+        return ParamPassingMode::RefReadWrite;
+    return getRefParamPassingModeForAccess(*accessQualifier);
 }
 
 void BorrowInParamType::_toTextOverride(StringBuilder& out)
@@ -1431,9 +1458,9 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
 
 ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
 {
-    if (as<RefParamType>(paramType))
+    if (auto refParamType = as<RefParamType>(paramType))
     {
-        return ParamPassingMode::Ref;
+        return refParamType->getParamPassingMode();
     }
     else if (as<BorrowInParamType>(paramType))
     {

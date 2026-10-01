@@ -7345,7 +7345,8 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             }
             else if (
                 as<InOutModifier>(modifier) || as<OutModifier>(modifier) ||
-                as<BorrowModifier>(modifier) || as<RefModifier>(modifier))
+                as<BorrowModifier>(modifier) || as<RefModifier>(modifier) ||
+                as<ConstModifier>(modifier))
             {
                 auto clonedModifier =
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
@@ -15194,8 +15195,15 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         case ParamPassingMode::Out:
             addModifier(param, m_astBuilder->create<OutModifier>());
             break;
-        case ParamPassingMode::Ref:
+        case ParamPassingMode::RefReadWrite:
             addModifier(param, m_astBuilder->create<RefModifier>());
+            break;
+        case ParamPassingMode::RefReadOnly:
+            addModifier(param, m_astBuilder->create<RefModifier>());
+            addModifier(param, m_astBuilder->create<ConstModifier>());
+            break;
+        case ParamPassingMode::RefWriteOnly:
+            SLANG_UNEXPECTED("no parameter modifier spells a write-only reference");
             break;
         case ParamPassingMode::BorrowIn:
             addModifier(param, m_astBuilder->create<BorrowModifier>());
@@ -17065,7 +17073,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto paramMode = getParamPassingMode(param);
         arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
                                 paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+                                isRefParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -17095,7 +17103,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
                 thisArg->type.type = thisArgType;
                 thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
                                             thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
+                                            isRefParamPassingMode(thisArgDirection);
                 thisArg->loc = decl->loc;
                 fakeArgs.insert(0, thisArg);
             }

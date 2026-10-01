@@ -643,8 +643,8 @@ public:
     // Construct the type `InOutParam<valueType>`
     BorrowInOutParamType* getBorrowInOutParamType(Type* valueType);
 
-    // Construct the type `RefParam<valueType>`
-    RefParamType* getRefParamType(Type* valueType);
+    // Construct the type `RefParam<valueType, accessQualifier>`
+    RefParamType* getRefParamType(Type* valueType, AccessQualifier accessQualifier);
 
     // Construct the type `ImmutableBorrowParam<valueType>`
     BorrowInParamType* getConstRefParamType(Type* valueType);
