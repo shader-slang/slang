@@ -1037,7 +1037,7 @@ Enable machine-readable diagnostic output in tab-separated format
 
 **-diagnostic-format &lt;default|vs&gt;**
 
-Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio headers and uncolored, indented source details. Machine-readable diagnostics take precedence.
+Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio headers and uncolored, indented source details. Machine-readable diagnostics take precedence. 
 
 
 <a id="diagnostic-color"></a>
