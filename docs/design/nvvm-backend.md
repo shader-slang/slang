@@ -24,6 +24,10 @@ route uses an internal NVVM artifact, separate from the CPU LLVM target. When `l
 changes the route, the linked target program owns a copy of the effective target request before
 capability computation. Layout, specialization and emission use that same request; other programs
 and the shared session keep their original requests.
+`linkWithOptions` constructs an independent component option owner, including when requirements
+are already satisfied. It snapshots the input options and applies canonical overrides before any
+target program is created. Already compiled inputs keep their options, hashes, layouts and code;
+ordinary `link` can still reuse a requirement-free component.
 
 The `nvvm` capability refines `cuda`, so an explicit `case nvvm` wins over `case cuda`. CUDA device
 and SM requirements remain applicable. CUDA source/header output and NVRTC PTX select `cuda`;

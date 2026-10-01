@@ -1168,3 +1168,15 @@ summarizer's `--table` and `--clusters` options); legacy defaults can generate n
 issue directory. Ignore guards prevent accidental snapshot commits. Keep source/tool behavior changes
 separate from documentation cleanup. A documentation-only migration needs exact data/input checks,
 link/reference checks and relevant CPU contracts; it does not require a fresh GPU checkpoint.
+
+### Relinking and repeated static context
+
+Use the existing focused selectors `nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations`,
+`cudaEmissionMethodLinkOptionsAffectRoutingAndHash` and `SlangcReadFromStdin` plus the three
+`tests/cuda/nvvm-copyable-kernel-context.slang` cells. The route test compiles the original before
+relinking, switches an option-bearing variant back, and checks original hash/layout/code stability
+and inherited options. The static fixture explicitly initializes its record with `{}`.
+For the retained third-dispatch failure, reuse the corpus driver's allocation reset and output
+comparison with one reference, one warmup and one sample launch in each mode. The ignored
+`build/nvvm-link-options/repeat-static-context.py --output <fresh-directory>` adapter also checks
+the exact32 uint32 values6400..6431. Event fields are protocol evidence only, not accepted timing.

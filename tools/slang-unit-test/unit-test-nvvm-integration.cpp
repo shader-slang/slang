@@ -4076,44 +4076,80 @@ SLANG_UNIT_TEST(nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations)
         const String baselineBefore =
             _compileAndCheckNamedIntrinsicRoute(baselineProgram, baselineIsNVVM);
 
-        // linkWithOptions may return its input for an already requirement-free component.
-        // Give each option set a fresh composite, as applications do when linking variants,
-        // while sharing the same session, module, entry point and original target request.
-        ComPtr<slang::IModule> module(session->loadModule("directNVVM", diagnostics.writeRef()));
-        SLANG_CHECK_ABORT(module != nullptr);
-        ComPtr<slang::IEntryPoint> entry;
-        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(module->findAndCheckEntryPoint(
-            "computeMain",
-            SLANG_STAGE_COMPUTE,
-            entry.writeRef(),
-            diagnostics.writeRef())));
+        ComPtr<slang::IBlob> baselineHash;
+        baselineProgram->getEntryPointHash(0, 0, baselineHash.writeRef());
+        SLANG_CHECK_ABORT(baselineHash != nullptr);
+        auto baselineLayout = baselineProgram->getLayout(0, diagnostics.writeRef());
+        SLANG_CHECK_ABORT(baselineLayout != nullptr);
+        SLANG_CHECK(baselineLayout->getEntryPointCount() == 1);
+
         const SlangEmitCUDAMethod opposite =
             baselineIsNVVM ? SLANG_EMIT_CUDA_VIA_NVRTC : SLANG_EMIT_CUDA_VIA_NVVM;
-        for (SlangEmitCUDAMethod method : {opposite, baseline})
-        {
-            slang::IComponentType* components[] = {module.get(), entry.get()};
-            ComPtr<slang::IComponentType> variant;
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(session->createCompositeComponentType(
-                components,
-                SLANG_COUNT_OF(components),
-                variant.writeRef(),
-                diagnostics.writeRef())));
-            slang::CompilerOptionEntry option = {};
-            option.name = slang::CompilerOptionName::EmitCUDAMethod;
-            option.value.kind = slang::CompilerOptionValueKind::Int;
-            option.value.intValue0 = method;
-            ComPtr<slang::IComponentType> linkedVariant;
-            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(variant->linkWithOptions(
-                linkedVariant.writeRef(),
-                1,
-                &option,
-                diagnostics.writeRef())));
-            _compileAndCheckNamedIntrinsicRoute(linkedVariant, method == SLANG_EMIT_CUDA_VIA_NVVM);
-            // Check the original cached bytes after both the opposite-route compilation and a
-            // new original-route compilation, so neither variant can contaminate the baseline.
-            SLANG_CHECK(
-                _compileAndCheckNamedIntrinsicRoute(baselineProgram, baselineIsNVVM) ==
-                baselineBefore);
-        }
+        slang::CompilerOptionEntry option = {};
+        option.name = slang::CompilerOptionName::EmitCUDAMethod;
+        option.value.kind = slang::CompilerOptionValueKind::Int;
+        option.value.intValue0 = opposite;
+        ComPtr<slang::IComponentType> linkedVariant;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            baselineProgram
+                ->linkWithOptions(linkedVariant.writeRef(), 1, &option, diagnostics.writeRef())));
+        const String variantBefore =
+            _compileAndCheckNamedIntrinsicRoute(linkedVariant, !baselineIsNVVM);
+        ComPtr<slang::IBlob> variantHash;
+        linkedVariant->getEntryPointHash(0, 0, variantHash.writeRef());
+        SLANG_CHECK_ABORT(variantHash != nullptr);
+        SLANG_CHECK(_getBlobText(variantHash) != _getBlobText(baselineHash));
+        auto variantLayout = linkedVariant->getLayout(0, diagnostics.writeRef());
+        SLANG_CHECK_ABORT(variantLayout != nullptr);
+        SLANG_CHECK(variantLayout->getEntryPointCount() == 1);
+
+        // Relink the compiled variant, which already has its own route option. This catches
+        // both cached-code reuse and appending a new value behind the old scalar option.
+        option.value.intValue0 = baseline;
+        ComPtr<slang::IComponentType> restoredVariant;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            linkedVariant
+                ->linkWithOptions(restoredVariant.writeRef(), 1, &option, diagnostics.writeRef())));
+        _compileAndCheckNamedIntrinsicRoute(restoredVariant, baselineIsNVVM);
+        ComPtr<slang::IBlob> hashAfter;
+        linkedVariant->getEntryPointHash(0, 0, hashAfter.writeRef());
+        SLANG_CHECK_ABORT(hashAfter != nullptr);
+        SLANG_CHECK(_getBlobText(hashAfter) == _getBlobText(variantHash));
+        SLANG_CHECK(linkedVariant->getLayout(0, diagnostics.writeRef()) == variantLayout);
+        SLANG_CHECK(
+            _compileAndCheckNamedIntrinsicRoute(linkedVariant, !baselineIsNVVM) == variantBefore);
+        baselineProgram->getEntryPointHash(0, 0, hashAfter.writeRef());
+        SLANG_CHECK_ABORT(hashAfter != nullptr);
+        SLANG_CHECK(_getBlobText(hashAfter) == _getBlobText(baselineHash));
+        SLANG_CHECK(baselineProgram->getLayout(0, diagnostics.writeRef()) == baselineLayout);
+        SLANG_CHECK(
+            _compileAndCheckNamedIntrinsicRoute(baselineProgram, baselineIsNVVM) == baselineBefore);
+
+        // An unrelated option must inherit the component's route, rather than fall back to
+        // the session target. The result also keeps its child program alive independently.
+        option.name = slang::CompilerOptionName::Optimization;
+        option.value.intValue0 = SLANG_OPTIMIZATION_LEVEL_NONE;
+        ComPtr<slang::IComponentType> inheritedVariant;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(linkedVariant->linkWithOptions(
+            inheritedVariant.writeRef(),
+            1,
+            &option,
+            diagnostics.writeRef())));
+        ComPtr<slang::IComponentType> unchangedVariant;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(linkedVariant->linkWithOptions(
+            unchangedVariant.writeRef(),
+            0,
+            nullptr,
+            diagnostics.writeRef())));
+        unchangedVariant->getEntryPointHash(0, 0, hashAfter.writeRef());
+        SLANG_CHECK_ABORT(hashAfter != nullptr);
+        SLANG_CHECK(_getBlobText(hashAfter) == _getBlobText(variantHash));
+        restoredVariant = nullptr;
+        linkedVariant = nullptr;
+        baselineProgram = nullptr;
+        _compileAndCheckNamedIntrinsicRoute(inheritedVariant, !baselineIsNVVM);
+        auto unchangedLayout = unchangedVariant->getLayout(0, diagnostics.writeRef());
+        SLANG_CHECK_ABORT(unchangedLayout != nullptr);
+        SLANG_CHECK(unchangedLayout->getEntryPointCount() == 1);
     }
 }

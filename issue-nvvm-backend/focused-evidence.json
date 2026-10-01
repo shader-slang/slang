@@ -82986,6 +82986,99 @@
         "Focused SM80 O0/O3 qualification; no full campaign, performance, concurrency, dynamic-component or whole-record claim.",
         "Identity is the frozen item2 candidate; later disjoint item3 source/build activity does not relabel these historical tested artifacts."
       ]
+    },
+    "nvvm-link-options-and-static-context": {
+      "status": "accepted-focused",
+      "scope": "Shared linkWithOptions isolates effective options and all component-owned caches for already compiled inputs; explicit static fixture initialization resolves its invalid zero assumption.",
+      "identity": {
+        "revision": "a4bb02c78ba77c4c64b32add3b5544e8429bda9a",
+        "patch_sha256": "2ac6452855a39380c406a878228911be27e6ce532a3883d7db47b19d52598086",
+        "source_sha256": {
+          "source/slang/slang-linkable.cpp": "44a78125b21ee34f7402b482c4c627336752661e98efec9e6411fb494b544203",
+          "tools/slang-unit-test/unit-test-nvvm-integration.cpp": "ad9511a6393cb18d35b4cb1a3f309a16aef79b6be7dc19c0cb5779feee4b8871",
+          "tests/cuda/nvvm-copyable-kernel-context.slang": "d6a307a19bed840bbc69d20cf38ca789bc3d3362e21f4666ec36021046484d33"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "e9165d250a1cac77894810e756b4e7375895e74bf847dadbbbea4f72fd1eabcf",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "94fc793df35e5083bee447ef1b988efcc2dcf4b8a1f5e077bdf4dd97c1319f51",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "73728d1781277b4d5060c1eccdd3322eacb0de7aac7e9255a7413091de41707d"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-link-options/build.json",
+          "sha256": "8cdf961627a3cd1182d2fbf871e28b1d3eaf84343f102e494dd1c9b400b9b3ab"
+        },
+        "focused": {
+          "path": "build/nvvm-link-options/focused.json",
+          "sha256": "1498622a3cba0d194ff469f52d0412b532f9323d6c098f31d349d2e80325713c"
+        },
+        "outcomes": {
+          "tests/cuda/nvvm-copyable-kernel-context.slang (cuda)": "passed",
+          "tests/cuda/nvvm-copyable-kernel-context.slang.1 (cuda)": "passed",
+          "tests/cuda/nvvm-copyable-kernel-context.slang.2 (cuda)": "passed",
+          "slang-unit-test-tool/nvvmSlangLinkedRouteOverridesEmitIsolatedImplementations.internal": "passed",
+          "slang-unit-test-tool/cudaEmissionMethodLinkOptionsAffectRoutingAndHash.internal": "passed",
+          "slang-unit-test-tool/SlangcReadFromStdin.internal": "passed"
+        },
+        "repeated": {
+          "path": "build/nvvm-link-options/repeated-fix.json",
+          "sha256": "8e685e4d7afae5e7e40b56653e40c47b713074af26beaea8ab005a32ed65005e"
+        },
+        "repeated_results": {
+          "path": "build/nvvm-link-options/static-repeat-after-2/results.json",
+          "sha256": "bc29f2c941e5e76f290a294b1645fae1f5fc87444896f33030f56c0a2c89d88c"
+        },
+        "driver": {
+          "path": "build/nvvm-link-options/repeat-static-context.py",
+          "sha256": "f939de15dd45f27df817156d9582573ff528dd47ace02d096abfcf27c77c08ef"
+        },
+        "launches": 9,
+        "expected_values": [
+          6400, 6401, 6402, 6403, 6404, 6405, 6406, 6407, 6408, 6409, 6410,
+          6411, 6412, 6413, 6414, 6415, 6416, 6417, 6418, 6419, 6420, 6421,
+          6422, 6423, 6424, 6425, 6426, 6427, 6428, 6429, 6430, 6431
+        ]
+      },
+      "resolved_failures": {
+        "relink_before": {
+          "path": "build/nvvm-link-options/before.json",
+          "sha256": "76ff0f3bc45ac4d757a2d2a888936c5d53863f67e8f500482738d5619083098a"
+        },
+        "retained_route": {
+          "path": "build/nvvm-target-intrinsics/focused-units-1.log",
+          "sha256": "5f66606da853309055061c1a8bde11a7d8daa6febfdba6ce79c776e3056e8e69"
+        },
+        "static_before": {
+          "path": "build/nvvm-results/2026-09-28-corpus-device1/copyable-context-diagnosis/diagnosis.json",
+          "sha256": "f95dfb4bc22485089faecdf1b11500c3fcc24da6d6a1d184d54505b1e3670c53"
+        },
+        "meaning": "Route/hash regression reproduced on unchanged compiler, then passed after ownership fix. Repeated-dispatch fixture now supplies state = {}; no implicit-zero language/compiler policy changed."
+      },
+      "validation_incidents": {
+        "initial_repeated_launcher": {
+          "path": "build/nvvm-link-options/repeated.json",
+          "sha256": "069523a9c10386989a9cace0c2f36dc19191f6520e4bb6d70cf31da6c67a779c"
+        },
+        "meaning": "Nonexistent bin/render-test identity path failed before GPU execution; corrected to existing lib/librender-test-tool.so and rerun with fresh output directory."
+      },
+      "qualification": "Six focused checks and three same-context/module launches in each of NVRTC O3/NVVM O0/NVVM O3. Reset256 input/output bytes before each launch; all32 expected values and later full-output equality checked. No full suite or performance claim. Module43/ABI46/container2 unchanged."
     }
   }
 }

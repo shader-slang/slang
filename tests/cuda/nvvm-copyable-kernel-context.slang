@@ -19,7 +19,7 @@ struct State
     uint payload[2];
     bool other;
 }
-static State state;
+static State state = {};
 static bool flag = false;
 static uint visits = 0;
 

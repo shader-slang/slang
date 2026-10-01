@@ -84,8 +84,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 62 feature objects, preserving all prior objects and the full baseline. Each feature's
+Twenty-one feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 63 feature objects, preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The newly authorized sequence is:
 
@@ -123,15 +123,13 @@ Current additions beyond the full checkpoint are:
   and AnyValue expansion remain excluded. CUDA rejects Std430 and uses 40 for
   Scalar/C; its three nonzero Scalar mismatches remain recorded.
 
-The latest batch is `features.nvvm-layout-pointer-fields`, raw evidence under
-`build/nvvm-layout-pointer-fields/`. Checked field/component address records select shared-rule byte
-offsets; load/store plans select scalar payloads and Bool integer conversion. The existing type-role
-caches and provider ABI are unchanged. O0/O3 allocated-memory checks cover nested UInt64/UInt32,
-Float32/float3 and Bool fields, with all3,072 pointee bytes, padding, guards and binding bytes checked.
-A grouped compile smoke also covers signed32/64 and integer vector widths2/4 across all layouts.
-Literal vector components are admitted; dynamic addresses and field-pointer helper arguments remain
-excluded. Readonly roots are not newly admitted. The predecessor's original pointer/data-layouts
-source now compiles, while its unspecified bindings remain unexecuted.
+The latest batch is `features.nvvm-link-options-and-static-context`, raw evidence under
+`build/nvvm-link-options/`. Already compiled components can be relinked with different options
+without mutating original options, hashes, layouts or cached code. Six focused checks pass.
+The copyable-context fixture now explicitly initializes its static record; three same-context
+launches in each of NVRTC O3/NVVM O0/NVVM O3 produce all32 expected values. Bare static storage
+still has no implicit-zero promise. Initial route/hash failures and third-dispatch failure remain
+retained as resolved histories; the full baseline is unchanged.
 
 The full checkpoint remains unchanged: its 36 main gaps and 249 surface cells retain their original
 identities. Focused records supersede specifically resolved texture-handle, dynamic-surface and
@@ -154,8 +152,8 @@ Keep these open distinctions visible:
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
 The parameter-group slice is complete. **Resumed for the four items above, then stop again.**
-Item 1 is committed as `180094a4f`. Item 2 implementation and focused validation are complete;
-next: the retained static-state fixture and shared link-option cache ownership issues.
+Items 1–2 are committed as `180094a4f` and `a4bb02c78`. Item 3 is complete; next: the
+restricted CubeArray and mip-query investigation, then stop.
 
 ## Retained boundaries
 
@@ -170,6 +168,6 @@ remain authoritative; structured-buffer load/store conversions are planned, whil
 family planning and broader aggregate admission remain feature work.
 Barrier convergence, external Half ABI, numeric sweep, material-runtime and performance conclusions
 retain prior qualifications. Snapshot caching remains non-atomic with external libdevice replacement.
-Repeated bare-static-state dispatch in nvvm-copyable-kernel-context remains unresolved. Relinking a
-compiled requirement-free component may retain cached target output after option changes.
+The earlier repeated-static fixture and link-option cache failures are resolved with focused
+evidence; retain their original failure records.
 CUDA `dim3 == uint3` source emission remains unsupported.

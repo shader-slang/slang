@@ -8,6 +8,7 @@
 #include "core/slang-memory-file-system.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-linkable-impls.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-rich-diagnostics.h"
@@ -564,16 +565,49 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
     slang::CompilerOptionEntry const* entries,
     ISlangBlob** outDiagnostics)
 {
-    SLANG_RETURN_ON_FAIL(link(outLinkedComponentType, outDiagnostics));
+    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+    DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    auto linked = *outLinkedComponentType;
-
-    if (linked)
+    try
     {
-        static_cast<ComponentType*>(linked)->getOptionSet().load(count, entries);
-    }
+        auto linked = fillRequirements(this);
+        if (!linked)
+            return SLANG_FAIL;
 
-    return SLANG_OK;
+        // Consider linking an already compiled program with a different backend option.
+        // Filling its requirements can return the original program, whose target programs
+        // already own options, layouts and code. Give the new options their own component
+        // instead of mutating that input. Construct directly because the ordinary composite
+        // factory intentionally returns its only child without creating an option owner.
+        List<RefPtr<ComponentType>> children;
+        children.add(linked);
+        RefPtr<ComponentType> result = new CompositeComponentType(getLinkage(), children);
+        result->getOptionSet().overrideWith(getOptionSet());
+
+        // Loading entries appends values. Merge through the existing override policy so a
+        // scalar option replaces an inherited value and repeatable options retain their rules.
+        CompilerOptionSet additionalOptions;
+        additionalOptions.load(count, entries);
+        result->getOptionSet().overrideWith(additionalOptions);
+
+        *outLinkedComponentType = ComPtr<slang::IComponentType>(result).detach();
+        return SLANG_OK;
+    }
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult(
