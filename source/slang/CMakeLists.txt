@@ -65,23 +65,26 @@ target_include_directories(
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
 )
 
-# Optimize slang-rich-diagnostics.cpp for size regardless of build type.
-# This file includes generated fiddle code that can be large.
-# Use /O1;/Os for MSVC, -Oz for Clang, -Os for GCC.
-# For MSVC, we must disable PCH for this file since changing optimization
-# level is incompatible with precompiled headers (warning C4653).
-# Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
-# GCC/Clang don't have this issue, so they get size optimization in all configs.
-string(
-    CONCAT
-    RICH_DIAG_SIZE_OPT_FLAGS
-    "$<$<NOT:"
-    "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
-    ">:"
-    "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,"
-    "$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>"
-    ">"
-)
+# slang-rich-diagnostics.cpp includes large generated fiddle code, so we
+# size-optimize it: /O1;/Os for MSVC, -Os for GCC, -Oz for Clang/AppleClang.
+# These per-file flags differ from those the shared precompiled header was built
+# with, so PCH is skipped for this file on every compiler (SKIP_PRECOMPILE_HEADERS
+# below); on MSVC that divergence surfaces as warning C4653.
+#
+# Only MSVC skips the flags in Debug, where /RTC1 runtime checks conflict with
+# optimization; the $<CONFIG:Debug> genex is therefore confined to the MSVC path.
+# Non-MSVC gets a plain flag with no $<CONFIG> because the Xcode generator rejects
+# a per-source COMPILE_OPTIONS that merely contains a $<CONFIG:...> condition, even
+# when the resolved flags are identical across configs. clang-cl reports compiler
+# ID Clang (though it sets CMake's MSVC variable), so it takes the else branch and
+# is size-optimized with -Oz.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set(RICH_DIAG_SIZE_OPT_FLAGS "$<$<NOT:$<CONFIG:Debug>>:/O1;/Os>")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(RICH_DIAG_SIZE_OPT_FLAGS "-Os")
+else()
+    set(RICH_DIAG_SIZE_OPT_FLAGS "-Oz")
+endif()
 set_source_files_properties(
     slang-rich-diagnostics.cpp
     PROPERTIES
