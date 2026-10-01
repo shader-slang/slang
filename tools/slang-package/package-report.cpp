@@ -98,7 +98,7 @@ String formatResolveFailure(const ResolveFailure& failure)
         builder << "\nPackage '" << failure.packageName
                 << "' has no published releases to select from.\n";
         builder << "Help: confirm the dependency points at the right Git location and that it "
-                   "publishes 'vMAJOR.MINOR.PATCH' release tags.";
+                   "publishes dotted release tags such as 'v1.2.3'.";
     }
     return builder.produceString();
 }
@@ -180,8 +180,8 @@ static ResolveChangeKind _classifyChange(const LockedPackage* previous, const Lo
     const bool nextPath = next.path.getLength() != 0;
     if (previousPath != nextPath || previous->git != next.git || previous->path != next.path)
         return ResolveChangeKind::Replaced;
-    SemanticVersion previousVersion;
-    SemanticVersion nextVersion;
+    PackageVersion previousVersion;
+    PackageVersion nextVersion;
     String error;
     if (SLANG_SUCCEEDED(parseExactVersion(previous->version, previousVersion, error)) &&
         SLANG_SUCCEEDED(parseExactVersion(next.version, nextVersion, error)))
@@ -234,7 +234,7 @@ static void _appendConstraintLines(
     }
 }
 
-static bool _constraintMatches(const ResolveConstraintNote& note, const SemanticVersion& version)
+static bool _constraintMatches(const ResolveConstraintNote& note, const PackageVersion& version)
 {
     if (note.constraint.clauses.getCount() == 0)
         return true;
@@ -245,7 +245,7 @@ static void _appendRejectedPrevious(StringBuilder& builder, const ResolveChange&
 {
     if (!change.previousVersion.getLength() || !change.explanation)
         return;
-    SemanticVersion previous;
+    PackageVersion previous;
     String error;
     if (SLANG_FAILED(parseExactVersion(change.previousVersion, previous, error)))
         return;

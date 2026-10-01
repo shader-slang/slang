@@ -54,7 +54,7 @@ public:
         const String& packageName,
         const String& git,
         const String& commit,
-        SemanticVersion& outVersion,
+        PackageVersion& outVersion,
         String& outError) = 0;
 
     virtual SlangResult loadManifest(

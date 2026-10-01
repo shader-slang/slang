@@ -129,10 +129,10 @@ slang package dependency add <name> --path <path> --as <version>
 Add a direct dependency, or replace the existing direct declaration with the same name. Exactly
 one of the three source forms must be used:
 
-- **Git version range** selects a semantic-version release tag from the Git repository.
-- **Git ref** pins a branch, tag, or commit. `--as` declares the exact semantic version that the
+- **Git version range** selects a dotted release tag from the Git repository.
+- **Git ref** pins a branch, tag, or commit. `--as` declares the exact version that the
   selected source provides. When omitted, the resolver derives it from the nearest
-  `vMAJOR.MINOR.PATCH` tag reachable from the resolved commit.
+  release tag reachable from the resolved commit.
 - **Path** uses a local directory in place and requires an exact version through `--as`.
 
 `<name>` identifies the package in the graph and must match the selected package manifest.
@@ -144,18 +144,20 @@ one of the three source forms must be used:
 characters or quotes, or use Git's command-executing `ext::` transport.
 
 `--version <range>`
-: Select a compatible release tag. Versions are written without a `v` prefix. Whitespace joins
+: Select a compatible release tag. A version is one or more decimal components with no `v`
+prefix, for example `1.4.0` or `1.4.0.2`. The number of components is significant, and a shorter
+sequence sorts first, so `1.4.0` and `1.4.0.0` are different releases. Whitespace joins
 comparisons with AND and `||` joins alternatives, for example
-`>=1.2.0 <2.0.0 !=1.4.0`. `^1.2.3` means `>=1.2.3 <2.0.0` and `~1.2.3` means
-`>=1.2.3 <1.3.0`. Either operator may omit trailing components: `^1.2` means
-`>=1.2.0 <2.0.0`, `^0.0` means `>=0.0.0 <0.1.0`, and `~1` means `>=1.0.0 <2.0.0`. A bare
-version such as `1.4.0` remains exact and must include all three components.
+`>=1.2.0 <2.0.0 !=1.4.0`. `^1.2.3` means `>=1.2.3 <2`, `^0.0.0.4` means
+`>=0.0.0.4 <0.0.0.5`, and `~1.2.3` means `>=1.2.3 <1.3`. A bare version matches only the
+sequence that was written.
 
 `--ref <ref>`
 : Select an opaque Git branch, tag, or commit instead of choosing a semantic-version release.
 
 `--as <version>`
-: Declare the exact `MAJOR.MINOR.PATCH` version provided by a Git ref or path dependency.
+: Declare the exact dotted version provided by a Git ref or path dependency, such as `1.4.0` or
+`1.4.0.2`.
 
 `--path <path>`
 : Select a local package directory. Relative paths are resolved from the package that declares
@@ -251,7 +253,7 @@ relative to the workspace, but must be on the same filesystem. The directory mus
 The workspace must already have a lock file. The package itself does not need to be in that lock
 when an explicit version is supplied.
 
-The optional version is an exact `MAJOR.MINOR.PATCH` version used for solver compatibility. When
+The optional version is an exact dotted version used for solver compatibility. When
 omitted, the command uses the package's current locked version. Supply it when the package is not
 already in the lock.
 
@@ -367,8 +369,8 @@ as a Git pin and removes the edit registration.
 not accepted here; omit `--ref` to freeze `HEAD`.
 
 `--as <version>`
-: With `--adopt`, declare the exact semantic version provided by `HEAD`. If omitted, the command
-uses a unique release tag at `HEAD`, or the nearest `vMAJOR.MINOR.PATCH` ancestor. It fails when
+: With `--adopt`, declare the exact dotted version provided by `HEAD`. If omitted, the command
+uses a unique release tag at `HEAD`, or the nearest release-tag ancestor. It fails when
 no such tag exists.
 
 `--yes`

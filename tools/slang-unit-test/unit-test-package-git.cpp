@@ -2146,7 +2146,7 @@ SLANG_UNIT_TEST(PackageToolUneditAdoptsVersionTag)
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(adoptArguments), adoptArguments, error)));
     SLANG_CHECK(
-        error.getUnownedSlice().indexOf(UnownedStringSlice("multiple semantic-version tags")) >= 0);
+        error.getUnownedSlice().indexOf(UnownedStringSlice("multiple release-version tags")) >= 0);
     tagArguments.clear();
     tagArguments.add("-C");
     tagArguments.add(checkout);

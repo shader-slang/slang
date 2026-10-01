@@ -900,7 +900,7 @@ static SlangResult _init(const String& projectRoot, String& outError)
     manifest.licenseFiles.add("LICENSE");
     manifest.workspace.depsDirectory = "deps";
     manifest.workspace.outputDirectory = "out";
-    SemanticVersion installedToolchain;
+    PackageVersion installedToolchain;
     String installedToolchainText;
     String toolchainError;
     if (SLANG_SUCCEEDED(getInstalledSlangToolchainVersion(
@@ -1056,7 +1056,7 @@ static SlangResult _dependencyPin(
     }
     if (hasRequestedVersion)
     {
-        SemanticVersion ignored;
+        PackageVersion ignored;
         SLANG_RETURN_ON_FAIL(parseExactVersion(requestedVersion, ignored, outError));
     }
 
@@ -1568,7 +1568,7 @@ static SlangResult _update(
             {
                 String checkout;
                 String headCommit;
-                SemanticVersion inferredVersion;
+                PackageVersion inferredVersion;
                 String tag;
                 bool foundTag = false;
                 String inferError;
@@ -3082,7 +3082,7 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
 /// The manifest records the pin so a later update cannot silently select another release; the lock
 /// records the exact commit that fetch installs. Omit `requestedRef` to freeze `HEAD` as a commit
 /// or as a unique release tag that points at `HEAD`. Pass `requestedRef` to keep following that
-/// branch or tag. Omit `requestedVersion` to derive `as` from the nearest `vMAJOR.MINOR.PATCH` tag
+/// branch or tag. Omit `requestedVersion` to derive `as` from the nearest release tag
 /// reachable from `HEAD`.
 static SlangResult _adoptInPlaceOverride(
     const String& projectRoot,
@@ -3169,12 +3169,12 @@ static SlangResult _adoptInPlaceOverride(
     }
     if (version.getLength())
     {
-        SemanticVersion ignoredVersion;
+        PackageVersion ignoredVersion;
         SLANG_RETURN_ON_FAIL(parseExactVersion(version, ignoredVersion, outError));
     }
     else
     {
-        SemanticVersion taggedVersion;
+        PackageVersion taggedVersion;
         bool foundTag = false;
         String headTag;
         SLANG_RETURN_ON_FAIL(
@@ -3450,7 +3450,7 @@ static SlangResult _overrideAdd(
         return SLANG_FAIL;
     }
     String providedVersion = as.getLength() ? as : lockedPackage->version;
-    SemanticVersion ignoredVersion;
+    PackageVersion ignoredVersion;
     SLANG_RETURN_ON_FAIL(parseExactVersion(providedVersion, ignoredVersion, outError));
 
     List<LocalPackage> localPackages;

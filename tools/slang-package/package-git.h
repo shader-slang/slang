@@ -7,7 +7,7 @@ namespace Slang
 namespace PackageTool
 {
 
-/// List `vMAJOR.MINOR.PATCH` tags already present in a local clone, without contacting a remote.
+/// List dotted release tags already present in a local clone, without contacting a remote.
 SlangResult listReleaseTagsFromRepository(
     const String& repositoryPath,
     List<TagCandidate>& outCandidates,
@@ -55,11 +55,11 @@ SlangResult getRepositoryHeadCommit(
     String& outCommit,
     String& outError);
 
-/// Find the one semantic-version tag that points at `HEAD`, or report that none exists.
+/// Find the one release-version tag that points at `HEAD`, or report that none exists.
 SlangResult findVersionTagAtHead(
     const String& repositoryPath,
     String& outTag,
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     bool& outFound,
     String& outError);
 
@@ -70,7 +70,7 @@ SlangResult resolveLocalRevision(
     String& outCommit,
     String& outError);
 
-/// Find the nearest `vMAJOR.MINOR.PATCH` tag that is an ancestor of `commit`.
+/// Find the nearest dotted release tag that is an ancestor of `commit`.
 ///
 /// Consider this example: `main` is three commits after `v1.3.0`. The pin still checks out
 /// `main`, and this helper reports `v1.3.0` so the solver can treat that tree as 1.3.0 when `as`
@@ -80,7 +80,7 @@ SlangResult findNearestReleaseTag(
     const String& repositoryPath,
     const String& commit,
     String& outTag,
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     bool& outFound,
     String& outError);
 

@@ -539,6 +539,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             ${slang_SOURCE_DIR}/tools/slang-package/package-resolver.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-tool.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-types.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-version.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-validate.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-context.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp

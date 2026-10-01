@@ -61,7 +61,7 @@ SlangResult validateLockedDependency(
         return SLANG_FAIL;
     }
 
-    SemanticVersion lockedVersion;
+    PackageVersion lockedVersion;
     SLANG_RETURN_ON_FAIL(parseExactVersion(lockedPackage.version, lockedVersion, outError));
     if (dependency.version.getLength())
     {
@@ -105,7 +105,7 @@ SlangResult validateLockedWorkspaceExclusions(
         const LockedPackage& package = lock.packages[packageIndex];
         if (package.path.getLength())
             continue;
-        SemanticVersion version;
+        PackageVersion version;
         String versionError;
         SLANG_RELEASE_ASSERT(
             SLANG_SUCCEEDED(parseExactVersion(package.version, version, versionError)));

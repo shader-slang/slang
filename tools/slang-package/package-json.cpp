@@ -410,7 +410,7 @@ static SlangResult _readDependencies(
                 return SLANG_FAIL;
             }
         }
-        SemanticVersion providedVersion;
+        PackageVersion providedVersion;
         if (dependency.as.getLength())
         {
             SLANG_RETURN_ON_FAIL(parseExactVersion(dependency.as, providedVersion, outError));
@@ -1073,7 +1073,7 @@ static SlangResult _readLockedPackage(
         _readOptionalString(container, pair.value, "path", outPackage.path, outError));
     SLANG_RETURN_ON_FAIL(
         _readRequiredString(container, pair.value, "version", outPackage.version, outError));
-    SemanticVersion ignoredVersion;
+    PackageVersion ignoredVersion;
     if (SLANG_FAILED(parseExactVersion(outPackage.version, ignoredVersion, outError)))
     {
         outError = String("Locked package has an invalid effective version: ") + outPackage.name;
@@ -1277,7 +1277,7 @@ SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackage
             outError));
         if (package.as.getLength())
         {
-            SemanticVersion ignoredVersion;
+            PackageVersion ignoredVersion;
             SLANG_RETURN_ON_FAIL(parseExactVersion(package.as, ignoredVersion, outError));
         }
         if (!_isSafeLocalPath(package.path))

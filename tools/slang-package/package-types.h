@@ -1,8 +1,8 @@
 #pragma once
 
 #include "core/slang-list.h"
-#include "core/slang-semantic-version.h"
 #include "core/slang-string.h"
+#include "package-version.h"
 
 namespace Slang
 {
@@ -26,10 +26,10 @@ struct Dependency
     String version;
     /// An opaque Git branch, tag, or commit that pins this edge instead of selecting a release tag.
     String ref;
-    /// Exact semantic version that a pinned Git ref or path dependency provides.
+    /// Exact dotted version that a pinned Git ref or path dependency provides.
     ///
-    /// Omit this on a Git pin to derive the version from the nearest `vMAJOR.MINOR.PATCH` tag
-    /// reachable from the resolved commit. Path dependencies still require it.
+    /// Omit this on a Git pin to derive the version from the nearest release tag reachable from
+    /// the resolved commit. Path dependencies still require it.
     String as;
 };
 
@@ -235,7 +235,7 @@ enum class VersionComparison
 struct VersionPredicate
 {
     VersionComparison comparison;
-    SemanticVersion version;
+    PackageVersion version;
 };
 
 /// One AND-group in a version constraint: every predicate must match.
@@ -249,18 +249,18 @@ struct VersionConstraint
 {
     List<VersionClause> clauses;
 
-    bool matches(const SemanticVersion& version) const;
+    bool matches(const PackageVersion& version) const;
 };
 
 /// Return whether a release version matches a validated policy constraint.
-bool matchesVersionPolicy(const String& constraintText, const SemanticVersion& version);
+bool matchesVersionPolicy(const String& constraintText, const PackageVersion& version);
 
 struct TagCandidate
 {
     String ref;
     String commit;
     String path;
-    SemanticVersion version;
+    PackageVersion version;
 };
 
 /// Parse a version constraint written without a `v` prefix.
@@ -268,9 +268,11 @@ struct TagCandidate
 /// Consider this example: `>=1.2.0 !=1.3.0` matches 1.2.0 and 1.4.0 but not 1.3.0.
 /// `>=1.0.0 <1.3.0 || >=1.3.1 <2.0.0` matches either interval. Whitespace-separated
 /// comparisons in one clause are AND; `||` joins clauses as OR. A clause may be a single
-/// exact three-component version such as `1.4.0`. `^1.2.3` means `>=1.2.3 <2.0.0` and
-/// `~1.2.3` means `>=1.2.3 <1.3.0`. Either operator may omit trailing components: `^1.2`
-/// means `>=1.2.0 <2.0.0`, `^0.0` means `>=0.0.0 <0.1.0`, and `~1` means `>=1.0.0 <2.0.0`.
+/// exact version such as `1.4.0` or `1.4.0.2`. `^` increments the leftmost non-zero component,
+/// or the last component when every component is zero, and drops what follows: `^1.2.3` means
+/// `>=1.2.3 <2`, `^0.0` means `>=0.0 <0.1`, and `^0.0.0.4` means `>=0.0.0.4 <0.0.0.5`. `~`
+/// increments the second component when at least two are written: `~1.2.3.4` means
+/// `>=1.2.3.4 <1.3`, and `~1` means `>=1 <2`.
 SlangResult parseVersionConstraint(
     const UnownedStringSlice& text,
     VersionConstraint& outConstraint,
@@ -289,28 +291,28 @@ SlangResult parseDependencyConstraint(
     VersionConstraint& outConstraint,
     String& outError);
 
-SlangResult parseReleaseTag(const UnownedStringSlice& tag, SemanticVersion& outVersion);
-inline SlangResult parseReleaseTag(const String& tag, SemanticVersion& outVersion)
+SlangResult parseReleaseTag(const UnownedStringSlice& tag, PackageVersion& outVersion);
+inline SlangResult parseReleaseTag(const String& tag, PackageVersion& outVersion)
 {
     return parseReleaseTag(tag.getUnownedSlice(), outVersion);
 }
 
-/// Parse an exact semantic version written without a `v` prefix.
+/// Parse an exact dotted version written without a `v` prefix.
 SlangResult parseExactVersion(
     const UnownedStringSlice& text,
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     String& outError);
 inline SlangResult parseExactVersion(
     const String& text,
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     String& outError)
 {
     return parseExactVersion(text.getUnownedSlice(), outVersion, outError);
 }
 
-inline String formatExactVersion(const SemanticVersion& version)
+inline String formatExactVersion(const PackageVersion& version)
 {
-    return String(version.m_major) + "." + String(version.m_minor) + "." + String(version.m_patch);
+    return version.format();
 }
 
 inline constexpr char kSlangToolchainName[] = "slang-toolchain";
@@ -320,9 +322,9 @@ void addSlangToolchainConstraint(
     const Manifest& manifest,
     List<ToolchainConstraint>& ioConstraints);
 
-/// Return the sibling compiler's exact `MAJOR.MINOR.PATCH` identity.
+/// Return the sibling compiler's exact three-component identity as a package version.
 SlangResult getInstalledSlangToolchainVersion(
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     String& outExactText,
     String& outError);
 

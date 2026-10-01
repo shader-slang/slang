@@ -65,87 +65,123 @@ static SlangResult _runSlangc(const List<String>& arguments, ExecuteResult& outR
 SLANG_UNIT_TEST(PackageVersionConstraint)
 {
     VersionConstraint constraint;
-    SemanticVersion version;
+    PackageVersion version;
     String error;
     SLANG_CHECK(SLANG_FAILED(
         parseReleaseTag(UnownedStringSlice("v999999999999999999999999999999.0.0"), version)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice(">=1.2.0 <2.0.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 9, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 1, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(2, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 9, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 1, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(2, 0, 0)));
 
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("1.4.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 4, 1)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 4, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 4, 1)));
 
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice(">=1.0"), constraint, error)));
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice(">=1.0"), constraint, error)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 3)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(0, 9, 9)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^1.2.3"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 3)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 9, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 2, 2)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(2, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 3)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 9, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 2, 2)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(2, 0, 0)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("2"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("2.0"), version)));
+    SLANG_CHECK(!constraint.matches(version));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^0.2.3"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(0, 2, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(0, 3, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(0, 2, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(0, 3, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^0.0.3"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(0, 0, 3)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(0, 0, 4)));
+    SLANG_CHECK(constraint.matches(PackageVersion(0, 0, 3)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(0, 0, 4)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^0.0.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(0, 0, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(0, 0, 1)));
+    SLANG_CHECK(constraint.matches(PackageVersion(0, 0, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(0, 0, 1)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^1.2"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 9, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 1, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(2, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 9, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 1, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(2, 0, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^0.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(0, 0, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(0, 1, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(0, 0, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(0, 1, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(0, 9, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(0, 9, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 0, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("~1.2.3"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 3)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 9)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 2, 2)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 3, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 3)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 2, 2)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("~1.2"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 3, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("~1"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 9, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(2, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 9, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(2, 0, 0)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("~0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(0, 9, 1)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(0, 9, 1)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 0, 0)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice("^1.2 !=1.5.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 5, 0)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 6, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 4, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 5, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 6, 0)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice("~1.2.3 || ^2"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 4)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(2, 1, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 3, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(3, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 4)));
+    SLANG_CHECK(constraint.matches(PackageVersion(2, 1, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(3, 0, 0)));
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^1.2.3.4"), constraint, error)));
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^1.2.3.4"), constraint, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.4"), version)));
+    SLANG_CHECK(constraint.matches(version));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 9, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(2, 0, 0)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.3"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("^0.0.0.4"), constraint, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("0.0.0.4"), version)));
+    SLANG_CHECK(constraint.matches(version));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("0.0.0.4.1"), version)));
+    SLANG_CHECK(constraint.matches(version));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("0.0.0.5"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("0.0.0.9"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("~1.2.3.4"), constraint, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.4"), version)));
+    SLANG_CHECK(constraint.matches(version));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 9)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("1.2.3"), constraint, error)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 3)));
+    SLANG_CHECK(SLANG_SUCCEEDED(PackageVersion::parse(UnownedStringSlice("1.2.3.0"), version)));
+    SLANG_CHECK(!constraint.matches(version));
+    SLANG_CHECK(PackageVersion(1, 2, 3) < version);
+    SLANG_CHECK(version < PackageVersion(1, 2, 4));
     SLANG_CHECK(
         SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^1.2.x"), constraint, error)));
     SLANG_CHECK(
@@ -153,47 +189,56 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
     SLANG_CHECK(SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^"), constraint, error)));
     SLANG_CHECK(SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("~"), constraint, error)));
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^65535.0.0"), constraint, error)));
-    SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("~1.65535.0"), constraint, error)));
+        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^4294967295"), constraint, error)));
+    SLANG_CHECK(SLANG_FAILED(
+        parseVersionConstraint(UnownedStringSlice("~1.4294967295"), constraint, error)));
+    SLANG_CHECK(SLANG_FAILED(parseExactVersion(UnownedStringSlice("4294967296"), version, error)));
+    SLANG_CHECK(SLANG_FAILED(parseExactVersion(
+        UnownedStringSlice("1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0.1.2.3"),
+        version,
+        error)));
     SLANG_CHECK(SLANG_FAILED(parseExactVersion(UnownedStringSlice("^1.2.3"), version, error)));
-    SLANG_CHECK(SLANG_FAILED(parseExactVersion(UnownedStringSlice("1.2"), version, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(parseExactVersion(UnownedStringSlice("1.2"), version, error)));
+    SLANG_CHECK(version != PackageVersion(1, 2, 0));
+    SLANG_CHECK(SLANG_SUCCEEDED(parseExactVersion(UnownedStringSlice("1.2.3.4"), version, error)));
+    SLANG_CHECK(SLANG_SUCCEEDED(parseReleaseTag(UnownedStringSlice("v1.2.3.4"), version)));
+    SLANG_CHECK(SLANG_FAILED(parseReleaseTag(UnownedStringSlice("1.2.3"), version)));
     SLANG_CHECK(
         SLANG_FAILED(parseVersionConstraint(UnownedStringSlice(">=v1.2.0"), constraint, error)));
     SLANG_CHECK(
         SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("1.2.0 1.3.0"), constraint, error)));
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice("<=2.0.0 >=1.0.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 5, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 5, 0)));
     SLANG_CHECK(
         SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("> 1.2.0"), constraint, error)));
 
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice(">=1.2.0 !=1.3.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 3, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 1, 9)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 4, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 1, 9)));
 
     SLANG_CHECK(
         SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("!=1.3.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 3, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
 
     SLANG_CHECK(SLANG_SUCCEEDED(parseVersionConstraint(
         UnownedStringSlice(">=1.0.0 <1.3.0 || >=1.3.1 <2.0.0"),
         constraint,
         error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 3, 1)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 3, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(2, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 2, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 3, 1)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 3, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(2, 0, 0)));
 
     SLANG_CHECK(SLANG_SUCCEEDED(
         parseVersionConstraint(UnownedStringSlice("1.4.0 || 1.5.0"), constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 5, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(1, 6, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 4, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 5, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(1, 6, 0)));
 
     SLANG_CHECK(SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("||"), constraint, error)));
     SLANG_CHECK(
@@ -207,8 +252,8 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
     pinned.ref = "release";
     pinned.as = "1.4.0";
     SLANG_CHECK(SLANG_SUCCEEDED(parseDependencyConstraint(pinned, constraint, error)));
-    SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
-    SLANG_CHECK(!constraint.matches(SemanticVersion(9, 0, 0)));
+    SLANG_CHECK(constraint.matches(PackageVersion(1, 4, 0)));
+    SLANG_CHECK(!constraint.matches(PackageVersion(9, 0, 0)));
 }
 
 SLANG_UNIT_TEST(PackageManifestJSON)
@@ -827,7 +872,7 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(manifest.licenseFiles[0] == "LICENSE");
     SLANG_CHECK(manifest.workspace.depsDirectory == "deps");
     SLANG_CHECK(manifest.workspace.outputDirectory == "out");
-    SemanticVersion installedToolchain;
+    PackageVersion installedToolchain;
     String installedToolchainText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         getInstalledSlangToolchainVersion(installedToolchain, installedToolchainText, error)));
@@ -868,7 +913,7 @@ SLANG_UNIT_TEST(PackageToolSlangToolchain)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
 
-    SemanticVersion installedToolchain;
+    PackageVersion installedToolchain;
     String installedToolchainText;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         getInstalledSlangToolchainVersion(installedToolchain, installedToolchainText, error)));
@@ -3116,7 +3161,7 @@ public:
         release.candidate.ref = String("v") + version;
         release.candidate.commit = release.candidate.ref;
         SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
-            SemanticVersion::parse(version.getUnownedSlice(), release.candidate.version)));
+            PackageVersion::parse(version.getUnownedSlice(), release.candidate.version)));
         releases.add(release);
     }
 
@@ -3132,7 +3177,7 @@ public:
         release.candidate.ref = ref;
         release.candidate.commit = String("commit-") + ref;
         SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
-            SemanticVersion::parse(version.getUnownedSlice(), release.candidate.version)));
+            PackageVersion::parse(version.getUnownedSlice(), release.candidate.version)));
         releases.add(release);
     }
 
@@ -3159,7 +3204,7 @@ public:
         const String&,
         const String& git,
         const String& commit,
-        SemanticVersion& outVersion,
+        PackageVersion& outVersion,
         String& outError) override
     {
         for (const auto& release : releases)
@@ -3301,7 +3346,7 @@ SLANG_UNIT_TEST(PackageResolverReportsNoPublishedCandidates)
         "\n"
         "Package 'noise' has no published releases to select from.\n"
         "Help: confirm the dependency points at the right Git location and that it publishes "
-        "'vMAJOR.MINOR.PATCH' release tags.\n");
+        "dotted release tags such as 'v1.2.3'.\n");
 }
 
 // Most rejection reasons are a single clause, but a candidate whose manifest will not parse carries
@@ -3351,7 +3396,7 @@ SLANG_UNIT_TEST(PackageResolverSlangToolchain)
     SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
     SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("slang-toolchain")) >= 0);
 
-    SemanticVersion installed;
+    PackageVersion installed;
     String installedText;
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(getInstalledSlangToolchainVersion(installed, installedText, error)));
@@ -3417,7 +3462,7 @@ SLANG_UNIT_TEST(PackageResolverSlangToolchainNotEqual)
     Manifest root = _makeManifest("root");
     _addDependency(root, "noise", "memory:noise", ">=1.0.0");
 
-    SemanticVersion installed;
+    PackageVersion installed;
     String installedText;
     String error;
     SLANG_CHECK_ABORT(

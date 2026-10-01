@@ -518,8 +518,8 @@ same local tree without re-entering its configuration.
   pin. `dependency pin NAME` can promote a transitive Git package to a direct exact-version edge
   without adopting a working tree. A local-only fix that is not published still needs adopt or an
   upstream release.
-- An adopted commit with no `vMAJOR.MINOR.PATCH` tag in its history requires explicit `--as`;
-  Git object identity does not determine a semantic version. An ancestor release tag is enough.
+- An adopted commit with no dotted release tag in its history requires explicit `--as`;
+  Git object identity does not determine a release version. An ancestor release tag is enough.
 - Overrides are path-only; there is no user-global Git-to-Git remapping policy.
 - `slang-package-overlay.json` and `slang-package-includes.txt` must not be committed. A team-wide
   source relationship belongs in

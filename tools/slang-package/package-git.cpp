@@ -130,7 +130,7 @@ static SlangResult _parseReleaseTagLines(
         bool isPeeled = reference.endsWith("^{}");
         UnownedStringSlice tagSlice =
             isPeeled ? reference.head(reference.getLength() - 3) : reference;
-        SemanticVersion version;
+        PackageVersion version;
         if (SLANG_FAILED(parseReleaseTag(tagSlice, version)))
             continue;
 
@@ -464,7 +464,7 @@ SlangResult resolveLocalRevision(
 SlangResult findVersionTagAtHead(
     const String& repositoryPath,
     String& outTag,
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     bool& outFound,
     String& outError)
 {
@@ -480,12 +480,12 @@ SlangResult findVersionTagAtHead(
     for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
     {
         String tag = line.trim();
-        SemanticVersion version;
+        PackageVersion version;
         if (!tag.getLength() || SLANG_FAILED(parseReleaseTag(tag, version)))
             continue;
         if (outFound)
         {
-            outError = "HEAD has multiple semantic-version tags; pass --as explicitly.";
+            outError = "HEAD has multiple release-version tags; pass --as explicitly.";
             return SLANG_FAIL;
         }
         outFound = true;
@@ -499,7 +499,7 @@ SlangResult findNearestReleaseTag(
     const String& repositoryPath,
     const String& commit,
     String& outTag,
-    SemanticVersion& outVersion,
+    PackageVersion& outVersion,
     bool& outFound,
     String& outError)
 {
@@ -513,14 +513,14 @@ SlangResult findNearestReleaseTag(
     SLANG_RETURN_ON_FAIL(_runGit(repositoryPath, arguments, result, outError));
 
     String nearestTag;
-    SemanticVersion nearestVersion;
+    PackageVersion nearestVersion;
     Int nearestDistance = 0;
     bool haveNearest = false;
     bool nearestTied = false;
     for (auto line : LineParser(result.standardOutput.getUnownedSlice()))
     {
         String tag = line.trim();
-        SemanticVersion version;
+        PackageVersion version;
         if (!tag.getLength() || SLANG_FAILED(parseReleaseTag(tag, version)))
             continue;
 

@@ -139,7 +139,7 @@ public:
         const String& packageName,
         const String& git,
         const String& commit,
-        SemanticVersion& outVersion,
+        PackageVersion& outVersion,
         String& outError) override
     {
         String repositoryPath;
@@ -237,7 +237,7 @@ public:
             return gitSource.resolveReference(packageName, git, ref, outCandidate, outError);
 
         const LocalPackage& localPackage = (*localPackages)[localIndex];
-        SemanticVersion version;
+        PackageVersion version;
         SLANG_RETURN_ON_FAIL(parseExactVersion(localPackage.as, version, outError));
         outCandidate = TagCandidate();
         outCandidate.path = localPackage.path;
@@ -250,7 +250,7 @@ public:
         const String& packageName,
         const String& git,
         const String& commit,
-        SemanticVersion& outVersion,
+        PackageVersion& outVersion,
         String& outError) override
     {
         Index localIndex = findActiveLocalPackageIndex(*localPackages, packageName);
@@ -320,7 +320,7 @@ public:
 /// transitives that existed only because of that pin must be pruned. Path packages are selected
 /// immediately; Git packages are searched by release tag or resolved from one pinned ref.
 /// `ownerKey` records which selected representation added each Git requirement so a later path
-/// selection can retract it. Every candidate has one effective semantic version, including paths
+/// selection can retract it. Every candidate has one effective release version, including paths
 /// and local overrides, so all incoming version constraints use the same matching path.
 class Resolver
 {
@@ -397,7 +397,7 @@ public:
             report->toolchainConstraints = toolchainConstraints;
             if (toolchainConstraints.getCount())
             {
-                SemanticVersion installed;
+                PackageVersion installed;
                 String installedText;
                 String toolchainError;
                 if (SLANG_SUCCEEDED(getInstalledSlangToolchainVersion(
@@ -448,7 +448,7 @@ private:
         }
     }
 
-    bool matchesAll(const ResolutionPackage& package, const SemanticVersion& version) const
+    bool matchesAll(const ResolutionPackage& package, const PackageVersion& version) const
     {
         for (const auto& requirement : package.gitRequirements)
         {
@@ -463,7 +463,7 @@ private:
         const ResolutionPackage& package,
         String& outRef,
         String& outAs,
-        SemanticVersion& outVersion) const
+        PackageVersion& outVersion) const
     {
         for (const auto& requirement : package.gitRequirements)
         {
@@ -477,13 +477,13 @@ private:
                 SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(parseExactVersion(outAs, outVersion, error)));
             }
             else
-                outVersion = SemanticVersion();
+                outVersion = PackageVersion();
             return true;
         }
         return false;
     }
 
-    const Exclusion* findExclusion(const String& packageName, const SemanticVersion& version) const
+    const Exclusion* findExclusion(const String& packageName, const PackageVersion& version) const
     {
         for (const auto& exclusion : rootManifest->workspace.exclusions)
         {
@@ -498,7 +498,7 @@ private:
 
     static const Retraction* findRetraction(
         const List<Retraction>& retractions,
-        const SemanticVersion& version)
+        const PackageVersion& version)
     {
         for (const auto& retraction : retractions)
         {
@@ -856,7 +856,7 @@ private:
                 String("Package '") + dependency.name + "' is required from more than one path.";
             return SLANG_FAIL;
         }
-        SemanticVersion pathVersion;
+        PackageVersion pathVersion;
         SLANG_RETURN_ON_FAIL(parseExactVersion(dependency.as, pathVersion, outError));
         if (package.canonicalPath == canonicalPath && package.locked.path.getLength())
         {
@@ -884,7 +884,7 @@ private:
         }
         String pinnedRef;
         String pinnedAs;
-        SemanticVersion pinnedVersion;
+        PackageVersion pinnedVersion;
         if (getPinnedIdentity(package, pinnedRef, pinnedAs, pinnedVersion) &&
             pinnedAs.getLength() && pinnedVersion != pathVersion)
         {
@@ -1018,7 +1018,7 @@ private:
             addWarning(
                 String("Path dependency '") + dependency.name + "' shadows a Git dependency from " +
                 dependency.git + ".");
-            SemanticVersion selectedVersion;
+            PackageVersion selectedVersion;
             SLANG_RETURN_ON_FAIL(
                 parseExactVersion(package.locked.version, selectedVersion, outError));
             if (constraint.clauses.getCount() && !constraint.matches(selectedVersion))
@@ -1043,7 +1043,7 @@ private:
             addGitRequirement(package, dependency, declaringManifest, constraint, outError));
         if (package.selected)
         {
-            SemanticVersion selectedVersion;
+            PackageVersion selectedVersion;
             SLANG_RETURN_ON_FAIL(
                 parseExactVersion(package.locked.version, selectedVersion, outError));
             if (constraint.clauses.getCount() && !constraint.matches(selectedVersion))
@@ -1089,7 +1089,7 @@ private:
     /// identifies one failed member of that same constraint set for the diagnostic.
     String describeConstraintRejection(
         const ResolutionPackage& package,
-        const SemanticVersion& version)
+        const PackageVersion& version)
     {
         for (const auto& note : package.constraintNotes)
         {
@@ -1129,7 +1129,7 @@ private:
         List<Retraction> retractions;
         String pinnedRef;
         String pinnedAs;
-        SemanticVersion pinnedVersion;
+        PackageVersion pinnedVersion;
         if (getPinnedIdentity(unresolved, pinnedRef, pinnedAs, pinnedVersion))
         {
             TagCandidate candidate;

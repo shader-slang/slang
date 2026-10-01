@@ -159,11 +159,15 @@ to skip one known-bad compiler version without inventing an upper bound, for exa
 Later schemas may add other system tools, or split Slang into separately versioned components if
 distributions start shipping them independently. Unknown `tools` keys are errors today.
 
-Ordinary dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package
-publishers must treat as immutable. A manifest may instead pin an opaque branch or tag with `ref`
-and omit `as` to derive the solver identity from the nearest release tag on that line, or write
-`as` to assign it explicitly. `schema_version` in `slang-package.json` is only the file
-format version. For a Git package the lock records the resolved ref, exact semantic version, and
+Ordinary dependency versions come from Git tags named `v` followed by one or more decimal
+components, such as `v1.2.3` or `v2026.10.1.4`. Publishers must treat those tags as immutable.
+Comparison is numeric from left to right, and a shorter sequence comes before the same sequence
+with more components, so `1.2.3 < 1.2.3.0 < 1.2.3.1 < 1.2.4`. `1.2.3` and `1.2.3.0` are different
+releases. These are dotted release identifiers, not Semantic Version values, and a component must
+fit in 32 bits. At most 32 components are accepted. A manifest may instead pin an opaque branch or
+tag with `ref` and omit `as` to derive the solver identity from the nearest release tag on that
+line, or write `as` to assign it explicitly. `schema_version` in `slang-package.json` is only the
+file format version. For a Git package the lock records the resolved ref, exact version, and
 commit; a path package has no ref or commit to record, so its row carries the path and the `as`
 version.
 
@@ -188,23 +192,25 @@ workspace exclusions apply only to remote Git selections.
 
 Each dependency entry has one of three shapes, matching `slang package dependency add`:
 
-- `git` plus `version` selects the highest compatible `vMAJOR.MINOR.PATCH` release tag.
-- `path` plus `as` uses one relative tree as the exact semantic version named by `as`.
+- `git` plus `version` selects the highest compatible dotted release tag.
+- `path` plus `as` uses one relative tree as the exact version named by `as`.
 - `git`, `ref`, and optional `as` pins an opaque branch, tag, or full 40-character commit ID.
-  Omit `as` to derive the exact solver version from the nearest `vMAJOR.MINOR.PATCH` tag
+  Omit `as` to derive the exact solver version from the nearest release tag
   reachable from that commit. Write `as` to claim a different identity.
 
 `git` may be a URL or a local Git repository path. A `version` is one or more clauses joined by
 `||`. Each clause is a space-separated intersection of `>`, `>=`, `<`, `<=`, `!=`, `^`, and `~`
-constraints, or a single exact version. `^1.2.3` means `>=1.2.3 <2.0.0`, while `^0.2.3` means
-`>=0.2.3 <0.3.0` and `^0.0.3` means `>=0.0.3 <0.0.4`. A missing component stays flexible, so
-`^1.2` means `>=1.2.0 <2.0.0`, `^0.0` means `>=0.0.0 <0.1.0`, and `^0` means `>=0.0.0 <1.0.0`.
-`~1.2.3` means `>=1.2.3 <1.3.0`, `~1.2` means `>=1.2.0 <1.3.0`, and `~1` means
-`>=1.0.0 <2.0.0`. For example, `^1.2 !=1.5.0` accepts later 1.x releases except 1.5.0, and
-`~1.2.3 || ^2` accepts either alternative. Dependents still unify one version per
-package name: every incoming constraint must match that version. Both `version` and `as` omit the
-release tag's `v` prefix. A bare version and `as` still require all three components, so `1.2.3`
-matches only that release and `1.2` is not a version. `ref` is a branch, tag, or full
+constraints, or a single exact version. `^` increments the leftmost non-zero component, or the
+last component when every written component is zero, and drops the components after it. `^1.2.3`
+means `>=1.2.3 <2`, `^0.2.3` means `>=0.2.3 <0.3`, `^0.0.3` means `>=0.0.3 <0.0.4`, `^0.0` means
+`>=0.0 <0.1`, and `^0.0.0.4` means `>=0.0.0.4 <0.0.0.5`. `~` increments the second component when
+at least two are written, and the only component otherwise: `~1.2.3` means `>=1.2.3 <1.3`,
+`~1.2.3.4` means `>=1.2.3.4 <1.3`, and `~1` means `>=1 <2`. For example, `^1.2 !=1.5.0` accepts
+later 1.x releases except 1.5.0, and `~1.2.3 || ^2` accepts either alternative. Dependents still
+unify one version per package name: every incoming constraint must match that version. Both
+`version` and `as` omit the release tag's `v` prefix. A bare version matches only the sequence
+that was written, so `1.2.3` does not match `1.2.3.0`. Because a shorter sequence sorts first, a
+written upper bound such as `<2.0.0` also matches `2` and `2.0`. `ref` is a branch, tag, or full
 40-character commit ID; the lock always records the exact commit.
 
 A dependency `path` must be relative to the manifest that declares it and must be paired with an
@@ -400,7 +406,7 @@ Use `slang package dependency add` and `dependency remove` to edit direct manife
 `dependency list` to inspect them. Add accepts exactly one source shape:
 `--git URL --version RANGE`, `--git URL --ref REF [--as VERSION]`, or
 `--path PATH --as VERSION`. `dependency pin NAME` rewrites a Git edge from the current lock:
-default writes that lock's exact `version`, `--to MAJOR.MINOR.PATCH` writes a different exact
+default writes that lock's exact `version`, `--to VERSION` writes a different exact
 version, and `--commit` writes `ref` plus `as` from the locked SHA. A transitive Git package is
 promoted to a direct edge. Pinning leaves an active overlay registered. When the lock row already
 selects that overlay, pass `--to` explicitly because its effective version need not be a published
@@ -447,7 +453,7 @@ Plain `unedit NAME` requires a Git-only lock row and a clean checkout at that lo
 manifest and lock, replacing its version range with canonical `ref` plus `as`
 intent. `--ref` keeps following that branch or tag; without it, `HEAD` is frozen as a
 commit (or as a unique release tag that points at `HEAD`). Omit `--as` to derive the
-version from the nearest `vMAJOR.MINOR.PATCH` tag reachable from `HEAD`. An untagged
+version from the nearest release tag reachable from `HEAD`. An untagged
 history with no ancestor release tag requires `--as`. Adoption does not copy the commit into
 `.slang/cache`; push it to the package origin before expecting upstream validation or a fresh
 checkout to succeed. Clean and adopt ask for confirmation unless `--yes` is passed.
@@ -475,7 +481,7 @@ For example, the generated local-state file may contain:
 Use the package commands to change this file; its schema is tool-owned and may evolve.
 
 `slang package override add NAME PATH [AS]` uses an existing local package directory instead. `AS`
-is an exact semantic version for solver compatibility. When it is omitted, the command uses the
+is an exact dotted version for solver compatibility. When it is omitted, the command uses the
 version in the package's current lock row. If `NAME` is already edited and `PATH` is that
 workspace checkout, the command updates the same in-place registration. `override enable`,
 `override disable`, `override remove`, and `override list` retain or inspect the same registration.

@@ -90,7 +90,7 @@ add NAME --git URL --version RANGE`. To pin a branch, tag, or full 40-character 
 Omit `--as` to derive that version from the nearest release tag in the pin's history.
 Path dependencies use `--path PATH --as VERSION`. After a lock exists,
 `slang package dependency pin NAME` copies that selection into a direct Git exact-version edge.
-`--to MAJOR.MINOR.PATCH` writes a different exact version. `--commit` writes the locked SHA as
+`--to VERSION` writes a different exact version. `--commit` writes the locked SHA as
 `ref`; it requires a Git-only lock row because an overlay lock row has no locked SHA. Pin leaves an
 active overlay registered, but once the lock selects that overlay, pass `--to` explicitly because
 its effective version need not be published in Git. The lock records selection identity: the
@@ -282,7 +282,7 @@ commit. `unedit NAME --clean` discards local state and restores that commit; pas
 confirmation cannot be interactive. To keep a committed fix, use
 `unedit NAME --adopt [--ref REF] [--as VERSION]`: this pins the direct dependency in the manifest and writes a
 Git-only lock at `HEAD`. `--ref` keeps following that branch or tag; without it, `HEAD` is frozen.
-Omit `--as` to derive the version from the nearest `vMAJOR.MINOR.PATCH` tag reachable from `HEAD`.
+Omit `--as` to derive the version from the nearest release tag reachable from `HEAD`.
 
 `slang package override add NAME PATH [AS]` points the package at a directory you already have.
 `PATH=deps/NAME` updates the same in-place registration created by `edit`; another path creates an
