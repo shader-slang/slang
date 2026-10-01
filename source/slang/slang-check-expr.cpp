@@ -9069,10 +9069,10 @@ void SemanticsVisitor::maybeSuggestMissingGenericConstraintForMemberLookup(
 
     // A constraint is written on the generic declaration that owns the parameter, so we only
     // suggest an interface whose unqualified name resolves to it from there. Consider
-    // `float3 read<IHasNormal, T>(T value) { return value.normal; }`: the interface `IHasNormal`
-    // declares `normal`, but inside `read` that name means the first generic parameter, so
-    // suggesting `where T : IHasNormal` would not help. The same check drops a candidate whose name
-    // is shared with another visible interface.
+    // `float3 read<IHasNormal, T>(T value) { return value.getNormal(); }`: the interface
+    // `IHasNormal` declares `getNormal`, but inside `read` that name means the first generic
+    // parameter, so suggesting `where T : IHasNormal` would not help. The same check drops a
+    // candidate whose name is shared with another visible interface.
     Scope* constraintScope = getScope(genericParamDeclRef.getDecl());
     List<Decl*> interfaces;
     for (auto candidate : candidates)
