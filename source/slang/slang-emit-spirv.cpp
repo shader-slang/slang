@@ -5364,15 +5364,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
                 for (IRFunc* entryPoint : *entryPointsUsingInst)
                 {
-                    bool isQuad = true;
-                    IREntryPointDecoration* entryPointDecor = nullptr;
-                    for (auto dec : entryPoint->getDecorations())
-                    {
-                        if (auto maybeEntryPointDecor = as<IREntryPointDecoration>(dec))
-                            entryPointDecor = maybeEntryPointDecor;
-                        if (as<IRDerivativeGroupLinearDecoration>(dec))
-                            isQuad = false;
-                    }
+                    auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
                     if (!entryPointDecor ||
                         entryPointDecor->getProfile().getStage() != Stage::Compute)
                         continue;
@@ -5380,7 +5372,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
                     auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-                    if (isQuad)
+                    if (shouldUseQuadDerivativeGroup(entryPoint))
                     {
                         verifyComputeDerivativeGroupModifiers(
                             this->m_sink,
