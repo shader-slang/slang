@@ -73,6 +73,22 @@ bindings across launches. Then qualify triangle hit/miss with payload transport,
 representative material. Keep stage/ABI ownership explicit and use typed OptiX operations or genuine
 primitive calls; do not restore CUDA-text recognition. Advanced OptiX features follow actual demand.
 
+## Optional application validation with slang-rhi
+
+The sibling `../slang-rhi` checkout is an additional application test source. Rebuild it against
+this local Slang compiler before use; preserve its existing build and use a separate CUDA/OptiX
+configuration. [RESULTS](RESULTS.md#optional-slang-rhi-cuda-suite) owns the commands. The suite is
+**on demand**, not part of every iteration or the automatic working-corpus cadence. Qualify setup
+with a small selection before deliberately running the broader suite.
+
+Use explicit NVVM and selected NVRTC comparison runs. The RHI test selector covers its shared
+CUDA test-device and availability paths; custom devices/sessions and internal direct NVRTC kernels
+retain their own compiler choices. Record those limits, actual executed tests, skips and failures.
+Require CUDA availability so a missing device/compiler cannot produce a misleading pass. Group
+new failures by compiler representation/operation, RHI binding/harness or external runtime cause;
+use application relevance to choose bounded next slices. Do not weaken RHI assertions or silently
+add its results to the accepted Slang corpus. Full suite runs remain separately requested milestones.
+
 ## Fast validation by default
 
 Choose the smallest checks that establish the batch's actual contracts:

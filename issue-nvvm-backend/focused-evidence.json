@@ -84682,6 +84682,283 @@
         "last_full_unchanged": true,
         "meaning": "Working-tier integration does not replace the accepted full checkpoint."
       }
+    },
+    "nvvm-rhi-cuda-workflow": {
+      "status": "accepted-focused",
+      "scope": "Optional on-demand sibling RHI CUDA compiler selection with bounded compute, resource and raygen controls; full RHI suite and NVVM triangle remain unqualified.",
+      "identity": {
+        "repository_revision_at_record": "25ac69e55dba3026863401e0f7aa82fb29d927ec",
+        "slang_build_identity": {
+          "path": "build/nvvm-working-corpus/repair-identity.json",
+          "sha256": "aef3a68ee6e2bb6e374a50cae2da8ffd3039fdbf0777d331f85d6c21838b1a6b"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "ae57d78c8908efa7b8bd13eb7bac9232d8789d554881b507d40df1a39c547d52",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9bb095303845b795c9fbade9ce674cb8d869dae103331535788a2b3ea4298fba",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "fc4a698273b05de7026f8de5ee6d023fe39e031a64f375d8c40d7c1e4f2460a5",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "addc67f6f1754d30bc7b0c4ba5913ad66d9581387eacf74d4507662241ccf055"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "rhi_target_policy": "DeviceImpl selects SLANG_PTX with null profile and actual CUDA device capabilities; no RHI PTX target inspection or SM80 claim. The nested repair identity retains its original qualification context.",
+        "sibling": {
+          "repository": "/home/skallweit/codex/agent-sandbox/slang-rhi",
+          "base_revision": "0bd799a7c04ea7dc5597ff811fb08fdb1b6fab43",
+          "accepted_commit": "318c25881fbe15e07aaa8056032fa62e776bcabb",
+          "branch": "nvvm-cuda-workflow",
+          "patch": {
+            "path": "build/nvvm-rhi-cuda/selector.patch",
+            "sha256": "434924cd43b74170131fe5a796c9c5657a9cd808560b6a88e5831c02ad87ee41"
+          },
+          "source_sha256": {
+            "CMakeLists.txt": "f2239d90453317f4b5e83d3a65cb9ffff9636d1ef316dd868f3c9dfa3ac1dd1f",
+            "README.md": "b69c8506889d8480fe5b5795cd1cf81504ebc189d4d44000440d6108c2fb7d43",
+            "tests/main.cpp": "a512360e118a744d2d3b303237ca73059262730f53711edeea2fb2e778ece6b2",
+            "tests/testing.h": "bc19205bf013c3419b462d847002ee82b39ebc541afe90398c31487258f30823",
+            "tests/testing.cpp": "c0bd95ab17fcfd6cfa554f1eaaccaac13f6298aa78f2b778f3355b4d54c129e3"
+          },
+          "source_map": {
+            "path": "build/nvvm-rhi-cuda/selector-source.json",
+            "sha256": "aa0e8487169299944887b0bbf9af6ca69499c4d9e3fcf37f3f6812789f4678b1"
+          }
+        },
+        "rhi_runtime": {
+          "executable": {
+            "path": "build/nvvm-rhi-cuda/rhi-build/RelWithDebInfo/slang-rhi-tests",
+            "sha256": "981eff12a0aa7d26ba40b9440082bbdfda86e1881f71d05a0f88ee454e305f94"
+          },
+          "configuration": {
+            "path": "build/nvvm-rhi-cuda/rhi-build/CMakeCache.txt",
+            "sha256": "952846509ea2e460599020d4464c260d941f4d8ae52c872665b0315bf4fd3c24"
+          }
+        },
+        "observed_loaded_libraries": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3": {
+            "resolved_path": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/lib/libslang-compiler.so.0.2026.18.3",
+            "sha256": "ae57d78c8908efa7b8bd13eb7bac9232d8789d554881b507d40df1a39c547d52"
+          },
+          "/lib/x86_64-linux-gnu/libcuda.so.1": {
+            "resolved_path": "/usr/lib/x86_64-linux-gnu/libcuda.so.595.71.05",
+            "sha256": "76e0d9678d41cf6b6ae71d18549d88a963d3d434f08108baa12457eb53ca88d6"
+          },
+          "/usr/local/cuda-12.9/lib64/libnvrtc.so": {
+            "resolved_path": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc.so.12.9.86",
+            "sha256": "c3430e8b6b0d8d3a74f5f839118a85e13e3ad6e4d6203ea1b6a27a0c0b4fe10a"
+          },
+          "/usr/local/cuda-12.9/lib64/libnvrtc-builtins.so.12.9": {
+            "resolved_path": "/usr/local/cuda-12.9/targets/x86_64-linux/lib/libnvrtc-builtins.so.12.9.86",
+            "sha256": "6507cf33450cfb22970c2c1e7aa8e7c0a33e39d864720277b05f61a92791e2e8"
+          },
+          "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": {
+            "resolved_path": "/home/skallweit/codex/agent-sandbox/slang/build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+            "sha256": "9bb095303845b795c9fbade9ce674cb8d869dae103331535788a2b3ea4298fba"
+          },
+          "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so": {
+            "resolved_path": "/usr/local/cuda-12.9/nvvm/lib64/libnvvm.so.4.0.0",
+            "sha256": "7915b9e3eaed7f686774ee82f99cfacebaefcd00296f44bdb979e57d363a7ca8"
+          }
+        },
+        "loader_log": {
+          "path": "build/nvvm-rhi-cuda/nvvm-focused-final.log",
+          "sha256": "bfba91d9e37587620e292504c61f26056cad54e589458fae0154a9f694920ecb"
+        },
+        "meaning": "Final gates preceded commits; source and runtime hashes match the accepted sibling selector and Slang BF16 repair. Repository commit is not a relabeled configured compiler version."
+      },
+      "contract": {
+        "selector": "--cuda-compiler=nvvm|nvrtc; absent preserves default",
+        "header_gate": "Compile-check named EmitCUDAMethod and SLANG_EMIT_CUDA_VIA_NVVM/NVRTC against the selected headers.",
+        "runtime_gate": "Canonical ICompileRequest::processCommandLineArguments rejects unsupported old runtimes before test execution.",
+        "forwarded_option": "Exactly one named EmitCUDAMethod integer option; do not forward parser-generated defaults.",
+        "application": "Shared CUDA availability and createTestingDevice paths only."
+      },
+      "validation": {
+        "final_outcomes": {
+          "nvvm-focused-final": {
+            "gate": {
+              "path": "build/nvvm-rhi-cuda/nvvm-focused-final.json",
+              "sha256": "d420be76f106b9cd53691e9bb5357d2941f6366a113d53f24b0a93304df80969"
+            },
+            "selected_cases": [
+              "compute-trivial.cuda",
+              "uint16-structured-buffer.cuda",
+              "ray-tracing-raygen-entrypoint-resources.cuda",
+              "ray-tracing-raygen-entrypoint.cuda"
+            ],
+            "passed_cases": 4,
+            "failed_cases": 0,
+            "passed_assertions": 82,
+            "selected_capability_skips": 0,
+            "filtered_out_cases_reported_by_doctest": 921,
+            "elapsed_seconds": 1.7512001991271973
+          },
+          "nvrtc-focused-final": {
+            "gate": {
+              "path": "build/nvvm-rhi-cuda/nvrtc-focused-final.json",
+              "sha256": "e6434eb3dc82cdc1c9669cec0e7d2301e84206fe87258d73c53c4b21f3dc4f86"
+            },
+            "selected_cases": [
+              "compute-trivial.cuda",
+              "uint16-structured-buffer.cuda",
+              "ray-tracing-raygen-entrypoint-resources.cuda",
+              "ray-tracing-raygen-entrypoint.cuda",
+              "ray-tracing-triangle-intersection.cuda"
+            ],
+            "passed_cases": 5,
+            "failed_cases": 0,
+            "passed_assertions": 138,
+            "selected_capability_skips": 0,
+            "filtered_out_cases_reported_by_doctest": 920,
+            "elapsed_seconds": 3.0087013244628906
+          },
+          "default-final": {
+            "gate": {
+              "path": "build/nvvm-rhi-cuda/default-final.json",
+              "sha256": "59f5591e802d4c89da3164a9b5a924a4d248e79a1d656849a71bad09303fdc14"
+            },
+            "selected_cases": ["compute-trivial.cuda"],
+            "passed_cases": 1,
+            "failed_cases": 0,
+            "passed_assertions": 16,
+            "selected_capability_skips": 0,
+            "filtered_out_cases_reported_by_doctest": 924,
+            "elapsed_seconds": 1.5259461402893066
+          }
+        },
+        "negative_controls": {
+          "cli-negative-final": {
+            "record": {
+              "path": "build/nvvm-rhi-cuda/cli-negative-final.json",
+              "sha256": "bcd3e0c537faada0eac76607b42f5dbe979f5b72c56663d7eb343784bfbc1f69"
+            },
+            "expected_rejections": 3
+          },
+          "old-request-parser": {
+            "record": {
+              "path": "build/nvvm-rhi-cuda/old-request-parser.json",
+              "sha256": "a8e80d301a11b21eb7ac0b923582f1dec1ca8a7ab0f3b5f3c29de15e8d397496"
+            },
+            "expected_rejections": 2
+          }
+        },
+        "selector_configuration": {
+          "path": "build/nvvm-rhi-cuda/reconfigure-selector.json",
+          "sha256": "5132d7c28b0a95cd4261bf1fea74333d6bdd7ccc5f34d671c7cf9ae8c85395ae"
+        },
+        "selector_build": {
+          "path": "build/nvvm-rhi-cuda/build-selector.json",
+          "sha256": "2cac0d2927c088892b530ceca4216e6e6b20afa85f2f6d3e8a873d3d7e22c7d5"
+        },
+        "header_compatibility": {
+          "configure": {
+            "path": "build/nvvm-rhi-cuda/old-header-configure.json",
+            "sha256": "ac0bacbaa32dd5ffb586c7154b552c467dac378133bbff960e96ebd22c5491ae"
+          },
+          "old_cache": {
+            "path": "build/nvvm-rhi-cuda/old-header-check/CMakeCache.txt",
+            "sha256": "f1e2a4cbd5be29cfb9e8412b28191753ec96c9d14bb954f1ef397367fc5a5117"
+          },
+          "current_cache": {
+            "path": "build/nvvm-rhi-cuda/rhi-build/CMakeCache.txt",
+            "sha256": "952846509ea2e460599020d4464c260d941f4d8ae52c872665b0315bf4fd3c24"
+          },
+          "old_header_selection_available": false,
+          "current_header_selection_available": true,
+          "old_header_full_build_performed": false
+        },
+        "cuda_inventory": {
+          "gate": {
+            "path": "build/nvvm-rhi-cuda/list-cuda.json",
+            "sha256": "fb23c3a939f7c3b5cc95f2d3c0cb2377767d5a53342116119e0bc372d64249a8"
+          },
+          "listed_registered_cases": 262,
+          "unique_case_names": 261,
+          "duplicate_name": "cmd-copy-texture-offset-mip1.cuda",
+          "executed_cases": 0
+        }
+      },
+      "unresolved_failures": [
+        {
+          "case": "ray-tracing-triangle-intersection.cuda",
+          "backend": "nvvm",
+          "classification": "backend-preflight",
+          "diagnostic": "E52017",
+          "shape": "struct field address result: Ptr<vector<uint,2>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>",
+          "before": {
+            "path": "build/nvvm-rhi-cuda/nvvm-triangle-before.json",
+            "sha256": "3240b3b7bf8295c6f441cbaa570857362c9423142ec04a6e89afe4c7e521f86d"
+          },
+          "final": {
+            "path": "build/nvvm-rhi-cuda/nvvm-triangle-final.json",
+            "sha256": "698592836d4340fab4c9e30136b8a204fc1d6a94bb0c0d8779b69734c97f80b9"
+          },
+          "analysis": {
+            "path": "build/nvvm-rhi-cuda/triangle-admission-review.md",
+            "sha256": "cfc54617b595952ffdce2e7f86ddfff5d9799fcc3e7675cbf313886c3355b424"
+          },
+          "status": "unresolved",
+          "comparison": "The same triangle case passes in the five-case NVRTC final selection."
+        }
+      ],
+      "resolved_failure_history": [
+        {
+          "problem": "Convenience command-line parser returned success with 16 option entries on old runtime instead of rejecting the unknown NVVM selector.",
+          "initial_log": {
+            "path": "build/nvvm-rhi-cuda/old-parser-nvvm.log",
+            "sha256": "cb8c1f69956ecb8c66c1985fa2eb9274b811cb98965b42d4cb48c622a86eaa15"
+          },
+          "initial_source": {
+            "path": "build/nvvm-rhi-cuda/selector-initial-source.json",
+            "sha256": "af10100b559ac8dcfef4a11bb56d5ee041cb16e4b20071af4c88b05bd37c11d8"
+          },
+          "initial_patch": {
+            "path": "build/nvvm-rhi-cuda/selector-initial.patch",
+            "sha256": "38ac0dcc184b3cd5bdd59f8b11fff46f120f503bdca2c73e92b48962de8a9f30"
+          },
+          "resolution": "Use canonical compile-request parsing for runtime support, named CMake compile check for header support, and construct exactly one requested option.",
+          "verification": {
+            "path": "build/nvvm-rhi-cuda/old-request-parser.json",
+            "sha256": "a8e80d301a11b21eb7ac0b923582f1dec1ca8a7ab0f3b5f3c29de15e8d397496"
+          }
+        }
+      ],
+      "superseded_validation": {
+        "meaning": "Initial positive gates used the initial selector and earlier material compiler identity; they are historical, not fresh final-identity qualification.",
+        "identity": {
+          "path": "build/nvvm-optix-material/identity.json",
+          "sha256": "79168a1138f37bdc4e565b77d104182c784d9b2a9080eef41cf433160911770a"
+        },
+        "gates": [
+          {
+            "path": "build/nvvm-rhi-cuda/nvvm-focused.json",
+            "sha256": "27793ad3366d481f7ef8a00b42abd25176c9d9b41e659feb2e27930465af56f5"
+          },
+          {
+            "path": "build/nvvm-rhi-cuda/nvrtc-focused.json",
+            "sha256": "6b84a79cb7fb4a7bc0f83596417399fd69d3e4566ed2fec617ebeb6031dcec46"
+          }
+        ]
+      },
+      "limitations": [
+        "On-demand workflow only; the 262-case inventory is listing evidence, not suite acceptance.",
+        "Direct DeviceDesc/custom-session tests can bypass the shared selector. Internal CUDA clear kernels and standalone NVRTC remain NVRTC.",
+        "Doctest skipped totals are filtered-out cases; every selected positive case passed without capability skips.",
+        "NVVM triangle explicit-layout uint2 global-field rejection remains unresolved; later PrimitiveIndex support is not established.",
+        "No Slang compiler/provider change or full baseline/accepted-identity advancement in this workflow feature."
+      ]
     }
   }
 }

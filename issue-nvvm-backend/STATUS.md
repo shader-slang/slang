@@ -77,7 +77,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Twenty-four feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 69 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 70 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -183,13 +183,21 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-**Active work:** finish optional sibling `../slang-rhi` CUDA validation setup against this local
-Slang build, as requested by the maintainer. Preserve its existing `build-all`; the separate build
-is under `build/nvvm-rhi-cuda/rhi-build`. Full RHI runs are on demand, outside the automatic smoke/
-working cadence. The bounded triangle probe passes NVRTC but first rejects a conventional-global
-`uint2` field address in NVVM; `PrimitiveIndex` is another known missing operation behind it.
-Use those concrete application boundaries to select the next feature work after setup qualification.
-Smoke has passed after every implementation iteration. The prior full baseline retains its identity.
+The optional sibling RHI workflow is qualified in `build/nvvm-rhi-cuda/rhi-build`, linked to this
+local Slang compiler/provider. The selector is committed as `318c2588` on sibling branch
+`nvvm-cuda-workflow`; its existing `build-all` is unchanged. Four NVVM compute/raygen cases, five
+NVRTC controls and a default compute case pass. Three malformed selectors reject; old headers
+disable explicit selection and old-runtime probes reject unsupported flags. Library tracing verifies
+the local compiler/provider. The CUDA listing has262registrations (261unique names); the full suite has **not** run
+and remains on demand outside automatic smoke/working cadence. Custom device/session paths and
+internal direct NVRTC kernels retain their documented compiler owners.
+
+**Active work:** qualify conventional-global Int/UInt/Float32 vector fields (widths2/3/4) through
+existing checked address/storage conversions. The bounded RHI triangle probe passes NVRTC but first
+rejects its conventional-global `uint2` field address in NVVM. That ScalarLayout pointer is canonical;
+fix the owning field admission/conversion, not its spelling. `PrimitiveIndex` is another known
+missing operation behind this boundary. Smoke has passed after every implementation iteration;
+the working cadence restarted at the repaired checkpoint. The prior full baseline retains its identity.
 
 ## Retained boundaries
 

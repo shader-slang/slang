@@ -132,6 +132,57 @@ eight raw SDK helpers from compute and raygen to prove backend rejection before 
 Use compute smoke and raygen binding controls after this named-query batch. Unchanged triangle
 storage/type/IR contracts retain their earlier static evidence; no new static rebuild is needed.
 
+## Optional slang-rhi CUDA suite
+
+This is on-demand application validation. The prepared sibling checkout needs the test harness's
+`--cuda-compiler=nvvm|nvrtc` selector. Its existing `build-all` uses a downloaded compiler; keep that
+build intact. From the Slang repository root, configure a separate build against the local headers
+and package root (the directory containing `lib/` and `bin/`):
+
+```bash
+export RHI_SOURCE="$(realpath ../slang-rhi)"
+export RHI_BUILD="$PWD/build/nvvm-rhi-cuda/rhi-build"
+cmake -S "$RHI_SOURCE" -B "$RHI_BUILD" -G 'Ninja Multi-Config' \
+  -DSLANG_RHI_FETCH_SLANG=OFF \
+  -DSLANG_RHI_SLANG_INCLUDE_DIR="$PWD/include" \
+  -DSLANG_RHI_SLANG_BINARY_DIR="$PWD/build/RelWithDebInfo" \
+  -DSLANG_RHI_BUILD_TESTS=ON -DSLANG_RHI_BUILD_EXAMPLES=OFF \
+  -DSLANG_RHI_BUILD_TESTS_WITH_GLFW=OFF -DSLANG_RHI_ENABLE_CUDA=ON \
+  -DSLANG_RHI_ENABLE_OPTIX=ON -DSLANG_RHI_ENABLE_CPU=OFF \
+  -DSLANG_RHI_ENABLE_VULKAN=OFF -DSLANG_RHI_ENABLE_WGPU=OFF \
+  -DFETCHCONTENT_SOURCE_DIR_OPTIX_8_0="$RHI_SOURCE/build-all/_deps/optix_8_0-src" \
+  -DFETCHCONTENT_SOURCE_DIR_OPTIX_8_1="$RHI_SOURCE/build-all/_deps/optix_8_1-src" \
+  -DFETCHCONTENT_SOURCE_DIR_OPTIX_9_0="$RHI_SOURCE/build-all/_deps/optix_9_0-src"
+cmake --build "$RHI_BUILD" --config RelWithDebInfo --parallel 8 --target slang-rhi-tests
+```
+
+These dependency overrides reuse the prepared local OptiX headers; they do not install a toolkit
+or change the existing RHI build. RHI derives target capabilities from its CUDA device;
+`SLANG_NVVM_TEST_ARCH` controls Slang test tools and does not set the RHI shader target. Use the matching CUDA/provider/library environment from
+[Evidence and outputs](#evidence-and-outputs). Rebuild Slang first after compiler changes, then
+refresh this RHI target when its headers or sources change. Check `ldd` on the test executable and
+record both repository revisions/patches and actual compiler/provider/test-binary hashes.
+
+Qualify the setup with a bounded selection in separate processes:
+
+```bash
+"$RHI_BUILD/RelWithDebInfo/slang-rhi-tests" --select-devices=cuda --require-devices=cuda \
+  --cuda-compiler=nvvm --test-case=compute-trivial.cuda
+"$RHI_BUILD/RelWithDebInfo/slang-rhi-tests" --select-devices=cuda --require-devices=cuda \
+  --cuda-compiler=nvrtc --test-case=compute-trivial.cuda
+```
+
+Only when the broader suite is requested, run the same command with `--test-case='*.cuda'`.
+Keep NVVM and NVRTC logs separate, retain initial failures, and inspect executed/failed/skipped
+counts and individual diagnostics. A zero-test filter or skipped test is not runtime qualification.
+Use focused retries for investigated failures; do not rerun the entire suite after each fix.
+
+The compiler selector covers CUDA availability and the shared `createTestingDevice` path.
+Tests constructing custom devices or Slang sessions can bypass it, and RHI's internal CUDA clear
+kernels still use NVRTC directly. Therefore a CUDA suite run is not proof that every shader used
+NVVM. The standalone `nvrtc` test is also direct NVRTC and is outside the `*.cuda` filter. Keep
+these application results separate from Slang's accepted full baseline and tier admissions.
+
 ## Correctness baseline and comparison
 
 For an authorized migration after a host/driver change with unchanged verified compiler/toolkit
