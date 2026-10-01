@@ -137,6 +137,8 @@ static bool isUnaryArithmeticOp(VMOp op)
     case VMOp::Neg:
     case VMOp::Not:
     case VMOp::BitNot:
+    case VMOp::Sin:
+    case VMOp::Cos:
         return true;
     default:
         return false;

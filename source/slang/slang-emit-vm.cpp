@@ -663,6 +663,12 @@ public:
         case kIROp_Neq:
             opInfo.opcode = VMOp::Neq;
             break;
+        case kIROp_Sin:
+            opInfo.opcode = VMOp::Sin;
+            break;
+        case kIROp_Cos:
+            opInfo.opcode = VMOp::Cos;
+            break;
         default:
             SLANG_UNEXPECTED("Unsupported operation");
             break;
@@ -1277,6 +1283,20 @@ public:
                     operands.add(ensureInst(tuple));
                 }
                 writeInst(funcBuilder, VMOp::Print, 0, operands.getArrayView());
+            }
+            break;
+        case kIROp_Sin:
+        case kIROp_Cos:
+            {
+                auto result = ensureWorkingsetMemory(funcBuilder, inst);
+                auto opInfo = translateArithmeticOp(inst);
+
+                writeInst(
+                    funcBuilder,
+                    opInfo.opcode,
+                    getExtCode(inst->getDataType()),
+                    result,
+                    ensureInst(inst->getOperand(0)));                            
             }
             break;
         default:

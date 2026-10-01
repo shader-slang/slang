@@ -1615,6 +1615,9 @@ local insts = {
 			min_operands = 1,
 		},
 	},
+	-- math intrinsics
+	{ Sin = { operands = { { "value" } } } },
+	{ Cos = { operands = { { "value" } } } },
 	{ loopExitValue = { min_operands = 1 } },
 	{
 		ReportCheckpointStore = {

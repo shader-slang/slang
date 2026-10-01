@@ -373,6 +373,51 @@ VMExtFunction unaryArithmeticInstHandler(int elementCount)
 }
 
 template<typename Func>
+VMExtFunction unaryArithmeticInstHandler(uint32_t extCode)
+{
+    ArithmeticExtCode arithExtCode;
+    memcpy(&arithExtCode, &extCode, sizeof(arithExtCode));
+    switch (arithExtCode.scalarType)
+    {
+    case kSlangByteCodeScalarTypeSignedInt:
+        switch (arithExtCode.scalarBitWidth)
+        {
+        case 0:
+            return unaryArithmeticInstHandler<Func, int8_t>(arithExtCode.vectorSize);
+        case 1:
+            return unaryArithmeticInstHandler<Func, int16_t>(arithExtCode.vectorSize);
+        case 2:
+            return unaryArithmeticInstHandler<Func, int32_t>(arithExtCode.vectorSize);
+        case 3:
+            return unaryArithmeticInstHandler<Func, int64_t>(arithExtCode.vectorSize);
+        }
+    case kSlangByteCodeScalarTypeUnsignedInt:
+        switch (arithExtCode.scalarBitWidth)
+        {
+        case 0:
+            return unaryArithmeticInstHandler<Func, uint8_t>(arithExtCode.vectorSize);
+        case 1:
+            return unaryArithmeticInstHandler<Func, uint16_t>(arithExtCode.vectorSize);
+        case 2:
+            return unaryArithmeticInstHandler<Func, uint32_t>(arithExtCode.vectorSize);
+        case 3:
+            return unaryArithmeticInstHandler<Func, uint64_t>(arithExtCode.vectorSize);
+        }
+    case kSlangByteCodeScalarTypeFloat:
+        switch (arithExtCode.scalarBitWidth)
+        {
+        case 2:
+            return unaryArithmeticInstHandler<Func, float>(arithExtCode.vectorSize);
+        case 3:
+            return unaryArithmeticInstHandler<Func, double>(arithExtCode.vectorSize);
+        default:
+            return nullptr;
+        }
+    }
+    return nullptr;
+}
+
+template<typename Func>
 VMExtFunction unaryArithmeticLogicalInstHandler(uint32_t extCode)
 {
     ArithmeticExtCode arithExtCode;
@@ -1053,6 +1098,8 @@ void printHandler(IByteCodeRunner* inCtx, VMExecInstHeader* inst, void* userData
     ctx->m_printCallback(result.getBuffer(), ctx->m_printCallbackUserData);
 }
 
+SIMPLE_UNARY_SCALAR_FUNC(Sin, ::std::sin);
+SIMPLE_UNARY_SCALAR_FUNC(Cos, ::std::cos);
 
 VMExtFunction mapInstToFunction(
     VMInstHeader* instHeader,
@@ -1144,6 +1191,10 @@ VMExtFunction mapInstToFunction(
         }
     case VMOp::Print:
         return printHandler;
+    case VMOp::Sin:
+        return unaryArithmeticInstHandler<SinScalarFunc>(instHeader->opcodeExtension);
+    case VMOp::Cos:
+        return unaryArithmeticInstHandler<CosScalarFunc>(instHeader->opcodeExtension);
     }
     return VMExtFunction();
 }

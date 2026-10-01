@@ -202,6 +202,10 @@ CapabilitySet TargetRequest::getTargetCaps()
         atoms.add(CapabilityName::wgsl);
         break;
 
+    case CodeGenTarget::HostVM:
+        atoms.add(CapabilityName::slangvm);
+        break;
+
     default:
         break;
     }
