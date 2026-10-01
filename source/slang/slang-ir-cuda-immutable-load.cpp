@@ -100,8 +100,10 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     // A shader-record handle stored in a struct field, returned from a function or picked by a
     // `select` reaches its loads through a value that `isPointerToImmutableLocation` cannot trace
     // back to `GetOptiXSbtDataPtr`, so it would be judged immutable by its `ConstantBuffer` type.
-    // IR types are deduplicated, so any handle of one of these types may point into the SBT, and
-    // we keep its loads off the read-only cache (shader-slang/slang#10188).
+    // IR types are deduplicated, so any handle of one of these types anywhere in the module may
+    // point into the SBT, and we keep its loads off the read-only cache (shader-slang/slang#10188).
+    // The check is keyed by type, so an ordinary constant buffer that shares the record's type
+    // loses `__ldg` too.
     HashSet<IRType*> sbtRecordBufferTypes;
 
     bool mayPointIntoOptiXShaderBindingTable(IRInst* rootAddr)

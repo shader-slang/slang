@@ -2,6 +2,11 @@
 
 // Note: A significant portion of this code is taken and modified from
 // slang-ir-entry-point-uniforms.cpp
+//
+// On OptiX, a ray tracing program's shader binding table (SBT) data, returned by
+// `optixGetSbtDataPointer()`, can be declared two ways: as entry-point `uniform` parameters
+// (`collectOptiXEntryPointUniformParams`) or as a module-scope shader-record constant buffer
+// (`lowerShaderRecordGlobalParamsForOptiX`). Both lower to `GetOptiXSbtDataPtr`.
 
 #include "slang-ir-optix-entry-point-uniforms.h"
 
@@ -25,6 +30,7 @@ static IRInst* emitOptiXSbtDataPtrAtBodyStart(
     IRGlobalValueWithCode* code,
     IRType* sbtRecordPtrType)
 {
+    SLANG_ASSERT(code->getFirstBlock());
     builder.setInsertBefore(code->getFirstBlock()->getFirstOrdinaryInst());
     return builder.emitIntrinsicInst(sbtRecordPtrType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
 }
@@ -316,13 +322,26 @@ static void diagnoseShaderRecordUseOutsideRayTracingStages(
         else
         {
             SLANG_ASSERT(entryPoint->findDecoration<IRCudaKernelDecoration>());
-            if (auto nameHint = entryPoint->findDecoration<IRNameHintDecoration>())
+            auto nameHint = entryPoint->findDecoration<IRNameHintDecoration>();
+            SLANG_ASSERT(nameHint);
+            if (nameHint)
                 entryPointName = nameHint->getName();
         }
         sink->diagnose(Diagnostics::ShaderRecordOutsideRayTracingStage{
             .entryPoint = entryPointName,
             .location = getDiagnosticPos(param)});
     }
+}
+
+/// Return the function, or global-variable initializer, whose body contains `inst`.
+static IRGlobalValueWithCode* findEnclosingCode(IRInst* inst)
+{
+    for (auto parent = inst->getParent(); parent; parent = parent->getParent())
+    {
+        if (auto code = as<IRGlobalValueWithCode>(parent))
+            return code;
+    }
+    return nullptr;
 }
 
 /// Consider:
@@ -363,14 +382,13 @@ void lowerShaderRecordGlobalParamsForOptiX(IRModule* module, DiagnosticSink* sin
 
         // We rewrite the uses even after reporting an error, so the module stays well formed
         // until the compile fails. Every use is an instruction inside a function, or inside the
-        // initializer of a `__global` variable, which keeps its initializer.
+        // initializer of a `__global` variable, which keeps its initializer. The latter runs
+        // outside any OptiX program and is unsupported; NVRTC rejects every dynamic `__global`
+        // initializer.
         Dictionary<IRGlobalValueWithCode*, IRInst*> sbtRecordPtrPerBody;
         while (auto use = param->firstUse)
         {
-            IRGlobalValueWithCode* body = nullptr;
-            for (auto parent = use->getUser()->getParent(); parent && !body;
-                 parent = parent->getParent())
-                body = as<IRGlobalValueWithCode>(parent);
+            auto body = findEnclosingCode(use->getUser());
             SLANG_RELEASE_ASSERT(body);
 
             IRInst* sbtRecordPtr = nullptr;

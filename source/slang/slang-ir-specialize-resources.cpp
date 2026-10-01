@@ -47,15 +47,17 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
         // as a first-class type.
         //
         // TODO: This should not apply to CPU or CUDA, where
-        // `ConstantBuffer<T>` is just `T*`. Right now this
-        // optimization is not applying to those targets by
-        // coincidence (because the shader parameters are not
-        // globals, there is no way for the specialization to
-        // succeed), but eventually we should turn it off more
-        // carefully. The exception is a CUDA shader-record
-        // global, which stays a global until
-        // `lowerShaderRecordGlobalParamsForOptiX`; specializing
-        // it lets helpers read the OptiX SBT record directly.
+        // `ConstantBuffer<T>` is just `T*`. On those targets the
+        // ordinary shader parameters are not globals by now, so
+        // there is no way for the specialization to succeed, and
+        // eventually we should turn it off more carefully. A CUDA
+        // shader-record global is the one exception: it stays a
+        // global until `lowerShaderRecordGlobalParamsForOptiX`,
+        // and specializing a helper for it lets the helper read
+        // the OptiX SBT directly. That is an optimization, not a
+        // correctness requirement: an unspecialized helper still
+        // reads the SBT, and `lowerImmutableBufferLoadForCUDA`
+        // keeps that read off `__ldg`.
         //
         if (as<IRUniformParameterGroupType>(type))
             return true;

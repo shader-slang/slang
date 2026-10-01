@@ -2490,6 +2490,9 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Shader-record globals are lowered after `moveGlobalVarInitializationToEntryPoints` above,
+    // and before `lowerImmutableBufferLoadForCUDA`, which keeps loads through the resulting SBT
+    // handles off `__ldg`.
     if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
         SLANG_PASS(lowerShaderRecordGlobalParamsForOptiX, sink);
 

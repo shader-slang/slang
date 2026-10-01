@@ -6,6 +6,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target ptx -entry csMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry csMain -stage compute -DVIA_GENERIC
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry chsMain -stage closesthit -entry csMain -stage compute -DVIA_STATIC_INIT
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -DVIA_CUDA_KERNEL
 
 struct SbtData
 {
@@ -62,6 +63,15 @@ void chsMain(inout float4 payload, in BuiltInTriangleIntersectionAttributes attr
 void csMain()
 {
     gOut[0] = float4(1);
+}
+
+#elif defined(VIA_CUDA_KERNEL)
+
+// A `[CudaKernel]` function is an ordinary CUDA kernel, launched without an SBT record.
+[CudaKernel]
+void csMain()
+{
+    gOut[0] = gSbtRecordData.color;
 }
 
 #else

@@ -3,6 +3,8 @@
 //TEST:SIMPLE(filecheck=CBUF): -target cuda -entry rgMain -stage raygeneration -DUSE_CBUFFER
 //TEST:REFLECTION(filecheck=REFL): -target cuda -entry chsMain -stage closesthit -no-codegen
 //TEST:SIMPLE(filecheck=TWO): -target cuda -entry chsMain -stage closesthit -entry missMain -stage miss
+//TEST:REFLECTION(filecheck=CBUFREFL): -target cuda -entry rgMain -stage raygeneration -DUSE_CBUFFER -no-codegen
+//TEST:SIMPLE(filecheck=BOTH): -target cuda -entry rgBoth -stage raygeneration
 
 // Regression test for shader-slang/slang#12628: on CUDA/OptiX a shader-record global must be read
 // from the shader binding table (SBT) via `optixGetSbtDataPointer()`, the way SPIR-V reads it from
@@ -63,6 +65,21 @@
 //REFL: "binding": {"kind": "uniform", "offset": 16, "size": 4
 //REFL: {"kind": "uniform", "value": 32, "alignment": 16}
 
+// `gScale` moves to offset 0 of `GlobalParams`; host code that fills `GlobalParams` from
+// reflection depends on this.
+
+//REFL: "name": "gScale"
+//REFL-NEXT: "binding": {"kind": "uniform", "offset": 0, "size": 4
+
+//CBUFREFL: "name": "ShaderRecord"
+//CBUFREFL-NEXT: "binding": {"kind": "shaderRecord", "index": 0}
+//CBUFREFL: "name": "shaderRecordID"
+//CBUFREFL: "binding": {"kind": "uniform", "offset": 0, "size": 4
+//CBUFREFL: "name": "scale"
+//CBUFREFL: "binding": {"kind": "uniform", "offset": 4, "size": 4
+//CBUFREFL: "name": "gScale"
+//CBUFREFL-NEXT: "binding": {"kind": "uniform", "offset": 0, "size": 4
+
 // The `cbuffer` spelling of a shader record goes through the same path.
 
 //CBUF-NOT: __ldg
@@ -72,9 +89,21 @@
 //CBUF-NOT: ShaderRecord
 //CBUF: };
 //CBUF-NOT: __ldg
-//CBUF-DAG: optixGetSbtDataPointer())->shaderRecordID_0
-//CBUF-DAG: optixGetSbtDataPointer())->scale_0
+//CBUF: optixGetSbtDataPointer())->shaderRecordID_0
 //CBUF-NOT: __ldg
+//CBUF: optixGetSbtDataPointer())->scale_0
+//CBUF-NOT: __ldg
+
+// A ray generation program that reads both an entry-point `uniform` and the global reads two
+// views of the same SBT data, neither through `__ldg`.
+
+//BOTH-NOT: __ldg
+//BOTH: __raygen__rgBoth
+//BOTH-NOT: __ldg
+//BOTH: ((ShaderRecordParams_0*)optixGetSbtDataPointer())->value_0
+//BOTH-NOT: __ldg
+//BOTH: ((SbtData_0*)optixGetSbtDataPointer())->id_0
+//BOTH-NOT: __ldg
 
 struct SbtData
 {
@@ -127,6 +156,13 @@ void chsMain(inout float4 payload, in BuiltInTriangleIntersectionAttributes attr
 void missMain(inout float4 payload)
 {
     payload = readColor();
+}
+
+// Entry-point `uniform` parameters are read from the start of the same SBT data as the global.
+[shader("raygeneration")]
+void rgBoth(uniform uint value)
+{
+    gOut[0] = float4(float(value + gSbtRecordData.id));
 }
 
 #endif
