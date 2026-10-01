@@ -12,6 +12,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: OpImageRead
     // CHECK: OpCompositeInsert
     // CHECK: OpImageWrite
-    // CHECK-CUDA: CUsurfObject texture_0
+    // On CUDA the write needs a converting read from `rgba8`, which the CUDA prelude does not have.
+    // CHECK-CUDA: error[E55204]
+    // CHECK-CUDA: 'RWTexture partial texel write (surface read)' is not supported
     texture[dispatchThreadID.xy].a = h;
 }

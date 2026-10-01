@@ -755,10 +755,15 @@ protected:
     // Sort witnessTable entries according to the order defined in the witnessed interface type.
     List<IRWitnessTableEntry*> getSortedWitnessTableEntries(IRWitnessTable* witnessTable);
 
-    // Special handling for swizzleStore call, save the right-handside vector to a temporary
-    // variable first, then assign the corresponding elements to the left-handside vector one by
-    // one.
+    // Special handling for a swizzledStore or swizzleSet on a target without swizzle assignment:
+    // the right-handside vector is saved to a temporary variable first, then the corresponding
+    // elements are assigned to the left-handside vector one by one.
     void _emitSwizzleStorePerElement(IRInst* inst);
+
+    /// Return true if the target can assign to a multi-component swizzle such as `v.xy = ...`.
+    /// The C++, CUDA and WGSL vector types have no such l-value, so a swizzled assignment has to
+    /// be spelled one component at a time.
+    bool _doesTargetSupportSwizzleAssignment();
 
     String _emitLiteralOneWithType(int bitWidth);
 

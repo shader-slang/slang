@@ -12,9 +12,10 @@
 //CUDA: CUsurfObject outputTexture1D_{{[0-9]+}};
 //CUDA: CUsurfObject outputTexture2D_{{[0-9]+}};
 //CUDA: CUsurfObject outputTexture3D_{{[0-9]+}};
-//CUDA: globalParams_{{[0-9]+}}->outputTexture1D_{{[0-9]+}}[{{.*}}]
-//CUDA: globalParams_{{[0-9]+}}->outputTexture2D_{{[0-9]+}}[{{.*}}]
-//CUDA: globalParams_{{[0-9]+}}->outputTexture3D_{{[0-9]+}}[{{.*}}]
+//CUDA: surf1Dwrite<{{.*}}>
+//CUDA: surf2Dwrite<{{.*}}>
+//CUDA: surf3Dwrite<{{.*}}>
+//CUDA: surf2DLayeredwrite<{{.*}}>
 //CUDA: surf1Dread<{{.*}}>
 //CUDA: surf2Dread<{{.*}}>
 //CUDA: surf3Dread<{{.*}}>

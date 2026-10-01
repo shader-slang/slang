@@ -11,6 +11,60 @@
 
 namespace Slang
 {
+// A write to some of the components of a texel becomes a read-modify-write of the whole texel,
+// which is not atomic: a concurrent write by another thread to other components of the same
+// texel can be lost. On CUDA the read is also undefined if the texel was already written in the
+// same kernel launch (CUDA C++ Programming Guide, "Read/Write Coherency"). We warn about this on
+// CUDA.
+static void diagnoseTexelReadModifyWrite(
+    TargetRequest* target,
+    IRInst* storeInst,
+    DiagnosticSink* sink)
+{
+    if (!isCUDATarget(target))
+        return;
+    sink->diagnose(Diagnostics::TexturePartialWriteIsReadModifyWrite{
+        .target = target->getTarget(),
+        .location = storeInst->sourceLoc,
+    });
+}
+
+// Return `texel` with the component at `index` replaced by `value`. A constant index is a
+// one-element swizzle. A dynamic index, as in `tex[i][k] = v`, cannot be a swizzle, so we pick each
+// component `c` of the new texel as `k == c ? v : texel[c]`.
+static IRInst* emitSetTexelComponent(
+    IRBuilder& builder,
+    IRType* texelType,
+    IRInst* texel,
+    IRInst* index,
+    IRInst* value)
+{
+    if (as<IRIntLit>(index))
+        return builder.emitSwizzleSet(texelType, texel, value, 1, &index);
+
+    auto vectorType = as<IRVectorType>(texelType);
+    SLANG_RELEASE_ASSERT(vectorType);
+    IRIntegerValue componentCount = getIntVal(vectorType->getElementCount());
+    ShortList<IRInst*> components;
+    for (IRIntegerValue c = 0; c < componentCount; c++)
+    {
+        IRInst* selectArgs[] = {
+            builder.emitEql(index, builder.getIntValue(index->getDataType(), c)),
+            value,
+            builder.emitElementExtract(texel, c),
+        };
+        components.add(builder.emitIntrinsicInst(
+            vectorType->getElementType(),
+            kIROp_Select,
+            3,
+            selectArgs));
+    }
+    return builder.emitMakeVector(
+        texelType,
+        components.getCount(),
+        components.getArrayView().getBuffer());
+}
+
 void legalizeStore(
     TargetRequest* target,
     IRBuilder& builder,
@@ -20,6 +74,7 @@ void legalizeStore(
     SLANG_ASSERT(storeInst);
 
     builder.setInsertBefore(storeInst);
+    IRBuilderSourceLocRAII sourceLocationScope(&builder, storeInst->sourceLoc);
     auto getElementPtr = as<IRGetElementPtr>(storeInst->getOperand(0));
     IRImageSubscript* imageSubscript = as<IRImageSubscript>(getRootAddr(storeInst->getOperand(0)));
     SLANG_ASSERT(imageSubscript);
@@ -27,8 +82,12 @@ void legalizeStore(
     IRTextureType* textureType = as<IRTextureType>(imageSubscript->getImage()->getFullType());
     SLANG_ASSERT(textureType);
     auto imageElementType = cast<IRPtrTypeBase>(imageSubscript->getDataType())->getValueType();
-    auto vectorBaseType = getIRVectorBaseType(imageElementType);
-    IRType* vector4Type = builder.getVectorType(vectorBaseType, 4);
+    // Metal, GLSL and SPIR-V image loads and stores always operate on 4-component texels. A CUDA
+    // `surf*read<T>`/`surf*write<T>` accesses exactly `sizeof(T)` bytes, so on CUDA the texel keeps
+    // the texture's own element type.
+    IRType* texelType = isCUDATarget(target)
+                            ? imageElementType
+                            : builder.getVectorType(getIRVectorBaseType(imageElementType), 4);
     IRType* coordType = imageSubscript->getCoord()->getDataType();
     int coordVectorSize = getIRVectorElementSize(coordType);
 
@@ -120,21 +179,21 @@ void legalizeStore(
             IRInst* newValue = nullptr;
             if (getElementPtr)
             {
-                auto originalValue = builder.emitImageLoad(vector4Type, loadParams);
-                auto index = getElementPtr->getIndex();
-                newValue =
-                    builder.emitSwizzleSet(vector4Type, originalValue, legalizedStore, 1, &index);
+                diagnoseTexelReadModifyWrite(target, storeInst, sink);
+                auto originalValue = builder.emitImageLoad(texelType, loadParams);
+                newValue = emitSetTexelComponent(
+                    builder,
+                    texelType,
+                    originalValue,
+                    getElementPtr->getIndex(),
+                    legalizedStore);
             }
             else
             {
                 newValue = legalizedStore;
-                if (getIRVectorElementSize(imageElementType) != 4)
+                if (getIRVectorElementSize(imageElementType) != getIRVectorElementSize(texelType))
                 {
-                    newValue = builder.emitVectorReshape(
-                        builder.getVectorType(
-                            vectorBaseType,
-                            builder.getIntValue(builder.getIntType(), 4)),
-                        newValue);
+                    newValue = builder.emitVectorReshape(texelType, newValue);
                 }
             }
 
@@ -154,14 +213,15 @@ void legalizeStore(
             // Here we assume the imageElementType is already lowered into float4/uint4 types from
             // any user-defined type.
             SLANG_ASSERT(imageElementType->getOp() == kIROp_VectorType);
-            auto originalValue = builder.emitImageLoad(vector4Type, loadParams);
+            diagnoseTexelReadModifyWrite(target, storeInst, sink);
+            auto originalValue = builder.emitImageLoad(texelType, loadParams);
             Array<IRInst*, 4> indices;
             for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
             {
                 indices.add(swizzledStore->getElementIndex(i));
             }
             auto newValue = builder.emitSwizzleSet(
-                vector4Type,
+                texelType,
                 originalValue,
                 swizzledStore->getSource(),
                 swizzledStore->getElementCount(),

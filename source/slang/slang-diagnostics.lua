@@ -6007,6 +6007,13 @@ warning(
     span { loc = "location" }
 )
 
+warning(
+    "texture-partial-write-is-read-modify-write",
+    56006,
+    "write to part of a texel is a non-atomic read-modify-write",
+    span { loc = "location", message = "on target '~target:CodeGenTarget', this write to part of a texel is lowered to a read-modify-write of the whole texel. A concurrent write by another thread to other components of the same texel can be lost, and on CUDA the read returns undefined data if the texel was already written earlier in the same kernel launch." }
+)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
 

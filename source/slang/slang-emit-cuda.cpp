@@ -3,6 +3,8 @@
 
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-intrinsic-expand.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 
@@ -711,6 +713,98 @@ void CUDASourceEmitter::_emitInitializerList(
     m_writer->emit("\n}");
 }
 
+/// Emit a `kIROp_ImageLoad` or `kIROp_ImageStore` as a `surf*read`/`surf*write` call.
+///
+/// `legalizeImageSubscript` produces these ops when it turns a write to part of a texel, such as
+/// `tex[i].w = v`, into a read-modify-write of the whole texel. We spell the call the same way the
+/// `RWTexture` `Load`/`Store` accessors in hlsl.meta.slang do, e.g.
+/// `surf2Dwrite<float4>(value, tex, (coord).x * 16, (coord).y, SLANG_CUDA_BOUNDARY_MODE)`.
+void CUDASourceEmitter::_emitSurfaceAccess(IRInst* inst)
+{
+    const bool isWrite = inst->getOp() == kIROp_ImageStore;
+    IRInst* image = inst->getOperand(0);
+    IRInst* coord = inst->getOperand(1);
+    auto textureType = as<IRTextureTypeBase>(image->getDataType());
+    SLANG_RELEASE_ASSERT(textureType);
+
+    const char* shapeName = nullptr;
+    Index dimensionCount = 0;
+    switch (textureType->GetBaseShape())
+    {
+    case SLANG_TEXTURE_1D:
+        shapeName = "1D";
+        dimensionCount = 1;
+        break;
+    case SLANG_TEXTURE_2D:
+        shapeName = "2D";
+        dimensionCount = 2;
+        break;
+    case SLANG_TEXTURE_3D:
+        shapeName = "3D";
+        dimensionCount = 3;
+        break;
+    default:
+        break;
+    }
+    const bool isArray = textureType->isArray();
+    const CUDASurfaceAccessInfo access = getCUDASurfaceAccessInfo(image, isWrite);
+
+    // The CUDA prelude only has converting reads from half-based formats and none from layered
+    // surfaces, and its converting layered writes do nothing.
+    const bool isConversionSupported =
+        !access.isFormatConversion || (!isArray && (isWrite || access.requiresHalf));
+    if (!shapeName || textureType->isMultisample() || !isConversionSupported)
+    {
+        emitUnsupportedTargetIntrinsicExpr(
+            this,
+            inst,
+            isWrite ? "RWTexture partial texel write (surface write)"
+                    : "RWTexture partial texel write (surface read)",
+            inst->sourceLoc);
+        return;
+    }
+
+    const Index coordCount = getIRVectorElementSize(coord->getDataType());
+    SLANG_RELEASE_ASSERT(coordCount == dimensionCount + (isArray ? 1 : 0));
+
+    if (access.requiresHalf)
+        m_extensionTracker->requireBaseType(BaseType::Half);
+
+    m_writer->emit("surf");
+    m_writer->emit(shapeName);
+    if (isArray)
+        m_writer->emit("Layered");
+    m_writer->emit(isWrite ? "write" : "read");
+    if (access.isFormatConversion)
+        m_writer->emit("_convert");
+    m_writer->emit("<");
+    emitType(textureType->getElementType());
+    m_writer->emit(">(");
+    if (isWrite)
+    {
+        emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+    }
+    emitOperand(image, getInfo(EmitOp::General));
+    for (Index i = 0; i < coordCount; ++i)
+    {
+        m_writer->emit(", (");
+        emitOperand(coord, getInfo(EmitOp::General));
+        m_writer->emit(")");
+        if (coordCount != 1)
+        {
+            m_writer->emit(".");
+            m_writer->emitChar("xyzw"[i]);
+        }
+        if (i == 0)
+        {
+            m_writer->emit(" * ");
+            m_writer->emitUInt64(UInt64(access.xScale));
+        }
+    }
+    m_writer->emit(", SLANG_CUDA_BOUNDARY_MODE)");
+}
+
 void CUDASourceEmitter::emitIntrinsicCallExprImpl(
     IRCall* inst,
     UnownedStringSlice intrinsicDefinition,
@@ -1071,6 +1165,12 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 }
             }
             m_writer->emit(")");
+            return true;
+        }
+    case kIROp_ImageLoad:
+    case kIROp_ImageStore:
+        {
+            _emitSurfaceAccess(inst);
             return true;
         }
     case kIROp_FloatCast:

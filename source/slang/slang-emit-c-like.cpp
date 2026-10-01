@@ -500,18 +500,29 @@ void CLikeSourceEmitter::_emitSwizzleStorePerElement(IRInst* inst)
     auto subscriptOuter = getInfo(EmitOp::General);
     auto subscriptPrec = getInfo(EmitOp::Postfix);
 
-    auto ii = cast<IRSwizzledStore>(inst);
+    // A `swizzledStore` writes through the pointer in its destination operand, while a
+    // `swizzleSet` updates the value it defines, which `emitInstResultDecl` has already
+    // initialized from its base.
+    auto swizzledStore = as<IRSwizzledStore>(inst);
+    auto swizzleSet = as<IRSwizzleSet>(inst);
+    SLANG_RELEASE_ASSERT(swizzledStore || swizzleSet);
+    IRInst* source = swizzledStore ? swizzledStore->getSource() : swizzleSet->getSource();
+    UInt elementCount =
+        swizzledStore ? swizzledStore->getElementCount() : swizzleSet->getElementCount();
 
-    UInt elementCount = ii->getElementCount();
     UInt dstIndex = 0;
     for (UInt ee = 0; ee < elementCount; ++ee)
     {
         bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
 
-        emitDereferenceOperand(ii->getDest(), leftSide(subscriptOuter, subscriptPrec));
+        if (swizzledStore)
+            emitDereferenceOperand(swizzledStore->getDest(), leftSide(subscriptOuter, subscriptPrec));
+        else
+            emitOperand(swizzleSet, leftSide(subscriptOuter, subscriptPrec));
         m_writer->emit(".");
 
-        IRInst* irElementIndex = ii->getElementIndex(ee);
+        IRInst* irElementIndex =
+            swizzledStore ? swizzledStore->getElementIndex(ee) : swizzleSet->getElementIndex(ee);
         SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
 
         IRConstant* irConst = (IRConstant*)irElementIndex;
@@ -525,11 +536,17 @@ void CLikeSourceEmitter::_emitSwizzleStorePerElement(IRInst* inst)
         maybeCloseParens(needCloseSubscript);
 
         m_writer->emit(" = ");
-        emitOperand(ii->getSource(), getInfo(EmitOp::General));
+        emitOperand(source, getInfo(EmitOp::General));
         m_writer->emit(".");
         m_writer->emit(kComponents[dstIndex++]);
         m_writer->emit(";\n");
     }
+}
+
+bool CLikeSourceEmitter::_doesTargetSupportSwizzleAssignment()
+{
+    return !isCPUTarget(getTargetReq()) && !isCUDATarget(getTargetReq()) &&
+           !isWGPUTarget(getTargetReq());
 }
 
 void CLikeSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
@@ -1849,10 +1866,12 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // Instead, the right-hand-side expression should be generated as a separable
     // statement and stored in a temporary varible, then assign to the left-hand-side
     // variable per element. E.g. vec4.x = vec2.x; vec4.y = vec2.y.
-    if (as<IRSwizzledStore>(user))
+    auto swizzleSetUser = as<IRSwizzleSet>(user);
+    if (as<IRSwizzledStore>(user) ||
+        (swizzleSetUser && swizzleSetUser->getElementCount() > 1 &&
+         swizzleSetUser->getSource() == inst))
     {
-        if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
-            isWGPUTarget(getTargetReq()))
+        if (!_doesTargetSupportSwizzleAssignment())
             return false;
     }
 
@@ -3380,6 +3399,12 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(";\n");
 
+            if (ii->getElementCount() > 1 && !_doesTargetSupportSwizzleAssignment())
+            {
+                _emitSwizzleStorePerElement(inst);
+                break;
+            }
+
             auto subscriptOuter = getInfo(EmitOp::General);
             auto subscriptPrec = getInfo(EmitOp::Postfix);
             bool needCloseSubscript = maybeEmitParens(subscriptOuter, subscriptPrec);
@@ -3409,10 +3434,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_SwizzledStore:
         {
-            // cpp, cuda and wgsl targets don't support swizzle on the left handside, so we
-            // have to assign the element one by one.
-            if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
-                isWGPUTarget(getTargetReq()))
+            if (!_doesTargetSupportSwizzleAssignment())
             {
                 _emitSwizzleStorePerElement(inst);
             }

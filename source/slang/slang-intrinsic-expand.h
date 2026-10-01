@@ -7,6 +7,25 @@
 namespace Slang
 {
 
+/// How a CUDA surface read or write (`surf*read`/`surf*write`) of a given resource is spelled.
+struct CUDASurfaceAccessInfo
+{
+    /// The access calls the `_convert` variant, because the resource's `[format(...)]` differs
+    /// from its element type.
+    bool isFormatConversion = false;
+
+    /// The access needs the `half` type to be enabled.
+    bool requiresHalf = false;
+
+    /// The factor applied to the x coordinate, which CUDA surfaces address in bytes.
+    size_t xScale = 0;
+};
+
+/// Return how a read (`isWrite == false`) or write of the CUDA surface `resourceInst` is spelled.
+/// The `$C` and `$E` intrinsic expansions and the CUDA emitter's `kIROp_ImageLoad` /
+/// `kIROp_ImageStore` handling both use it, so that every spelling of a surface access agrees.
+CUDASurfaceAccessInfo getCUDASurfaceAccessInfo(IRInst* resourceInst, bool isWrite);
+
 /* Handles all the special case handling of expansions of intrinsics. In particular handles the
 expansion of the 'special cases' prefixed with '$' */
 struct IntrinsicExpandContext

@@ -2411,7 +2411,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
         SLANG_PASS(legalizeDynamicResourcesForGLSL, codeGenContext);
 
-    // Legalize `ImageSubscript` loads.
     switch (target)
     {
     case CodeGenTarget::MetalLibAssembly:
@@ -2420,6 +2419,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::GLSL:
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             SLANG_PASS(legalizeImageSubscript, targetRequest, sink);
         }
