@@ -79033,6 +79033,193 @@
         "last_targeted": "local-record-array-borrows",
         "implementations_since_full": 4
       }
+    },
+    "nvvm-texture-float-dimensions": {
+      "status": "accepted-focused",
+      "scope": "Numeric Float32 outputs for existing read-only non-array non-mip Texture1D/2D/3D/Cube dimensions. Module43/providerABI46/container2 unchanged.",
+      "contract": "Core generator selects the existing UInt32 TextureQuerySize body and ordinary numeric casts with ordered width/height/depth outputs. Provider/resource/type admission and integer array behavior are unchanged.",
+      "identity": {
+        "revision": "964b35be658d2cd465770297db82e791a7ba4153",
+        "patch_sha256": "c3a6c7738fb6b87196b9556ce3a8115221bc456bec8fe054e629e24a8a473adc",
+        "source_sha256": {
+          "source/slang/slang-core-module-textures.cpp": "b2972128e39a713bc3f259dff9066475dc961d34c9cbec0a277f3985edb4fea6",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "75f95d34e35b3e2168746e6244314605e8e704bf9ac1b6943ae22eb082dd2214",
+          "tests/cuda/nvvm-texture-dimensions.slang": "dea2131b54ca9f64214f0bb0edebb3ed860732f4ade92a80a63ff523e68c224d",
+          "tests/cuda/nvvm-texture-query-unsupported.slang": "c8662b5fc4fd68f6a34035719d5f189840f7743cc4c0b775e4d3524488519742"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "411eb14e21998f99fca1810db47ff0bcabd45d5bc9a203aa00ec32c470937552",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "b215a42bd93ded7f4e85524fe9809aa4394c5ceeb62bb626be382d0514048795",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c51b826b4080fc3690b449ecec2fcb013d7c7350f633e09e0ba6d383c177845e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "75d3ab9556fd027a953b6c40864d124d06ad55dd46f2a601e093a2cabd2fe60c",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "e34e9035c4f49c5972f9dc41c3535837f8e8867d52cec39cc634702378623fcf",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "86974a6f4d150c27afa6407c68ef3db04b4e030116f67adf0caebafbf5ceceb9"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ],
+        "test_only_source_changes_after_initial_validation": [
+          "tests/cuda/nvvm-texture-query-unsupported.slang"
+        ]
+      },
+      "initial_validation_identity": {
+        "path": "build/nvvm-texture-float-dimensions/tested-identity.json",
+        "sha256": "c3f1c5907bd983f86a8a03e273ebb2e8045b7b756f13633600e4f4bda875d7c9"
+      },
+      "build": {
+        "path": "build/nvvm-texture-float-dimensions/build.json",
+        "sha256": "484525321b0ca7b28f24e30e8ac93ebf5db384adf7c04de4c55fc09a00cd9771"
+      },
+      "validation": {
+        "unit": {
+          "gate": {
+            "path": "build/nvvm-texture-float-dimensions/unit.json",
+            "sha256": "e4183c9f00f9d4e5348963ee507becd9036f49ce1a7b0731ff0faf79202ffe75"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangResourceOperationsUseTypedInstructions.internal": "passed"
+          },
+          "counts": {
+            "passed": 1
+          }
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-texture-float-dimensions/runtime.json",
+            "sha256": "54743f5e7a034aca4b56131e139a4f3e66d9488677920a4b47194a6f1c85bea5"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-texture-dimensions.slang (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang.2 (cuda)": "passed"
+          },
+          "counts": {
+            "passed": 3
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-texture-float-dimensions/negatives-retry.json",
+            "sha256": "96d144e8645b9441d2b9ce21b605375257d6aae45fe054c8630c946d60d447bf"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-texture-query-unsupported.slang": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.3": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        }
+      },
+      "inputs_before": [
+        {
+          "path": "build/nvvm-texture-float-dimensions/before-query-unsupported.slang",
+          "sha256": "ed886f5f0208fbb9c1480f395721fa2094a5e8fda774d910329e1b7006e4dd17"
+        },
+        {
+          "path": "build/nvvm-texture-float-dimensions/before-dimensions.slang",
+          "sha256": "70115989dc50fab0de86d6f53e132ded59baa2fbb80f5fd3eef2571456c0b42a"
+        }
+      ],
+      "positive_transition": {
+        "old_obligations": [
+          "floatDimensions NVVM O0",
+          "floatDimensions NVVM O3"
+        ],
+        "before": "Direct-NVVM unsupported float-output query source/diagnostic obligations.",
+        "after": "Corresponding Texture2D<float2> Float32-output operation is checked in extended dimensions fixture, NVVM O0/O3, alongside other selected shapes and CUDA comparison.",
+        "scope": "Two focused API obligations, not unchanged exact shader invocations or full discovery corpus cells."
+      },
+      "runtime_contract": "Independent declared geometries1/2/4/8; Float32/SInt32/UInt32 2D texel families and widths1/2/4; 1D/3D/Cube and raw descriptor helper. All integer/array-zero controls retained. Fourteen anchored zero error words, completion4096 and untouched tailguard3735928559. Square/cubic resources do not prove lane order; typed unit independently binds each stored output to width/height/depth and UInt32-to-Float32 conversion.",
+      "negative_inventory_mapping": [
+        {
+          "old_ordinal": 2,
+          "new_ordinal": 0,
+          "entry": "mipDimensions",
+          "optimization": "O0"
+        },
+        {
+          "old_ordinal": 3,
+          "new_ordinal": 1,
+          "entry": "mipDimensions",
+          "optimization": "O3"
+        },
+        {
+          "old_ordinal": 4,
+          "new_ordinal": 2,
+          "entry": "multisampleDimensions",
+          "optimization": "O0"
+        },
+        {
+          "old_ordinal": 5,
+          "new_ordinal": 3,
+          "entry": "multisampleDimensions",
+          "optimization": "O3"
+        }
+      ],
+      "validation_incidents": [
+        {
+          "kind": "Stale diagnostic expectations in retained query negatives",
+          "initial_gate": {
+            "path": "build/nvvm-texture-float-dimensions/negatives.json",
+            "sha256": "8ec1b643acd0c6ae750f59f1289585600194916f8db2f132d6c200a44dff48fa"
+          },
+          "initial_source": {
+            "path": "build/nvvm-texture-float-dimensions/initial-query-unsupported.slang",
+            "sha256": "5e30d60b6f455c40aedca0dcbd9a05a8d61f2015fb7fd59ce439d7ad0f2d0234"
+          },
+          "initial_outcomes": {
+            "tests/cuda/nvvm-texture-query-unsupported.slang": "FAILED",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.1": "FAILED",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.2": "FAILED",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.3": "FAILED"
+          },
+          "actual": "Mip overloads reject at compute/CUDA capability validation; multisample texture type rejects at target validation, before the formerly expected GenericAsm/direct-NVVM rejection.",
+          "repair": "Only expected diagnostic comments changed; all five mip diagnostic messages and both multisample messages are exhaustively matched. No non-exhaustive flag or source/body/command change.",
+          "retry": {
+            "path": "build/nvvm-texture-float-dimensions/negatives-retry.json",
+            "sha256": "96d144e8645b9441d2b9ce21b605375257d6aae45fe054c8630c946d60d447bf"
+          },
+          "reuse": "Successful unit/runtime gates retained: their sources, compiler/provider/test-plugin/modules and all options are unchanged. No rebuild."
+        }
+      ],
+      "preservation": {
+        "prior_feature_count": 46,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_dimensions_history": "The full compute/texture-get-dimensions discovery shader still requires excluded mip/count/array contracts; original failures retain their identity and are not resolved by this feature."
+      },
+      "limitations": [
+        "Float32 array outputs and writable texture queries remain unit-tested preflight rejections with null output/no module creation. Mip and multisample diagnostics remain four negative cells.",
+        "Integer array-count zero outputs remain the previous limited contract, not actual layer-count support.",
+        "No new provider operation, resource ABI, static role change, full campaign or performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "texture-float-dimensions",
+        "implementations_since_full": 5
+      }
     }
   }
 }

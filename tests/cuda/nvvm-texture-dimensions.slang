@@ -31,7 +31,7 @@ TextureCube<uint2> cubeTexture;
 Texture2DArray<float4> arrayTexture;
 //TEST_INPUT: TextureCube(format=RG32Sint, size=4, arrayLength=1, content=one):name cubeArrayTexture
 TextureCubeArray<int2> cubeArrayTexture;
-//TEST_INPUT: ubuffer(data=[99 99 99 99 99 99 99 99 99 99 99 99 99 99], stride=4):out,name outputBuffer
+//TEST_INPUT: ubuffer(data=[99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 3735928559], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 [noinline]
@@ -39,9 +39,12 @@ uint checkDimensions<T : ITexelElement>(Texture2D<T> texture, int expected)
 {
     int2 signedSize = int2(-1);
     uint2 unsignedSize = uint2(0xffffffff);
+    float2 floatSize = float2(-1.0f);
     texture.GetDimensions(signedSize.x, signedSize.y);
     texture.GetDimensions(unsignedSize.x, unsignedSize.y);
-    return any(signedSize != int2(expected)) || any(unsignedSize != uint2(expected)) ? 1 : 0;
+    texture.GetDimensions(floatSize.x, floatSize.y);
+    return any(signedSize != int2(expected)) || any(unsignedSize != uint2(expected))
+        || any(floatSize != float2(expected)) ? 1 : 0;
 }
 
 [noinline]
@@ -66,31 +69,41 @@ void computeMain()
     outputBuffer[8] = checkDimensions(textureUint4, 8);
     int width = -1;
     oneDimensional.GetDimensions(width);
-    outputBuffer[9] = width != 1 ? 1 : 0;
+    float floatWidth = -1.0f;
+    oneDimensional.GetDimensions(floatWidth);
+    outputBuffer[9] = width != 1 || floatWidth != 1.0f ? 1 : 0;
     int3 volumeSize = int3(-1);
     threeDimensional.GetDimensions(volumeSize.x, volumeSize.y, volumeSize.z);
-    outputBuffer[10] = any(volumeSize != int3(2)) ? 1 : 0;
+    float3 floatVolumeSize = float3(-1.0f);
+    threeDimensional.GetDimensions(floatVolumeSize.x, floatVolumeSize.y, floatVolumeSize.z);
+    outputBuffer[10] = any(volumeSize != int3(2)) || any(floatVolumeSize != float3(2.0f)) ? 1 : 0;
     int2 cubeSize = int2(-1);
     cubeTexture.GetDimensions(cubeSize.x, cubeSize.y);
-    outputBuffer[11] = any(cubeSize != int2(4)) ? 1 : 0;
+    float2 floatCubeSize = float2(-1.0f);
+    cubeTexture.GetDimensions(floatCubeSize.x, floatCubeSize.y);
+    outputBuffer[11] = any(cubeSize != int2(4)) || any(floatCubeSize != float2(4.0f)) ? 1 : 0;
     int3 arraySize = int3(-1);
     arrayTexture.GetDimensions(arraySize.x, arraySize.y, arraySize.z);
     // CUDA's prelude explicitly returns zero for unavailable array-size queries.
     outputBuffer[12] = any(arraySize != int3(8, 8, 0)) ? 1 : 0;
     cubeArrayTexture.GetDimensions(arraySize.x, arraySize.y, arraySize.z);
     outputBuffer[13] = any(arraySize != int3(4, 4, 0)) ? 1 : 0;
+    outputBuffer[14] = 4096;
 }
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
-//CHECK: 0
+//CHECK: type: uint32_t
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}0{{$}}
+//CHECK-NEXT: {{^}}4096{{$}}
+//CHECK-NEXT: {{^}}3735928559{{$}}

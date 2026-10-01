@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Four bounded feature batches now pass focused validation after the full checkpoint:
+Five bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -97,19 +97,22 @@ Four bounded feature batches now pass focused validation after the full checkpoi
   two static and nine runtime cells; readonly passes four shared, two static and nine runtime cells.
   Readonly access preserves caller mutation visibility and cannot grant writes. Native array/pointer
   results, external roles and unproven pointer roots remain excluded.
+- Non-array, non-mip texture dimensions now accept Float32 outputs through ordinary numeric casts.
+  One typed-operation unit and three runtime modes pass. Four retained mip/MS negatives pass after
+  correcting stale expectations to the existing earlier capability/type diagnostics; failures retained.
 
 The full baseline retains its original 36 corpus gaps and four dynamic-surface failures; focused
 records supersede the affected cells without relabeling the full run. Current identities and
 precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references` and
-`features.nvvm-local-record-array-borrows`. Four implementations have passed focused validation
-since the full run.
+`features.nvvm-local-record-array-borrows` and `features.nvvm-texture-float-dimensions`. Five
+implementations have passed focused validation since the full run.
 
-Next implement Float32 outputs for non-mip, non-array read-only texture dimensions under
-`plan.texture-float-dimensions.md`, using existing unsigned size queries and ordinary numeric casts.
-Preserve mip/layer-count, multisample and writable-resource restrictions; the full dimensions corpus
-failure is not resolved by this bounded overload addition. Use the existing dimensions fixture,
-resource-operation unit and retained query negatives. No new full campaign.
+Next investigate actual array layer counts through documented device queries before proposing a
+resource ABI change. Existing whole-resource probes suggest height/depth can supply some counts, but
+restricted-view behavior remains unqualified. Start with one full versus restricted 2DArray view
+comparison; keep mip counts, cube-face interpretation and singleton host bindings separate. The full
+dimensions corpus failure remains unresolved. No new full campaign.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

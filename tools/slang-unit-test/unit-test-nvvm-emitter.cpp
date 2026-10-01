@@ -11344,6 +11344,96 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
         SLANG_CHECK(store.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER);
         SLANG_CHECK(store.elementType.bitWidth == 32 && store.elementType.laneCount == 1);
     }
+    _resetDirectNVVMFakes();
+    {
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        const char* source = R"SLANG(
+            Texture3D<float4> texture;
+            RWStructuredBuffer<float> output;
+            [numthreads(1,1,1)] void computeMain()
+            {
+                float width, height, depth;
+                texture.GetDimensions(width, height, depth);
+                output[0] = width;
+                output[1] = height;
+                output[2] = depth;
+            }
+        )SLANG";
+        ComPtr<slang::IBlob> code, diagnostics;
+        auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.textureOperations.getCount() == 3);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 3);
+        const SlangNVVMTextureOperation operations[] = {
+            SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
+            SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
+            SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH};
+        // Runtime resources are cubic. Bind each ordered output to its own spatial query here,
+        // including the unsigned numeric conversion, so swapped lanes cannot cancel in runtime.
+        for (Index lane = 0; lane < 3; ++lane)
+        {
+            const auto stored = gFakeNVVMBuilder.storeValueRefs[lane];
+            SLANG_CHECK_ABORT(stored.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+            const auto& conversion = gFakeNVVMBuilder.scalarOperations[stored.index];
+            SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_TO_FLOAT);
+            SLANG_CHECK(conversion.operandCount == 1);
+            SLANG_CHECK(NVVMSemantics::areSameType(conversion.resultType, NVVMSemantics::kFloat32));
+            SLANG_CHECK(NVVMSemantics::areSameType(
+                conversion.operandTypes[0],
+                NVVMSemantics::kUnsignedI32));
+            const auto extracted = conversion.operands[0];
+            SLANG_CHECK_ABORT(extracted.kind == FakeNVVMBuilderValueKind::VectorElement);
+            SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[extracted.index] == uint32_t(lane));
+            const auto vector = gFakeNVVMBuilder.vectorElementBaseValueRefs[extracted.index];
+            SLANG_CHECK_ABORT(vector.kind == FakeNVVMBuilderValueKind::VectorConstruct);
+            SLANG_CHECK_ABORT(gFakeNVVMBuilder.vectorConstructElementCounts[vector.index] == 3);
+            const auto query =
+                gFakeNVVMBuilder.vectorConstructElementValueRefs
+                    [gFakeNVVMBuilder.vectorConstructElementOffsets[vector.index] + lane];
+            SLANG_CHECK_ABORT(query.kind == FakeNVVMBuilderValueKind::TextureOperation);
+            const auto& operation = gFakeNVVMBuilder.textureOperations[query.index];
+            SLANG_CHECK(operation.operation == operations[lane]);
+            SLANG_CHECK(operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D && operation.isArray == 0);
+        }
+    }
+    for (bool isArray : {false, true})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << (isArray ? "Texture2DArray<float4>" : "RWTexture2D<float4>")
+               << " texture; RWStructuredBuffer<float> output; "
+               << "[numthreads(1,1,1)] void computeMain() { float w,h,n; "
+               << "texture.GetDimensions(w,h" << (isArray ? ",n" : "") << "); output[0]=w+h"
+               << (isArray ? "+n" : "") << "; }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result =
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+        const auto text = _getBlobText(diagnostics);
+        if (SLANG_SUCCEEDED(result) || text.indexOf("E52017") < 0)
+        {
+            StringBuilder message;
+            message << (isArray ? "Float32 array dimensions: " : "writable dimensions: ") << text;
+            getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        }
+        SLANG_CHECK(SLANG_FAILED(result));
+        SLANG_CHECK(code == nullptr);
+        SLANG_CHECK(text.indexOf("E52017") >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.textureOperations.getCount() == 0);
+    }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
 

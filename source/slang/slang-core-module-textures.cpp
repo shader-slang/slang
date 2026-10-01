@@ -660,7 +660,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
             StringBuilder nvvm;
-            if (!includeMipInfo && !isMultisample && dimType != DimType::Float &&
+            // Float outputs use ordinary conversion of spatial queries; array-count support
+            // remains limited to the existing integer-output contract.
+            if (!includeMipInfo && !isMultisample && (dimType != DimType::Float || !isArray) &&
                 !(isArray && baseShape == SLANG_TEXTURE_1D))
             {
                 nvvm << "let size = __nvvmTextureQuerySize(this);\n";
