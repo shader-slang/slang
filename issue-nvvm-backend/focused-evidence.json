@@ -86243,6 +86243,354 @@
         "No full RHI suite or full baseline advancement; all74 prior focused features and accepted records remain unchanged."
       ],
       "rhi_oracle_commit": "011c2d62313649c4d343fbcc416ec1cc18593886"
+    },
+    "nvvm-optix-anyhit-state": {
+      "status": "accepted-focused",
+      "scope": "Admit thirteen existing world-ray, ray-range, flags and hit-identity queries in AnyHit; qualify both unequal triangle attributes in the same runtime callback.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "revision": "0762f003c7c6147a9ef2494390732b9c2dfb89c3",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm.cpp": "44df862796e95e4dca1e9f63a4a02e6e587df5bd2619137133c54daaabe232d1",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "53eb4eb88f1bb636489e92978e8681ce11a10696f5b46e9f6d4a53c5fc715a5f"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "6866ac5c50318bd2965f77849302e1dd4c6896cf9f4febbaef0535397ac4dd2a",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "3a96fee0d76dc1f2ff379af452c223a10f4aa2615ad72348a6533ab15132a548",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "0ee60a0a2923d61771586ef5a293e1ef5f388ad6b55b6f608838b5cbdedc4897",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "0968aaec67f2ad5613b8c4e57d603d7389678aa7bbb332011dc2e4f746008a08"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "meaning": "Matching AnyHit query stage admission and shared unit build; core/provider/static source unchanged.",
+        "patch_sha256": "747f9042a24fdb356ec5e67663c0d302f15af6aa3876d492d6db45139290fd2b"
+      },
+      "before_identity": {
+        "path": "build/nvvm-anyhit-state/before-identity.json",
+        "sha256": "087558ae5772e04c26fb35c5fc297bd98fbc3987168959970b13ecb6b9ed8d13"
+      },
+      "rhi_identity": {
+        "path": "build/nvvm-anyhit-state/rhi-retry-identity.json",
+        "sha256": "0997a56cd78e7067f001fbbfddb25c0051202f835e1bd8b5fbf95dd0d4d6caf9"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-anyhit-state/build.json",
+          "sha256": "bc8b6be30895698912f8b01ecd60f034a992da52fc33a6c3ea5d667140acf4c7",
+          "return_code": 0,
+          "elapsed_seconds": 32.587451457977295
+        },
+        "rhi_build_initial": {
+          "path": "build/nvvm-anyhit-state/rhi-build.json",
+          "sha256": "d8e8e94c011e42cd508c2c9d2e498447a58d5491b33e815380099a3f54244fa9",
+          "return_code": 0,
+          "elapsed_seconds": 3.895282745361328
+        },
+        "rhi_build_retry": {
+          "path": "build/nvvm-anyhit-state/rhi-build-retry.json",
+          "sha256": "de3400dab51b336689affe0cf3a201750a46a706e27d28e2bb09f844e2b89b1b",
+          "return_code": 0,
+          "elapsed_seconds": 3.915879011154175
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-anyhit-state/nvvm-after.json",
+            "sha256": "6bbfe3517c2f6cd5eea522aac043241110ff9fa9d0ea29f06cab9e72d413e8f4",
+            "return_code": 0,
+            "elapsed_seconds": 2.3319802284240723
+          },
+          "case": "ray-tracing-intrinsics-anyhit-state.cuda",
+          "passed_cases": 1,
+          "passed_assertions": 289,
+          "optimization_levels": [0, 3],
+          "filtered_out_cases": 932
+        },
+        "nvrtc_control": {
+          "record": {
+            "path": "build/nvvm-anyhit-state/nvrtc-before-retry.json",
+            "sha256": "bcaa047b2c6058219a6061377b67348c99aa19aadb1a16242bde44656b80cc47",
+            "return_code": 0,
+            "elapsed_seconds": 3.0668888092041016
+          },
+          "passed_cases": 1,
+          "passed_assertions": 289,
+          "optimization_levels": [0, 3],
+          "meaning": "Accepted pre-stage-change compiler and corrected independent oracle; not final compiler evidence."
+        },
+        "stage_unit": {
+          "record": {
+            "path": "build/nvvm-anyhit-state/focused.json",
+            "sha256": "7ee9aafd6355c77944a1dd80a93d558cd85e5058a67f4e6b3961770514dd40fa",
+            "return_code": 0,
+            "elapsed_seconds": 12.370569229125977
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission.internal": "passed"
+          },
+          "forbidden_stage_cases": 62,
+          "meaning": "Compute/raygen and miss hit-information rejection, AnyHit-only object/termination roles, reachable-helper closure and pre-provider-mutation guarantees."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-anyhit-state/smoke.json",
+            "sha256": "9d31bd643f5857d3283622b114a4a556178023437c2ce4892b97eb33e7b9d2e8",
+            "return_code": 0,
+            "elapsed_seconds": 21.964056968688965
+          },
+          "selection": {
+            "path": "build/nvvm-anyhit-state/smoke-1/selection.json",
+            "sha256": "bdeb8b6aeb060d572fa886936f9907e61eaa21d33c4993f13ad0f2ea5a8faa3f"
+          },
+          "provenance": {
+            "path": "build/nvvm-anyhit-state/smoke-1/provenance.json",
+            "sha256": "825113fe248441ffa84b9e307ca6d425aa8f6f139da3fd2a0b08857845044147"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "reused": "Core/provider signatures and static plan evidence remain owned by nvvm-optix-anyhit. No new provider/static run; only emitter stage admission and its shared negative unit changed."
+      },
+      "runtime_contract": {
+        "payload": "Sixteen UInt32 scalar fields: thirteen physical queries, two attributes and a phase marker.",
+        "rays": 7,
+        "hits": 6,
+        "misses": 1,
+        "output_words": 114,
+        "guards": 2,
+        "world_direction": [0.5, -0.25, 2],
+        "origin": "target - 2 * direction",
+        "ray_tmin": 0.25,
+        "trace_tmax": 4,
+        "candidate_t": 2,
+        "instance_translations_x": [0, 4],
+        "instance_ids": [61453, 4660],
+        "primitive_indices": [0, 1, 2],
+        "flags": [2, 10],
+        "hit_kinds": [254, 255],
+        "barycentrics": [0.25, 0.125],
+        "barycentric_bits": [1048576000, 1040187392],
+        "oracle": "Independent host scene/ray arithmetic and exact Float32 bits; all114 words checked at O0/O3. ClosestHit is NOP; FORCE_NON_OPAQUE overrides opaque geometry. Miss retains fifteen independent sentinels and writes its phase. Qualification is this exact-input fixture, not general bit-exact hardware intersection arithmetic."
+      },
+      "failure_history": [
+        {
+          "record": {
+            "path": "build/nvvm-anyhit-state/nvrtc-before.json",
+            "sha256": "2bef64998dcfe9cf97864b57064d8ffa2355633d530ea545ff22e9107880c617",
+            "return_code": 1,
+            "elapsed_seconds": 3.1268560886383057
+          },
+          "rhi_identity": {
+            "path": "build/nvvm-anyhit-state/rhi-identity.json",
+            "sha256": "d837553833922fb9e017254aecaa006fd2e2fe01edc841d77bafa94253d6a79f"
+          },
+          "patch": {
+            "path": "build/nvvm-anyhit-state/rhi-oracle.patch",
+            "sha256": "d8d6fc305d7cb128114de3d7af0fa9e5bd1f54577acb074c73fea086d4a88cca"
+          },
+          "original_world_direction": [0.5, -0.25, 1.5],
+          "passed_assertions": 269,
+          "failed_assertions": 20,
+          "exact_mismatches": [
+            {
+              "actual_bits": 1040187389,
+              "expected_bits": 1040187392,
+              "optimization": 0,
+              "ray": 0,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048575999,
+              "expected_bits": 1048576000,
+              "optimization": 0,
+              "ray": 1,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187388,
+              "expected_bits": 1040187392,
+              "optimization": 0,
+              "ray": 1,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048576001,
+              "expected_bits": 1048576000,
+              "optimization": 0,
+              "ray": 2,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187393,
+              "expected_bits": 1040187392,
+              "optimization": 0,
+              "ray": 2,
+              "field": 14
+            },
+            {
+              "actual_bits": 1040187389,
+              "expected_bits": 1040187392,
+              "optimization": 0,
+              "ray": 3,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048575999,
+              "expected_bits": 1048576000,
+              "optimization": 0,
+              "ray": 4,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187388,
+              "expected_bits": 1040187392,
+              "optimization": 0,
+              "ray": 4,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048576001,
+              "expected_bits": 1048576000,
+              "optimization": 0,
+              "ray": 5,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187393,
+              "expected_bits": 1040187392,
+              "optimization": 0,
+              "ray": 5,
+              "field": 14
+            },
+            {
+              "actual_bits": 1040187389,
+              "expected_bits": 1040187392,
+              "optimization": 3,
+              "ray": 0,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048575999,
+              "expected_bits": 1048576000,
+              "optimization": 3,
+              "ray": 1,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187388,
+              "expected_bits": 1040187392,
+              "optimization": 3,
+              "ray": 1,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048576001,
+              "expected_bits": 1048576000,
+              "optimization": 3,
+              "ray": 2,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187393,
+              "expected_bits": 1040187392,
+              "optimization": 3,
+              "ray": 2,
+              "field": 14
+            },
+            {
+              "actual_bits": 1040187389,
+              "expected_bits": 1040187392,
+              "optimization": 3,
+              "ray": 3,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048575999,
+              "expected_bits": 1048576000,
+              "optimization": 3,
+              "ray": 4,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187388,
+              "expected_bits": 1040187392,
+              "optimization": 3,
+              "ray": 4,
+              "field": 14
+            },
+            {
+              "actual_bits": 1048576001,
+              "expected_bits": 1048576000,
+              "optimization": 3,
+              "ray": 5,
+              "field": 13
+            },
+            {
+              "actual_bits": 1040187393,
+              "expected_bits": 1040187392,
+              "optimization": 3,
+              "ray": 5,
+              "field": 14
+            }
+          ],
+          "classification": "Initial fixture exact-barycentric expectation failed at O0/O3; all other query/marker/guard expectations passed. Intersection reciprocal arithmetic is an unproven cause hypothesis.",
+          "resolution": "Fixture-only directionZ1.5 to2 in host/shader; expected barycentrics unchanged, no observed-bit substitution or tolerance. Corrected NVRTC control and final NVVM runtime each pass289 assertions. Original input remains unqualified for exact barycentric agreement.",
+          "retry": {
+            "path": "build/nvvm-anyhit-state/nvrtc-before-retry.json",
+            "sha256": "bcaa047b2c6058219a6061377b67348c99aa19aadb1a16242bde44656b80cc47",
+            "return_code": 0,
+            "elapsed_seconds": 3.0668888092041016
+          }
+        },
+        {
+          "initial": {
+            "path": "build/nvvm-anyhit-state/nvvm-before.json",
+            "sha256": "b96f0e53e6501b9a27a733d6446eb1c169372d1b4858e821182086435b8251a6",
+            "return_code": 1,
+            "elapsed_seconds": 1.417123556137085
+          },
+          "corrected_fixture": {
+            "path": "build/nvvm-anyhit-state/nvvm-before-retry.json",
+            "sha256": "5e8d3c7c06e80d32247edd4c7f74bb434e6d57b370bc7eca16d40252f390e0c5",
+            "return_code": 1,
+            "elapsed_seconds": 1.414534330368042
+          },
+          "diagnostic": "E52017 OptiX primitive stage",
+          "optimization_entered": 0,
+          "optimization_not_reached": 3,
+          "passed_assertions": 23,
+          "failed_assertions": 2,
+          "meaning": "The selected case entered and failed pipeline creation. Trailing zero-tests-executed message is an RHI reporter accounting artifact, not a skipped case.",
+          "resolution": {
+            "path": "build/nvvm-anyhit-state/nvvm-after.json",
+            "sha256": "6bbfe3517c2f6cd5eea522aac043241110ff9fa9d0ea29f06cab9e72d413e8f4",
+            "return_code": 0,
+            "elapsed_seconds": 2.3319802284240723
+          }
+        }
+      ],
+      "qualification": [
+        "No core/provider/static/API changes, no new helper or fallback; existing stage-policy owner admits canonical calls.",
+        "Object-ray and termination calls remain AnyHit-only; TraceRay remains raygen-only; Intersection/callable and recursive callback tracing remain excluded.",
+        "One implementation iteration since the1711-cell working checkpoint at0762f003c. That checkpoint retains its identity and was not rerun for this small stage-only batch.",
+        "All75 prior focused objects and historical full baseline unchanged; full RHI remains on demand and has not run."
+      ],
+      "rhi_oracle_commit": "16066a67a210ffc1bd9aa918e7d38fa0c58c672d"
     }
   }
 }

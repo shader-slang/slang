@@ -3063,12 +3063,13 @@ bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
     };
     for (auto query : rayStateQueries)
         if (name == UnownedStringSlice(query))
-            return stage == Stage::Miss || stage == Stage::ClosestHit;
-    // Hit properties require a recorded intersection; a miss has only ray state.
+            return stage == Stage::Miss || stage == Stage::ClosestHit || stage == Stage::AnyHit;
+    // Hit properties describe the current candidate in AnyHit or the selected hit in ClosestHit.
+    // A miss has only ray state.
     if (name == toSlice("_optix_read_primitive_idx") ||
         name == toSlice("_optix_read_instance_idx") || name == toSlice("_optix_read_instance_id") ||
         name == toSlice("_optix_get_hit_kind"))
-        return stage == Stage::ClosestHit;
+        return stage == Stage::ClosestHit || stage == Stage::AnyHit;
     if (name == toSlice("_optix_get_payload") || name == toSlice("_optix_set_payload"))
         return stage == Stage::Miss || stage == Stage::ClosestHit || stage == Stage::AnyHit;
     if (name.startsWith(toSlice("_optix_get_attribute_")))

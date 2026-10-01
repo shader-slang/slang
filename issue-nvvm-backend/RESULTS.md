@@ -193,6 +193,12 @@ cases use exact independent affine expectations without normalizing the directio
 `ray-tracing-intrinsics-ignore-hit.cuda` are small supplemental controls. Select these names with
 the same compiler/device options above; they do not require a full-suite run.
 
+`ray-tracing-intrinsics-anyhit-state.cuda` runs O0/O3 internally and checks the thirteen physical
+world-ray/range/flags/hit-identity queries and two triangle attributes inside AnyHit. It checks all
+114 output words for six hits and a miss, with independent exact expectations, a NOP ClosestHit
+and FORCE_NON_OPAQUE rays. Use the same selector options for focused NVVM execution or an NVRTC
+control. Its exact barycentric qualification is limited to the maintained ray/triangle fixture.
+
 Only when the broader suite is requested, run the same command with `--test-case='*.cuda'`.
 Keep NVVM and NVRTC logs separate, retain initial failures, and inspect executed/failed/skipped
 counts and individual diagnostics. A zero-test filter or skipped test is not runtime qualification.

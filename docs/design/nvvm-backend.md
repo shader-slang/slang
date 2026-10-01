@@ -130,12 +130,13 @@ ABI46 tables. The provider adapts finite payload arrays to the SDK's fixed 32-re
 primitive, zeros unused inputs, and retains side effects and a compiler memory clobber. Exact named
 get/set payload calls require literal indices 0..31; triangle attributes admit indices 0 and 1.
 World-ray origin/direction and ray-range queries use eight exact Float32 zero-argument SDK calls
-in miss/closest-hit. Core composes the vector queries; the provider uses Float32 register transport.
-Direction retains the traced value without normalization. Current distance is the closest-hit
-distance or the original maximum in miss. Queries retain their observation position; the trace
+in miss/closest-hit/any-hit. Core composes the vector queries; the provider uses Float32 register
+transport. Direction retains the traced value without normalization. Current distance is the
+candidate intersection distance in any-hit, the selected distance in closest-hit, or the original
+maximum in miss. Queries retain their observation position; the trace
 operation owns the callback memory clobber. Primitive index, instance index and custom instance ID
-use three exact nullary UInt32 SDK queries in closest-hit only. HitKind uses the same scalar
-transport and hit-only stage policy. RayFlags is UInt32 ray state available in miss/closest-hit
+use three exact nullary UInt32 SDK queries in closest-hit/any-hit. HitKind uses the same scalar
+transport and hit-only stage policy. RayFlags is UInt32 ray state available in miss/closest-hit/any-hit
 and preserves the incoming trace flags. The instance index identifies the
 entry in the instance acceleration structure; the custom ID comes from its host descriptor. Miss
 has ray state but no hit identity. This stage policy also applies to indirect helper calls.

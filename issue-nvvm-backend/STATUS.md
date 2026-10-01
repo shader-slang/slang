@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-nine feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 75 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 76 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -223,7 +223,7 @@ shared call effects preserve implicitly observed payload writes, while late hois
 known exit. CUDA text/name recognition is removed. The independent RHI nine-mode oracle initially
 returned incoming7 instead of11/12/21/31 in12 terminating cases at O0/O3; all231 assertions now pass.
 Ten source cells pass through eight initial passes and two retries after correcting only new
-assertion ordering. The focused unknown-call/cycle static unit and15 smoke cells pass (22.75s).
+assertion ordering. The focused unknown-call/cycle static unit and 15 smoke cells pass (22.75s).
 At that gate, NVVM final IR retained store11 and its register write before termination, then
 rejected the unsupported AnyHit stage with E52017 and no PTX. Raw evidence is in build/nvvm-anyhit-producer.
 
@@ -234,16 +234,26 @@ O0/O3. The strengthened affine oracle checks inverse-transformed, unnormalized v
 NVRTC control passes 129 assertions. Three before-NVVM cases failed O0 stage admission and never
 reached O3. Two world-ray controls pass 64 assertions, both affected shared units and the recursive
 source diagnostic pass, both static plan units pass, and all 15 smoke cells pass (21.97s).
-NVVM recursion still rejects with E55214. AnyHit attribute admission is statically checked; the
-selected runtime callbacks do not consume attribute values. No ABI/module version changed.
+NVVM recursion still rejects with E55214. At that gate, AnyHit attribute admission was statically
+checked; the separate query batch below adds runtime observation. No ABI/module version changed.
 
 The scheduled working checkpoint after five implementations passes all 1,711 configurations,
-with no regressions or changed inputs. It refreshes this admitted corpus on the current compiler;
-the historical full baseline retains its own identity. The optional full RHI suite has not run.
+with no regressions or changed inputs on the compiler accepted as `0762f003c`, before the query
+extension below. The historical full baseline retains its own identity. The optional full RHI suite has not run.
 Raw evidence is under build/nvvm-anyhit; source and artifacts remained frozen throughout the run.
 
-**Next work:** admit the existing world-ray, ray-range, flags and hit-identity queries in AnyHit,
-as supported by the installed SDK, with an independent callback oracle. Core/provider signatures
-already exist; preserve raygen/compute and miss hit-information rejection. Keep transforms,
-geometry-index/SBT semantics, motion and procedural/callable ABI work as separate decisions.
-The working cadence restarts at this checkpoint. Full RHI remains on demand.
+The AnyHit query extension is accepted: thirteen existing physical queries now pass the owning
+stage policy. The independent sibling RHI callback oracle checks both unequal attributes as well,
+with 289 assertions at NVVM O0/O3. Its prior-compiler NVRTC control also passes 289. The original
+fixture produced twenty 1–4 ULP NVRTC barycentric mismatches; a reviewed change of direction Z from 1.5 to 2
+kept exact expected values unchanged. Both original/retry identities and failures are retained.
+The affected unit retains 62 forbidden-stage/no-mutation cases and passes; all 15 smoke cells pass
+in 21.96s. The eight-job incremental build took 32.59s. No core/provider/static/API changes were
+needed, so unchanged contracts retain their earlier evidence. Raw evidence: build/nvvm-anyhit-state.
+
+**Next work:** probe the four existing RHI ObjectToWorld/WorldToObject matrix cases and audit their
+fixed-array payload and transform-composition boundaries. Raw SDK object-ray queries are AnyHit/
+Intersection-only, so ClosestHit needs a different implementation, not broader stage admission.
+GeometryIndex is not interchangeable with an SBT record index. Keep motion, procedural/callable ABI
+and recursive callback tracing separate. This is one implementation iteration after the 1,711-cell working
+checkpoint at 0762f003c; that checkpoint was not rerun or relabeled. Full RHI remains on demand.

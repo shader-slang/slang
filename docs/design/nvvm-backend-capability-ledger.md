@@ -60,10 +60,17 @@ source regressions. A subsequent bounded AnyHit batch qualifies exact object-ray
 nullary Void ignore/accept primitives. Five selected NVVM RHI cases pass 418 assertions; object
 origin/direction and the nine-mode payload oracle execute O0/O3. The affine oracle distinguishes
 inverse-transformed, unnormalized directions from world-space values. Two world-ray controls add
-64 passing assertions. AnyHit attributes have checked/static plan coverage, without fresh runtime
-observation of attribute values. Existing ray-state/hit-identity query stage restrictions remain
-unchanged. The working checkpoint passes all 1,711 admitted configurations; full RHI stays optional.
-World-ray origin/direction and minimum/current distance are qualified in miss/closest-hit.
+64 passing assertions. A separate AnyHit state oracle qualifies the thirteen existing world-ray,
+ray-range, flags and hit-identity queries plus both unequal triangle attributes at O0/O3. All 289
+assertions pass through NVVM and a prior-compiler NVRTC control. Six isolated hits across two
+instances and a miss check 114 words, both faces, flags 2/10, independent IDs, candidate distance 2
+versus trace maximum 4, sentinels and guards. ClosestHit is NOP. The original direction Z 1.5 fixture
+had twenty 1–4 ULP NVRTC barycentric mismatches; direction Z 2 selects a cleaner exact-input domain
+without changing expected barycentrics or adding tolerance. Exact outcomes and both identities are
+retained in focused evidence; this is not a general exact-intersection claim. The affected 62-case
+rejection unit and 15 smoke cells pass. The preceding working checkpoint passes all 1,711 admitted
+configurations on its recorded compiler; it was not repeated for this small stage extension.
+Full RHI stays optional. World-ray and range queries remain qualified in miss/closest-hit as well.
 The [material fixture](../../tests/pipeline/ray-tracing/nvvm-optix-material.slang) samples all four
 texel centers of a 2x2 texture and evaluates the unchanged imported MaterialX dielectric BSDF.
 NVVM O0/O3 and NVRTC O3 each check 202 words: 16 material lanes against the maintained finite-input
@@ -73,8 +80,8 @@ NVVM O0 differs from CUDA in 12 bounded material words; O3 matches all words for
 This qualifies one textured normal-incidence BSDF path, not the full generated material graph or its
 packed texture-handle convention. PTX acceptance by libNVVM alone is not an OptiX execution claim.
 
-PrimitiveIndex, InstanceIndex, InstanceID and HitKind are qualified in closest-hit through exact
-UInt32 SDK queries. RayFlags is qualified in miss/closest-hit. The optional sibling RHI `ray-tracing-intrinsics-hit-identities.cuda` test checks two
+PrimitiveIndex, InstanceIndex, InstanceID and HitKind use exact UInt32 SDK queries in
+closest-hit/any-hit. RayFlags is qualified in miss/closest-hit/any-hit. The optional sibling RHI `ray-tracing-intrinsics-hit-identities.cuda` test checks two
 instances, distinct custom IDs, primitive indices 0/1/2, one miss and all 44 words at NVVM O0/O3;
 NVRTC controls use the same independent host oracle. Both triangle windings and incoming flags 0/1
 are checked, including nonzero flags in miss. The original RHI triangle test also passes.
