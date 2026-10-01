@@ -97,6 +97,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS ((SlangNVVMBuilderInterfaceID)3u)
 #define SLANG_NVVM_BUILDER_INTERFACE_TEXTURE_OPERATIONS ((SlangNVVMBuilderInterfaceID)4u)
 #define SLANG_NVVM_BUILDER_INTERFACE_ATOMIC_OPERATIONS ((SlangNVVMBuilderInterfaceID)5u)
+#define SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS ((SlangNVVMBuilderInterfaceID)6u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -246,6 +247,23 @@ extern "C"
         /** Used only by compare-exchange; must be relaxed for every other operation. */
         SlangNVVMMemoryOrder failureMemoryOrder;
     } SlangNVVMAtomicOperationDesc;
+
+    /** Scoped, non-atomic accesses to exactly the described scalar location. */
+    typedef uint32_t SlangNVVMMemoryOperation;
+#define SLANG_NVVM_MEMORY_OP_LOAD ((SlangNVVMMemoryOperation)0u)
+#define SLANG_NVVM_MEMORY_OP_STORE ((SlangNVVMMemoryOperation)1u)
+    typedef uint32_t SlangNVVMMemoryScope;
+#define SLANG_NVVM_MEMORY_SCOPE_DEVICE ((SlangNVVMMemoryScope)0u)
+#define SLANG_NVVM_MEMORY_SCOPE_WORKGROUP ((SlangNVVMMemoryScope)1u)
+
+    typedef struct SlangNVVMMemoryOperationDesc
+    {
+        SlangNVVMMemoryOperation operation;
+        SlangNVVMValueTypeDesc valueType;
+        SlangNVVMAddressSpace addressSpace;
+        SlangNVVMMemoryScope scope;
+        uint32_t alignment;
+    } SlangNVVMMemoryOperationDesc;
 
     typedef uint32_t SlangNVVMSurfaceOperation;
 #define SLANG_NVVM_SURFACE_OP_LOAD ((SlangNVVMSurfaceOperation)0u)
@@ -605,6 +623,24 @@ extern "C"
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderAtomicOperationsAPI;
+
+    /** Optional interface. Existing ABI46 tables remain unchanged.
+        Load takes a pointer and returns a value; store takes pointer/value and returns null. */
+    typedef struct SlangNVVMBuilderMemoryOperationsAPI
+    {
+#define SLANG_NVVM_MEMORY_OPERATIONS_VERSION 1u
+        uint32_t structureSize;
+        uint32_t version;
+        SlangNVVMResult(SLANG_NVVM_CALL* isOperationSupported)(
+            const SlangNVVMMemoryOperationDesc* operation,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitOperation)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMMemoryOperationDesc* operation,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderMemoryOperationsAPI;
 
     typedef struct SlangNVVMBuilderSurfaceOperationsAPI
     {

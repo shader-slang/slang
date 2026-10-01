@@ -2860,7 +2860,7 @@
         {
           "attempt": "independent-normal-control-v1",
           "outcome": "Independent closed-form check caught a missing denominator in a reviewer shortcut before GPU execution.",
-          "resolution": "Corrected denominator to 1+alpha\u00b2; actual scalar reference and source were unchanged.",
+          "resolution": "Corrected denominator to 1+alpha²; actual scalar reference and source were unchanged.",
           "evidence": {
             "path": "build/nvvm-material-sample/review/scalar-replay.v1.json",
             "sha256": "8ffa7f200d59a8f02c43a469194f57f87dda1776de7786f5f2182c5af53b97fc"
@@ -8722,7 +8722,7 @@
           "round1_nvrtc_over_nvvm_o3": 0.9596760743029731
         }
       ],
-      "observations": "Eight longer wave/min/max fixtures show NVVM O3 intervals 1.76\u20132.42 times NVRTC O3; FP8 scalar transport is near parity at 1.03. These targeted correctness workloads include shader checks and do not define general shader throughput.",
+      "observations": "Eight longer wave/min/max fixtures show NVVM O3 intervals 1.76–2.42 times NVRTC O3; FP8 scalar transport is near parity at 1.03. These targeted correctness workloads include shader checks and do not define general shader throughput.",
       "correctness": {
         "original_outcomes_preserved": 1740,
         "input_deltas": [],
@@ -11503,7 +11503,7 @@
         {
           "id": "conversion-blocked-capability-wire-identities",
           "status": "resolved",
-          "cause": "The NVVM capability addition shifted serialized atom and alias identities while admitting versions31\u201333. The historical32 surface module decoded compute as fragment (E30702), and the historical32 atomic_bfloat16 alias emitted89 instead of80 at SM80 under O0/O3.",
+          "cause": "The NVVM capability addition shifted serialized atom and alias identities while admitting versions31–33. The historical32 surface module decoded compute as fragment (E30702), and the historical32 atomic_bfloat16 alias emitted89 instead of80 at SM80 under O0/O3.",
           "correction": "The maintainer authorized an all-backend prototype compatibility break. Minimum and written semantic versions are34; existing guards reject older bytes before AST/IR decoding. Real old32/33 modules now reject with E00130; identical source rebuilt at34 selects80 and alias/surface PTX assembles at O0/O3. Three static units cover31/32/33 rejection, metadata, current loads and source fallback. Historical loads are not relabeled successful.",
           "initial_gates": [
             {
@@ -80333,6 +80333,456 @@
         "last_full": "post-cleanup-half",
         "last_targeted": "half-volume-surfaces",
         "implementations_since_full": 10
+      }
+    },
+    "nvvm-coherent-pointer-memory": {
+      "status": "accepted-focused",
+      "scope": "Naturally aligned Int/UInt32/64 coherent pointer loads/stores: Device with proven global storage, Workgroup with proven shared storage. Actual NVVM target SM70+; qualified at SM80. Module43/providerABI46/container2 unchanged.",
+      "contract": "Canonical scope/alignment attributes select ld/st.relaxed.gpu.global or ld/st.relaxed.cta.shared. Sideeffect and memory clobber preserve accessed-location effects; no acquire/release promise for unrelated locations, scope widening, ordinary fallback or read-modify-write substitute.",
+      "identity": {
+        "revision": "6a29dfc460c0cb302fa03003b7455cfc17fb8aba",
+        "patch_sha256": "27bd73a37c703e186b4050094fb7cd617cd31f0bb558727b398b1f07abca8df1",
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "3572b7a8924e44fc9c8ec16797c8a4628beba834d2868248ee84178db37d0086",
+          "source/compiler-core/slang-nvvm-ir-builder.cpp": "163d50623715227f54dea3d3744e4eaf08247bd767ba320c8244ef28c219a6a4",
+          "source/compiler-core/slang-nvvm-ir-builder.h": "8755e29fa0410bec4c1c8eb31f496d729e14b9a07e102a1115b21e483aeada9d",
+          "source/compiler-core/slang-nvvm-semantic-catalog.h": "49239f51da013b5983dd680893f57047e1ab221525f146be3edb1538c3cdf182",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "df07848014870e95647fc9640afc06b0d0d11083467be5d61cfa6a8a132911c4",
+          "source/slang/core.meta.slang": "14f685f38df479ad7dbaa5683ab5a9d526fc97bec7ff318efa8a48073d54c7b8",
+          "source/slang/slang-capabilities.capdef": "8220ff84e0e13b559edbc9f6bb20adedd01e54a0a3837313516823feb87cca2d",
+          "source/slang/slang-emit-nvvm-plan.h": "39942ab119936782aebab970396c89dd2e935584da234b00ec6a311b5f9cc3e9",
+          "source/slang/slang-emit-nvvm.cpp": "a662222178ae725191b4787581f107cfd2b6251b107eae8c00e9a8759d763c4a",
+          "source/slang/slang-ir-lower-buffer-element-type.cpp": "370a46a9cd237a9bc21a1afab4af9308406e234b0319e9c105ee78f00700d6bc",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "250f4e9b9bc24bf53c966c203b4ceb56419b79b62d34861a21a9fea745af2d38",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "e24654ba1c79b8d45f4056e434a05a555df90e2cbd0d4a319e8412bfa8a377ba",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "1b486982056368f9f49a780daee6518b69de2ff32751358fb62d9412d924283f",
+          "tests/cuda/nvvm-coherent-pointer-memory.slang": "d4194a49539a7cfd5788bf3f5f9948f7a2d72dba7d81c92ee00e0cd47b17a875",
+          "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang": "752f190e0cb5b32111319d8b4e348ede65e6fc46eee0f889042e7f9c381e689b"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "889590639f8c7755edcf00d2a10e9fc19339fe1a0d821a9043de36be44f91f05",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "ea2e1d6e8ad467aed1edc132525bc277543d85f07f90eb3d5fbc9e1695df29b1",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "e1bc5c46d9fe9f6597a455d4003f4f6e7fdc6559ac53ce6b3f84811aee3447ad",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "ca74575bcca30e095e5d1b8e59a734ed4f20823146cd9b5f8237c2287476279d"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "production_validation_identity": {
+        "path": "build/nvvm-coherent-pointer-memory/final-tested-identity.json",
+        "sha256": "49d3ebeed9c90f74ef533e30f0332e89eff912804f34c4c234e28adfc2bff224"
+      },
+      "validation_identity_difference": {
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so"
+        ],
+        "reason": "Only fake recording was repaired after successful real-provider/compiler checks. Production and real-provider unit source remain exact."
+      },
+      "build": {
+        "initial_failure": {
+          "path": "build/nvvm-coherent-pointer-memory/build.json",
+          "sha256": "14c9757f82084fb45c30f37f76ed5a8967b84fce9c61042457ac101cb02696eb"
+        },
+        "first_success": {
+          "path": "build/nvvm-coherent-pointer-memory/build-retry.json",
+          "sha256": "7b357951cd9e2e4e6c3442e340c8a4a724299a276a66b29b42ce7e4313ba0659"
+        },
+        "production_corrections": {
+          "path": "build/nvvm-coherent-pointer-memory/build-corrections.json",
+          "sha256": "d07e8d9d96966a017a7f0e7a545b7d2f41d36d5bb61f6a66a9726addc55d0c24"
+        },
+        "fake_pointer_repair": {
+          "path": "build/nvvm-coherent-pointer-memory/build-fake-repair.json",
+          "sha256": "a8f5bbf39cb544900a645dd4cb63c9709f4abeebacb999371e38485525f63a13"
+        },
+        "fake_global_repair": {
+          "path": "build/nvvm-coherent-pointer-memory/build-fake-global-repair.json",
+          "sha256": "0493bdbbb45850599d7a9ab059e907271d4671c4c3e4205e8bab824498f3b00d"
+        }
+      },
+      "compatibility": {
+        "path": "build/nvvm-coherent-pointer-memory/compatibility-check.json",
+        "sha256": "fdd27e7d80a8429bafc43fbb947b58a2d9af5661c27fb5939fdc393f389fa26a"
+      },
+      "research": {
+        "qualification": {
+          "path": "build/nvvm-coherent-pointer-memory/prototype-qualification.json",
+          "sha256": "75be59124a1447ca54d2d2d47fbefaea4861f6251c5a40c3f119f9ae8c42d068"
+        },
+        "independent_review": {
+          "path": "build/nvvm-coherent-pointer-memory/research-review.json",
+          "sha256": "2bce3c5be1f0f084064e216a0adbbdac420329679ee1147f3a365c480340ce85"
+        },
+        "contract": {
+          "path": "build/nvvm-coherent-pointer-memory/contract.md",
+          "sha256": "3fc6144c1ba0c371fc2efd3686f51ed9c2f7317ac4cda97ddd4906ac94e29bd0"
+        },
+        "scope": "Four race-free O0/O3 global/shared mechanism probes; unchanged inputs, exact outputs/guards/completion. Implementation evidence, not universal memory-model proof."
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-coherent-pointer-memory/emitter-units-final.json",
+            "sha256": "07cbf1c54a7bbfce160bd82a75290bf1d6d1241488e290f921f8387a5b2c5715"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangCoherentMemoryUsesCheckedDescriptors.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangCoherentMemoryRejectsBeforeProviderMutation.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderCoherentMemoryPreservesScopesAndRejectsWithoutMutation.internal": "passed"
+          },
+          "counts": {
+            "passed": 3
+          },
+          "real_provider_gate": {
+            "path": "build/nvvm-coherent-pointer-memory/units-final.json",
+            "sha256": "ccef9d5b1c6a82b238e419e286f225a3061b824765ebfc5a3caf94a3b63301ae"
+          },
+          "reuse": "Real-provider unit passed before fake-only repairs; provider/compiler and real unit source unchanged. Two affected fake units rerun on final plugin."
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-coherent-pointer-memory/runtime-final.json",
+            "sha256": "432dac267620d34e53f4429c623e0c71d69eb25d29a32b331f765bd5b689fa49"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-coherent-pointer-memory.slang (cuda)": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory.slang.1 (cuda)": "passed"
+          },
+          "counts": {
+            "passed": 2
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-coherent-pointer-memory/negatives-final.json",
+            "sha256": "06768dc2036fcd8748efdd1278af4976f707c029f22642e8d795fb4027d4ff1c"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.3": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.4": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.5": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.6": "passed",
+            "tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang.7": "passed"
+          },
+          "counts": {
+            "passed": 8
+          }
+        },
+        "discovery": {
+          "gate": {
+            "path": "build/nvvm-coherent-pointer-memory/discovery-final.json",
+            "sha256": "09dbef6623e707a211439f0ca536f5b131225034ac9bf2f77eb3f32e1a618d48"
+          },
+          "results": {
+            "path": "build/nvvm-coherent-pointer-memory/discovery-final-results/results.json",
+            "sha256": "39d94fa6144eea2a30b8d50bd6df08bbd02a9fb1bcda845a115a6cb54c17d56c"
+          },
+          "source": {
+            "path": "tests/language-feature/pointer/coherent-load-store-groupshared.slang",
+            "sha256": "9a031e38669584eac112e318e8852ee2f5d368404c9d6e5f7162252aac9e645a"
+          },
+          "counts": {
+            "correct": 2
+          },
+          "transitions": [
+            {
+              "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "before": {
+                "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+                "mode": "nvvm-o0",
+                "classification": "infrastructure",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+                "canonical_shape": "target capability requirement"
+              },
+              "after": {
+                "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+                "source": "language-feature/pointer/coherent-load-store-groupshared.slang",
+                "source_line": 2,
+                "source_test_ordinal": 1,
+                "cuda_ordinal": 1,
+                "mode": "nvvm-o0",
+                "capability": "cuda_sm_8_0",
+                "reference_derived_from_direct": false,
+                "classification": "correct",
+                "return_code": 0,
+                "execution_counts": {
+                  "passed": 1,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "elapsed_ms": 1613,
+                "diagnostic": "",
+                "canonical_shape": "",
+                "log": "build/nvvm-coherent-pointer-memory/discovery-final-results/logs/nvvm-o0/f114ce026511157483fc10ad5ffef6b5227e6f98.log"
+              },
+              "log": {
+                "path": "build/nvvm-coherent-pointer-memory/discovery-final-results/logs/nvvm-o0/f114ce026511157483fc10ad5ffef6b5227e6f98.log",
+                "sha256": "e13f8ee93167f91e6e462acbcc57f0d478127fb41b5b990e4af96994e800d49a"
+              }
+            },
+            {
+              "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "before": {
+                "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+                "mode": "nvvm-o3",
+                "classification": "infrastructure",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "E36107: target capability requirements make the entry point unavailable to CUDA",
+                "canonical_shape": "target capability requirement"
+              },
+              "after": {
+                "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+                "source": "language-feature/pointer/coherent-load-store-groupshared.slang",
+                "source_line": 2,
+                "source_test_ordinal": 1,
+                "cuda_ordinal": 1,
+                "mode": "nvvm-o3",
+                "capability": "cuda_sm_8_0",
+                "reference_derived_from_direct": false,
+                "classification": "correct",
+                "return_code": 0,
+                "execution_counts": {
+                  "passed": 1,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "elapsed_ms": 1611,
+                "diagnostic": "",
+                "canonical_shape": "",
+                "log": "build/nvvm-coherent-pointer-memory/discovery-final-results/logs/nvvm-o3/a93b28a4e6c04a4f70302a8ef5fa39d75c5b8934.log"
+              },
+              "log": {
+                "path": "build/nvvm-coherent-pointer-memory/discovery-final-results/logs/nvvm-o3/a93b28a4e6c04a4f70302a8ef5fa39d75c5b8934.log",
+                "sha256": "e13f8ee93167f91e6e462acbcc57f0d478127fb41b5b990e4af96994e800d49a"
+              }
+            }
+          ]
+        },
+        "vulkan_control": {
+          "gate": {
+            "path": "build/nvvm-coherent-pointer-memory/vulkan-control-final.json",
+            "sha256": "ff1542a3d1f6c4fed25765d7eac482e7e5893155522e07e74c6d53985fd2bca7"
+          },
+          "binary": {
+            "path": "build/nvvm-coherent-pointer-memory/final-vulkan-control.spv",
+            "sha256": "2e0e5e9442dad066f1502db0f4089737cd21bf1768a097f59115a27d94a9c89e"
+          },
+          "byte_identical_to_before_corrections": true,
+          "scope": "Compile only; no Vulkan GPU claim."
+        },
+        "generated_code": {
+          "inspection": {
+            "path": "build/nvvm-coherent-pointer-memory/code-inspection.json",
+            "sha256": "d9de4c1df3f375c521bca81c51c0dc6e85b1c97c4a55265d3bd4b903c311bdfd"
+          },
+          "modes": {
+            "o0": {
+              "compile": {
+                "path": "build/nvvm-coherent-pointer-memory/code-o0.json",
+                "sha256": "f3854851fc0b1884f2398ce860d4b250f00206424cabc8993103c66bbaee1acd"
+              },
+              "assembly": {
+                "path": "build/nvvm-coherent-pointer-memory/final-assemble-o0.json",
+                "sha256": "ef53996d7b42eebe9e14824b526d5e2a0abe41b427d42c6a27c7fa0e7f2569b7"
+              },
+              "llvm": {
+                "path": "build/nvvm-coherent-pointer-memory/final-o0-1.llvm-ir-asm",
+                "sha256": "a9cca38021112e363b629929719e29a277c893583d19d5550f277e75d47aa194"
+              },
+              "ptx": {
+                "path": "build/nvvm-coherent-pointer-memory/final-o0.ptx",
+                "sha256": "e3b3ba0ef4698e662b066e057ff51cb37b2e92631c2b8d219cde114097518f5a"
+              },
+              "cubin": {
+                "path": "build/nvvm-coherent-pointer-memory/final-o0.cubin",
+                "sha256": "c2f2b3e9a1596727835755eecb72319bfbf454c6f9ae678a5d1c93662f4d309a"
+              }
+            },
+            "o3": {
+              "compile": {
+                "path": "build/nvvm-coherent-pointer-memory/code-o3.json",
+                "sha256": "f000868d0d3371f57871168fd04c8320ac8b345f9f8d11a21c4511fc078a3dc7"
+              },
+              "assembly": {
+                "path": "build/nvvm-coherent-pointer-memory/final-assemble-o3.json",
+                "sha256": "851a27871af776ba43135b8a82cda5e6d5757400b1e9768ed537354a450f6421"
+              },
+              "llvm": {
+                "path": "build/nvvm-coherent-pointer-memory/final-o3-1.llvm-ir-asm",
+                "sha256": "a9cca38021112e363b629929719e29a277c893583d19d5550f277e75d47aa194"
+              },
+              "ptx": {
+                "path": "build/nvvm-coherent-pointer-memory/final-o3.ptx",
+                "sha256": "d57e67c6d2010b1d766133853db564c35e2fa9f2c63ec6fa37641662262e0362"
+              },
+              "cubin": {
+                "path": "build/nvvm-coherent-pointer-memory/final-o3.cubin",
+                "sha256": "29bcd24b7dbc32c72559d0e0a181cfc49751811f0c9c9d41db372e271c0796b5"
+              }
+            }
+          }
+        },
+        "racy_compile_only": {
+          "physical_pointer": {
+            "gate": {
+              "path": "build/nvvm-coherent-pointer-memory/physical-compile-final.json",
+              "sha256": "68a2dd381f9897d56bd38f9add3b495118c9919d646a9a336875c5acab7d3332"
+            },
+            "ptx": {
+              "path": "build/nvvm-coherent-pointer-memory/physical-compile-final.ptx",
+              "sha256": "e662b223bf0c1fb0f1839af9544ece47ffb67aa1bbb596e9d7dc49c0e96b3446"
+            },
+            "outcome": "compiled; not executed"
+          },
+          "redundant_load": {
+            "gate": {
+              "path": "build/nvvm-coherent-pointer-memory/redundant-compile-final.json",
+              "sha256": "52cf75e7fff8fa96b4c0be96761b77f1e4900fbeed767e1fc2d09ce5d4d6f364"
+            },
+            "outcome": "E52017 scoped memory access; unsupported scope remains rejected, not executed"
+          }
+        }
+      },
+      "resolved_validation_incidents": [
+        {
+          "problem": "SLANG_CHECK macro under unbraced if/else failed test compilation.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/build.json",
+            "sha256": "14c9757f82084fb45c30f37f76ed5a8967b84fce9c61042457ac101cb02696eb"
+          },
+          "fix": "Brace both test branches."
+        },
+        {
+          "problem": "No-RMW substring red. matched shared.; fake global record did not model scalar pointer fields.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/units.json",
+            "sha256": "e9fa65a5ab1f9d18499ae463330779428bcd8d67329cb604418c9f00b2df0e44"
+          },
+          "fix": "Use instruction boundaries; retain pointer kinds through field address/load and shared pointee classification."
+        },
+        {
+          "problem": "Negative directives without output paths did not reach emission.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/negatives.json",
+            "sha256": "88b6ce63a2c678dc6c2a0bcd2456b5a7f338e213ead0fd41877bcf298626cb9f"
+          },
+          "fix": "Require explicit outputs; check actual backend diagnostics."
+        },
+        {
+          "problem": "Capability alias alone allowed CUDA ordinary dereference and SM60 scoped PTX after upgrade warnings.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/negatives-retry.json",
+            "sha256": "d333817fdca0d7b63f7b24365662ab388ade0b84ed9d739fbc41ad1de54f2bd6"
+          },
+          "cuda": {
+            "gate": {
+              "path": "build/nvvm-coherent-pointer-memory/cuda-actual.json",
+              "sha256": "c671e78a62ce0502b478c8a06b1efca957f490c8b6b6336fe766db34626b48ed"
+            },
+            "artifact": {
+              "path": "build/nvvm-coherent-pointer-memory/cuda-actual.cu",
+              "sha256": "32abf97add99c99cb1b0d0b7895e6be94119797267706568acc5fa49bd0a05eb"
+            }
+          },
+          "sm60": {
+            "gate": {
+              "path": "build/nvvm-coherent-pointer-memory/sm60-actual.json",
+              "sha256": "7d910daa0d28f70d0225df7710e2b16fd8ea06a2847d7a0dddbadbfe821afb77"
+            },
+            "artifact": {
+              "path": "build/nvvm-coherent-pointer-memory/sm60-actual.ptx",
+              "sha256": "c54157577bd912955111c1a45e38b10f5b2645f3913ffd376408fccba8618789"
+            }
+          },
+          "fix": "Explicit SPIR-V/NVVM target bodies and actual target SM70 preflight; final eight negatives pass."
+        },
+        {
+          "problem": "GetElementPtr acquired ScalarLayout but GetOffsetPtr retained DefaultLayout.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/discovery.json",
+            "sha256": "3191e1c7ccb4bf52226d53cff8dff5d2a8ac2d241d906fdad7746073d9fa5ba8"
+          },
+          "ir": {
+            "path": "build/nvvm-coherent-pointer-memory/groupshared-ir-failure.json",
+            "sha256": "464eb556d81e48072954fadb61341692ff5a9fd274a7bb26f8b08e8c496485b3"
+          },
+          "fix": "Fix buffer-layout producer to inherit the canonical base pointer type; retain emitter exact equality. Original source O0/O3 now passes."
+        },
+        {
+          "problem": "After struct admission, fake field/load type recording still omitted scalar pointer kinds.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/units-final.json",
+            "sha256": "ccef9d5b1c6a82b238e419e286f225a3061b824765ebfc5a3caf94a3b63301ae"
+          },
+          "fix": "Complete modeled pointer-field transport; real provider unit already passed."
+        },
+        {
+          "problem": "Fake global handles all consulted the last-declared global type.",
+          "evidence": {
+            "path": "build/nvvm-coherent-pointer-memory/emitter-units-retry.json",
+            "sha256": "fddd87855df078c822c31f45b008777f2c28aebeda5469daacd9daf3ba0e0d60"
+          },
+          "fix": "Each successful declaration records its own type on its handle; both affected emitter units rerun."
+        }
+      ],
+      "preservation": {
+        "prior_feature_count": 52,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "original_corpus_sources": "unchanged"
+      },
+      "limitations": [
+        "Other scope/address pairs, weak alignment, float/vector/aggregate values, unknown pointer roots, new helper/readonly roles and volatile semantics remain excluded.",
+        "The two original racy fixtures are compile/optimizer evidence only; their original runtime failures are not declared resolved. CUDA coherent operations remain unavailable.",
+        "Focused correctness and compile/assembly only; no full campaign, performance claim or universal memory-model proof."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "coherent-pointer-memory",
+        "implementations_since_full": 11
       }
     }
   }

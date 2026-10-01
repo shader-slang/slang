@@ -1578,25 +1578,35 @@ internal void __store_coherent<T, AddressSpace addrSpace, L:IBufferDataLayout>(P
 /// @param ptr The pointer to store value to.
 /// @param value The value to store.
 ///
-[require(SPV_KHR_vulkan_memory_model)]
+[require(coherent_pointer_memory)]
 [ForceInline]
 __generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace, L:IBufferDataLayout>
 void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace, L> ptr, T value)
 {
-    __store_coherent<T, addrSpace, L>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+    __target_switch
+    {
+    case spirv:
+    case nvvm:
+        __store_coherent<T, addrSpace, L>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+    }
 }
 
 /// Load a value coherently to a memoryscope.
 /// Tighter memory scopes may be faster to operate on.
 /// @param ptr The pointer to load from.
 ///
-[require(SPV_KHR_vulkan_memory_model)]
+[require(coherent_pointer_memory)]
 [ForceInline]
 [__NoSideEffect]
 __generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
 T loadCoherent(Ptr<T, access, addrSpace, L> ptr)
 {
-    return __load_coherent<T, access, addrSpace, L>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
+    __target_switch
+    {
+    case spirv:
+    case nvvm:
+        return __load_coherent<T, access, addrSpace, L>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
+    }
 }
 
 ${

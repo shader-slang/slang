@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Ten bounded feature batches now pass focused validation after the full checkpoint:
+Eleven bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -108,7 +108,7 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
 `features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
 `features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
-`features.nvvm-half-volume-surfaces`. Ten
+`features.nvvm-half-volume-surfaces` and `features.nvvm-coherent-pointer-memory`. Eleven
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -123,7 +123,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; ten feature implementations have passed focused validation since the full checkpoint.
+unchanged; eleven feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -162,11 +162,31 @@ remain distinct, with independent host readback and exact spatial guards. The ei
 34 seconds. The full baseline remains unchanged; eight new rows require reviewed adoption of
 24 cells at the next full checkpoint.
 
-Next, investigate the existing coherent-pointer corpus failures as a bounded memory-semantics
-research gate. Establish scope, availability/visibility and volatile behavior against Slang's
-Vulkan/D3D contracts before opening capability admission or extending provider memory operations.
-CUDA C++ remains comparison evidence. The generic `requirePrelude` source-text boundary, graphics
-entry tests and hardware capability failures are separate from missing NVVM primitives.
+Scoped coherent pointer memory now passes for naturally aligned Int/UInt32/64 with exactly
+Device/global and Workgroup/shared accesses. Three distinct units, four race-free O0/O3 GPU cells,
+eight negative cells, two LLVM/PTX inspections/assemblies and a Vulkan compile control pass. The
+original groupshared source is unchanged and its two NVVM failures are resolved in focused evidence.
+The physical-pointer fixture compiles but is not executed; redundant-load still rejects unsupported
+scope. Both original programs contain races, so their runtime failures are not declared resolved.
+
+Focused testing found and fixed three production gaps: pointer offsets now inherit the canonical
+base layout at the buffer-layout producer, explicit target bodies prevent CUDA from silently emitting
+ordinary loads, and preflight checks actual SM70 capability rather than trusting source-profile
+upgrade warnings. The original failed outputs are retained. Fake pointer fields and per-global type
+recording also needed repairs; only the test plugin was rebuilt for those final retries. The successful
+production compiler checks were reused with exact identity. Optional interface6 leaves existing ABI46
+tables unchanged. Other scope/space pairs, new pointer roles and volatile semantics remain excluded.
+Research and all attempts are under `build/nvvm-coherent-pointer-memory/`; no new full campaign.
+
+Next, investigate explicit-layout Device pointer arithmetic and transport. The existing Std430,
+Scalar and C layout test specifies byte strides64/48/40, but its uninitialized pointer inputs are not
+a new runtime oracle. First inspect canonical layout/storage IR, then qualify initialized allocated
+pointers and in-range offsets before admission. Reuse existing layout producers/utilities and retain
+role-specific dereference boundaries. The ignored bounded plan is
+`issue-nvvm-backend/plan.layout-pointer-transport.md`.
+
+The generic `requirePrelude` source-text boundary, graphics entry tests and hardware capability
+failures are separate from missing NVVM primitives.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

@@ -1736,6 +1736,9 @@ Other
 `all`
 > User should not use this capability
 
+`coherent_pointer_memory`
+> Location-scoped coherent pointer accesses; NVVM scoped PTX requires SM70.
+
 `nvvm`
 > Direct NVVM implementation refinement; retains CUDA device/SM capabilities during migration.
 

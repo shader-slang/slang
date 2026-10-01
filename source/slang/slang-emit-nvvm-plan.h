@@ -262,6 +262,8 @@ struct NVVMPlannedLoad
     uint32_t alignment = 0;
     SlangNVVMLoadFlags flags = SLANG_NVVM_LOAD_FLAG_NONE;
     bool isGlobalUserPointer = false;
+    bool isScoped = false;
+    SlangNVVMMemoryOperationDesc memoryOperation = {};
 };
 
 /// Owns a store's storage conversion and pointer-value ABI choice before provider mutation.
@@ -273,6 +275,8 @@ struct NVVMPlannedStore
     NVVMPlannedStorageConversion conversion;
     uint32_t alignment = 0;
     bool usesHelperPointerValue = false;
+    bool isScoped = false;
+    SlangNVVMMemoryOperationDesc memoryOperation = {};
 };
 
 /// Records a field selected by canonical IR key and the admitted storage/access roles of its root.
@@ -414,6 +418,8 @@ struct NVVMEmissionPlan
     List<NVVMPlannedEphemeralValue> ephemeralValues;
     List<NVVMPlannedSurfaceOperation> surfaceOperations;
     List<NVVMPlannedAtomicOperation> atomicOperations;
+    // GetOffsetPtr has no field/element record. Retain its checked physical space at planning.
+    Dictionary<IRInst*, SlangNVVMAddressSpace> scopedOffsetSpaces;
 };
 
 struct NVVMAtomicOperationRequirement

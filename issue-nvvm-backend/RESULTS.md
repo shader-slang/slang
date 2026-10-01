@@ -759,6 +759,42 @@ under the ignored results root. Update the current baseline/identity/focused evi
 STATUS and feature matrix; keep completed working plans/report drafts uncommitted. Make the reviewed
 local commit and stop unless further work was explicitly authorized.
 
+## Scoped coherent pointer memory
+
+Use the dedicated race-free fixture and the original groupshared discovery seed for focused memory
+validation; preserve the original source and full checkpoint inventory:
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  slang-unit-test-tool/nvvmIRBuilderCoherentMemoryPreservesScopesAndRejectsWithoutMutation.internal \
+  slang-unit-test-tool/nvvmSlangCoherentMemoryUsesCheckedDescriptors.internal \
+  slang-unit-test-tool/nvvmSlangCoherentMemoryRejectsBeforeProviderMutation.internal
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  -api-only -api cuda tests/cuda/nvvm-coherent-pointer-memory.slang
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang
+python3 issue-nvvm-backend/run-compute-discovery.py --config RelWithDebInfo \
+  --architecture 80 --jobs 1 --match coherent-load-store-groupshared \
+  --modes nvvm-o0 nvvm-o3 --keep-mirrors --require-all-correct \
+  --output "$NVVM_RESULTS/coherent-groupshared"
+build/RelWithDebInfo/bin/slangc \
+  tests/language-feature/pointer/coherent-load-store-groupshared.slang \
+  -target spirv -entry computeMain -stage compute -capability vk_mem_model \
+  -o "$NVVM_RESULTS/coherent-vulkan-control.spv"
+```
+
+Require three distinct units, two dedicated runtime cells, eight diagnostic cells and two original
+source discovery cells. The SPIR-V compile checks that the alternative capability retains Vulkan
+without imposing CUDA's SM floor. Inspect O0/O3 generated code for the exact GPU/global and CTA/shared
+scopes, widths, memory effects and shared-address conversion. The direct provider unit compares both
+serializers before/after rejected calls and rules out stores/RMW in load-only modules. Preserve
+optional-interface absence and malformed-table negatives.
+
+The original physical-storage-buffer and redundant-coherent-load fixtures contain racing accesses;
+retain them as compile/optimizer evidence, not runtime oracles. Unsupported scopes in the latter may
+remain rejected. Passing the groupshared seed does not resolve all coherent corpus failures. Scoped
+relaxed accesses alone do not establish execution synchronization or acquire/release of other data.
+
 ## Physical surface correctness
 
 `extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. The original six fixtures under

@@ -3,6 +3,267 @@
 #include "unit-test-nvvm-library-signature-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
+SLANG_UNIT_TEST(nvvmIRBuilderCoherentMemoryPreservesScopesAndRejectsWithoutMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const auto api = builder.getMemoryOperationsAPI();
+    SLANG_CHECK_ABORT(api != nullptr);
+    const SlangNVVMValueTypeDesc types[] = {
+        NVVMSemantics::kSignedI32,
+        NVVMSemantics::kUnsignedI32,
+        NVVMSemantics::kSignedI64,
+        NVVMSemantics::kUnsignedI64};
+    for (const auto& type : types)
+        for (bool shared : {false, true})
+            for (bool store : {false, true})
+            {
+                const SlangNVVMMemoryOperationDesc desc = {
+                    store ? SLANG_NVVM_MEMORY_OP_STORE : SLANG_NVVM_MEMORY_OP_LOAD,
+                    type,
+                    shared ? SLANG_NVVM_ADDRESS_SPACE_SHARED : SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+                    shared ? SLANG_NVVM_MEMORY_SCOPE_WORKGROUP : SLANG_NVVM_MEMORY_SCOPE_DEVICE,
+                    type.bitWidth / 8};
+                SLANG_CHECK(builder.supportsMemoryOperation(desc));
+                String control[2];
+                for (bool injectFailures : {false, true})
+                {
+                    ScopedNVVMBuilderModule module;
+                    module.builder = &builder;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        builder.createModule(toSlice("coherent-memory-contract"), module.module)));
+                    SlangNVVMTypeHandle integer = nullptr, otherInteger = nullptr,
+                                        voidType = nullptr;
+                    SlangNVVMTypeHandle pointer = nullptr, otherPointer = nullptr,
+                                        functionType = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        builder.getIntegerType(module.module, type.bitWidth, integer)));
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(
+                        module.module,
+                        type.bitWidth == 32 ? 64 : 32,
+                        otherInteger)));
+                    SLANG_CHECK_ABORT(
+                        SLANG_SUCCEEDED(builder.getVoidType(module.module, voidType)));
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        builder
+                            .getPointerType(module.module, integer, desc.addressSpace, pointer)));
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+                        module.module,
+                        integer,
+                        shared ? SLANG_NVVM_ADDRESS_SPACE_GLOBAL : SLANG_NVVM_ADDRESS_SPACE_SHARED,
+                        otherPointer)));
+                    const SlangNVVMTypeHandle parameters[] =
+                        {pointer, integer, otherPointer, otherInteger};
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionType(
+                        module.module,
+                        store ? voidType : integer,
+                        parameters,
+                        SLANG_COUNT_OF(parameters),
+                        functionType)));
+                    SlangNVVMValueHandle function = nullptr, otherFunction = nullptr,
+                                         values[4] = {};
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                        module.module,
+                        functionType,
+                        SLANG_NVVM_LINKAGE_EXTERNAL,
+                        SLANG_NVVM_FUNCTION_FLAG_NONE,
+                        toSlice("access"),
+                        function)));
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                        module.module,
+                        functionType,
+                        SLANG_NVVM_LINKAGE_EXTERNAL,
+                        SLANG_NVVM_FUNCTION_FLAG_NONE,
+                        toSlice("other"),
+                        otherFunction)));
+                    for (uint32_t i = 0; i < SLANG_COUNT_OF(values); ++i)
+                        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                            builder.getFunctionParameter(module.module, function, i, values[i])));
+                    SlangNVVMValueHandle otherFunctionPointer = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getFunctionParameter(
+                        module.module,
+                        otherFunction,
+                        0,
+                        otherFunctionPointer)));
+                    SlangNVVMBlockHandle block = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        builder.createBlock(module.module, function, toSlice("entry"), block)));
+                    SLANG_CHECK_ABORT(
+                        SLANG_SUCCEEDED(builder.setInsertBlock(module.module, block)));
+                    const SlangNVVMValueHandle operands[] = {values[0], values[1]};
+                    const size_t count = store ? 2 : 1;
+                    if (injectFailures)
+                    {
+                        // Unsupported descriptors and bad physical operands must not leave casts,
+                        // calls, declarations or metadata in either serialization of an otherwise
+                        // valid module.
+                        for (uint32_t invalidCase = 0; invalidCase < 11; ++invalidCase)
+                        {
+                            auto invalid = desc;
+                            switch (invalidCase)
+                            {
+                            case 0:
+                                invalid.operation = 99;
+                                break;
+                            case 1:
+                                invalid.valueType.kind = SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+                                break;
+                            case 2:
+                                invalid.valueType.bitWidth = 16;
+                                break;
+                            case 3:
+                                invalid.valueType.laneCount = 2;
+                                break;
+                            case 4:
+                                invalid.scope = 99;
+                                break;
+                            case 5:
+                                invalid.addressSpace = SLANG_NVVM_ADDRESS_SPACE_GENERIC;
+                                break;
+                            case 6:
+                                invalid.scope = shared ? SLANG_NVVM_MEMORY_SCOPE_DEVICE
+                                                       : SLANG_NVVM_MEMORY_SCOPE_WORKGROUP;
+                                break;
+                            case 7:
+                                invalid.alignment = 0;
+                                break;
+                            case 8:
+                                invalid.alignment = 3;
+                                break;
+                            case 9:
+                                invalid.alignment = desc.alignment / 2;
+                                break;
+                            case 10:
+                                invalid.alignment = desc.alignment * 2;
+                                break;
+                            }
+                            SLANG_CHECK(!builder.supportsMemoryOperation(invalid));
+                            SlangNVVMValueHandle rejected = function;
+                            SLANG_CHECK(
+                                api->emitOperation(
+                                    module.module,
+                                    &invalid,
+                                    operands,
+                                    count,
+                                    &rejected) == SLANG_E_INVALID_ARG);
+                            SLANG_CHECK(rejected == nullptr);
+                        }
+                        auto wrongWidth = desc;
+                        wrongWidth.valueType.bitWidth = type.bitWidth == 32 ? 64 : 32;
+                        wrongWidth.alignment = wrongWidth.valueType.bitWidth / 8;
+                        SLANG_CHECK(builder.supportsMemoryOperation(wrongWidth));
+                        SlangNVVMValueHandle rejectedWidth = function;
+                        SLANG_CHECK(
+                            api->emitOperation(
+                                module.module,
+                                &wrongWidth,
+                                operands,
+                                count,
+                                &rejectedWidth) == SLANG_E_INVALID_ARG);
+                        SLANG_CHECK(rejectedWidth == nullptr);
+                        const SlangNVVMValueHandle badPointers[] = {
+                            values[1],
+                            values[2],
+                            otherFunctionPointer};
+                        for (auto badPointer : badPointers)
+                        {
+                            const SlangNVVMValueHandle badOperands[] = {badPointer, values[1]};
+                            SlangNVVMValueHandle rejected = function;
+                            SLANG_CHECK(
+                                api->emitOperation(
+                                    module.module,
+                                    &desc,
+                                    badOperands,
+                                    count,
+                                    &rejected) == SLANG_E_INVALID_ARG);
+                            SLANG_CHECK(rejected == nullptr);
+                        }
+                        if (store)
+                        {
+                            const SlangNVVMValueHandle badOperands[] = {values[0], values[3]};
+                            SlangNVVMValueHandle rejected = function;
+                            SLANG_CHECK(
+                                api->emitOperation(
+                                    module.module,
+                                    &desc,
+                                    badOperands,
+                                    count,
+                                    &rejected) == SLANG_E_INVALID_ARG);
+                            SLANG_CHECK(rejected == nullptr);
+                        }
+                        for (uint32_t invalidCase = 0; invalidCase < 3; ++invalidCase)
+                        {
+                            SlangNVVMValueHandle rejected = function;
+                            SLANG_CHECK(
+                                api->emitOperation(
+                                    module.module,
+                                    invalidCase == 0 ? nullptr : &desc,
+                                    invalidCase == 1 ? nullptr : operands,
+                                    invalidCase == 2 ? 0 : count,
+                                    &rejected) == SLANG_E_INVALID_ARG);
+                            SLANG_CHECK(rejected == nullptr);
+                        }
+                        SLANG_CHECK(
+                            api->emitOperation(module.module, &desc, operands, count, nullptr) ==
+                            SLANG_E_INVALID_ARG);
+                    }
+                    SlangNVVMValueHandle result = nullptr;
+                    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                        builder.emitMemoryOperation(module.module, desc, operands, count, result)));
+                    if (store)
+                    {
+                        SLANG_CHECK(result == nullptr);
+                        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(module.module)));
+                    }
+                    else
+                    {
+                        SLANG_CHECK_ABORT(result != nullptr);
+                        SLANG_CHECK_ABORT(
+                            SLANG_SUCCEEDED(builder.emitValueReturn(module.module, result)));
+                    }
+                    uint32_t formatIndex = 0;
+                    for (const auto format :
+                         {SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+                          SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY})
+                    {
+                        ComPtr<ISlangBlob> assembly;
+                        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                            builder.serializeModule(module.module, format, assembly)));
+                        const String text = _getBlobText(assembly);
+                        SLANG_CHECK(text.contains("asm sideeffect"));
+                        SLANG_CHECK(text.contains("~{memory}"));
+                        StringBuilder mnemonic;
+                        mnemonic << (store ? "st.relaxed." : "ld.relaxed.")
+                                 << (shared ? "cta.shared.u" : "gpu.global.u") << type.bitWidth;
+                        SLANG_CHECK(
+                            _countOccurrences(text.getUnownedSlice(), mnemonic.getUnownedSlice()) ==
+                            1);
+                        SLANG_CHECK(!text.contains("cmpxchg") && !text.contains("atomicrmw"));
+                        SLANG_CHECK(!text.contains(" atom.") && !text.contains("\"atom."));
+                        SLANG_CHECK(!text.contains(" red.") && !text.contains("\"red."));
+                        SLANG_CHECK(!text.contains("!invariant.load"));
+                        SLANG_CHECK(text.contains(store ? "st.relaxed" : "ld.relaxed"));
+                        SLANG_CHECK(!text.contains(store ? "ld.relaxed" : "st.relaxed"));
+                        SLANG_CHECK(text.contains("cvta.to.shared.u64") == shared);
+                        if (shared)
+                        {
+                            SLANG_CHECK(text.contains("addrspacecast"));
+                            SLANG_CHECK(text.contains("cvt.u32.u64"));
+                        }
+                        if (injectFailures)
+                        {
+                            SLANG_CHECK(text == control[formatIndex]);
+                        }
+                        else
+                        {
+                            control[formatIndex] = text;
+                        }
+                        ++formatIndex;
+                    }
+                }
+            }
+}
+
 static bool _supportsNVVMScalarBuilderOperation(
     const NVVMIRBuilder& builder,
     NVVMScalarTestOperation operation)

@@ -48,6 +48,18 @@ The installed compiler can be older than Git HEAD; source revision alone does no
 | Receiver snapshots              | Canonical aggregate parameter snapshots preserve values across resource mutation; GPU and material compile evidence                   | Aggregate-memory ordering issue is fixed; material runtime is separately scoped below. [Snapshot](../../tests/cuda/nvvm-aggregate-param-snapshot.slang), [resource snapshot](../../tests/cuda/nvvm-aggregate-param-resource-snapshot.slang)                                                                                                                                                                                              |
 | Nested integer aggregate stores | Nested records and root/wrapped/multidimensional arrays; NVVM O0/O3 GPU and 39 provider shape/alignment checks                        | Qualified libNVVM store workaround; focused NVRTC optimized copies still fail. [Root](../../tests/cuda/nvvm-nested-array-root.slang), [wrapper](../../tests/cuda/nvvm-nested-array-wrapped.slang), [multidimensional](../../tests/cuda/nvvm-nested-array-multidimensional.slang)                                                                                                                                                         |
 
+Scoped coherent pointer memory admits naturally aligned Int/UInt32/64 for exactly Device/global
+and Workgroup/shared. The canonical memory attributes select scoped relaxed GPU/CTA operations;
+coherent reads do not become read-modify-write operations or invariant loads. Existing permissions
+and proven pointer roots remain required. The [guarded fixture](../../tests/cuda/nvvm-coherent-pointer-memory.slang)
+uses disjoint writes, a group barrier, mirrored reads, ordinary-memory controls and both-end guards.
+The [negative fixture](../../tests/cuda/nvvm-coherent-pointer-memory-unsupported.slang) keeps CUDA C++,
+SM60, mismatched scopes/spaces, float/vector values, weak alignment and integer-derived roots closed.
+The NVVM arm requires SM70+, with focused qualification at SM80; the Vulkan capability arm is
+unchanged. Other scopes, new pointer roles and volatile semantics are not admitted. The original
+physical-pointer and redundant-load corpus programs contain races and are not runtime oracles.
+See [the scoped validation procedure](../../issue-nvvm-backend/RESULTS.md#scoped-coherent-pointer-memory).
+
 Core execution helpers and varying-parameter legalization use named
 `llvm.nvvm.read.ptx.sreg.*` intrinsics for all twelve thread/block/grid coordinates.
 The named-intrinsic boundary admits zero-argument scalar i32 register reads, the three void

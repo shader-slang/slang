@@ -183,6 +183,25 @@ key and qualified parent, not pointee type alone. Indexed children retain the pa
 access/storage proof. Constant-memory parameter-group loads remain ordinary loads; invariant global
 buffer recipes require their separate immutable-location contract.
 
+Coherent pointer accesses retain canonical `MemoryScopeAttr` and `AlignedAttr` in checked load/store
+records. Naturally aligned Int/UInt32/64 use `ld/st.relaxed.gpu.global` for Device/global and
+`ld/st.relaxed.cta.shared` for Workgroup/shared. Existing address records, admitted entry pointers
+and checked global-pointer loads prove the physical space; `GetOffsetPtr` retains its validated
+base space because it has no field/element record. A helper pointer's type alone is insufficient.
+These are accessed-location availability/visibility operations, not acquire/release of unrelated
+locations. The existing barriers still own execution synchronization. Other scope/space pairs,
+weak alignment and unproven roots reject before provider mutation. The shared buffer-layout producer
+propagates the base layout through pointer offsets, keeping the emitter's exact type check intact.
+
+The mapping follows [Vulkan's availability/visibility contract](https://docs.vulkan.org/spec/latest/appendices/memorymodel.html#memory-model-availability-visibility)
+and [PTX scoped relaxed accesses](https://docs.nvidia.com/cuda/archive/12.9.1/parallel-thread-execution/index.html#memory-consistency-model).
+It is a bounded implementation choice qualified at SM80, not a universal memory-model equivalence
+proof. Explicit target-switch arms preserve SPIR-V and NVVM producers and exclude CUDA C++.
+Preflight checks the actual selected CUDA architecture for SM70+; inferred source-capability
+upgrades alone do not prove the downstream architecture. Provider primitives retain `sideeffect` and a memory clobber, never invariant
+metadata or a read-modify-write substitute. Shared pointers pass through a typed address-space cast
+and explicit `cvta.to.shared` conversion before forming the shared offset.
+
 Natural payload layout, CUDA layout and physical LLVM layout are distinct. AnyValue packs Natural
 payloads; internal copyable locals and borrows can use native value layout, including float3
 alignment16. External storage and qualified BF16/compact families use their proven representations.
@@ -229,6 +248,13 @@ handles. LLVM objects/symbols cannot cross into the CPU LLVM provider or host co
 LLVM build is statically linked with hidden/excluded symbols. Handles belong to their live module;
 destroying it invalidates subordinate handles. Serialization follows a caller-owned size-query/write
 protocol, and the host copies outputs while retaining the provider library.
+
+Scoped memory uses optional `MEMORY_OPERATIONS` interface6, with its own size/version and pure
+descriptor-support query. Existing ABI46 tables retain their layouts. An absent interface permits
+ordinary programs; a coherent request requires support before module creation. A present malformed
+table fails initialization. The provider validates the actual typed AS1/AS3 pointer and exact scalar
+operands before emitting any casts or calls. LLVM atomic loads/stores are not substituted for these
+operations because the qualified libNVVM dialect does not support them.
 
 LLVM modules use `nvptx64-nvidia-cuda`, the specified DataLayout, `nvvmir.version` and kernel
 annotations; a calling convention alone does not mark a kernel. The current direct emitter writes

@@ -2231,6 +2231,12 @@ struct LoweredElementTypeContext
                     ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
                     builder.setDataType(inst, ptrType);
                 }
+                else if (auto offset = as<IRGetOffsetPtr>(inst))
+                {
+                    // Pointer arithmetic preserves the base pointer type. Its layout may have
+                    // changed above when the base is an address into lowered storage.
+                    builder.setDataType(inst, offset->getOperand(0)->getDataType());
+                }
             }
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())

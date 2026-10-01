@@ -101,6 +101,22 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
+    /// Returns the optional scoped-memory interface, or null for an older provider.
+    const SlangNVVMBuilderMemoryOperationsAPI* getMemoryOperationsAPI() const
+    {
+        return m_memoryOperations.isOperationSupported ? &m_memoryOperations : nullptr;
+    }
+
+    bool supportsMemoryOperation(const SlangNVVMMemoryOperationDesc& operation) const;
+
+    /// Emits a checked scoped load or store through the optional memory interface.
+    SlangResult emitMemoryOperation(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMMemoryOperationDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Queries one complete typed surface-resource operation.
     bool supportsSurfaceOperation(const SlangNVVMSurfaceOperationDesc& operation) const;
 
@@ -410,6 +426,7 @@ private:
     SlangNVVMBuilderConstructionAPI m_construction = {};
     SlangNVVMBuilderValueOperationsAPI m_valueOperations = {};
     SlangNVVMBuilderAtomicOperationsAPI m_atomicOperations = {};
+    SlangNVVMBuilderMemoryOperationsAPI m_memoryOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;

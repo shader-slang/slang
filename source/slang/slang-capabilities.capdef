@@ -2800,3 +2800,6 @@ alias all = _sm_6_10 + hlsl_nvapi
           | spirv_1_5 + sm_6_10
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
+
+/// Location-scoped coherent pointer accesses; NVVM scoped PTX requires SM70.
+alias coherent_pointer_memory = SPV_KHR_vulkan_memory_model | nvvm + _cuda_sm_7_0;

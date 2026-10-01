@@ -563,6 +563,21 @@ inline bool isSupported(const SlangNVVMValueOperationDesc& desc)
     return find(desc) || resolveValueOperationFamily(desc, resolution);
 }
 
+/// Admits the two qualified scoped-memory pairs without widening source scopes.
+inline bool isSupported(const SlangNVVMMemoryOperationDesc& desc)
+{
+    return (desc.operation == SLANG_NVVM_MEMORY_OP_LOAD ||
+            desc.operation == SLANG_NVVM_MEMORY_OP_STORE) &&
+           (desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+            desc.valueType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+           (desc.valueType.bitWidth == 32 || desc.valueType.bitWidth == 64) &&
+           desc.valueType.laneCount == 1 && desc.alignment == desc.valueType.bitWidth / 8 &&
+           ((desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_GLOBAL &&
+             desc.scope == SLANG_NVVM_MEMORY_SCOPE_DEVICE) ||
+            (desc.addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED &&
+             desc.scope == SLANG_NVVM_MEMORY_SCOPE_WORKGROUP));
+}
+
 /// Returns whether an atomic descriptor is in the currently established direct-NVVM family.
 inline bool isSupported(const SlangNVVMAtomicOperationDesc& desc)
 {

@@ -154,6 +154,24 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
         return SLANG_E_NO_INTERFACE;
     }
 
+    SlangNVVMBuilderMemoryOperationsAPI memoryOperations = {};
+    const void* memoryOperationsRaw = nullptr;
+    const SlangResult memoryResult =
+        api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS, &memoryOperationsRaw);
+    if (memoryResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(memoryResult);
+        if (!memoryOperationsRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate =
+            *static_cast<const SlangNVVMBuilderMemoryOperationsAPI*>(memoryOperationsRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_MEMORY_OPERATIONS_VERSION ||
+            !candidate.isOperationSupported || !candidate.emitOperation)
+            return SLANG_E_NO_INTERFACE;
+        memoryOperations = candidate;
+    }
+
     outBuilder.m_api = api;
     outBuilder.m_foundation = foundation;
     outBuilder.m_construction = construction;
@@ -161,6 +179,8 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
     outBuilder.m_atomicOperations = atomicOperations;
     outBuilder.m_surfaceOperations = surfaceOperations;
     outBuilder.m_textureOperations = textureOperations;
+    // Older ABI46 providers may omit this interface. Ordinary programs must keep working.
+    outBuilder.m_memoryOperations = memoryOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
 }
@@ -412,6 +432,34 @@ SlangResult NVVMIRBuilder::emitAtomicOperation(
             return result;
         return !outValue ? SLANG_OK : SLANG_FAIL;
     }
+    return _validateHandleResult(result, outValue);
+}
+
+bool NVVMIRBuilder::supportsMemoryOperation(const SlangNVVMMemoryOperationDesc& operation) const
+{
+    if (!isInitialized() || !m_memoryOperations.isOperationSupported)
+        return false;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(m_memoryOperations.isOperationSupported(&operation, &supported)) &&
+           supported != 0;
+}
+
+SlangResult NVVMIRBuilder::emitMemoryOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMMemoryOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsMemoryOperation(operation))
+        return SLANG_E_NOT_AVAILABLE;
+    const SlangResult result =
+        m_memoryOperations.emitOperation(module, &operation, operands, operandCount, &outValue);
+    if (operation.operation == SLANG_NVVM_MEMORY_OP_STORE)
+        return SLANG_FAILED(result) ? result : (!outValue ? SLANG_OK : SLANG_FAIL);
     return _validateHandleResult(result, outValue);
 }
 

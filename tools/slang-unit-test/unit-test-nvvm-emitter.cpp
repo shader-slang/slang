@@ -3,6 +3,223 @@
 #include "unit-test-nvvm-source-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
+SLANG_UNIT_TEST(nvvmSlangCoherentMemoryUsesCheckedDescriptors)
+{
+    const struct TypeCase
+    {
+        const char* spelling;
+        SlangNVVMValueTypeDesc type;
+    } types[] = {
+        {"int", NVVMSemantics::kSignedI32},
+        {"uint", NVVMSemantics::kUnsignedI32},
+        {"int64_t", NVVMSemantics::kSignedI64},
+        {"uint64_t", NVVMSemantics::kUnsignedI64}};
+    for (const auto& type : types)
+        for (bool shared : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            StringBuilder source;
+            source << (shared ? "groupshared " : "uniform ") << type.spelling
+                   << (shared ? " memory[2]; " : "* memory; ") << "RWStructuredBuffer<"
+                   << type.spelling << "> output; "
+                   << "[numthreads(2,1,1)] void computeMain(uint3 tid : SV_GroupThreadID) { "
+                   << (shared ? "let base = __getAddress(memory[0]); " : "") << "storeCoherent<"
+                   << type.type.bitWidth / 8
+                   << ", MemoryScope::" << (shared ? "Workgroup" : "Device") << ">("
+                   << (shared ? "base + tid.x" : "__getAddress(memory[tid.x])")
+                   << ", output[tid.x]); "
+                   << "AllMemoryBarrierWithGroupSync(); output[tid.x] = loadCoherent<"
+                   << type.type.bitWidth / 8
+                   << ", MemoryScope::" << (shared ? "Workgroup" : "Device") << ">("
+                   << (shared ? "base + 1 - tid.x" : "__getAddress(memory[1-tid.x])") << "); }";
+            ComPtr<slang::IBlob> code, diagnostics;
+            const auto result = _compileSlangWithDirectNVVM(
+                session,
+                source.getBuffer(),
+                code,
+                diagnostics,
+                "cuda_sm_8_0");
+            if (SLANG_FAILED(result))
+                getTestReporter()->message(
+                    TestMessageType::Info,
+                    _getBlobText(diagnostics).getBuffer());
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+            SLANG_CHECK(gFakeNVVMBuilder.memoryOperations.getCount() == 2);
+            SLANG_CHECK(gFakeNVVMBuilder.emitMemoryOperationCallCount == 2);
+            uint32_t loads = 0, stores = 0;
+            for (const auto& desc : gFakeNVVMBuilder.memoryOperations)
+            {
+                SLANG_CHECK(NVVMSemantics::areSameType(desc.valueType, type.type));
+                SLANG_CHECK(desc.alignment == type.type.bitWidth / 8);
+                SLANG_CHECK(
+                    desc.addressSpace ==
+                    (shared ? SLANG_NVVM_ADDRESS_SPACE_SHARED : SLANG_NVVM_ADDRESS_SPACE_GLOBAL));
+                SLANG_CHECK(
+                    desc.scope ==
+                    (shared ? SLANG_NVVM_MEMORY_SCOPE_WORKGROUP : SLANG_NVVM_MEMORY_SCOPE_DEVICE));
+                loads += desc.operation == SLANG_NVVM_MEMORY_OP_LOAD;
+                stores += desc.operation == SLANG_NVVM_MEMORY_OP_STORE;
+            }
+            SLANG_CHECK(loads == 1 && stores == 1);
+            SLANG_CHECK(gFakeNVVMBuilder.emitAtomicOperationCallCount == 0);
+        }
+}
+
+SLANG_UNIT_TEST(nvvmSlangCoherentMemoryRejectsBeforeProviderMutation)
+{
+    const struct RejectedCase
+    {
+        const char* declarations;
+        const char* body;
+        const char* capability;
+    } cases[] = {
+        {"uniform int* p;",
+         "output[0] = loadCoherent<4, MemoryScope::Workgroup>(p);",
+         "cuda_sm_8_0"},
+        {"groupshared int value;",
+         "storeCoherent<4, MemoryScope::Device>(__getAddress(value), 1);",
+         "cuda_sm_8_0"},
+        {"uniform float* p;",
+         "output[0] = int(loadCoherent<4, MemoryScope::Device>(p));",
+         "cuda_sm_8_0"},
+        {"uniform int2* p;",
+         "output[0] = loadCoherent<8, MemoryScope::Device>(p).x;",
+         "cuda_sm_8_0"},
+        {"uniform int* p;", "output[0] = loadCoherent<2, MemoryScope::Device>(p);", "cuda_sm_8_0"},
+        {"uniform uint64_t address;",
+         "output[0] = loadCoherent<4, MemoryScope::Device>(Ptr<int>(address));",
+         "cuda_sm_8_0"},
+        {"uniform int* p;",
+         "output[0] = loadCoherent<4, MemoryScope::Invocation>(p);",
+         "cuda_sm_8_0"},
+        {"uniform int* p;", "output[0] = loadCoherent<4, MemoryScope::Device>(p);", "cuda_sm_6_0"},
+    };
+    for (const auto& test : cases)
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << test.declarations << "RWStructuredBuffer<int> output; "
+               << "[numthreads(1,1,1)] void computeMain() {" << test.body << "}";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
+            session,
+            source.getBuffer(),
+            code,
+            diagnostics,
+            test.capability)));
+        const String text = _getBlobText(diagnostics);
+        const bool belowFloor = UnownedStringSlice(test.capability) == "cuda_sm_6_0";
+        if (gFakeNVVMBuilder.createModuleCallCount != 0 || !text.contains("E52017"))
+        {
+            getTestReporter()->message(TestMessageType::Info, source.getBuffer());
+        }
+        if (!text.contains("E52017"))
+            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+        SLANG_CHECK(text.contains("E52017"));
+        if (belowFloor)
+        {
+            SLANG_CHECK(text.contains("scoped memory requires SM 7.0"));
+        }
+        SLANG_CHECK(!code);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        SLANG_CHECK(gFakeNVVMBuilder.emitMemoryOperationCallCount == 0);
+    }
+
+    // An older provider may omit this optional interface. Ordinary memory must still compile,
+    // while a coherent operation must fail preflight before any output module is created.
+    for (bool omitInterface : {false, true})
+        for (bool coherent : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            gFakeNVVMBuilder.omitMemoryOperationsInterface = omitInterface;
+            gFakeNVVMBuilder.rejectMemoryOperations = !omitInterface;
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            StringBuilder source;
+            source << "uniform int* p; RWStructuredBuffer<int> output; "
+                   << "[numthreads(1,1,1)] void computeMain() { output[0] = "
+                   << (coherent ? "loadCoherent<4, MemoryScope::Device>(p)" : "p[0]") << "; }";
+            ComPtr<slang::IBlob> code, diagnostics;
+            const auto result = _compileSlangWithDirectNVVM(
+                session,
+                source.getBuffer(),
+                code,
+                diagnostics,
+                "cuda_sm_8_0");
+            if (coherent)
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+                SLANG_CHECK(!code);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+                SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+            }
+            else
+            {
+                if (SLANG_FAILED(result))
+                    getTestReporter()->message(
+                        TestMessageType::Info,
+                        _getBlobText(diagnostics).getBuffer());
+                SLANG_CHECK(SLANG_SUCCEEDED(result));
+                SLANG_CHECK(_getBlobText(code) == kFakeDirectPTX);
+                SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 1);
+                SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount > 0);
+                SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount > 0);
+            }
+            SLANG_CHECK(gFakeNVVMBuilder.emitMemoryOperationCallCount == 0);
+        }
+
+    // A present but malformed table is not an older provider. Reject it at initialization,
+    // including when the requested program only uses ordinary memory.
+    for (uint32_t invalidCase = 0; invalidCase < 4; ++invalidCase)
+    {
+        _resetDirectNVVMFakes();
+        auto& api = gFakeNVVMBuilder.memoryOperationsAPI;
+        switch (invalidCase)
+        {
+        case 0:
+            api.structureSize = 0;
+            break;
+        case 1:
+            ++api.version;
+            break;
+        case 2:
+            api.isOperationSupported = nullptr;
+            break;
+        case 3:
+            api.emitOperation = nullptr;
+            break;
+        }
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        const char* source = "uniform int* p; RWStructuredBuffer<int> output; "
+                             "[numthreads(1,1,1)] void computeMain() { output[0] = p[0]; }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            _compileSlangWithDirectNVVM(session, source, code, diagnostics, "cuda_sm_8_0")));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
 // Gives fake-emitter tests that intentionally request a libdevice operation the same coherent
 // toolkit shape required by production preflight. The fake bytes are never parsed by the fake
 // compiler; their presence proves the module dependency is carried through discovery.

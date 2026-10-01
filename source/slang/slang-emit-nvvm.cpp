@@ -5639,6 +5639,95 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
     return address;
 }
 
+// Resolves a physical space from already checked producers. A default `Ptr<int>` kernel
+// parameter is global, but the same type in a helper can carry a local address. Preserve that
+// distinction; field/element records and planned pointer loads already own their source roles.
+bool _getNVVMScopedPointerSpace(
+    const NVVMEmissionPlan& plan,
+    IRFunc* entryPoint,
+    IRInst* pointer,
+    SlangNVVMAddressSpace& outSpace)
+{
+    IRInst* root = plan.addresses.getRoot(pointer);
+    if (const auto space = plan.scopedOffsetSpaces.tryGetValue(root))
+    {
+        outSpace = *space;
+        return true;
+    }
+    if (getNVVMSupportedSharedGlobal(root))
+    {
+        outSpace = SLANG_NVVM_ADDRESS_SPACE_SHARED;
+        return true;
+    }
+    const bool isEntryParameter =
+        as<IRParam>(root) && root->getParent() == entryPoint->getFirstBlock() &&
+        asNVVMSupportedDeviceCopyableValuePointerType(root->getDataType());
+    const auto load = _findPlannedNVVMOperation(plan.loads, root);
+    if (isEntryParameter || (load && load->isGlobalUserPointer))
+    {
+        outSpace = SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
+        return true;
+    }
+    return false;
+}
+
+// Consumes the canonical memory attributes after ordinary pointer availability and permission
+// checks. A coherent access has one exact scalar descriptor, not an ordinary-load fallback.
+SlangResult _planNVVMScopedMemory(
+    CodeGenContext* codeGenContext,
+    const NVVMEmissionPlan& plan,
+    IRFunc* entryPoint,
+    IRInst* inst,
+    IRInst* pointer,
+    IRType* valueType,
+    bool& outIsScoped,
+    SlangNVVMMemoryOperationDesc& outOperation)
+{
+    outIsScoped = false;
+    outOperation = {};
+    auto scopeAttr = inst->findAttr<IRMemoryScopeAttr>();
+    if (!scopeAttr)
+        return SLANG_OK;
+    // Source capability inference may warn and upgrade a requirement without changing the
+    // selected downstream architecture. Scoped PTX accesses require the actual target to be SM70.
+    if (!codeGenContext->getTargetCaps().implies(CapabilityAtom::_cuda_sm_7_0))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("scoped memory requires SM 7.0"));
+    for (auto attr : inst->getAllAttrs())
+    {
+        if (!as<IRMemoryScopeAttr>(attr) && !as<IRAlignedAttr>(attr))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("scoped memory attributes"));
+    }
+    auto alignedAttr = inst->findAttr<IRAlignedAttr>();
+    auto scope =
+        scopeAttr->getOperandCount() == 1 ? as<IRIntLit>(scopeAttr->getMemoryScope()) : nullptr;
+    auto alignment = alignedAttr && alignedAttr->getOperandCount() == 1
+                         ? as<IRIntLit>(alignedAttr->getOperand(0))
+                         : nullptr;
+    if (inst->getAllAttrs().getCount() != 2 || !scope || !alignment || alignment->getValue() < 0 ||
+        alignment->getValue() > kNVVMUInt32Max ||
+        !_getNVVMSemanticType(valueType, outOperation.valueType) ||
+        !_getNVVMScopedPointerSpace(plan, entryPoint, pointer, outOperation.addressSpace))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("scoped memory access"));
+    switch (MemoryScope(scope->getValue()))
+    {
+    case MemoryScope::Device:
+        outOperation.scope = SLANG_NVVM_MEMORY_SCOPE_DEVICE;
+        break;
+    case MemoryScope::Workgroup:
+        outOperation.scope = SLANG_NVVM_MEMORY_SCOPE_WORKGROUP;
+        break;
+    default:
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("scoped memory access"));
+    }
+    outOperation.operation =
+        inst->getOp() == kIROp_Load ? SLANG_NVVM_MEMORY_OP_LOAD : SLANG_NVVM_MEMORY_OP_STORE;
+    outOperation.alignment = uint32_t(alignment->getValue());
+    if (!NVVMSemantics::isSupported(outOperation))
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("scoped memory access"));
+    outIsScoped = true;
+    return SLANG_OK;
+}
+
 // Plans the complete ordinary-load decision before any provider mutation. Access flags and
 // physical representation are independent: `read(__constref Payload p) { return p.value; }`
 // keeps a native float3, while the same semantic field in a parameter group is compact storage.
@@ -5919,7 +6008,10 @@ SlangResult _validateNVVMFunction(
                 break;
 
             case kIROp_Store:
-                if (inst->getOperandCount() != 2 || !inst->getOperand(0))
+                if ((inst->findAttr<IRMemoryScopeAttr>()
+                         ? inst->getOperandCount() - inst->getAllAttrs().getCount()
+                         : inst->getOperandCount()) != 2 ||
+                    !inst->getOperand(0))
                     return _diagnoseUnsupportedIR(codeGenContext, toSlice("store"));
                 break;
 
@@ -6446,6 +6538,17 @@ SlangResult _validateNVVMFunction(
                     }
                     NVVMPlannedLoad plannedLoad;
                     _planNVVMLoad(codeGenContext, requirements, load, plannedLoad);
+                    SLANG_RETURN_ON_FAIL(_planNVVMScopedMemory(
+                        codeGenContext,
+                        requirements.emissionPlan,
+                        entryPoint,
+                        load,
+                        load->getPtr(),
+                        load->getDataType(),
+                        plannedLoad.isScoped,
+                        plannedLoad.memoryOperation));
+                    if (plannedLoad.isScoped)
+                        plannedLoad.flags = SLANG_NVVM_LOAD_FLAG_NONE;
                     requirements.emissionPlan.loads.add(plannedLoad);
                     availableValues.add(load);
                 }
@@ -6489,6 +6592,15 @@ SlangResult _validateNVVMFunction(
                     }
                     NVVMPlannedStore plannedStore;
                     _planNVVMStore(codeGenContext, requirements, store, plannedStore);
+                    SLANG_RETURN_ON_FAIL(_planNVVMScopedMemory(
+                        codeGenContext,
+                        requirements.emissionPlan,
+                        entryPoint,
+                        store,
+                        store->getPtr(),
+                        store->getVal()->getDataType(),
+                        plannedStore.isScoped,
+                        plannedStore.memoryOperation));
                     requirements.emissionPlan.stores.add(plannedStore);
                 }
                 break;
@@ -7043,6 +7155,13 @@ SlangResult _validateNVVMFunction(
                         inst,
                         availableValues,
                         dominatorTree));
+                    SlangNVVMAddressSpace space;
+                    if (_getNVVMScopedPointerSpace(
+                            requirements.emissionPlan,
+                            entryPoint,
+                            basePointer,
+                            space))
+                        requirements.emissionPlan.scopedOffsetSpaces[inst] = space;
                     availableValues.add(inst);
                 }
                 break;
@@ -9569,6 +9688,22 @@ SlangResult emitNVVMIRFromLinkedIR(
                 SLANG_E_NOT_AVAILABLE);
         }
     }
+    for (const auto& load : requirements.emissionPlan.loads)
+    {
+        if (load.isScoped && !builder.supportsMemoryOperation(load.memoryOperation))
+            return _requireBuilderOperation(
+                codeGenContext,
+                "scoped memory load",
+                SLANG_E_NOT_AVAILABLE);
+    }
+    for (const auto& store : requirements.emissionPlan.stores)
+    {
+        if (store.isScoped && !builder.supportsMemoryOperation(store.memoryOperation))
+            return _requireBuilderOperation(
+                codeGenContext,
+                "scoped memory store",
+                SLANG_E_NOT_AVAILABLE);
+    }
     for (const auto& requirement : requirements.surfaceOperations)
     {
         if (!builder.supportsSurfaceOperation(requirement.desc))
@@ -10015,15 +10150,31 @@ SlangResult emitNVVMIRFromLinkedIR(
                             typeContext,
                             loweredPointer));
                         SlangNVVMValueHandle loweredValue = nullptr;
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "value load",
-                            builder.emitLoad(
-                                moduleScope.module,
-                                loweredPointer,
-                                load->alignment,
-                                load->flags,
-                                loweredValue)));
+                        if (load->isScoped)
+                        {
+                            const SlangNVVMValueHandle operands[] = {loweredPointer};
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "scoped memory load",
+                                builder.emitMemoryOperation(
+                                    moduleScope.module,
+                                    load->memoryOperation,
+                                    operands,
+                                    1,
+                                    loweredValue)));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "value load",
+                                builder.emitLoad(
+                                    moduleScope.module,
+                                    loweredPointer,
+                                    load->alignment,
+                                    load->flags,
+                                    loweredValue)));
+                        }
                         SlangNVVMValueHandle semanticValue = nullptr;
                         SLANG_RETURN_ON_FAIL(_emitNVVMPlannedStorageConversion(
                             codeGenContext,
@@ -10090,14 +10241,31 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
-                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-                            codeGenContext,
-                            "value store",
-                            builder.emitStore(
-                                moduleScope.module,
-                                storageValue,
-                                loweredPointer,
-                                store->alignment)));
+                        if (store->isScoped)
+                        {
+                            const SlangNVVMValueHandle operands[] = {loweredPointer, storageValue};
+                            SlangNVVMValueHandle unused = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "scoped memory store",
+                                builder.emitMemoryOperation(
+                                    moduleScope.module,
+                                    store->memoryOperation,
+                                    operands,
+                                    2,
+                                    unused)));
+                        }
+                        else
+                        {
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "value store",
+                                builder.emitStore(
+                                    moduleScope.module,
+                                    storageValue,
+                                    loweredPointer,
+                                    store->alignment)));
+                        }
                     }
                     break;
 

@@ -986,6 +986,93 @@ static SlangResult SLANG_NVVM_CALL _emitIntegerNegate(
     return SLANG_OK;
 }
 
+static SlangResult SLANG_NVVM_CALL
+_isMemoryOperationSupported(const SlangNVVMMemoryOperationDesc* operation, uint32_t* outSupported)
+{
+    if (outSupported)
+        *outSupported = 0;
+    if (!operation || !outSupported)
+        return SLANG_E_INVALID_ARG;
+    *outSupported = Slang::NVVMSemantics::isSupported(*operation) ? 1 : 0;
+    return SLANG_OK;
+}
+
+// Preserves location-scoped memory effects without pretending these operations synchronize
+// unrelated locations. Shared addresses cross the typed AS3-to-generic boundary before PTX's
+// explicit conversion; truncating a generic address alone would not produce a shared offset.
+static SlangResult SLANG_NVVM_CALL _emitMemoryOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMMemoryOperationDesc* operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    ModuleState* state = _getModule(module);
+    llvm::BasicBlock* block = _getValidInsertionBlock(state);
+    if (!operation || !Slang::NVVMSemantics::isSupported(*operation) || !outValue || !block ||
+        !operands || operandCount != (operation->operation == SLANG_NVVM_MEMORY_OP_LOAD ? 1u : 2u))
+        return SLANG_E_INVALID_ARG;
+    const bool isLoad = operation->operation == SLANG_NVVM_MEMORY_OP_LOAD;
+    llvm::Value* pointer = _getValue(operands[0]);
+    auto pointerType = _getLoadablePointerType(state, pointer);
+    if (!pointerType || pointerType->getAddressSpace() != operation->addressSpace ||
+        !pointerType->getNonOpaquePointerElementType()->isIntegerTy(
+            operation->valueType.bitWidth) ||
+        !_isValueUsableAtInsertionPoint(state, block, pointer))
+        return SLANG_E_INVALID_ARG;
+    llvm::Type* valueType = pointerType->getNonOpaquePointerElementType();
+    llvm::Value* value = isLoad ? nullptr : _getValue(operands[1]);
+    if (!isLoad && (!value || value->getType() != valueType ||
+                    !_isValueUsableAtInsertionPoint(state, block, value)))
+        return SLANG_E_INVALID_ARG;
+
+    // Every rejection above is non-mutating. The descriptor now owns both the instruction
+    // spelling and the exact physical operand types.
+    const bool shared = operation->addressSpace == SLANG_NVVM_ADDRESS_SPACE_SHARED;
+    if (shared)
+        pointer = state->builder.CreateAddrSpaceCast(pointer, llvm::PointerType::get(valueType, 0));
+    llvm::Type* addressType = llvm::Type::getInt64Ty(state->context);
+    llvm::Value* address = state->builder.CreatePtrToInt(pointer, addressType);
+    const char* width = operation->valueType.bitWidth == 32 ? "32" : "64";
+    const char* valueConstraint = operation->valueType.bitWidth == 32 ? "r" : "l";
+    std::string assembly;
+    if (shared)
+    {
+        assembly = "{ .reg .b64 shared64; .reg .b32 shared32; cvta.to.shared.u64 shared64, ";
+        assembly += isLoad ? "$1; " : "$0; ";
+        assembly += "cvt.u32.u64 shared32, shared64; ";
+    }
+    assembly += isLoad ? "ld.relaxed." : "st.relaxed.";
+    assembly += shared ? "cta.shared.u" : "gpu.global.u";
+    assembly += width;
+    if (isLoad)
+        assembly += shared ? " $0, [shared32];" : " $0, [$1];";
+    else
+        assembly += shared ? " [shared32], $1;" : " [$0], $1;";
+    if (shared)
+        assembly += " }";
+    const std::string constraints = isLoad ? std::string("=") + valueConstraint + ",l,~{memory}"
+                                           : std::string("l,") + valueConstraint + ",~{memory}";
+    llvm::SmallVector<llvm::Type*, 2> parameterTypes{addressType};
+    llvm::SmallVector<llvm::Value*, 2> arguments{address};
+    if (!isLoad)
+    {
+        parameterTypes.push_back(valueType);
+        arguments.push_back(value);
+    }
+    auto functionType = llvm::FunctionType::get(
+        isLoad ? valueType : llvm::Type::getVoidTy(state->context),
+        parameterTypes,
+        false);
+    auto primitive = llvm::InlineAsm::get(functionType, assembly, constraints, true);
+    auto call = state->builder.CreateCall(primitive, arguments);
+    if (isLoad)
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMAtomicOperationDesc* operation,
@@ -4950,6 +5037,13 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return api;
     }();
 
+    static const SlangNVVMBuilderMemoryOperationsAPI memoryOperations = {
+        sizeof(SlangNVVMBuilderMemoryOperationsAPI),
+        SLANG_NVVM_MEMORY_OPERATIONS_VERSION,
+        _isMemoryOperationSupported,
+        _emitMemoryOperation,
+    };
+
     switch (interfaceID)
     {
     case SLANG_NVVM_BUILDER_INTERFACE_FOUNDATION:
@@ -4963,6 +5057,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_ATOMIC_OPERATIONS:
         *outInterface = &atomicOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS:
+        *outInterface = &memoryOperations;
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_SURFACE_OPERATIONS:
         *outInterface = &surfaceOperations;
