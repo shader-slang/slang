@@ -207,7 +207,7 @@ In practice to write shader code that works across D3D12 and VK you should have 
 
 ## tex.Load
 
-tex.Load on a read-only texture is supported on CUDA for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms; the mip map selection argument is ignored (the fetch reads the base level). Load is also allowed on RWTexture types on CUDA. Note: half-typed textures are not supported for Load or SampleLevel on CUDA (use a float texture).
+tex.Load on a read-only texture is supported on CUDA for `Texture1D`, `Texture2D`, `Texture3D`, and the 1D/2D array forms; the mip level in the last component of the location is passed to the explicit-level PTX fetch. A `Texture1D` load reads row 0 of the texture as a 2D texture of height 1; a 1D texture object created over linear memory is not supported. Load is also allowed on RWTexture types on CUDA. Note: half-typed textures are not supported for Load or SampleLevel on CUDA (use a float texture).
 
 <a id="full-bool"></a>
 
