@@ -341,6 +341,14 @@ public:
     bool isInitialized() const { return m_stageInterfaces[0] != nullptr; }
     bool isTrustedModule(Module* module) const;
 
+    /// Returns whether the trusted structural ray-tracing module is visible through this exact
+    /// module dependency closure.
+    ///
+    /// The registry belongs to a linkage and remains initialized after any module imports the
+    /// standard module. Consumers must use this query instead of `isInitialized()` when deciding
+    /// whether structural semantics apply to one particular source module or entry point.
+    bool isVisibleFrom(const List<Module*>& moduleDependencies) const;
+
     InterfaceDecl* getStageInterface(StructuralRayTracingStageKind kind) const;
     StructuralRayTracingStageKind getStageKind(InterfaceDecl* interfaceDecl) const;
     AggTypeDecl* getStageInputType(StructuralRayTracingStageKind kind) const;

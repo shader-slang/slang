@@ -27,12 +27,7 @@ static bool _isStructuralRayTracingVisible(
     if (!module)
         return true;
 
-    for (auto dependency : module->getModuleDependencies())
-    {
-        if (registry.isTrustedModule(dependency))
-            return true;
-    }
-    return false;
+    return registry.isVisibleFrom(module->getModuleDependencies());
 }
 
 static FunctionDeclBase* _getStageImplementation(

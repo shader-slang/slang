@@ -1921,6 +1921,19 @@ bool StructuralRayTracingDeclRegistry::isTrustedModule(Module* module) const
     return module && module->getModuleDecl() == m_trustedModuleDecl;
 }
 
+bool StructuralRayTracingDeclRegistry::isVisibleFrom(const List<Module*>& moduleDependencies) const
+{
+    if (!isInitialized())
+        return false;
+
+    for (auto dependency : moduleDependencies)
+    {
+        if (isTrustedModule(dependency))
+            return true;
+    }
+    return false;
+}
+
 Type* StructuralRayTracingDeclRegistry::tryGetTraceProgramDescriptorSchemaType(
     Type* descriptorType) const
 {

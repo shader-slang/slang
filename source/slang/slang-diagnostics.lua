@@ -4544,6 +4544,13 @@ err(
 )
 
 err(
+    "metal-ray-generation-requires-structural-dispatch",
+    38098,
+    "Metal ray-generation entry point requires structural dispatch",
+    span { loc = "location", message = "this Metal ray-generation entry point does not reach 'RayTracer.trace' or 'RayTracer.callShader'" }
+)
+
+err(
     "structural-ray-tracing-curve-requires-metal",
     38060,
     "structural ray-tracing curve primitives require Metal",

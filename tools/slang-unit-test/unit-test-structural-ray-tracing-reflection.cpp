@@ -3273,3 +3273,73 @@ SLANG_UNIT_TEST(structuralRayTracingD3DRecordBindingReflection)
     checkNoRecordBinding("ordinaryMain", SLANG_STAGE_COMPUTE, false);
     checkNoRecordBinding("unrelatedRaygen", SLANG_STAGE_RAY_GENERATION, false);
 }
+
+SLANG_UNIT_TEST(structuralRayTracingActivationIsModuleScoped)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::CompilerOptionEntry experimentalOption = {};
+    experimentalOption.name = slang::CompilerOptionName::ExperimentalFeature;
+    experimentalOption.value.kind = slang::CompilerOptionValueKind::Int;
+    experimentalOption.value.intValue0 = 1;
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_METAL;
+    target.profile = globalSession->findProfile("metal_3_1");
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &target;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &experimentalOption;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> structuralModule(session->loadModuleFromSourceString(
+        "structuralImport",
+        "structural-import.slang",
+        "import slang.raytracing;",
+        diagnostics.writeRef()));
+    if (!structuralModule && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(structuralModule != nullptr);
+
+    // The registry is shared by the session, so loading the module above initializes it. This
+    // second module has no dependency on `slang.raytracing`; it must retain ordinary Metal stage
+    // handling instead of inheriting the first module's structural ray-generation semantics.
+    diagnostics.setNull();
+    ComPtr<slang::IModule> unrelatedModule(session->loadModuleFromSourceString(
+        "unrelated",
+        "unrelated.slang",
+        "[shader(\"raygeneration\")] void main() {}",
+        diagnostics.writeRef()));
+    if (!unrelatedModule && diagnostics)
+        fprintf(stderr, "%s\n", (const char*)diagnostics->getBufferPointer());
+    SLANG_CHECK_ABORT(unrelatedModule != nullptr);
+
+    diagnostics.setNull();
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(unrelatedModule->findAndCheckEntryPoint(
+        "main",
+        SLANG_STAGE_RAY_GENERATION,
+        entryPoint.writeRef(),
+        diagnostics.writeRef())));
+
+    diagnostics.setNull();
+    ComPtr<slang::IComponentType> linkedEntryPoint;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(entryPoint->link(linkedEntryPoint.writeRef(), diagnostics.writeRef())));
+
+    diagnostics.setNull();
+    ComPtr<slang::IBlob> code;
+    auto codeResult =
+        linkedEntryPoint->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+    SLANG_CHECK(SLANG_FAILED(codeResult));
+    const char* diagnosticText =
+        diagnostics ? static_cast<const char*>(diagnostics->getBufferPointer()) : "";
+    SLANG_CHECK(std::strstr(diagnosticText, "E38098") == nullptr);
+}

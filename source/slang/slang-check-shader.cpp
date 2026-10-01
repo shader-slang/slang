@@ -2556,13 +2556,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         if (targetCaps.getCompileTarget() == CapabilityAtom::metal &&
             entryPoint->getStage() == Stage::RayGeneration &&
-            linkage->getStructuralRayTracingDeclRegistry().functionReachesStructuralTrace(
-                entryPointFuncDecl))
+            linkage->getStructuralRayTracingDeclRegistry().isVisibleFrom(
+                entryPoint->getModuleDependencies()))
         {
-            // Structural ray-generation programs become Metal compute kernels, but source code
-            // still executes in the logical ray-generation stage. Using the abstract stage atom
-            // admits only operations with an explicit structural Metal implementation; the target
-            // lowering changes the physical entry-point stage after consuming those operations.
+            // Metal has no native ray-generation stage. Treat the source stage as abstract during
+            // capability validation and let post-specialization structural lowering decide
+            // whether it has a Metal implementation. The decision cannot use the checked-AST call
+            // graph: consider `generic<T : ITracer>(T x) { x.trace(); }` called with a concrete
+            // implementation whose method invokes `RayTracer.trace`. Witness specialization
+            // exposes that trace only in IR. The Metal pass changes exactly the ray-generation
+            // entry points that reach such an operation to physical compute kernels, then
+            // diagnoses any entry point that remains in the unsupported logical stage.
             stageCapabilitySet = CapabilitySet{CapabilityName::_raygen};
         }
         targetCaps.join(stageCapabilitySet);

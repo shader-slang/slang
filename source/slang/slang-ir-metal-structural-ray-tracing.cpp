@@ -5501,6 +5501,28 @@ static void _makeStructuralRayGenerationEntryPointPhysicalCompute(
         builder.getIntValue(builder.getIntType(), Profile(Stage::Compute).raw));
 }
 
+// Diagnoses a logical Metal ray-generation entry point for which post-specialization IR exposed no
+// structural dispatch operation. Semantic checking tentatively admits the logical stage because a
+// trace may be hidden behind generic interface dispatch; this is the exact check after witness
+// specialization has made every selected implementation reachable through ordinary IR calls.
+static void _diagnoseUnloweredMetalRayGenerationEntryPoints(
+    const List<IRFunc*>& entryPoints,
+    DiagnosticSink* sink)
+{
+    if (sink->getErrorCount() != 0)
+        return;
+
+    for (auto entryPoint : entryPoints)
+    {
+        auto decoration = entryPoint->findDecoration<IREntryPointDecoration>();
+        if (!decoration || decoration->getProfile().getStage() != Stage::RayGeneration)
+            continue;
+
+        sink->diagnose(Diagnostics::MetalRayGenerationRequiresStructuralDispatch{
+            .location = entryPoint->sourceLoc});
+    }
+}
+
 struct MetalRayGenerationSystemValueThreader
 {
     MetalRayGenerationSystemValueThreader(
@@ -6049,6 +6071,7 @@ void prepareMetalStructuralRayTracing(
         // and ensure the compiler-only wrapper never reaches general Metal legalization.
         Dictionary<IRType*, IRType*> noTargetDescriptorTypes;
         lowerStructuralRayTracingProgramDescriptorTypes(module, noTargetDescriptorTypes, nullptr);
+        _diagnoseUnloweredMetalRayGenerationEntryPoints(entryPoints, sink);
         return;
     }
     if (hasInvalidStructuralEntryPoint)
@@ -6304,6 +6327,8 @@ void prepareMetalStructuralRayTracing(
         referencingEntryPoints,
         physicalRayGenerationEntryPoints,
         dispatchValues);
+
+    _diagnoseUnloweredMetalRayGenerationEntryPoints(entryPoints, sink);
 
     lowerMetalStructuralRayTracingStageInputOperations(module, payloadValues);
     for (auto child = module->getModuleInst()->getFirstChild(); child; child = child->getNextInst())

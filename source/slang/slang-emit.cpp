@@ -1586,6 +1586,31 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
+    bool hasTentativeMetalRayGenerationEntryPoint = false;
+    if (target == CodeGenTarget::Metal)
+    {
+        auto& registry = codeGenContext->getLinkage()->getStructuralRayTracingDeclRegistry();
+        auto& selectedEntryPointIndices = codeGenContext->getEntryPointIndices();
+        SLANG_ASSERT(irEntryPoints.getCount() == selectedEntryPointIndices.getCount());
+        // `linkIR` creates these IR functions in selected-entry-point order. Consult the matching
+        // source component because the registry is linkage-wide: a different module importing
+        // `slang.raytracing` must not activate structural lowering for this entry point.
+        for (Index i = 0; i < irEntryPoints.getCount(); ++i)
+        {
+            auto entryPoint = irEntryPoints[i];
+            if (auto decoration = entryPoint->findDecoration<IREntryPointDecoration>())
+            {
+                auto sourceEntryPoint = codeGenContext->getEntryPoint(selectedEntryPointIndices[i]);
+                if (decoration->getProfile().getStage() == Stage::RayGeneration &&
+                    registry.isVisibleFrom(sourceEntryPoint->getModuleDependencies()))
+                {
+                    hasTentativeMetalRayGenerationEntryPoint = true;
+                    break;
+                }
+            }
+        }
+    }
+
     const bool hasStructuralRayTracing = requiredLoweringPassSet.structuralRayTracingTrace ||
                                          requiredLoweringPassSet.structuralRayTracingStageInput;
     if (requiredLoweringPassSet.higherOrderFunc && hasStructuralRayTracing)
@@ -1628,7 +1653,8 @@ Result linkAndOptimizeIR(
         target == CodeGenTarget::Metal &&
         (requiredLoweringPassSet.structuralRayTracingTrace ||
          requiredLoweringPassSet.structuralRayTracingStageInput ||
-         requiredLoweringPassSet.structuralRayTracingProgramDescriptor))
+         requiredLoweringPassSet.structuralRayTracingProgramDescriptor ||
+         hasTentativeMetalRayGenerationEntryPoint))
     {
         SLANG_PASS(
             prepareMetalStructuralRayTracing,
