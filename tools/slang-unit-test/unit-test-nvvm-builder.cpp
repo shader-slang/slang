@@ -21,6 +21,12 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
         {"_optix_get_sbt_data_ptr_64", NVVMSemantics::kUnsignedI64},
         {"_optix_get_attribute_0", NVVMSemantics::kUnsignedI32},
         {"_optix_get_attribute_1", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_2", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_3", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_4", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_5", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_6", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_attribute_7", NVVMSemantics::kUnsignedI32},
         {"_optix_read_primitive_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_instance_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_instance_id", NVVMSemantics::kUnsignedI32},
@@ -13763,4 +13769,236 @@ SLANG_UNIT_TEST(nvvmIRBuilderMaskedWavesRejectRetiredOperations)
             control = _getBlobText(assembly);
         }
     }
+}
+
+// Invalid operations must not create private helpers or alter either serialized LLVM dialect.
+SLANG_UNIT_TEST(nvvmIRBuilderHitObjectRejectsWithoutMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    auto api = builder.getHitObjectOperationsAPI();
+    SLANG_CHECK_ABORT(api);
+    uint32_t size = 0, alignment = 0;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getHitObjectStorageLayout(size, alignment)));
+    SLANG_CHECK(size > 0 && alignment > 0 && size % alignment == 0);
+    const SlangNVVMHitObjectOperationDesc nop = {SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP, 0, 0, 0};
+    const SlangNVVMHitObjectOperationDesc invalidDescs[] = {
+        {0u, 0, 0, 0},
+        {0xffffffffu, 0, 0, 0},
+        {SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP, 1, 0, 0},
+        {SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP, 0, 1, 0},
+        {SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP, 0, 0, 1},
+        {SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE, 0, 0, 33},
+        {SLANG_NVVM_HIT_OBJECT_OP_INVOKE, 0, 0, 33},
+        {SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION, 0, 0, 9},
+        {SLANG_NVVM_HIT_OBJECT_OP_QUERY, SLANG_NVVM_HIT_OBJECT_QUERY_ATTRIBUTE, 8, 0},
+        {SLANG_NVVM_HIT_OBJECT_OP_QUERY, SLANG_NVVM_HIT_OBJECT_QUERY_LSS, 2, 0},
+        {SLANG_NVVM_HIT_OBJECT_OP_QUERY, SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_WORLD_TO_OBJECT, 3, 0},
+        {SLANG_NVVM_HIT_OBJECT_OP_QUERY, SLANG_NVVM_HIT_OBJECT_QUERY_IS_HIT, 0, 1},
+    };
+    String control[2];
+    for (bool reject : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("hit-object"), scope.module)));
+        SlangNVVMTypeHandle objectType = nullptr, pointerType = nullptr, voidType = nullptr,
+                            functionType = nullptr, i32 = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getHitObjectType(scope.module, objectType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getPointerType(
+            scope.module,
+            objectType,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            pointerType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, i32)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, &pointerType, 1, functionType)));
+        SlangNVVMValueHandle function = nullptr, other = nullptr, object = nullptr,
+                             foreign = nullptr, wrong = nullptr;
+        for (auto target : {&function, &other})
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+                scope.module,
+                functionType,
+                SLANG_NVVM_LINKAGE_EXTERNAL,
+                SLANG_NVVM_FUNCTION_FLAG_NONE,
+                target == &function ? toSlice("main") : toSlice("other"),
+                *target)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, function, 0, object)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getFunctionParameter(scope.module, other, 0, foreign)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerConstant(scope.module, i32, 0, wrong)));
+        if (reject)
+        {
+            SlangNVVMValueHandle result = function;
+            SLANG_CHECK(SLANG_FAILED(api->emitOperation(scope.module, &nop, &object, 1, &result)));
+            SLANG_CHECK(!result);
+        }
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        if (reject)
+        {
+            for (auto desc : invalidDescs)
+            {
+                uint32_t supported = 1;
+                SLANG_CHECK(SLANG_SUCCEEDED(api->isOperationSupported(&desc, &supported)));
+                SLANG_CHECK(!supported);
+                SlangNVVMValueHandle result = function;
+                SLANG_CHECK(
+                    SLANG_FAILED(api->emitOperation(scope.module, &desc, &object, 1, &result)));
+                SLANG_CHECK(!result);
+            }
+            for (auto invalid : {foreign, wrong, function, SlangNVVMValueHandle(nullptr)})
+            {
+                SlangNVVMValueHandle result = function;
+                SLANG_CHECK(
+                    SLANG_FAILED(api->emitOperation(scope.module, &nop, &invalid, 1, &result)));
+                SLANG_CHECK(!result);
+            }
+            for (int invalid = 0; invalid < 6; ++invalid)
+            {
+                SlangNVVMValueHandle result = function;
+                SLANG_CHECK(SLANG_FAILED(api->emitOperation(
+                    invalid == 0 ? nullptr : scope.module,
+                    invalid == 1 ? nullptr : &nop,
+                    invalid == 2 ? nullptr : &object,
+                    invalid == 3   ? 0
+                    : invalid == 4 ? 2
+                                   : 1,
+                    invalid == 5 ? nullptr : &result)));
+                if (invalid != 5)
+                    SLANG_CHECK(!result);
+            }
+        }
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitHitObjectOperation(scope.module, nop, &object, 1, result)));
+        SLANG_CHECK(!result);
+        const SlangNVVMHitObjectOperationDesc query =
+            {SLANG_NVVM_HIT_OBJECT_OP_QUERY, SLANG_NVVM_HIT_OBJECT_QUERY_IS_NOP, 0, 0};
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitHitObjectOperation(scope.module, query, &object, 1, result)));
+        SLANG_CHECK(result);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        if (reject)
+        {
+            result = function;
+            SLANG_CHECK(SLANG_FAILED(api->emitOperation(scope.module, &nop, &object, 1, &result)));
+            SLANG_CHECK(!result);
+        }
+        const SlangNVVMSerializationFormat formats[] = {
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY};
+        for (Index i = 0; i < 2; ++i)
+        {
+            ComPtr<ISlangBlob> blob;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(scope.module, formats[i], blob)));
+            auto text = _getBlobText(blob);
+            SLANG_CHECK(text.contains("_optix_hitobject_is_nop"));
+            SLANG_CHECK(text.contains(
+                "@__slang_optix9_restore(%slang.optix9.hit.object* %slangParameter0)"));
+            SLANG_CHECK(text.contains("asm sideeffect"));
+            if (reject)
+            {
+                SLANG_CHECK(text == control[i]);
+            }
+            else
+            {
+                control[i] = text;
+            }
+        }
+    }
+}
+
+static SlangNVVMBuilderHitObjectOperationsAPI gHitObjectTestAPI;
+static SlangResult SLANG_NVVM_CALL
+_queryHitObjectTestInterface(SlangNVVMBuilderInterfaceID id, const void** output)
+{
+    if (id == SLANG_NVVM_BUILDER_INTERFACE_HIT_OBJECT_OPERATIONS)
+    {
+        if (!output)
+            return SLANG_E_INVALID_ARG;
+        *output = &gHitObjectTestAPI;
+        return SLANG_OK;
+    }
+    return _fakeNVVMBuilderQueryInterface(id, output);
+}
+
+// The optional extension admits the complete finite operation family, including empty payloads.
+SLANG_UNIT_TEST(nvvmIRBuilderHitObjectOperationContract)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const auto api = builder.getHitObjectOperationsAPI();
+    SLANG_CHECK_ABORT(api);
+    SLANG_CHECK(api->structureSize == sizeof(*api));
+    SLANG_CHECK(api->version == SLANG_NVVM_HIT_OBJECT_OPERATIONS_VERSION);
+    for (uint32_t query = 0; query <= SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS; ++query)
+    {
+        const unsigned rows = query == SLANG_NVVM_HIT_OBJECT_QUERY_ATTRIBUTE ? 8
+                              : query == SLANG_NVVM_HIT_OBJECT_QUERY_LSS     ? 2
+                              : query == SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_OBJECT_TO_WORLD ||
+                                      query == SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_WORLD_TO_OBJECT
+                                  ? 3
+                                  : 1;
+        for (unsigned row = 0; row < rows; ++row)
+            SLANG_CHECK(builder.supportsHitObjectOperation(
+                {SLANG_NVVM_HIT_OBJECT_OP_QUERY, query, row, 0}));
+        SLANG_CHECK(
+            !builder.supportsHitObjectOperation({SLANG_NVVM_HIT_OBJECT_OP_QUERY, query, rows, 0}));
+    }
+    for (uint32_t op = SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP;
+         op <= SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION;
+         ++op)
+    {
+        unsigned bound =
+            op == SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE || op == SLANG_NVVM_HIT_OBJECT_OP_INVOKE ? 32
+            : op == SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION                             ? 8
+                                                                                             : 0;
+        for (unsigned count = 0; count <= bound; ++count)
+            SLANG_CHECK(builder.supportsHitObjectOperation({op, 0, 0, count}));
+        SLANG_CHECK(!builder.supportsHitObjectOperation({op, 0, 0, bound + 1}));
+    }
+    uint32_t value = 1;
+    SLANG_CHECK(SLANG_FAILED(api->isOperationSupported(nullptr, &value)));
+    SLANG_CHECK(!value);
+    SLANG_CHECK(SLANG_FAILED(api->getStorageLayout(&value, nullptr)));
+    SLANG_CHECK(!value);
+    SlangNVVMTypeHandle type = reinterpret_cast<SlangNVVMTypeHandle>(uintptr_t(1));
+    SLANG_CHECK(SLANG_FAILED(api->getHitObjectType(nullptr, &type)));
+    SLANG_CHECK(!type);
+
+    _resetDirectNVVMFakes();
+    ComPtr<ISlangSharedLibrary> library(new FakeNVVMBuilderLibrary);
+    auto root = _makeFakeNVVMBuilderAPI();
+    NVVMIRBuilder oldProvider;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::initialize(root, library, oldProvider)));
+    SLANG_CHECK(
+        !oldProvider.supportsHitObjectOperation({SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP, 0, 0, 0}));
+    root.queryInterface = _queryHitObjectTestInterface;
+    for (int invalid = 0; invalid < 7; ++invalid)
+    {
+        gHitObjectTestAPI = *api;
+        if (invalid == 1)
+            gHitObjectTestAPI.structureSize = 0;
+        if (invalid == 2)
+            ++gHitObjectTestAPI.version;
+        if (invalid == 3)
+            gHitObjectTestAPI.getStorageLayout = nullptr;
+        if (invalid == 4)
+            gHitObjectTestAPI.getHitObjectType = nullptr;
+        if (invalid == 5)
+            gHitObjectTestAPI.isOperationSupported = nullptr;
+        if (invalid == 6)
+            gHitObjectTestAPI.emitOperation = nullptr;
+        NVVMIRBuilder checked;
+        SLANG_CHECK(
+            (invalid == 0) == SLANG_SUCCEEDED(NVVMIRBuilder::initialize(root, library, checked)));
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
 }

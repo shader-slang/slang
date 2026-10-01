@@ -1,6 +1,7 @@
 // slang-ir-legalize-varying-params.cpp
 #include "slang-ir-legalize-varying-params.h"
 
+#include "compiler-core/slang-nvvm-ir-builder-api.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
@@ -1156,6 +1157,24 @@ UInt getNVVMOptixPayloadRegisterCount(IRType* type)
         layout.size != count * 4)
         return 0;
     return count;
+}
+
+bool getNVVMOptixHitObjectPayloadRegisterCount(IRType* type, UInt& outCount)
+{
+    outCount = getNVVMOptixPayloadRegisterCount(type);
+    if (outCount)
+        return true;
+    // An empty callback payload has no words. Distinguish that canonical empty record from
+    // unsupported positive-sized types; the existing TraceRay nonempty contract is unchanged.
+    auto record = as<IRStructType>(type);
+    if (!record)
+        return false;
+    for (auto field : record->getFields())
+    {
+        SLANG_UNUSED(field);
+        return false;
+    }
+    return true;
 }
 
 struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalizeContext
@@ -2596,7 +2615,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 // Raygen shaders pass payload TO TraceRay, not receive it FROM registers
                 bool useRegisterBasedPayload = (m_stage == Stage::AnyHit) ||
                                                (m_stage == Stage::ClosestHit) ||
-                                               (m_stage == Stage::Miss);
+                                               (m_stage == Stage::Miss) ||
+                                               (emitNVVMDirectly && m_stage == Stage::Intersection);
 
                 // Compute how many registers are required for this payload type
                 int registerCount = 0;
@@ -2605,7 +2625,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                                         ? getNVVMOptixPayloadRegisterCount(info.type)
                                         : computePayloadRegisterCount(info.type, &builder);
 
-                if (!useRegisterBasedPayload || registerCount == 0 ||
+                UInt selectedCount = 0;
+                const bool emptyNVVMPayload =
+                    emitNVVMDirectly && useRegisterBasedPayload &&
+                    getNVVMOptixHitObjectPayloadRegisterCount(info.type, selectedCount) &&
+                    selectedCount == 0;
+                if (!useRegisterBasedPayload || (registerCount == 0 && !emptyNVVMPayload) ||
                     registerCount > kMaxPayloadRegisters)
                 {
                     // Fallback to pointer packing for large/unsupported payloads or non-callee
@@ -2679,6 +2704,137 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             return diagnoseUnsupportedUserVal(info);
         }
     }
+    // HitObject operations keep a caller-owned object reference while payload values use the
+    // same register traversal as TraceRay. Unsupported original types remain explicit markers.
+    void legalizeNVVMHitObjects(IRModule* module)
+    {
+        List<IRInst*> work;
+        for (auto global : module->getGlobalInsts())
+            if (auto func = as<IRFunc>(global))
+                for (auto block : func->getBlocks())
+                    for (auto inst : block->getOrdinaryInsts())
+                        if (inst->getOp() == kIROp_OptixHitObjectTraverse ||
+                            inst->getOp() == kIROp_OptixHitObjectInvoke ||
+                            inst->getOp() == kIROp_OptixHitObjectAttributes ||
+                            inst->getOp() == kIROp_ReportOptiXIntersection)
+                            work.add(inst);
+        for (auto inst : work)
+        {
+            const bool report = inst->getOp() == kIROp_ReportOptiXIntersection;
+            const bool attributes = inst->getOp() == kIROp_OptixHitObjectAttributes;
+            const bool traverse = inst->getOp() == kIROp_OptixHitObjectTraverse;
+            const UInt expected = report ? 3 : attributes ? 1 : traverse ? 13 : 2;
+            if (inst->getOperandCount() != expected)
+                continue;
+            auto type = report ? inst->getOperand(2)->getDataType() : inst->getDataType();
+            UInt count = 0;
+            if (!getNVVMOptixHitObjectPayloadRegisterCount(type, count) ||
+                ((attributes || report) && count > 8))
+                continue;
+            IRBuilder builder(module);
+            builder.setInsertBefore(inst);
+            IRBuilderSourceLocRAII sourceLoc(&builder, inst->sourceLoc);
+            List<IRInst*> words;
+            words.setCount(count);
+            if (!attributes && count)
+            {
+                payloadWriteWords = &words;
+                int offset = 0;
+                emitOptiXPayloadWrite(offset, inst->getOperand(expected - 1), type, &builder);
+                payloadWriteWords = nullptr;
+                SLANG_ASSERT(offset == int(count * 4));
+            }
+            if (attributes)
+            {
+                for (UInt i = 0; i < count; ++i)
+                {
+                    IRInst* args[] = {
+                        inst->getOperand(0),
+                        builder.getIntValue(
+                            builder.getUIntType(),
+                            SLANG_NVVM_HIT_OBJECT_QUERY_ATTRIBUTE),
+                        builder.getIntValue(builder.getUIntType(), i)};
+                    words[i] = builder.emitIntrinsicInst(
+                        builder.getUIntType(),
+                        kIROp_OptixHitObjectQuery,
+                        3,
+                        args);
+                }
+                payloadReadArray = count
+                                       ? builder.emitMakeArray(
+                                             builder.getArrayType(
+                                                 builder.getUIntType(),
+                                                 builder.getIntValue(builder.getIntType(), count)),
+                                             count,
+                                             words.getBuffer())
+                                       : nullptr;
+            }
+            else
+            {
+                List<IRInst*> args;
+                args.add(type);
+                args.add(builder.getIntValue(
+                    builder.getUIntType(),
+                    report     ? SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION
+                    : traverse ? SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE
+                               : SLANG_NVVM_HIT_OBJECT_OP_INVOKE));
+                if (report)
+                {
+                    args.add(inst->getOperand(0));
+                    args.add(inst->getOperand(1));
+                }
+                else
+                {
+                    args.add(inst->getOperand(0));
+                    if (traverse)
+                    {
+                        args.add(inst->getOperand(1));
+                        for (UInt vectorIndex : {7u, 9u})
+                            for (UInt lane = 0; lane < 3; ++lane)
+                                args.add(builder.emitElementExtract(
+                                    builder.getFloatType(),
+                                    inst->getOperand(vectorIndex),
+                                    builder.getIntValue(builder.getIntType(), lane)));
+                        args.add(inst->getOperand(8));
+                        args.add(inst->getOperand(10));
+                        args.add(inst->getOperand(11));
+                        args.add(inst->getOperand(3));
+                        args.add(inst->getOperand(2));
+                        for (UInt i = 4; i < 7; ++i)
+                            args.add(inst->getOperand(i));
+                    }
+                }
+                args.addRange(words);
+                IRType* resultType = report  ? static_cast<IRType*>(builder.getUIntType())
+                                     : count ? builder.getArrayType(
+                                                   builder.getUIntType(),
+                                                   builder.getIntValue(builder.getIntType(), count))
+                                             : static_cast<IRType*>(builder.getVoidType());
+                auto operation = builder.emitIntrinsicInst(
+                    resultType,
+                    kIROp_OptixHitObjectPayload,
+                    args.getCount(),
+                    args.getBuffer());
+                if (report)
+                {
+                    auto value =
+                        builder.emitNeq(operation, builder.getIntValue(builder.getUIntType(), 0));
+                    inst->replaceUsesWith(value);
+                    inst->removeAndDeallocate();
+                    continue;
+                }
+                payloadReadArray = count ? operation : nullptr;
+            }
+            int offset = 0;
+            IRInst* value = count ? emitOptiXPayloadRead(offset, type, &builder)
+                                  : builder.emitMakeStruct(type, 0, nullptr);
+            payloadReadArray = nullptr;
+            SLANG_ASSERT(offset == int(count * 4));
+            inst->replaceUsesWith(value);
+            inst->removeAndDeallocate();
+        }
+    }
+
     // Converts only the admitted typed producer. Unsupported payloads remain explicit IR
     // for NVVM preflight, just like unsupported callback payload pointer fallbacks.
     void legalizeNVVMTraceRays(IRModule* module)
@@ -2930,7 +3086,16 @@ void legalizeEntryPointVaryingParamsForCUDA(
     context.inlineShaderTerminatingCalleesForRayEntryPoints(module, sink);
     context.processModule(module, sink);
     if (emitNVVMDirectly)
+    {
         context.legalizeNVVMTraceRays(module);
+    }
+}
+
+void legalizeOptiXHitObjectOperationsForNVVM(IRModule* module)
+{
+    CUDAEntryPointVaryingParamLegalizeContext context;
+    context.emitNVVMDirectly = true;
+    context.legalizeNVVMHitObjects(module);
 }
 
 void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink)

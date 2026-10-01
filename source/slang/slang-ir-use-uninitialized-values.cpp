@@ -440,6 +440,15 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // in as a out parameter or not
         return getCallUsageType(as<IRCall>(user), inst);
 
+    // Noncopyable allocation and typed constructors have an explicit destination.
+    // That operand is initialized, while ray/payload inputs still read their values.
+    case kIROp_AllocateOpaqueHandle:
+    case kIROp_OptixHitObjectMakeNop:
+    case kIROp_OptixHitObjectMakeMiss:
+    case kIROp_OptixHitObjectTraverse:
+        SLANG_RELEASE_ASSERT(user->getOperandCount() > 0);
+        return user->getOperand(0) == inst ? Store : Load;
+
     case kIROp_Store:
     case kIROp_AtomicStore:
     case kIROp_SwizzledStore:

@@ -433,6 +433,15 @@ struct NVVMPlannedTraceRay
     List<IRInst*> operands;
 };
 
+/// Retains a selected object reference and typed operands; SDK state stays provider-private.
+struct NVVMPlannedHitObjectOperation
+{
+    IRInst* source = nullptr;
+    IRType* payloadType = nullptr;
+    SlangNVVMHitObjectOperationDesc desc = {};
+    List<IRInst*> operands;
+};
+
 /// Retains one checked SDK row read, without exposing the SDK's storage pointer.
 struct NVVMPlannedInstanceTransform
 {
@@ -472,6 +481,7 @@ struct NVVMEmissionPlan
     List<NVVMPlannedValueOperation> valueOperations;
     List<NVVMPlannedNamedIntrinsic> namedIntrinsics;
     List<NVVMPlannedTraceRay> traceRays;
+    List<NVVMPlannedHitObjectOperation> hitObjectOperations;
     List<NVVMPlannedInstanceTransform> instanceTransforms;
     List<NVVMPlannedUInt64WordConstruction> uint64WordConstructions;
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
@@ -537,6 +547,7 @@ public:
         IRInst* source) const;
     const NVVMPlannedNamedIntrinsic* findNamedIntrinsic(IRInst* source) const;
     const NVVMPlannedTraceRay* findTraceRay(IRInst* source) const;
+    const NVVMPlannedHitObjectOperation* findHitObjectOperation(IRInst* source) const;
     const NVVMPlannedInstanceTransform* findInstanceTransform(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
@@ -559,6 +570,7 @@ private:
     Dictionary<IRInst*, Index> m_valueOperations;
     Dictionary<IRInst*, Index> m_namedIntrinsics;
     Dictionary<IRInst*, Index> m_traceRays;
+    Dictionary<IRInst*, Index> m_hitObjectOperations;
     Dictionary<IRInst*, Index> m_instanceTransforms;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;

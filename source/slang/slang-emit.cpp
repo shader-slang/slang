@@ -1942,7 +1942,13 @@ Result linkAndOptimizeIR(
     // selector is not yet a phi the pass finds nothing to thread and is a no-op.
     SLANG_PASS(threadSwitchOnConstantPhi);
 
-    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    // Preserve the semantic zero-word payload before empty-type legalization removes values.
+    // Both paths consume the canonical typed producers after specialization and tuple lowering.
+    if (emitNVVMDirectly)
+    {
+        SLANG_PASS(legalizeOptiXHitObjectOperationsForNVVM);
+    }
+    else if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
     {
         SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
     }

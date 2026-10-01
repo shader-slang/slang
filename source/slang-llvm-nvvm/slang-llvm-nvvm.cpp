@@ -69,6 +69,11 @@ struct ModuleState
     llvm::LLVMContext context;
     std::unique_ptr<llvm::Module> module;
     llvm::IRBuilder<> builder;
+    llvm::StructType* hitObjectType = nullptr;
+    llvm::Function* hitObjectCapture = nullptr;
+    llvm::Function* hitObjectRestore = nullptr;
+    llvm::Function* hitObjectMatrix[2] = {};
+    llvm::Function* hitObjectTransform[2] = {};
 };
 
 // Input-library state is independent of every output ModuleState. Parse once; queries never
@@ -506,6 +511,20 @@ static SlangResult SLANG_NVVM_CALL _getFunctionType(
     return SLANG_OK;
 }
 
+// Names parameters so provider-created functions serialize in both supported LLVM dialects.
+static void _nameFunctionParameters(llvm::Function* function)
+{
+    size_t parameterIndex = 0;
+    for (llvm::Argument& parameter : function->args())
+    {
+        // LLVM 14 prints an unnamed numeric parameter as an explicit `%0` declaration. LLVM 7
+        // accepts numeric parameter slots only when they are implicit, while accepting ordinary
+        // named parameters. Stable provider-owned names keep the typed module and its textual
+        // representation valid in both dialects without parsing a function signature later.
+        parameter.setName("slangParameter" + std::to_string(parameterIndex++));
+    }
+}
+
 static SlangResult SLANG_NVVM_CALL _declareFunction(
     SlangNVVMModuleHandle module,
     SlangNVVMTypeHandle functionType,
@@ -535,15 +554,7 @@ static SlangResult SLANG_NVVM_CALL _declareFunction(
         *state->module);
     if (flags & SLANG_NVVM_FUNCTION_FLAG_NO_INLINE)
         function->addFnAttr(llvm::Attribute::NoInline);
-    size_t parameterIndex = 0;
-    for (llvm::Argument& parameter : function->args())
-    {
-        // LLVM 14 prints an unnamed numeric parameter as an explicit `%0` declaration. LLVM 7
-        // accepts numeric parameter slots only when they are implicit, while accepting ordinary
-        // named parameters. Stable provider-owned names keep the typed module and its textual
-        // representation valid in both dialects without parsing a function signature later.
-        parameter.setName("slangParameter" + std::to_string(parameterIndex++));
-    }
+    _nameFunctionParameters(function);
     *outFunction = reinterpret_cast<SlangNVVMValueHandle>(function);
     return SLANG_OK;
 }
@@ -1225,6 +1236,8 @@ static SlangResult SLANG_NVVM_CALL _emitTraceRay(
     *outValue = reinterpret_cast<SlangNVVMValueHandle>(result);
     return SLANG_OK;
 }
+
+#include "slang-llvm-nvvm-hit-object.h"
 
 static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
@@ -3475,21 +3488,16 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
     if (!intrinsic.name || (!intrinsic.operands && intrinsic.operandCount))
         return OptixIntrinsicKind::None;
     const llvm::StringRef name(intrinsic.name, intrinsic.nameSize);
-    const char* queries[] = {
-        "_optix_get_launch_index_x",
-        "_optix_get_launch_index_y",
-        "_optix_get_launch_index_z",
-        "_optix_get_launch_dimension_x",
-        "_optix_get_launch_dimension_y",
-        "_optix_get_launch_dimension_z",
-        "_optix_get_attribute_0",
-        "_optix_get_attribute_1",
-        "_optix_read_primitive_idx",
-        "_optix_read_instance_idx",
-        "_optix_read_instance_id",
-        "_optix_get_ray_flags",
-        "_optix_get_hit_kind",
-        "_optix_get_transform_list_size"};
+    const char* queries[] = {"_optix_get_launch_index_x",     "_optix_get_launch_index_y",
+                             "_optix_get_launch_index_z",     "_optix_get_launch_dimension_x",
+                             "_optix_get_launch_dimension_y", "_optix_get_launch_dimension_z",
+                             "_optix_get_attribute_0",        "_optix_get_attribute_1",
+                             "_optix_get_attribute_2",        "_optix_get_attribute_3",
+                             "_optix_get_attribute_4",        "_optix_get_attribute_5",
+                             "_optix_get_attribute_6",        "_optix_get_attribute_7",
+                             "_optix_read_primitive_idx",     "_optix_read_instance_idx",
+                             "_optix_read_instance_id",       "_optix_get_ray_flags",
+                             "_optix_get_hit_kind",           "_optix_get_transform_list_size"};
     if (!intrinsic.operandCount)
     {
         for (auto query : queries)
@@ -5464,6 +5472,15 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _emitTraceRay,
     };
 
+    static const SlangNVVMBuilderHitObjectOperationsAPI hitObjectOperations = {
+        sizeof(SlangNVVMBuilderHitObjectOperationsAPI),
+        SLANG_NVVM_HIT_OBJECT_OPERATIONS_VERSION,
+        _getHitObjectStorageLayout,
+        _getHitObjectType,
+        _isHitObjectOperationSupported,
+        _emitHitObjectOperation,
+    };
+
     static const SlangNVVMBuilderInstanceTransformOperationsAPI instanceTransformOperations = {
         sizeof(SlangNVVMBuilderInstanceTransformOperationsAPI),
         SLANG_NVVM_INSTANCE_TRANSFORM_OPERATIONS_VERSION,
@@ -5490,6 +5507,9 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS:
         *outInterface = &instanceTransformOperations;
+        return SLANG_OK;
+    case SLANG_NVVM_BUILDER_INTERFACE_HIT_OBJECT_OPERATIONS:
+        *outInterface = &hitObjectOperations;
         return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS:
         *outInterface = &traceOperations;

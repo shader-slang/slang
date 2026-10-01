@@ -42,7 +42,9 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
     {
         RayCallback,
         HitCallback,
+        HitCandidate,
         AnyHit,
+        ObjectRay,
         Optix
     };
     const struct
@@ -60,21 +62,21 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
         {"_optix_get_world_ray_direction_z", "float", QueryStage::RayCallback},
         {"_optix_get_ray_tmin", "float", QueryStage::RayCallback},
         {"_optix_get_ray_tmax", "float", QueryStage::RayCallback},
-        {"_optix_read_primitive_idx", "uint", QueryStage::HitCallback},
-        {"_optix_read_instance_idx", "uint", QueryStage::HitCallback},
-        {"_optix_read_instance_id", "uint", QueryStage::HitCallback},
+        {"_optix_read_primitive_idx", "uint", QueryStage::HitCandidate},
+        {"_optix_read_instance_idx", "uint", QueryStage::HitCandidate},
+        {"_optix_read_instance_id", "uint", QueryStage::HitCandidate},
         {"_optix_get_ray_flags", "uint", QueryStage::RayCallback},
         {"_optix_get_hit_kind", "uint", QueryStage::HitCallback},
-        {"_optix_get_object_ray_origin_x", "float", QueryStage::AnyHit},
-        {"_optix_get_object_ray_origin_y", "float", QueryStage::AnyHit},
-        {"_optix_get_object_ray_origin_z", "float", QueryStage::AnyHit},
-        {"_optix_get_object_ray_direction_x", "float", QueryStage::AnyHit},
-        {"_optix_get_object_ray_direction_y", "float", QueryStage::AnyHit},
-        {"_optix_get_object_ray_direction_z", "float", QueryStage::AnyHit},
+        {"_optix_get_object_ray_origin_x", "float", QueryStage::ObjectRay},
+        {"_optix_get_object_ray_origin_y", "float", QueryStage::ObjectRay},
+        {"_optix_get_object_ray_origin_z", "float", QueryStage::ObjectRay},
+        {"_optix_get_object_ray_direction_x", "float", QueryStage::ObjectRay},
+        {"_optix_get_object_ray_direction_y", "float", QueryStage::ObjectRay},
+        {"_optix_get_object_ray_direction_z", "float", QueryStage::ObjectRay},
         {"_optix_ignore_intersection", "void", QueryStage::AnyHit},
         {"_optix_terminate_ray", "void", QueryStage::AnyHit},
-        {"_optix_get_transform_list_size", "uint", QueryStage::HitCallback},
-        {"_optix_get_transform_list_handle", "uint64_t", QueryStage::HitCallback, "uint"},
+        {"_optix_get_transform_list_size", "uint", QueryStage::HitCandidate},
+        {"_optix_get_transform_list_handle", "uint64_t", QueryStage::HitCandidate, "uint"},
         {"_optix_get_transform_type_from_handle", "int", QueryStage::Optix, "uint64_t"},
         {"_optix_get_instance_id_from_handle", "uint", QueryStage::Optix, "uint64_t"},
         {"_optix_get_instance_child_from_handle", "uint64_t", QueryStage::Optix, "uint64_t"},
@@ -84,11 +86,17 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
              {SLANG_STAGE_COMPUTE,
               SLANG_STAGE_RAY_GENERATION,
               SLANG_STAGE_MISS,
-              SLANG_STAGE_CLOSEST_HIT})
+              SLANG_STAGE_CLOSEST_HIT,
+              SLANG_STAGE_INTERSECTION})
         {
             if ((query.allowedStage == QueryStage::Optix && stage != SLANG_STAGE_COMPUTE) ||
                 (stage == SLANG_STAGE_MISS && query.allowedStage == QueryStage::RayCallback) ||
-                (stage == SLANG_STAGE_CLOSEST_HIT && query.allowedStage != QueryStage::AnyHit))
+                (stage == SLANG_STAGE_CLOSEST_HIT && query.allowedStage != QueryStage::AnyHit &&
+                 query.allowedStage != QueryStage::ObjectRay) ||
+                (stage == SLANG_STAGE_INTERSECTION &&
+                 (query.allowedStage == QueryStage::RayCallback ||
+                  query.allowedStage == QueryStage::HitCandidate ||
+                  query.allowedStage == QueryStage::ObjectRay)))
                 continue;
             _resetDirectNVVMFakes();
             ComPtr<slang::IGlobalSession> globalSession;
@@ -116,11 +124,12 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
             StringBuilder source;
             const char* type = query.resultType;
             const bool isVoid = strcmp(type, "void") == 0;
-            const char* entryAttribute = stage == SLANG_STAGE_COMPUTE ? "[numthreads(1,1,1)] "
-                                         : stage == SLANG_STAGE_RAY_GENERATION
-                                             ? "[shader(\"raygeneration\")] "
-                                         : stage == SLANG_STAGE_MISS ? "[shader(\"miss\")] "
-                                                                     : "[shader(\"closesthit\")] ";
+            const char* entryAttribute =
+                stage == SLANG_STAGE_COMPUTE          ? "[numthreads(1,1,1)] "
+                : stage == SLANG_STAGE_RAY_GENERATION ? "[shader(\"raygeneration\")] "
+                : stage == SLANG_STAGE_MISS           ? "[shader(\"miss\")] "
+                : stage == SLANG_STAGE_INTERSECTION   ? "[shader(\"intersection\")] "
+                                                      : "[shader(\"closesthit\")] ";
             StringBuilder parameter;
             if (query.parameterType)
             {

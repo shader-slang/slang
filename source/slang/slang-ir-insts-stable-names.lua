@@ -892,5 +892,16 @@ return {
 	["textureQueryLayerCount"] = 916,
 	["optixTraceRay"] = 917,
 	["optixTraceRayPayload"] = 918,
-	["optixInstanceTransformRow"] = 919
+	["optixInstanceTransformRow"] = 919,
+	["optixHitObjectQuery"] = 920,
+	["optixHitObjectMakeMiss"] = 921,
+	["optixHitObjectMakeNop"] = 922,
+	["optixHitObjectSetSbt"] = 923,
+	["optixHitObjectLoadSbt"] = 924,
+	["optixHitObjectReorder"] = 925,
+	["optixReorderHint"] = 926,
+	["optixHitObjectTraverse"] = 927,
+	["optixHitObjectInvoke"] = 928,
+	["optixHitObjectAttributes"] = 929,
+	["optixHitObjectPayload"] = 930
 }

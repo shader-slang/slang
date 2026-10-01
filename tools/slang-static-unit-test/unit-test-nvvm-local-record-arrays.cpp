@@ -5,6 +5,7 @@
 #include "slang/slang-ir-legalize-varying-params.h"
 #include "slang/slang-ir-nvvm-legalize.h"
 #include "slang/slang-ir-nvvm-surface-legalize.h"
+#include "slang/slang-ir-use-uninitialized-values.h"
 
 using namespace Slang;
 
@@ -52,6 +53,457 @@ struct LocalRecordArrayIR
 };
 
 } // namespace
+
+// Noncopyable initialization has a destination operand, not a fictitious returned SSA handle.
+SLANG_UNIT_TEST(irOpaqueConstructorsWriteOnlyTheirDestination)
+{
+    enum class Case
+    {
+        HitObjectAllocation,
+        RayQueryAllocation,
+        Nop,
+        Miss,
+        MissUninitialized,
+        Traverse,
+        TraverseUninitialized
+    };
+    for (auto testCase :
+         {Case::HitObjectAllocation,
+          Case::RayQueryAllocation,
+          Case::Nop,
+          Case::Miss,
+          Case::MissUninitialized,
+          Case::Traverse,
+          Case::TraverseUninitialized})
+    {
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        IRType* objectType =
+            testCase == Case::RayQueryAllocation
+                ? builder.getType(kIROp_RayQueryType, builder.getIntValue(builder.getIntType(), 0))
+                : builder.getType(kIROp_HitObjectType);
+        auto referenceType = builder.getOutParamType(objectType);
+        auto sceneType = builder.getType(kIROp_RaytracingAccelerationStructureType);
+        IRType* parameters[] = {referenceType, sceneType};
+        auto function = builder.createFunc();
+        function->setFullType(builder.getFuncType(2, parameters, builder.getVoidType()));
+        builder.setInsertInto(function);
+        builder.emitBlock();
+        auto destination = builder.emitParam(referenceType);
+        auto scene = builder.emitParam(sceneType);
+        auto zero = builder.getIntValue(builder.getUIntType(), 0);
+        auto floatZero = builder.getFloatValue(builder.getFloatType(), 0);
+        List<IRInst*> operands;
+        operands.add(destination);
+        IROp op = kIROp_AllocateOpaqueHandle;
+        IRType* result = builder.getVoidType();
+        if (testCase == Case::Nop)
+            op = kIROp_OptixHitObjectMakeNop;
+        if (testCase == Case::Miss || testCase == Case::MissUninitialized)
+        {
+            op = kIROp_OptixHitObjectMakeMiss;
+            operands.add(zero);
+            for (UInt i = 0; i < 9; ++i)
+                operands.add(
+                    i == 0 && testCase == Case::MissUninitialized
+                        ? static_cast<IRInst*>(
+                              builder.emitLoadFromUninitializedMemory(builder.getFloatType()))
+                        : floatZero);
+            operands.add(zero);
+        }
+        if (testCase == Case::Traverse || testCase == Case::TraverseUninitialized)
+        {
+            op = kIROp_OptixHitObjectTraverse;
+            result = builder.getUIntType();
+            operands.add(scene);
+            for (UInt i = 0; i < 5; ++i)
+                operands.add(zero);
+            IRInst* lanes[] = {floatZero, floatZero, floatZero};
+            auto vector =
+                builder.emitMakeVector(builder.getVectorType(builder.getFloatType(), 3), 3, lanes);
+            operands.add(vector);
+            operands.add(floatZero);
+            operands.add(vector);
+            operands.add(floatZero);
+            operands.add(floatZero);
+            operands.add(
+                testCase == Case::TraverseUninitialized
+                    ? static_cast<IRInst*>(
+                          builder.emitLoadFromUninitializedMemory(builder.getUIntType()))
+                    : zero);
+        }
+        auto constructor =
+            builder.emitIntrinsicInst(result, op, operands.getCount(), operands.getBuffer());
+        SLANG_CHECK(constructor->mightHaveSideEffects());
+        builder.emitReturn();
+        checkForUsingUninitializedValues(module, &context.sink);
+        const bool bad =
+            testCase == Case::MissUninitialized || testCase == Case::TraverseUninitialized;
+        SLANG_CHECK(
+            bad == String(context.sink.outputBuffer.getUnownedSlice()).contains("uninitialized"));
+    }
+}
+
+// Object references keep their caller-owned storage identity; provider-private state is not
+// an external buffer, entry parameter or numeric value ABI.
+SLANG_UNIT_TEST(nvvmOptixHitObjectsKeepOwnedReferences)
+{
+    enum class Case
+    {
+        Queries,
+        Array,
+        Helper,
+        GlobalAfterValidCall,
+        WrongResult,
+        WrongIndex,
+        DynamicIndex,
+        ReadOnlyConstruction,
+        Compute,
+        AnyHit,
+        Intersection,
+        Callable,
+        Traverse,
+        Invoke,
+        EmptyInvoke,
+        Report,
+        WrongReportStage,
+        InvalidPayload
+    };
+    for (auto testCase :
+         {Case::Queries,
+          Case::Array,
+          Case::Helper,
+          Case::GlobalAfterValidCall,
+          Case::WrongResult,
+          Case::WrongIndex,
+          Case::DynamicIndex,
+          Case::ReadOnlyConstruction,
+          Case::Compute,
+          Case::AnyHit,
+          Case::Intersection,
+          Case::Callable,
+          Case::Traverse,
+          Case::Invoke,
+          Case::EmptyInvoke,
+          Case::Report,
+          Case::WrongReportStage,
+          Case::InvalidPayload})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto objectType = builder.getType(kIROp_HitObjectType);
+        auto uintType = builder.getUIntType();
+        auto empty = testCase == Case::EmptyInvoke ? builder.createStructType() : nullptr;
+        auto arrayType =
+            builder.getArrayType(objectType, builder.getIntValue(builder.getIntType(), 2));
+        const auto objectInfo = classifyNVVMType(objectType);
+        SLANG_CHECK(objectInfo.supports(NVVMTypeUse::Storage));
+        for (auto use :
+             {NVVMTypeUse::EntryPointParameter,
+              NVVMTypeUse::HelperParameter,
+              NVVMTypeUse::HelperResult,
+              NVVMTypeUse::ParameterGroupStorage,
+              NVVMTypeUse::StructuredBufferStorage})
+            SLANG_CHECK(!objectInfo.supports(use));
+        auto globalObject =
+            testCase == Case::GlobalAfterValidCall ? builder.createGlobalVar(objectType) : nullptr;
+        IRFunc* helper = nullptr;
+        IRType* referenceType = builder.getOutParamType(objectType);
+        if (testCase == Case::ReadOnlyConstruction)
+            referenceType = builder.getPtrType(
+                kIROp_BorrowInParamType,
+                objectType,
+                AccessQualifier::Read,
+                AddressSpace::Generic,
+                builder.getDefaultBufferLayoutType());
+        if (testCase == Case::Helper || testCase == Case::GlobalAfterValidCall ||
+            testCase == Case::ReadOnlyConstruction)
+        {
+            helper = builder.createFunc();
+            IRType* parameters[] = {referenceType};
+            helper->setFullType(builder.getFuncType(1, parameters, builder.getVoidType()));
+            builder.setInsertInto(helper);
+            builder.emitBlock();
+            auto reference = builder.emitParam(referenceType);
+            IRInst* args[] = {
+                reference,
+                builder.getIntValue(uintType, 0),
+                builder.getIntValue(uintType, 0)};
+            if (testCase == Case::ReadOnlyConstruction)
+                builder
+                    .emitIntrinsicInst(builder.getVoidType(), kIROp_OptixHitObjectMakeNop, 1, args);
+            else
+                builder.emitIntrinsicInst(uintType, kIROp_OptixHitObjectQuery, 3, args);
+            builder.emitReturn();
+            builder.setInsertInto(module);
+        }
+        IRInst* scene = nullptr;
+        IRStructField* sceneField = nullptr;
+        if (testCase == Case::Traverse)
+        {
+            auto globals = builder.createStructType();
+            builder.addSynthesizedParameterGroupDecoration(globals);
+            sceneField = builder.createStructField(
+                globals,
+                builder.createStructKey(),
+                builder.getType(kIROp_RaytracingAccelerationStructureType));
+            scene = builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
+        }
+        const Stage stage = testCase == Case::Compute  ? Stage::Compute
+                            : testCase == Case::AnyHit ? Stage::AnyHit
+                            : testCase == Case::Intersection || testCase == Case::Report
+                                ? Stage::Intersection
+                            : testCase == Case::Callable         ? Stage::Callable
+                            : testCase == Case::WrongReportStage ? Stage::ClosestHit
+                                                                 : Stage::RayGeneration;
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(entry, Profile(stage), toSlice("probe"), toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        const bool report = testCase == Case::Report || testCase == Case::WrongReportStage;
+        IRInst* object = nullptr;
+        if (!report)
+        {
+            object = builder.emitVar(testCase == Case::Array ? arrayType : objectType);
+            if (testCase == Case::Array)
+                object = builder.emitElementAddress(
+                    builder.getPtrType(objectType),
+                    object,
+                    builder.getIntValue(builder.getIntType(), 1));
+            auto initial = builder.emitIntrinsicInst(
+                builder.getVoidType(),
+                kIROp_AllocateOpaqueHandle,
+                1,
+                &object);
+            SLANG_CHECK(initial->mightHaveSideEffects());
+        }
+        if (helper)
+        {
+            IRInst* args[] = {object};
+            builder.emitCallInst(builder.getVoidType(), helper, 1, args);
+            if (globalObject)
+            {
+                args[0] = globalObject;
+                builder.emitCallInst(builder.getVoidType(), helper, 1, args);
+            }
+        }
+        else if (
+            testCase == Case::Traverse || testCase == Case::Invoke ||
+            testCase == Case::EmptyInvoke || testCase == Case::InvalidPayload || report)
+        {
+            IRType* payload = testCase == Case::EmptyInvoke ? static_cast<IRType*>(empty)
+                              : testCase == Case::InvalidPayload
+                                  ? static_cast<IRType*>(builder.getHalfType())
+                                  : static_cast<IRType*>(uintType);
+            List<IRInst*> args;
+            args.add(payload);
+            args.add(builder.getIntValue(
+                uintType,
+                report                       ? 10
+                : testCase == Case::Traverse ? 3
+                                             : 4));
+            if (report)
+            {
+                args.add(builder.getFloatValue(builder.getFloatType(), 1));
+                args.add(builder.getIntValue(uintType, 19));
+            }
+            else
+                args.add(object);
+            if (testCase == Case::Traverse)
+            {
+                args.add(builder.emitLoad(builder.emitFieldAddress(
+                    builder.getPtrType(sceneField->getFieldType()),
+                    scene,
+                    sceneField->getKey())));
+                for (UInt i = 0; i < 9; ++i)
+                    args.add(builder.getFloatValue(builder.getFloatType(), float(i)));
+                for (UInt i = 0; i < 5; ++i)
+                    args.add(builder.getIntValue(uintType, i));
+            }
+            if (testCase != Case::EmptyInvoke)
+                args.add(builder.getIntValue(uintType, 7));
+            IRType* result =
+                report ? static_cast<IRType*>(uintType)
+                : testCase == Case::EmptyInvoke
+                    ? static_cast<IRType*>(builder.getVoidType())
+                    : builder.getArrayType(uintType, builder.getIntValue(builder.getIntType(), 1));
+            builder.emitIntrinsicInst(
+                result,
+                kIROp_OptixHitObjectPayload,
+                args.getCount(),
+                args.getBuffer());
+        }
+        else
+        {
+            const UInt queryCount = testCase == Case::Queries ? 23 : 1;
+            for (UInt query = 0; query < queryCount; ++query)
+            {
+                UInt selectedQuery = testCase == Case::WrongIndex ? 15 : query;
+                IRInst* index = builder.getIntValue(uintType, testCase == Case::WrongIndex ? 8 : 0);
+                if (testCase == Case::DynamicIndex)
+                    index = builder.emitAdd(uintType, index, index);
+                IRType* result = selectedQuery >= 10 && selectedQuery <= 14
+                                     ? static_cast<IRType*>(builder.getFloatType())
+                                     : uintType;
+                if (selectedQuery == 10 || selectedQuery == 11)
+                    result = builder.getVectorType(builder.getFloatType(), 3);
+                if (selectedQuery >= 17 && selectedQuery <= 20)
+                    result = builder.getVectorType(builder.getFloatType(), 4);
+                if (testCase == Case::WrongResult)
+                    result = builder.getUInt64Type();
+                IRInst* args[] = {object, builder.getIntValue(uintType, selectedQuery), index};
+                auto queryInst =
+                    builder.emitIntrinsicInst(result, kIROp_OptixHitObjectQuery, 3, args);
+                SLANG_CHECK(queryInst->mightHaveSideEffects());
+                SLANG_CHECK(!getIROpInfo(queryInst->getOp()).isHoistable());
+            }
+        }
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const bool valid = testCase == Case::Queries || testCase == Case::Array ||
+                           testCase == Case::Helper || testCase == Case::Traverse ||
+                           testCase == Case::Invoke || testCase == Case::EmptyInvoke ||
+                           testCase == Case::Report;
+        if (valid != SLANG_SUCCEEDED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
+        if (valid)
+        {
+            const UInt expected = testCase == Case::Queries ? 24 : testCase == Case::Report ? 1 : 2;
+            SLANG_CHECK(requirements.emissionPlan.hitObjectOperations.getCount() == expected);
+            if (testCase == Case::Queries)
+                for (UInt i = 0; i < 23; ++i)
+                {
+                    const auto& selected = requirements.emissionPlan.hitObjectOperations[i + 1];
+                    SLANG_CHECK(selected.desc.query == i);
+                    SLANG_CHECK(selected.operands.getCount() == 1);
+                    SLANG_CHECK(selected.operands[0] == object);
+                }
+            NVVMIRBuilder provider;
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, provider)));
+            ComPtr<IArtifact> artifact;
+            SLANG_CHECK(SLANG_FAILED(emitNVVMIRFromLinkedIR(
+                &context.codeGen,
+                linked,
+                provider,
+                requirements,
+                artifact)));
+            SLANG_CHECK(!artifact);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
+// Variadic reports become the same dense record contract as portable ReportHit attributes.
+SLANG_UNIT_TEST(nvvmOptixReportsKeepAttributeAndStageBounds)
+{
+    enum class Case
+    {
+        Counts,
+        Oversize,
+        Boolean,
+        WrongStage
+    };
+    for (auto testCase : {Case::Counts, Case::Oversize, Case::Boolean, Case::WrongStage})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(testCase == Case::WrongStage ? Stage::ClosestHit : Stage::Intersection),
+            toSlice("probe"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        auto block = builder.emitBlock();
+        const UInt first = testCase == Case::Counts ? 0 : testCase == Case::Oversize ? 9 : 1;
+        const UInt last = testCase == Case::Counts ? 8 : first;
+        for (UInt count = first; count <= last; ++count)
+        {
+            builder.setInsertInto(module);
+            auto attributes = builder.createStructType();
+            for (UInt i = 0; i < count; ++i)
+            {
+                IRType* fieldType = testCase == Case::Boolean
+                                        ? static_cast<IRType*>(builder.getBoolType())
+                                    : i % 3 == 0 ? static_cast<IRType*>(builder.getUIntType())
+                                    : i % 3 == 1 ? static_cast<IRType*>(builder.getIntType())
+                                                 : static_cast<IRType*>(builder.getFloatType());
+                builder.createStructField(attributes, builder.createStructKey(), fieldType);
+            }
+            builder.setInsertInto(block);
+            List<IRInst*> operands;
+            operands.add(attributes);
+            operands.add(builder.getIntValue(
+                builder.getUIntType(),
+                SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION));
+            operands.add(builder.getFloatValue(builder.getFloatType(), 1));
+            operands.add(builder.getIntValue(builder.getUIntType(), 19));
+            for (UInt i = 0; i < count; ++i)
+                operands.add(builder.getIntValue(builder.getUIntType(), i + 11));
+            builder.emitIntrinsicInst(
+                builder.getUIntType(),
+                kIROp_OptixHitObjectPayload,
+                operands.getCount(),
+                operands.getBuffer());
+        }
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const bool valid = testCase == Case::Counts;
+        SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
+        if (valid)
+        {
+            SLANG_CHECK_ABORT(requirements.emissionPlan.hitObjectOperations.getCount() == 9);
+            for (UInt count = 0; count <= 8; ++count)
+            {
+                const auto& selected = requirements.emissionPlan.hitObjectOperations[count];
+                SLANG_CHECK(
+                    selected.desc.operation == SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION);
+                SLANG_CHECK(selected.desc.payloadCount == count);
+                SLANG_CHECK(selected.operands.getCount() == count + 2);
+                for (UInt i = 0; i < count; ++i)
+                    SLANG_CHECK(
+                        as<IRIntLit>(selected.operands[i + 2])->getValue() ==
+                        IRIntegerValue(i + 11));
+            }
+            NVVMIRBuilder provider;
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeNVVMBuilderLoader);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(NVVMIRBuilder::load(String(), loader, provider)));
+            ComPtr<IArtifact> artifact;
+            SLANG_CHECK(SLANG_FAILED(emitNVVMIRFromLinkedIR(
+                &context.codeGen,
+                linked,
+                provider,
+                requirements,
+                artifact)));
+            SLANG_CHECK(!artifact);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
 
 // The canonical SBT opcode is the sole new pointer producer, with ordinary load flags.
 SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
@@ -119,7 +571,8 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
         linked.entryPoints.add(entry);
         NVVMOperationRequirements requirements;
         const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
-        const bool valid = testCase == Case::Valid || testCase == Case::AnyHit;
+        const bool valid =
+            testCase == Case::Valid || testCase == Case::AnyHit || testCase == Case::Intersection;
         if (valid != SLANG_SUCCEEDED(result))
             getTestReporter()->message(
                 TestMessageType::Info,
@@ -129,7 +582,9 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
             SLANG_CHECK(
                 requirements.emissionPlan.functionNames[0] ==
-                (testCase == Case::AnyHit ? "__anyhit__raygenMain" : "__raygen__raygenMain"));
+                (testCase == Case::AnyHit         ? "__anyhit__raygenMain"
+                 : testCase == Case::Intersection ? "__intersection__raygenMain"
+                                                  : "__raygen__raygenMain"));
             SLANG_CHECK(requirements.emissionPlan.namedIntrinsics.getCount() == 1);
             SLANG_CHECK(requirements.emissionPlan.namedIntrinsics[0].source == sbt);
             SLANG_CHECK(requirements.emissionPlan.loads.getCount() == 1);
@@ -240,7 +695,8 @@ SLANG_UNIT_TEST(nvvmOptixInstanceRowsRequireCheckedImmediates)
             NVVMOperationRequirements requirements;
             const bool valid =
                 testCase == Case::Valid && (stage == Stage::RayGeneration || stage == Stage::Miss ||
-                                            stage == Stage::ClosestHit || stage == Stage::AnyHit);
+                                            stage == Stage::ClosestHit || stage == Stage::AnyHit ||
+                                            stage == Stage::Intersection);
             auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
             if (valid != SLANG_SUCCEEDED(result))
                 getTestReporter()->message(
@@ -272,7 +728,7 @@ SLANG_UNIT_TEST(nvvmOptixInstanceRowsRequireCheckedImmediates)
                     artifact)));
                 SLANG_CHECK(!artifact);
             }
-            const auto expectedDiagnostic = stage == Stage::Intersection || stage == Stage::Callable
+            const auto expectedDiagnostic = stage == Stage::Callable
                                                 ? toSlice("entry-point stage")
                                                 : toSlice("OptiX instance transform row");
             SLANG_CHECK(

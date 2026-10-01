@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty-five feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 82 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Thirty-six feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 83 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -342,24 +342,56 @@ use directly qualified CUDA height/depth queries: the separate `suq.array_size` 
 module load with CUDA801. The NVRTC surface fixture returns zero instead of layer counts 3/4 at
 both O0/O3; its four wrong assertions remain recorded, with the allocation-based oracle unchanged.
 
-The manifest preserves the original full run and all failed attempts. Focused updates plus three
-new fixtures give **225 pass / 37 fail / 10 skip** among 272 current NVVM registrations. These are
-mixed-age known outcomes, not another full-suite run. NVRTC has 261 pass / 1 fail / 10 skip, with
-the new surface-dimension discrepancy. Current unresolved groups: HitObject representation 26,
-active-list matrix composition 4, trace payload 2, and one each for pointer-bearing records,
-typed-buffer globals, cluster queries, callable ABI and intersection stages. Raw family evidence:
-`build/nvvm-resource-parameters`; current contracts and exact identities are in focused evidence.
+The manifest preserves the original full run and all failed attempts. The resource family resolved 24
+original failures; the supported HitObject family below resolves 26 more. Including four added
+fixtures, current mixed-age NVVM outcomes are **252 pass / 11 fail / 10 skip** across 273 registrations
+(272 unique names). NVRTC has 261 pass / 2 fail / 10 skip: the surface-layer count discrepancy and the
+new lifecycle fixture's illegal object-ray getter remain documented comparison failures. This is
+not another full-suite run. Current unresolved groups are active-list matrices 4, payload boundaries 2,
+and one each of arbitrary MakeHit, cluster query, callable ABI, typed-buffer globals and nested
+pointer records. Existing shaders/oracles were not weakened and no failure was demoted.
 
-**Next work:** investigate the complete HitObject representation/operation family against its
-26 retained RHI failures, including producer, stage and payload prerequisites before implementation.
-The maintainer requires complete families; isolated operations do not establish completion.
-There is one implementation since the accepted 1,713-cell working checkpoint. Continue focused
-family checks plus smoke; working runs remain every three to five batches or sooner for concrete
-shared risks. Further full RHI runs remain on demand.
+**HitObject feasibility gate:** both explicit SDK8.1 MakeHit constructors compile through
+NVRTC, but the current OptiX9 module compiler rejects them with error7204: they require ABI102
+or older, while the active OptiX ABI is105. The NOP control passes module/program/pipeline creation.
+No launch occurred. This OptiX ABI is unrelated to Slang provider ABI46. Exact attempts are retained
+under `build/nvvm-hitobject`; the first combined log interleaved stdout/stderr, so a same-binary
+separated capture preserves machine-readable outcomes.
 
-Public composite ObjectToWorld/WorldToObject matrices remain unsupported; their complete family
+**HitObject lifecycle is accepted with focused validation.** The approved OptiX9 scope preserves
+independent traced-hit/miss/nop objects through helpers, repeated invocation and SBT changes,
+plus geometry queries, ordered transforms/object rays and all three reorder forms. All four
+arbitrary MakeHit/MakeMotionHit constructors explicitly diagnose. Provider-private storage is 392
+bytes with alignment 8 and all 31 transform handles owned; external entry/buffer/payload roles stay rejected.
+
+The final 27-case RHI family passes 2,265 assertions, including the guarded 533-word lifecycle fixture
+at O0/O3. Standalone nested instance/SRT/matrix motion passes 309 words at each level, with its exact
+earlier identity retained; all four stages also compile at O0/O3 on the final compiler. Six static
+units, six provider/stage units, six cross-backend constructor cells, four MakeHit negative cells,
+eight motion compile cells and four attribute/empty-payload PTX cells pass. Five NVRTC controls and
+all 15 smoke cells pass (22.00s). No new full checkpoint or working-corpus admission; this is the
+second accepted implementation since the 1,713-cell working checkpoint.
+
+RHI now uses the conservative OptiX ALLOW_ANY graph policy. Changing only that flag repaired zero
+custom instance IDs and an LSS fault after saved-hit replay (70 isolated assertions). This is observed
+SDK9/driver compatibility, with unmeasured specialization cost, not a universal API prohibition or a
+claim of broader RHI motion/depth support. CUDA's lifecycle comparison still aborts module creation:
+its object-ray getter uses an incoming intrinsic illegal in raygen. The independent oracle is unchanged.
+
+The family also corrected canonical allocation effects and zero-word operation timing. Existing
+AllocateOpaqueHandle is Void(destination); preserving its write effect fixes constructor initialization
+without inventing opaque copies. NVVM payload packing now precedes empty-type cleanup: a retained
+probe previously compiled but silently lost empty-payload Traverse/Invoke. Final PTX assertions
+require both calls and every report widths 0..8. ReportHitOptix uses the same typed tuple path as
+portable ReportHit. Exact failed builds, tests, context-poisoned outcomes and repairs remain in
+[focused evidence](focused-evidence.json) and the [RHI manifest](rhi-cuda-status.json).
+
+The next candidate is the complete ordinary active-list matrix family (four remaining application
+failures), reusing ordered transform composition where appropriate. No new family has started.
+
+The ordinary current-ray ObjectToWorld/WorldToObject matrices remain unsupported; their family
 requires static/motion semantics and full direction-dependent list composition. A single-instance
 shortcut is not sufficient. Raw SDK object-ray queries remain AnyHit/Intersection-only, and
-GeometryIndex is distinct from SBT record index. Procedural/callable ABI and recursive callback
+GeometryIndex is distinct from SBT record index. Callable ABI, broader payload layouts and recursive callback
 tracing remain separate. Custom RHI devices/sessions and internal NVRTC kernels retain the route
 ownership documented in the manifest; passing all resource-only tests would not prove NVVM compilation.

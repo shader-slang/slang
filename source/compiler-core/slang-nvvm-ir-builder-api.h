@@ -100,6 +100,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_MEMORY_OPERATIONS ((SlangNVVMBuilderInterfaceID)6u)
 #define SLANG_NVVM_BUILDER_INTERFACE_TRACE_OPERATIONS ((SlangNVVMBuilderInterfaceID)7u)
 #define SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS ((SlangNVVMBuilderInterfaceID)8u)
+#define SLANG_NVVM_BUILDER_INTERFACE_HIT_OBJECT_OPERATIONS ((SlangNVVMBuilderInterfaceID)9u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -700,6 +701,84 @@ extern "C"
             size_t operandCount,
             SlangNVVMValueHandle* outValue);
     } SlangNVVMBuilderInstanceTransformOperationsAPI;
+
+    /** Finite operations on independently owned OptiX9 hit-object snapshots. */
+    typedef uint32_t SlangNVVMHitObjectOperation;
+// Zero is not a valid operation.
+#define SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP ((SlangNVVMHitObjectOperation)1u)
+#define SLANG_NVVM_HIT_OBJECT_OP_MAKE_MISS ((SlangNVVMHitObjectOperation)2u)
+#define SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE ((SlangNVVMHitObjectOperation)3u)
+#define SLANG_NVVM_HIT_OBJECT_OP_INVOKE ((SlangNVVMHitObjectOperation)4u)
+#define SLANG_NVVM_HIT_OBJECT_OP_QUERY ((SlangNVVMHitObjectOperation)5u)
+#define SLANG_NVVM_HIT_OBJECT_OP_SET_SBT_INDEX ((SlangNVVMHitObjectOperation)6u)
+#define SLANG_NVVM_HIT_OBJECT_OP_LOAD_SBT_U32 ((SlangNVVMHitObjectOperation)7u)
+#define SLANG_NVVM_HIT_OBJECT_OP_REORDER ((SlangNVVMHitObjectOperation)8u)
+#define SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT ((SlangNVVMHitObjectOperation)9u)
+#define SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION ((SlangNVVMHitObjectOperation)10u)
+
+    typedef uint32_t SlangNVVMHitObjectQuery;
+#define SLANG_NVVM_HIT_OBJECT_QUERY_IS_HIT ((SlangNVVMHitObjectQuery)0u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_IS_MISS ((SlangNVVMHitObjectQuery)1u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_IS_NOP ((SlangNVVMHitObjectQuery)2u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_INSTANCE_ID ((SlangNVVMHitObjectQuery)3u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_INSTANCE_INDEX ((SlangNVVMHitObjectQuery)4u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_SBT_GAS_INDEX ((SlangNVVMHitObjectQuery)5u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_PRIMITIVE_INDEX ((SlangNVVMHitObjectQuery)6u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_HIT_KIND ((SlangNVVMHitObjectQuery)7u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_SBT_INDEX ((SlangNVVMHitObjectQuery)8u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_RAY_FLAGS ((SlangNVVMHitObjectQuery)9u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_WORLD_ORIGIN ((SlangNVVMHitObjectQuery)10u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_WORLD_DIRECTION ((SlangNVVMHitObjectQuery)11u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_TMIN ((SlangNVVMHitObjectQuery)12u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_TMAX ((SlangNVVMHitObjectQuery)13u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_TIME ((SlangNVVMHitObjectQuery)14u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_ATTRIBUTE ((SlangNVVMHitObjectQuery)15u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_CLUSTER_ID ((SlangNVVMHitObjectQuery)16u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_SPHERE ((SlangNVVMHitObjectQuery)17u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_LSS ((SlangNVVMHitObjectQuery)18u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_OBJECT_TO_WORLD ((SlangNVVMHitObjectQuery)19u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_WORLD_TO_OBJECT ((SlangNVVMHitObjectQuery)20u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_IS_SPHERE ((SlangNVVMHitObjectQuery)21u)
+#define SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS ((SlangNVVMHitObjectQuery)22u)
+
+    typedef struct SlangNVVMHitObjectOperationDesc
+    {
+        SlangNVVMHitObjectOperation operation;
+        SlangNVVMHitObjectQuery query; /**< QUERY only; otherwise zero. */
+        uint32_t index;        /**< Attribute0..7, LSS row0..1 or matrix row0..2; otherwise zero. */
+        uint32_t payloadCount; /**< Traverse/Invoke0..32; ReportIntersection attributes0..8. */
+    } SlangNVVMHitObjectOperationDesc;
+
+    /** Optional interface; existing ABI46 tables remain unchanged.
+        Storage is private and owned by each canonical HitObject local. Operand0 is its generic
+        storage pointer, except REORDER_HINT and REPORT_INTERSECTION.
+        Remaining operands: MAKE_MISS uses the SDK's eleven scalar arguments; TRAVERSE uses the
+        trace interface's fifteen scalars followed by payload words; INVOKE uses payload words;
+        SET_SBT_INDEX/LOAD_SBT_U32 use one UInt32; REORDER forms use hint/bits UInt32 values.
+        REPORT_INTERSECTION uses Float32 distance, UInt32 kind and attribute words.
+        Nonempty payload results are UInt32 arrays; predicates and ReportIntersection return UInt32;
+       no-result calls return null. QUERY returns the exact scalar or vector prescribed by its code.
+       No SDK pointer escapes. */
+    typedef struct SlangNVVMBuilderHitObjectOperationsAPI
+    {
+#define SLANG_NVVM_HIT_OBJECT_OPERATIONS_VERSION 1u
+        uint32_t structureSize;
+        uint32_t version;
+        SlangNVVMResult(
+            SLANG_NVVM_CALL* getStorageLayout)(uint32_t* outSize, uint32_t* outAlignment);
+        SlangNVVMResult(SLANG_NVVM_CALL* getHitObjectType)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMTypeHandle* outType);
+        SlangNVVMResult(SLANG_NVVM_CALL* isOperationSupported)(
+            const SlangNVVMHitObjectOperationDesc* operation,
+            uint32_t* outSupported);
+        SlangNVVMResult(SLANG_NVVM_CALL* emitOperation)(
+            SlangNVVMModuleHandle module,
+            const SlangNVVMHitObjectOperationDesc* operation,
+            const SlangNVVMValueHandle* operands,
+            size_t operandCount,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderHitObjectOperationsAPI;
 
     typedef struct SlangNVVMBuilderSurfaceOperationsAPI
     {

@@ -132,6 +132,99 @@ eight raw SDK helpers from compute and raygen to prove backend rejection before 
 Use compute smoke and raygen binding controls after this named-query batch. Unchanged triangle
 storage/type/IR contracts retain their earlier static evidence; no new static rebuild is needed.
 
+## HitObject family validation
+
+The supported OptiX9 lifecycle is qualified separately from arbitrary MakeHit, whose four overloads
+must diagnose. The maintained motion fixture has eight compile-only cells: four individual entries
+at O0/O3. Direct NVVM accepts one entry per compilation. These cells do not qualify GPU execution.
+Run constructor compatibility and the negative fixture with the affected provider checks:
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/pipeline/ray-tracing/nvvm-opaque-constructors.slang \
+  tests/pipeline/ray-tracing/nvvm-hitobject-makehit-unsupported.slang \
+  tests/pipeline/ray-tracing/nvvm-hitobject-motion.slang \
+  tests/pipeline/ray-tracing/nvvm-report-hit-attributes.slang \
+  slang-unit-test-tool/nvvmIRBuilderHitObject
+```
+
+The isolated static runner uses `nvvmOptixHitObjectsKeepOwnedReferences`, with affected `nvvmOptix`
+stage/trace controls and `irOpaqueConstructorsWriteOnlyTheirDestination`. Constructor checks cover
+the shared effectful `AllocateOpaqueHandle : Void(destination)` contract across NVVM, CUDA, HLSL
+and SPIR-V. Only the destination is initialized; ray and payload inputs must still be checked.
+
+The RHI selection contains 27 registrations: the supported HitObject, SER, sphere/LSS/cluster and
+transform cases, the new lifecycle fixture, and the intersection prerequisite
+`ray-tracing-native-primitive-flags.cuda`. Keep explicit CUDA/NVVM selection and require the device:
+
+```bash
+build/nvvm-rhi-cuda/rhi-build/RelWithDebInfo/slang-rhi-tests \
+  --select-devices=cuda --require-devices=cuda --cuda-compiler=nvvm \
+  --test-case=ray-tracing-hitobject-lifecycle.cuda --no-colors=true
+```
+
+Use the recorded exact selection for the family run. The arbitrary
+`ray-tracing-hitobject-make-hit.cuda` registration retains its intentional unsupported outcome
+separately; its previous CUDA pass does not establish faithful constructor arguments. The lifecycle
+fixture checks all 533 guarded words and O0/O3 within one registration. Its focused run passed 1,127
+assertions. The final family passes 27/27 with 2,265 assertions, six static units and 15 smoke cells.
+Four attribute/empty-payload source cells at O0/O3 additionally require PTX calls for all report
+widths 0..8 (both eight-word forms) and zero-word Traverse/Invoke; compile success alone is insufficient.
+
+The independent motion runtime host is retained with raw evidence under
+`build/nvvm-hitobject/motion-probe/`. It checks all 309 output words, guards and completion over a
+nested instance/SRT/matrix graph at times 0/.5/1. Compile each entry separately at O0/O3 and retain
+reflection JSON for every module:
+
+```bash
+for opt in 0 3; do
+    for entry in motionRayGen motionMiss motionClosestHit motionAnyHit; do
+        case "$entry" in
+            motionRayGen) stage=raygeneration ;;
+            motionMiss) stage=miss ;;
+            motionClosestHit) stage=closesthit ;;
+            motionAnyHit) stage=anyhit ;;
+        esac
+        build/RelWithDebInfo/bin/slangc \
+            tests/pipeline/ray-tracing/nvvm-hitobject-motion.slang \
+  tests/pipeline/ray-tracing/nvvm-report-hit-attributes.slang \
+            -target ptx -emit-cuda-via-nvvm -capability cuda_sm_8_0 \
+            -entry "$entry" -stage "$stage" -O"$opt" \
+            -reflection-json "build/nvvm-hitobject/motion-probe/nvvm-o$opt-$stage-reflection.json" \
+            -o "build/nvvm-hitobject/motion-probe/nvvm-o$opt-$stage.ptx"
+    done
+done
+```
+
+Before launch, verify every module's `SLANG_globalParams` is an inline 24-byte record with scene at
+0, output pointer at 8 and UInt64 count at 16, and confirm emitted entry names. The host's C++ layout
+assertions do not inspect shader reflection. A differing reflected ABI requires an explicit binding
+update before execution. With the verified layout and names, use the rebuilt prepared host:
+
+```bash
+for opt in 0 3; do
+    build/nvvm-hitobject/motion-probe/run-motion \
+        "build/nvvm-hitobject/motion-probe/nvvm-o$opt-raygeneration.ptx" \
+        "build/nvvm-hitobject/motion-probe/nvvm-o$opt-miss.ptx" \
+        "build/nvvm-hitobject/motion-probe/nvvm-o$opt-closesthit.ptx" \
+        "build/nvvm-hitobject/motion-probe/nvvm-o$opt-anyhit.ptx" \
+        SLANG_globalParams __raygen__motionRayGen __miss__motionMiss \
+        __closesthit__motionClosestHit __anyhit__motionAnyHit
+done
+```
+
+The NVVM O0/O3 runtime gates each passed all 309 words. SDK-only controls retain separate provenance.
+The oracle covers interpolated translation with fixed nonidentity quaternion/scales; it does not
+claim changing-quaternion, maximum-depth or every motion-geometry qualification.
+
+Keep the lifecycle NVRTC comparison failure unchanged: its incoming object-ray getter is illegal in
+raygeneration, independently of whether a selected NVVM object works. The RHI graph option is
+conservatively `ALLOW_ANY`: the recorded SDK9/driver produced zero identity and an LSS replay
+failure under the single-level specialization; the isolated corrected LSS case passes 70 assertions.
+This is observational compatibility evidence, with unmeasured performance and no additional RHI
+scene-depth claim. Use scene-derived expected values. Exact outcomes and loaded identities belong
+in focused evidence and the RHI manifest; these commands alone do not imply acceptance.
+
 ## Optional slang-rhi CUDA suite
 
 This is on-demand application validation. The prepared sibling checkout needs the test harness's

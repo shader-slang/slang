@@ -9742,7 +9742,6 @@ bool IRInst::mightHaveSideEffects(
     case kIROp_MakeTensorView:
     case kIROp_TorchTensorGetView:
     case kIROp_GetStringHash:
-    case kIROp_AllocateOpaqueHandle:
     case kIROp_GetArrayLength:
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:

@@ -442,6 +442,12 @@ enum class NVVMTypeUse
     StructuredBufferStorage,
 };
 
+/// Recognizes only private HitObject storage and finite local arrays of that storage.
+bool isNVVMHitObjectStorageType(IRInst* type);
+
+/// Recognizes canonical generic local/borrow/out references, without external storage admission.
+IRPtrTypeBase* asNVVMHitObjectPointerType(IRInst* type);
+
 /// Records every established direct-NVVM representation role for one canonical linked-IR type.
 ///
 /// This is the classification boundary between canonical Slang types and provider type lowering.
@@ -464,6 +470,8 @@ struct NVVMTypeInfo
     IRPtrTypeBase* localRecordArrayReference = nullptr;
     bool isPointerBearingHelperValue = false;
     bool isAccelerationStructure = false;
+    bool isHitObjectStorage = false;
+    IRPtrTypeBase* hitObjectPointer = nullptr;
     bool isRawBuffer = false;
     bool isSurface = false;
     bool isSampledTexture = false;

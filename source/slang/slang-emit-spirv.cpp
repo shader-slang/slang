@@ -5028,6 +5028,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
                 SLANG_UNIMPLEMENTED_X(e.getBuffer());
             }
+        // Opaque constructors identify storage already declared by emitVar. The marker is
+        // effectful for shared initialization analysis but has no separate SPIR-V instruction.
+        case kIROp_AllocateOpaqueHandle:
         case kIROp_Specialize:
         case kIROp_MissingReturn:
         case kIROp_StaticAssert:

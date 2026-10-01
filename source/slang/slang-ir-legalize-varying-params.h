@@ -24,6 +24,9 @@ struct EntryPointInfo
 // Both trace callers and callback parameters use this check before their type is erased.
 UInt getNVVMOptixPayloadRegisterCount(IRType* type);
 
+/// Admits the same dense payload algebra plus a canonical empty HitObject payload record.
+bool getNVVMOptixHitObjectPayloadRegisterCount(IRType* type, UInt& outCount);
+
 void legalizeEntryPointVaryingParamsForCPU(
     IRModule* module,
     TargetProgram* target,
@@ -33,6 +36,10 @@ void legalizeEntryPointVaryingParamsForCUDA(
     IRModule* module,
     DiagnosticSink* sink,
     bool emitNVVMDirectly = false);
+
+// Pack HitObject payloads and intersection attributes before empty-value legalization erases
+// their zero-word aggregates. Original types remain explicit metadata for NVVM preflight.
+void legalizeOptiXHitObjectOperationsForNVVM(IRModule* module);
 
 void legalizeOptiXReportIntersectionsForCUDA(IRModule* module, DiagnosticSink* sink);
 

@@ -128,6 +128,20 @@ public:
         size_t operandCount,
         SlangNVVMValueHandle& outValue) const;
 
+    const SlangNVVMBuilderHitObjectOperationsAPI* getHitObjectOperationsAPI() const
+    {
+        return m_hitObjectOperations.isOperationSupported ? &m_hitObjectOperations : nullptr;
+    }
+    SlangResult getHitObjectStorageLayout(uint32_t& outSize, uint32_t& outAlignment) const;
+    SlangResult getHitObjectType(SlangNVVMModuleHandle module, SlangNVVMTypeHandle& outType) const;
+    bool supportsHitObjectOperation(const SlangNVVMHitObjectOperationDesc& operation) const;
+    SlangResult emitHitObjectOperation(
+        SlangNVVMModuleHandle module,
+        const SlangNVVMHitObjectOperationDesc& operation,
+        const SlangNVVMValueHandle* operands,
+        size_t operandCount,
+        SlangNVVMValueHandle& outValue) const;
+
     /// Returns the optional scoped-memory interface, or null for an older provider.
     const SlangNVVMBuilderMemoryOperationsAPI* getMemoryOperationsAPI() const
     {
@@ -456,6 +470,7 @@ private:
     SlangNVVMBuilderMemoryOperationsAPI m_memoryOperations = {};
     SlangNVVMBuilderTraceOperationsAPI m_traceOperations = {};
     SlangNVVMBuilderInstanceTransformOperationsAPI m_instanceTransformOperations = {};
+    SlangNVVMBuilderHitObjectOperationsAPI m_hitObjectOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};
     ComPtr<ISlangSharedLibrary> m_library;

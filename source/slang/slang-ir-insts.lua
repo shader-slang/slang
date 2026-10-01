@@ -1681,6 +1681,19 @@ local insts = {
 	{ optixTraceRayPayload = { min_operands = 17 } },
 	-- Effectful Float4 row read of a valid instance transform; the SDK pointer stays internal.
 	{ optixInstanceTransformRow = { operands = { { "handle" }, { "row" }, { "inverse" } } } },
+	-- Typed operations retain the source object; SDK outgoing state is provider-private.
+	{ optixHitObjectQuery = { min_operands = 3 } },
+	{ optixHitObjectMakeMiss = { min_operands = 12 } },
+	{ optixHitObjectMakeNop = { min_operands = 1 } },
+	{ optixHitObjectSetSbt = { min_operands = 2 } },
+	{ optixHitObjectLoadSbt = { min_operands = 2 } },
+	{ optixHitObjectReorder = { min_operands = 3 } },
+	{ optixReorderHint = { min_operands = 2 } },
+	{ optixHitObjectTraverse = { min_operands = 13 } },
+	{ optixHitObjectInvoke = { min_operands = 2 } },
+	{ optixHitObjectAttributes = { min_operands = 1 } },
+	{ optixHitObjectPayload = { min_operands = 3 } },
+
 	-- Read a uint32 value from OptiX payload register N (0-31).
 	-- Operand 0: register index (int literal)
 	{ getOptiXPayloadRegister = { min_operands = 1 } },

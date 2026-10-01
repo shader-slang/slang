@@ -110,7 +110,7 @@ supported public operations, widths and pointer-output qualifications.
 
 ### OptiX entry and binding ownership
 
-Ray-generation, miss, closest-hit and any-hit entries reuse the shared OptiX uniform-collection pass.
+Ray-generation, miss, closest-hit, any-hit and intersection entries reuse the shared OptiX uniform-collection pass.
 That producer moves entry uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`;
 it leaves compute parameters unchanged. After payload/varying legalization, NVVM preflight accepts
 void, parameterless entries and owns their stage-specific SDK symbol prefixes. Conventional globals
@@ -134,35 +134,35 @@ reuse the same traversal; unsupported shapes retain an operation or pointer fall
 preflight rejects. The lowered
 trace keeps its original type and returns an ordinary UInt32 array. Checked plans validate this
 contract before provider mutation. The original payload type is an explicit type dependency even
-when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit/any-hit;
-triangle attributes in closest-hit/any-hit. These stage checks cover the reachable helper closure.
+when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit/any-hit/intersection;
+attributes in closest-hit/any-hit. These stage checks cover the reachable helper closure.
 
 The optional versioned trace interface uses the existing provider query mechanism without changing
 ABI46 tables. The provider adapts finite payload arrays to the SDK's fixed 32-result/49-argument
 primitive, zeros unused inputs, and retains side effects and a compiler memory clobber. Exact named
-get/set payload calls require literal indices 0..31; triangle attributes admit indices 0 and 1.
+get/set payload calls require literal indices 0..31; attribute registers admit indices 0 through 7.
 World-ray origin/direction and ray-range queries use eight exact Float32 zero-argument SDK calls
-in miss/closest-hit/any-hit. Core composes the vector queries; the provider uses Float32 register
+in miss/closest-hit/any-hit/intersection. Core composes the vector queries; the provider uses Float32 register
 transport. Direction retains the traced value without normalization. Current distance is the
 candidate intersection distance in any-hit, the selected distance in closest-hit, or the original
 maximum in miss. Queries retain their observation position; the trace
 operation owns the callback memory clobber. Primitive index, instance index and custom instance ID
-use three exact nullary UInt32 SDK queries in closest-hit/any-hit. HitKind uses the same scalar
-transport and hit-only stage policy. RayFlags is UInt32 ray state available in miss/closest-hit/any-hit
+use three exact nullary UInt32 SDK queries in closest-hit/any-hit/intersection. HitKind uses the same
+scalar transport in closest-hit/any-hit. RayFlags is UInt32 ray state available in miss/closest-hit/any-hit/intersection
 and preserves the incoming trace flags. The instance index identifies the
 entry in the instance acceleration structure; the custom ID comes from its host descriptor. Miss
 has ray state but no hit identity. This stage policy also applies to indirect helper calls.
 Unknown names, wrong signatures and invalid insertion points fail before emission. Missing trace
 support is diagnosed before module creation. This finite typed SDK boundary does not interpret CUDA
 text or admit arbitrary external calls. Object-ray origin/direction compose six exact Float32
-queries admitted only in any-hit; they preserve inverse transformation without normalization.
+queries admitted in any-hit/intersection; they preserve inverse transformation without normalization.
 IgnoreHit and AcceptHitAndEndSearch use exact nullary Void SDK calls, also any-hit-only. These
 calls are side-effecting, have no output constraint or result handle, and follow checked payload
-writebacks. Procedural intersection, callback tracing, callables and pointer payload transport
-remain outside this contract.
+writebacks. ReportIntersection accepts zero through eight attribute words in intersection programs.
+Ordinary callback TraceRay, callables and pointer payload transport remain outside this contract.
 
-Transform-list size and handle queries use exact UInt32/UInt64 SDK signatures in any-hit and
-closest-hit. Handle-property queries accept opaque UInt64 values in the existing OptiX stages;
+Transform-list size and handle queries use exact UInt32/UInt64 SDK signatures in any-hit,
+closest-hit and intersection. Handle-property queries accept opaque UInt64 values in the existing OptiX stages;
 transform type returns signed Int32 before core conversion to the public enum, instance ID returns
 UInt32, and child handles remain UInt64. These handles have no pointer semantics. The provider
 validates signatures before deriving scalar register constraints, and separates dynamic list indexes
@@ -181,6 +181,69 @@ present malformed table fails initialization. Existing table layouts, module43 a
 unchanged. Core and shared lowering own the logical matrix, while the provider owns only Float4 row
 reads of a valid instance. Composite public `ObjectToWorld`/`WorldToObject` queries still require
 complete active-list composition, including transform kinds and direction-dependent ordering.
+
+### Owned HitObject state
+
+Canonical noncopyable HitObjects use caller-owned local storage and internal helper references.
+The existing out-parameter lowering owns returns; the backend does not replace objects with public
+integer handles. Fixed local arrays retain the same storage role. Entry parameters, exported helper
+references, external buffers, numeric conversions and payload embedding remain excluded. Checked
+address records prove local or internal-formal roots before emission. Construction and ordinary
+stores require write access; SetShaderTableIndex preserves the existing opaque interior mutation
+contract through borrowed `this`.
+
+The canonical constructor marker is `AllocateOpaqueHandle : Void(destination)`. Shared lowering
+into return destinations produces it for noncopyable HitObject and RayQuery constructors; it is an
+effectful write, not an opaque value to copy. Initialization analysis classifies only the destination
+as written and still checks ray and payload inputs as reads. NVVM plans HitObject allocation as
+MAKE_NOP into the caller-owned destination. SPIR-V consumes the marker without another instruction
+because its native variable already owns the opaque storage, including inside function bodies.
+
+Optional interface 9 owns the private type and storage layout. Preflight checks layout and selected
+operation support before module creation; an omitted extension only blocks programs that need it.
+The OptiX9 provider stores a hit/miss/nop tag, opaque traversal data, ray metadata, SBT selection and
+an owned ordered list of up to 31 transform handles, the SDK9 graph-depth limit. This provider
+layout occupies 392 bytes with 8-byte alignment; the compiler queries it rather than duplicating
+those constants. Capture reads only tag-appropriate state. Restore selects the source object before queries, invocation or reorder and
+explicitly applies its saved SBT selection. Invoke uses the current caller payload and leaves the
+saved object intact. Hint-only reorder activates NOP, avoiding dependence on another object's state.
+Every SDK observation/transition retains side effects and a memory clobber.
+
+Shared payload legalization reuses the existing dense scalar/vector/record/array traversal after
+specialization and tuple lowering, before empty-type cleanup. Zero-word Traverse/Invoke must become
+effectful Void calls before an empty result can erase them. Original payload types remain metadata
+in checked plans; the existing zero-state type collector admits them only after operation validation. HitObject operations additionally admit canonical empty payload
+records. Traverse/Invoke return up to 32 ordinary UInt32 words; attributes and ReportIntersection use
+up to eight. Both generic attribute records and variadic `ReportHitOptix` calls use the same typed
+report tuple and zero-through-eight-word attribute contract. HitObject lifecycle operations are
+available in raygen/closest-hit/miss, reordering in raygen, and ReportIntersection in intersection. Stage checks include reachable helpers.
+
+The provider composes complete object transforms from the saved ordered list and ray time. Instance
+and static transforms use their documented matrices; matrix/SRT motion transforms interpolate public
+SDK key data. After clamping a motion-key position to the finite nonnegative key interval, integer
+conversion selects its lower key; this requires no additional floating-point intrinsic.
+Object-to-world traverses the list in reverse, world-to-object in forward order.
+Object-ray composition preserves direction magnitude. Private SDK pointers never enter compiler
+storage roles. Core owns public matrix shapes and ordinary vector composition. Provider-private
+capture, restore and matrix helpers use the same `_nameFunctionParameters` routine as ordinary
+function declarations, preserving both supported LLVM dialects without rewriting printed signatures.
+
+The sibling RHI adapter uses `OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY` for this replay path. On the
+recorded SDK9/driver combination, the single-level specialization produced zero instance identity
+and a linear-swept-sphere failure after owned-hit restoration. The conservative option preserves
+that restored transform list in the tested cases. This is an observed compatibility constraint,
+not a universal prohibition on the specialization; its performance impact has not been measured.
+The option alone does not establish support for deeper application scene graphs.
+
+OptiX9 cannot represent arbitrary MakeHit identity/attribute construction through the removed older
+ABI primitives. All four public arbitrary constructors diagnose explicitly; traced-hit restoration is
+a separate supported mechanism. CUDA's implicit-object aliases and incoming object-ray getters are
+not a semantic oracle for independent objects. GeometryIndex is the OptiX SBT GAS index; it equals a
+geometry ordinal only under the one-record-per-build-input convention without per-primitive offsets.
+Current runtime qualifications and their numerical/scene limits live in the capability ledger and
+focused evidence, alongside retained comparison failures.
+
+### Shader termination and numeric dispatch
 
 Shader termination has canonical declaration identity before optimization: the core
 IgnoreHit and AcceptHitAndEndSearch declarations carry existing KnownBuiltin metadata.

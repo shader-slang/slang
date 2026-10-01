@@ -31,6 +31,50 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
+## HitObject lifecycle and boundaries
+
+The OptiX9 implementation retains independent noncopyable objects in caller-owned storage,
+including helper returns and references, and restores the selected object before queries,
+invocation and reordering. The private snapshot is 392 bytes with 8-byte alignment and owns up to
+31 transform handles. Arbitrary MakeHit/MakeMotionHit remains explicitly unsupported: all four
+constructors diagnose, separately from restoration of a previously traced hit. The supported family passes 27 RHI registrations with 2,265 assertions, six static units, six provider/stage
+units, 22 source control cells and 15 smoke cases. This resolves 26 original application failures;
+the arbitrary MakeHit registration remains intentionally unsupported. The full checkpoint is unchanged.
+
+The sibling `ray-tracing-hitobject-lifecycle.cuda` oracle passes at NVVM O0/O3 with 1,127 assertions.
+It checks all 533 guarded words, independent hit/miss/nop objects, helper transport, two asymmetric
+affine instances, full forward/inverse matrices and object rays, SBT selection and repeated
+invocation with an evolving current payload. The unchanged NVRTC comparison aborts during OptiX
+module creation because its incoming ObjectRayOrigin getter is illegal in raygeneration. CUDA's
+single implicit outgoing object and ignored constructor arguments are not an oracle for independent
+objects; scene-derived expected values remain authoritative.
+
+The independent host for the [motion fixture](../../tests/pipeline/ray-tracing/nvvm-hitobject-motion.slang)
+passes all 309 guarded words at NVVM O0/O3. It checks a nested instance/SRT/matrix graph at times
+0, .5 and 1, all 24 forward/inverse coefficients, world/object rays, attributes and repeated invocation
+with an evolving payload. The oracle uses exact finite values with signed-zero equivalence. Its
+motion interpolates translation with fixed nonidentity quaternion and scales; this does not qualify
+changing-quaternion interpolation, maximum graph depth or every motion geometry. SDK-only controls
+retain separate identities and do not establish compiler correctness. The fixture's eight maintained
+compile cells each select one entry at O0/O3; they do not run the host.
+
+The sibling RHI adapter now selects the conservative `ALLOW_ANY` graph option. On the recorded
+SDK9/driver combination, the previous single-level specialization yielded zero instance identity
+and a linear-swept-sphere failure after replay; the isolated corrected instance-ID and LSS cases pass 70 assertions.
+This is observed compatibility evidence, not a universal API prohibition. Performance is unmeasured,
+and this option does not extend the RHI scene-depth qualification.
+
+The retained compatibility gate compiles the two explicit SDK8.1 constructors through NVRTC, but
+OptiX9 rejects both at module creation7204 (maximum supported ABI102, current105). A NOP control
+passes module/program/pipeline creation; no GPU launch or constructor correctness is claimed.
+SDK9 documents restoration from prior opaque traversal data, not arbitrary hit construction.
+[The SDK9 construction contract](https://raytracing-docs.nvidia.com/optix9/guide/optix_guide.250130.A4.pdf)
+and [DXR object semantics](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hitobject)
+explain the distinction. The maintainer approved the supported OptiX9 lifecycle with arbitrary
+MakeHit explicitly rejected. FromRayQuery, callable stages and general pointer payloads remain
+separate work. GeometryIndex exposes the SBT GAS index, which equals a geometry ordinal only under
+the one-record-per-build-input convention without per-primitive SBT offsets.
+
 ## OptiX ray generation and triangle tracing
 
 The direct PTX route admits ray-generation entries, launch index/dimensions, conventional launch
@@ -62,8 +106,9 @@ module creation. Static tests retain SBT layout/load and role/cache boundaries.
 
 The original raygen/triangle fixtures target SM80 with CUDA12.9/OptiX SDK9 on the recorded
 L4/595.71.05 host; sibling RHI targets follow the CUDA device. Pointer payloads, matrices,
-explicitly strided/unsized arrays, padded/subword payloads, procedural intersection, callables and recursive
-callback tracing remain outside this contract. The shared payload-termination producer repair is separately
+explicitly strided/unsized arrays, padded/subword payloads, callables and recursive
+callback tracing remain outside this trace contract. Typed procedural ReportIntersection now admits
+zero through eight attributes, including variadic ReportHitOptix, with separate family validation. The shared payload-termination producer repair is separately
 qualified by nine CUDA/NVRTC modes at O0/O3 (231 assertions), a focused IR boundary unit and
 source regressions. A subsequent bounded AnyHit batch qualifies exact object-ray queries and
 nullary Void ignore/accept primitives. Five selected NVVM RHI cases pass 418 assertions; object

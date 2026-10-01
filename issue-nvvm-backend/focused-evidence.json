@@ -87706,7 +87706,7 @@
       "scope": "Complete registered CUDA application suite in the tested sibling RHI binary, across all registered feature areas. Initial full NVVM/NVRTC comparison and maintained failure inventory; not full NVVM acceptance.",
       "manifest": {
         "path": "issue-nvvm-backend/rhi-cuda-status.json",
-        "sha256": "d5fb1f8850a9e7f42be34eedb2ac467594d42684731de3d2379cfed3d84df22c"
+        "sha256": "82f8fbc8199dde808d4a23e2b95d08d2f8b4953183914edb7aecf32a678d02f8"
       },
       "identity": {
         "path": "build/nvvm-rhi-full/identity.json",
@@ -87818,24 +87818,27 @@
       ],
       "failure_family_counts_scope": "Initial full checkpoint; current focused resolution is separate.",
       "current_focused_resolution": {
-        "registration_count": 272,
-        "unique_name_count": 271,
-        "scope": "Original full inventory plus three focused fixtures. Unselected cases retain original identities; this is not a rerun of the full suite.",
+        "registration_count": 273,
+        "unique_name_count": 272,
+        "scope": "Initial full inventory plus four focused fixtures. Unselected cases retain original identities; not another full-suite run.",
         "by_compiler": {
           "nvvm": {
-            "passed": 225,
-            "failed": 37,
+            "passed": 252,
+            "failed": 11,
             "skipped": 10
           },
           "nvrtc": {
             "passed": 261,
             "skipped": 10,
-            "failed": 1
+            "failed": 2
           }
         },
-        "original_nvvm_failures_resolved": 24,
-        "original_nvvm_failures_remaining": 37,
-        "new_fixture_nvrtc_difference": "surface-dimensions retains four zero-layer count mismatches at O0/O3; independent expected counts3/4 unchanged."
+        "original_nvvm_failures_resolved": 50,
+        "original_nvvm_failures_remaining": 11,
+        "new_fixture_nvrtc_differences": [
+          "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
+          "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged"
+        ]
       },
       "current_failure_family_counts": {
         "nested_pointer_record_field": 1,
@@ -87843,11 +87846,11 @@
         "texture_fetch": 0,
         "compute_entry_parameters": 0,
         "typed_buffer_global": 1,
-        "hitobject_representation": 26,
+        "hitobject_representation": 1,
         "cluster_query": 1,
         "callable_abi": 1,
         "trace_payload_boundary": 2,
-        "intersection_stage": 1,
+        "intersection_stage": 0,
         "active_list_matrix_composition": 4
       }
     },
@@ -88140,6 +88143,538 @@
         "Original full baseline and all80earlier unrelated feature objects remain unchanged. Raw evidence and five-part report stay ignored; current architecture/status/manifest updated in place."
       ],
       "rhi_fixture_commit": "7280a008b2056cb4f772660bac8a1857fa1dffb5"
+    },
+    "nvvm-hitobject-lifecycle": {
+      "status": "accepted-focused",
+      "scope": "Complete selected OptiX9 owned HitObject lifecycle with explicit exclusion of arbitrary MakeHit; typed intersection reporting prerequisite.",
+      "identity": {
+        "path": "build/nvvm-hitobject/final-identity.json",
+        "sha256": "6e1c5e74ba76f1df3c094b6ff252b0acb8edd69c131cd2da62f85a26eca3625c"
+      },
+      "source_identity": {
+        "path": "build/nvvm-hitobject/final-source-identity.json",
+        "sha256": "d43184a0a8b57cdc2052d77e11fb77ba00a211ef568874437efd8f910153af70"
+      },
+      "motion_runtime_identity": {
+        "path": "build/nvvm-hitobject/runtime-identity-1.json",
+        "sha256": "37cfe17b7bf1456a284dd8897cb6c04e5455b76eb0875b3d40237d8772cb2262"
+      },
+      "reused_control_identity": {
+        "path": "build/nvvm-hitobject/controls-before-empty-identity.json",
+        "sha256": "bc186385419516264346a492ae5fb9b1021dbc8db69db5f772eea9caa56c16c7"
+      },
+      "rhi_manifest": {
+        "path": "issue-nvvm-backend/rhi-cuda-status.json",
+        "sha256": "82f8fbc8199dde808d4a23e2b95d08d2f8b4953183914edb7aecf32a678d02f8"
+      },
+      "validation": {
+        "builds": {
+          "shared-build-empty": {
+            "path": "build/nvvm-hitobject/shared-build-empty.json",
+            "sha256": "330fdd4b35e25fec36bc9a48b9a493070aebaf249d29b942310a9c550626da00",
+            "return_code": 0,
+            "elapsed_seconds": 35.48528289794922
+          },
+          "static-build-empty": {
+            "path": "build/nvvm-hitobject/static-build-empty.json",
+            "sha256": "195e91ebb4451da92e3e38fce6fc2ddf09d0bd81f2f42bf7e441158df622fb6b",
+            "return_code": 0,
+            "elapsed_seconds": 31.780017852783203
+          }
+        },
+        "static": {
+          "optix": {
+            "path": "build/nvvm-hitobject/static-optix-2.json",
+            "sha256": "cda4ee9c4586e93e8fdff326f9f6be94c1975ce0d23543c3fb2afb211b9550bc",
+            "return_code": 0,
+            "elapsed_seconds": 7.022630453109741
+          },
+          "opaque_constructor_effects": {
+            "path": "build/nvvm-hitobject/static-opaque-2.json",
+            "sha256": "705975870e90bb9871da7c89c5950e64672e9fee3f281f228b550341c6370bea",
+            "return_code": 0,
+            "elapsed_seconds": 0.2650461196899414
+          },
+          "scope": "Five OptiX grouped units plus one seven-group shared diagnostic unit; stage/count/type/role/provenance/provider omission and no-mutation contracts."
+        },
+        "shared_units": {
+          "provider-units-final": {
+            "path": "build/nvvm-hitobject/provider-units-final.json",
+            "sha256": "994b008798247ca091e715453223906b7294d98dff91d1e05de2a1d480ef3665",
+            "return_code": 0,
+            "elapsed_seconds": 1.4445793628692627
+          },
+          "provider-optix": {
+            "path": "build/nvvm-hitobject/provider-optix.json",
+            "sha256": "0429a5751d403ea93886e5f57f604317faae0864a0dda4ac7eac17fdd0407650",
+            "return_code": 0,
+            "elapsed_seconds": 1.4262921810150146
+          },
+          "stage-units": {
+            "path": "build/nvvm-hitobject/stage-units.json",
+            "sha256": "6fb24a536a1f7b7c639212b2e1766eecc8e87663ad17eb2bc013e1c8570aa643",
+            "return_code": 0,
+            "elapsed_seconds": 14.502349853515625
+          }
+        },
+        "source_controls": {
+          "source-constructors": {
+            "path": "build/nvvm-hitobject/source-constructors.json",
+            "sha256": "01ce40ad7f6aeb1a57ebc69a8c8e900b543b74c813f4a6740ee326bb6122142e",
+            "return_code": 0,
+            "elapsed_seconds": 1.5431842803955078
+          },
+          "source-hitobject-2": {
+            "path": "build/nvvm-hitobject/source-hitobject-2.json",
+            "sha256": "f727d62c3cff96c1583749f37e90e578af0810104829d06280be8f09352975ed",
+            "return_code": 0,
+            "elapsed_seconds": 2.252964735031128
+          },
+          "source-reports-2": {
+            "path": "build/nvvm-hitobject/source-reports-2.json",
+            "sha256": "c14ca8450d3572d7f7cf04cc93d054a6af9e3fbb645b53f7daa44828590ac170",
+            "return_code": 0,
+            "elapsed_seconds": 1.5709457397460938
+          }
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-hitobject/rhi-family-final.json",
+            "sha256": "943c980d53169a2573a0fd81deefb41eeab397fb7c403215bad5052694c2cd65",
+            "return_code": 0,
+            "elapsed_seconds": 5.687803030014038
+          },
+          "counts": {
+            "passed": 27
+          },
+          "assertions": {
+            "total": 2265,
+            "passed": 2265,
+            "failed": 0
+          },
+          "selected": 27,
+          "original_failures_resolved": 26,
+          "new_fixture": 1,
+          "scope": "Existing26cases keep authored/default options; new533-word guarded lifecycle executes O0/O3 with independent scene oracle."
+        },
+        "motion": {
+          "o0": {
+            "path": "build/nvvm-hitobject/motion-nvvm-o0-runtime-1.json",
+            "sha256": "5b43d7a16e74652569799ac049391d749f5be828e8d2c1caf203ecabae70d5a7",
+            "return_code": 0,
+            "elapsed_seconds": 6.671912908554077
+          },
+          "o3": {
+            "path": "build/nvvm-hitobject/motion-nvvm-o3-runtime-1.json",
+            "sha256": "370e7006569fe6c681ea5828ac91d834f23ac7fbb73d0060627e02037426692d",
+            "return_code": 0,
+            "elapsed_seconds": 10.51844334602356
+          },
+          "abi_o0": {
+            "path": "build/nvvm-hitobject/motion-probe/nvvm-o0-abi-check.json",
+            "sha256": "434ba158920e8074e10fea014c9d4ed534a997ec3ec38b1296aa48f38b90c164"
+          },
+          "abi_o3": {
+            "path": "build/nvvm-hitobject/motion-probe/nvvm-o3-abi-check.json",
+            "sha256": "5678a7cf4cec2fcff6c681318b0da6559506b369815c307cebbe02b3849f11cd"
+          },
+          "sources": {
+            "path": "build/nvvm-hitobject/motion-probe/per-stage-source-identity.json",
+            "sha256": "f55bf9719770dfad771898866ff96373597b2f2f13fb0908ce72a5cf05184137"
+          },
+          "host": {
+            "path": "build/nvvm-hitobject/motion-probe/run-motion.cpp",
+            "sha256": "157d4cca7807a1cad7f3b45ba3737c8702a617be9c5dabe9454de7726bb22454"
+          },
+          "words_each": 309,
+          "scope": "Nested instance/SRT/matrix graph at0/.5/1; exact finite values with signed-zero equivalence, full matrices/object rays and repeated current-payload invocation. Fixed quaternion/scales with changing translations; no maximum-depth/changing-quaternion/general-motion claim. Tested before unrelated ReportHitOptix core fix; exact earlier binary identity retained."
+        },
+        "graph_policy": {
+          "isolated": {
+            "path": "build/nvvm-hitobject/rhi-any-graph-runtime.json",
+            "sha256": "1146d26f8a974ee7eed2e94d61847d0abe8525edebafe9f0103bff6aca92a102",
+            "return_code": 0,
+            "elapsed_seconds": 1.934194803237915
+          },
+          "lifecycle": {
+            "path": "build/nvvm-hitobject/lifecycle-nvvm-3.json",
+            "sha256": "14bd30bf1fa6c87bcc464c6c4cab9754b6099e2420b235afa7a39d4eedb68f9b",
+            "return_code": 0,
+            "elapsed_seconds": 22.728896141052246
+          },
+          "remaining": {
+            "path": "build/nvvm-hitobject/rhi-tail-2.json",
+            "sha256": "cd0785f57fc05939f7f8e4ab8fd2f2434f58754ef1a98490c6a67f85b6cab8ad",
+            "return_code": 0,
+            "elapsed_seconds": 2.8080570697784424
+          },
+          "scope": "Changing only RHI graph flag to ALLOW_ANY repairs InstanceID/LSS70assertions. Observed SDK9/driver compatibility, not universal spec prohibition. Performance unmeasured; no RHI graph-depth expansion claim."
+        },
+        "comparison": {
+          "controls": {
+            "path": "build/nvvm-hitobject/rhi-nvrtc-controls.json",
+            "sha256": "417bf5d23b811603f2a95bb9995e870e6e41ebc203596543cca55b17326c5758",
+            "return_code": 0,
+            "elapsed_seconds": 3.543860912322998
+          },
+          "outcomes": {
+            "outcomes": {
+              "ray-tracing-hitobject-make-miss.cuda": {
+                "status": "passed",
+                "terminal_line": 3,
+                "detail": "0.87s",
+                "failed_assertions": 0
+              },
+              "ray-tracing-hitobject-query-instance-id.cuda": {
+                "status": "passed",
+                "terminal_line": 4,
+                "detail": "0.33s",
+                "failed_assertions": 0
+              },
+              "ray-tracing-hitobject-query-invoke-hit-rg.cuda": {
+                "status": "passed",
+                "terminal_line": 5,
+                "detail": "0.31s",
+                "failed_assertions": 0
+              },
+              "ray-tracing-lss-intrinsics-hit-object.cuda": {
+                "status": "passed",
+                "terminal_line": 6,
+                "detail": "0.32s",
+                "failed_assertions": 0
+              },
+              "ray-tracing-triangle-intersection.cuda": {
+                "status": "passed",
+                "terminal_line": 7,
+                "detail": "0.63s",
+                "failed_assertions": 0
+              }
+            },
+            "assertions": {
+              "total": 187,
+              "passed": 187,
+              "failed": 0
+            },
+            "counts": {
+              "passed": 5
+            }
+          },
+          "lifecycle": {
+            "path": "build/nvvm-hitobject/lifecycle-nvrtc-before.json",
+            "sha256": "0ebe7c9d348b71a085e849ed2b2bd0567ada77896250e0002f7071610fe297fa",
+            "return_code": -6,
+            "elapsed_seconds": 2.35579776763916
+          },
+          "scope": "Selected unchanged NVRTC source contracts pass; independent lifecycle abort remains. CUDA is comparison, not oracle."
+        },
+        "sdk_controls": {
+          "snapshot-runtime": {
+            "path": "build/nvvm-hitobject/snapshot-runtime.json",
+            "sha256": "386bd5d0c6aeec6dd5610286475d745b3f55f4eeabc898669dc9269a956b21f0",
+            "return_code": 0,
+            "elapsed_seconds": 1.1063318252563477
+          },
+          "motion-sdk-runtime": {
+            "path": "build/nvvm-hitobject/motion-sdk-runtime.json",
+            "sha256": "96a3060aaa4bd4b17a18b79bb0745fcfcaddffaf3fc2b367fb8deed49b22bac2",
+            "return_code": 0,
+            "elapsed_seconds": 1.4930520057678223
+          },
+          "sdk-no-handle-id-runtime": {
+            "path": "build/nvvm-hitobject/sdk-no-handle-id-runtime.json",
+            "sha256": "c4c81e979ba84226e210b4866ec7ae04ec0ed7ca064334f18d09affbdec6a99d",
+            "return_code": 0,
+            "elapsed_seconds": 1.1174523830413818
+          }
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-hitobject/smoke.json",
+            "sha256": "dd4fad72d120d6f28155550917d13a7e6f89e923d963a3e385579723f9ce623b",
+            "return_code": 0,
+            "elapsed_seconds": 22.00464153289795
+          },
+          "selection": {
+            "path": "build/nvvm-hitobject/smoke-1/selection.json",
+            "sha256": "eab204fa65ac8dd2d466a744d1a5a8a5bb6d9c32770b14fcdc1d52a74e71cb04"
+          },
+          "provenance": {
+            "path": "build/nvvm-hitobject/smoke-1/provenance.json",
+            "sha256": "51477efa7539e9074e4f10fae75bf085d8f9af15b148df81dd306436ff6cc8e8"
+          },
+          "selected": 15,
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "inventory": {
+          "record": {
+            "path": "build/nvvm-hitobject/rhi-inventory.json",
+            "sha256": "7977ccd7767f9b53ba195baa18997025de83b09ee0bc564930dc85384e61a16e",
+            "return_code": 0,
+            "elapsed_seconds": 0.00716090202331543
+          },
+          "registrations": 273,
+          "unique_names": 272,
+          "scope": "Listing only; exact multiset reconciled, duplicate registration retained."
+        }
+      },
+      "contracts": [
+        "Canonical NonCopyable HitObject owns private392-byte/alignment8 snapshot with31 transform handles; module-local storage/fixed arrays and internal borrowed/out references only. External entry/buffer/payload/exported helper/numeric-cast roles remain rejected.",
+        "Canonical AllocateOpaqueHandle is Void(destination), retains effects and exact destination write semantics. NVVM initializes owned NOP, SPIRV/CLike native variable declarations own storage. Non-destination ray/payload inputs remain reads.",
+        "All supported trace/motion/miss/nop variants, finite queries/geometry/attributes/SBT, repeated invoke/current payload, ordered transforms/object rays and three reorder forms use typed plan records. RG/CH/MS lifecycle, RG reorder, Intersection reports; callable/AH/compute exclusions retained.",
+        "All four arbitrary MakeHit/MakeMotionHit variants explicitly diagnose; user approved OptiX9 scope after ABI feasibility gate. FromRayQuery/general pointer payloads separate.",
+        "Dense scalar/vector/record/array word recipes reused; canonical empty payloads distinguished from invalid types.0..32payload and0..8attributes finite descriptors; portable and variadic reports share typed tuple path. Broader admission is not an exhaustive runtime claim for every word count.",
+        "Optional extension9 queries private layout and finite operations without changing ABI46/module43/container2. Invalid physical signatures/ownership/insertion reject before helper creation; exact both-dialect serialization proves no mutation.",
+        "GeometryIndex is SBT GAS index, equal geometry ordinal only for one SBT record per build input without per-primitive offsets. Vulkan/D3D source object identity remains oracle; CUDA ignored object pointers/constructor arguments are not copied."
+      ],
+      "failure_history": [
+        {
+          "stage": "static-optix",
+          "record": {
+            "path": "build/nvvm-hitobject/static-optix.json",
+            "sha256": "2d6a844c681986407f717f54767de8dc42d302f030d4b5d081f703a31e6cf7e1",
+            "return_code": 1,
+            "elapsed_seconds": 7.0394768714904785
+          },
+          "detail": "3pass2fail: selected zero-word payload metadata rejected by ordinary nonzero type collection. Reuse existing zero-state collection only for validated metadata."
+        },
+        {
+          "stage": "static-opaque",
+          "record": {
+            "path": "build/nvvm-hitobject/static-opaque.json",
+            "sha256": "5858fccec6ca11094695bdd31c70e52947193e211c86755514710c46f7171622",
+            "return_code": 1,
+            "elapsed_seconds": 0.2635493278503418
+          },
+          "detail": "Negative fixture used hoisted Poison outside function-local diagnostic traversal. Replaced with canonical local uninitialized-memory read."
+        },
+        {
+          "stage": "source-reports",
+          "record": {
+            "path": "build/nvvm-hitobject/source-reports.json",
+            "sha256": "1026b7b84fe471c8ca075a4e598d642d33233d58b5bfad2e14171a992f68d08b",
+            "return_code": 1,
+            "elapsed_seconds": 1.431666612625122
+          },
+          "detail": "Zero-attribute ReportOptiXIntersection reaches empty-type legalization before packing; non-simple-operand exception. Move same packer before empty cleanup."
+        },
+        {
+          "stage": "empty-payload-before",
+          "record": {
+            "path": "build/nvvm-hitobject/empty-payload-before.json",
+            "sha256": "952afe3e32a8c44e0d1b03655de907414a6e39cb65e6de0aeb6797ce0af9d7a4",
+            "return_code": 0,
+            "elapsed_seconds": 0.29413795471191406
+          },
+          "detail": "Compiler exited0, but PTX omitted both traversal and invocation for empty payload. Early typed packing preserves effectful Void calls; explicit call-presence regression added."
+        },
+        {
+          "stage": "shared-build",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build.json",
+            "sha256": "4e3c2507e5c09ab354e46103219546e0f50c3c05f09a803e2e2923432e1c401e",
+            "return_code": 1,
+            "elapsed_seconds": 71.76273488998413
+          },
+          "detail": "Unbraced test assertion macro; test syntax corrected."
+        },
+        {
+          "stage": "shared-build-retry",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build-retry.json",
+            "sha256": "de2b2b029081c796e0a68e975db271b58ab589aa29fa44fcbcf0dec9f711a047",
+            "return_code": 1,
+            "elapsed_seconds": 93.87165522575378
+          },
+          "detail": "Const logical plan alignment mutation; provider alignment moved to emission-local allocation facts."
+        },
+        {
+          "stage": "shared-build-retry-2",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build-retry-2.json",
+            "sha256": "f687a63c285ff3e92c2381f64c5536ac66694a5b1ebf9824828a9481ea7e00a8",
+            "return_code": 1,
+            "elapsed_seconds": 214.8265986442566
+          },
+          "detail": "Core target capability conflicts; direct NVVM matrix-row composition and explicit arithmetic floors."
+        },
+        {
+          "stage": "shared-build-retry-3",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build-retry-3.json",
+            "sha256": "023a214323dd309acd560ccde9f7018db39f9ba4a929d4924f17af98850dccc5",
+            "return_code": 1,
+            "elapsed_seconds": 77.0636191368103
+          },
+          "detail": "Uninitialized return destination; initial source-local workaround was later removed."
+        },
+        {
+          "stage": "shared-build-retry-4",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build-retry-4.json",
+            "sha256": "32ee6e4cbafa2a942aa5f5bc4c0f9140f7703df5030b60642f5d628bded7d41f",
+            "return_code": 1,
+            "elapsed_seconds": 76.93397283554077
+          },
+          "detail": "Bare local is not initialization; attempted explicit initializer was later removed."
+        },
+        {
+          "stage": "shared-build-retry-5",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build-retry-5.json",
+            "sha256": "a5a921180acc7a8483ed0241a5980266d179e3f6ab54922d341b6ebce7170b9f",
+            "return_code": 1,
+            "elapsed_seconds": 77.27893590927124
+          },
+          "detail": "Explicit initializer still removed as pure; source trace established canonical Void(destination) allocation marker."
+        },
+        {
+          "stage": "core-init-ir",
+          "record": {
+            "path": "build/nvvm-hitobject/core-init-ir.json",
+            "sha256": "d54be79f311a0a60fa545dc4a82cec0611d09b880eeec10fb551ed11b5f5e811",
+            "return_code": -6,
+            "elapsed_seconds": 5.034785747528076
+          },
+          "detail": "Bootstrap aborted before CLI dump handling; no IR dump, canonical producer traced in source."
+        },
+        {
+          "stage": "constructor-controls",
+          "record": {
+            "path": "build/nvvm-hitobject/constructor-controls.json",
+            "sha256": "a53f11e439fc0803ff3ae2c37eb4f6cca1ab73d66b17128d9a7c6390ca9a211d",
+            "return_code": 1,
+            "elapsed_seconds": 1.534881353378296
+          },
+          "detail": "1/6 pass: HLSL fixture flags, SPIRV local allocation-marker dispatch, and private LLVM formal spelling exposed. All6 retry pass."
+        },
+        {
+          "stage": "constructor-nvvm-dump",
+          "record": {
+            "path": "build/nvvm-hitobject/constructor-nvvm-dump.json",
+            "sha256": "b4ad2a4d5ef1efacf866bd1f83dea7134de7241f92506b0e58ad55a11eb76759",
+            "return_code": 255,
+            "elapsed_seconds": 0.29495978355407715
+          },
+          "detail": "LLVM14 numeric formal spelling rejected by LLVM7 reader; reuse existing provider naming helper."
+        },
+        {
+          "stage": "shared-build-final",
+          "record": {
+            "path": "build/nvvm-hitobject/shared-build-final.json",
+            "sha256": "d7871a8311f96de072de41ca0703d779a8d0203222c73ec3b05297a40f3dacf3",
+            "return_code": 1,
+            "elapsed_seconds": 74.0299015045166
+          },
+          "detail": "Hidden reporting helper stage requirement made target-switch cases incomparable. Public/backend intersection gates retained; hidden marker requires CUDA."
+        },
+        {
+          "stage": "static-build",
+          "record": {
+            "path": "build/nvvm-hitobject/static-build.json",
+            "sha256": "08cc3d9908e3a3b77cc51c8f6f622e08f07a1c3b014e09a852b22bc399d521a1",
+            "return_code": 1,
+            "elapsed_seconds": 73.41253018379211
+          },
+          "detail": "Two new fixture C++ errors: string-slice contains and distinct-pointer conditional, repaired without contract change."
+        },
+        {
+          "stage": "lifecycle-nvvm-1",
+          "record": {
+            "path": "build/nvvm-hitobject/lifecycle-nvvm-1.json",
+            "sha256": "c1e632999eb343da8107066d7e6a95692cd0d9923cc733dae4d199d825b9dadf",
+            "return_code": 1,
+            "elapsed_seconds": 1.325700044631958
+          },
+          "detail": "Private floor.f32 outside named intrinsic contract. Bounded finite nonnegative key truncation replaces it, no dialect widening."
+        },
+        {
+          "stage": "motion-nvvm-o0-1",
+          "record": {
+            "path": "build/nvvm-hitobject/motion-nvvm-o0-1.json",
+            "sha256": "34bb5f02be700f30e834fb551b93890f651a5a4d434df3e40d407dfb02fd47d1",
+            "return_code": 255,
+            "elapsed_seconds": 0.32376575469970703
+          },
+          "detail": "Harness tried four entries per direct NVVM compilation; corrected to per-stage modules with independently verified launch ABI."
+        },
+        {
+          "stage": "lifecycle-nvvm-2",
+          "record": {
+            "path": "build/nvvm-hitobject/lifecycle-nvvm-2.json",
+            "sha256": "fff71c380a767750e5a766dc0d84f74da1ae0f229da488d10e2353c0067655b2",
+            "return_code": 1,
+            "elapsed_seconds": 19.84916400909424
+          },
+          "detail": "O0/O3 each10 InstanceID observations zero under RHI single-level graph specialization."
+        },
+        {
+          "stage": "rhi-family-1",
+          "record": {
+            "path": "build/nvvm-hitobject/rhi-family-1.json",
+            "sha256": "4a01cce95439cdde1f96a91af233ca42f6fe0cda85e674f430938fb843dcff21",
+            "return_code": 250,
+            "elapsed_seconds": 3.377359390258789
+          },
+          "detail": "16pass10fail: variadic ReportHitOptix bypassed typed marker, InstanceID mismatch, LSS illegal address; seven subsequent failures are CUDA-context fallout."
+        },
+        {
+          "stage": "lifecycle-nvrtc-before",
+          "record": {
+            "path": "build/nvvm-hitobject/lifecycle-nvrtc-before.json",
+            "sha256": "0ebe7c9d348b71a085e849ed2b2bd0567ada77896250e0002f7071610fe297fa",
+            "return_code": -6,
+            "elapsed_seconds": 2.35579776763916
+          },
+          "detail": "Illegal incoming ObjectRayOrigin in raygeneration aborts OptiX module creation. Authored oracle unchanged."
+        },
+        {
+          "stage": "lifecycle-nvvm-before",
+          "record": {
+            "path": "build/nvvm-hitobject/lifecycle-nvvm-before.json",
+            "sha256": "1f46c2308a787bbfb79ab6543a8b9606c3b384635c8dd1fd64d750d3c3b11620",
+            "return_code": 1,
+            "elapsed_seconds": 1.408519983291626
+          },
+          "detail": "Preimplementation HitObject helper-reference rejection."
+        },
+        {
+          "stage": "probe-compatibility",
+          "record": {
+            "path": "build/nvvm-hitobject/probe-compatibility.json",
+            "sha256": "4ec8170f9192026998d165bb657afbdef0053a7de90276739d0e6567dd71ce43",
+            "return_code": 2,
+            "elapsed_seconds": 0.6235647201538086
+          },
+          "detail": "SDK8.1 explicit constructors compile to PTX but OptiX9 rejects required ABI102 vs current105; NOP module/program/pipeline control passes, no launch."
+        },
+        {
+          "stage": "probe-separated",
+          "record": {
+            "path": "build/nvvm-hitobject/probe-separated.json",
+            "sha256": "1cf77d5f32cfdf952f3eb876d2a7ae827c666bc106aa62d25ef12dc588148b7d",
+            "return_code": 2,
+            "elapsed_seconds": 0.6020090579986572
+          },
+          "detail": "Same compatibility probe captured without stdout/stderr interleaving; not a new ABI result."
+        },
+        {
+          "stage": "rhi-unsupported",
+          "record": {
+            "path": "build/nvvm-hitobject/rhi-unsupported.json",
+            "sha256": "5b9115e49173f735c418e79f7d312c0747e0a9f35ce6852e131f8be606522248",
+            "return_code": 1,
+            "elapsed_seconds": 1.4078595638275146
+          },
+          "detail": "Original arbitrary MakeHit registration explicitly diagnoses under approved OptiX9 scope; remains failed in application inventory."
+        }
+      ],
+      "qualification": [
+        "Focused acceptance only. Original full baseline, initial RHI checkpoint and all unrelated feature objects preserved.",
+        "Current mixed-age RHI273 registrations: NVVM252pass11fail10skip; NVRTC261pass2fail10skip.50 original NVVM failures resolved,11 remain; arbitrary MakeHit intentionally unsupported.",
+        "Working1713/exploratory459/smoke15 unchanged; second accepted implementation since working checkpoint. No new full Slang/RHI run."
+      ]
     }
   }
 }

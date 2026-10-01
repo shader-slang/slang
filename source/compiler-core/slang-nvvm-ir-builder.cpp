@@ -209,6 +209,25 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
         instanceTransformOperations = candidate;
     }
 
+    SlangNVVMBuilderHitObjectOperationsAPI hitObjectOperations = {};
+    const void* hitObjectRaw = nullptr;
+    const SlangResult hitObjectResult =
+        api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_HIT_OBJECT_OPERATIONS, &hitObjectRaw);
+    if (hitObjectResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(hitObjectResult);
+        if (!hitObjectRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate =
+            *static_cast<const SlangNVVMBuilderHitObjectOperationsAPI*>(hitObjectRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_HIT_OBJECT_OPERATIONS_VERSION ||
+            !candidate.getStorageLayout || !candidate.getHitObjectType ||
+            !candidate.isOperationSupported || !candidate.emitOperation)
+            return SLANG_E_NO_INTERFACE;
+        hitObjectOperations = candidate;
+    }
+
     outBuilder.m_api = api;
     outBuilder.m_foundation = foundation;
     outBuilder.m_construction = construction;
@@ -220,6 +239,7 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
     outBuilder.m_memoryOperations = memoryOperations;
     outBuilder.m_traceOperations = traceOperations;
     outBuilder.m_instanceTransformOperations = instanceTransformOperations;
+    outBuilder.m_hitObjectOperations = hitObjectOperations;
     outBuilder.m_library = library;
     return SLANG_OK;
 }
@@ -498,6 +518,61 @@ SlangResult NVVMIRBuilder::emitTraceRay(
     return _validateHandleResult(
         m_traceOperations.emitTraceRay(module, &operation, operands, operandCount, &outValue),
         outValue);
+}
+
+SlangResult NVVMIRBuilder::getHitObjectStorageLayout(uint32_t& outSize, uint32_t& outAlignment)
+    const
+{
+    outSize = outAlignment = 0;
+    if (!isInitialized() || !m_hitObjectOperations.getStorageLayout)
+        return SLANG_E_NOT_AVAILABLE;
+    SLANG_RETURN_ON_FAIL(m_hitObjectOperations.getStorageLayout(&outSize, &outAlignment));
+    return outSize && outAlignment && !(outAlignment & (outAlignment - 1)) ? SLANG_OK : SLANG_FAIL;
+}
+
+SlangResult NVVMIRBuilder::getHitObjectType(
+    SlangNVVMModuleHandle module,
+    SlangNVVMTypeHandle& outType) const
+{
+    outType = nullptr;
+    if (!module)
+        return SLANG_E_INVALID_ARG;
+    if (!isInitialized() || !m_hitObjectOperations.getHitObjectType)
+        return SLANG_E_NOT_AVAILABLE;
+    return _validateHandleResult(m_hitObjectOperations.getHitObjectType(module, &outType), outType);
+}
+
+bool NVVMIRBuilder::supportsHitObjectOperation(
+    const SlangNVVMHitObjectOperationDesc& operation) const
+{
+    if (!isInitialized() || !m_hitObjectOperations.isOperationSupported)
+        return false;
+    uint32_t supported = 0;
+    return SLANG_SUCCEEDED(m_hitObjectOperations.isOperationSupported(&operation, &supported)) &&
+           supported;
+}
+
+SlangResult NVVMIRBuilder::emitHitObjectOperation(
+    SlangNVVMModuleHandle module,
+    const SlangNVVMHitObjectOperationDesc& operation,
+    const SlangNVVMValueHandle* operands,
+    size_t operandCount,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!module || (!operands && operandCount))
+        return SLANG_E_INVALID_ARG;
+    if (!supportsHitObjectOperation(operation))
+        return SLANG_E_NOT_AVAILABLE;
+    SLANG_RETURN_ON_FAIL(
+        m_hitObjectOperations.emitOperation(module, &operation, operands, operandCount, &outValue));
+    const bool hasResult = operation.operation == SLANG_NVVM_HIT_OBJECT_OP_QUERY ||
+                           operation.operation == SLANG_NVVM_HIT_OBJECT_OP_LOAD_SBT_U32 ||
+                           operation.operation == SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION ||
+                           ((operation.operation == SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE ||
+                             operation.operation == SLANG_NVVM_HIT_OBJECT_OP_INVOKE) &&
+                            operation.payloadCount);
+    return bool(outValue) == hasResult ? SLANG_OK : SLANG_FAIL;
 }
 
 bool NVVMIRBuilder::supportsInstanceTransform(const SlangNVVMInstanceTransformDesc& operation) const

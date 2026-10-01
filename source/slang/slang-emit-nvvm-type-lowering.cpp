@@ -2553,8 +2553,52 @@ SlangResult NVVMTypeLoweringContext::_lowerPointerType(
     return SLANG_OK;
 }
 
+bool isNVVMHitObjectStorageType(IRInst* type)
+{
+    while (auto array = as<IRArrayType>(type))
+    {
+        auto count = as<IRIntLit>(array->getElementCount());
+        if (array->getArrayStride() || !count || count->getValue() <= 0 ||
+            count->getValue() > UINT32_MAX)
+            return false;
+        type = array->getElementType();
+    }
+    return type && type->getOp() == kIROp_HitObjectType;
+}
+
+IRPtrTypeBase* asNVVMHitObjectPointerType(IRInst* type)
+{
+    auto pointer = as<IRPtrTypeBase>(type);
+    if (!pointer || pointer->getAddressSpace() != AddressSpace::Generic ||
+        !isNVVMHitObjectStorageType(pointer->getValueType()))
+        return nullptr;
+    if ((pointer->getOp() == kIROp_PtrType || pointer->getOp() == kIROp_OutParamType ||
+         pointer->getOp() == kIROp_BorrowInOutParamType) &&
+        pointer->getOperandCount() == 1)
+        return pointer;
+    auto layout = pointer->getDataLayout();
+    if (pointer->getOperandCount() != 4 || !layout ||
+        (layout->getOp() != kIROp_DefaultBufferLayoutType &&
+         layout->getOp() != kIROp_ScalarBufferLayoutType))
+        return nullptr;
+    const bool read =
+        (pointer->getOp() == kIROp_BorrowInParamType || pointer->getOp() == kIROp_PtrType) &&
+        pointer->getAccessQualifier() == AccessQualifier::Read;
+    const bool write =
+        (pointer->getOp() == kIROp_RefParamType || pointer->getOp() == kIROp_PtrType) &&
+        pointer->getAccessQualifier() == AccessQualifier::ReadWrite;
+    return read || write ? pointer : nullptr;
+}
+
 bool NVVMTypeInfo::supports(NVVMTypeUse use) const
 {
+    // Noncopyable source results already use a caller-owned out parameter. Checked local
+    // loads/stores use private SSA aggregates; helper/external value ABIs stay shut.
+    if (isHitObjectStorage)
+        return use == NVVMTypeUse::Storage || use == NVVMTypeUse::Value;
+    if (hitObjectPointer)
+        return use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperParameter;
+
     // Consider `RaytracingAccelerationStructure scene; TraceRay(scene, ...);`. Shared uniform
     // collection stores the handle in the synthesized launch record, then loads and forwards it
     // through an ordinary helper parameter. This does not establish a returned-handle ABI or
@@ -2670,6 +2714,8 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
     NVVMTypeInfo info;
     info.canonicalType = type;
     info.isAccelerationStructure = isNVVMAccelerationStructureType(type);
+    info.isHitObjectStorage = isNVVMHitObjectStorageType(type);
+    info.hitObjectPointer = asNVVMHitObjectPointerType(type);
     info.isVoid = as<IRVoidType>(type) != nullptr;
     info.isInteger = isNVVMSupportedIntegerScalarType(type, &info.integerBitWidth);
     info.isFloatingPoint =
@@ -3194,6 +3240,37 @@ SlangResult NVVMTypeLoweringContext::lowerType(
                 : use == NVVMTypeUse::StructuredBufferStorage ? 8u
                                                               : 1u,
                 outType)));
+    }
+    else if (typeInfo.isHitObjectStorage)
+    {
+        if (auto array = as<IRArrayType>(type))
+        {
+            SlangNVVMTypeHandle element = nullptr;
+            SLANG_RETURN_ON_FAIL(lowerType(array->getElementType(), NVVMTypeUse::Storage, element));
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                "HitObject local array type",
+                m_builder.getArrayType(
+                    m_module,
+                    element,
+                    uint32_t(getIntVal(array->getElementCount())),
+                    outType)));
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                "HitObject private storage type",
+                m_builder.getHitObjectType(m_module, outType)));
+        }
+    }
+    else if (typeInfo.hitObjectPointer)
+    {
+        SlangNVVMTypeHandle element = nullptr;
+        SLANG_RETURN_ON_FAIL(
+            lowerType(typeInfo.hitObjectPointer->getValueType(), NVVMTypeUse::Storage, element));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "HitObject private storage reference",
+            m_builder
+                .getPointerType(m_module, element, SLANG_NVVM_ADDRESS_SPACE_GENERIC, outType)));
     }
     else if (typeInfo.isAccelerationStructure)
     {
