@@ -90,11 +90,14 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
             if (first == NVVMTypeUse::HelperParameter)
             {
                 // Populate the reference representation before any array value/storage lookup.
-                for (IROp op : {kIROp_OutParamType, kIROp_BorrowInOutParamType})
+                for (IROp op :
+                     {kIROp_BorrowInParamType, kIROp_OutParamType, kIROp_BorrowInOutParamType})
                 {
                     SlangNVVMTypeHandle reference = nullptr;
                     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(
-                        ir.builder.getPtrType(op, array),
+                        op == kIROp_BorrowInParamType
+                            ? ir.builder.getBorrowInParamType(array, AddressSpace::Generic)
+                            : ir.builder.getPtrType(op, array),
                         NVVMTypeUse::HelperParameter,
                         reference)));
                     SLANG_CHECK(reference != nullptr);
@@ -149,9 +152,12 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder)
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, use, repeated)));
                 SLANG_CHECK(repeated == expected);
             }
-            for (IROp referenceOp : {kIROp_OutParamType, kIROp_BorrowInOutParamType})
+            for (IROp referenceOp :
+                 {kIROp_OutParamType, kIROp_BorrowInOutParamType, kIROp_BorrowInParamType})
             {
-                auto reference = ir.builder.getPtrType(referenceOp, array);
+                auto reference = referenceOp == kIROp_BorrowInParamType
+                                     ? ir.builder.getBorrowInParamType(array, AddressSpace::Generic)
+                                     : ir.builder.getPtrType(referenceOp, array);
                 SlangNVVMTypeHandle expectedPointer = nullptr;
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
                     scope.module,
@@ -208,6 +214,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         Local,
         InternalOut,
         InternalInOut,
+        InternalRead,
         Global,
         EntryParameter,
         BlockParameter,
@@ -217,6 +224,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         RootKind::Local,
         RootKind::InternalOut,
         RootKind::InternalInOut,
+        RootKind::InternalRead,
         RootKind::Global,
         RootKind::EntryParameter,
         RootKind::BlockParameter,
@@ -227,7 +235,9 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         NVVMStaticTestContext context(unitTestContext);
         LocalRecordArrayIR ir(context.env.getSessionImpl());
         auto& builder = ir.builder;
-        const bool isInternal = kind == RootKind::InternalOut || kind == RootKind::InternalInOut;
+        const bool isReadOnly = kind == RootKind::InternalRead;
+        const bool isInternal =
+            kind == RootKind::InternalOut || kind == RootKind::InternalInOut || isReadOnly;
         const bool isSupported = kind == RootKind::Local || isInternal;
         auto pointerType = builder.getPtrType(kIROp_PtrType, ir.outerArray);
         IRInst* root = nullptr;
@@ -247,11 +257,15 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         auto block = builder.emitBlock();
         auto input = builder.emitParam(builder.getUIntType());
         IRInst* localAllocation = nullptr;
+        IRInst* helperCall = nullptr;
         if (isInternal)
         {
-            auto referenceType = builder.getPtrType(
-                kind == RootKind::InternalOut ? kIROp_OutParamType : kIROp_BorrowInOutParamType,
-                ir.outerArray);
+            auto referenceType =
+                isReadOnly ? builder.getBorrowInParamType(ir.outerArray, AddressSpace::Generic)
+                           : builder.getPtrType(
+                                 kind == RootKind::InternalOut ? kIROp_OutParamType
+                                                               : kIROp_BorrowInOutParamType,
+                                 ir.outerArray);
             builder.setInsertInto(ir.module.get());
             auto helper = builder.createFunc();
             IRType* helperTypes[] = {referenceType, builder.getUIntType()};
@@ -259,7 +273,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
             builder.setInsertInto(block);
             localAllocation = builder.emitVar(ir.outerArray);
             IRInst* arguments[] = {localAllocation, input};
-            builder.emitCallInst(builder.getVoidType(), helper, 2, arguments);
+            helperCall = builder.emitCallInst(builder.getVoidType(), helper, 2, arguments);
             builder.emitReturn();
             builder.setInsertInto(helper);
             builder.emitBlock();
@@ -298,6 +312,9 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         IRInst* bf16Value = nullptr;
         if (isSupported)
         {
+            const auto helperInsertLoc = builder.getInsertLoc();
+            if (isReadOnly)
+                builder.setInsertBefore(helperCall);
             bf16Value =
                 builder.emitBitCast(ir.bf16, builder.getIntValue(builder.getUInt16Type(), 0));
             IRInst* lanes[] = {bf16Value, bf16Value};
@@ -314,7 +331,8 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
                 builder.getIntValue(builder.getUIntType(), 0)};
             auto outer = builder.emitMakeStruct(ir.outer, SLANG_COUNT_OF(outerFields), outerFields);
             auto array = builder.emitMakeArrayFromElement(ir.outerArray, outer);
-            builder.emitStore(root, array);
+            builder.emitStore(isReadOnly ? localAllocation : root, array);
+            builder.setInsertLoc(helperInsertLoc);
             wholeLoad = builder.emitLoad(root);
             auto destination = builder.emitVar(ir.outerArray);
             wholeStore = builder.emitStore(destination, wholeLoad);
@@ -325,7 +343,14 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         auto lane = builder.emitElementAddress(pair, index);
         IRInst* pairStore = nullptr;
         IRInst* laneStore = nullptr;
-        if (isSupported)
+        IRInst* pairLoad = nullptr;
+        IRInst* laneLoad = nullptr;
+        if (isReadOnly)
+        {
+            pairLoad = builder.emitLoad(pair);
+            laneLoad = builder.emitLoad(lane);
+        }
+        else if (isSupported)
         {
             pairStore = builder.emitStore(pair, pairValue);
             laneStore = builder.emitStore(lane, bf16Value);
@@ -368,7 +393,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         SLANG_CHECK(selected->base == root && selected->index == index);
         SLANG_CHECK(selected->aggregateType == ir.outerArray);
         SLANG_CHECK(selected->resultType->getValueType() == ir.outer);
-        SLANG_CHECK(!selected->isReadOnly && !selected->isParameterGroupStorage);
+        SLANG_CHECK(selected->isReadOnly == isReadOnly && !selected->isParameterGroupStorage);
         const auto innerSelection = plan.addresses.findFieldAddress(inner);
         const auto pairSelection = plan.addresses.findFieldAddress(pair);
         SLANG_CHECK_ABORT(innerSelection && pairSelection);
@@ -376,18 +401,27 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
         SLANG_CHECK(pairSelection->selection.field == ir.pairField);
         SLANG_CHECK(innerSelection->selection.isLocalSubstandardRecordStorage);
         SLANG_CHECK(pairSelection->selection.isLocalSubstandardRecordStorage);
-        SLANG_CHECK(innerSelection->selection.isMutable && pairSelection->selection.isMutable);
+        SLANG_CHECK(innerSelection->selection.isMutable == !isReadOnly);
+        SLANG_CHECK(pairSelection->selection.isMutable == !isReadOnly);
+        auto laneSelection = plan.addresses.findElementAddress(lane);
+        SLANG_CHECK_ABORT(laneSelection);
+        SLANG_CHECK(laneSelection->isReadOnly == isReadOnly);
+        SLANG_CHECK(plan.addresses.getRoot(lane) == root);
         bool sawWholeLoad = false;
+        UInt checkedLoads = 0;
         for (const auto& load : plan.loads)
         {
-            if (load.source == wholeLoad)
+            if (load.source == wholeLoad || load.source == pairLoad || load.source == laneLoad)
             {
-                sawWholeLoad = true;
-                SLANG_CHECK(load.alignment == 4);
+                ++checkedLoads;
+                sawWholeLoad |= load.source == wholeLoad;
+                SLANG_CHECK(load.flags == SLANG_NVVM_LOAD_FLAG_NONE);
+                SLANG_CHECK(load.alignment == (load.source == laneLoad ? 2 : 4));
                 SLANG_CHECK(load.conversion.kind == NVVMStorageConversionKind::Identity);
             }
         }
         SLANG_CHECK(sawWholeLoad);
+        SLANG_CHECK(checkedLoads == (isReadOnly ? 3 : 1));
         UInt checkedStores = 0;
         for (const auto& store : plan.stores)
         {
@@ -399,7 +433,7 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
                 SLANG_CHECK(store.conversion.kind == NVVMStorageConversionKind::Identity);
             }
         }
-        SLANG_CHECK(checkedStores == 3);
+        SLANG_CHECK(checkedStores == (isReadOnly ? 1 : 3));
     }
     // Type equality is not a producer proof. These calls use the exact formal reference type;
     // a global reaches argument validation, while undefined/block values reject even earlier.
@@ -458,5 +492,70 @@ SLANG_UNIT_TEST(nvvmLocalRecordArrayAddressesRequireLocalProducer)
                 TestMessageType::Info,
                 context.sink.outputBuffer.getBuffer());
         SLANG_CHECK(diagnostic.indexOf(expected) >= 0);
+    }
+    // Read access is not write authority, even when the exact array pointee is shared.
+    // Build these cases directly because source checking normally rejects both operations.
+    for (bool forwardToMutable : {false, true})
+    {
+        NVVMStaticTestContext context(unitTestContext);
+        LocalRecordArrayIR ir(context.env.getSessionImpl());
+        auto& builder = ir.builder;
+        auto readType = builder.getBorrowInParamType(ir.outerArray, AddressSpace::Generic);
+        auto writeType = builder.getPtrType(kIROp_BorrowInOutParamType, ir.outerArray);
+        auto writer = builder.createFunc();
+        IRType* writerTypes[] = {writeType};
+        writer->setFullType(builder.getFuncType(1, writerTypes, builder.getVoidType()));
+        builder.setInsertInto(writer);
+        builder.emitBlock();
+        builder.emitParam(writeType);
+        builder.emitReturn();
+        builder.setInsertInto(ir.module.get());
+        auto reader = builder.createFunc();
+        IRType* readerTypes[] = {readType};
+        reader->setFullType(builder.getFuncType(1, readerTypes, builder.getVoidType()));
+        builder.setInsertInto(reader);
+        builder.emitBlock();
+        IRInst* borrowed = builder.emitParam(readType);
+        if (forwardToMutable)
+            builder.emitCallInst(builder.getVoidType(), writer, 1, &borrowed);
+        else
+        {
+            auto element =
+                builder.emitElementAddress(borrowed, builder.getIntValue(builder.getUIntType(), 0));
+            auto inner = builder.emitFieldAddress(element, ir.innerField->getKey());
+            auto pair = builder.emitFieldAddress(inner, ir.pairField->getKey());
+            auto value =
+                builder.emitBitCast(ir.bf16, builder.getIntValue(builder.getUInt16Type(), 0));
+            IRInst* lanes[] = {value, value};
+            builder.emitStore(pair, builder.emitMakeVector(ir.pair, 2, lanes));
+        }
+        builder.emitReturn();
+        builder.setInsertInto(ir.module.get());
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        IRInst* local = builder.emitVar(ir.outerArray);
+        builder.emitCallInst(builder.getVoidType(), reader, 1, &local);
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = ir.module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        SLANG_CHECK(SLANG_FAILED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+        const auto diagnostic = context.sink.outputBuffer.getUnownedSlice();
+        const auto expected = forwardToMutable ? toSlice("call argument type")
+                                               : toSlice("immutable struct field access");
+        if (diagnostic.indexOf(expected) < 0)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(diagnostic.indexOf(expected) >= 0);
+        SLANG_CHECK(requirements.emissionPlan.stores.getCount() == 0);
     }
 }

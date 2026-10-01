@@ -777,12 +777,22 @@ IRArrayType* asNVVMSupportedLocalSubstandardRecordArrayType(IRInst* type, uint32
 IRPtrTypeBase* asNVVMSupportedLocalRecordArrayReferenceType(IRInst* type)
 {
     auto pointer = as<IRPtrTypeBase>(type);
-    if (!pointer ||
+    if (!pointer || pointer->getAddressSpace() != AddressSpace::Generic ||
+        !asNVVMSupportedLocalSubstandardRecordArrayType(pointer->getValueType()))
+        return nullptr;
+    if (pointer->getOp() == kIROp_BorrowInParamType)
+    {
+        auto layout = pointer->getDataLayout();
+        if (pointer->getOperandCount() != 4 ||
+            pointer->getAccessQualifier() != AccessQualifier::Read || !layout ||
+            layout->getOp() != kIROp_DefaultBufferLayoutType)
+            return nullptr;
+    }
+    else if (
         (pointer->getOp() != kIROp_OutParamType &&
          pointer->getOp() != kIROp_BorrowInOutParamType) ||
-        pointer->getOperandCount() != 1 || pointer->getAddressSpace() != AddressSpace::Generic ||
-        pointer->getAccessQualifier() != AccessQualifier::ReadWrite ||
-        !asNVVMSupportedLocalSubstandardRecordArrayType(pointer->getValueType()))
+        pointer->getOperandCount() != 1 ||
+        pointer->getAccessQualifier() != AccessQualifier::ReadWrite)
         return nullptr;
     return pointer;
 }

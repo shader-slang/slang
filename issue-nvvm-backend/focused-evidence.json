@@ -78877,6 +78877,162 @@
         "last_targeted": "local-record-array-references",
         "implementations_since_full": 3
       }
+    },
+    "nvvm-local-record-array-borrows": {
+      "status": "accepted-focused",
+      "scope": "Internal readonly BorrowInParam references to the existing one-dimensional identity-record arrays. Module43/providerABI46/container2 unchanged.",
+      "contract": {
+        "type": "Exact four-operand Generic/Read/DefaultBufferLayout BorrowInParam over the existing fixed record-array family; HelperParameter-only, before cache lookup.",
+        "calls": "Readonly formals accept qualified local Vars or internal mutable/readonly first-block parameters. Mutable formals still require writable actuals, checked before type-equality admission.",
+        "addresses": "Checked local storage provenance permits canonical readonly Default-layout array/field/BF2 lane children; read permission never grants writes or external storage roles.",
+        "loads": "Existing native Storage representation and identity conversions; ordinary NONE load flags because mutable caller storage is not an immutable location."
+      },
+      "identity": {
+        "revision": "23a03c707472d270dd483e72e12f7da6d5d9db52",
+        "patch_sha256": "b73d0823f51b35b9e1953abd721601830d1e004aaa436dfed608e6bd5b872e40",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "171ceca4cf19917d16f64a9ad0fee5fad16a724ef52dac95546826accc47b2a8",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "df4acf40aa1ac7f25280c17d6288661db772b7a6563cfa3460ee262abf56c11e",
+          "source/slang/slang-emit-nvvm.cpp": "c080665c3ed0bad7f81b843bc30ed3a934be6537a8398e3deab8e13c4991c6cd",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "ee3c576b80a4cfc6e21c5ccfca2b535ffa157c75780bf51bcf67b852c0428a04",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "d74f80fa18e3807a84c54e3a03d54ae504a70ca3b5a3854680dbc664b3285a3d",
+          "tests/cuda/nvvm-local-substandard-record-array-references.slang": "3fc73eee0f569ea0522c35641979db10fcefc569ed2bf4b1ed3761514c39cc31"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "0d617bd75908591990a88a1c3b5fa755a1f13950fe136dadf0721029f9a9a2e4",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "c62e1a4669fe406b9d81cc9cc21dfa72d74077c8ed66ed04603f9c32fcd5ffe5",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c51b826b4080fc3690b449ecec2fcb013d7c7350f633e09e0ba6d383c177845e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "75d3ab9556fd027a953b6c40864d124d06ad55dd46f2a601e093a2cabd2fe60c",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "e34e9035c4f49c5972f9dc41c3535837f8e8867d52cec39cc634702378623fcf",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "eb4bd0151d7cc891374c3988d139a8f4523e469e175c579657087560293ff7c9"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "build": {
+        "path": "build/nvvm-local-record-array-borrows/build.json",
+        "sha256": "e5473bb7dc39ab663904364341592b753a20b98f7a950b61fb025f9af48ccdf3"
+      },
+      "static_build": {
+        "path": "build/nvvm-local-record-array-borrows/build-static.json",
+        "sha256": "1bf54a6d9014d874aaf52e37626be1d78f34588e2804c887737be6120ebe4a1f"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-local-record-array-borrows/units.json",
+            "sha256": "980b89d81aba1eaef4bb020d88a6c541aa2981109576d72e658fe7b511cee4ac"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangBorrowedFloat3KeepsNativeMemoryRepresentation.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLocalRecordArrayParameterUsesCanonicalValueABI.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles.internal": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-local-record-array-borrows/runtime.json",
+            "sha256": "044e281681d6d19373397f4fc0240c8cac2b6dfb14c674aada9ed7eefb9cc0a5"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-local-substandard-record-array-copies.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-copies.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-references.slang (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-references.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-array-references.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-arrays.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-local-substandard-record-arrays.slang.2 (cuda)": "passed",
+            "tests/cuda/nvvm-substandard-record-array-parameter.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-substandard-record-array-parameter.slang.2 (cuda)": "passed"
+          },
+          "counts": {
+            "passed": 9
+          }
+        },
+        "static": {
+          "passed": 2,
+          "gate": {
+            "path": "build/nvvm-local-record-array-borrows/static-units.json",
+            "sha256": "12b05caf9a4fe53bcb8e43a23462025aa37de6187635e6d244f8d2409928eee7"
+          },
+          "outcomes": {
+            "nvvmLocalRecordArrayTypeRolesIgnoreCacheOrder": "passed",
+            "nvvmLocalRecordArrayAddressesRequireLocalProducer": "passed"
+          },
+          "identity": {
+            "path": "build/nvvm-local-record-array-borrows/static-before-identity.json",
+            "sha256": "3d59b6a2d7ac78aef63002512dce49b76f3afbfef4090a081f450e589af94973"
+          },
+          "verified_after": {
+            "path": "build/nvvm-local-record-array-borrows/static-after-identity.json",
+            "sha256": "3d59b6a2d7ac78aef63002512dce49b76f3afbfef4090a081f450e589af94973"
+          }
+        }
+      },
+      "before": {
+        "source": {
+          "path": "build/nvvm-local-record-array-borrows/before-readonly-negative.cpp",
+          "sha256": "a31df1d74581ad0c47558e62c98275ac67414793bf79e6198314ab71e762bc3d"
+        },
+        "qualified_negative_gate": {
+          "path": "build/nvvm-local-record-array-refs/units.json",
+          "sha256": "01951f9ee3413152436d2e6577b68de69187b721b2176461f8b325996c265f88"
+        },
+        "transition": "Exact readonly-array source row formerly required helper-parameter preflight rejection; now compiles via the real LLVM provider. Twelve other source negatives remain."
+      },
+      "runtime_contract": {
+        "fixture": {
+          "path": "tests/cuda/nvvm-local-substandard-record-array-references.slang",
+          "sha256": "3fc73eee0f569ea0522c35641979db10fcefc569ed2bf4b1ed3761514c39cc31"
+        },
+        "modes": ["CUDA O3", "NVVM O0", "NVVM O3"],
+        "seeds": [291, 65244, 32769, 32705],
+        "checks": "Readonly-to-readonly forwarding; mutable-to-readonly forwarding; independent before, forwarded-before, after-mutation and saved-snapshot raw-lane expectations. All previous full-field, literal-slot, guard/completion and return/out/inout checks retained.",
+        "controls": "Six unchanged NVVM transport/copy/by-value cells run fresh; the existing borrowed-float3 unit checks the independent native-layout/non-invariant-load contract."
+      },
+      "permission_negatives": "Direct static entry/local/internal-reference graphs reject readonly actual passed to mutable helper and store through readonly BF2 field; exact expected diagnostics and zero planned stores. Existing forged-root and forbidden-role/cache checks retained.",
+      "validation_incidents": [],
+      "preservation": {
+        "prior_feature_count": 45,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "history": "Older NVRTC wrong-output/timeout and parser histories retain original identities; no claim of resolving main corpus cells."
+      },
+      "limitations": [
+        "No native array/pointer results, exported/entry/resource/global/shared/forged roots, arbitrary pointers, wrappers, multidimensional arrays or BF3/BF4 array elements.",
+        "Readonly array fields do not admit a separate readonly scalar-record helper ABI.",
+        "Four-seed two-element runtime qualification; no large-array scalability, escaping/concurrent-alias or performance claim.",
+        "No full campaign; shared and static configured compiler version strings retain actual older values."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "local-record-array-borrows",
+        "implementations_since_full": 4
+      }
     }
   }
 }

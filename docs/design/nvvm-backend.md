@@ -207,13 +207,15 @@ and runtime Float32-to-FP8 narrowing remains research-only.
 Selected finite local records and their direct fixed arrays have narrower admission than general
 recursive values. Natural AnyValue payloads are unpacked through canonical field keys into qualified
 CUDA locals and repacked after mutation; earlier snapshots retain their bytes. Array value parameters
-can use a separate callee Var without changing the caller snapshot. Internal out/inout array
-references use the same Storage representation, including source array returns canonically rewritten
-to OutParam. Calls and child-address plans require a local Var or a first-block mutable parameter of
-an internal defined helper; type equality alone does not prove that origin. Native array/pointer
-results, external/exported references, readonly borrows, wrapper/multidimensional forms and BF3/BF4
-record-array combinations remain excluded even after a successful layout-cache lookup. Their exact
-boundaries remain in the role matrix.
+can use a separate callee Var without changing the caller snapshot. Internal out/inout and readonly
+array references use the same Storage representation, including source array returns canonically
+rewritten to OutParam. Calls and child-address plans require a local Var or a first-block admitted
+parameter of an internal defined helper; type equality alone does not prove that origin. Mutable
+formals require writable actuals. Readonly child addresses retain local storage layout and cannot
+become writable, while their loads remain ordinary because the caller can mutate its storage between
+calls. Native array/pointer results, external/exported references, wrapper/multidimensional forms and
+BF3/BF4 record-array combinations remain excluded even after a successful layout-cache lookup. Their
+exact boundaries remain in the role matrix.
 
 General per-root physical-storage rewriting is not implemented by these plans. Shared buffer-element
 lowering already owns physical types and packing, but its selected roots do not include every Generic

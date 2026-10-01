@@ -18,15 +18,29 @@ struct Outer { uint8_t tag; Inner inner; uint tail; }
 typedef Outer Pair[2];
 
 [noinline]
+uint readLane(__constref Pair values, uint slot, uint lane)
+{
+    return uint(bit_cast<uint16_t>(values[slot].inner.pair[lane]));
+}
+
+[noinline]
+uint readForward(__constref Pair values, uint slot, uint lane)
+{
+    return readLane(values, slot, lane);
+}
+
+[noinline]
 void mutate(inout Pair values, uint slot, uint lane, uint bits)
 {
     values[slot].inner.pair[lane] = bit_cast<BFloat16>(uint16_t(bits));
 }
 
 [noinline]
-void forward(inout Pair values, uint slot, uint lane, uint bits)
+uint forward(inout Pair values, uint slot, uint lane, uint bits)
 {
+    uint before = readForward(values, slot, lane);
     mutate(values, slot, lane, bits);
+    return before;
 }
 
 [noinline]
@@ -81,8 +95,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     initialize(direct, seed);
     Pair values = make(seed);
     let saved = values;
-    forward(values, slot, lane, replacement);
-    uint bad = check(direct[0], seed, seed ^ 0x2222, seed ^ 65535);
+    uint expectedBefore = slot == 0 && lane == 0 ? seed ^ 0x2222
+        : (slot == 0 ? seed : other) ^ (lane == 0 ? 0 : 65535);
+    uint before = readForward(values, slot, lane);
+    uint forwardedBefore = forward(values, slot, lane, replacement);
+    uint after = readForward(values, slot, lane);
+    uint savedAfter = readForward(saved, slot, lane);
+    uint bad = uint(before != expectedBefore || forwardedBefore != expectedBefore
+        || after != replacement || savedAfter != expectedBefore) << 8;
+    bad |= check(direct[0], seed, seed ^ 0x2222, seed ^ 65535);
     bad |= check(direct[1], other, other, other ^ 65535);
     bad |= check(saved[0], seed, seed ^ 0x2222, seed ^ 65535);
     bad |= check(saved[1], other, other, other ^ 65535);

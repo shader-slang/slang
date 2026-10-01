@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Three bounded feature batches now pass focused validation after the full checkpoint:
+Four bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -92,21 +92,24 @@ Three bounded feature batches now pass focused validation after the full checkpo
   runtime cells, two distinct units and four existing negatives pass. The merge converts only the
   replacement and preserves untouched physical lanes. A fake Float32/Boolean classification bug
   and an overbroad call-count assertion were fixed; original attempts remain recorded.
-- Internal out/inout references to existing local record arrays support nested forwarding and
-  source array returns through canonical OutParam lowering. Three shared units and nine runtime
-  cells plus two direct static role/provenance units pass. Native array/pointer results,
-  readonly/external roles and unproven pointer roots remain excluded.
+- Internal mutable and readonly references to existing local record arrays support nested forwarding
+  and source returns through canonical OutParam lowering. The mutable batch passes three shared,
+  two static and nine runtime cells; readonly passes four shared, two static and nine runtime cells.
+  Readonly access preserves caller mutation visibility and cannot grant writes. Native array/pointer
+  results, external roles and unproven pointer roots remain excluded.
 
 The full baseline retains its original 36 corpus gaps and four dynamic-surface failures; focused
 records supersede the affected cells without relabeling the full run. Current identities and
 precise reuse are in `features.nvvm-texture-descriptor-words`,
-`features.nvvm-dynamic-surface-components` and `features.nvvm-local-record-array-references`.
-Three implementations have passed focused validation since the full run.
+`features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references` and
+`features.nvvm-local-record-array-borrows`. Four implementations have passed focused validation
+since the full run.
 
-Next consider internal readonly borrows of the same local record arrays. Preserve mutable/readonly
-access distinctions in helper forwarding and child addresses; readonly borrowing of mutable caller
-storage must not imply invariant loads. Prepare a bounded plan and focused controls before extending
-the retained readonly-array rejection. Continue the authorized workflow without a new full campaign.
+Next implement Float32 outputs for non-mip, non-array read-only texture dimensions under
+`plan.texture-float-dimensions.md`, using existing unsigned size queries and ordinary numeric casts.
+Preserve mip/layer-count, multisample and writable-resource restrictions; the full dimensions corpus
+failure is not resolved by this bounded overload addition. Use the existing dimensions fixture,
+resource-operation unit and retained query negatives. No new full campaign.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

@@ -10456,7 +10456,7 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
         SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     }
-    // These exact source cases were previously rejected solely at mutable helper parameters.
+    // These exact source cases were previously rejected at internal reference parameters.
     const struct
     {
         const char* name;
@@ -10519,6 +10519,24 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
                 outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
             }
         )SLANG"},
+        {"readonly array", R"SLANG(
+            struct Payload
+            {
+                BFloat16 value;
+            }
+            [noinline] uint read(__constref Payload p[2], uint v)
+            {
+                return uint(bit_cast<uint16_t>(p[v & 1].value));
+            }
+            RWStructuredBuffer<uint> outputBuffer;
+            [numthreads(1, 1, 1)]
+            void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                Payload p[2];
+                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(tid.x));
+                outputBuffer[0] = read(p, tid.y);
+            }
+        )SLANG"},
     };
     for (const auto& test : referenceCases)
     {
@@ -10539,7 +10557,10 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysPreserveValuesAndAddresses)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
         SLANG_CHECK(code != nullptr);
         SLANG_CHECK(gFakeNVVM.addedModule.indexOf("[2 x { i16 }]*") >= 0);
-        SLANG_CHECK(gFakeNVVM.addedModule.indexOf("call void ") >= 0);
+        SLANG_CHECK(
+            gFakeNVVM.addedModule.indexOf(
+                UnownedStringSlice(test.name) == "readonly array" ? "call i32 " : "call void ") >=
+            0);
         SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
         SLANG_CHECK(gFakeNVVM.compileProgramCallCount == 1);
     }
@@ -10806,24 +10827,6 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles)
         )SLANG"},
 
 
-        {"readonly array", "helper function parameter: BorrowInParam<Array<Payload, 2>", R"SLANG(
-            struct Payload
-            {
-                BFloat16 value;
-            }
-            [noinline] uint read(__constref Payload p[2], uint v)
-            {
-                return uint(bit_cast<uint16_t>(p[v & 1].value));
-            }
-            RWStructuredBuffer<uint> outputBuffer;
-            [numthreads(1, 1, 1)]
-            void computeMain(uint3 tid : SV_DispatchThreadID)
-            {
-                Payload p[2];
-                p[0].value = p[1].value = bit_cast<BFloat16>(uint16_t(tid.x));
-                outputBuffer[0] = read(p, tid.y);
-            }
-        )SLANG"},
         {"local wrapper", "'var'", R"SLANG(
             struct Payload
             {

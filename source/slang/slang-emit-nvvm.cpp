@@ -193,7 +193,7 @@ bool _isNVVMConventionalGlobalStorageType(const NVVMConventionalGlobalParams& pa
     return false;
 }
 
-// Proves that this array pointer comes from mutable local storage or an internal out/inout
+// Proves that this array pointer comes from mutable local storage or an internal out/inout/readonly
 // parameter. For example, forwarding `out Payload values[2]` to an inout helper preserves the
 // same storage; a matching pointer on a global, block parameter or external function does not.
 IRPtrTypeBase* _getNVVMLocalSubstandardRecordArrayPointer(IRInst* value)
@@ -500,7 +500,7 @@ bool _getNVVMStructFieldAddress(
                asNVVMSupportedAggregateStorageArrayType(fieldType);
     }
 
-    if (outAddress.isMutable)
+    if (outAddress.isMutable || outAddress.isLocalSubstandardRecordStorage)
     {
         return _getNVVMExecutableValueAlignment(fieldType) != 0 ||
                (outAddress.isLocalSubstandardRecordStorage && asNVVMBFloat16VectorType(fieldType));
@@ -980,6 +980,7 @@ bool _getNVVMSequentialElementPointer(
         {
             arrayType = asNVVMSupportedLocalSubstandardRecordArrayType(baseType->getValueType());
             isLocalSubstandardRecordStorage = true;
+            isImmutable = baseType->getAccessQualifier() == AccessQualifier::Read;
         }
     }
     if (!baseType && hasResourceElementBase)
@@ -1060,13 +1061,14 @@ bool _getNVVMSequentialElementPointer(
         {
             const auto field = addresses.findFieldAddress(base);
             if (field && !field->selection.isConventionalGlobal &&
-                (field->selection.isMutable ||
+                (field->selection.isMutable || field->selection.isLocalSubstandardRecordStorage ||
                  asNVVMSupported32BitNumericVectorType(field->selection.field->getFieldType())))
             {
                 numericPointer = as<IRPtrTypeBase>(base->getDataType());
                 valueType = numericPointer ? numericPointer->getValueType() : nullptr;
                 isImmutable = !field->selection.isMutable;
                 isParameterGroupStorage = field->selection.isParameterGroupStorage;
+                isLocalSubstandardRecordStorage = field->selection.isLocalSubstandardRecordStorage;
             }
         }
         const auto parentElement = addresses.findElementAddress(base);
@@ -1114,7 +1116,9 @@ bool _getNVVMSequentialElementPointer(
         (resultType && (resultType->getOperandCount() == 1 || resultType->getOperandCount() == 3) &&
          !resultLayout) ||
         (resultType && resultType->getOperandCount() == 4 && resultLayout &&
-         resultLayout->getOp() == kIROp_ScalarBufferLayoutType);
+         (resultLayout->getOp() == kIROp_ScalarBufferLayoutType ||
+          (isLocalSubstandardRecordStorage && isImmutable &&
+           resultLayout->getOp() == kIROp_DefaultBufferLayoutType)));
     if (!aggregateType || !resultType || resultType->getOp() != kIROp_PtrType ||
         !hasCanonicalLocalLayout || resultType->getAddressSpace() != expectedAddressSpace ||
         resultType->getAccessQualifier() != expectedAccess ||
@@ -4959,7 +4963,10 @@ bool _isSupportedNVVMHelperArgument(IRInst* argument, IRType* parameterType)
     if (auto reference = asNVVMSupportedLocalRecordArrayReferenceType(parameterType))
     {
         auto actual = _getNVVMLocalSubstandardRecordArrayPointer(argument);
-        return actual && isTypeEqual(actual->getValueType(), reference->getValueType());
+        return actual &&
+               (reference->getAccessQualifier() == AccessQualifier::Read ||
+                actual->getAccessQualifier() == AccessQualifier::ReadWrite) &&
+               isTypeEqual(actual->getValueType(), reference->getValueType());
     }
     if (isTypeEqual(argumentType, parameterType))
         return true;
