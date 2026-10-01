@@ -8163,7 +8163,9 @@ SLANG_UNIT_TEST(nvvmSlangScalarIntrinsicHelpersUseTypedRecipes)
         SLANG_CHECK(operationCounts[74] == 0);
         SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_tanhf"));
         SLANG_CHECK(operationCounts[75] == 0);
-        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmaf"));
+        // This fixture calls only Half fma; native Half selection must not promote it.
+        SLANG_CHECK(gFakeNVVMBuilder.namedIntrinsicNames.contains("llvm.fma"));
+        SLANG_CHECK(!gFakeNVVMBuilder.namedIntrinsicNames.contains("__nv_fmaf"));
         SLANG_CHECK(operationCounts[76] == 0);
         SLANG_CHECK(operationCounts[SLANG_NVVM_VALUE_OP_FLOAT_CONVERT] >= 20);
         // The selected libdevice call writes its output pointer internally, without a
@@ -9157,7 +9159,8 @@ SLANG_UNIT_TEST(nvvmSlangNestedSubstandardRecordsRejectOtherRoles)
             [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
             { outputBuffer[0].inner.value = bit_cast<FloatE4M3>(uint8_t(tid.x)); }
         )SLANG",
-         "struct field address result"},
+         // The unsupported external element root is rejected before child field planning.
+         "raw RWStructuredBuffer numeric element pointer"},
         {R"SLANG(
             [CudaDeviceExport] [noinline] Outer copy(Outer x) { return x; }
             RWStructuredBuffer<uint> outputBuffer;
@@ -10066,7 +10069,8 @@ SLANG_UNIT_TEST(nvvmSlangFloat8UnsupportedRolesStopBeforeEmission)
                 outputBuffer[0] = bit_cast<F>(uint8_t(tid.x));
             }
         )SLANG",
-         "struct field address result"},
+         // The unsupported external element root is rejected before child field planning.
+         "raw RWStructuredBuffer numeric element pointer"},
         {R"SLANG(
             [noinline]
             vector<F, 2> copy(vector<F, 2> v)
@@ -10642,7 +10646,8 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles)
                 outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1][tid.z & 1].value));
             }
         )SLANG"},
-        {"shared array", "sequential element pointer: Ptr<Payload", R"SLANG(
+        // Parent availability rejects this unsupported global before child address planning.
+        {"shared array", "'global_var'", R"SLANG(
             struct Payload
             {
                 BFloat16 value;
@@ -10657,7 +10662,8 @@ SLANG_UNIT_TEST(nvvmSlangLocalSubstandardRecordArraysRejectOtherRoles)
                 outputBuffer[0] = uint(bit_cast<uint16_t>(p[tid.y & 1].value));
             }
         )SLANG"},
-        {"resource array", "struct field address result: Ptr<StructuredBuffer<Wrapper>", R"SLANG(
+        // The resource load is rejected before its local-only element fields are planned.
+        {"resource array", "raw structured-buffer value load", R"SLANG(
             struct Payload
             {
                 BFloat16 value;
