@@ -1,6 +1,8 @@
 // Issue #13140: interfaces declared in an imported user module are offered by the
 // missing-constraint suggestion when they are visible here (`public`), and not when they are
-// `internal` to that module, since naming one in a constraint would not compile.
+// `internal` to that module, since naming one in a constraint would not compile. A public
+// interface whose matching requirement is `internal` is not offered either: the constraint would
+// not make the requirement accessible here.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
@@ -29,4 +31,11 @@ int internalImport<T>(T t)
     return t.internalThing();
 //CHECK:     ^^^^^^^^^^^^^ member not found
 //CHECK:     ^^^^^^^^^^^^^ 'internalThing' is not a member of 'T'.
+}
+
+int internalRequirement<T>(T t)
+{
+    return t.hiddenRequirement();
+//CHECK:     ^^^^^^^^^^^^^^^^^ member not found
+//CHECK:     ^^^^^^^^^^^^^^^^^ 'hiddenRequirement' is not a member of 'T'.
 }

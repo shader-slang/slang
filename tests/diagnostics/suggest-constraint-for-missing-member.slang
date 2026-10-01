@@ -75,6 +75,21 @@ interface IShared
     int shared();
 }
 
+// Negative: inside an interface method with a default body, `this` has the type of a synthesized
+// `This` parameter that cannot be given a `where` clause (the fix is `interface IFooUsesBar : IBar`),
+// so `IBar` is not suggested.
+interface IFooUsesBar
+{
+    int foo() { return this.bar(); }
+//CHECK:                    ^^^ member not found
+//CHECK:                    ^^^ 'bar' is not a member of 'This'.
+}
+
+interface IBar
+{
+    int bar();
+}
+
 namespace NS
 {
 interface IShared
@@ -104,10 +119,8 @@ int staticMember<T>()
 //CHECK:     ^^^^ consider adding a constraint such as 'where T : IFactory', since 'make' is declared by that interface
 }
 
-// Positive: the matching static requirement is a *generic* method (`static int makeGen<U>(U)`).
-// `getDirectMemberDeclsOfName` returns the outer generic decl and `isDeclUsableAsStaticMember`
-// unwraps it to find the `static` modifier on the inner function, so the interface is still
-// suggested — this pins that unwrap, which a plain static-modifier check would miss.
+// Positive: a static access whose matching requirement is a *generic* static method
+// (`static int makeGen<U>(U)`) is suggested like a non-generic one.
 int genericStaticRequirement<T>()
 {
     return T.makeGen(1);
@@ -127,8 +140,8 @@ int valueStaticRequirement<T>(T v)
 //CHECK:     ^^ consider adding a constraint such as 'where T : IHasStaticSm', since 'sm' is declared by that interface
 }
 
-// Positive: only the interface that *directly* declares the member is suggested; a derived
-// interface that merely inherits it is not, because the search does not walk the inheritance graph.
+// Positive: only the interface that *directly* declares the member is suggested, not a derived
+// interface that inherits it; the base is usually visible wherever the derived one is.
 int inheritedMemberDirectOnly<T>(T t)
 {
     return t.baseThing();
@@ -157,8 +170,9 @@ int staticInstanceMismatch<U>()
 //CHECK:     ^^^^^^^ 'doThing' is not a member of 'typeof(U)'.
 }
 
-// Positive: two differently-named interfaces both declare the member → one note each, emitted in
-// a deterministic name-sorted order (IAlpha before IBeta).
+// Positive: two differently-named interfaces both declare the member → one note each. (The order
+// of the notes is checked by `suggest-constraint/sorted-notes.slang`; this exhaustive matcher does
+// not check order.)
 int twoMatchesSorted<T>(T t)
 {
     return t.poly();
@@ -168,16 +182,16 @@ int twoMatchesSorted<T>(T t)
 //CHECK:     ^^^^ consider adding a constraint such as 'where T : IBeta', since 'poly' is declared by that interface
 }
 
-// Positive: an associated type is reachable through a value in type position (`v.Element x;`), so a
-// value access whose only matching requirement is an associated type is still suggested.
+// Positive: an associated type is reachable through a value in type position (`t.assocThing x;`),
+// so a value access whose only matching requirement is an associated type is still suggested.
 void assocTypeThroughValue<T>(T t)
 {
-    {
-        t.assocThing local;
-//CHECK:  ^^^^^^^^^^ member not found
-//CHECK:  ^^^^^^^^^^ 'assocThing' is not a member of 'T'.
-//CHECK:  ^^^^^^^^^^ consider adding a constraint such as 'where T : IHasAssoc', since 'assocThing' is declared by that interface
-    }
+    t.assocThing local;
+/*CHECK:
+      ^^^^^^^^^^ member not found
+      ^^^^^^^^^^ 'assocThing' is not a member of 'T'.
+      ^^^^^^^^^^ consider adding a constraint such as 'where T : IHasAssoc', since 'assocThing' is declared by that interface
+*/
 }
 
 // Negative: two distinct visible interfaces share the unqualified name `IShared` (one at global
@@ -198,6 +212,56 @@ float3 shadowedByGenericParam<IHasNormal, T>(T value)
 //CHECK:         ^^^^^^^^^ member not found
 //CHECK:         ^^^^^^^^^ 'getNormal' is not a member of 'T'.
 }
+
+// Positive: the shadowing generic parameter belongs to an inner generic, while `T` belongs to the
+// struct. The constraint goes on the struct, where `IHasNormal` names the interface, so the note is
+// offered (the name is resolved where the constraint is written, not at the failed access).
+struct ShadowInMethod<T>
+{
+    float3 read<IHasNormal>(T value)
+    {
+        return value.getNormal();
+//CHECK:             ^^^^^^^^^ member not found
+//CHECK:             ^^^^^^^^^ 'getNormal' is not a member of 'T'.
+//CHECK:             ^^^^^^^^^ consider adding a constraint such as 'where T : IHasNormal', since 'getNormal' is declared by that interface
+    }
+}
+
+// Negative: `v::doThing()` is a static lookup even though `v` is a value, and `IHasDoThing`
+// declares `doThing` as an instance requirement, so constraining `U` to it would not help.
+int staticSyntaxOnValue<U>(U v)
+{
+    return v::doThing();
+//CHECK:      ^^^^^^^ member not found
+//CHECK:      ^^^^^^^ 'doThing' is not a member of 'U'.
+}
+
+// Negative: `lessThan` is declared by the core module's `IComparable`, which is in scope for every
+// program; core-module interfaces are not suggested.
+bool coreInterfaceSkipped<T>(T a, T b)
+{
+    return a.lessThan(b);
+//CHECK:     ^^^^^^^^ member not found
+//CHECK:     ^^^^^^^^ 'lessThan' is not a member of 'T'.
+}
+
+// Positive: inside `namespace UsedNS`, which the file also opens with `using namespace UsedNS`, the
+// scope walk reaches `UsedNS` twice; its interface is still suggested once.
+namespace UsedNS
+{
+interface IUsed
+{
+    int used();
+}
+int reachedTwice<T>(T t)
+{
+    return t.used();
+//CHECK:     ^^^^ member not found
+//CHECK:     ^^^^ 'used' is not a member of 'T'.
+//CHECK:     ^^^^ consider adding a constraint such as 'where T : IUsed', since 'used' is declared by that interface
+}
+}
+using namespace UsedNS;
 
 // Negative: no interface declares the failed name, so no suggestion is offered.
 float noSuggestion<Vertex>(Vertex v)

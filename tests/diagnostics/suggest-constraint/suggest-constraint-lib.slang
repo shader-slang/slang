@@ -16,3 +16,8 @@ internal interface IInternalThing
 {
     int internalThing();
 }
+
+public interface IMixedVis
+{
+    internal int hiddenRequirement();
+}

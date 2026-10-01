@@ -1,8 +1,9 @@
-// Issue #13140: each constraint the missing-constraint note suggests for a same-module or imported
-// user interface in `../suggest-constraint-for-missing-member.slang` and `imports.slang`, once
-// applied, makes the failed member access valid. Each function below is the diagnostic test's
-// failing case with the suggested constraint added; this test checks they compile and compute the
-// expected values.
+// Issue #13140: the constraints the missing-constraint note suggests for same-module and imported
+// user interfaces in `../suggest-constraint-for-missing-member.slang` and `imports.slang`, once
+// applied, make the failed member accesses valid. Each function is a failing case from those
+// tests with the suggested constraint added; `twoMatchesSortedBeta` applies the second of the two
+// notes, and `assocTypeThroughValue` also uses the associated type so that it is checked. This test
+// compiles them and checks the computed values.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
