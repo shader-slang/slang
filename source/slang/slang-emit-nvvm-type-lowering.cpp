@@ -1888,6 +1888,22 @@ bool getNVVMSupportedSurfaceFormat(
     return true;
 }
 
+// Buffer/RWBuffer use the canonical CUDA texture/surface handle layout (eight bytes).
+// An unused binding still contributes to neighboring field offsets. This storage-only shape
+// deliberately grants no texture operations, helper values or executable buffer loads.
+static bool _isNVVMTypedBufferBindingStorage(IRInst* type)
+{
+    auto texture = as<IRTextureTypeBase>(type);
+    if (!texture || texture->getOp() != kIROp_TextureType || texture->getOperandCount() < 9 ||
+        texture->GetBaseShape() != SLANG_TEXTURE_BUFFER || texture->isArray() ||
+        texture->isMultisample() || texture->isShadow() ||
+        (texture->getAccess() != SLANG_RESOURCE_ACCESS_READ &&
+         texture->getAccess() != SLANG_RESOURCE_ACCESS_READ_WRITE))
+        return false;
+    SlangNVVMValueTypeDesc element = {};
+    return _getNVVMSelected32BitNumericElementType(texture->getElementType(), element);
+}
+
 bool getNVVMSupportedReadOnlyTextureType(IRInst* type, NVVMReadOnlyTextureType& outType)
 {
     outType = {};
@@ -2115,7 +2131,9 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field)
            getNVVMSupportedReadOnlyTextureType(type, sampledTextureType) ||
            asNVVMSupportedDescriptorHandleType(type) || asNVVMSupportedSamplerStorageType(type) ||
            asNVVMSupportedUnsizedSamplerArrayStorageType(type) ||
-           asNVVMSupportedAggregateStorageArrayType(type);
+           asNVVMSupportedAggregateStorageArrayType(type) ||
+           asNVVMSupportedAggregateStorageStructType(type) ||
+           _isNVVMTypedBufferBindingStorage(type);
 }
 
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
@@ -2700,7 +2718,8 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                compactParameterGroupVectorType || aggregateStorageArrayType ||
                deviceCopyablePointer || devicePhysicalStoragePointer || isRawBuffer ||
                parameterGroup || isSurface || isSampledTexture || samplerStorage ||
-               unsizedSamplerArrayStorage || atomicType || descriptorHandle;
+               unsizedSamplerArrayStorage || atomicType || descriptorHandle ||
+               isTypedBufferBindingStorage;
     case NVVMTypeUse::ParameterGroupStorage:
         return isParameterGroupElementStorage;
     case NVVMTypeUse::StructuredBufferStorage:
@@ -2768,6 +2787,7 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
     info.compactParameterGroupVectorType = asNVVMSupportedCompactParameterGroupVectorType(type);
     info.deviceArrayPointer = asNVVMSupportedDeviceArrayPointerType(type, &info.deviceArrayType);
     info.isRawBuffer = getNVVMSupportedRawBufferType(type, info.rawBufferType);
+    info.isTypedBufferBindingStorage = _isNVVMTypedBufferBindingStorage(type);
     info.isSurface = getNVVMSupportedSurfaceType(type, info.surfaceType);
     info.isSampledTexture = getNVVMSupportedReadOnlyTextureType(type, info.sampledTextureType);
     info.isBufferDataPointer =
@@ -3374,6 +3394,13 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     else if (deviceArrayPointer)
     {
         return _lowerPointerType(type, deviceArrayType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outType);
+    }
+    else if (typeInfo.isTypedBufferBindingStorage)
+    {
+        SLANG_RELEASE_ASSERT(use == NVVMTypeUse::Storage);
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "typed-buffer binding handle storage",
+            m_builder.getIntegerType(m_module, 64, outType)));
     }
     else if (isRawBuffer)
     {

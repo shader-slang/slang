@@ -125,13 +125,16 @@ are readonly to shader stores, but loads are not invariant because hosts can cha
 launches. The shared immutable-location policy owns that distinction.
 
 `TraceRay` constructs a typed IR operation with explicit ray fields and the original payload type.
-Shared CUDA payload layout admits nonempty, padding-free Int32/UInt32/Float32 scalars, vectors,
-records and fixed arrays totaling at most 32 words. Array counts must be positive literals, checked
-against the remaining word bound before multiplication. Recursive CUDA size equality proves dense
-natural packing, including array elements; explicit array strides remain outside this contract
-because the shared layout query does not interpret them. Caller packing and callback unpacking
-reuse the same traversal; unsupported shapes retain an operation or pointer fallback that NVVM
-preflight rejects. The lowered
+CUDA payload values admit nonempty Int32/UInt32/Float32 scalars, vectors, matrices,
+records and positive literal fixed arrays within 32 physical words, including internal and tail
+padding. Explicit strides and unsupported leaves remain rejected. The distinct `CUDAPayload`
+layout rule reuses CUDA field/vector alignment but stores matrices as logical rows, matching
+CUDA's prelude and NVVM's legalized row arrays regardless of external matrix-layout annotations.
+Its separate cache identity keeps these value offsets distinct from external buffer layout.
+Matrix legalization may produce singleton vectors; the existing vector pass normalizes those
+before NVVM helper and payload admission. Caller packing initializes padding words to zero;
+callback traversal selects canonical field offsets and advances by complete aggregate extents.
+Unsupported shapes retain an operation or pointer fallback that preflight rejects. The lowered
 trace keeps its original type and returns an ordinary UInt32 array. Checked plans validate this
 contract before provider mutation. The original payload type is an explicit type dependency even
 when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit/any-hit/intersection;
@@ -192,6 +195,11 @@ and saved helper caches retain their distinct signatures. These operations prese
 memory observations; they neither expose SDK pointers nor grant general pointer conversion.
 Each row currently evaluates the full list independently; no performance improvement is claimed.
 
+Current-hit sphere and linear-swept-sphere data/predicates and cluster identity use a finite typed
+query operation in AnyHit/ClosestHit. Core composes the public vector/matrix shapes. Provider queries
+consume incoming SDK state directly, with no saved-object allocation or restoration; zero operands,
+query IDs, result types and literal row bounds are checked before emission.
+
 ### Owned HitObject state
 
 Canonical noncopyable HitObjects use caller-owned local storage and internal helper references.
@@ -219,12 +227,14 @@ explicitly applies its saved SBT selection. Invoke uses the current caller paylo
 saved object intact. Hint-only reorder activates NOP, avoiding dependence on another object's state.
 Every SDK observation/transition retains side effects and a memory clobber.
 
-Shared payload legalization reuses the existing dense scalar/vector/record/array traversal after
+Shared payload legalization reuses the selected scalar/vector/matrix/record/array traversal after
 specialization and tuple lowering, before empty-type cleanup. Zero-word Traverse/Invoke must become
 effectful Void calls before an empty result can erase them. Original payload types remain metadata
 in checked plans; the existing zero-state type collector admits them only after operation validation. HitObject operations additionally admit canonical empty payload
 records. Traverse/Invoke return up to 32 ordinary UInt32 words; attributes and ReportIntersection use
-up to eight. Both generic attribute records and variadic `ReportHitOptix` calls use the same typed
+up to eight **dense scalar leaves**, independent of payload padding. ReportHit and saved/current
+attribute reads reuse the same dense traversal; CUDA's sizeof-based saved-attribute helper is not
+the NVVM contract. Both generic attribute records and variadic `ReportHitOptix` calls use the same typed
 report tuple and zero-through-eight-word attribute contract. HitObject lifecycle operations are
 available in raygen/closest-hit/miss, reordering in raygen, and ReportIntersection in intersection. Stage checks include reachable helpers.
 
@@ -379,6 +389,12 @@ comparison samplers and unsized sampler arrays that have storage-only contracts.
 reuse the parameter-group compact-vector conversion for width3: twelve bytes of scalar-array
 storage become a three-lane SSA vector. Widths2/4 retain their native representation. This does not
 authorize stores through uniforms or broaden ordinary device-pointer and resource-storage roles.
+Recursive pointer-bearing records and arrays retain this checked conventional root, canonical
+field keys and external-layout proof through child selection. Storage admission does not grant
+whole-record loads or helpers. Unused Buffer/RWBuffer bindings have only an eight-byte CUDA handle
+storage role; actual typed-buffer operations remain rejected. RHI must not append a raw-buffer
+count into the following reflected field. Binding qualification does not imply typed access or
+null-resource dereference semantics.
 
 Explicit Std430/Scalar/C Device pointers to finite copyable records use a byte-address representation.
 Shared buffer-layout selection owns the layout; preflight queries its stride once and retains the

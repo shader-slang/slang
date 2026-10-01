@@ -22026,6 +22026,12 @@ float RayCurrentTime()
     }
 }
 
+[require(nvvm)]
+[NonUniformReturn]
+__generic<T>
+__intrinsic_op($(kIROp_OptixCurrentHitQuery))
+internal T __nvvmOptixCurrentHitQuery(uint query, uint index);
+
 /// @category raytracing
 [__requiresNVAPI]
 __glsl_extension(GL_NV_cluster_acceleration_structure)
@@ -22038,6 +22044,7 @@ int GetClusterID()
     {
     case hlsl:  __intrinsic_asm "NvRtGetClusterID";
     case glsl:  __intrinsic_asm "(gl_ClusterIDNV)";
+    case nvvm: return int(__nvvmOptixCurrentHitQuery<uint>(16u, 0u));
     case cuda: __intrinsic_asm "optixGetClusterId";
     case spirv:
         return spirv_asm
@@ -22058,6 +22065,7 @@ float4 GetSpherePositionAndRadius()
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+    case nvvm: return __nvvmOptixCurrentHitQuery<float4>(17u, 0u);
     case cuda:
         {
             __intrinsic_asm "optixGetSpherePositionAndRadius";
@@ -22084,6 +22092,7 @@ float2x4 GetLssPositionsAndRadii()
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+    case nvvm: return float2x4(__nvvmOptixCurrentHitQuery<float4>(18u, 0u), __nvvmOptixCurrentHitQuery<float4>(18u, 1u));
     case cuda:
         {
             __intrinsic_asm "optixGetLssPositionsAndRadii";
@@ -22117,6 +22126,7 @@ bool IsSphereHit()
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+    case nvvm: return __nvvmOptixCurrentHitQuery<uint>(21u, 0u) != 0;
     case cuda:
         {
             __intrinsic_asm "optixIsSphereHit";
@@ -22141,6 +22151,7 @@ bool IsLssHit()
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvRtIsLssHit";
+    case nvvm: return __nvvmOptixCurrentHitQuery<uint>(22u, 0u) != 0;
     case cuda:
         {
             __intrinsic_asm "optixIsLSSHit";

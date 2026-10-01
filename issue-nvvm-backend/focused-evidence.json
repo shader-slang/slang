@@ -87818,38 +87818,40 @@
       ],
       "failure_family_counts_scope": "Initial full checkpoint; current focused resolution is separate.",
       "current_focused_resolution": {
-        "registration_count": 273,
-        "unique_name_count": 272,
-        "scope": "Initial full inventory plus four focused fixtures. Unselected cases retain original identities; not another full-suite run.",
+        "registration_count": 278,
+        "unique_name_count": 277,
+        "scope": "Original full inventory plus nine focused fixtures. Unselected registrations retain their own tested identity; not another full-suite run.",
         "by_compiler": {
           "nvvm": {
-            "passed": 256,
-            "failed": 7,
+            "passed": 266,
+            "failed": 2,
             "skipped": 10
           },
           "nvrtc": {
-            "passed": 261,
-            "skipped": 10,
-            "failed": 2
+            "passed": 264,
+            "failed": 4,
+            "skipped": 10
           }
         },
-        "original_nvvm_failures_resolved": 54,
-        "original_nvvm_failures_remaining": 7,
+        "original_nvvm_failures_resolved": 59,
+        "original_nvvm_failures_remaining": 2,
         "new_fixture_nvrtc_differences": [
           "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
-          "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged"
+          "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged",
+          "array-payload-singleton-matrices: CUDA source rejects matrices with one row/column (E39999), NVVM O0/O3 independent oracle passes",
+          "hitobject-padded-attributes: CUDA sizeof-based helper rejects48-byte record; NVVM passes8dense-leaf ReportHit/GetAttributes/Invoke oracle atO0/O3"
         ]
       },
       "current_failure_family_counts": {
-        "nested_pointer_record_field": 1,
+        "nested_pointer_record_field": 0,
         "combined_sampler_values": 0,
         "texture_fetch": 0,
         "compute_entry_parameters": 0,
-        "typed_buffer_global": 1,
+        "typed_buffer_global": 0,
         "hitobject_representation": 1,
-        "cluster_query": 1,
+        "cluster_query": 0,
         "callable_abi": 1,
-        "trace_payload_boundary": 2,
+        "trace_payload_boundary": 0,
         "intersection_stage": 0,
         "active_list_matrix_composition": 0
       }
@@ -88812,6 +88814,420 @@
         "Intersection execution, changing quaternion and maximum depth remain unqualified.",
         "Each row composes the full list separately; no speed claim.",
         "Focused third implementation since working checkpoint; no full-baseline replacement."
+      ]
+    },
+    "nvvm-rhi-data-query-storage": {
+      "status": "accepted-focused",
+      "scope": "Complete selected32-bit padded/matrix payload family and dense attribute family; current sphere/LSS data/predicates and cluster identity; checked conventional pointer records/arrays; inert RO/RW typed-buffer binding layout.",
+      "compiler_identity": {
+        "path": "build/nvvm-rhi-data-families/compiler-identity.json",
+        "sha256": "47e142ebe9745a0c673f69da2d06315adf4b290563aa6534e2d018fde54ae40f"
+      },
+      "rhi_identity": {
+        "path": "build/nvvm-rhi-data-families/rhi-identity.json",
+        "sha256": "fdb089fde573cb3da51049b2f770ce3daee6586439eaa28274ef8ea87e6343cf"
+      },
+      "validation": {
+        "build-4": {
+          "path": "build/nvvm-rhi-data-families/build-4.json",
+          "sha256": "3d18de48dddade8157e62ce1614880f15cac4c53b3699dd524a4e90322cccfd5",
+          "return_code": 0,
+          "elapsed_seconds": 32.88455557823181
+        },
+        "static-build-2": {
+          "path": "build/nvvm-rhi-data-families/static-build-2.json",
+          "sha256": "c37abf2c64528579482abb841094ba98e4eba5b058c42cd2e34ab72c23d5946f",
+          "return_code": 0,
+          "elapsed_seconds": 294.3052315711975
+        },
+        "static-optix": {
+          "path": "build/nvvm-rhi-data-families/static-optix.json",
+          "sha256": "d945b930fa9147d10b0b7f86ae51d2848c1efbb10d95f2596c29a1104c974015",
+          "return_code": 0,
+          "elapsed_seconds": 7.1562817096710205
+        },
+        "static-current": {
+          "path": "build/nvvm-rhi-data-families/static-current.json",
+          "sha256": "b5c867d974c67fff7b478f6136bb9c298b543ce8ad0f122580a77365fdc23f69",
+          "return_code": 0,
+          "elapsed_seconds": 0.35819363594055176
+        },
+        "static-binding": {
+          "path": "build/nvvm-rhi-data-families/static-binding.json",
+          "sha256": "acae0f60dfd21ab21ce20fafa8a8ea7b9dde525150c074c75f9a66c8f8032ee7",
+          "return_code": 0,
+          "elapsed_seconds": 0.25415945053100586
+        },
+        "units": {
+          "path": "build/nvvm-rhi-data-families/units.json",
+          "sha256": "8930b782cba082388aa4c468f55fb2c318c84c5c5a2b1e73ccff2792c4dcd9f9",
+          "return_code": 0,
+          "elapsed_seconds": 1.6612250804901123
+        },
+        "smoke": {
+          "path": "build/nvvm-rhi-data-families/smoke.json",
+          "sha256": "5c93112b8f79d87451378043dfba4ee8de175d5e6f0801edac114a4a3eb8e177",
+          "return_code": 0,
+          "elapsed_seconds": 21.786140203475952
+        },
+        "rhi-restored-build": {
+          "path": "build/nvvm-rhi-data-families/rhi-restored-build.json",
+          "sha256": "4fdf819c1969dabf1399412364f4f6bb4449a57e85ccf8728ced4f1adc3a1a15",
+          "return_code": 0,
+          "elapsed_seconds": 2.159071922302246
+        },
+        "rhi-final": {
+          "path": "build/nvvm-rhi-data-families/rhi-final.json",
+          "sha256": "436789013b2ffc35155fe44a58338d1f077f063706600122b095051fa364dd32",
+          "return_code": 0,
+          "elapsed_seconds": 6.353156089782715
+        },
+        "nvrtc-final": {
+          "path": "build/nvvm-rhi-data-families/nvrtc-final.json",
+          "sha256": "9be2e062fa355420247966d361bd80b7f3deba30baf0e2d20e09840acdeb9cf3",
+          "return_code": 1,
+          "elapsed_seconds": 7.589033603668213
+        },
+        "rhi-inventory": {
+          "path": "build/nvvm-rhi-data-families/rhi-inventory.json",
+          "sha256": "de2cf254ba83d9e70ed9d9ee8e8f68716f6a8732f20c434b4e4f65866eed6dc9",
+          "return_code": 0,
+          "elapsed_seconds": 0.006327152252197266
+        }
+      },
+      "outcomes": {
+        "rhi": {
+          "cases": {
+            "bind-pointers-nested-array-copy.cuda": {
+              "status": "passed",
+              "terminal_line": 3,
+              "detail": "0.54s",
+              "assertion_records": []
+            },
+            "bind-pointers-struct-float-copy.cuda": {
+              "status": "passed",
+              "terminal_line": 4,
+              "detail": "0.01s",
+              "assertion_records": []
+            },
+            "null-views.cuda": {
+              "status": "passed",
+              "terminal_line": 5,
+              "detail": "0.03s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-flat.cuda": {
+              "status": "passed",
+              "terminal_line": 6,
+              "detail": "0.75s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-layout.cuda": {
+              "status": "passed",
+              "terminal_line": 7,
+              "detail": "0.81s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-nested.cuda": {
+              "status": "passed",
+              "terminal_line": 8,
+              "detail": "0.79s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-singleton-matrices.cuda": {
+              "status": "passed",
+              "terminal_line": 9,
+              "detail": "0.72s",
+              "assertion_records": []
+            },
+            "ray-tracing-cluster-tracing.cuda": {
+              "status": "passed",
+              "terminal_line": 101,
+              "detail": "0.06s",
+              "assertion_records": []
+            },
+            "ray-tracing-hitobject-padded-attributes.cuda": {
+              "status": "passed",
+              "terminal_line": 102,
+              "detail": "0.83s",
+              "assertion_records": []
+            },
+            "ray-tracing-lss-intrinsics.cuda": {
+              "status": "passed",
+              "terminal_line": 103,
+              "detail": "0.08s",
+              "assertion_records": []
+            },
+            "ray-tracing-sphere-intrinsics.cuda": {
+              "status": "passed",
+              "terminal_line": 104,
+              "detail": "0.05s",
+              "assertion_records": []
+            },
+            "typed-buffer-binding-neighbors.cuda": {
+              "status": "passed",
+              "terminal_line": 105,
+              "detail": "0.02s",
+              "assertion_records": []
+            }
+          },
+          "counts": {
+            "passed": 12,
+            "failed": 0,
+            "skipped": 0
+          },
+          "assertions": {
+            "total": 49976,
+            "passed": 49976,
+            "failed": 0
+          }
+        },
+        "nvrtc": {
+          "cases": {
+            "bind-pointers-nested-array-copy.cuda": {
+              "status": "passed",
+              "terminal_line": 3,
+              "detail": "0.60s",
+              "assertion_records": []
+            },
+            "bind-pointers-struct-float-copy.cuda": {
+              "status": "passed",
+              "terminal_line": 4,
+              "detail": "0.07s",
+              "assertion_records": []
+            },
+            "null-views.cuda": {
+              "status": "passed",
+              "terminal_line": 5,
+              "detail": "0.09s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-flat.cuda": {
+              "status": "passed",
+              "terminal_line": 6,
+              "detail": "1.39s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-layout.cuda": {
+              "status": "passed",
+              "terminal_line": 7,
+              "detail": "1.37s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-nested.cuda": {
+              "status": "passed",
+              "terminal_line": 8,
+              "detail": "1.37s",
+              "assertion_records": []
+            },
+            "ray-tracing-array-payload-singleton-matrices.cuda": {
+              "status": "failed",
+              "terminal_line": 38,
+              "detail": "0.13s",
+              "assertion_records": [
+                {
+                  "line": 14,
+                  "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E39999]: matrices with 1 column or row are not supported by the current code generation target",
+                  "context": [
+                    "   --> /home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-array-payload.slang:267:8",
+                    "    |",
+                    "267 | struct SingletonPayload",
+                    "    |        ^^^^^^^^^^^^^^^^ matrices with 1 column or row are not supported by the current code generation target",
+                    "----'",
+                    "error[E39999]: matrices with 1 column or row are not supported by the current code generation target"
+                  ]
+                },
+                {
+                  "line": 35,
+                  "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1134: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+                  "context": [
+                    "  logged: optimization := 0",
+                    "",
+                    "ray-tracing-array-payload-singleton-matrices.cuda               FAILED (0.13s)",
+                    "ray-tracing-cluster-tracing.cuda ",
+                    "===============================================================================",
+                    "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-clusters.cpp:787:"
+                  ]
+                }
+              ]
+            },
+            "ray-tracing-cluster-tracing.cuda": {
+              "status": "passed",
+              "terminal_line": 130,
+              "detail": "0.31s",
+              "assertion_records": []
+            },
+            "ray-tracing-hitobject-padded-attributes.cuda": {
+              "status": "failed",
+              "terminal_line": 146,
+              "detail": "0.22s",
+              "assertion_records": [
+                {
+                  "line": 136,
+                  "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] nvrtc 12.9: default_program(5881): error : static assertion failed with \"Attribute type is too large\"",
+                  "context": [
+                    "nvrtc 12.9: note :       static_assert(numInts <= 8, \"Attribute type is too large\");",
+                    "nvrtc 12.9: note :       ^",
+                    "nvrtc 12.9: note :           detected during instantiation of \"T optixHitObjectGetAttribute<T>(OptixTraversableHandle *) [with T=PaddedAttributes_0]\" at line 676 of /home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-hitobject-intrinsics.slang",
+                    "",
+                    "  logged: optimization := 0",
+                    ""
+                  ]
+                },
+                {
+                  "line": 143,
+                  "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1134: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+                  "context": [
+                    "  logged: optimization := 0",
+                    "",
+                    "ray-tracing-hitobject-padded-attributes.cuda                    FAILED (0.22s)",
+                    "ray-tracing-lss-intrinsics.cuda                                 PASSED (0.29s)",
+                    "ray-tracing-sphere-intrinsics.cuda                              PASSED (0.28s)",
+                    "typed-buffer-binding-neighbors.cuda                             PASSED (0.08s)"
+                  ]
+                }
+              ]
+            },
+            "ray-tracing-lss-intrinsics.cuda": {
+              "status": "passed",
+              "terminal_line": 147,
+              "detail": "0.29s",
+              "assertion_records": []
+            },
+            "ray-tracing-sphere-intrinsics.cuda": {
+              "status": "passed",
+              "terminal_line": 148,
+              "detail": "0.28s",
+              "assertion_records": []
+            },
+            "typed-buffer-binding-neighbors.cuda": {
+              "status": "passed",
+              "terminal_line": 149,
+              "detail": "0.08s",
+              "assertion_records": []
+            }
+          },
+          "counts": {
+            "passed": 10,
+            "failed": 2,
+            "skipped": 0
+          },
+          "assertions": {
+            "total": 49855,
+            "passed": 49851,
+            "failed": 4
+          }
+        },
+        "static": {
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        },
+        "provider_and_source": {
+          "passed": 7,
+          "failed": 0
+        },
+        "smoke": {
+          "passed": 15,
+          "regressions": 0,
+          "input_changes": 0,
+          "selection": {
+            "path": "build/nvvm-rhi-data-families/smoke-1/selection.json",
+            "sha256": "7a43b4ac867945442097fcceb79d5e1e88eb3675371d410e3a95ad496eedaa55"
+          }
+        },
+        "revert_drill": {
+          "build": {
+            "path": "build/nvvm-rhi-data-families/rhi-revert-build.json",
+            "sha256": "470b9d749b8c29fc36cf91cd49cc2d5360fbd8ea57c89f4b11473cbf0dc4a668",
+            "return_code": 0,
+            "elapsed_seconds": 2.141658067703247
+          },
+          "run": {
+            "path": "build/nvvm-rhi-data-families/rhi-revert-neighbors.json",
+            "sha256": "71d592ed0189792d3f25394c534a12f6c5ceb891b27ea7498cf1e97f8f9da581",
+            "return_code": 1,
+            "elapsed_seconds": 1.6047089099884033
+          },
+          "failed_assertions": 32,
+          "reason": "Restoring count write corrupts32guard bytes across null/nonnull binding cases; restored final compiler/RHI passes."
+        }
+      },
+      "contracts": [
+        "Physical payload layout owns padding/array extents and logical row matrices; distinct CUDAPayload cache leaves external CUDA layout unchanged. Selected32bit leaves,32physical words maximum, explicitstrides/unsupportedleaves rejected.",
+        "Existing vector legalization normalizes singleton rows immediately after NVVM matrix production.",
+        "Attributes enumerate up to8dense32bit leaves independent of48byte padded record size; existing flatten/fetch reused.",
+        "Current queries own AnyHit/ClosestHit typed plans and SDK incoming primitives; no saved-object storage or restore. Runtime observesCH; staticAH policy coverage.",
+        "Conventional global pointer records reuse external layout proof and checked parent root; no whole pointer-bearing load/helper expansion.",
+        "Typed-buffer Storage role is i64 only; binding preserves neighboring uniforms, but actual typed access/null dereference not qualified.",
+        "Module43/providerABI46/container2 unchanged; focused fourth iteration since working1713, no full baseline replaced."
+      ],
+      "failure_history": [
+        {
+          "attempt": {
+            "path": "build/nvvm-rhi-data-families/build-2.json",
+            "sha256": "053cfe66cb0db4d22fbc208b9fa189febada38f16767324987985c5ff7c8abca",
+            "return_code": 1,
+            "elapsed_seconds": 184.02267289161682
+          },
+          "log": {
+            "path": "build/nvvm-rhi-data-families/build-2.log",
+            "sha256": "f402e9ed607a4447ed3b44496caf56d4dfd309ee33ca1629b548a93dac36a4c1"
+          },
+          "detail": "Iterator equality unavailable in newemptyrecord test; supported inequality fixes build."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-rhi-data-families/static-build.json",
+            "sha256": "bbcf7415f22bd468b13ade0907183eb4ac51558be399f4b061bd960b9e1ed2ed",
+            "return_code": 1,
+            "elapsed_seconds": 73.13451838493347
+          },
+          "log": {
+            "path": "build/nvvm-rhi-data-families/static-build.log",
+            "sha256": "8b1f690525e1428943c7bf569c318923d7cf9f0577c0d63188986409aef53109"
+          },
+          "detail": "Static fixture used genericgetType instead ofcanonicalgetMatrixType."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-rhi-data-families/rhi-1.json",
+            "sha256": "8cdd95beb420417b4e87d495884e91b7b81f8459820b7cbbc95197d3400fa6af",
+            "return_code": -6,
+            "elapsed_seconds": 1.8467283248901367
+          },
+          "log": {
+            "path": "build/nvvm-rhi-data-families/rhi-1.log",
+            "sha256": "e4549158534af7abe8655fc86d7c23b8cd76695bb5d734ca1c9f0a839fe42b21"
+          },
+          "detail": "Pointer record reachable-type omission; wrong16byte typedbinding ledglobal328/host280 andCUDAillegaladdress, poisoninglatercases."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-rhi-data-families/rhi-2.json",
+            "sha256": "e0f1e85f0335299c02581671d103e8ae9590868510ddba89bff0279ddea7f616",
+            "return_code": -6,
+            "elapsed_seconds": 5.23344874382019
+          },
+          "log": {
+            "path": "build/nvvm-rhi-data-families/rhi-2.log",
+            "sha256": "837d13fe2354d0119b56315908f680334b350dd5041ee350809375e177f2e324"
+          },
+          "detail": "O0 singleton vectors createdaftervectorpass, current-query result wrapperexpectedVoid, newattribute fixturepipelineonly2words; finalabortleftsphere/LSSunrun."
+        },
+        {
+          "attempt": {
+            "path": "build/nvvm-rhi-data-families/nvrtc-final.json",
+            "sha256": "9be2e062fa355420247966d361bd80b7f3deba30baf0e2d20e09840acdeb9cf3",
+            "return_code": 1,
+            "elapsed_seconds": 7.589033603668213
+          },
+          "log": {
+            "path": "build/nvvm-rhi-data-families/nvrtc-final.log",
+            "sha256": "a34b934d28acbc386e438c3ce11a6b6a6cf3c3db7aa76bfeeb39533fe8790f60"
+          },
+          "detail": "Two intentionalcomparisonboundaries: singletonmatrixE39999 andsizeof-basedsavedattributehelper; exactindependentNVVMoraclesunchanged."
+        }
       ]
     }
   }

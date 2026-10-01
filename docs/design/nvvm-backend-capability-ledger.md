@@ -90,8 +90,9 @@ Each of six cases checks four hits, four misses and all 34 output words, includi
 Both triangle attributes are consumed with unequal values (.125 and .25); Float4 lanes use independent
 exact IEEE bit expectations. The existing render-test scene provides real acceleration structures.
 
-Type admission is limited to padding-free Int32/UInt32/Float32 scalar/vector/record/fixed-array
-payloads of 1..32 words. The sibling RHI flat and nested array tests add runtime qualification for
+Type admission includes Int32/UInt32/Float32 scalar/vector/matrix/record/fixed-array
+payloads of 1..32 physical words, including padding. CUDA payload matrices store logical rows
+independently of buffer annotations; singleton rows/columns use canonical scalar legalization. The sibling RHI flat and nested array tests add runtime qualification for
 Float32[12] and nested records totaling exactly 32 words (Float2 arrays, signed and unsigned arrays).
 Both execute caller/AnyHit/ClosestHit/miss at NVVM O0/O3: 293 assertions pass, with all 26/66 output
 words and guards checked. A prior-compiler NVRTC control passes the same oracle. Stateful AnyHit
@@ -104,9 +105,21 @@ aggregate admission. Provider tests cover 1/4/32 live words, exact SDK adaptatio
 without mutation. Preflight enforces stages and rejects missing optional trace support before
 module creation. Static tests retain SBT layout/load and role/cache boundaries.
 
+The sibling RHI layout and singleton-matrix fixtures execute padded record arrays and row/column
+annotations through caller/AnyHit/ClosestHit/miss at O0/O3. Padded procedural attributes qualify
+all eight dense words in a 48-byte record through ReportHit, saved GetAttributes and Invoke.
+Current sphere/LSS data and predicates plus cluster ID execute in ClosestHit; AnyHit admission
+has static coverage. Recursive conventional pointer records/arrays retain checked storage roles.
+Unused RO/RW typed-buffer bindings preserve eight-byte slots and neighboring uniforms, including
+null bindings; this is not typed-buffer access support.
+NVRTC passes the padded-layout oracle but rejects singleton matrices and its sizeof-based saved
+attribute helper rejects the 48-byte record. These are recorded comparison differences, with the
+independent NVVM oracle unchanged. [Focused evidence](../../issue-nvvm-backend/focused-evidence.json)
+and the [RHI manifest](../../issue-nvvm-backend/rhi-cuda-status.json) own exact outcomes.
+
 The original raygen/triangle fixtures target SM80 with CUDA12.9/OptiX SDK9 on the recorded
-L4/595.71.05 host; sibling RHI targets follow the CUDA device. Pointer payloads, matrices,
-explicitly strided/unsized arrays, padded/subword payloads, callables and recursive
+L4/595.71.05 host; sibling RHI targets follow the CUDA device. Pointer payloads,
+explicitly strided/unsized arrays, subword payloads, callables and recursive
 callback tracing remain outside this trace contract. Typed procedural ReportIntersection now admits
 zero through eight attributes, including variadic ReportHitOptix, with separate family validation. The shared payload-termination producer repair is separately
 qualified by nine CUDA/NVRTC modes at O0/O3 (231 assertions), a focused IR boundary unit and

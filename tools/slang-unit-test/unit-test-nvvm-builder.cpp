@@ -14081,3 +14081,98 @@ SLANG_UNIT_TEST(nvvmIRBuilderCurrentTransformsKeepCheckedRows)
             control = text;
     }
 }
+
+// Incoming geometry queries must neither allocate nor restore a saved HitObject.
+SLANG_UNIT_TEST(nvvmIRBuilderCurrentHitQueriesKeepIncomingState)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    auto api = builder.getHitObjectOperationsAPI();
+    SLANG_CHECK_ABORT(api);
+    String control;
+    for (bool reject : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("incoming-hit"), scope.module)));
+        SlangNVVMTypeHandle voidType = nullptr, functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, nullptr, 0, functionType)));
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("main"),
+            function)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        for (uint32_t query : {16u, 17u, 18u, 21u, 22u})
+        {
+            for (uint32_t index = 0; index < (query == 18 ? 2u : 1u); ++index)
+            {
+                SlangNVVMHitObjectOperationDesc desc =
+                    {SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY, query, index, 0};
+                SLANG_CHECK(builder.supportsHitObjectOperation(desc));
+                if (reject)
+                {
+                    auto invalid = desc;
+                    invalid.payloadCount = 1;
+                    SLANG_CHECK(!builder.supportsHitObjectOperation(invalid));
+                    SlangNVVMValueHandle result = function;
+                    SLANG_CHECK(SLANG_FAILED(
+                        api->emitOperation(scope.module, &invalid, nullptr, 0, &result)));
+                    SLANG_CHECK(!result);
+                    invalid = desc;
+                    invalid.index = query == 18 ? 2 : 1;
+                    SLANG_CHECK(!builder.supportsHitObjectOperation(invalid));
+                    result = function;
+                    SLANG_CHECK(SLANG_FAILED(
+                        api->emitOperation(scope.module, &invalid, nullptr, 0, &result)));
+                    SLANG_CHECK(!result);
+                    result = function;
+                    SLANG_CHECK(SLANG_FAILED(
+                        api->emitOperation(scope.module, &desc, &function, 1, &result)));
+                    SLANG_CHECK(!result);
+                }
+                SlangNVVMValueHandle result = nullptr;
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    builder.emitHitObjectOperation(scope.module, desc, nullptr, 0, result)));
+                SLANG_CHECK(result);
+            }
+        }
+        for (uint32_t query : {0u, 1u, 15u, 19u, 20u, 23u, 100u})
+        {
+            SlangNVVMHitObjectOperationDesc desc =
+                {SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY, query, 0, 0};
+            SLANG_CHECK(!builder.supportsHitObjectOperation(desc));
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        ComPtr<ISlangBlob> blob;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.serializeModule(scope.module, SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY, blob)));
+        auto text = _getBlobText(blob);
+        for (auto symbol :
+             {"_optix_get_cluster_id",
+              "_optix_get_sphere_data_current_hit",
+              "_optix_get_linear_curve_vertex_data_current_hit",
+              "_optix_get_hit_kind",
+              "_optix_get_primitive_type_from_hit_kind"})
+            SLANG_CHECK(text.contains(symbol));
+        SLANG_CHECK(!text.contains("restore"));
+        SLANG_CHECK(!text.contains("slang.optix9.hit.object"));
+        if (reject)
+        {
+            SLANG_CHECK(text == control);
+        }
+        else
+        {
+            control = text;
+        }
+    }
+}

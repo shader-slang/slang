@@ -313,6 +313,22 @@ through caller, AnyHit, ClosestHit and miss, including complete output buffers a
 both names with the same compiler/device options. Their local geometry prevents duplicate AnyHit
 invocations; they do not require matrix queries or a full-suite run.
 
+Use `ray-tracing-array-payload-layout.cuda` and
+`ray-tracing-array-payload-singleton-matrices.cuda` for padded records and row/column matrix
+annotations, including singleton dimensions. Both execute O0/O3 with the same independent stage
+arithmetic and guards. `ray-tracing-hitobject-padded-attributes.cuda` reports and observes eight
+dense attributes from a 48-byte record at O0/O3; its pipeline explicitly reserves 32 attribute bytes.
+NVRTC rejects singleton matrices and the sizeof-based saved-attribute helper; retain those
+comparison outcomes instead of weakening the NVVM oracle.
+
+`bind-pointers-nested-array-copy.cuda` selects between distinct pointer pairs and checks both
+entire destinations, including untouched lanes. `typed-buffer-binding-neighbors.cuda` binds guard
+uniforms before null/non-null RO/RW typed views and checks that binding does not overwrite adjacent
+fields. It qualifies binding storage only. Pair these with the original pointer/null-view cases
+when changing conventional global storage. Current sphere/LSS and cluster queries use the original
+`ray-tracing-sphere-intrinsics.cuda`, `ray-tracing-lss-intrinsics.cuda` and
+`ray-tracing-cluster-tracing.cuda` oracles.
+
 For numeric/resource entry transport, select `numeric-entry-abi.cuda`,
 `resource-parameter-abi.cuda` and `surface-dimensions.cuda`. Each runs O0/O3 internally. The first
 checks all 48 scalar/vector argument shapes, CUDA member offsets, adjacent tails and exact lane

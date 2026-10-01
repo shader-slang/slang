@@ -1111,7 +1111,7 @@ protected:
 // turn our attention to the target-specific subtypes that handle
 // translation of "leaf" varying parameters.
 
-UInt getNVVMOptixPayloadRegisterCount(IRType* type)
+static UInt _getNVVMOptixRegisterCount(IRType* type, bool denseAttributes)
 {
     UInt count = 0;
     if (type->getOp() == kIROp_IntType || type->getOp() == kIROp_UIntType ||
@@ -1121,19 +1121,32 @@ UInt getNVVMOptixPayloadRegisterCount(IRType* type)
     {
         auto lanes = as<IRIntLit>(vectorType->getElementCount());
         if (!lanes || lanes->getValue() < 2 || lanes->getValue() > 4 ||
-            getNVVMOptixPayloadRegisterCount(vectorType->getElementType()) != 1)
+            _getNVVMOptixRegisterCount(vectorType->getElementType(), denseAttributes) != 1)
             return 0;
         count = UInt(lanes->getValue());
     }
+    else if (auto matrixType = as<IRMatrixType>(type))
+    {
+        auto rows = as<IRIntLit>(matrixType->getRowCount());
+        auto columns = as<IRIntLit>(matrixType->getColumnCount());
+        auto layout = as<IRIntLit>(matrixType->getLayout());
+        if (!rows || !columns || !layout || rows->getValue() < 1 || rows->getValue() > 4 ||
+            columns->getValue() < 1 || columns->getValue() > 4 ||
+            (layout->getValue() != SLANG_MATRIX_LAYOUT_ROW_MAJOR &&
+             layout->getValue() != SLANG_MATRIX_LAYOUT_COLUMN_MAJOR) ||
+            _getNVVMOptixRegisterCount(matrixType->getElementType(), denseAttributes) != 1)
+            return 0;
+        count = UInt(rows->getValue() * columns->getValue());
+    }
     else if (auto arrayType = as<IRArrayType>(type))
     {
-        // The shared payload traversal visits elements consecutively. Natural CUDA layout
-        // and the recursive size check below prove dense packing, but do not interpret an
-        // explicit array stride, even when it happens to equal the natural stride.
+        // The payload traversal uses the canonical CUDA element extent. Explicit strides
+        // remain outside this ABI, even when they happen to equal the natural stride.
         auto elements = as<IRIntLit>(arrayType->getElementCount());
         if (arrayType->getArrayStride() || !elements || elements->getValue() <= 0)
             return 0;
-        UInt elementWords = getNVVMOptixPayloadRegisterCount(arrayType->getElementType());
+        UInt elementWords =
+            _getNVVMOptixRegisterCount(arrayType->getElementType(), denseAttributes);
         if (!elementWords || elements->getValue() > IRIntegerValue(32 / elementWords))
             return 0;
         count = UInt(elements->getValue()) * elementWords;
@@ -1142,7 +1155,7 @@ UInt getNVVMOptixPayloadRegisterCount(IRType* type)
     {
         for (auto field : structType->getFields())
         {
-            UInt fieldCount = getNVVMOptixPayloadRegisterCount(field->getFieldType());
+            UInt fieldCount = _getNVVMOptixRegisterCount(field->getFieldType(), denseAttributes);
             if (!fieldCount || count + fieldCount > 32)
                 return 0;
             count += fieldCount;
@@ -1150,13 +1163,30 @@ UInt getNVVMOptixPayloadRegisterCount(IRType* type)
     }
     if (!count || count > 32)
         return 0;
-    // Shared CUDA layout includes internal and tail padding. Equality with the sum of
-    // positive-sized leaves proves that neither would need an uninitialized register.
+    if (denseAttributes)
+        return count;
+    // Register count includes every physical word, including internal and tail padding.
+    // Callers initialize all words before filling live fields; callbacks skip padding.
     IRSizeAndAlignment layout;
-    if (SLANG_FAILED(getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &layout)) ||
-        layout.size != count * 4)
+    if (SLANG_FAILED(
+            getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDAPayload(), type, &layout)) ||
+        layout.size < IRIntegerValue(count * 4) || layout.size > 128 || layout.size % 4)
         return 0;
-    return count;
+    return UInt(layout.size / 4);
+}
+
+UInt getNVVMOptixPayloadRegisterCount(IRType* type)
+{
+    return _getNVVMOptixRegisterCount(type, false);
+}
+
+bool getNVVMOptixAttributeRegisterCount(IRType* type, UInt& outCount)
+{
+    outCount = _getNVVMOptixRegisterCount(type, true);
+    if (outCount)
+        return outCount <= 8;
+    auto record = as<IRStructType>(type);
+    return record && !(record->getFields().begin() != record->getFields().end());
 }
 
 bool getNVVMOptixHitObjectPayloadRegisterCount(IRType* type, UInt& outCount)
@@ -1283,7 +1313,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     }
 
     // Get C++ size and alignment of a type using CUDA layout rules.
-    // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
+    // Uses IRTypeLayoutRules::getCUDAPayload() which extends C layout with CUDA-specific
     // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
     bool getTypeCppSizeAndAlignment(
         IRType* type,
@@ -1296,7 +1326,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
         IRSizeAndAlignment sizeAndAlign;
         Result result =
-            getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &sizeAndAlign);
+            getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDAPayload(), type, &sizeAndAlign);
         if (SLANG_FAILED(result))
             return false;
 
@@ -1338,6 +1368,26 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return regCount;
     }
 
+    // Maps a logical matrix element to the physical CUDA payload word location. The matrix
+    // value ABI stores rows; caller packing and callback unpacking use this same offset.
+    int getPayloadMatrixElementOffset(
+        IRMatrixType* type,
+        IRIntegerValue row,
+        IRIntegerValue column,
+        IRBuilder* builder)
+    {
+        auto vector = builder->getVectorType(type->getElementType(), type->getColumnCount());
+        IRSizeAndAlignment vectorLayout;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+            nullptr,
+            IRTypeLayoutRules::getCUDAPayload(),
+            vector,
+            &vectorLayout)));
+        return int(
+            row * vectorLayout.getStride() +
+            column * getTypeCppSize(type->getElementType(), builder));
+    }
+
     // Emit code to read a value from payload registers.
     // ioByteOffset is the current byte offset, aligned to the type's alignment before reading.
     // This must match C++ struct layout rules for compatibility with the prelude's
@@ -1349,6 +1399,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
         if (auto structType = as<IRStructType>(typeToFetch))
         {
+            const int startOffset = ioByteOffset;
             List<IRInst*> fieldVals;
             for (auto field : structType->getFields())
             {
@@ -1363,14 +1414,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     continue;
                 }
 
-                // Align to field alignment before reading
-                int fieldAlign = getTypeCppAlignment(fieldType, builder);
-                ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
+                IRIntegerValue fieldOffset = 0;
+                SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+                    getOffset(nullptr, IRTypeLayoutRules::getCUDAPayload(), field, &fieldOffset)));
+                ioByteOffset = startOffset + int(fieldOffset);
                 auto fieldVal = emitOptiXPayloadRead(ioByteOffset, fieldType, builder);
                 if (!fieldVal)
                     return nullptr;
                 fieldVals.add(fieldVal);
             }
+            ioByteOffset = startOffset + getTypeCppSize(typeToFetch, builder);
             return builder->emitMakeStruct(typeToFetch, fieldVals);
         }
         else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
@@ -1395,26 +1448,34 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         }
         else if (auto matType = as<IRMatrixType>(typeToFetch))
         {
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            if (rowCountInst)
+            const int startOffset = ioByteOffset;
+            const auto rows = getIntVal(matType->getRowCount());
+            const auto columns = getIntVal(matType->getColumnCount());
+            auto rowType =
+                builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+            List<IRInst*> rowVals;
+            for (IRIntegerValue row = 0; row < rows; ++row)
             {
-                auto rowType =
-                    builder->getVectorType(matType->getElementType(), matType->getColumnCount());
-                IRIntegerValue rowCount = rowCountInst->getValue();
-                List<IRInst*> rowVals;
-                for (IRIntegerValue ii = 0; ii < rowCount; ++ii)
+                List<IRInst*> elements;
+                for (IRIntegerValue column = 0; column < columns; ++column)
                 {
-                    auto rowVal = emitOptiXPayloadRead(ioByteOffset, rowType, builder);
-                    if (!rowVal)
+                    ioByteOffset =
+                        startOffset + getPayloadMatrixElementOffset(matType, row, column, builder);
+                    auto value =
+                        emitOptiXPayloadRead(ioByteOffset, matType->getElementType(), builder);
+                    if (!value)
                         return nullptr;
-                    rowVals.add(rowVal);
+                    elements.add(value);
                 }
-                return builder->emitIntrinsicInst(
-                    typeToFetch,
-                    kIROp_MakeMatrix,
-                    rowVals.getCount(),
-                    rowVals.getBuffer());
+                rowVals.add(
+                    builder->emitMakeVector(rowType, elements.getCount(), elements.getBuffer()));
             }
+            ioByteOffset = startOffset + getTypeCppSize(typeToFetch, builder);
+            return builder->emitIntrinsicInst(
+                typeToFetch,
+                kIROp_MakeMatrix,
+                rowVals.getCount(),
+                rowVals.getBuffer());
         }
         else if (auto vecType = as<IRVectorType>(typeToFetch))
         {
@@ -1582,6 +1643,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
         if (auto structType = as<IRStructType>(type))
         {
+            const int startOffset = ioByteOffset;
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
@@ -1590,13 +1652,15 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 if (as<IRVoidType>(fieldType))
                     continue;
 
-                // Align to field alignment before writing
-                int fieldAlign = getTypeCppAlignment(fieldType, builder);
-                ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
+                IRIntegerValue fieldOffset = 0;
+                SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+                    getOffset(nullptr, IRTypeLayoutRules::getCUDAPayload(), field, &fieldOffset)));
+                ioByteOffset = startOffset + int(fieldOffset);
                 auto fieldKey = field->getKey();
                 auto fieldVal = builder->emitFieldExtract(fieldType, value, fieldKey);
                 emitOptiXPayloadWrite(ioByteOffset, fieldVal, fieldType, builder);
             }
+            ioByteOffset = startOffset + getTypeCppSize(type, builder);
         }
         else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
@@ -1614,6 +1678,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         }
         else if (auto matType = as<IRMatrixType>(type))
         {
+            const int startOffset = ioByteOffset;
             auto rowCountInst = as<IRIntLit>(matType->getRowCount());
             auto colCountInst = as<IRIntLit>(matType->getColumnCount());
             if (rowCountInst && colCountInst)
@@ -1632,10 +1697,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         auto colIdx = builder->getIntValue(builder->getIntType(), col);
                         // Then extract the element from the row vector
                         auto elementVal = builder->emitElementExtract(elementType, rowVal, colIdx);
+                        ioByteOffset =
+                            startOffset + getPayloadMatrixElementOffset(matType, row, col, builder);
                         emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
                     }
                 }
             }
+            ioByteOffset = startOffset + getTypeCppSize(type, builder);
         }
         else if (auto vecType = as<IRVectorType>(type))
         {
@@ -2240,7 +2308,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             IRType* registerType = reinterpret ? builder->getUIntType() : typeToFetch;
             IRInst* args[] = {registerType, idxInst};
             IRInst* getAttr =
-                builder->emitIntrinsicInst(registerType, kIROp_GetOptiXHitAttribute, 2, args);
+                payloadReadArray
+                    ? builder->emitElementExtract(builder->getUIntType(), payloadReadArray, idxInst)
+                    : builder->emitIntrinsicInst(registerType, kIROp_GetOptiXHitAttribute, 2, args);
             return reinterpret ? builder->emitBitCast(typeToFetch, getAttr) : getAttr;
         }
 
@@ -2728,15 +2798,26 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 continue;
             auto type = report ? inst->getOperand(2)->getDataType() : inst->getDataType();
             UInt count = 0;
-            if (!getNVVMOptixHitObjectPayloadRegisterCount(type, count) ||
-                ((attributes || report) && count > 8))
+            if (!(attributes || report ? getNVVMOptixAttributeRegisterCount(type, count)
+                                       : getNVVMOptixHitObjectPayloadRegisterCount(type, count)))
                 continue;
             IRBuilder builder(module);
             builder.setInsertBefore(inst);
             IRBuilderSourceLocRAII sourceLoc(&builder, inst->sourceLoc);
             List<IRInst*> words;
             words.setCount(count);
-            if (!attributes && count)
+            for (auto& word : words)
+                word = builder.getIntValue(builder.getUIntType(), 0);
+            if (report && count)
+            {
+                List<IRInst*> leaves;
+                SLANG_RELEASE_ASSERT(
+                    flattenOptiXHitAttributes(inst->getOperand(2), type, &builder, leaves));
+                SLANG_RELEASE_ASSERT(leaves.getCount() == count);
+                for (UInt i = 0; i < count; ++i)
+                    words[i] = builder.emitBitCast(builder.getUIntType(), leaves[i]);
+            }
+            else if (!attributes && count)
             {
                 payloadWriteWords = &words;
                 int offset = 0;
@@ -2826,10 +2907,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 payloadReadArray = count ? operation : nullptr;
             }
             int offset = 0;
-            IRInst* value = count ? emitOptiXPayloadRead(offset, type, &builder)
+            IRInst* value = count ? (attributes ? emitOptiXAttributeFetch(offset, type, &builder)
+                                                : emitOptiXPayloadRead(offset, type, &builder))
                                   : builder.emitMakeStruct(type, 0, nullptr);
             payloadReadArray = nullptr;
-            SLANG_ASSERT(offset == int(count * 4));
+            SLANG_ASSERT(offset == int(attributes ? count : count * 4));
             inst->replaceUsesWith(value);
             inst->removeAndDeallocate();
         }
@@ -2857,6 +2939,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             IRBuilderSourceLocRAII sourceLoc(&builder, trace->sourceLoc);
             List<IRInst*> words;
             words.setCount(count);
+            for (auto& word : words)
+                word = builder.getIntValue(builder.getUIntType(), 0);
             payloadWriteWords = &words;
             int byteOffset = 0;
             emitOptiXPayloadWrite(byteOffset, trace->getOperand(10), payloadType, &builder);

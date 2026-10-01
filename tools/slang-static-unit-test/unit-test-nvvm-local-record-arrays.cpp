@@ -828,7 +828,7 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
             payloadValid = false;
             break;
         case Case::Padding:
-            payloadValid = false;
+            count = 8;
             break;
         case Case::FloatArray12:
         case Case::Float3Array:
@@ -914,8 +914,11 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
                     arrayCount,
                     stride);
                 payloadValid = testCase == Case::FloatArray12 || testCase == Case::Float3Array ||
-                               testCase == Case::NestedMixed32;
-                count = testCase == Case::NestedMixed32 ? 32 : 12;
+                               testCase == Case::NestedMixed32 ||
+                               testCase == Case::PaddedRecordArray;
+                count = testCase == Case::NestedMixed32       ? 32
+                        : testCase == Case::PaddedRecordArray ? 16
+                                                              : 12;
                 break;
             }
         default:
@@ -2740,4 +2743,141 @@ SLANG_UNIT_TEST(nvvmResourceEntryFormatsRequireDeclaredOwners)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
+}
+
+// Layout annotations affect buffers; CUDA payload values always contain logical rows.
+SLANG_UNIT_TEST(nvvmOptixPayloadAndAttributeLayoutsStayDistinct)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder builder(module);
+    builder.setInsertInto(module);
+    for (auto layout : {SLANG_MATRIX_LAYOUT_ROW_MAJOR, SLANG_MATRIX_LAYOUT_COLUMN_MAJOR})
+    {
+        auto matrix = builder.getMatrixType(
+            builder.getFloatType(),
+            builder.getIntValue(builder.getIntType(), 2),
+            builder.getIntValue(builder.getIntType(), 3),
+            builder.getIntValue(builder.getIntType(), layout));
+        auto record = builder.createStructType();
+        builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+        builder.createStructField(record, builder.createStructKey(), matrix);
+        SLANG_CHECK(getNVVMOptixPayloadRegisterCount(record) == 7);
+        UInt attributes = 0;
+        SLANG_CHECK(getNVVMOptixAttributeRegisterCount(record, attributes) && attributes == 7);
+    }
+    auto record = builder.createStructType();
+    builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+    builder.createStructField(
+        record,
+        builder.createStructKey(),
+        builder.getVectorType(builder.getFloatType(), 4));
+    UInt attributes = 0;
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(record) == 8);
+    SLANG_CHECK(getNVVMOptixAttributeRegisterCount(record, attributes) && attributes == 5);
+    auto array = builder.getArrayType(record, builder.getIntValue(builder.getIntType(), 4));
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(array) == 32);
+    SLANG_CHECK(!getNVVMOptixAttributeRegisterCount(array, attributes));
+    auto tooBig = builder.getArrayType(record, builder.getIntValue(builder.getIntType(), 5));
+    SLANG_CHECK(getNVVMOptixPayloadRegisterCount(tooBig) == 0);
+}
+
+SLANG_UNIT_TEST(nvvmTypedBufferBindingsStayStorageOnly)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder builder(module);
+    builder.setInsertInto(module);
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    ScopedNVVMBuilderModule scope;
+    scope.builder = &provider;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(provider.createModule(toSlice("typed-binding"), scope.module)));
+    NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+    SlangNVVMTypeHandle handleType = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getIntegerType(scope.module, 64, handleType)));
+    auto zero = builder.getIntValue(builder.getIntType(), 0);
+    auto one = builder.getIntValue(builder.getIntType(), 1);
+    for (bool writable : {false, true})
+        for (auto scalarOp : {kIROp_FloatType, kIROp_IntType, kIROp_UIntType})
+            for (int lanes = 1; lanes <= 4; ++lanes)
+            {
+                auto scalar = builder.getType(scalarOp);
+                IRType* element = lanes == 1 ? scalar : builder.getVectorType(scalar, lanes);
+                auto buffer = builder.getTextureType(
+                    element,
+                    builder.getType(kIROp_TextureShapeBufferType),
+                    zero,
+                    zero,
+                    zero,
+                    writable ? one : zero,
+                    zero,
+                    zero,
+                    zero);
+                auto info = classifyNVVMType(buffer);
+                SLANG_CHECK(info.supports(NVVMTypeUse::Storage));
+                SlangNVVMTypeHandle storage = nullptr;
+                SLANG_CHECK_ABORT(
+                    SLANG_SUCCEEDED(lowering.lowerType(buffer, NVVMTypeUse::Storage, storage)));
+                SLANG_CHECK(storage == handleType);
+
+                for (auto use :
+                     {NVVMTypeUse::Value,
+                      NVVMTypeUse::HelperValue,
+                      NVVMTypeUse::HelperParameter,
+                      NVVMTypeUse::HelperResult,
+                      NVVMTypeUse::EntryPointParameter,
+                      NVVMTypeUse::ParameterGroupStorage,
+                      NVVMTypeUse::StructuredBufferStorage})
+                    SLANG_CHECK(!info.supports(use));
+            }
+}
+
+SLANG_UNIT_TEST(nvvmCurrentHitQueriesKeepStageAndShapeBoundaries)
+{
+    for (auto stage :
+         {Stage::AnyHit,
+          Stage::ClosestHit,
+          Stage::Intersection,
+          Stage::RayGeneration,
+          Stage::Miss,
+          Stage::Compute})
+        for (uint32_t query : {16u, 17u, 18u, 21u, 22u})
+            for (int invalid = 0; invalid < 4; ++invalid)
+            {
+                NVVMStaticTestContext context(unitTestContext);
+                auto module = IRModule::create(context.env.getSessionImpl());
+                IRBuilder builder(module);
+                builder.setInsertInto(module);
+                auto entry = builder.createFunc();
+                entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+                builder.addEntryPointDecoration(
+                    entry,
+                    Profile(stage),
+                    toSlice("probe"),
+                    toSlice("test"));
+                builder.setInsertInto(entry);
+                builder.emitBlock();
+                IRType* result =
+                    query == 17 || query == 18
+                        ? static_cast<IRType*>(builder.getVectorType(builder.getFloatType(), 4))
+                        : builder.getUIntType();
+                if (invalid == 1)
+                    result = builder.getBoolType();
+                IRInst* args[] = {
+                    builder.getIntValue(builder.getUIntType(), query),
+                    invalid == 2
+                        ? builder.getPoison(builder.getUIntType())
+                        : builder.getIntValue(builder.getUIntType(), invalid == 3 ? 2 : 0)};
+                builder.emitIntrinsicInst(result, kIROp_OptixCurrentHitQuery, 2, args);
+                builder.emitReturn();
+                LinkedIR linked = {};
+                linked.module = module;
+                linked.entryPoints.add(entry);
+                NVVMOperationRequirements requirements;
+                bool valid = invalid == 0 && (stage == Stage::AnyHit || stage == Stage::ClosestHit);
+                auto status = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+                SLANG_CHECK(valid == SLANG_SUCCEEDED(status));
+            }
 }

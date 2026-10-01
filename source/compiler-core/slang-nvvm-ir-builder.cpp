@@ -587,6 +587,7 @@ SlangResult NVVMIRBuilder::emitHitObjectOperation(
     SLANG_RETURN_ON_FAIL(
         m_hitObjectOperations.emitOperation(module, &operation, operands, operandCount, &outValue));
     const bool hasResult = operation.operation == SLANG_NVVM_HIT_OBJECT_OP_QUERY ||
+                           operation.operation == SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY ||
                            operation.operation == SLANG_NVVM_HIT_OBJECT_OP_LOAD_SBT_U32 ||
                            operation.operation == SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION ||
                            ((operation.operation == SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE ||

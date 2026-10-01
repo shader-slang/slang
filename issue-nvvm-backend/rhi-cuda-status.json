@@ -634,6 +634,209 @@
         "failed": 0
       },
       "scope": "Four current-ray matrix APIs. Authored/default options; separate nested motion gate supplies O0/O3 coverage. Not a full suite."
+    },
+    "data-rhi-1": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/rhi-1.json",
+        "sha256": "8cdd95beb420417b4e87d495884e91b7b81f8459820b7cbbc95197d3400fa6af",
+        "return_code": -6,
+        "elapsed_seconds": 1.8467283248901367
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/rhi-1.log",
+        "sha256": "e4549158534af7abe8655fc86d7c23b8cd76695bb5d734ca1c9f0a839fe42b21"
+      },
+      "compiler_selection": "nvvm",
+      "counts": {
+        "passed": 0,
+        "failed": 5,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 46,
+        "passed": 40,
+        "failed": 6
+      },
+      "identity": null,
+      "compiler_identity": null,
+      "scope": "Retained intermediate attempt; exact source snapshot not captured. Later acceptance uses final matching identity. rhi-1 after null-views is CUDA-context fallout; rhi-2 aborted before sphere/LSS execution."
+    },
+    "data-rhi-2": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/rhi-2.json",
+        "sha256": "e0f1e85f0335299c02581671d103e8ae9590868510ddba89bff0279ddea7f616",
+        "return_code": -6,
+        "elapsed_seconds": 5.23344874382019
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/rhi-2.log",
+        "sha256": "837d13fe2354d0119b56315908f680334b350dd5041ee350809375e177f2e324"
+      },
+      "compiler_selection": "nvvm",
+      "counts": {
+        "passed": 6,
+        "failed": 3,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 33341,
+        "passed": 33336,
+        "failed": 5
+      },
+      "identity": null,
+      "compiler_identity": null,
+      "scope": "Retained intermediate attempt; exact source snapshot not captured. Later acceptance uses final matching identity. rhi-1 after null-views is CUDA-context fallout; rhi-2 aborted before sphere/LSS execution."
+    },
+    "data-rhi-3": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/rhi-3.json",
+        "sha256": "720b262e419f5978f14d06d5761750194ef08fd76be80354f65ec8af53792206",
+        "return_code": 0,
+        "elapsed_seconds": 6.953686237335205
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/rhi-3.log",
+        "sha256": "2db6c22c4790c4f89b0fdd7c305b62602ca490f7661349a21a8cb7dc513368f3"
+      },
+      "compiler_selection": "nvvm",
+      "counts": {
+        "passed": 11,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 33542,
+        "passed": 33542,
+        "failed": 0
+      },
+      "identity": null,
+      "compiler_identity": {
+        "path": "build/nvvm-rhi-data-families/compiler-identity.json",
+        "sha256": "47e142ebe9745a0c673f69da2d06315adf4b290563aa6534e2d018fde54ae40f"
+      },
+      "scope": "Retained intermediate attempt; exact source snapshot not captured. Later acceptance uses final matching identity. rhi-1 after null-views is CUDA-context fallout; rhi-2 aborted before sphere/LSS execution."
+    },
+    "data-nvrtc": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/nvrtc.json",
+        "sha256": "7a5c8b95473dff69b275f9d179a9ed65f0cc57a303c0608b34e4b44e6386c006",
+        "return_code": 1,
+        "elapsed_seconds": 8.014258861541748
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/nvrtc.log",
+        "sha256": "dd1717706cd52d8f522ab56e2ef4873efd59391f983377459d7cf55e2f31129c"
+      },
+      "compiler_selection": "nvrtc",
+      "counts": {
+        "passed": 9,
+        "failed": 2,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 33421,
+        "passed": 33417,
+        "failed": 4
+      },
+      "identity": null,
+      "compiler_identity": {
+        "path": "build/nvvm-rhi-data-families/compiler-identity.json",
+        "sha256": "47e142ebe9745a0c673f69da2d06315adf4b290563aa6534e2d018fde54ae40f"
+      },
+      "scope": "Retained intermediate attempt; exact source snapshot not captured. Later acceptance uses final matching identity. rhi-1 after null-views is CUDA-context fallout; rhi-2 aborted before sphere/LSS execution."
+    },
+    "data-rhi-strengthened": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/rhi-strengthened.json",
+        "sha256": "340a5fe9c30c4827c101b119ea20360111ffe389ef7d9c9fd7a7cfdea1bf1c11",
+        "return_code": 0,
+        "elapsed_seconds": 1.6110374927520752
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/rhi-strengthened.log",
+        "sha256": "f610acc9f112e4ed3486eecf123ef96b6aeb3de167274344819f858f8f21ee44"
+      },
+      "compiler_selection": "nvvm",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 32827,
+        "passed": 32827,
+        "failed": 0
+      },
+      "identity": null,
+      "compiler_identity": {
+        "path": "build/nvvm-rhi-data-families/compiler-identity.json",
+        "sha256": "47e142ebe9745a0c673f69da2d06315adf4b290563aa6534e2d018fde54ae40f"
+      },
+      "scope": "Retained intermediate attempt; exact source snapshot not captured. Later acceptance uses final matching identity. rhi-1 after null-views is CUDA-context fallout; rhi-2 aborted before sphere/LSS execution."
+    },
+    "data-rhi-final": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/rhi-final.json",
+        "sha256": "436789013b2ffc35155fe44a58338d1f077f063706600122b095051fa364dd32",
+        "return_code": 0,
+        "elapsed_seconds": 6.353156089782715
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/rhi-final.log",
+        "sha256": "f78ffe2d7d8c9fa2e64a279d6955612c3657108735504f0d211f17e62f6ff1e3"
+      },
+      "compiler_selection": "nvvm",
+      "counts": {
+        "passed": 12,
+        "failed": 0,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 49976,
+        "passed": 49976,
+        "failed": 0
+      },
+      "identity": {
+        "path": "build/nvvm-rhi-data-families/rhi-identity.json",
+        "sha256": "fdb089fde573cb3da51049b2f770ce3daee6586439eaa28274ef8ea87e6343cf"
+      },
+      "compiler_identity": {
+        "path": "build/nvvm-rhi-data-families/compiler-identity.json",
+        "sha256": "47e142ebe9745a0c673f69da2d06315adf4b290563aa6534e2d018fde54ae40f"
+      },
+      "scope": "Focused final matching source/runtime identity."
+    },
+    "data-nvrtc-final": {
+      "gate": {
+        "path": "build/nvvm-rhi-data-families/nvrtc-final.json",
+        "sha256": "9be2e062fa355420247966d361bd80b7f3deba30baf0e2d20e09840acdeb9cf3",
+        "return_code": 1,
+        "elapsed_seconds": 7.589033603668213
+      },
+      "log": {
+        "path": "build/nvvm-rhi-data-families/nvrtc-final.log",
+        "sha256": "a34b934d28acbc386e438c3ce11a6b6a6cf3c3db7aa76bfeeb39533fe8790f60"
+      },
+      "compiler_selection": "nvrtc",
+      "counts": {
+        "passed": 10,
+        "failed": 2,
+        "skipped": 0
+      },
+      "assertions": {
+        "total": 49855,
+        "passed": 49851,
+        "failed": 4
+      },
+      "identity": {
+        "path": "build/nvvm-rhi-data-families/rhi-identity.json",
+        "sha256": "fdb089fde573cb3da51049b2f770ce3daee6586439eaa28274ef8ea87e6343cf"
+      },
+      "compiler_identity": {
+        "path": "build/nvvm-rhi-data-families/compiler-identity.json",
+        "sha256": "47e142ebe9745a0c673f69da2d06315adf4b290563aa6534e2d018fde54ae40f"
+      },
+      "scope": "Focused final matching source/runtime identity."
     }
   },
   "reconciliation": {
@@ -693,13 +896,14 @@
     {
       "id": "nested_pointer_record_field",
       "title": "Nested pointer-bearing record access",
-      "current_unresolved_count": 1,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 1,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Checked pointer-bearing record field address and storage roles.",
       "source_candidates": ["../slang-rhi/tests/test-bind-pointers.cpp"],
       "registrations": ["bind-pointers-struct-float-copy.cuda"],
-      "initial_unresolved_count": 1
+      "initial_unresolved_count": 1,
+      "resolution_run": "data-rhi-final"
     },
     {
       "id": "combined_sampler_values",
@@ -776,13 +980,14 @@
     {
       "id": "typed_buffer_global",
       "title": "Typed buffer global resource",
-      "current_unresolved_count": 1,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 1,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Conventional global Buffer resource admission and null-view semantics.",
       "source_candidates": ["../slang-rhi/tests/test-null-views.cpp"],
       "registrations": ["null-views.cuda"],
-      "initial_unresolved_count": 1
+      "initial_unresolved_count": 1,
+      "resolution_run": "data-rhi-final"
     },
     {
       "id": "hitobject_representation",
@@ -833,13 +1038,14 @@
     {
       "id": "cluster_query",
       "title": "OptiX cluster identity",
-      "current_unresolved_count": 1,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 1,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Typed SDK optixGetClusterId query and owning stages.",
       "source_candidates": ["../slang-rhi/tests/test-ray-tracing-clusters.cpp"],
       "registrations": ["ray-tracing-cluster-tracing.cuda"],
-      "initial_unresolved_count": 1
+      "initial_unresolved_count": 1,
+      "resolution_run": "data-rhi-final"
     },
     {
       "id": "callable_abi",
@@ -857,7 +1063,7 @@
     {
       "id": "trace_payload_boundary",
       "title": "Native primitive trace payloads",
-      "current_unresolved_count": 2,
+      "current_unresolved_count": 0,
       "nvrtc_controls_pass": 2,
       "basis": "first observed NVVM compiler rejection; candidate implementation family, not a claim of complete root-cause analysis",
       "scope": "Inspect exact sphere/LSS payload shape rejected as optixTraceRay before selecting the required whole payload family.",
@@ -869,7 +1075,8 @@
         "ray-tracing-lss-intrinsics.cuda",
         "ray-tracing-sphere-intrinsics.cuda"
       ],
-      "initial_unresolved_count": 2
+      "initial_unresolved_count": 2,
+      "resolution_run": "data-rhi-final"
     },
     {
       "id": "intersection_stage",
@@ -1132,7 +1339,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -1148,6 +1355,54 @@
           "status": "passed",
           "terminal_line": 10,
           "detail": "0.08s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 13,
+          "detail": "0.29s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.09s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.01s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.07s",
           "failed_assertions": 0
         }
       ],
@@ -1169,6 +1424,44 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 8,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'struct'",
+              "context": [
+                "",
+                "",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-bind-pointers.cpp:198: FATAL ERROR: REQUIRE( !((device->createComputePipeline(pipelineDesc, pipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+                "",
+                "bind-pointers-struct-float-copy.cuda                            FAILED (0.29s)",
+                "null-views.cuda "
+              ]
+            },
+            {
+              "line": 11,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-bind-pointers.cpp:198: FATAL ERROR: REQUIRE( !((device->createComputePipeline(pipelineDesc, pipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "",
+                "bind-pointers-struct-float-copy.cuda                            FAILED (0.29s)",
+                "null-views.cuda ",
+                "===============================================================================",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-null-views.cpp:9:",
+                "TEST CASE:  null-views.cuda"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
       ]
     },
@@ -5733,7 +6026,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -5749,6 +6042,54 @@
           "status": "passed",
           "terminal_line": 231,
           "detail": "0.10s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 27,
+          "detail": "0.46s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.04s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.03s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.09s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.03s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 5,
+          "detail": "0.09s",
           "failed_assertions": 0
         }
       ],
@@ -5770,6 +6111,32 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 21,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Driver] cuStreamSynchronize(m_stream) call failed",
+              "context": [
+                "  result: 700 (CUDA_ERROR_ILLEGAL_ADDRESS)",
+                "  detail: an illegal memory access was encountered",
+                "  location: /home/skallweit/codex/agent-sandbox/slang-rhi/src/cuda/cuda-command.cpp:1321",
+                "",
+                "",
+                "null-views.cuda                                                 FAILED (0.46s)"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
       ]
     },
@@ -5989,6 +6356,46 @@
           "terminal_line": 247,
           "detail": "1.84s",
           "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "0.79s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "0.76s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "1.42s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "0.75s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 6,
+          "detail": "1.39s",
+          "failed_assertions": 0
         }
       ]
     },
@@ -6019,6 +6426,46 @@
           "status": "passed",
           "terminal_line": 248,
           "detail": "2.30s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 8,
+          "detail": "0.93s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 8,
+          "detail": "0.82s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 8,
+          "detail": "1.45s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 8,
+          "detail": "0.79s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 8,
+          "detail": "1.37s",
           "failed_assertions": 0
         }
       ]
@@ -6236,7 +6683,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -6252,6 +6699,54 @@
           "status": "passed",
           "terminal_line": 345,
           "detail": "0.34s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 39,
+          "detail": "0.00s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 118,
+          "detail": "0.05s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 101,
+          "detail": "0.08s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 130,
+          "detail": "0.33s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 101,
+          "detail": "0.06s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 130,
+          "detail": "0.31s",
           "failed_assertions": 0
         }
       ],
@@ -6273,6 +6768,64 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 33,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Driver] cuMemcpy(buffer->getDeviceAddress(), (CUdeviceptr)initData, desc.size) call failed",
+              "context": [
+                "  result: 700 (CUDA_ERROR_ILLEGAL_ADDRESS)",
+                "  detail: an illegal memory access was encountered",
+                "  location: /home/skallweit/codex/agent-sandbox/slang-rhi/src/cuda/cuda-buffer.cpp:94",
+                "",
+                "",
+                "ray-tracing-cluster-tracing.cuda                                FAILED (0.00s)"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 113,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52018]: LLVM 14 NVVM IR builder operation 'OptiX HitObject operation' failed with result -2147467259",
+              "context": [
+                "",
+                "",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-clusters.cpp:659: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtp, pipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+                "",
+                "ray-tracing-cluster-tracing.cuda                                FAILED (0.05s)",
+                "ray-tracing-hitobject-padded-attributes.cuda "
+              ]
+            },
+            {
+              "line": 116,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-clusters.cpp:659: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtp, pipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "",
+                "ray-tracing-cluster-tracing.cuda                                FAILED (0.05s)",
+                "ray-tracing-hitobject-padded-attributes.cuda ",
+                "===============================================================================",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-hitobject-intrinsics.cpp:733:",
+                "TEST CASE:  ray-tracing-hitobject-padded-attributes.cuda"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
       ]
     },
@@ -8605,7 +9158,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -8621,6 +9174,46 @@
           "status": "passed",
           "terminal_line": 411,
           "detail": "0.33s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 51,
+          "detail": "0.00s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 103,
+          "detail": "0.11s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 147,
+          "detail": "0.32s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 103,
+          "detail": "0.08s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 147,
+          "detail": "0.29s",
           "failed_assertions": 0
         }
       ],
@@ -8642,6 +9235,32 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 45,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Driver] cuMemcpy(buffer->getDeviceAddress(), (CUdeviceptr)initData, desc.size) call failed",
+              "context": [
+                "  result: 700 (CUDA_ERROR_ILLEGAL_ADDRESS)",
+                "  detail: an illegal memory access was encountered",
+                "  location: /home/skallweit/codex/agent-sandbox/slang-rhi/src/cuda/cuda-buffer.cpp:94",
+                "",
+                "",
+                "ray-tracing-lss-intrinsics.cuda                                 FAILED (0.00s)"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
       ]
     },
@@ -9315,7 +9934,7 @@
         }
       ],
       "current_status": {
-        "nvvm": "failed",
+        "nvvm": "passed",
         "nvrtc": "passed"
       },
       "history": [
@@ -9331,6 +9950,46 @@
           "status": "passed",
           "terminal_line": 443,
           "detail": "0.36s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 63,
+          "detail": "0.00s",
+          "failed_assertions": 1
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 104,
+          "detail": "0.07s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 148,
+          "detail": "0.31s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 104,
+          "detail": "0.05s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 148,
+          "detail": "0.28s",
           "failed_assertions": 0
         }
       ],
@@ -9352,6 +10011,32 @@
             }
           ],
           "comparison": "Same registration passes NVRTC control; no NVVM resolution yet."
+        },
+        {
+          "run": "data-rhi-1",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 57,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Driver] cuMemcpy(buffer->getDeviceAddress(), (CUdeviceptr)initData, desc.size) call failed",
+              "context": [
+                "  result: 700 (CUDA_ERROR_ILLEGAL_ADDRESS)",
+                "  detail: an illegal memory access was encountered",
+                "  location: /home/skallweit/codex/agent-sandbox/slang-rhi/src/cuda/cuda-buffer.cpp:94",
+                "",
+                "",
+                "ray-tracing-sphere-intrinsics.cuda                              FAILED (0.00s)"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
         }
       ]
     },
@@ -13213,44 +13898,562 @@
         }
       ],
       "resolution": "Supported owned HitObject lifecycle/intersection prerequisite qualified on focused final evidence."
+    },
+    {
+      "id": "bind-pointers-nested-array-copy.cuda#occurrence-1",
+      "name": "bind-pointers-nested-array-copy.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-bind-pointers.cpp",
+          "line": 244
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.57s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.54s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.62s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-strengthened",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.53s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.54s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 3,
+          "detail": "0.60s",
+          "failed_assertions": 0
+        }
+      ],
+      "failure_history": [
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        }
+      ],
+      "qualification": "New independent family regression; actual selected outcomes and comparison differences are recorded below."
+    },
+    {
+      "id": "ray-tracing-array-payload-layout.cuda#occurrence-1",
+      "name": "ray-tracing-array-payload-layout.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-ray-tracing-array-payload.cpp",
+          "line": 198
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 7,
+          "detail": "0.96s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 7,
+          "detail": "0.82s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 7,
+          "detail": "1.52s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 7,
+          "detail": "0.81s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 7,
+          "detail": "1.37s",
+          "failed_assertions": 0
+        }
+      ],
+      "failure_history": [
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        }
+      ],
+      "qualification": "New independent family regression; actual selected outcomes and comparison differences are recorded below."
+    },
+    {
+      "id": "ray-tracing-array-payload-singleton-matrices.cuda#occurrence-1",
+      "name": "ray-tracing-array-payload-singleton-matrices.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-ray-tracing-array-payload.cpp",
+          "line": 203
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "failed"
+      },
+      "history": [
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 21,
+          "detail": "0.15s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 9,
+          "detail": "0.84s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "failed",
+          "terminal_line": 38,
+          "detail": "0.13s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 9,
+          "detail": "0.72s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "failed",
+          "terminal_line": 38,
+          "detail": "0.13s",
+          "failed_assertions": 2
+        }
+      ],
+      "failure_history": [
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 14,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E52017]: direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: BorrowInOutParam<SingletonPayload>'",
+              "context": [
+                "",
+                "  logged: optimization := 0",
+                "",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1133: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+                "  logged: optimization := 0",
+                ""
+              ]
+            },
+            {
+              "line": 18,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1133: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "  logged: optimization := 0",
+                "",
+                "ray-tracing-array-payload-singleton-matrices.cuda               FAILED (0.15s)",
+                "ray-tracing-cluster-tracing.cuda ",
+                "===============================================================================",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-clusters.cpp:787:"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 14,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E39999]: matrices with 1 column or row are not supported by the current code generation target",
+              "context": [
+                "   --> /home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-array-payload.slang:267:8",
+                "    |",
+                "267 | struct SingletonPayload",
+                "    |        ^^^^^^^^^^^^^^^^ matrices with 1 column or row are not supported by the current code generation target",
+                "----'",
+                "error[E39999]: matrices with 1 column or row are not supported by the current code generation target"
+              ]
+            },
+            {
+              "line": 35,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1134: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "  logged: optimization := 0",
+                "",
+                "ray-tracing-array-payload-singleton-matrices.cuda               FAILED (0.13s)",
+                "ray-tracing-cluster-tracing.cuda ",
+                "===============================================================================",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-clusters.cpp:787:"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 14,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] error[E39999]: matrices with 1 column or row are not supported by the current code generation target",
+              "context": [
+                "   --> /home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-array-payload.slang:267:8",
+                "    |",
+                "267 | struct SingletonPayload",
+                "    |        ^^^^^^^^^^^^^^^^ matrices with 1 column or row are not supported by the current code generation target",
+                "----'",
+                "error[E39999]: matrices with 1 column or row are not supported by the current code generation target"
+              ]
+            },
+            {
+              "line": 35,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1134: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "  logged: optimization := 0",
+                "",
+                "ray-tracing-array-payload-singleton-matrices.cuda               FAILED (0.13s)",
+                "ray-tracing-cluster-tracing.cuda ",
+                "===============================================================================",
+                "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-clusters.cpp:787:"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        }
+      ],
+      "qualification": "New independent family regression; actual selected outcomes and comparison differences are recorded below."
+    },
+    {
+      "id": "ray-tracing-hitobject-padded-attributes.cuda#occurrence-1",
+      "name": "ray-tracing-hitobject-padded-attributes.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-ray-tracing-hitobject-intrinsics.cpp",
+          "line": 744
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "failed"
+      },
+      "history": [
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "failed",
+          "terminal_line": 143,
+          "detail": "0.17s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "data-rhi-3",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 102,
+          "detail": "1.10s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "failed",
+          "terminal_line": 146,
+          "detail": "0.22s",
+          "failed_assertions": 2
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 102,
+          "detail": "0.83s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "failed",
+          "terminal_line": 146,
+          "detail": "0.22s",
+          "failed_assertions": 2
+        }
+      ],
+      "failure_history": [
+        {
+          "run": "data-rhi-2",
+          "compiler_selection": "nvvm",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 124,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Driver] [COMPILER]: COMPILE ERROR: ",
+              "context": [
+                "Error: Requested 8 attribute values in optixReportIntersection but only 2 are configured in the pipeline: No source location available. The input PTX may not contain debug information (nvcc option: -lineinfo), OptixModuleCompileOptions::debugLevel set to OPTIX_COMPILE_DEBUG_LEVEL_NONE, or no useful information is present for the current block.",
+                "Info: Module Statistics",
+                "\tpayload values        :          0",
+                "\tattribute values      :          8",
+                "Info: Properties for entry function \"__intersection__intersectionPaddedAttributes\"",
+                "\tsemantic type                :           INTERSECTION"
+              ]
+            },
+            {
+              "line": 141,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-hitobject-intrinsics.cpp:733: FATAL ERROR: test case CRASHED: SIGABRT - Abort (abnormal termination) signal",
+              "context": [
+                "",
+                "ray-tracing-hitobject-padded-attributes.cuda                    FAILED (0.17s)",
+                "-------------------------------------------------------------------------------",
+                "Total time: 3.67s",
+                "===============================================================================",
+                "[doctest] test cases:     9 |     6 passed | 3 failed | 941 skipped"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 136,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] nvrtc 12.9: default_program(5881): error : static assertion failed with \"Attribute type is too large\"",
+              "context": [
+                "nvrtc 12.9: note :       static_assert(numInts <= 8, \"Attribute type is too large\");",
+                "nvrtc 12.9: note :       ^",
+                "nvrtc 12.9: note :           detected during instantiation of \"T optixHitObjectGetAttribute<T>(OptixTraversableHandle *) [with T=PaddedAttributes_0]\" at line 676 of /home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-hitobject-intrinsics.slang",
+                "",
+                "  logged: optimization := 0",
+                ""
+              ]
+            },
+            {
+              "line": 143,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1134: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "  logged: optimization := 0",
+                "",
+                "ray-tracing-hitobject-padded-attributes.cuda                    FAILED (0.22s)",
+                "ray-tracing-lss-intrinsics.cuda                                 PASSED (0.32s)",
+                "ray-tracing-sphere-intrinsics.cuda                              PASSED (0.31s)",
+                "-------------------------------------------------------------------------------"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "unresolved-at-this-run",
+          "assertion_records": [
+            {
+              "line": 136,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/testing.cpp:289: FATAL ERROR: [Error] [Slang] nvrtc 12.9: default_program(5881): error : static assertion failed with \"Attribute type is too large\"",
+              "context": [
+                "nvrtc 12.9: note :       static_assert(numInts <= 8, \"Attribute type is too large\");",
+                "nvrtc 12.9: note :       ^",
+                "nvrtc 12.9: note :           detected during instantiation of \"T optixHitObjectGetAttribute<T>(OptixTraversableHandle *) [with T=PaddedAttributes_0]\" at line 676 of /home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-hitobject-intrinsics.slang",
+                "",
+                "  logged: optimization := 0",
+                ""
+              ]
+            },
+            {
+              "line": 143,
+              "text": "/home/skallweit/codex/agent-sandbox/slang-rhi/tests/test-ray-tracing-common.h:1134: FATAL ERROR: REQUIRE( !((device->createRayTracingPipeline(rtpDesc, raytracingPipeline.writeRef())) < 0) ) THREW exception: \"unknown exception\"",
+              "context": [
+                "  logged: optimization := 0",
+                "",
+                "ray-tracing-hitobject-padded-attributes.cuda                    FAILED (0.22s)",
+                "ray-tracing-lss-intrinsics.cuda                                 PASSED (0.29s)",
+                "ray-tracing-sphere-intrinsics.cuda                              PASSED (0.28s)",
+                "typed-buffer-binding-neighbors.cuda                             PASSED (0.08s)"
+              ]
+            }
+          ],
+          "details": "Exact attempt retained; rhi-1 cluster/LSS/sphere are poisoned-context fallout. rhi-2 abort leaves subsequent cases unrun."
+        }
+      ],
+      "qualification": "New independent family regression; actual selected outcomes and comparison differences are recorded below."
+    },
+    {
+      "id": "typed-buffer-binding-neighbors.cuda#occurrence-1",
+      "name": "typed-buffer-binding-neighbors.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-null-views.cpp",
+          "line": 166
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "data-rhi-strengthened",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 4,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "passed",
+          "terminal_line": 105,
+          "detail": "0.02s",
+          "failed_assertions": 0
+        },
+        {
+          "run": "data-nvrtc-final",
+          "compiler_selection": "nvrtc",
+          "status": "passed",
+          "terminal_line": 149,
+          "detail": "0.08s",
+          "failed_assertions": 0
+        }
+      ],
+      "failure_history": [
+        {
+          "run": "data-rhi-final",
+          "compiler_selection": "nvvm",
+          "status": "resolved-at-this-run",
+          "failed_assertions": 0
+        }
+      ],
+      "qualification": "New independent family regression; actual selected outcomes and comparison differences are recorded below."
     }
   ],
   "current_known_outcomes": {
-    "registration_count": 273,
-    "unique_name_count": 272,
-    "scope": "Initial full inventory plus four focused fixtures. Unselected cases retain original identities; not another full-suite run.",
+    "registration_count": 278,
+    "unique_name_count": 277,
+    "scope": "Original full inventory plus nine focused fixtures. Unselected registrations retain their own tested identity; not another full-suite run.",
     "by_compiler": {
       "nvvm": {
-        "passed": 256,
-        "failed": 7,
+        "passed": 266,
+        "failed": 2,
         "skipped": 10
       },
       "nvrtc": {
-        "passed": 261,
-        "skipped": 10,
-        "failed": 2
+        "passed": 264,
+        "failed": 4,
+        "skipped": 10
       }
     },
-    "original_nvvm_failures_resolved": 54,
-    "original_nvvm_failures_remaining": 7,
+    "original_nvvm_failures_resolved": 59,
+    "original_nvvm_failures_remaining": 2,
     "new_fixture_nvrtc_differences": [
       "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
-      "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged"
+      "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged",
+      "array-payload-singleton-matrices: CUDA source rejects matrices with one row/column (E39999), NVVM O0/O3 independent oracle passes",
+      "hitobject-padded-attributes: CUDA sizeof-based helper rejects48-byte record; NVVM passes8dense-leaf ReportHit/GetAttributes/Invoke oracle atO0/O3"
     ]
   },
   "initial_full_checkpoint_fields": "scope, identity, inventory, reconciliation and original nvvm-full/nvrtc-full runs retain the initial269-registration identity. Current focused histories and current_known_outcomes are separately scoped.",
   "current_inventory": {
     "gate": {
-      "path": "build/nvvm-hitobject/rhi-inventory.json",
-      "sha256": "7977ccd7767f9b53ba195baa18997025de83b09ee0bc564930dc85384e61a16e"
+      "path": "build/nvvm-rhi-data-families/rhi-inventory.json",
+      "sha256": "de2cf254ba83d9e70ed9d9ee8e8f68716f6a8732f20c434b4e4f65866eed6dc9",
+      "return_code": 0,
+      "elapsed_seconds": 0.006327152252197266
     },
     "listing": {
-      "path": "build/nvvm-hitobject/rhi-inventory.log",
-      "sha256": "6293f037cf519e1973713396f53706f273d5444fa6beb265777fcd77d7ea0259"
+      "path": "build/nvvm-rhi-data-families/rhi-inventory.log",
+      "sha256": "5400d1f88d94fb28b03675fb7dd50223092b2f99316142341a8bc2c5890b7761"
     },
-    "registration_count": 273,
-    "unique_name_count": 272,
+    "registration_count": 278,
+    "unique_name_count": 277,
     "manifest_multiset_matches": true,
-    "scope": "Listing only after adding lifecycle fixture."
+    "scope": "Listing only after five additional data-family fixtures; all earlier registrations retained."
   }
 }

@@ -319,6 +319,12 @@ bool _getNVVMStructFieldAddress(
         structType = basePointerType
                          ? asNVVMSupportedHelperStructType(basePointerType->getValueType())
                          : nullptr;
+        if (!structType && basePointerType && parentAddress.isConventionalGlobal)
+        {
+            // The checked parent owns CUDA binding storage. Descending into a pointer-bearing
+            // record preserves that role without admitting a whole record as a helper value.
+            structType = asNVVMSupportedAggregateStorageStructType(basePointerType->getValueType());
+        }
         if (!structType && basePointerType && parentAddress.isLocalSubstandardRecordStorage)
         {
             // For `outer.inner.pair[index]`, the parent field address proves that inner belongs
@@ -3270,7 +3276,9 @@ bool _planNVVMHitObject(IRInst* inst, Stage stage, NVVMPlannedHitObjectOperation
             UInt count = 0;
             if (!plan.payloadType || !operation ||
                 operation->getDataType()->getOp() != kIROp_UIntType ||
-                !getNVVMOptixHitObjectPayloadRegisterCount(plan.payloadType, count))
+                !(operation->getValue() == SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION
+                      ? getNVVMOptixAttributeRegisterCount(plan.payloadType, count)
+                      : getNVVMOptixHitObjectPayloadRegisterCount(plan.payloadType, count)))
                 return false;
             auto code = operation->getValue();
             if (code != SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE &&
@@ -3298,18 +3306,28 @@ bool _planNVVMHitObject(IRInst* inst, Stage stage, NVVMPlannedHitObjectOperation
             }
         }
         break;
+    case kIROp_OptixCurrentHitQuery:
     case kIROp_OptixHitObjectQuery:
         {
-            if (inst->getOperandCount() != 3)
+            const bool current = inst->getOp() == kIROp_OptixCurrentHitQuery;
+            const UInt first = current ? 0 : 1;
+            if (inst->getOperandCount() != first + 2)
                 return false;
-            auto query = as<IRIntLit>(inst->getOperand(1));
-            auto index = as<IRIntLit>(inst->getOperand(2));
+            auto query = as<IRIntLit>(inst->getOperand(first));
+            auto index = as<IRIntLit>(inst->getOperand(first + 1));
             if (!query || !index || query->getDataType()->getOp() != kIROp_UIntType ||
                 index->getDataType()->getOp() != kIROp_UIntType || query->getValue() < 0 ||
                 query->getValue() > SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS || index->getValue() < 0)
                 return false;
-            desc.operation = SLANG_NVVM_HIT_OBJECT_OP_QUERY;
+            desc.operation =
+                current ? SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY : SLANG_NVVM_HIT_OBJECT_OP_QUERY;
             desc.query = SlangNVVMHitObjectQuery(query->getValue());
+            if (current && desc.query != SLANG_NVVM_HIT_OBJECT_QUERY_CLUSTER_ID &&
+                desc.query != SLANG_NVVM_HIT_OBJECT_QUERY_SPHERE &&
+                desc.query != SLANG_NVVM_HIT_OBJECT_QUERY_LSS &&
+                desc.query != SLANG_NVVM_HIT_OBJECT_QUERY_IS_SPHERE &&
+                desc.query != SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS)
+                return false;
             desc.index = uint32_t(index->getValue());
             if (index->getValue() != desc.index)
                 return false;
@@ -3334,8 +3352,9 @@ bool _planNVVMHitObject(IRInst* inst, Stage stage, NVVMPlannedHitObjectOperation
                 expectedResult = kIROp_FloatType;
                 vectorLanes = 4;
             }
-            plan.operands.add(inst->getOperand(0));
-            start = 3;
+            if (!current)
+                plan.operands.add(inst->getOperand(0));
+            start = first + 2;
         }
         break;
     default:
@@ -3343,10 +3362,12 @@ bool _planNVVMHitObject(IRInst* inst, Stage stage, NVVMPlannedHitObjectOperation
     }
     for (UInt i = start; i < inst->getOperandCount(); ++i)
         plan.operands.add(inst->getOperand(i));
+    const bool currentQuery = desc.operation == SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY;
     const bool report = desc.operation == SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION;
     const bool reorder = desc.operation == SLANG_NVVM_HIT_OBJECT_OP_REORDER ||
                          desc.operation == SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT;
-    if (report ? stage != Stage::Intersection
+    if (currentQuery ? (stage != Stage::AnyHit && stage != Stage::ClosestHit)
+        : report     ? stage != Stage::Intersection
         : reorder
             ? stage != Stage::RayGeneration
             : stage != Stage::RayGeneration && stage != Stage::ClosestHit && stage != Stage::Miss)
@@ -3362,7 +3383,8 @@ bool _planNVVMHitObject(IRInst* inst, Stage stage, NVVMPlannedHitObjectOperation
     }
     if (result->getOp() != expectedResult)
         return false;
-    const bool hasObject = !report && desc.operation != SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT;
+    const bool hasObject =
+        !currentQuery && !report && desc.operation != SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT;
     UInt fixedCount = desc.operation == SLANG_NVVM_HIT_OBJECT_OP_MAKE_MISS  ? 11
                       : desc.operation == SLANG_NVVM_HIT_OBJECT_OP_TRAVERSE ? 15
                       : report || reorder                                   ? 2
@@ -6731,6 +6753,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_AllocateOpaqueHandle:
             case kIROp_OptixHitObjectMakeNop:
             case kIROp_OptixHitObjectMakeMiss:
+            case kIROp_OptixCurrentHitQuery:
             case kIROp_OptixHitObjectQuery:
             case kIROp_OptixHitObjectSetSbt:
             case kIROp_OptixHitObjectLoadSbt:
@@ -7341,6 +7364,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_AllocateOpaqueHandle:
             case kIROp_OptixHitObjectMakeNop:
             case kIROp_OptixHitObjectMakeMiss:
+            case kIROp_OptixCurrentHitQuery:
             case kIROp_OptixHitObjectQuery:
             case kIROp_OptixHitObjectSetSbt:
             case kIROp_OptixHitObjectLoadSbt:
@@ -10739,19 +10763,23 @@ SlangResult validateNVVMSupportedIR(
                     "conventional global field",
                     fieldType);
             }
-            if (auto storageArray = asNVVMSupportedAggregateStorageArrayType(fieldType))
+            auto storageArray = asNVVMSupportedAggregateStorageArrayType(fieldType);
+            auto storageStruct = asNVVMSupportedAggregateStorageStructType(fieldType);
+            if (storageArray || storageStruct)
             {
                 auto fieldVarLayout = findVarLayout(field->getKey());
                 if (!_hasNVVMCompatibleAggregateStorageLayout(
                         codeGenContext,
-                        storageArray,
+                        fieldType,
                         fieldVarLayout ? fieldVarLayout->getTypeLayout() : nullptr))
                 {
                     return _diagnoseUnsupportedIR(
                         codeGenContext,
                         toSlice("aggregate storage layout"));
                 }
-                if (auto elementStruct = as<IRStructType>(storageArray->getElementType()))
+                if (auto elementStruct = storageStruct
+                                             ? storageStruct
+                                             : as<IRStructType>(storageArray->getElementType()))
                 {
                     _addNVVMReachableStructTypes(elementStruct, selectedReachableStructTypes);
                 }
@@ -11543,6 +11571,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 case kIROp_AllocateOpaqueHandle:
                 case kIROp_OptixHitObjectMakeNop:
                 case kIROp_OptixHitObjectMakeMiss:
+                case kIROp_OptixCurrentHitQuery:
                 case kIROp_OptixHitObjectQuery:
                 case kIROp_OptixHitObjectSetSbt:
                 case kIROp_OptixHitObjectLoadSbt:

@@ -723,6 +723,8 @@ extern "C"
 #define SLANG_NVVM_HIT_OBJECT_OP_REORDER ((SlangNVVMHitObjectOperation)8u)
 #define SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT ((SlangNVVMHitObjectOperation)9u)
 #define SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION ((SlangNVVMHitObjectOperation)10u)
+// Current-hit queries have no object operand and do not restore outgoing state.
+#define SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY ((SlangNVVMHitObjectOperation)11u)
 
     typedef uint32_t SlangNVVMHitObjectQuery;
 #define SLANG_NVVM_HIT_OBJECT_QUERY_IS_HIT ((SlangNVVMHitObjectQuery)0u)

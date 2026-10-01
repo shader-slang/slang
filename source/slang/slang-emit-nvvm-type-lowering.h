@@ -473,6 +473,7 @@ struct NVVMTypeInfo
     bool isHitObjectStorage = false;
     IRPtrTypeBase* hitObjectPointer = nullptr;
     bool isRawBuffer = false;
+    bool isTypedBufferBindingStorage = false;
     bool isSurface = false;
     bool isSampledTexture = false;
     bool isBufferDataPointer = false;

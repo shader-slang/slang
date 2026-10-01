@@ -833,6 +833,37 @@ struct CUDALayoutRules : CLayoutRules
     }
 };
 
+// OptiX register payloads mirror CUDA C++ values, whose Matrix<T,R,C> stores R row
+// vectors. Buffer matrix layout remains a separate rule: a column-major annotation controls
+// external buffer storage, not the prelude value or its legalized array-of-rows equivalent.
+struct CUDAPayloadLayoutRules : CUDALayoutRules
+{
+    CUDAPayloadLayoutRules() { ruleName = IRTypeLayoutRuleName::CUDAPayload; }
+
+    Result calcSizeAndAlignment(
+        TargetRequest* targetReq,
+        IRType* type,
+        IRSizeAndAlignment* outSizeAndAlignment) override
+    {
+        if (auto matrix = as<IRMatrixType>(type))
+        {
+            auto rows = as<IRIntLit>(matrix->getRowCount());
+            auto columns = as<IRIntLit>(matrix->getColumnCount());
+            if (!rows || !columns)
+                return SLANG_FAIL;
+            IRBuilder builder(type->getModule());
+            auto row = builder.getVectorType(matrix->getElementType(), matrix->getColumnCount());
+            return _calcArraySizeAndAlignment(
+                targetReq,
+                this,
+                row,
+                matrix->getRowCount(),
+                outSizeAndAlignment);
+        }
+        return CUDALayoutRules::calcSizeAndAlignment(targetReq, type, outSizeAndAlignment);
+    }
+};
+
 struct ConstantBufferLayoutRules : IRTypeLayoutRules
 {
     ConstantBufferLayoutRules() { ruleName = IRTypeLayoutRuleName::D3DConstantBuffer; }
@@ -1061,6 +1092,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getCUDA()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getCUDAPayload()
+{
+    static CUDAPayloadLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getLLVM()
 {
     static LLVMLayoutRules rules;
@@ -1088,6 +1125,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getC();
     case IRTypeLayoutRuleName::CUDA:
         return getCUDA();
+    case IRTypeLayoutRuleName::CUDAPayload:
+        return getCUDAPayload();
     case IRTypeLayoutRuleName::D3DConstantBuffer:
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:

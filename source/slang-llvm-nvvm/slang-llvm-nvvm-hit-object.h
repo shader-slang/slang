@@ -640,7 +640,10 @@ public:
         return b.CreateExtractValue(b.CreateCall(getMatrixHelper(inverse), {object}), row);
     }
 
-    llvm::Value* query(llvm::Value* object, const SlangNVVMHitObjectOperationDesc& desc)
+    llvm::Value* query(
+        llvm::Value* object,
+        const SlangNVVMHitObjectOperationDesc& desc,
+        bool current = false)
     {
         const char* integerNames[] = {
             "_optix_hitobject_is_hit",
@@ -675,7 +678,8 @@ public:
         case SLANG_NVVM_HIT_OBJECT_QUERY_IS_SPHERE:
         case SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS:
             {
-                auto kind = scalar("_optix_hitobject_get_hitkind", u32);
+                auto kind =
+                    scalar(current ? "_optix_get_hit_kind" : "_optix_hitobject_get_hitkind", u32);
                 auto type = scalar("_optix_get_primitive_type_from_hit_kind", u32, {kind});
                 return b.CreateZExt(
                     b.CreateICmpEQ(
@@ -693,11 +697,19 @@ public:
         case SLANG_NVVM_HIT_OBJECT_QUERY_ATTRIBUTE:
             return scalar("_optix_hitobject_get_attribute", u32, {b.getInt32(desc.index)});
         case SLANG_NVVM_HIT_OBJECT_QUERY_CLUSTER_ID:
-            return scalar("_optix_hitobject_get_cluster_id", u32);
+            return scalar(
+                current ? "_optix_get_cluster_id" : "_optix_hitobject_get_cluster_id",
+                u32);
         case SLANG_NVVM_HIT_OBJECT_QUERY_SPHERE:
-            return vectorQuery("_optix_hitobject_get_sphere_data", 4);
+            return vectorQuery(
+                current ? "_optix_get_sphere_data_current_hit" : "_optix_hitobject_get_sphere_data",
+                4);
         case SLANG_NVVM_HIT_OBJECT_QUERY_LSS:
-            return vectorQuery("_optix_hitobject_get_linear_curve_vertex_data", 8, desc.index * 4);
+            return vectorQuery(
+                current ? "_optix_get_linear_curve_vertex_data_current_hit"
+                        : "_optix_hitobject_get_linear_curve_vertex_data",
+                8,
+                desc.index * 4);
         case SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_OBJECT_TO_WORLD:
         case SLANG_NVVM_HIT_OBJECT_QUERY_MATRIX_WORLD_TO_OBJECT:
             return matrixRow(
@@ -743,10 +755,18 @@ _isHitObjectOperationSupported(const SlangNVVMHitObjectOperationDesc* desc, uint
     if (!desc || !outSupported)
         return SLANG_E_INVALID_ARG;
     if (desc->operation < SLANG_NVVM_HIT_OBJECT_OP_MAKE_NOP ||
-        desc->operation > SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION)
+        desc->operation > SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY)
         return SLANG_OK;
-    if (desc->operation == SLANG_NVVM_HIT_OBJECT_OP_QUERY)
+    if (desc->operation == SLANG_NVVM_HIT_OBJECT_OP_QUERY ||
+        desc->operation == SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY)
     {
+        if (desc->operation == SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY &&
+            desc->query != SLANG_NVVM_HIT_OBJECT_QUERY_CLUSTER_ID &&
+            desc->query != SLANG_NVVM_HIT_OBJECT_QUERY_SPHERE &&
+            desc->query != SLANG_NVVM_HIT_OBJECT_QUERY_LSS &&
+            desc->query != SLANG_NVVM_HIT_OBJECT_QUERY_IS_SPHERE &&
+            desc->query != SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS)
+            return SLANG_OK;
         if (desc->payloadCount || desc->query > SLANG_NVVM_HIT_OBJECT_QUERY_IS_LSS)
             return SLANG_OK;
         unsigned bound = desc->query == SLANG_NVVM_HIT_OBJECT_QUERY_ATTRIBUTE ? 8
@@ -784,7 +804,8 @@ static SlangResult SLANG_NVVM_CALL _emitHitObjectOperation(
     if (SLANG_FAILED(_isHitObjectOperationSupported(desc, &supported)) || !supported || !outValue ||
         !block || (!operands && operandCount))
         return SLANG_E_INVALID_ARG;
-    bool hasObject = desc->operation != SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT &&
+    bool hasObject = desc->operation != SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY &&
+                     desc->operation != SLANG_NVVM_HIT_OBJECT_OP_REORDER_HINT &&
                      desc->operation != SLANG_NVVM_HIT_OBJECT_OP_REPORT_INTERSECTION;
     unsigned scalarCount = 0;
     switch (desc->operation)
@@ -842,7 +863,8 @@ static SlangResult SLANG_NVVM_CALL _emitHitObjectOperation(
         args.push_back(value);
     }
     // Invalid descriptors, values, ownership and insertion points leave the whole module unchanged.
-    HitObjectEmitter::getStorageType(state);
+    if (hasObject)
+        HitObjectEmitter::getStorageType(state);
     HitObjectEmitter emitter(state);
     auto& b = state->builder;
     llvm::Value* result = nullptr;
@@ -862,6 +884,9 @@ static SlangResult SLANG_NVVM_CALL _emitHitObjectOperation(
     case SLANG_NVVM_HIT_OBJECT_OP_INVOKE:
         emitter.restore(object);
         result = emitter.payloadCall(false, desc->payloadCount, args);
+        break;
+    case SLANG_NVVM_HIT_OBJECT_OP_CURRENT_QUERY:
+        result = emitter.query(nullptr, *desc, true);
         break;
     case SLANG_NVVM_HIT_OBJECT_OP_QUERY:
         emitter.restore(object);

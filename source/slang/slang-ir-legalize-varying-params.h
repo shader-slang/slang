@@ -20,11 +20,14 @@ struct EntryPointInfo
     IREntryPointDecoration* entryPointDecor;
 };
 
-// Returns the register count for the padding-free 32-bit OptiX payload subset.
+// Returns the physical register count for the selected 32-bit CUDA value payload algebra.
 // Both trace callers and callback parameters use this check before their type is erased.
 UInt getNVVMOptixPayloadRegisterCount(IRType* type);
 
-/// Admits the same dense payload algebra plus a canonical empty HitObject payload record.
+// Attribute registers are dense scalar leaves, independent of CUDA payload padding.
+bool getNVVMOptixAttributeRegisterCount(IRType* type, UInt& outCount);
+
+/// Admits the same payload algebra plus a canonical empty HitObject payload record.
 bool getNVVMOptixHitObjectPayloadRegisterCount(IRType* type, UInt& outCount);
 
 void legalizeEntryPointVaryingParamsForCPU(

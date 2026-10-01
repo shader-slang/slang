@@ -2183,6 +2183,14 @@ Result linkAndOptimizeIR(
     MatrixTypeLoweringOptions matrixTypeLoweringOptions = {};
     matrixTypeLoweringOptions.lowerAllMatrixTypes = emitNVVMDirectly;
     SLANG_PASS(legalizeMatrixTypes, targetProgram, sink, matrixTypeLoweringOptions);
+    if (emitNVVMDirectly)
+    {
+        // Matrix legalization creates vector<T,1> rows for matrix<T,R,1>, after the
+        // earlier vector pass. Finish the canonical scalar replacement before helper
+        // and ray-payload admission see these newly produced singleton vectors.
+        SLANG_PASS(legalizeVectorTypes, sink);
+    }
+
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
