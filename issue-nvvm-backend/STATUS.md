@@ -9,7 +9,7 @@ normalization at exact-width integer consumers. The consolidated integration che
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
-below; the loop is now stopped for maintainer discussion.
+below; the maintainer has resumed the four bounded items listed below.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -21,8 +21,8 @@ stopping only for a decision that actually needs human input. After all queued c
 work, the maintainer additionally requests a full NVVM validation checkpoint, fixes for discovered
 issues, and resumption of feature development under the standard workflow. No push, Slack or system changes.
 On 2026-10-01 the maintainer instructed: finish the current parameter-group layout-pointer slice,
-then stop for discussion. This supersedes automatic continuation after that slice; do not select
-or implement another feature without a new resume instruction.
+then stop for discussion. That slice finished. The maintainer subsequently authorized the four
+items below, then another stop; this does not authorize an open-ended feature loop.
 Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
@@ -84,10 +84,19 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Eighteen feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 60 feature objects, preserving all prior objects and the full baseline. Each feature's
+Nineteen feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 61 feature objects, preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
-These batches used eight-job builds and focused validation; further work awaits maintainer discussion.
+These batches used eight-job builds and focused validation. The newly authorized sequence is:
+
+1. Unify pointer-to-UInt64 reinterpretation with the existing checked address-observation contract.
+2. Add explicit-layout record field loads and stores across Std430/Scalar/C in bounded batches.
+3. Investigate and fix retained static-state dispatch and target-option relinking issues where
+   the intended contract is established.
+4. Investigate restricted CubeArray binding and mip-query failures, implementing fixes supported
+   by the findings and retaining unresolved external/semantic boundaries.
+
+Stop again after item 4. Approximate Half math and other feature work remain outside this sequence.
 
 Current additions beyond the full checkpoint are:
 
@@ -107,25 +116,19 @@ Current additions beyond the full checkpoint are:
   and Workgroup/shared with scoped relaxed operations. Actual SM70 admission, canonical memory
   attributes and checked producer spaces remain required; qualification is at SM80.
 - Std430/Scalar/C Device record pointers support address-only entry/internal-helper parameters and
-  checked direct fields of conventional constant buffers, signed32 offsets and UInt64 address observation. Strides follow shared layout rules; the
+  checked direct fields of conventional constant buffers, signed32 offsets and explicit/reinterpret UInt64 address observation. Strides follow shared layout rules; the
   motivating record has 64/48/40-byte strides. No dereference, export, pointer result/general storage,
   inverse reconstruction or AnyValue expansion is implied. CUDA rejects Std430 and uses 40 for
   Scalar/C; its three nonzero Scalar mismatches remain recorded.
 
-The latest batch is `features.nvvm-parameter-group-layout-pointers`, raw evidence under
-`build/nvvm-parameter-group-layout-pointers/`. A checked load plan admits a direct immutable
-constant-buffer pointer field only after proving the collected-global origin; the same plan owns
-its eight-byte alignment. Whole pointer-bearing record values, ordinary storage, arrays and
-unqualified nested loads remain excluded. Eight shared units, five static tests, twelve
-source/diagnostic cells and eight allocated-address O0/O3 cases pass. The 24-byte buffer, eight-byte
-global binding, six retained helper calls and all guards/unchanged inputs are checked independently.
-Three failed attempts are retained: missing load-result admission was fixed in its owning plan,
-the fake provider's inner/outer record tables were corrected, and the static cache-order test
-exposed ordinary struct storage admission that was too broad before cache lookup. The corrected
-role check preserves the existing synthesized-global field policy.
-The fake-only rebuild preserved real compiler/provider identity. After the subsequent cache-role
-fix, final compile/runtime checks passed again; LLVM/PTX remained byte-identical. All three issues
-are resolved within the slice, and the initial failures remain recorded.
+The latest batch is `features.nvvm-pointer-reinterpret`, with raw evidence under
+`build/nvvm-pointer-reinterpret/`. Exact layout-pointer-to-UInt64 BitCast operations now normalize
+to the existing checked CastPtrToInt path. The dedicated initialized fixture compares both
+spellings at cbuffer roots and signed helper offsets; O0/O3 allocated-address checks preserve
+64/48/40-byte strides, all guards and unchanged input/binding bytes. The original three-layout
+source now compiles, but its unspecified bindings are not executed. No inverse casts or new
+pointer roots are admitted. The parameter-group predecessor's three resolved validation incidents
+remain in its focused record, including the corrected storage-role cache admission.
 
 The full checkpoint remains unchanged: its 36 main gaps and 249 surface cells retain their original
 identities. Focused records supersede specifically resolved texture-handle, dynamic-surface and
@@ -137,10 +140,9 @@ Keep these open distinctions visible:
 - CubeArray restricted views reported a plausible count but selected faces shifted by one face;
   full-view success does not qualify restricted binding. Mip-query linkage failures and the full
   dimensions corpus fixture remain unresolved. Do not divide counts or guess view endpoints.
-- The original three-layout pointer fixture now reaches a pointer-to-UInt64 `bitCast` rejection,
-  advancing beyond its earlier parameter-buffer field-address rejection. Its unspecified pointer
-  bindings are never executed. Broader conventional pointer storage and AnyValue roles require
-  separate work.
+- The original three-layout pointer fixture now compiles through the shared checked pointer-to-UInt64
+  conversion. Its unspecified pointer bindings are never executed, so this is a compile-only
+  resolution. Broader conventional pointer storage and AnyValue roles remain separate work.
 - Original physical-storage-buffer and redundant-coherent-load fixtures contain races or unsupported
   scopes. Their compile evidence does not resolve runtime failures. Graphics tests, hardware atomics,
   generic `requirePrelude` text and non-square host packing remain distinct from missing primitives.
@@ -148,8 +150,8 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-The requested slice is complete. **Stopped for maintainer discussion.** Do not select or implement
-another feature without a new resume instruction.
+The parameter-group slice is complete. **Resumed for the four items above, then stop again.**
+Item 1 is complete; next: explicit-layout record field loads and stores.
 
 ## Retained boundaries
 

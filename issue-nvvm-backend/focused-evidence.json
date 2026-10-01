@@ -82633,6 +82633,169 @@
         "implementations_since_full": 18
       },
       "stopping_condition": "Maintainer requested finishing this slice then stopping for discussion. No automatic next feature."
+    },
+    "nvvm-pointer-reinterpret": {
+      "status": "accepted-focused",
+      "scope": "Std430/Scalar/C checked record-pointer observations accept exact UInt64 bitcasts produced by public reinterpret; same canonical CastPtrToInt path and root checks. No new inverse cast, pointer role or provider ABI.",
+      "identity": {
+        "revision": "c7165e1c1aa3cb2dc94898087e0bf4ca83d4a79b",
+        "patch_sha256": "1c3ab168985b11d854de4205a20c1cd31e51a7eec800ffdb4e966e30f97cab11",
+        "source_sha256": {
+          "source/slang/slang-ir-nvvm-legalize.cpp": "ccbbba0051b586e8d1c339623af84953a3cdeeecc145d226f4f8326da051dc57",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "78fdbb1d80f584ecf7daefb57597a4b2c693268aa0ed748027cb7eb7e69aa13c",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "8c1f7af54a4f9bcf72050f78a874e5ef525d67b5ca261c76bbff5ca5d0f92f85",
+          "tests/cuda/nvvm-pointer-reinterpret.slang": "b7302926d8df62174660bd322cdc0d6371f47d523c0c0b4a06c1091e2798e563"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "d6e5f51ef166de36e738d29475e59bf7ac7175521ccd2c131555e1790b0307f0",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "db8d5d824107f149bab6d4831ad5caa3bec984b24483411620fca4d6204baa5b",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "7ff60ca11cbf2bb559437063dfc23a5920213c506558f223c66470836e340b1f"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-pointer-reinterpret/build.json",
+          "sha256": "55cbdd04fdf170280dd618f36b7da3f5cd4659a3ecee25735f66f62ef8fd6d78"
+        },
+        "focused_initial": {
+          "path": "build/nvvm-pointer-reinterpret/focused.json",
+          "sha256": "b376896f605c3a440172fbfe75dd414f17c21c0818f6a829326fd132ac684432"
+        },
+        "focused_retry": {
+          "path": "build/nvvm-pointer-reinterpret/unit-retry.json",
+          "sha256": "969d21a881bb68557d052d881e4f94a01dd1a58f8eed375b497ad1d7772e36e0"
+        },
+        "outcomes": {
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang": "passed",
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.1": "passed",
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.2": "passed",
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.3": "passed",
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.4": "passed",
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.5": "passed",
+          "tests/cuda/nvvm-parameter-group-layout-pointers.slang": "passed",
+          "tests/cuda/nvvm-parameter-group-layout-pointers.slang.1": "passed",
+          "tests/cuda/nvvm-pointer-reinterpret.slang": "passed",
+          "tests/cuda/nvvm-pointer-reinterpret.slang.1": "passed",
+          "slang-unit-test-tool/nvvmSlangParameterGroupLayoutPointersUseCheckedLoads.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangLayoutPointersUseCheckedByteOffsets.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal": "passed"
+        },
+        "static": {
+          "path": "build/nvvm-pointer-reinterpret/static-retry.json",
+          "sha256": "4f29b4acea63415ae97bf7e6a7683ecd3e5b75046340ef75ca9eb8118d69f511"
+        },
+        "static_identity": {
+          "path": "build/nvvm-pointer-reinterpret/static-identity.json",
+          "sha256": "1ffae2a22c0d7bdeb9f6cc56d7bc29edd1ed11a8f705199eadd328a22dd2d522"
+        },
+        "runtime": {
+          "path": "build/nvvm-pointer-reinterpret/runtime-results.json",
+          "sha256": "41c93e9f349cc05da16667817437f9f6ad7ae9fa1af30eb1f60c649ba8c2b1ab"
+        },
+        "runtime_gate": {
+          "path": "build/nvvm-pointer-reinterpret/runtime.json",
+          "sha256": "751afa67be2369ea597788a51303826fe622c0b01fc4725e37dd7d10dc597559"
+        },
+        "runtime_cases": 8,
+        "code": {
+          "path": "build/nvvm-pointer-reinterpret/code-inspection.json",
+          "sha256": "495cbca23204308898845effaea2847b16fc8d1d50925eb93c3127481a2c0fa4"
+        },
+        "source": {
+          "path": "tests/cuda/nvvm-pointer-reinterpret.slang",
+          "sha256": "b7302926d8df62174660bd322cdc0d6371f47d523c0c0b4a06c1091e2798e563"
+        },
+        "host": {
+          "path": "build/nvvm-parameter-group-layout-pointers/run-pointer-transport.py",
+          "sha256": "79a49be09f53d41cef3b4ee3bee6d6d517c118ba1f0909c9ba03a41bde4606d5"
+        },
+        "production_reuse": {
+          "path": "build/nvvm-pointer-reinterpret/production-reuse.json",
+          "sha256": "43e25873f66be3c39dd030176e4b34d58e6817cacef58154753e677b90333cda"
+        }
+      },
+      "resolved_failures": {
+        "dedicated_before": {
+          "path": "build/nvvm-pointer-reinterpret/before-fixture.json",
+          "sha256": "3c8c65fc4acf9d1a4b1bd86ad58ba6ccc80de5739bcd0cd25e6d3feae9ace6ec"
+        },
+        "original_before": {
+          "path": "build/nvvm-pointer-reinterpret/before-original.json",
+          "sha256": "6bfe6ce45c9131417ec965486ea00e5c9284bed67df1220fdacb293012d2b0f6"
+        },
+        "original_after": {
+          "path": "build/nvvm-pointer-reinterpret/original.json",
+          "sha256": "7a7e2d8df1a0818392cbd6146121b553b2f85d96d4bbba695c4efe62ab440e4c"
+        },
+        "meaning": "Original pointer/data-layouts now compiles. Unspecified original bindings never executed; only initialized dedicated fixture is GPU qualified."
+      },
+      "validation_incidents": {
+        "fake": {
+          "initial": {
+            "path": "build/nvvm-pointer-reinterpret/focused.json",
+            "sha256": "b376896f605c3a440172fbfe75dd414f17c21c0818f6a829326fd132ac684432"
+          },
+          "identity": {
+            "path": "build/nvvm-pointer-reinterpret/initial-tested-identity.json",
+            "sha256": "87cfa0e0783ae4c48e8bcf31b26f8f1480c58868e62ac6bcc55c01422318f630"
+          },
+          "resolution": "12/13 initial pass; public reinterpret adds numeric packing structs that collide with fake singleton struct table. Fake canonical test now uses bit_cast; public reinterpret remains covered by real source/runtime. Existing assertions retained."
+        },
+        "static": {
+          "initial": {
+            "path": "build/nvvm-pointer-reinterpret/static.json",
+            "sha256": "d1bff46090a662943ffeeedacd2ac48b957c6e3527d4f9e6187424dbef366a8d"
+          },
+          "identity": {
+            "path": "build/nvvm-pointer-reinterpret/initial-static-identity.json",
+            "sha256": "6f6f5f0e01ab1aeab726d6d83ab89f062242e5f9b3b15969d5e8de97d8f086b5"
+          },
+          "backtrace": {
+            "path": "build/nvvm-pointer-reinterpret/static-backtrace.json",
+            "sha256": "c725524ab159a27682d594bb3b7223aeafe410195a25b76a1cec4bf29d5935fe"
+          },
+          "resolution": "Synthetic entry lacked canonical KeepAlive; legalization DCE removed it and test used stale instruction. Add linker-owned liveness decoration to fixture; unchanged production and positive/rejection assertions now pass."
+        }
+      },
+      "preservation": {
+        "prior_feature_count": 60,
+        "prior_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        }
+      },
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "implementations_since_full": 19
+      },
+      "limitations": [
+        "No original uninitialized-pointer runtime claim.",
+        "No general AnyValue expansion, record dereference or inverse conversion.",
+        "Focused SM80 O0/O3 correctness only; no full campaign or performance claim."
+      ]
     }
   }
 }

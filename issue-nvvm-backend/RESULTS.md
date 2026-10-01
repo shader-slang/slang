@@ -807,6 +807,7 @@ build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-re
   tests/cuda/nvvm-std430-pointer-transport.slang \
   tests/cuda/nvvm-layout-pointer-helpers.slang \
   tests/cuda/nvvm-parameter-group-layout-pointers.slang \
+  tests/cuda/nvvm-pointer-reinterpret.slang \
   tests/cuda/nvvm-layout-pointer-transport-unsupported.slang
 ```
 
@@ -852,8 +853,12 @@ Run the direct static `nvvmLayoutPointerHelpersCheckEveryCallProducer` test in t
 static build, alongside the two `nvvmLocalRecordArray` controls. It places a same-typed unapproved
 actual after a valid call to the same helper; no type-equality shortcut may admit the second call.
 Keep static executable/configuration identity separate from the shared compiler and unit plugin.
-The original three-layout corpus fixture has separate conventional pointer-storage and AnyValue
-roles; its exact compile-only result belongs in the focused record. Its unspecified bindings are
+Reinterpret qualification uses `tests/cuda/nvvm-pointer-reinterpret.slang` with that same host
+and its `--source` argument. It compares explicit and reinterpret observations of the same allocated
+addresses, including retained helper offsets. The direct static
+`nvvmLayoutPointerReinterpretPreservesProducerChecks` test checks all three layouts and confirms
+that normalization preserves rejection of an unproven root before provider mutation.
+The original three-layout corpus fixture has its exact compile-only result in the focused record. Its unspecified bindings are
 not an allocated-address oracle. Do not execute it or declare its corpus failure resolved from the
 dedicated helper fixture.
 

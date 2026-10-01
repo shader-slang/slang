@@ -588,6 +588,38 @@ void _legalizeNVVMTextureDescriptorWordConversions(LinkedIR& linkedIR)
     }
 }
 
+// Reinterpret lowering preserves a genuine pointer-to-UInt64 BitCast. For example,
+// `reinterpret<uint64_t>(layoutPointer)` observes the same address as `uint64_t(layoutPointer)`.
+// Canonicalize that exact address-only shape so both spellings use the existing checked-root
+// plan. This grants no provenance and leaves inverse, UInt2 and ordinary pointer bitcasts alone.
+void _legalizeNVVMLayoutPointerObservations(LinkedIR& linkedIR)
+{
+    List<IRInst*> observations;
+    for (auto globalInst : linkedIR.module->getGlobalInsts())
+    {
+        auto function = as<IRFunc>(globalInst);
+        if (!function)
+            continue;
+        for (auto block : function->getBlocks())
+            for (auto inst : block->getOrdinaryInsts())
+                if (inst->getOp() == kIROp_BitCast && inst->getOperandCount() == 1 &&
+                    inst->getDataType()->getOp() == kIROp_UInt64Type &&
+                    asNVVMSupportedLayoutTransportPointerType(inst->getOperand(0)->getDataType()))
+                    observations.add(inst);
+    }
+    IRBuilder builder(linkedIR.module);
+    for (auto inst : observations)
+    {
+        builder.setInsertBefore(inst);
+        IRBuilderSourceLocRAII sourceLoc(&builder, inst->sourceLoc);
+        auto value = inst->getOperand(0);
+        auto result = builder.emitIntrinsicInst(inst->getDataType(), kIROp_CastPtrToInt, 1, &value);
+        inst->transferDecorationsTo(result);
+        inst->replaceUsesWith(result);
+        inst->removeAndDeallocate();
+    }
+}
+
 SlangResult _verifyNVVMReadyIR(CodeGenContext* codeGenContext, const LinkedIR& linkedIR)
 {
     for (auto globalInst : linkedIR.module->getGlobalInsts())
@@ -628,6 +660,7 @@ SlangResult legalizeIRForNVVM(CodeGenContext* codeGenContext, LinkedIR& linkedIR
     SLANG_RETURN_ON_FAIL(_removeNVVMCompileTimeOnlyInstructions(codeGenContext, linkedIR));
     _legalizeNVVMLocalBooleanVectorAddresses(linkedIR);
     _legalizeNVVMTextureDescriptorWordConversions(linkedIR);
+    _legalizeNVVMLayoutPointerObservations(linkedIR);
 
     IRDeadCodeEliminationOptions options;
     options.keepLayoutsAlive = true;

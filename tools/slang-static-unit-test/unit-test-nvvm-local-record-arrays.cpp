@@ -2,6 +2,7 @@
 #include "nvvm-static-test-context.h"
 #include "slang-unit-test/unit-test-nvvm-support.h"
 #include "slang/slang-emit-nvvm.h"
+#include "slang/slang-ir-nvvm-legalize.h"
 
 using namespace Slang;
 
@@ -49,6 +50,90 @@ struct LocalRecordArrayIR
 };
 
 } // namespace
+
+// Canonicalization preserves the actual producer. An address-only bitcast cannot turn a
+// same-typed global into an entry parameter or another approved pointer root.
+SLANG_UNIT_TEST(nvvmLayoutPointerReinterpretPreservesProducerChecks)
+{
+    for (auto layoutOp :
+         {kIROp_Std430BufferLayoutType, kIROp_ScalarBufferLayoutType, kIROp_CBufferLayoutType})
+        for (bool forged : {false, true})
+        {
+            _resetDirectNVVMFakes();
+            NVVMStaticTestContext context(unitTestContext);
+            auto module = IRModule::create(context.env.getSessionImpl());
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            auto record = builder.createStructType();
+            builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+            auto pointer = builder.getPtrType(
+                record,
+                AccessQualifier::ReadWrite,
+                AddressSpace::UserPointer,
+                builder.getType(layoutOp));
+            auto outputPointer = builder.getPtrType(
+                builder.getUInt64Type(),
+                AccessQualifier::ReadWrite,
+                AddressSpace::UserPointer,
+                builder.getDefaultBufferLayoutType());
+            IRInst* global = nullptr;
+            if (forged)
+            {
+                global = builder.createGlobalVar(record);
+                global->setFullType(pointer);
+            }
+            IRType* parameterTypes[] = {pointer, outputPointer};
+            auto entry = builder.createFunc();
+            entry->setFullType(builder.getFuncType(2, parameterTypes, builder.getVoidType()));
+            builder.addEntryPointDecoration(
+                entry,
+                Profile(Stage::Compute),
+                toSlice("computeMain"),
+                toSlice("test"));
+            // Linked entry points carry KeepAlive; this legalization boundary runs DCE.
+            builder.addKeepAliveDecoration(entry);
+            builder.setInsertInto(entry);
+            builder.emitBlock();
+            auto formal = builder.emitParam(pointer);
+            auto output = builder.emitParam(outputPointer);
+            IRInst* operand = forged ? global : formal;
+            auto bits = builder.emitBitCast(builder.getUInt64Type(), operand);
+            auto store = cast<IRStore>(builder.emitStore(output, bits));
+            builder.emitReturn();
+            LinkedIR linked = {};
+            linked.module = module;
+            linked.entryPoints.add(entry);
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(legalizeIRForNVVM(&context.codeGen, linked)));
+            auto observation = store->getVal();
+            SLANG_CHECK_ABORT(observation->getOp() == kIROp_CastPtrToInt);
+            SLANG_CHECK(observation->getDataType() == builder.getUInt64Type());
+            SLANG_CHECK(observation->getOperand(0) == operand);
+            NVVMOperationRequirements requirements;
+            const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+            if (forged)
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+                const auto text = context.sink.outputBuffer.getUnownedSlice();
+                if (text.indexOf(toSlice("pointer address producer")) < 0)
+                    getTestReporter()->message(
+                        TestMessageType::Info,
+                        context.sink.outputBuffer.getBuffer());
+                SLANG_CHECK(text.indexOf(toSlice("pointer address producer")) >= 0);
+            }
+            else
+            {
+                if (SLANG_FAILED(result))
+                    getTestReporter()->message(
+                        TestMessageType::Info,
+                        context.sink.outputBuffer.getBuffer());
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+                SLANG_CHECK(
+                    requirements.emissionPlan.pointerToIntegerValues[observation] == operand);
+            }
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+        }
+}
 
 // A loaded pointer is a root only when checked records prove the direct conventional-cbuffer
 // chain. Loads need not be in the first block; unrelated nested group loads stay unqualified.

@@ -38,7 +38,11 @@ Continue until a recorded stopping condition actually requires human input.
 
 The maintainer added a stopping condition on 2026-10-01: finish the current parameter-group
 layout-pointer slice, including focused validation and reviewed local commit, then stop for
-discussion. Do not resume feature selection or implementation without a new maintainer instruction.
+discussion. That slice completed. The maintainer then explicitly resumed four items: pointer-to-UInt64
+reinterpretation; explicit-layout record field loads/stores; retained static-state dispatch and
+target-option relinking issues; restricted CubeArray/mip-query investigation. Work through those
+bounded items with focused validation and reviewed local commits, then stop again. This authorization
+does not resume the general feature loop or the remaining Half numerical-policy work.
 
 Use one implementation owner and an independent reviewer when available. The lead owns scope,
 acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight

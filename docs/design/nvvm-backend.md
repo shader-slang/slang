@@ -187,7 +187,9 @@ Explicit Std430/Scalar/C Device pointers to finite copyable records have an addr
 Shared buffer-layout selection owns the layout; preflight queries its stride once and retains the
 current function's root, exact pointer type and signed index in an offset plan. Emission uses global
 byte pointers, signed 64-bit scaling and non-inbounds byte offsets. Canonical `CastPtrToInt` observes
-the address as UInt64. Internal first-block helper parameters are conditional roots: every call
+the address as UInt64. NVVM legalization normalizes the equivalent layout-pointer-to-UInt64
+`BitCast` produced by `reinterpret<uint64_t>` to that same instruction; it retains the operand
+and grants no new producer provenance or inverse conversion. Internal first-block helper parameters are conditional roots: every call
 checks the actual's exact type and checked producer before the general type-match
 path, then checks availability and dominance. The existing finite direct-call closure validates all
 bodies before provider mutation. No interprocedural provenance walk or new pointer representation is
