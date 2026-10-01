@@ -8968,14 +8968,14 @@ static bool doesInterfaceDeclareUsableRequirement(
 // appending each one once to `outInterfaces`. Each entry is the declaration the interface's name
 // refers to: the `GenericDecl` for a generic interface, the `InterfaceDecl` otherwise.
 //
-// The core module is skipped (as `findClosestInScopeName` does) because it is in scope for every
-// program, so its common requirement names (`equals`, `lessThan`, ...) would follow almost any
-// typo. Every other module, including a standard module such as `slang.numerics`, is in scope only
-// because the program imported it.
+// The core module is skipped (as `findClosestInScopeName` does) because it is implicitly in scope
+// for every program, so its common requirement names (`equals`, `lessThan`, ...) would follow
+// almost any typo. Interfaces from the module being checked and from modules it imports, including
+// a standard module such as `slang.numerics`, are kept.
 //
-// Requirements inherited from a base interface are not matched. Following the issue discussion, a
-// base interface is usually visible wherever a derived one is, so naming the interface that
-// declares the member directly is enough.
+// Requirements inherited from a base interface are not matched: a base interface is usually
+// visible wherever a derived one is, so naming the interface that declares the member directly is
+// enough.
 static void collectVisibleInterfacesDeclaringRequirement(
     SemanticsVisitor* semantics,
     Name* requirementName,

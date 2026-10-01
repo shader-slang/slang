@@ -2,8 +2,8 @@
 // user interfaces in `../suggest-constraint-for-missing-member.slang` and `imports.slang`, once
 // applied, make the failed member accesses valid. Each function is a failing case from those
 // tests with the suggested constraint added; `twoMatchesSortedBeta` applies the second of the two
-// notes, and `assocTypeThroughValue` also uses the associated type so that it is checked. This test
-// compiles them and checks the computed values.
+// notes, and `assocTypeThroughValue` also uses the associated type so that it is checked. This
+// test compiles them and checks the computed values.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -41,8 +41,18 @@ int assocTypeThroughValue<T>(T t) where T : IHasAssoc
 int genericInterfaceSuggested<C>(C c) where C : IContainer<int> { return c.getItem(); }
 int publicImport<T>(T t) where T : IPublicThing { return t.publicThing(); }
 int publicGenericImport<T>(T t) where T : IPublicBox<int> { return t.publicItem(); }
+struct ShadowInMethod<T> where T : IHasNormal
+{
+    float3 read<IHasNormal>(T value) { return value.getNormal(); }
+}
+namespace UsedNS
+{
+interface IUsed { int used(); }
+int reachedTwice<T>(T t) where T : IUsed { return t.used(); }
+}
+using namespace UsedNS;
 
-struct Thing : IHasNormal, IFactory, IGenericStaticFactory, IHasStaticSm, IBase, IAlpha, IBeta, IHasAssoc, IContainer<int>, IPublicThing, IPublicBox<int>
+struct Thing : IHasNormal, IFactory, IGenericStaticFactory, IHasStaticSm, IBase, IAlpha, IBeta, IHasAssoc, IContainer<int>, IPublicThing, IPublicBox<int>, IUsed
 {
     float3 getNormal() { return float3(1, 2, 3); }
     static int make() { return 4; }
@@ -56,9 +66,10 @@ struct Thing : IHasNormal, IFactory, IGenericStaticFactory, IHasStaticSm, IBase,
     int getItem() { return 10; }
     int publicThing() { return 11; }
     int publicItem() { return 12; }
+    int used() { return 13; }
 }
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -76,6 +87,9 @@ void computeMain()
     outputBuffer[8] = publicImport(t);
     outputBuffer[9] = publicGenericImport(t);
     outputBuffer[10] = twoMatchesSortedBeta(t);
+    ShadowInMethod<Thing> shadow;
+    outputBuffer[11] = int(shadow.read<int>(t).y);
+    outputBuffer[12] = reachedTwice(t);
     // CHECK: 3
     // CHECK-NEXT: 4
     // CHECK-NEXT: 5
@@ -87,4 +101,6 @@ void computeMain()
     // CHECK-NEXT: 11
     // CHECK-NEXT: 12
     // CHECK-NEXT: 108
+    // CHECK-NEXT: 2
+    // CHECK-NEXT: 13
 }
