@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-eight feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 74 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Twenty-nine feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 75 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -224,12 +224,26 @@ known exit. CUDA text/name recognition is removed. The independent RHI nine-mode
 returned incoming7 instead of11/12/21/31 in12 terminating cases at O0/O3; all231 assertions now pass.
 Ten source cells pass through eight initial passes and two retries after correcting only new
 assertion ordering. The focused unknown-call/cycle static unit and15 smoke cells pass (22.75s).
-NVVM final IR retains store11 and its register write before termination, then rejects the still
-unsupported AnyHit stage with E52017 and no PTX. Raw evidence is in build/nvvm-anyhit-producer.
+At that gate, NVVM final IR retained store11 and its register write before termination, then
+rejected the unsupported AnyHit stage with E52017 and no PTX. Raw evidence is in build/nvvm-anyhit-producer.
 
-**Next work:** admit a bounded AnyHit path with exact ObjectRay queries and effectful termination
-primitives, preserving checked payload/attribute stages and recursive E55214 rejection. Strengthen
-existing RHI object-ray controls with a nonidentity transform and correct AnyHit payload write
-permissions. Four implementation iterations have passed since the repaired working checkpoint;
-run the scheduled working corpus after this next bounded slice. The optional full RHI suite remains
-on demand, and the prior full baseline retains its identity.
+The bounded AnyHit execution batch is accepted. Six exact Float32 object-ray queries and two
+effectful Void termination calls reuse the existing provider ABI. Five NVVM RHI cases pass 418
+assertions, including object origin/direction and the unchanged nine-mode termination oracle at
+O0/O3. The strengthened affine oracle checks inverse-transformed, unnormalized values; its earlier
+NVRTC control passes 129 assertions. Three before-NVVM cases failed O0 stage admission and never
+reached O3. Two world-ray controls pass 64 assertions, both affected shared units and the recursive
+source diagnostic pass, both static plan units pass, and all 15 smoke cells pass (21.97s).
+NVVM recursion still rejects with E55214. AnyHit attribute admission is statically checked; the
+selected runtime callbacks do not consume attribute values. No ABI/module version changed.
+
+The scheduled working checkpoint after five implementations passes all 1,711 configurations,
+with no regressions or changed inputs. It refreshes this admitted corpus on the current compiler;
+the historical full baseline retains its own identity. The optional full RHI suite has not run.
+Raw evidence is under build/nvvm-anyhit; source and artifacts remained frozen throughout the run.
+
+**Next work:** admit the existing world-ray, ray-range, flags and hit-identity queries in AnyHit,
+as supported by the installed SDK, with an independent callback oracle. Core/provider signatures
+already exist; preserve raygen/compute and miss hit-information rejection. Keep transforms,
+geometry-index/SBT semantics, motion and procedural/callable ABI work as separate decisions.
+The working cadence restarts at this checkpoint. Full RHI remains on demand.

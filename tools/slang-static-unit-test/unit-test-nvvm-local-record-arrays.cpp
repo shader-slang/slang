@@ -60,11 +60,17 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
         Valid,
         Compute,
         AnyHit,
+        Intersection,
         InvalidType,
         EntryParameter
     };
     for (auto testCase :
-         {Case::Valid, Case::Compute, Case::AnyHit, Case::InvalidType, Case::EntryParameter})
+         {Case::Valid,
+          Case::Compute,
+          Case::AnyHit,
+          Case::Intersection,
+          Case::InvalidType,
+          Case::EntryParameter})
     {
         _resetDirectNVVMFakes();
         NVVMStaticTestContext context(unitTestContext);
@@ -85,9 +91,10 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
         builder.addEntryPointDecoration(
             entry,
             Profile(
-                testCase == Case::Compute  ? Stage::Compute
-                : testCase == Case::AnyHit ? Stage::AnyHit
-                                           : Stage::RayGeneration),
+                testCase == Case::Compute        ? Stage::Compute
+                : testCase == Case::AnyHit       ? Stage::AnyHit
+                : testCase == Case::Intersection ? Stage::Intersection
+                                                 : Stage::RayGeneration),
             toSlice("raygenMain"),
             toSlice("test"));
         builder.setInsertInto(entry);
@@ -111,14 +118,17 @@ SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
         linked.entryPoints.add(entry);
         NVVMOperationRequirements requirements;
         const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
-        if ((testCase == Case::Valid) != SLANG_SUCCEEDED(result))
+        const bool valid = testCase == Case::Valid || testCase == Case::AnyHit;
+        if (valid != SLANG_SUCCEEDED(result))
             getTestReporter()->message(
                 TestMessageType::Info,
                 context.sink.outputBuffer.getBuffer());
-        if (testCase == Case::Valid)
+        if (valid)
         {
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
-            SLANG_CHECK(requirements.emissionPlan.functionNames[0] == "__raygen__raygenMain");
+            SLANG_CHECK(
+                requirements.emissionPlan.functionNames[0] ==
+                (testCase == Case::AnyHit ? "__anyhit__raygenMain" : "__raygen__raygenMain"));
             SLANG_CHECK(requirements.emissionPlan.namedIntrinsics.getCount() == 1);
             SLANG_CHECK(requirements.emissionPlan.namedIntrinsics[0].source == sbt);
             SLANG_CHECK(requirements.emissionPlan.loads.getCount() == 1);
@@ -145,6 +155,7 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
         Float4,
         Compute,
         CallbackTrace,
+        AnyHitTrace,
         Bool,
         Padding,
         WrongOperand
@@ -154,6 +165,7 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
           Case::Float4,
           Case::Compute,
           Case::CallbackTrace,
+          Case::AnyHitTrace,
           Case::Bool,
           Case::Padding,
           Case::WrongOperand})
@@ -191,6 +203,7 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
             Profile(
                 testCase == Case::Compute         ? Stage::Compute
                 : testCase == Case::CallbackTrace ? Stage::Miss
+                : testCase == Case::AnyHitTrace   ? Stage::AnyHit
                                                   : Stage::RayGeneration),
             toSlice("probe"),
             toSlice("test"));
@@ -252,7 +265,8 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
-    for (auto stage : {Stage::Compute, Stage::RayGeneration, Stage::Miss, Stage::ClosestHit})
+    for (auto stage :
+         {Stage::Compute, Stage::RayGeneration, Stage::Miss, Stage::ClosestHit, Stage::AnyHit})
     {
         _resetDirectNVVMFakes();
         NVVMStaticTestContext context(unitTestContext);
@@ -273,9 +287,10 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
             &index);
         IRInst* args[] = {index, word};
         builder.emitIntrinsicInst(builder.getVoidType(), kIROp_SetOptiXPayloadRegister, 2, args);
+        const bool hasAttributes = stage == Stage::ClosestHit || stage == Stage::AnyHit;
         IRInst* attributeWords[2] = {};
         IRInst* attributeValues[2] = {};
-        if (stage == Stage::ClosestHit)
+        if (hasAttributes)
         {
             for (UInt i = 0; i < 2; ++i)
             {
@@ -299,14 +314,13 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
         linked.entryPoints.add(entry);
         NVVMOperationRequirements requirements;
         auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
-        const bool valid = stage == Stage::Miss || stage == Stage::ClosestHit;
+        const bool valid = stage == Stage::Miss || hasAttributes;
         SLANG_CHECK(valid == SLANG_SUCCEEDED(result));
         if (valid)
         {
             SLANG_CHECK(
-                requirements.emissionPlan.namedIntrinsics.getCount() ==
-                (stage == Stage::ClosestHit ? 4 : 2));
-            if (stage == Stage::ClosestHit)
+                requirements.emissionPlan.namedIntrinsics.getCount() == (hasAttributes ? 4 : 2));
+            if (hasAttributes)
             {
                 UInt conversions = 0;
                 for (const auto& planned : requirements.emissionPlan.valueOperations)
@@ -329,7 +343,9 @@ SLANG_UNIT_TEST(nvvmOptixTracePlansKeepPayloadAndStageBoundaries)
             }
             SLANG_CHECK(
                 requirements.emissionPlan.functionNames[0] ==
-                (stage == Stage::Miss ? "__miss__callback" : "__closesthit__callback"));
+                (stage == Stage::Miss     ? "__miss__callback"
+                 : stage == Stage::AnyHit ? "__anyhit__callback"
+                                          : "__closesthit__callback"));
         }
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
     }

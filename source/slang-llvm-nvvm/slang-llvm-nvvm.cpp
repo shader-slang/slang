@@ -3402,6 +3402,7 @@ enum class OptixIntrinsicKind
     Query32,
     Query64,
     QueryFloat32,
+    Terminate,
     GetPayload,
     SetPayload,
 };
@@ -3443,10 +3444,19 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
             "_optix_get_world_ray_direction_y",
             "_optix_get_world_ray_direction_z",
             "_optix_get_ray_tmin",
-            "_optix_get_ray_tmax"};
+            "_optix_get_ray_tmax",
+            "_optix_get_object_ray_origin_x",
+            "_optix_get_object_ray_origin_y",
+            "_optix_get_object_ray_origin_z",
+            "_optix_get_object_ray_direction_x",
+            "_optix_get_object_ray_direction_y",
+            "_optix_get_object_ray_direction_z"};
         for (auto query : rayQueries)
             if (name == query && areSameType(intrinsic.resultType, kFloat32))
                 return OptixIntrinsicKind::QueryFloat32;
+        if ((name == "_optix_ignore_intersection" || name == "_optix_terminate_ray") &&
+            areSameType(intrinsic.resultType, kVoid))
+            return OptixIntrinsicKind::Terminate;
         return OptixIntrinsicKind::None;
     }
     const bool get = name == "_optix_get_payload";
@@ -3626,14 +3636,17 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
             return SLANG_E_INVALID_ARG;
 
         const bool isSet = optixKind == OptixIntrinsicKind::SetPayload;
+        const bool isTerminate = optixKind == OptixIntrinsicKind::Terminate;
+        const bool isVoid = isSet || isTerminate;
         auto type = llvm::FunctionType::get(
             _getSemanticLLVMType(state->context, intrinsic->resultType),
             parameters,
             false);
-        llvm::SmallString<96> assembly(isSet ? "call " : "call ($0), ");
+        llvm::SmallString<96> assembly(isVoid ? "call " : "call ($0), ");
         assembly.append(llvm::StringRef(intrinsic->name, intrinsic->nameSize));
         assembly.append(isSet ? ", ($0, $1);" : operandCount ? ", ($1);" : ", ();");
-        const char* constraints = isSet                                           ? "r,r"
+        const char* constraints = isTerminate                                     ? ""
+                                  : isSet                                         ? "r,r"
                                   : operandCount                                  ? "=r,r"
                                   : optixKind == OptixIntrinsicKind::Query64      ? "=l"
                                   : optixKind == OptixIntrinsicKind::QueryFloat32 ? "=f"
@@ -3642,7 +3655,7 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
         // operation separately clobbers memory because its callbacks can access user storage.
         auto primitive = llvm::InlineAsm::get(type, assembly, constraints, true);
         auto call = state->builder.CreateCall(primitive, values);
-        if (!isSet)
+        if (!isVoid)
             *outValue = reinterpret_cast<SlangNVVMValueHandle>(call);
         return SLANG_OK;
     }

@@ -53,10 +53,16 @@ without mutation. Preflight enforces stages and rejects missing optional trace s
 module creation. Static tests retain SBT layout/load and role/cache boundaries.
 
 Qualification is CUDA12.9/OptiX SDK9, target SM80 on the recorded L4/595.71.05 host. Pointer payloads,
-arrays/matrices, padded/subword payloads, any-hit, procedural intersection, callables and recursive
+arrays/matrices, padded/subword payloads, procedural intersection, callables and recursive
 callback tracing remain outside this contract. The shared payload-termination producer repair is separately
 qualified by nine CUDA/NVRTC modes at O0/O3 (231 assertions), a focused IR boundary unit and
-source regressions. It preserves writes before known exits but does not itself admit NVVM AnyHit.
+source regressions. A subsequent bounded AnyHit batch qualifies exact object-ray queries and
+nullary Void ignore/accept primitives. Five selected NVVM RHI cases pass 418 assertions; object
+origin/direction and the nine-mode payload oracle execute O0/O3. The affine oracle distinguishes
+inverse-transformed, unnormalized directions from world-space values. Two world-ray controls add
+64 passing assertions. AnyHit attributes have checked/static plan coverage, without fresh runtime
+observation of attribute values. Existing ray-state/hit-identity query stage restrictions remain
+unchanged. The working checkpoint passes all 1,711 admitted configurations; full RHI stays optional.
 World-ray origin/direction and minimum/current distance are qualified in miss/closest-hit.
 The [material fixture](../../tests/pipeline/ray-tracing/nvvm-optix-material.slang) samples all four
 texel centers of a 2x2 texture and evaluates the unchanged imported MaterialX dielectric BSDF.

@@ -102,7 +102,7 @@ supported public operations, widths and pointer-output qualifications.
 
 ### OptiX entry and binding ownership
 
-Ray-generation, miss and closest-hit entries reuse the shared OptiX uniform-collection pass.
+Ray-generation, miss, closest-hit and any-hit entries reuse the shared OptiX uniform-collection pass.
 That producer moves entry uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`;
 it leaves compute parameters unchanged. After payload/varying legalization, NVVM preflight accepts
 void, parameterless entries and owns their stage-specific SDK symbol prefixes. Conventional globals
@@ -122,8 +122,8 @@ records totaling at most 32 words. Caller packing and callback unpacking reuse t
 unsupported shapes retain an operation or pointer fallback that NVVM preflight rejects. The lowered
 trace keeps its original type and returns an ordinary UInt32 array. Checked plans validate this
 contract before provider mutation. The original payload type is an explicit type dependency even
-when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit;
-triangle attributes only in closest-hit. These stage checks cover the reachable helper closure.
+when optimization removes every record-valued instruction used during packing. Trace is admitted in raygen; payload registers in miss/closest-hit/any-hit;
+triangle attributes in closest-hit/any-hit. These stage checks cover the reachable helper closure.
 
 The optional versioned trace interface uses the existing provider query mechanism without changing
 ABI46 tables. The provider adapts finite payload arrays to the SDK's fixed 32-result/49-argument
@@ -141,8 +141,12 @@ entry in the instance acceleration structure; the custom ID comes from its host 
 has ray state but no hit identity. This stage policy also applies to indirect helper calls.
 Unknown names, wrong signatures and invalid insertion points fail before emission. Missing trace
 support is diagnosed before module creation. This finite typed SDK boundary does not interpret CUDA
-text or admit arbitrary external calls. Any-hit, procedural intersection, callback tracing, callables
-and pointer payload transport remain outside this contract.
+text or admit arbitrary external calls. Object-ray origin/direction compose six exact Float32
+queries admitted only in any-hit; they preserve inverse transformation without normalization.
+IgnoreHit and AcceptHitAndEndSearch use exact nullary Void SDK calls, also any-hit-only. These
+calls are side-effecting, have no output constraint or result handle, and follow checked payload
+writebacks. Procedural intersection, callback tracing, callables and pointer payload transport
+remain outside this contract.
 
 Shader termination has canonical declaration identity before optimization: the core
 IgnoreHit and AcceptHitAndEndSearch declarations carry existing KnownBuiltin metadata.
@@ -152,8 +156,8 @@ and recursion diagnostics require a known exit. This preserves writes to a shade
 a nullary terminating helper implicitly observes, until varying legalization emits explicit
 payload-register writebacks. Conditional helpers can still return normally. The late legalizer
 uses the same identities instead of function names or CUDA target strings. Unsupported recursive
-termination still rejects; coverage accounting does not yet consume these identities. This
-shared correctness fix alone does not admit NVVM any-hit callbacks.
+termination still rejects; coverage accounting does not yet consume these identities. Stage
+admission remains a separate checked boundary.
 
 `resolveValueOperationFamily` is the single admission/diagnostic authority for numeric operation
 descriptors. Its exact catalog retains five hardware-wave signatures: active mask, ballot and

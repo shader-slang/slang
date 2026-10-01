@@ -85997,6 +85997,252 @@
         }
       ],
       "rhi_oracle_commit": "3b128336f06658f3e74c02673130cf19234470fd"
+    },
+    "nvvm-optix-anyhit": {
+      "status": "accepted-focused",
+      "scope": "Bounded triangle AnyHit execution, six ObjectRay Float32 queries and two nullary terminating primitives using the accepted shared payload-preservation repair.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "revision": "fca58462034cb6e17af8398fb3ed8e31b2101d93",
+        "source_sha256": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "78e9760037df0751ba319b6c4fb986cb65987c4028f7cb96da2dbee15740a277",
+          "source/slang/hlsl.meta.slang": "0a4cae87f77490ef439f5475319c69a3922447d6b0c77ae640b5c4cc31e0d1ff",
+          "source/slang/slang-emit-nvvm.cpp": "9405f04bfd16338bcce9d546fdaa8fe79484e7e2ff75f88a71cf7101f9906ab8",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "50f5c3b63ba2df9492a3cdbe25b4aae59a95bf55ffb915aa6d170354b4c2f3ec",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "abbfdb2f2225308c7901e8476da43adb654602338a2ac8632e3a75ae9d78efd0",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "1df79f615aa37a98558d508ccb19e0051c7b20b8294d7253369a06a4b63826fa"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "6155070edc3584f5a968bda8b692dd98d44fde090fe8cebe772c04edd8d582c7",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "3a96fee0d76dc1f2ff379af452c223a10f4aa2615ad72348a6533ab15132a548",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "92a9ae90acf5fd1563bc9d4fd4af1653f9d47a8731cd200df595a55dc4b04aff",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "4e82f50b4a4e5a521f396a072c57e5ce2325a283bceabd99f0eccfdb9a3ec865"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "meaning": "Matching bounded AnyHit core/emitter/provider and unit build, captured before focused qualification.",
+        "patch_sha256": "6c0539d8addf33f7924bf353d96c7f3dd1795e6da6b9e002e403fbfda165669f"
+      },
+      "rhi_identity": {
+        "path": "build/nvvm-anyhit/rhi-identity.json",
+        "sha256": "13bd4552dbe649d952109e4d68bcc4e2f3fa28dbf7846914b01753e859629e0f"
+      },
+      "before_identity": {
+        "path": "build/nvvm-anyhit/before-identity.json",
+        "sha256": "6765b63c635a8d14be923725a3090665f71ae11098082aafe6705c304dbc4f92"
+      },
+      "static_identity": {
+        "path": "build/nvvm-anyhit/static-identity.json",
+        "sha256": "424cc2e975f1514a61cecf2ed7e02ccbd5b5fc15d48adbbe812e157731945167"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-anyhit/build.json",
+          "sha256": "fe5985705b6dbdcd6d5e908e33c9dd17eb2d3a41b1f2fe1042ab68dfbdaf1cdb",
+          "return_code": 0,
+          "elapsed_seconds": 88.88294458389282
+        },
+        "rhi_build": {
+          "path": "build/nvvm-anyhit/rhi-build.json",
+          "sha256": "cb8c207dde360cc1b562b820a0b0e13a60ad736bcda11564025ad53c19981b06",
+          "return_code": 0,
+          "elapsed_seconds": 3.675949811935425
+        },
+        "focused": {
+          "record": {
+            "path": "build/nvvm-anyhit/focused.json",
+            "sha256": "33bc8cfd0c28a2fc297edd583ae72a1222911bd6284f194dfc61192dcee92d6b",
+            "return_code": 0,
+            "elapsed_seconds": 13.163453817367554
+          },
+          "outcomes": {
+            "tests/cuda/optix-terminate-nested-recursion.slang": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission.internal": "passed"
+          }
+        },
+        "static": {
+          "build": {
+            "path": "build/nvvm-anyhit/static-build.json",
+            "sha256": "2cd0d3598762d81fd47a8434d0fb3fbfae82eb7d76b092e39b823bf3123433d1",
+            "return_code": 0,
+            "elapsed_seconds": 81.43945693969727
+          },
+          "record": {
+            "path": "build/nvvm-anyhit/static-tests.json",
+            "sha256": "d57687a5e229adcaf675f2c0561b6e8dd592161ae411ac5c169bc896d520232f",
+            "return_code": 0,
+            "elapsed_seconds": 6.947609186172485
+          },
+          "outcomes": {
+            "nvvmOptixSbtPlansKeepStageAndTypeBoundaries": "passed",
+            "nvvmOptixTracePlansKeepPayloadAndStageBoundaries": "passed"
+          }
+        },
+        "recursion": {
+          "record": {
+            "path": "build/nvvm-anyhit/nvvm-recursion.json",
+            "sha256": "8b751e7bae51e70b236ec719108fb6c33c6b686c3c8423455db72fffe9f6d421",
+            "return_code": 255,
+            "elapsed_seconds": 0.279116153717041
+          },
+          "expected_diagnostic": "E55214 shader-terminating intrinsic in non-inlinable callee"
+        },
+        "runtime": {
+          "record": {
+            "path": "build/nvvm-anyhit/nvvm-after.json",
+            "sha256": "be24e3d7e48446622afa57fcfd88be6f68055b4d0a8d0a1e9150e3d8dfa98096",
+            "return_code": 0,
+            "elapsed_seconds": 4.306504011154175
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-accept-hit-and-end-search.cuda": "passed",
+            "ray-tracing-intrinsics-ignore-hit.cuda": "passed",
+            "ray-tracing-intrinsics-object-ray-direction.cuda": "passed",
+            "ray-tracing-intrinsics-object-ray-origin.cuda": "passed",
+            "ray-tracing-intrinsics-payload-termination.cuda": "passed"
+          },
+          "passed_assertions": 418,
+          "filtered_out_cases": 926,
+          "optimization": "Affine origin/direction and nine-mode payload termination complete O0/O3; direct accept/ignore retain existing defaults."
+        },
+        "world_controls": {
+          "record": {
+            "path": "build/nvvm-anyhit/world-controls.json",
+            "sha256": "d870016e9265ffc85d8af8686ee7b92a59e2ee7782ab9fe3c35d635241432e99",
+            "return_code": 0,
+            "elapsed_seconds": 1.736177682876587
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-world-ray-direction.cuda": "passed",
+            "ray-tracing-intrinsics-world-ray-origin.cuda": "passed"
+          },
+          "passed_assertions": 64,
+          "filtered_out_cases": 929
+        },
+        "nvrtc_before": {
+          "record": {
+            "path": "build/nvvm-anyhit/nvrtc-before.json",
+            "sha256": "2b946c47d4145b7b10e41b2e57c5df6d1718b97c0d5f72d0c943fb2d8cefa217",
+            "return_code": 0,
+            "elapsed_seconds": 4.553998708724976
+          },
+          "identity": {
+            "path": "build/nvvm-anyhit/before-identity.json",
+            "sha256": "6765b63c635a8d14be923725a3090665f71ae11098082aafe6705c304dbc4f92"
+          },
+          "passed_cases": 2,
+          "passed_assertions": 129,
+          "optimization_levels": [0, 3],
+          "meaning": "Accepted producer compiler before AnyHit admission, not final compiler; independent affine expectation."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-anyhit/smoke.json",
+            "sha256": "80dcc4b49e0e64888ee8112fd14d75c3a1ec993363d39e24a6d334512f638d77",
+            "return_code": 0,
+            "elapsed_seconds": 21.96737837791443
+          },
+          "selection": {
+            "path": "build/nvvm-anyhit/smoke-1/selection.json",
+            "sha256": "6c19a754b6d321ec4dfc1ef08e7afced468100ee84ee7bdd8151616aa3fc902e"
+          },
+          "provenance": {
+            "path": "build/nvvm-anyhit/smoke-1/provenance.json",
+            "sha256": "bd9bb2db67b71cfa1c2ee46e638343127c0327b56ffca13df1eab0da699356d5"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "working": {
+          "record": {
+            "path": "build/nvvm-anyhit/working.json",
+            "sha256": "74ff6504219b023a732b2a73ff641d3166ad2e97cbc14bd618695a7b1ad13562"
+          },
+          "selection": {
+            "path": "build/nvvm-anyhit/working-1/selection.json",
+            "sha256": "484db00f96b33f3843a1e04f23efdcb354dbd19beffd518b7693b39cfbe085cd"
+          },
+          "provenance": {
+            "path": "build/nvvm-anyhit/working-1/provenance.json",
+            "sha256": "fca8812ab5b549a0732ef01a840c25ff560e66a2ee45e00fe1f6a88b6c0fd395"
+          },
+          "selected": 1711,
+          "correct": 1711,
+          "regressions": 0,
+          "input_changes": 0,
+          "elapsed_seconds": 1072.261988401413,
+          "mode_counts": {
+            "nvrtc-o3": 569,
+            "nvvm-o0": 571,
+            "nvvm-o3": 571
+          },
+          "meaning": "Fresh scheduled admitted-working checkpoint after five implementation iterations. Historical full baseline and full-RHI status remain separate."
+        }
+      },
+      "runtime_contract": {
+        "object_to_world_rows": [
+          [0, -2, 0, 1],
+          [4, 0, 0, 2],
+          [0, 0, 8, 3]
+        ],
+        "world_origin": [0, 0, 0],
+        "world_direction": [0.5, 3, 11],
+        "expected_object_origin": [-0.5, 0.5, -0.375],
+        "expected_object_direction": [0.75, -0.25, 1.375],
+        "hit_parameter": 1,
+        "policy": "Exact binary fractions, all three query components at O0/O3, no normalization. Existing identity/termination oracles unchanged."
+      },
+      "resolved_failures": [
+        {
+          "before": {
+            "path": "build/nvvm-anyhit/nvvm-before.json",
+            "sha256": "52c39d34e1a20ed91b03a58fe0e5340af6e2076cc9a7f068b16c9bab00dad02d",
+            "return_code": 1,
+            "elapsed_seconds": 1.9970333576202393
+          },
+          "identity": {
+            "path": "build/nvvm-anyhit/before-identity.json",
+            "sha256": "6765b63c635a8d14be923725a3090665f71ae11098082aafe6705c304dbc4f92"
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-object-ray-direction.cuda": "backend-preflight-failure",
+            "ray-tracing-intrinsics-object-ray-origin.cuda": "backend-preflight-failure",
+            "ray-tracing-intrinsics-payload-termination.cuda": "backend-preflight-failure"
+          },
+          "diagnostic": "E52017 entry-point stage",
+          "before_optimization_executed": 0,
+          "before_optimization_not_reached": 3,
+          "resolution": {
+            "path": "build/nvvm-anyhit/nvvm-after.json",
+            "sha256": "be24e3d7e48446622afa57fcfd88be6f68055b4d0a8d0a1e9150e3d8dfa98096"
+          }
+        }
+      ],
+      "qualification": [
+        "Scheduled1711-cell working checkpoint passes without regressions or changed inputs; source/artifacts remained frozen.",
+        "AnyHit attribute0/1 admission has static plan/signature coverage only, no runtime observation of attribute values.",
+        "Finite existing32-bit payload representation; no procedural intersection, callable, recursion, arbitrary payload storage or ABI/module expansion.",
+        "Existing shared producer acceptance owns payload-before-termination correctness; earlier histories remain unchanged.",
+        "No full RHI suite or full baseline advancement; all74 prior focused features and accepted records remain unchanged."
+      ],
+      "rhi_oracle_commit": "011c2d62313649c4d343fbcc416ec1cc18593886"
     }
   }
 }

@@ -21322,6 +21322,7 @@ void IgnoreHit()
     {
     case hlsl: __intrinsic_asm "IgnoreHit";
     case glsl: __intrinsic_asm "ignoreIntersectionEXT;";
+    case nvvm: __intrinsic_asm "_optix_ignore_intersection";
     case cuda: __intrinsic_asm "optixIgnoreIntersection";
     case spirv:
         spirv_asm
@@ -21343,6 +21344,7 @@ void AcceptHitAndEndSearch()
     {
     case hlsl: __intrinsic_asm "AcceptHitAndEndSearch";
     case glsl: __intrinsic_asm "terminateRayEXT;";
+    case nvvm: __intrinsic_asm "_optix_terminate_ray";
     case cuda: __intrinsic_asm "optixTerminateRay";
     case spirv:
         spirv_asm
@@ -21774,6 +21776,66 @@ uint PrimitiveIndex()
     }
 }
 
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixObjectRayOriginX()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_object_ray_origin_x";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixObjectRayOriginY()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_object_ray_origin_y";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixObjectRayOriginZ()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_object_ray_origin_z";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixObjectRayDirectionX()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_object_ray_direction_x";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixObjectRayDirectionY()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_object_ray_direction_y";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal float __nvvmOptixObjectRayDirectionZ()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_object_ray_direction_z";
+    }
+}
+
 /// Returns the ray origin in object space of the current instance.
 /// @return Object-space position where the ray originated
 /// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
@@ -21786,6 +21848,7 @@ float3 ObjectRayOrigin()
     {
     case hlsl:  __intrinsic_asm "ObjectRayOrigin";
     case glsl: __intrinsic_asm "(gl_ObjectRayOriginEXT)";
+    case nvvm: return float3(__nvvmOptixObjectRayOriginX(), __nvvmOptixObjectRayOriginY(), __nvvmOptixObjectRayOriginZ());
     case cuda: __intrinsic_asm "optixGetObjectRayOrigin";
     case spirv:
         return spirv_asm
@@ -21807,6 +21870,7 @@ float3 ObjectRayDirection()
     {
     case hlsl:  __intrinsic_asm "ObjectRayDirection";
     case glsl: __intrinsic_asm "(gl_ObjectRayDirectionEXT)";
+    case nvvm: return float3(__nvvmOptixObjectRayDirectionX(), __nvvmOptixObjectRayDirectionY(), __nvvmOptixObjectRayDirectionZ());
     case cuda: __intrinsic_asm "optixGetObjectRayDirection";
     case spirv:
         return spirv_asm

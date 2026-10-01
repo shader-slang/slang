@@ -3029,11 +3029,25 @@ bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function)
 // A helper containing a payload access is still illegal when called by a compute entry.
 bool _isNVVMOptixStage(Stage stage)
 {
-    return stage == Stage::RayGeneration || stage == Stage::Miss || stage == Stage::ClosestHit;
+    return stage == Stage::RayGeneration || stage == Stage::Miss || stage == Stage::ClosestHit ||
+           stage == Stage::AnyHit;
 }
 
 bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
 {
+    const char* anyHitPrimitives[] = {
+        "_optix_get_object_ray_origin_x",
+        "_optix_get_object_ray_origin_y",
+        "_optix_get_object_ray_origin_z",
+        "_optix_get_object_ray_direction_x",
+        "_optix_get_object_ray_direction_y",
+        "_optix_get_object_ray_direction_z",
+        "_optix_ignore_intersection",
+        "_optix_terminate_ray",
+    };
+    for (auto primitive : anyHitPrimitives)
+        if (name == UnownedStringSlice(primitive))
+            return stage == Stage::AnyHit;
     // Ray state exists only while servicing a ray in the selected callback stages.
     // Match the complete SDK names so launch queries retain their separate stage contract.
     const char* rayStateQueries[] = {
@@ -3056,9 +3070,9 @@ bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
         name == toSlice("_optix_get_hit_kind"))
         return stage == Stage::ClosestHit;
     if (name == toSlice("_optix_get_payload") || name == toSlice("_optix_set_payload"))
-        return stage == Stage::Miss || stage == Stage::ClosestHit;
+        return stage == Stage::Miss || stage == Stage::ClosestHit || stage == Stage::AnyHit;
     if (name.startsWith(toSlice("_optix_get_attribute_")))
-        return stage == Stage::ClosestHit;
+        return stage == Stage::ClosestHit || stage == Stage::AnyHit;
     return _isNVVMOptixStage(stage);
 }
 
@@ -3078,13 +3092,14 @@ bool _planNVVMOptixRegister(IRInst* inst, Stage stage, NVVMPlannedNamedIntrinsic
         return false;
     if (attribute)
     {
-        if (stage != Stage::ClosestHit || inst->getOperand(0) != inst->getDataType() ||
+        if ((stage != Stage::ClosestHit && stage != Stage::AnyHit) ||
+            inst->getOperand(0) != inst->getDataType() ||
             inst->getDataType()->getOp() != kIROp_UIntType)
             return false;
         plan.name = index->getValue() ? "_optix_get_attribute_1" : "_optix_get_attribute_0";
         return true;
     }
-    if (stage != Stage::Miss && stage != Stage::ClosestHit)
+    if (stage != Stage::Miss && stage != Stage::ClosestHit && stage != Stage::AnyHit)
         return false;
     if (write)
     {
@@ -5064,6 +5079,8 @@ String _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
             return String("__miss__") + name;
         case Stage::ClosestHit:
             return String("__closesthit__") + name;
+        case Stage::AnyHit:
+            return String("__anyhit__") + name;
         default:
             break;
         }

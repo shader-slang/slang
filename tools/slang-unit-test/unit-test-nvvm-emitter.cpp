@@ -41,7 +41,8 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
     enum class QueryStage
     {
         RayCallback,
-        ClosestHit
+        ClosestHit,
+        AnyHit
     };
     const struct
     {
@@ -62,11 +63,26 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
         {"_optix_read_instance_id", "uint", QueryStage::ClosestHit},
         {"_optix_get_ray_flags", "uint", QueryStage::RayCallback},
         {"_optix_get_hit_kind", "uint", QueryStage::ClosestHit},
+        {"_optix_get_object_ray_origin_x", "float", QueryStage::AnyHit},
+        {"_optix_get_object_ray_origin_y", "float", QueryStage::AnyHit},
+        {"_optix_get_object_ray_origin_z", "float", QueryStage::AnyHit},
+        {"_optix_get_object_ray_direction_x", "float", QueryStage::AnyHit},
+        {"_optix_get_object_ray_direction_y", "float", QueryStage::AnyHit},
+        {"_optix_get_object_ray_direction_z", "float", QueryStage::AnyHit},
+        {"_optix_ignore_intersection", "void", QueryStage::AnyHit},
+        {"_optix_terminate_ray", "void", QueryStage::AnyHit},
     };
     for (const auto& query : queries)
-        for (SlangStage stage : {SLANG_STAGE_COMPUTE, SLANG_STAGE_RAY_GENERATION, SLANG_STAGE_MISS})
+        for (SlangStage stage :
+             {SLANG_STAGE_COMPUTE,
+              SLANG_STAGE_RAY_GENERATION,
+              SLANG_STAGE_MISS,
+              SLANG_STAGE_CLOSEST_HIT,
+              SLANG_STAGE_ANY_HIT})
         {
-            if (stage == SLANG_STAGE_MISS && query.allowedStage == QueryStage::RayCallback)
+            if ((stage == SLANG_STAGE_MISS && query.allowedStage == QueryStage::RayCallback) ||
+                (stage == SLANG_STAGE_CLOSEST_HIT && query.allowedStage != QueryStage::AnyHit) ||
+                (stage == SLANG_STAGE_ANY_HIT && query.allowedStage == QueryStage::AnyHit))
                 continue;
             _resetDirectNVVMFakes();
             ComPtr<slang::IGlobalSession> globalSession;
@@ -93,15 +109,22 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
                 SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
             StringBuilder source;
             const char* type = query.resultType;
-            const char* entryAttribute = stage == SLANG_STAGE_COMPUTE ? "[numthreads(1,1,1)] "
-                                         : stage == SLANG_STAGE_RAY_GENERATION
-                                             ? "[shader(\"raygeneration\")] "
-                                             : "[shader(\"miss\")] ";
-            source << "[require(nvvm)] [NonUniformReturn] " << type
+            const bool isVoid = strcmp(type, "void") == 0;
+            const char* entryAttribute =
+                stage == SLANG_STAGE_COMPUTE          ? "[numthreads(1,1,1)] "
+                : stage == SLANG_STAGE_RAY_GENERATION ? "[shader(\"raygeneration\")] "
+                : stage == SLANG_STAGE_MISS           ? "[shader(\"miss\")] "
+                : stage == SLANG_STAGE_CLOSEST_HIT    ? "[shader(\"closesthit\")] "
+                                                      : "[shader(\"anyhit\")] ";
+            source << "[require(nvvm)] " << (isVoid ? "" : "[NonUniformReturn] ") << type
                    << " primitive() { __target_switch { case nvvm: __intrinsic_asm \"" << query.name
-                   << "\"; } } [noinline] " << type
-                   << " indirect() { return primitive(); } RWStructuredBuffer<" << type
-                   << "> output; " << entryAttribute << "void main() { output[0] = indirect(); }";
+                   << "\"; } } [noinline] " << type << " indirect() { " << (isVoid ? "" : "return ")
+                   << "primitive(); } ";
+            if (isVoid)
+                source << entryAttribute << "void main() { indirect(); }";
+            else
+                source << "RWStructuredBuffer<" << type << "> output; " << entryAttribute
+                       << "void main() { output[0] = indirect(); }";
             ComPtr<slang::IBlob> diagnostics, code;
             ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
                 "optixRayStateStage",

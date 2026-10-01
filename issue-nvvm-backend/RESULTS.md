@@ -184,6 +184,15 @@ ray flags. Pair it with
   --test-case=ray-tracing-intrinsics-hit-identities.cuda,ray-tracing-triangle-intersection.cuda
 ```
 
+The focused AnyHit controls are `ray-tracing-intrinsics-payload-termination.cuda`,
+`ray-tracing-intrinsics-object-ray-origin.cuda` and
+`ray-tracing-intrinsics-object-ray-direction.cuda`. Each runs O0/O3 internally. The payload test
+checks nine direct/nested/conditional termination modes and normal-return controls; the object
+cases use exact independent affine expectations without normalizing the direction. Existing
+`ray-tracing-intrinsics-accept-hit-and-end-search.cuda` and
+`ray-tracing-intrinsics-ignore-hit.cuda` are small supplemental controls. Select these names with
+the same compiler/device options above; they do not require a full-suite run.
+
 Only when the broader suite is requested, run the same command with `--test-case='*.cuda'`.
 Keep NVVM and NVRTC logs separate, retain initial failures, and inspect executed/failed/skipped
 counts and individual diagnostics. A zero-test filter or skipped test is not runtime qualification.
