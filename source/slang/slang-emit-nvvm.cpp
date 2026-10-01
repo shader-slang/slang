@@ -2847,17 +2847,19 @@ bool _resolveNVVMTextureOperation(IRInst* inst, NVVMTextureOperationRequirement&
 
     if (isLayerQuery)
     {
-        if (!textureType.isArray || textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D ||
+        if (!textureType.isArray ||
+            (textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_1D &&
+             textureType.shape != SLANG_NVVM_TEXTURE_SHAPE_2D) ||
             !isNVVMUnsignedI32Type(inst->getDataType()))
             return false;
-        operation.operation = SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
-        outOperation.diagnosticName = "sampled Texture2DArray layer count";
+        operation.operation = textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D
+                                  ? SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT
+                                  : SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
+        outOperation.diagnosticName = "sampled texture array layer count";
         return true;
     }
     if (isQuery)
     {
-        if (textureType.isArray && textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D)
-            return false;
         const UInt rank = textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_1D   ? 1
                           : textureType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ? 3
                                                                              : 2;

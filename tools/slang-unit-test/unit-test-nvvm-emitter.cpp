@@ -11347,8 +11347,17 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
     const struct
     {
         bool isArray;
+        UInt spatialRank;
         const char* outputType;
-    } dimensionCases[] = {{false, "float"}, {true, "uint"}, {true, "int"}, {true, "float"}};
+    } dimensionCases[] = {
+        {false, 3, "float"},
+        {true, 2, "uint"},
+        {true, 2, "int"},
+        {true, 2, "float"},
+        {true, 1, "uint"},
+        {true, 1, "int"},
+        {true, 1, "float"},
+    };
     for (const auto& test : dimensionCases)
     {
         _resetDirectNVVMFakes();
@@ -11358,11 +11367,15 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
         ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
         session->setSharedLibraryLoader(loader);
         StringBuilder source;
-        source << (test.isArray ? "Texture2DArray<float4>" : "Texture3D<float4>")
+        source << (test.spatialRank == 1 ? "Texture1DArray<float4>"
+                   : test.isArray        ? "Texture2DArray<float4>"
+                                         : "Texture3D<float4>")
                << " texture; RWStructuredBuffer<" << test.outputType << "> output; "
                << "[numthreads(1,1,1)] void computeMain() { " << test.outputType
-               << " width,height,third; texture.GetDimensions(width,height,third); "
-               << "output[0]=width; output[1]=height; output[2]=third; }";
+               << " width,height,third; texture.GetDimensions(width,height"
+               << (test.spatialRank == 1 ? "" : ",third") << "); "
+               << "output[0]=width; output[1]=height; "
+               << (test.spatialRank == 1 ? "" : "output[2]=third;") << " }";
         ComPtr<slang::IBlob> code, diagnostics;
         auto result = _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
         if (SLANG_FAILED(result))
@@ -11370,15 +11383,16 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
                 TestMessageType::Info,
                 _getBlobText(diagnostics).getBuffer());
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
-        SLANG_CHECK_ABORT(gFakeNVVMBuilder.textureOperations.getCount() == 3);
-        SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 3);
+        const UInt outputCount = test.isArray ? test.spatialRank + 1 : test.spatialRank;
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.textureOperations.getCount() == outputCount);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == outputCount);
         const SlangNVVMTextureOperation operations[] = {
             SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH,
             SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT,
             SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH};
-        // Runtime resources are cubic. Bind each ordered output to its own spatial query here,
-        // including the unsigned numeric conversion, so swapped lanes cannot cancel in runtime.
-        for (Index lane = 0; lane < 3; ++lane)
+        // Some runtime resources have equal spatial extents. Bind each ordered output to its
+        // spatial or layer query, including numeric conversion, so swapped lanes cannot cancel.
+        for (Index lane = 0; lane < outputCount; ++lane)
         {
             auto value = gFakeNVVMBuilder.storeValueRefs[lane];
             if (UnownedStringSlice(test.outputType) == "float")
@@ -11410,24 +11424,29 @@ SLANG_UNIT_TEST(nvvmSlangResourceOperationsUseTypedInstructions)
                 value = conversion.operands[0];
             }
             auto query = value;
-            if (!test.isArray || lane < 2)
+            if (lane < test.spatialRank && value.kind == FakeNVVMBuilderValueKind::VectorElement)
             {
-                SLANG_CHECK_ABORT(value.kind == FakeNVVMBuilderValueKind::VectorElement);
                 SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[value.index] == uint32_t(lane));
                 const auto vector = gFakeNVVMBuilder.vectorElementBaseValueRefs[value.index];
                 SLANG_CHECK_ABORT(vector.kind == FakeNVVMBuilderValueKind::VectorConstruct);
                 SLANG_CHECK_ABORT(
                     gFakeNVVMBuilder.vectorConstructElementCounts[vector.index] ==
-                    (test.isArray ? 2 : 3));
+                    test.spatialRank);
                 query = gFakeNVVMBuilder.vectorConstructElementValueRefs
                             [gFakeNVVMBuilder.vectorConstructElementOffsets[vector.index] + lane];
+            }
+            else if (lane < test.spatialRank)
+            {
+                // A rank-one spatial query can fold directly to its scalar width result.
+                SLANG_CHECK(test.spatialRank == 1);
             }
             SLANG_CHECK_ABORT(query.kind == FakeNVVMBuilderValueKind::TextureOperation);
             const auto& operation = gFakeNVVMBuilder.textureOperations[query.index];
             SLANG_CHECK(operation.operation == operations[lane]);
             SLANG_CHECK(
-                operation.shape ==
-                (test.isArray ? SLANG_NVVM_TEXTURE_SHAPE_2D : SLANG_NVVM_TEXTURE_SHAPE_3D));
+                operation.shape == (test.spatialRank == 1 ? SLANG_NVVM_TEXTURE_SHAPE_1D
+                                    : test.isArray        ? SLANG_NVVM_TEXTURE_SHAPE_2D
+                                                          : SLANG_NVVM_TEXTURE_SHAPE_3D));
             SLANG_CHECK(operation.isArray == uint32_t(test.isArray));
         }
     }

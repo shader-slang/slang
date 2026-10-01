@@ -79439,6 +79439,210 @@
         "last_targeted": "texture-array-layer-counts",
         "implementations_since_full": 6
       }
+    },
+    "nvvm-texture-1d-array-layer-counts": {
+      "status": "accepted-focused",
+      "scope": "Non-mip readonly Texture1DArray width and actual view layer counts for int/uint/float outputs; existing2D support unchanged. Stable916/module43/providerABI46/container2 unchanged.",
+      "contract": "Reuse rank1 TextureQuerySize and scalar UInt32 TextureQueryLayerCount. Actual1DArray count maps to QUERY_HEIGHT; core casts/ordered outputs preserve roles. Non-array1D height and all1D depth remain rejected.",
+      "identity": {
+        "revision": "2c28ef437a35db8cb59e325532022c3030ff9f69",
+        "patch_sha256": "d861366db3a99073c58fc053c5ab46d92c0de2cc4ec94d0cbdbebbb0cbe4501d",
+        "source_sha256": {
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "326ef185ef7ceb1d63ca5001ef34cfa59bb06a8c29318bb2b20dc767a9bc0cca",
+          "source/slang/slang-core-module-textures.cpp": "bb5e3a0524f3fa46afaa6cce11b6945147de0cedf9a9b98b2c55be54f9765ab1",
+          "source/slang/slang-emit-nvvm.cpp": "6d6e1325081e6ae9a18c0e7be441dd883a0ba067d952c39d98b529d43144bfdc",
+          "tests/cuda/nvvm-texture-array-layer-counts.slang": "aadca4d61f332f271fed5e897d0707da0cba4df51a9d11579b967f2e608150e5",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "20180c4f921a475f3ac1923f70f5dbefe73fdddbceb1fb761cde6c9759291dc7",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "9d2f8eeebbeb4bfc38413286c9941a9bea2032436f7afa2b785873ae6a5dada8",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "4dd320ac15f385aa14f98417f81d04ff35f371de68c24c1920a03314dfd70ceb",
+          "tests/cuda/nvvm-texture-query-unsupported.slang": "c8662b5fc4fd68f6a34035719d5f189840f7743cc4c0b775e4d3524488519742",
+          "tests/cuda/nvvm-texture-dimensions.slang": "7577d58d193451d2e1b0dd36f8c752fe198087bfb4dc9678310646f0e1bfe5f6"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "9639aaba7676787e74bfa18026498d3418b814b93054d05d3602492745390c7c",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9933e10c36a8f81470e1d1bbd736c00ec592b5c9cfba0ceab4f08f098d33613c",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "548121377d62a246d0bc229b6c9b6fd59333ae52e0126e419257c90d45622ef0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "cfe40aa6b95b3bd298f67e5fb08ea819365ae9f4693e63622a828aecbdf52b85"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ],
+        "probe_sha256": {
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-texture-1d-array-layer-counts/slang-view-probe.cu": "4a9bd3df961cd1a697957d25ea0da6d0a066f8dff63cd301be32f1b459cdcd4b",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-texture-1d-array-layer-counts/slang-view-probe": "8dcfba1721a948dbd0c83689e7fce78cdbcf403183078d577c55372e37b84fda",
+          "/home/skallweit/codex/agent-sandbox/slang/build/nvvm-texture-1d-array-layer-counts/view-kernel.slang": "039e81f26d12d76ecfd4c412c13ca77a9507a81e7dc664fb99f77a40d3029df3"
+        }
+      },
+      "build": {
+        "path": "build/nvvm-texture-1d-array-layer-counts/build.json",
+        "sha256": "614b7c223c74c461af6e0eb3c2d49db2d11a971dd041f96ed023390e44d12415"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-texture-1d-array-layer-counts/units.json",
+            "sha256": "bda3f410e950ab556b63c8d684daa23d33b20abc7ce625a063d3cb480c62ea3d"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderQueriesTypedTextureOperations.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangResourceOperationsUseTypedInstructions.internal": "passed"
+          },
+          "counts": {
+            "passed": 3
+          }
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-texture-1d-array-layer-counts/runtime.json",
+            "sha256": "aa1c7640206ed024f24b01d2e037140a9612360a248b78d06aae85c2c8d50197"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-texture-array-layer-counts.slang (cuda)": "passed",
+            "tests/cuda/nvvm-texture-array-layer-counts.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang.1 (cuda)": "passed",
+            "tests/cuda/nvvm-texture-dimensions.slang.2 (cuda)": "passed"
+          },
+          "counts": {
+            "passed": 5
+          }
+        },
+        "negatives": {
+          "gate": {
+            "path": "build/nvvm-texture-1d-array-layer-counts/negatives.json",
+            "sha256": "95f1f6cf372eb787cd7e550997e4391357a15b489e555c57d23a83b53af96183"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-texture-query-unsupported.slang": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-texture-query-unsupported.slang.3": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        }
+      },
+      "runtime_contract": "Existing NVVM O0/O3 fixture adds1D arrays2/3/5 across UInt32/SInt32/Float32 texels and all three dimension output scalar families, with a raw UInt64 descriptor helper. Existing2D checks retained. Six anchored zero error words, leading324508639/tail3735928559 guards, completion4096. Three shared spatial control modes unchanged.",
+      "view_runtime": {
+        "compile": {
+          "path": "build/nvvm-texture-1d-array-layer-counts/compile-view.json",
+          "sha256": "3dcdd1aab45296b824b7ea9b3d11da4f7c0ee6b76dda5763a1dad5f816420ebc"
+        },
+        "execution": {
+          "path": "build/nvvm-texture-1d-array-layer-counts/view-runtime.json",
+          "sha256": "2ea0679dee5831fcda6e388a9d522f3c9dd8fb0434e81b9cd4f155be4b8007e1"
+        },
+        "host_build": {
+          "path": "build/nvvm-texture-1d-array-layer-counts/build-probe.json",
+          "sha256": "1d236310d20cc38a72d2e6bff43584f11ada897164c5886c99ee8907d2b9b723"
+        },
+        "host_identity": {
+          "path": "build/nvvm-texture-1d-array-layer-counts/probe-identity.json",
+          "sha256": "bc9f1f534f1fe6efe609c228f226b526acba3022ba5b70eb2c9d9a032121a051"
+        },
+        "abi": {
+          "path": "build/nvvm-texture-1d-array-layer-counts/view-abi.json",
+          "sha256": "43b07bd562b7ded571a7248def48bf85c74a8b10bd12523fd79927135d56a2a9"
+        },
+        "ptx": {
+          "path": "build/nvvm-texture-1d-array-layer-counts/view-kernel.ptx",
+          "sha256": "bd00f29651d810efdcc1749755fd74c095d432a1312d923b8b5c8556ceeb2631"
+        },
+        "observations": [
+          {
+            "case": "explicit-full",
+            "handle": 1,
+            "allocation": [11, 0, 5],
+            "allocation_flags": 1,
+            "view_status": 0,
+            "explicit_view": true,
+            "fetched_view_format": 13,
+            "fetched_view": [11, 0, 5, 0, 0, 0, 4],
+            "expected": [11, 5, 0],
+            "output": [324508639, 11, 5, 0, 3235823838, 3735928559],
+            "match": true
+          },
+          {
+            "case": "restricted-1-through-3",
+            "handle": 1,
+            "allocation": [11, 0, 5],
+            "allocation_flags": 1,
+            "view_status": 0,
+            "explicit_view": true,
+            "fetched_view_format": 13,
+            "fetched_view": [11, 0, 5, 0, 0, 1, 3],
+            "expected": [11, 3, 0],
+            "output": [324508639, 11, 3, 0, 3235823838, 3735928559],
+            "match": true
+          }
+        ],
+        "qualification": "Fresh Slang O3 raw-handle execution on two explicit views of one11x5 non-mipUInt32 layered allocation; dimensions11/5 and11/3. Width/count are returned via separate typed queries; third probe lane is literal0, not a public depth semantic. CUDA12.9/SM80 on L4driver595.71.05."
+      },
+      "research": {
+        "qualification": {
+          "path": "build/nvvm-texture-remaining-array-views/qualification.json",
+          "sha256": "8af9229f0645477857a0fe81b49f4f70b25c846d23f4d730f93dc87decdbb20c"
+        },
+        "status": "Partial qualification:2one-dimensional passes and2completed cube mismatches; process exited2, not an all-pass experiment.",
+        "retained_cube_mismatches": {
+          "full": {
+            "allocation": [8, 8, 30],
+            "requested_view_layers": [0, 29],
+            "intended_cube_count": 5,
+            "observed_depth": 30
+          },
+          "restricted": {
+            "allocation": [8, 8, 30],
+            "requested_view_layers": [6, 23],
+            "intended_cube_count": 3,
+            "observed_depth": 18
+          }
+        },
+        "interpretation": "All explicit descriptors echoed exactly and guards survived. This does not establish cube-view index units; tested direct-depth-to-public-count hypothesis failed. Retain distinct prior null-view cube counts, no divide6fallback or alternateendpoint retry."
+      },
+      "negative_boundaries": "Existing provider descriptor/no-mutation paired serialization and compiler writable/CubeArrayFloat/ordinary2Dlayer-query negatives retained. Four mip/MS cells unchanged.",
+      "validation_incidents": [],
+      "comparison": "CUDA source count-zero fallback remains a documented discrepancy, not Slang semantic oracle.",
+      "preservation": {
+        "prior_feature_count": 48,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        },
+        "full_dimensions_history": "Broad discovery still needs Cube/mip contracts and remains unresolved."
+      },
+      "limitations": [
+        "CubeArray counts and their explicit-view index units remain unqualified; no cube admission changes.",
+        "Mips, multisample/writable roles, singleton render-test binding and null-view getter anomaly remain outside this feature.",
+        "RestrictedSlang proof is non-mipUInt32/O3 on specifiedstack; no universalformat/driverclaim, full campaign or performanceclaim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "texture-1d-array-layer-counts",
+        "implementations_since_full": 7
+      }
     }
   }
 }

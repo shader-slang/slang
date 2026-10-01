@@ -296,6 +296,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderQueriesTypedTextureOperations)
                 SLANG_CHECK(
                     builder.supportsTextureOperation(query) ==
                     (shape != SLANG_NVVM_TEXTURE_SHAPE_1D));
+                query.isArray = 1;
+                SLANG_CHECK(
+                    builder.supportsTextureOperation(query) ==
+                    (shape != SLANG_NVVM_TEXTURE_SHAPE_3D));
+                query.isArray = 0;
                 query.operation = SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH;
                 SLANG_CHECK(
                     builder.supportsTextureOperation(query) ==
@@ -825,25 +830,28 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries)
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
                 builder.emitTextureOperation(module.module, operation, &texture, 1, queryResult)));
             SLANG_CHECK_ABORT(queryResult != nullptr);
-            if (operations[i] == SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH)
+            if (operations[i] == SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT ||
+                operations[i] == SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH)
             {
-                auto arrayDepth = operation;
-                arrayDepth.shape = SLANG_NVVM_TEXTURE_SHAPE_2D;
-                arrayDepth.isArray = 1;
+                auto arrayCount = operation;
+                arrayCount.shape = operations[i] == SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT
+                                       ? SLANG_NVVM_TEXTURE_SHAPE_1D
+                                       : SLANG_NVVM_TEXTURE_SHAPE_2D;
+                arrayCount.isArray = 1;
                 SlangNVVMValueHandle layerCount = nullptr;
                 SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
                     builder
-                        .emitTextureOperation(module.module, arrayDepth, &texture, 1, layerCount)));
+                        .emitTextureOperation(module.module, arrayCount, &texture, 1, layerCount)));
                 SLANG_CHECK(layerCount != nullptr);
                 if (injectFailure)
                 {
                     // Reject the non-array role while the insertion block is live. Final complete
                     // module bytes must match the control, not just the successful call count.
-                    arrayDepth.isArray = 0;
+                    arrayCount.isArray = 0;
                     SlangNVVMValueHandle rejected = layerCount;
                     SLANG_CHECK(SLANG_FAILED(builder.emitTextureOperation(
                         module.module,
-                        arrayDepth,
+                        arrayCount,
                         &texture,
                         1,
                         rejected)));
@@ -870,7 +878,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderEmitsIntegerSwitchAndTextureQueries)
             const UnownedStringSlice assemblySlice = assembly.getUnownedSlice();
             SLANG_CHECK(assembly.indexOf("switch i32 ") >= 0);
             SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("unreachable")) == 1);
-            SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("call i32 @llvm.nvvm.txq.")) == 4);
+            SLANG_CHECK(_countOccurrences(assemblySlice, toSlice("call i32 @llvm.nvvm.txq.")) == 5);
+            SLANG_CHECK(
+                _countOccurrences(assemblySlice, toSlice("call i32 @llvm.nvvm.txq.height(")) == 2);
             SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.width(i64") >= 0);
             SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.height(i64") >= 0);
             SLANG_CHECK(assembly.indexOf("@llvm.nvvm.txq.depth(i64") >= 0);

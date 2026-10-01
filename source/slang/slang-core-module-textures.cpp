@@ -660,11 +660,11 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
             StringBuilder nvvm;
-            // Spatial extents and the qualified 2D array layer count are distinct queries.
+            // Spatial extents and the qualified 1D/2D array layer counts are distinct queries.
             // Other array families retain their existing integer-output contract.
             if (!includeMipInfo && !isMultisample &&
-                (dimType != DimType::Float || !isArray || baseShape == SLANG_TEXTURE_2D) &&
-                !(isArray && baseShape == SLANG_TEXTURE_1D))
+                (dimType != DimType::Float || !isArray || baseShape == SLANG_TEXTURE_1D ||
+                 baseShape == SLANG_TEXTURE_2D))
             {
                 nvvm << "let size = __nvvmTextureQuerySize(this);\n";
                 nvvm << "width = " << rawT << "(size.x);\n";
@@ -675,8 +675,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 if (isArray)
                 {
                     nvvm << "elements = " << rawT << "("
-                         << (baseShape == SLANG_TEXTURE_2D ? "__nvvmTextureQueryLayerCount(this)"
-                                                           : "0")
+                         << (baseShape == SLANG_TEXTURE_1D || baseShape == SLANG_TEXTURE_2D
+                                 ? "__nvvmTextureQueryLayerCount(this)"
+                                 : "0")
                          << ");\n";
                 }
                 nvvm << "return;";

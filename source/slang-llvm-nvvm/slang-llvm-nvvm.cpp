@@ -4474,7 +4474,8 @@ static bool _isTextureOperationSupported(const SlangNVVMTextureOperationDesc& op
     case SLANG_NVVM_TEXTURE_OP_QUERY_WIDTH:
         return isNumericElement;
     case SLANG_NVVM_TEXTURE_OP_QUERY_HEIGHT:
-        return isNumericElement && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D;
+        return isNumericElement &&
+               (operation.shape != SLANG_NVVM_TEXTURE_SHAPE_1D || operation.isArray);
     case SLANG_NVVM_TEXTURE_OP_QUERY_DEPTH:
         return isNumericElement &&
                (operation.shape == SLANG_NVVM_TEXTURE_SHAPE_3D ||

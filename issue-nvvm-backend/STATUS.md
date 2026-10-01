@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Six bounded feature batches now pass focused validation after the full checkpoint:
+Seven bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -105,9 +105,9 @@ The full baseline retains its original 36 corpus gaps and four dynamic-surface f
 records supersede the affected cells without relabeling the full run. Current identities and
 precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-dynamic-surface-components`, `features.nvvm-local-record-array-references`,
-`features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions` and
-`features.nvvm-texture-array-layer-counts`. Six implementations have passed focused validation
-since the full run.
+`features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
+`features.nvvm-texture-array-layer-counts` and `features.nvvm-texture-1d-array-layer-counts`. Seven
+implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
 A separate scalar query preserves spatial rank and maps to the existing provider depth query with
@@ -117,10 +117,18 @@ allocation, with exact guards and independently checked view descriptors. CUDA C
 zero; this discrepancy is documented rather than used as the oracle. The null-view getter anomaly
 and singleton host-binding limitation remain separate and unresolved.
 
-Next qualify the remaining array-count shapes through documented queries, starting with 1DArray
-height counts for explicit full/restricted views. Preserve mip-count linkage histories and avoid
-opaque metadata assumptions. The full dimensions corpus failure remains unresolved. No new full
-campaign is required.
+Non-mip Texture1DArray dimensions now also pass all three output scalar families, using the
+existing scalar count query mapped to provider height. Three units, five runtime cells and four
+unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
+The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
+unchanged; seven feature implementations have passed focused validation since the full checkpoint.
+
+The prerequisite four-case research probe retains two completed CubeArray mismatches: explicit
+views returned depth 30/18 instead of intended cube counts 5/3. Exact descriptor echo and API success
+do not prove the assumed face-index interpretation. Older null-view cube queries returned cube
+counts, so do not add a division-by-six fallback. Next resolve explicit cube-view index units with
+independent content selection evidence before enabling cube counts. Mip-count linkage histories and
+the full dimensions corpus failure remain unresolved. No new full campaign.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

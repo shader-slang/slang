@@ -433,22 +433,21 @@ LLVM convergence metadata is retained on the intrinsic but is not propagated to 
 
 ## Texture, surface and descriptor contracts
 
-| Region                                  | Current contract / evidence                                                                                                | Limits / regression                                                                                                                                                                                                                                                                                           |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sampled textures                        | Typed Sample/Level/Fetch/Gather operations with unchanged provider contracts; focused compile/runtime evidence             | Full texture API and every shape/offset/format not implied. [Sample boundary](../../tests/cuda/nvvm-sampled-texture-unsupported.slang), [fetch boundary](../../tests/cuda/nvvm-texture-fetch-unsupported.slang)                                                                                               |
-| Surfaces                                | Typed physical accesses; explicit static Half conversion; masks preserve untouched bits                                    | Byte-addressed access and element-count geometry differ. [Float surface](../../tests/cuda/nvvm-native-float-surface.slang), [formatted provenance](../../tests/cuda/nvvm-formatted-surface-provenance.slang), [integer boundary](../../tests/cuda/nvvm-native-integer-surface-unsupported.slang)              |
-| Read-only texture descriptor conversion | Resource↔descriptor↔uint64 identity and UInt2 low/high word transport for accepted read-only texture families              | Buffer descriptors contain pointer/count and do not inherit integer-handle conversion. [Texture descriptors](../../tests/cuda/nvvm-texture-descriptor-conversion.slang), [buffer negative](../../tests/cuda/nvvm-texture-descriptor-buffer-unsupported.slang)                                                 |
-| Selected non-mip dimensions             | Typed UInt32 spatial queries for 1D/2D/3D/Cube and separate view-relative layer counts for 2DArray; int/uint/float outputs | Other array counts, requested mip and total/view level counts remain excluded. [Dimensions](../../tests/cuda/nvvm-texture-dimensions.slang), [array counts](../../tests/cuda/nvvm-texture-array-layer-counts.slang), [query negatives](../../tests/cuda/nvvm-texture-query-unsupported.slang)                 |
-| Undefined ordinary sampler              | Qualified CUDA placeholder semantics                                                                                       | Comparison samplers and arbitrary undefined resources remain excluded. [Sampler](../../tests/cuda/nvvm-undefined-sampler.slang), [comparison negative](../../tests/cuda/nvvm-undefined-comparison-sampler-unsupported.slang), [resource negative](../../tests/cuda/nvvm-undefined-resource-unsupported.slang) |
+| Region                                  | Current contract / evidence                                                                                                        | Limits / regression                                                                                                                                                                                                                                                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sampled textures                        | Typed Sample/Level/Fetch/Gather operations with unchanged provider contracts; focused compile/runtime evidence                     | Full texture API and every shape/offset/format not implied. [Sample boundary](../../tests/cuda/nvvm-sampled-texture-unsupported.slang), [fetch boundary](../../tests/cuda/nvvm-texture-fetch-unsupported.slang)                                                                                               |
+| Surfaces                                | Typed physical accesses; explicit static Half conversion; masks preserve untouched bits                                            | Byte-addressed access and element-count geometry differ. [Float surface](../../tests/cuda/nvvm-native-float-surface.slang), [formatted provenance](../../tests/cuda/nvvm-formatted-surface-provenance.slang), [integer boundary](../../tests/cuda/nvvm-native-integer-surface-unsupported.slang)              |
+| Read-only texture descriptor conversion | Resource↔descriptor↔uint64 identity and UInt2 low/high word transport for accepted read-only texture families                      | Buffer descriptors contain pointer/count and do not inherit integer-handle conversion. [Texture descriptors](../../tests/cuda/nvvm-texture-descriptor-conversion.slang), [buffer negative](../../tests/cuda/nvvm-texture-descriptor-buffer-unsupported.slang)                                                 |
+| Selected non-mip dimensions             | Typed UInt32 spatial queries for 1D/2D/3D/Cube and separate view-relative layer counts for 1DArray/2DArray; int/uint/float outputs | Other array counts, requested mip and total/view level counts remain excluded. [Dimensions](../../tests/cuda/nvvm-texture-dimensions.slang), [array counts](../../tests/cuda/nvvm-texture-array-layer-counts.slang), [query negatives](../../tests/cuda/nvvm-texture-query-unsupported.slang)                 |
+| Undefined ordinary sampler              | Qualified CUDA placeholder semantics                                                                                               | Comparison samplers and arbitrary undefined resources remain excluded. [Sampler](../../tests/cuda/nvvm-undefined-sampler.slang), [comparison negative](../../tests/cuda/nvvm-undefined-comparison-sampler-unsupported.slang), [resource negative](../../tests/cuda/nvvm-undefined-resource-unsupported.slang) |
 
 Core producers now own texture operation identity and output composition. Existing Sample and
 logical ImageLoad/ImageStore are joined by stable operations for explicit level,
 integer fetch, ordinary gather, spatial size and scalar array layer count. Full resource types reach
 preflight; sampler validation remains required, while the provider still uses CUDA texture-object
-state. Gather offsets
-remain ignored. Non-mip Texture2DArray layer counts use a distinct scalar UInt32 query mapped to
-`txq.depth` with the real 2D-array descriptor preserved. Spatial rank remains two. Integer and
-Float32 outputs use ordinary numeric casts; other array-count bodies retain the previous zero
+state. Gather offsets remain ignored. Non-mip Texture1DArray/Texture2DArray layer counts use a
+distinct scalar UInt32 query mapped to `txq.height`/`txq.depth` with the real array descriptor
+preserved. Spatial rank remains one/two. Integer and Float32 outputs use ordinary numeric casts; other array-count bodies retain the previous zero
 fallback. Mip, multisample and writable-resource admission remain unchanged. Public direct
 RWTexture2DArray.Store gains the same native32 path already admitted by canonical image stores.
 No Half-array, float3 sampling, extra access mode or query-level admission is implied.
@@ -461,17 +460,25 @@ Texture research distinguishes base geometry, selected mip geometry, layer/cube 
 allocated/view levels. The CUDA source producer currently loses some of those semantics. Agreement
 with NVRTC can therefore preserve the same error. A texture object and a surface handle are not
 interchangeable, and opaque descriptor bytes cannot be inspected as an undocumented metadata API.
-For correctly bound non-mip 2D arrays, layer count follows the bound view, consistent with
+For correctly bound non-mip 1D/2D arrays, layer count follows the bound view, consistent with
 [Direct3D resinfo](https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/resinfo--sm4---asm-)
 and [Vulkan image queries](https://docs.vulkan.org/spec/latest/chapters/images.html#spirvenv-image-query).
 CUDA C++ currently returns zero for this count, an intentional comparison discrepancy rather than
 the NVVM oracle. The render-test input producer currently treats `arrayLength=1` as non-array;
-this separate host limitation is not repaired with a shader fallback. CubeArray and 1DArray counts
-remain outside the qualification. NVVM O0/O3 runtime covers full arrays with 2/3/5 layers and all
-three output types. A raw-handle Slang O3 kernel additionally returns 11×7×5 for the full view and
+this separate host limitation is not repaired with a shader fallback. CubeArray counts remain
+outside the qualification. NVVM O0/O3 runtime covers full arrays with 2/3/5 layers and all three
+output types. A raw-handle Slang O3 kernel additionally returns 11×7×5 for the full view and
 11×7×3 for a restricted view of the same allocation on CUDA12.9/SM80. Explicit view descriptors and
 untouched guards were independently checked. Null-view descriptor getter garbage is retained as an
-API anomaly and is never used as query metadata.
+API anomaly and is never used as query metadata. The same output families now also cover 1D arrays
+with 2/3/5 layers; a raw Slang O3 kernel returns width/count 11/5 and 11/3 for independently validated
+full/restricted views of one layered allocation.
+
+A separate four-case probe retained two CubeArray mismatches: explicit views of an 8×8×30-face
+allocation with requested layer ranges 0..29 and 6..23 returned query depth 30/18, against intended
+public counts of 5/3 cubes. All APIs, echoed descriptors and guards passed. Echoed range fields do
+not establish their semantic units. Earlier null-view cube queries returned cube counts; these
+observations do not justify a universal division by six. Cube view interpretation remains unresolved.
 
 The observed driver lookup failures for `txq.array_size` and `txq.num_mipmap_levels` are specific to
 the qualified stack; `txq.level.width` loaded and executed. No full API repair is implemented.
