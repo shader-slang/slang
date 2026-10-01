@@ -2630,6 +2630,23 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+bool shouldUseQuadDerivativeGroup(IRFunc* entryPoint)
+{
+    if (entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>())
+        return false;
+    if (entryPoint->findDecoration<IRDerivativeGroupQuadDecoration>())
+        return true;
+
+    if (auto numThreads = entryPoint->findDecoration<IRNumThreadsDecoration>())
+    {
+        // Y selects the default grouping; the full thread-group shape is validated separately.
+        // A specialization constant can be overridden, so a default of 1 does not imply linear.
+        if (auto y = as<IRIntLit>(numThreads->getOperand(1)))
+            return y->getValue() != 1;
+    }
+    return true;
+}
+
 /// Gets a literal thread count, unwrapping a specialization constant's default when needed.
 static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
 {
