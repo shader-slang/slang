@@ -4130,14 +4130,22 @@ public:
         bool supressDiagnostic = false);
 
     /// When member lookup on `expr` fails because its base is a value (or the type) of a generic
-    /// type parameter, emit best-effort follow-on notes suggesting user-declared interfaces the
-    /// parameter could be constrained to that may make the member available (e.g.
-    /// `where T : IHasNormal`). A no-op unless the base resolves to a `GenericTypeParamDecl` and at
-    /// least one visible interface declares a usable member of the failed name; it runs only on the
-    /// lookup-failure path, so it adds no cost to successful compiles.
+    /// type parameter, emit best-effort follow-on notes suggesting interfaces the parameter could
+    /// be constrained to that may make the member available (e.g. `where T : IHasNormal`, or
+    /// "consider constraining 'T' to interface 'IContainer'" for a generic interface). A no-op
+    /// unless the base resolves to a `GenericTypeParamDecl` and at least one visible interface
+    /// declares a usable member of the failed name; it runs only on the lookup-failure path, so it
+    /// adds no cost to successful compiles.
     void maybeSuggestMissingGenericConstraintForMemberLookup(
         DeclRefExpr* expr,
         QualType const& baseType);
+
+    /// Return true if looking up `name` from `scope` (default lookup mask, keeping only results
+    /// visible from `scope`) finds exactly one declaration and it is `decl`. A diagnostic that
+    /// prints an unqualified name for the user to write at `scope` uses this to check the name will
+    /// mean `decl` there; for a generic declaration, `decl` is the `GenericDecl`, which is what
+    /// lookup returns for its name.
+    bool doesNameResolveToDecl(Name* name, Scope* scope, Decl* decl);
 
     SharedSemanticsContext& operator=(const SharedSemanticsContext&) = delete;
 

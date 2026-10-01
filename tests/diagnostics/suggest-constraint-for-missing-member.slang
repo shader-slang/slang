@@ -1,16 +1,18 @@
 // Test for issue #13140: when member lookup fails on a value (or the type) of a
-// generic type parameter, the compiler suggests a user-declared interface the
-// parameter could be constrained to, as a follow-on note to the "member not
-// found" error (e.g. `where Vertex : IHasNormal`).
+// generic type parameter, the compiler suggests an interface the parameter could be
+// constrained to, as a follow-on note to the "member not found" error (e.g.
+// `where Vertex : IHasNormal`, or "consider constraining 'C' to interface
+// 'IContainer'" for a generic interface, whose type arguments cannot be inferred).
 //
-// The suggestion is deliberately conservative (best-effort advice): only
-// user-declared, non-generic interfaces are offered, and only when the interface
-// declares a member usable in the access that failed (a static access `T.m`
-// requires a static requirement).
+// The suggestion is best-effort advice: an interface is offered only when it declares a
+// member usable in the access that failed (a static access `T.m` requires a static
+// requirement) and its unqualified name resolves to that interface where the constraint
+// would be written.
 //
-// This runs in exhaustive mode: every emitted diagnostic must be annotated, so
-// the negative cases below are enforced automatically — a spurious suggestion
-// note would be an unannotated diagnostic and fail the test.
+// This runs in exhaustive mode: every emitted diagnostic must be annotated, so the
+// negative cases below are enforced automatically — a spurious suggestion note would be
+// an unannotated diagnostic and fail the test. `suggest-constraint/applied-compiles.slang`
+// checks that each suggested constraint, once applied, compiles and runs.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
@@ -135,13 +137,14 @@ int inheritedMemberDirectOnly<T>(T t)
 //CHECK:     ^^^^^^^^^ consider adding a constraint such as 'where T : IBase', since 'baseThing' is declared by that interface
 }
 
-// Negative: only a *generic* interface declares the member. A bare
-// `where C : IContainer` is not a valid constraint, so no suggestion is offered.
-int genericInterfaceNotSuggested<C>(C c)
+// Positive: only a *generic* interface declares the member. A bare `where C : IContainer`
+// would not compile and the type argument cannot be inferred, so the note uses advisory wording.
+int genericInterfaceSuggested<C>(C c)
 {
     return c.getItem();
 //CHECK:     ^^^^^^^ member not found
 //CHECK:     ^^^^^^^ 'getItem' is not a member of 'C'.
+//CHECK:     ^^^^^^^ consider constraining 'C' to interface 'IContainer', since 'getItem' is declared by that interface
 }
 
 // Negative: the access is static (`U.doThing()`) but the only interface declaring
@@ -185,6 +188,15 @@ int ambiguousNameSuppressed<T>(T t)
     return t.shared();
 //CHECK:     ^^^^^^ member not found
 //CHECK:     ^^^^^^ 'shared' is not a member of 'T'.
+}
+
+// Negative: `IHasNormal` declares `getNormal`, but inside this function that name means the first
+// generic parameter, so `where T : IHasNormal` would not help and no suggestion is offered.
+float3 shadowedByGenericParam<IHasNormal, T>(T value)
+{
+    return value.getNormal();
+//CHECK:         ^^^^^^^^^ member not found
+//CHECK:         ^^^^^^^^^ 'getNormal' is not a member of 'T'.
 }
 
 // Negative: no interface declares the failed name, so no suggestion is offered.
