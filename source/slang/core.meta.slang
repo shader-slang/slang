@@ -5007,14 +5007,16 @@ __attributeTarget(FunctionDeclBase)
 attribute_syntax [NonUniformReturn] : NonDynamicUniformAttribute;
 
 /// Mark a compute shader entry point to allow it to use implicit derivatives.
-/// @remarks This attributes causes Slang to emit `DerivativeGroupQuadsNV` execution mode when producing SPIR-V. The attribute has no
-/// effect on other targets.
+/// @remarks This attribute emits the `DerivativeGroupQuadsKHR` execution mode for SPIR-V
+/// and the `derivative_group_quadsNV` layout qualifier for GLSL.
+/// It has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 
 /// Mark a compute shader entry point to allow it to use implicit derivatives.
-/// @remarks This attributes causes Slang to emit `DerivativeGroupLinearNV` execution mode when producing SPIR-V. The attribute has no
-/// effect on other targets.
+/// @remarks This attribute emits the `DerivativeGroupLinearKHR` execution mode for SPIR-V
+/// and the `derivative_group_linearNV` layout qualifier for GLSL.
+/// It has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
 

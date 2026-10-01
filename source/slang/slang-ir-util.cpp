@@ -2641,7 +2641,7 @@ bool shouldUseQuadDerivativeGroup(IRFunc* entryPoint)
     {
         // Y selects the default grouping; the full thread-group shape is validated separately.
         // A specialization constant can be overridden, so a default of 1 does not imply linear.
-        if (auto y = as<IRIntLit>(numThreads->getOperand(1)))
+        if (auto y = numThreads->getY())
             return y->getValue() != 1;
     }
     return true;
