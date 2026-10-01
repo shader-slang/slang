@@ -3142,6 +3142,8 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
         auto paramLayout = findVarLayout(param);
+        if (!isVaryingParameter(paramLayout))
+            continue;
         // A specialized payload/attribute struct must retain a struct layout, even when empty.
         // Otherwise an unresolved frontend layout can make a live ray payload look like a
         // private variable, and optimization can silently discard all of its writes (#13276).
@@ -3151,8 +3153,6 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         if (as<IRStructType>(valueType))
             SLANG_RELEASE_ASSERT(
                 paramLayout && as<IRStructTypeLayout>(paramLayout->getTypeLayout()));
-        if (!isVaryingParameter(paramLayout))
-            continue;
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
         if (as<IROutParamType>(param->getDataType()) ||
             as<IRBorrowInOutParamType>(param->getDataType()))
