@@ -530,6 +530,81 @@ def checkpoint(args):
     return record
 
 
+def corpus(args):
+    """Replay a tier through the existing corpus runners; acceptance is read-only."""
+    spec = importlib.util.spec_from_file_location("corpus_tiers", HERE / "nvvm-corpus-tiers.py")
+    tiers = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tiers)
+    metadata = read(args.tier_manifest)
+    inventory = tiers.build_inventory(REPO, accepted_baseline(args.baseline),
+                                      read(args.focused), metadata)
+    selected = tiers.select(inventory, args.tier, args.modes, args.limit)
+    record = dict(kind="corpus-tier", tier=args.tier, status="listed" if args.list_only else "running",
+                  scope=metadata["scope"], counts=dict(collections.Counter(row["tier"] for row in inventory)),
+                  inventory_count=len(inventory), selected_count=len(selected),
+                  references={name: reference(path) for name, path in (
+                      ("baseline", args.baseline), ("focused", args.focused),
+                      ("tier_manifest", args.tier_manifest))}, cells=selected, gates={})
+    write(args.output / "inventory.json", inventory)
+    path = args.output / "selection.json"
+    write(path, record)
+    if args.list_only:
+        return dict(record, status="passed")
+    _, environment, provenance = configure(args, args.output)
+    identity_paths = [HERE / name for name in ("nvvm-corpus-tiers.py", "nvvm-results.py",
+                      "run-compute-census.py", "run-compute-discovery.py")]
+    identity_paths.extend([args.baseline, args.focused, args.tier_manifest])
+    identity_paths.extend(REPO / name for cell in selected for name in cell["input_sha256"])
+    provenance["artifact_sha256"].update({str(p.resolve()): sha(p) for p in identity_paths})
+    write(args.output / "provenance.json", provenance)
+    actual = []
+    try:
+        for origin in ("frozen", "discovery", "candidate"):
+            group = [row for row in selected if row["origin"] == origin]
+            if not group:
+                continue
+            selection = args.output / (origin + "-cells.json")
+            write(selection, [{key: row[key] for key in ("id", "source", "source_test_ordinal", "mode")}
+                              for row in group])
+            modes = [mode for mode in MODES if any(row["mode"] == mode for row in group)]
+            script = "run-compute-discovery.py" if origin == "discovery" else "run-compute-census.py"
+            command = [sys.executable, HERE / script, "--config", args.build_label,
+                       "--bin-dir", args.slangc.parent, "--provider", args.provider,
+                       "--architecture", "80", "--jobs", str(args.jobs),
+                       "--cells-from", selection, "--output", args.output / origin,
+                       "--modes", *modes]
+            if origin == "frozen":
+                command += ["--workload-ids-from", HERE / "census.slice-195.tsv"]
+            if args.tier != "exploratory":
+                command += ["--require-all-correct"]
+            gate = run(command, args.output / (origin + ".log"), environment, args.timeout)
+            record["gates"][origin] = gate
+            write(path, record)
+            if gate["timed_out"] or gate["return_code"] not in (0, 2):
+                raise ValueError("corpus runner did not complete: " + origin)
+            rows = read(args.output / origin / "results.json")
+            indexed = index_outcomes(rows)
+            if set(indexed) != {(row["id"], row["mode"]) for row in group}:
+                raise ValueError("corpus runner changed selected cell inventory: " + origin)
+            actual.extend(rows)
+        indexed = index_outcomes(actual)
+        record["regressions"] = [{"id": row["id"], "mode": row["mode"],
+                                  "actual": indexed[row["id"], row["mode"]]}
+                                 for row in selected if row["tier"] == "working"
+                                 and not tiers.correct(indexed[row["id"], row["mode"]])]
+        record["input_changes"] = [dict(id=row["id"], mode=row["mode"], changes=row["input_changes"])
+                                   for row in selected if row["input_changes"]]
+        # Exploratory completion never promotes a pass or changes an accepted failure history.
+        record["outcomes"] = actual
+        record["status"] = ("failed" if record["regressions"] else "review-required"
+                            if record["input_changes"] else "passed")
+        verify_identity(provenance)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        record.update(status="failed", error=str(error))
+    write(path, record)
+    return record
+
+
 def stats(values):
     quartiles = statistics.quantiles(values, n=4, method="inclusive") if len(values) > 1 else values * 3
     return {"n": len(values), "median": statistics.median(values), "q1": quartiles[0],
@@ -833,6 +908,21 @@ def main():
             command.add_argument("--measurements", type=Path, required=True)
             command.add_argument("--stage-attribution", action="store_true",
                                  help="report disjoint material stages; requires instrumented phase logs")
+    command = sub.add_parser("corpus", help="select existing runtime corpus tiers")
+    command.add_argument("--output", type=Path, required=True)
+    command.add_argument("--tier", choices=["smoke", "working", "exploratory"], required=True)
+    command.add_argument("--list-only", action="store_true", help="write inventory without invoking tools")
+    command.add_argument("--modes", nargs="+", choices=MODES)
+    command.add_argument("--limit", type=int, help="maximum cells in an exploratory batch")
+    command.add_argument("--tier-manifest", type=Path, default=HERE / "corpus-tiers.json")
+    command.add_argument("--baseline", type=Path, default=HERE / "accepted-baseline.json")
+    command.add_argument("--focused", type=Path, default=HERE / "focused-evidence.json")
+    command.add_argument("--slangc", type=Path, default=REPO / "build/RelWithDebInfo/bin/slangc")
+    command.add_argument("--provider", type=Path, default=REPO / "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so")
+    command.add_argument("--cuda-root", type=Path, default=Path("/usr/local/cuda-12.9"))
+    command.add_argument("--build-label", choices=["RelWithDebInfo", "Release"], default="RelWithDebInfo")
+    command.add_argument("--jobs", type=int, choices=range(1, 9), default=4)
+    command.add_argument("--timeout", type=int, default=1800)
     args = parser.parse_args()
     args.output = args.output.resolve()
     try:
@@ -840,7 +930,7 @@ def main():
             raise ValueError("timeout must be positive")
         args.output.mkdir(parents=True, exist_ok=False)
         result = {"compare": compare, "checkpoint": checkpoint, "material": measure,
-                  "quality": measure, "report": report}[args.command](args)
+                  "quality": measure, "report": report, "corpus": corpus}[args.command](args)
         print(result["status"] + ": " + str(args.output))
         return 0 if result["status"] == "passed" else 1
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:

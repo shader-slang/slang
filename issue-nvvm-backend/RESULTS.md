@@ -1,4 +1,4 @@
-# Refresh NVVM results
+# Validate and refresh NVVM results
 
 This is a results-only workflow. It does not restart the development loop. Run from the repository
 root on native Linux, with matching optimized compiler, provider and test tools. Read STATUS and
@@ -42,6 +42,59 @@ export LD_LIBRARY_PATH="$PWD/build/RelWithDebInfo/lib:$PWD/build/RelWithDebInfo/
 The harness selects that toolkit's NVVM/NVRTC libraries and exact provider. A command failure returns
 nonzero and keeps partial evidence. Census exit2 can describe established gaps; exact structured
 comparison decides preservation. Running processes are killed as a group after their timeout.
+
+## Development corpus tiers
+
+The tier selector reuses the census and discovery runners. Its initial scope is eligible authored
+CUDA `COMPARE_COMPUTE` runtime cases: source, test ordinal and backend/optimization identify each
+configuration. Compile-only/PTX tests, rejection units and custom memory/material/OptiX hosts retain
+their focused commands. Smoke is a subset of working, not a second source tree.
+
+```bash
+python3 issue-nvvm-backend/nvvm-results.py corpus --tier smoke \
+  --output build/nvvm-results/smoke-1
+python3 issue-nvvm-backend/nvvm-results.py corpus --tier working \
+  --output build/nvvm-results/working-1
+python3 issue-nvvm-backend/nvvm-results.py corpus --tier exploratory \
+  --modes nvvm-o3 --limit 12 --output build/nvvm-results/explore-1
+```
+
+Add `--list-only` to inspect selection without invoking compiler or GPU tools. Every output directory
+must be new. Run smoke after implementation iterations, working every three to five iterations or
+after broad changes, and bounded exploratory batches when selecting work. A completed exploratory
+run can contain failures; inspect `selection.json` outcomes rather than interpreting command success
+as shader support. No run promotes or demotes configurations automatically.
+
+`corpus-tiers.json` owns the current smoke choices, exploratory priorities and exact focused
+admission mappings. The accepted full baseline still owns its historical outcomes; focused evidence
+owns later qualifications. Review the authored directive, adapted runner arguments, mode and oracle
+before admitting a focused cell. A source hash and an unrelated passing test are insufficient.
+Sidecar oracle hashes retain their accepted provenance. Changed inputs remain working expectations
+but require review; a working failure remains a regression. Preserve these histories when updating
+the compact metadata. The selector's CPU contracts are `test-nvvm-corpus-tiers.py` together with the
+existing census, discovery and results contracts.
+
+### OptiX raygen gate
+
+Build matching compiler, provider and unit tools with eight jobs, then run the permanent O0/O3 PTX
+fixture and the focused SDK/stage/runtime checks:
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  tests/cuda/nvvm-optix-raygen.slang \
+  slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal \
+  slang-unit-test-tool/nvvmSlangOptixPrimitivesRejectComputeBeforeEmission.internal \
+  slang-unit-test-tool/nvvmOptixRaygenBindings.internal
+```
+
+The runtime unit requires actual execution without skips on an OptiX host. It checks module,
+program-group and pipeline creation, reflected launch/SBT ABI, two changed launches per optimization
+mode, complete output and guards. It uses the existing dynamically loaded OptiX unit infrastructure;
+no SDK/runtime installation is part of this gate. Run the existing CUDA
+`tests/pipeline/ray-tracing/raygen.slang` control and the compute smoke selection when changing shared
+entry lowering. The separate static-build selector
+`nvvmOptixSbtPlansKeepStageAndTypeBoundaries` checks SBT layout, stage admission and load flags before
+provider mutation. These checks qualify raygen only, not triangle tracing or payload transport.
 
 ## Correctness baseline and comparison
 

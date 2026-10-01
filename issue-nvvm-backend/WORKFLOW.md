@@ -7,44 +7,20 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
-The maintainer explicitly resumed development on 2026-09-30 with a faster migration workflow.
-This supersedes the earlier stop-after-log request, four-worker limit, per-family numerical
-campaigns, routine module-version bumps and automatic full-checkpoint cadence. The immediate
-objective is to remove NVVM dependence on CUDA target-switch strings: express operations in the
-core module through explicit NVVM branches, named LLVM/NVVM/libdevice calls and ordinary Slang
-composition. Migrate related operations in substantial batches. Keep ordinary comma-separated
-`__intrinsic_asm` arguments; remove the NVVM semantic-tag extension after its last consumers migrate.
+The maintainer approved the corpus-tier and OptiX proposal and explicitly resumed development on
+2026-10-01. The earlier stop after four bounded items is superseded. First organize smoke, working
+and exploratory selection using existing inventories and runners. Then establish executable OptiX
+ray generation, triangle hit/miss with payloads, and representative material execution in bounded,
+reviewed local commits. Expand exploratory coverage around feature combinations and applications;
+use the findings to choose subsequent work. Continue until a concrete blocker needs human input or
+the maintainer sets another stopping point.
 
-Continue through bounded, reviewed local commits until the migration is complete or a concrete
-regression/design decision needs maintainer input. No push, publication, system installation,
-driver change or reboot is implied. Skip Slack notifications. The already-running log-family full
-checkpoint may finish and be reused; do not repeat it under the new workflow.
-
-After completion of the text-route migration, the maintainer explicitly resumed on 2026-09-30:
-fix signed16 O3 correctness, run one consolidated integration checkpoint, then consolidate operation
-dispatch/fakes, role-specific type admission and one complete resource/address/storage planning
-family, reduce fake maintenance, refresh architecture, and address Float16 instruction selection.
-STATUS holds the ordered work and semantic questions. Continue this authorized sequence in bounded
-reviewed commits; stop only when human judgment is actually required. This supersedes the migration
-completion stopping condition above. CUDA C++ is comparison evidence, not the universal oracle;
-verify Slang semantics against Vulkan/D3D12 contracts and document intentional differences.
-
-After this entire queued cleanup and Float16 sequence, the maintainer additionally authorized one
-full NVVM validation checkpoint, correction of issues it reveals, and then resumption of feature
-development under this standard workflow. This is an explicit integration milestone; it does not
-restore full campaigns after every small change. Preserve exact failures, rerun affected checks
-after fixes, and complete the checkpoint before returning to bounded reviewed feature batches.
-Continue until a recorded stopping condition actually requires human input.
-
-The maintainer added a stopping condition on 2026-10-01: finish the current parameter-group
-layout-pointer slice, including focused validation and reviewed local commit, then stop for
-discussion. That slice completed. The maintainer then explicitly resumed four items: pointer-to-UInt64
-reinterpretation; explicit-layout record field loads/stores; retained static-state dispatch and
-target-option relinking issues; restricted CubeArray/mip-query investigation. Work through those
-bounded items with focused validation and reviewed local commits, then stop again. This authorization
-does not resume the general feature loop or the remaining Half numerical-policy work.
-All four items have now completed with focused review. The requested stop is active; do not select
-or implement another slice without a new maintainer resume request.
+The accelerated workflow remains in effect: eight build jobs, related feature batches, economical
+validation and no routine semantic-module version bumps. CUDA is comparison evidence, not the
+universal oracle; preserve Slang's intended Vulkan/D3D12 semantics and document differences.
+The CUDA-text migration, maintenance sequence, native Half batch and requested full checkpoint are
+complete. Their accepted results and failure histories remain preserved. No push, publication,
+system installation, driver change, reboot or external communication is authorized.
 
 Use one implementation owner and an independent reviewer when available. The lead owns scope,
 acceptance and commits. Read-only analysis may overlap; serialize builds and GPU runs. Use **eight
@@ -58,12 +34,44 @@ user files. Follow the platform-specific slang-build skill and compiler methodol
 For substantial batches, keep a short uncommitted ExecPlan with scope, input-shape audit and actual
 validation results. Do not turn the plan into the program backlog.
 
-Inventory the remaining tags and CUDA-text recognizers and group migrations by shared lowering
-and calling convention. Prefer a large batch of straightforward named calls and core compositions
-to one commit per intrinsic. Include compound users when they are the remaining consumers of the
-same legacy operation; isolate genuinely new ABI, resource, control-flow or synchronization behavior.
-Use existing helpers and canonical IR. Delete recognizers/dispatch routes once all live consumers
-have migrated. Do not retain duplicate signature tables or target-specific repairs for malformed IR.
+Select work from exploratory failures grouped by their underlying missing representation or
+operation, weighted by application relevance. Prefer related operations and feature combinations
+that share lowering and calling conventions. Isolate genuinely new ABI, resource, control-flow or
+synchronization contracts into bounded slices with executable milestones. Reuse canonical shared
+IR and checked plan records. Express core behavior through explicit NVVM branches, typed named
+calls and ordinary Slang composition; genuine primitive PTX remains an intentional interface.
+Do not restore interpretation of CUDA target-switch strings or duplicate a mapping that already
+has an owner. Delete fallback branches made unreachable by a principled change.
+
+## Corpus tiers and development cadence
+
+Use one inventory of test configurations; frozen/discovery remain provenance metadata. Smoke is a
+subset of working, not a duplicate shader collection. A configuration identifies its source/test
+ordinal, backend/optimization and validation level. Keep compile-only qualification distinct from
+runtime correctness and retain intentional CUDA semantic differences.
+
+- **Smoke:** run after each implementation iteration alongside affected tests. Target one to two
+  minutes excluding builds; measure and trim redundant cases. Default to NVVM O3 with selected O0
+  lowering controls, broad compute/ABI/memory/resource coverage, and a few rejection contracts.
+- **Working:** protect all admitted passing configurations in the maintained inventory. Run every
+  three to five implementation iterations, or sooner after a broad representation/cache/ABI change.
+  A new failure remains a regression; never automatically demote it to exploratory.
+- **Exploratory:** include known failures and unevaluated candidates. Exercise bounded batches when
+  choosing work and between iterations, prioritizing feature combinations and application relevance.
+  Distinguish backend gaps, invalid inputs, harness limitations and external failures. Group related
+  failures by root cause. Promote only after the stated oracle and execution level pass.
+
+Use existing runners and compact selection metadata. Do not copy sources, duplicate baselines or
+build a second reporting framework. Eight-job incremental builds remain standard. NVRTC comparisons
+are selected evidence, not a universal oracle. PTX inspection can validate instruction selection;
+memory, synchronization, ABI and new OptiX launch contracts require execution. Preserve prior full
+results and exact failures. Full integration checkpoints remain deliberate milestones.
+
+The initial OptiX path uses PTX and existing runtime infrastructure. First qualify module/pipeline
+creation and raygen buffer output, launch index/dimensions, launch parameters/SBT data and updated
+bindings across launches. Then qualify triangle hit/miss with payload transport, followed by a
+representative material. Keep stage/ABI ownership explicit and use typed OptiX operations or genuine
+primitive calls; do not restore CUDA-text recognition. Advanced OptiX features follow actual demand.
 
 ## Fast validation by default
 

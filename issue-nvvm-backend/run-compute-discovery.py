@@ -408,6 +408,14 @@ def main() -> int:
     )
     census.select_architecture(workloads, args.architecture)
     provider_path, test_runner = census.execution_paths(repo_root, args)
+    cells = None
+    if args.cells_from:
+        if args.match or args.classify_only:
+            raise ValueError("--cells-from cannot combine with match or classify-only")
+        if output_root.exists():
+            raise ValueError("exact cell execution requires a new output directory")
+        cells = census.read_cell_selection(args.cells_from, workloads, args.modes)
+        workloads = [row for row in workloads if any((row["id"], mode) in cells for mode in args.modes)]
     output_root.mkdir(parents=True, exist_ok=True)
     _write_selection_files(
         output_root,
@@ -458,14 +466,17 @@ def main() -> int:
     mirror_root = _prepare_mirror_tree(tests_dir, output_root)
     all_results: list[dict[str, object]] = []
     for mode in args.modes:
+        mode_workloads = census.workloads_for_mode(run_workloads, mode, cells)
+        if not mode_workloads:
+            continue
         print(f"preparing generated discovery {mode} lanes", flush=True)
-        _populate_mirror_for_mode(tests_dir, mirror_root, run_workloads, mode, census)
+        _populate_mirror_for_mode(tests_dir, mirror_root, mode_workloads, mode, census)
         all_results.extend(
             census.run_mode(
                 repo_root,
                 output_root,
                 mirror_root,
-                run_workloads,
+                mode_workloads,
                 mode,
                 provider_path,
                 test_runner,
@@ -478,6 +489,8 @@ def main() -> int:
 
     counts = census._write_result_files(output_root, all_results)
     print(json.dumps(counts, indent=2), flush=True)
+    if cells is not None and not census.inventory_matches(all_results, run_workloads, args.modes, cells):
+        return 2
     return census.result_exit_code(all_results, args.require_all_correct)
 
 

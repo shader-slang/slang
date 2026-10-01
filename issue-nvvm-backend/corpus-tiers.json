@@ -1,0 +1,520 @@
+{
+  "schema": 1,
+  "scope": "Runtime COMPARE_COMPUTE union: accepted frozen/discovery plus eligible authored CUDA candidates. SIMPLE/PTX, rejection/unit gates, custom physical or allocated-address hosts, material performance and arbitrary repository sources remain separate.",
+  "admissions": [
+    {
+      "id": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-link-options-and-static-context",
+      "outcome_path": [
+        "validation",
+        "outcomes",
+        "tests/cuda/nvvm-copyable-kernel-context.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-copyable-kernel-context.slang"
+      ],
+      "rationale": "Same whole source/oracle as the corpus mode adaptation; explicit initializer qualified on each authored mode."
+    },
+    {
+      "id": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-link-options-and-static-context",
+      "outcome_path": [
+        "validation",
+        "outcomes",
+        "tests/cuda/nvvm-copyable-kernel-context.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-copyable-kernel-context.slang"
+      ],
+      "rationale": "Same whole source/oracle as the corpus mode adaptation; explicit initializer qualified on each authored mode."
+    },
+    {
+      "id": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-link-options-and-static-context",
+      "outcome_path": [
+        "validation",
+        "outcomes",
+        "tests/cuda/nvvm-copyable-kernel-context.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-copyable-kernel-context.slang"
+      ],
+      "rationale": "Same whole source/oracle as the corpus mode adaptation; explicit initializer qualified on each authored mode."
+    },
+    {
+      "id": "cuda/nvvm-coherent-pointer-memory.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-coherent-pointer-memory",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-coherent-pointer-memory.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-coherent-pointer-memory.slang"
+      ],
+      "rationale": "Exact authored CUDA runtime ordinal and mode, integer scoped global/shared accesses and full output guards."
+    },
+    {
+      "id": "cuda/nvvm-coherent-pointer-memory.slang#cuda-2",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-coherent-pointer-memory",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-coherent-pointer-memory.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-coherent-pointer-memory.slang"
+      ],
+      "rationale": "Exact authored CUDA runtime ordinal and mode, integer scoped global/shared accesses and full output guards."
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-coherent-pointer-memory",
+      "outcome_path": ["validation", "discovery", "transitions", 0, "after"],
+      "source_hash_path": ["validation", "discovery", "source", "sha256"],
+      "rationale": "Exact discovery cell transition; race-free original groupshared source unchanged."
+    },
+    {
+      "id": "language-feature/pointer/coherent-load-store-groupshared.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-coherent-pointer-memory",
+      "outcome_path": ["validation", "discovery", "transitions", 1, "after"],
+      "source_hash_path": ["validation", "discovery", "source", "sha256"],
+      "rationale": "Exact discovery cell transition; race-free original groupshared source unchanged."
+    },
+    {
+      "id": "cuda/nvvm-texture-dimensions.slang#discovery-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-texture-1d-array-layer-counts",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-texture-dimensions.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-texture-dimensions.slang"
+      ],
+      "rationale": "Current source and exact authored runtime mode qualified by the latest array-count control."
+    },
+    {
+      "id": "cuda/nvvm-texture-dimensions.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-texture-1d-array-layer-counts",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-texture-dimensions.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-texture-dimensions.slang"
+      ],
+      "rationale": "Current source and exact authored runtime mode qualified by the latest array-count control."
+    },
+    {
+      "id": "cuda/nvvm-texture-dimensions.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-texture-1d-array-layer-counts",
+      "outcome_path": [
+        "validation",
+        "runtime",
+        "outcomes",
+        "tests/cuda/nvvm-texture-dimensions.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-texture-dimensions.slang"
+      ],
+      "rationale": "Current source and exact authored runtime mode qualified by the latest array-count control."
+    }
+  ],
+  "smoke": [
+    {
+      "id": "compute/atomics-groupshared.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "shared atomic memory"
+    },
+    {
+      "id": "compute/byte-address-buffer-array.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "raw buffer and array addressing"
+    },
+    {
+      "id": "compute/rw-texture-simple.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "surface load/store"
+    },
+    {
+      "id": "compute/texture-get-dimensions-cuda.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "texture handle/query"
+    },
+    {
+      "id": "cuda/nvvm-helper-copyable-values.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "helper ABI aggregate values"
+    },
+    {
+      "id": "cuda/nvvm-float-matrix-values.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "matrix values"
+    },
+    {
+      "id": "cuda/nvvm-half-values.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "Half scalar/vector values"
+    },
+    {
+      "id": "cuda/nvvm-conventional-global-multi-resource.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "global resource binding"
+    },
+    {
+      "id": "hlsl-intrinsic/wave-mask/wave-prefix-sum.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "masked wave operations"
+    },
+    {
+      "id": "bindings/nested-parameter-block-2.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "rationale": "nested parameter layout"
+    },
+    {
+      "id": "cuda/nvvm-aggregate-param-resource-snapshot.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "rationale": "aggregate resource snapshot"
+    },
+    {
+      "id": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+      "mode": "nvvm-o3",
+      "rationale": "per-invocation initialized state"
+    },
+    {
+      "id": "cuda/nvvm-coherent-pointer-memory.slang#cuda-2",
+      "mode": "nvvm-o3",
+      "rationale": "scoped scalar memory"
+    },
+    {
+      "id": "cuda/nvvm-half-values.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "rationale": "Unoptimized lowering control for an O3 smoke contract."
+    },
+    {
+      "id": "cuda/nvvm-aggregate-param-resource-snapshot.slang#discovery-1",
+      "mode": "nvvm-o0",
+      "rationale": "Unoptimized lowering control for an O3 smoke contract."
+    }
+  ],
+  "exploratory_priority": {
+    "compute/atomics-buffer.slang#discovery-1": {
+      "rank": 1,
+      "reason": "Canonical buffer atomic API/capability boundary; inspect source validity before implementation.",
+      "failure_category": "backend"
+    },
+    "compute/texture-get-dimensions.slang#discovery-1": {
+      "rank": 2,
+      "reason": "Application-facing query overload boundary; preserve external Cube/mip limitations.",
+      "failure_category": "external"
+    },
+    "cuda/require-prelude.slang#cuda-1": {
+      "rank": 3,
+      "reason": "Explicit CUDA text prelude has no NVVM semantic equivalent; deliberate producer/target boundary.",
+      "failure_category": "backend"
+    },
+    "compute/non-square-column-major.slang#discovery-1": {
+      "rank": 20,
+      "reason": "Known host-packing mismatch; do not treat CUDA disagreement as NVVM oracle.",
+      "failure_category": "harness"
+    },
+    "language-feature/pointer/coherent-load-store-physical-storage-buffer.slang#discovery-1": {
+      "rank": 30,
+      "reason": "Existing racy input; exploratory execution is not a synchronization oracle.",
+      "failure_category": "invalid-input"
+    },
+    "language-feature/pointer/redundant-coherent-load.slang#discovery-1": {
+      "rank": 30,
+      "reason": "Racy/optimizer evidence only; not a coherent-memory runtime acceptance oracle.",
+      "failure_category": "invalid-input"
+    }
+  },
+  "oracle_inputs": {
+    "tests/bugs/empty-switch.slang.expected.txt": "16fbd7d1f18d2fedb247d73edc3bc6aa040f5ab99bd3b48c35b79e543d22179b",
+    "tests/bugs/gh-5776.slang.expected.txt": "b735182d130b15ed0fc5be1959eab9d7424a0899e01d5cc859d541b065b3e5bf",
+    "tests/bugs/loop-optimize.slang.expected.txt": "a8fec8fb29235d05040a35c140a80a1c2597c6a2f1bf72194739e1140ff8b5e8",
+    "tests/bugs/matrix-reshape.slang.expected.txt": "775eae9cdec5cf79f1e59eb6e7631c6b5e4675c599578664f8d4417972e06313",
+    "tests/bugs/string-inline.slang.expected.txt": "9543cdf2073ee7da040fabb42281b41eede7d5b89e2c5222dd61472f8febfa97",
+    "tests/compute/array-existential-parameter.slang.expected.txt": "176a9394b740ad7a503e5e672bdf4df40a17c09fdf6c594a559c06398dd9f2c5",
+    "tests/compute/array-param.slang.expected.txt": "149051825acc9f70977387777097d077b40b4c368bcf075fd8e098058451694c",
+    "tests/compute/assoctype-nested-lookup.slang.expected.txt": "5860c99deffbe51b3271759fce7287895dc17c2dd4ee98f88bdea227589d74d4",
+    "tests/compute/atomics-groupshared.slang.expected.txt": "c7083714a83672564f2daec1fda481893a35e21779c37dae5ce461d638c9d1c0",
+    "tests/compute/atomics.slang.expected.txt": "c4e322e6892101e9d2022df011c6bca184e4220271fe7056b8682981825b98d9",
+    "tests/compute/bitcast-64bit.slang.expected.txt": "42ad30a1e23810d2f1abc251644ee2df53b5b2b9e363b5db39842bb5e9f6b09a",
+    "tests/compute/bound-check-zero-index.slang.expected.txt": "bdd108262d4aa87c527fffa130a645f01098a080790ac8a7d8c63b281028521b",
+    "tests/compute/buffer-layout.slang.4.expected.txt": "259e1fcb8ff408799c66ab23243d813763a6eb9916c7c619a4d737f057abf1b7",
+    "tests/compute/byte-address-buffer-64bit.slang.expected.txt": "482af0eaec2515071bc1f7e855e880e429bcb8221ce936e8cfc07a410a31dd39",
+    "tests/compute/byte-address-buffer.slang.expected.txt": "e9486cabe262ba1cf3e23a516cfe7d934ed163a2f0933b1087e4c1fbf63c9107",
+    "tests/compute/dynamic-dispatch-1.slang.expected.txt": "c42b42375c9ec239cdb8b80fed4d2709cf44d8145df9fa991bae22aaa96ddf15",
+    "tests/compute/dynamic-dispatch-10.slang.expected.txt": "c9025f939d5d946d20e785314f2638a6c994561add7e0c2b9448990d497f7fa1",
+    "tests/compute/dynamic-dispatch-13.slang.expected.txt": "176a9394b740ad7a503e5e672bdf4df40a17c09fdf6c594a559c06398dd9f2c5",
+    "tests/compute/dynamic-dispatch-15.slang.expected.txt": "597a30e6a2a18b7593db2c88f0309751733f84423e9bcef06ccf79ad6919ff33",
+    "tests/compute/dynamic-dispatch-16.slang.expected.txt": "be224249c0f2dd501af54008967953010830c11dabd248ce0a636659f41a4aba",
+    "tests/compute/dynamic-dispatch-17.slang.expected.txt": "be224249c0f2dd501af54008967953010830c11dabd248ce0a636659f41a4aba",
+    "tests/compute/dynamic-dispatch-18.slang.expected.txt": "49264a2bfad3a0854ca144192d42ecc5e4cd38655bdf4293c9f9681d870e7c19",
+    "tests/compute/dynamic-dispatch-19.slang.expected.txt": "717cffeb85c7daee2780e6c86b3ca97e6e1d0ef27f8864317383c4e6a79314c6",
+    "tests/compute/dynamic-dispatch-2.slang.expected.txt": "5464764169c98a2306ca75b50364945ff1a623bbbd2175e0620147dd00084da2",
+    "tests/compute/dynamic-dispatch-3.slang.expected.txt": "60a701edf51f24cf239734611ca0c0b35ba6140f9465ef8075eabab073736569",
+    "tests/compute/dynamic-dispatch-4.slang.expected.txt": "f6f27e607eb6f31ed47149151ed7f303c6576f4b3e7eb908d211e3981af8e54b",
+    "tests/compute/dynamic-dispatch-5.slang.expected.txt": "80a79c540fc81ee42c3c9a54af21f71e9d3bd4edff1cd3180b5d9e9d755d209e",
+    "tests/compute/dynamic-dispatch-6.slang.expected.txt": "f6f27e607eb6f31ed47149151ed7f303c6576f4b3e7eb908d211e3981af8e54b",
+    "tests/compute/dynamic-dispatch-7.slang.expected.txt": "f6f27e607eb6f31ed47149151ed7f303c6576f4b3e7eb908d211e3981af8e54b",
+    "tests/compute/dynamic-dispatch-8.slang.expected.txt": "c42b42375c9ec239cdb8b80fed4d2709cf44d8145df9fa991bae22aaa96ddf15",
+    "tests/compute/dynamic-dispatch-9.slang.expected.txt": "c42b42375c9ec239cdb8b80fed4d2709cf44d8145df9fa991bae22aaa96ddf15",
+    "tests/compute/dynamic-dispatch-bindless-texture.slang.expected.txt": "a0db8280e47040bfa328b02b87c122e236c9e04571ae34dffbe91f1f8cb05bb4",
+    "tests/compute/dynamic-generics-simple.slang.expected.txt": "6fbb98d389e4bbe2bad571663ad550c2abcbfbf60a5296dda09861ae6166e728",
+    "tests/compute/entry-point-uniform-params.slang.expected.txt": "ea8896c21100f3b90b502509a496b24d0f3bd77216dc35505767dcbfd707cbfb",
+    "tests/compute/func-param-legalize.slang.expected.txt": "9f00673c1011e0a2ab059769b9bf3240d06071a3ea37e3f0e9440016e52c0117",
+    "tests/compute/func-resource-param.slang.expected.txt": "646c48bbca59a099bb949c48a26eb299340167cbfe2d685e913ab00f1290f8ea",
+    "tests/compute/groupshared.slang.expected.txt": "cad0f28b97992adf6892cf685ee1f1643b690b0aa265d403dbd2a29b4e7a868e",
+    "tests/compute/half-calc.slang.expected.txt": "5053ecf9de1cc570b5029e41fd17461fb7e9bbbe47cd54700b74717d36d05f0f",
+    "tests/compute/half-opaque-convert.slang.expected.txt": "3334f00d16daa7c2c73543a4cf8d3dc4837e73e90ca464b161cb18b642fae95f",
+    "tests/compute/half-rw-texture-convert.slang.expected.txt": "71275a64a418758c698ce16e7d6e963f9af36de90dffda2ba76187d07a5dbe8e",
+    "tests/compute/half-rw-texture-convert2.slang.expected.txt": "b4bafa29ab4618c322e31d80ff2e90c089051b1fe01458fb528473301cc202a4",
+    "tests/compute/half-rw-texture-simple.slang.expected.txt": "da6089898e402d4a612feb75fb5de7cce4154a6a0ac69f098454f786048b4d8f",
+    "tests/compute/half-structured-buffer.slang.expected.txt": "6f492f86b133fda71b32a8af941f246935567039841c9a6617ad47a2ac10aeea",
+    "tests/compute/half-texture-simple.slang.expected.txt": "28c08f460587d4265d7201a8714a29b9e3c924a029aa79e8e42c6d410f0ebc01",
+    "tests/compute/half-vector-calc.slang.expected.txt": "7cd6ca161916a9697cb26190a7871503bc290a2f9cc64c82f82020e18649ea7e",
+    "tests/compute/half-vector-compare.slang.expected.txt": "ed7bb3b5428277bfad09d54b54f2941a7e94ac7474cf7576f9ddab6406bc8752",
+    "tests/compute/int-generic.slang.expected.txt": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+    "tests/compute/interface-assoc-type-param.slang.expected.txt": "a0db8280e47040bfa328b02b87c122e236c9e04571ae34dffbe91f1f8cb05bb4",
+    "tests/compute/interface-func-param-in-struct.slang.expected.txt": "a0db8280e47040bfa328b02b87c122e236c9e04571ae34dffbe91f1f8cb05bb4",
+    "tests/compute/kernel-context-threading.slang.expected.txt": "fd169b958afb6e947803123bd7b37be5eaf0d0e51baeb6ec1e66b58f20a81e18",
+    "tests/compute/loop-unroll.slang.expected.txt": "5fdfb150840534f1f41db0bb93a631915fae3811a94531627d42c2c04dd9c1bf",
+    "tests/compute/matrix-layout-structured-buffer.slang.expected.txt": "ac7cc6da360712fc4b8b244fda84fd3e6c67ce9870c8d65db56f35900f6468f1",
+    "tests/compute/mutating-and-inout.slang.expected.txt": "b1789ab5f7a1d812f920e46ebc61546fafb4f1b4ef97d1034721180aaa356328",
+    "tests/compute/nested-assoc-types.slang.expected.txt": "b77a62c52b6d5702424a787a8b442c33dc1fcb8c95d976413edaf39f8ab63e37",
+    "tests/compute/pack-any-value-16bit.slang.expected.txt": "1434d042dd8c79ef4bbb23745c6a07c51249a6d3f4cb03687430bfbbabfd8e88",
+    "tests/compute/pack-any-value-8bit.slang.expected.txt": "f60a545a824da13e3e833196b196a9b5686d1014e4d666f5103fc30a71c9c56f",
+    "tests/compute/parameter-block.slang.expected.txt": "e169bdf59fac30d230f7d21be511d04dc8cc61e5edb1d8255758bc220ba3d4c7",
+    "tests/compute/row-major.slang.expected.txt": "02f4281515ba3e3594d5326a70aea844f09da1c5a02c10270f8917b1ca0b8410",
+    "tests/compute/rw-texture-simple.slang.expected.txt": "0c9ece4a59ab380a583c6cfd98ab531f8277f6be1614f31750df1ddc306f096b",
+    "tests/compute/simple-interface-parameter.slang.expected.txt": "16fbd7d1f18d2fedb247d73edc3bc6aa040f5ab99bd3b48c35b79e543d22179b",
+    "tests/compute/simple.slang.expected.txt": "dfe579fcc969494b4cff2afe9239b0f9e3a5916288f636ad8523b2c4a6267aba",
+    "tests/compute/struct-default-init.slang.expected.txt": "2d61c818366f382db63aa2e9ec728d8ed4a8c36b9d4a406d0a2c5123a8c31296",
+    "tests/compute/struct-in-generic.slang.expected.txt": "25b896aacd27417cafda71e78cffc3f3d4442c41325c2b5a8be147983fbd2f0b",
+    "tests/compute/structured-buffer-of-matrices.slang.expected.txt": "f5a0920736b39f7ab4cf2c355c52473c4daeec2a38c1bb55a73e2e26b2fb8c06",
+    "tests/compute/structured-buffer-swizzle-store.slang.expected.txt": "7de1555df0c2700329e815b93b32c571c3ea54dc967b89e81ab73b9972b72d1d",
+    "tests/compute/switch-stmt.slang.expected.txt": "38a3f5a2e85f0a9297bd8e3091b2827c136bbeca8851159707fa54a4dde05e61",
+    "tests/compute/texture-get-dimensions-cuda.slang.expected.txt": "f211a21d2a72175721e47dc1d8ee122fb9fdc13da8f3481cfcea11568f136548",
+    "tests/compute/texture-simple.slang.expected.txt": "0cc604702db898c8ba2d7eb63d3155199064e2ddc1976bf337c793fe3c1c37e1",
+    "tests/compute/texture-simpler.slang.expected.txt": "5418c4e756c0a70b8659d0e5b4a6f25d71dea1f5576cbf074e48dc8ef93534b5",
+    "tests/compute/texture-subscript-cuda.slang.expected.txt": "460963a48360081e4153e9c43295e70655806284b8730890d60c5db2d113d48a",
+    "tests/compute/transcendental-double.slang.expected.txt": "ab2a4ccdd8f8ed5e4878ea982b0381ff6093f9dc1395c0539a30ec89298e0053",
+    "tests/compute/transcendental.slang.expected.txt": "ab2a4ccdd8f8ed5e4878ea982b0381ff6093f9dc1395c0539a30ec89298e0053",
+    "tests/compute/transitive-interface.slang.expected.txt": "ad4a66c2e2d2cbe1b9378f156751f1ccae954bbef62d117ab9ad595e76c9b020",
+    "tests/compute/typedef-member.slang.expected.txt": "dfe579fcc969494b4cff2afe9239b0f9e3a5916288f636ad8523b2c4a6267aba",
+    "tests/compute/vector-scalar-compare.slang.expected.txt": "11be494edd3f8933aa0ddba0a3ff33703373d5625bddd0caa168ac79f8570e46",
+    "tests/compute/write-structured-buffer-field.slang.expected.txt": "b5af0d69fa5be00a42cf56d811fc37f958ab062f26de34efdd8c00211da77ebe",
+    "tests/cross-compile/simple-cross-compile.slang.expected.txt": "d7926b1314b1dd16324c7cdd8cf690187a7b8084e2e8ca63cb12355e7cf2a934",
+    "tests/cuda/compile-to-cuda.slang.expected.txt": "c43cf39cdab3e5ca9a1d8aa61cd481558fb0097f69b71fcaa6a787ff1f8cbdf7",
+    "tests/cuda/cuda-array-layout.slang.expected.txt": "ad4ed43ff1fad7cc77be57f00dd4d1464f624763509fb94027fd63be606ab9e3",
+    "tests/cuda/cuda-layout.slang.expected.txt": "2d99fec00938530459868b684a22810aa00c6feb8d83c7ccc26d4f704e807d44",
+    "tests/cuda/cuda-texture.slang.expected.txt": "78e87ed8bb03e1d5318cc74e0ab981752f4c11dbdf575d122f9b166635156d78",
+    "tests/cuda/nvvm-conventional-global-multi-resource.slang.expected.txt": "714cd3e79a7e252ea296d5fcadda4b7f66f0f78a08126c2772c08a94b407c4bd",
+    "tests/cuda/param-block-alignment.slang.expected.txt": "ddd6be8268509af2ff697e31b468710f7bed46012e8d20c8003fef7a9a3e73ba",
+    "tests/hlsl-intrinsic/active-mask/for-break.slang.expected.txt": "b05569bbe588ceb6c1797b50b2a4ada16ee667c387dd2851ec0298911de1b87e",
+    "tests/hlsl-intrinsic/active-mask/for-continue-ext.slang.expected.txt": "8b4a249ffd1a3853d0fd065192509859ed750fd1c25e5d3036149470ad202620",
+    "tests/hlsl-intrinsic/active-mask/for-continue.slang.expected.txt": "0c47f9cf6ccfcf8581006ca8966299ae7f463cf07a26d40bf0a4a7131775a734",
+    "tests/hlsl-intrinsic/active-mask/for.slang.expected.txt": "4df63d9c8fe620627aea171d24b288a1c374010a60634d74262794df2482c8ed",
+    "tests/hlsl-intrinsic/active-mask/if-conditional-exit.slang.expected.txt": "6b251d68e9a52b2977b9b64974164da16ecaf38fbcddbc15b1fc6263218d1364",
+    "tests/hlsl-intrinsic/active-mask/if-early-exit.slang.expected.txt": "14a79064d9c93d1279f73b62f8a84daebade7da2f30da849bc0d153adeaeb3cc",
+    "tests/hlsl-intrinsic/active-mask/if-one-sided.slang.expected.txt": "af0060d3bf498504e96f1741a0c1962a01efd5c968bc3d1faa4eafc8e1ed2365",
+    "tests/hlsl-intrinsic/active-mask/if.slang.expected.txt": "84680247b8d3a864ffde4a1795b5a97c82739463652e611e6d1888decc879a1b",
+    "tests/hlsl-intrinsic/active-mask/switch-no-default.slang.expected.txt": "14db3128104cacc96696c20fca0f0b9e073b27ea55cd406c2f4521040658591c",
+    "tests/hlsl-intrinsic/active-mask/switch.slang.expected.txt": "9eeb10dd7453d1f5aca56b7290c3930ee51f7736c86c529c2060596f68f9da02",
+    "tests/hlsl-intrinsic/asfloat16.slang.expected.txt": "13c3f14df5d87c5b7956fbd515a733691c6785c86a9c0c5804ca227753ac31f9",
+    "tests/hlsl-intrinsic/bit-cast.slang.expected.txt": "a575815b5dc26b0e2b1df72ebacef21271e8ad962e5c70c16a9c193258d6ff52",
+    "tests/hlsl-intrinsic/bit-cast/bit-cast-16-bit.slang.expected.txt": "15111e25dc4d04e4a054f2a43c472c72e60ca255c9e4eacfe5ab7894a96e161f",
+    "tests/hlsl-intrinsic/byte-address-buffer/byte-address-16bit-vector.slang.expected.txt": "1a780f55c02c991e1452b21be4a0de0276016ac2980c7014ef8a716ce4bb4443",
+    "tests/hlsl-intrinsic/byte-address-buffer/byte-address-16bit.slang.expected.txt": "1a780f55c02c991e1452b21be4a0de0276016ac2980c7014ef8a716ce4bb4443",
+    "tests/hlsl-intrinsic/byte-address-buffer/byte-address-struct.slang.expected.txt": "0647bf5360d1ba1493aa4d4ee2b959cc489bce4c6f46f009a4d8f033cc5f6e37",
+    "tests/hlsl-intrinsic/classify-double.slang.expected.txt": "5bfaec1e94b5a75da5c633dacabd570c892d63f9b7473bdfdc97c33e9d6551b4",
+    "tests/hlsl-intrinsic/classify-float.slang.expected.txt": "5bfaec1e94b5a75da5c633dacabd570c892d63f9b7473bdfdc97c33e9d6551b4",
+    "tests/hlsl-intrinsic/dot-accumulate.slang.expected.txt": "8e0f4a95dc5870f314f8cdc930e2e49351344f74a785fa8d68c1e2f7fc72e2bb",
+    "tests/hlsl-intrinsic/f16tof32.slang.expected.txt": "de479d8174da5eac2c4cc99b4853c643b41c51633ec911f4b6cec02555ecf923",
+    "tests/hlsl-intrinsic/f32tof16.slang.expected.txt": "98ad4c22772e4aa2860764786e918eecc045b77bacd29747b59c205e270bb4bc",
+    "tests/hlsl-intrinsic/literal-int64.slang.expected.txt": "7a733eb42ec5b339873a2a9d8eb3bee09053d303365f4f6ca1674c473231d4a4",
+    "tests/hlsl-intrinsic/matrix-double-reduced-intrinsic.slang.expected.txt": "d601438acc96989bbfdda9d1e989fc098e854f1b421a846e4fbff6f0d86d4d38",
+    "tests/hlsl-intrinsic/matrix-double.slang.expected.txt": "0a7b238914ae9cb0a48649b869b91dcd12990c89dacf89e543ac76531339d73f",
+    "tests/hlsl-intrinsic/matrix-float.slang.expected.txt": "d9ea75a4a53bd025dcef0396a3c302f01b126e73c265e3427d731f8de8ce5a62",
+    "tests/hlsl-intrinsic/matrix-int-runtime-index.slang.expected.txt": "b40b5c0031101e308a5ee3980049b4082d78330cda11f9f8d9e4c9bfbb4d880b",
+    "tests/hlsl-intrinsic/matrix-int.slang.expected.txt": "2bf3060c00c4e65d31371753f787e6eac36b7874e408103ca657961b60ca7d53",
+    "tests/hlsl-intrinsic/min-max-iarithmetic.slang.expected.txt": "96107eb8dd83133692be90907080ac096b76e64ed6961dd0d7d48538f46f8980",
+    "tests/hlsl-intrinsic/packed/pack-unpack.slang.expected.txt": "aeb610c95b876fff6d5be7c2152abbde25d3c67696aa036ea7731707876fc27b",
+    "tests/hlsl-intrinsic/quad-control/quad-control-comp-functionality.slang.expected.txt": "c63e95a8785681eaab73288f492d78eebe8ed12fdbf8f88589d71d56fb2c58f4",
+    "tests/hlsl-intrinsic/scalar-double-abs.slang.expected.txt": "6228e679c0c0eefd90f3d8ab0617f31f43ac7d2b850892f093ccefa2818cef30",
+    "tests/hlsl-intrinsic/scalar-double-acos.slang.expected.txt": "d75269383fd2ebd9dc5456f008a4d62bf62a4c0bdd59c028ecd9e9a87f1cee7f",
+    "tests/hlsl-intrinsic/scalar-double-asdouble.slang.expected.txt": "cd6468480f970172ee906066f29f5a794298d2e258f3b20f4405f5bde2b6a3ba",
+    "tests/hlsl-intrinsic/scalar-double-asin.slang.expected.txt": "cfbea2b1b8e9ff13fc64f8aa298b1c0d56e8e252f792bc3afb2099fd0a994d6f",
+    "tests/hlsl-intrinsic/scalar-double-asuint.slang.expected.txt": "4df32896761b66d3f867692bfea751da28df86f26d3f794dd0896ae508168d65",
+    "tests/hlsl-intrinsic/scalar-double-atan.slang.expected.txt": "63e4c43aa8256b52c6691ea6bb2e73fd0c033dde2e9afbb45ab0584fd47186b4",
+    "tests/hlsl-intrinsic/scalar-double-atan2.slang.expected.txt": "c04e3658d8d91502cc134396d482167b97bef3659452f4ad1121fc52a68d0644",
+    "tests/hlsl-intrinsic/scalar-double-ceil.slang.expected.txt": "ab16bf27c6eecbf7353a92ecece848121c7e4d2e00b047ccb11d8eaad86937b3",
+    "tests/hlsl-intrinsic/scalar-double-clamp.slang.expected.txt": "39a6d24813de8380bc914f96cbb62cacd63750dd83971eccc41e4b6d9d03478f",
+    "tests/hlsl-intrinsic/scalar-double-cos.slang.expected.txt": "8b44500c89515c93325865b14b48a67a7c03a1d29641c288c4226a7d8e8afb56",
+    "tests/hlsl-intrinsic/scalar-double-d3d-intrinsic.slang.expected.txt": "8cdb1a767da20b48e0660483de8cb3df181d25ec28b20fa79f7a95859428c716",
+    "tests/hlsl-intrinsic/scalar-double-exp.slang.expected.txt": "c68306c1368faa44b6da660871f64eca23e5b5cecd4917c10c5df1386223b45e",
+    "tests/hlsl-intrinsic/scalar-double-exp2.slang.expected.txt": "2c5f1381f8e31b112cb4fc6c1f59584e122e0fa478bdd6f2824d3ad2711b6c32",
+    "tests/hlsl-intrinsic/scalar-double-floor.slang.expected.txt": "ab16bf27c6eecbf7353a92ecece848121c7e4d2e00b047ccb11d8eaad86937b3",
+    "tests/hlsl-intrinsic/scalar-double-frac.slang.expected.txt": "2b1bb42f4ee09759e66e8c7d9cdbfc01491fe7f3b03407899e2110fe94d4878f",
+    "tests/hlsl-intrinsic/scalar-double-ldexp.slang.expected.txt": "b4046531efac412b0f3f81cb62a4f5377459856408754ad74a3b0484a3d6d74b",
+    "tests/hlsl-intrinsic/scalar-double-lerp.slang.expected.txt": "b56b30b11ac24c1bdb908ce7b68125e47d89d63598f1ef2f6a27924a004863d2",
+    "tests/hlsl-intrinsic/scalar-double-log.slang.expected.txt": "3bc2e50da235cec90fcfc8f9af0070d417dda8a50daa5d0873f13827818a563f",
+    "tests/hlsl-intrinsic/scalar-double-log10.slang.expected.txt": "dd078cebeedc49e69ebf618eb66e7d1989d894b7d6f4857a8897b99af8ec11d0",
+    "tests/hlsl-intrinsic/scalar-double-log2.slang.expected.txt": "5b0326890fc16ac25c4f7d0081d4b59f208ec5d70e07b8609236181912323f81",
+    "tests/hlsl-intrinsic/scalar-double-max.slang.expected.txt": "2cc6bcfd9584a3dd7c7e78d25e0da8893d698edc0dbb45eca53a0f0c320d0860",
+    "tests/hlsl-intrinsic/scalar-double-min.slang.expected.txt": "4c49d337fb4c5d6bbce4ac7224debf99152ee061aaa9d8617a534c96e22e129f",
+    "tests/hlsl-intrinsic/scalar-double-pow.slang.expected.txt": "0233d80002c7cee931453a67ecd9af1a3de6dd3277b071609fc2aa54eb136c6a",
+    "tests/hlsl-intrinsic/scalar-double-rcp.slang.expected.txt": "43eca0aafff878b4c19da395bf4e1c494648397082264a6eb45ebc029bbf0055",
+    "tests/hlsl-intrinsic/scalar-double-rsqrt.slang.expected.txt": "7ad3670a5ac3247e390a70854e2d670ee530cf5a5f1012e6a2ac948f331452d4",
+    "tests/hlsl-intrinsic/scalar-double-saturate.slang.expected.txt": "6d45c4bfd22ba3c82a4904dc2b2d544f6fe586d4f6a658ef3787718b2e4506a5",
+    "tests/hlsl-intrinsic/scalar-double-sign.slang.expected.txt": "587faf4cf127ab9df7670da3094e4e8f777e0c003508f8f1c95ee7ddbc1c72aa",
+    "tests/hlsl-intrinsic/scalar-double-simple.slang.expected.txt": "9a4a08a55ae2a08624a50386c4549f4621d888c4d726b19c5d2daaa4b486e858",
+    "tests/hlsl-intrinsic/scalar-double-sin.slang.expected.txt": "02932db5760ea7acd470588b4c353843e31f70a81d4be00701a46b1f07038be0",
+    "tests/hlsl-intrinsic/scalar-double-sincos.slang.expected.txt": "8ab433bd43a1fa0180909a095eeed900ea6d4dee52c85598768aa38c081485a0",
+    "tests/hlsl-intrinsic/scalar-double-smoothstep.slang.expected.txt": "b719029d40c041b20a4fa7b396d29aafb88461d37d7ed4b0032c74807e942d8a",
+    "tests/hlsl-intrinsic/scalar-double-sqrt.slang.expected.txt": "4fa776ad36a83f79bda8c2f910f490002eaa188837d91f33b4d7d6373a6f0098",
+    "tests/hlsl-intrinsic/scalar-double-step.slang.expected.txt": "b719029d40c041b20a4fa7b396d29aafb88461d37d7ed4b0032c74807e942d8a",
+    "tests/hlsl-intrinsic/scalar-double-tan.slang.expected.txt": "8c4c71f186de9555013c9640b14641983c8984f63bd11fe54134169c905a1333",
+    "tests/hlsl-intrinsic/scalar-double-trunc.slang.expected.txt": "ab16bf27c6eecbf7353a92ecece848121c7e4d2e00b047ccb11d8eaad86937b3",
+    "tests/hlsl-intrinsic/scalar-double-vk-intrinsic.slang.expected.txt": "7acd774b6ed9f3c0ee8a1a277b788bd1dd3adac3e24d16591a5f09bbfa5f53a0",
+    "tests/hlsl-intrinsic/scalar-double.slang.expected.txt": "38e9277634a071d1df8f2bef6720d87b653b670daaa755bea0615914c285d7b6",
+    "tests/hlsl-intrinsic/scalar-float.slang.expected.txt": "8163e551052f8631820a1bf2401313f13a2c43425821f7e44cf925234e12ece6",
+    "tests/hlsl-intrinsic/scalar-int.slang.expected.txt": "1d12322126f944c7bc56158fe9e7b40c2fba3d1676533a126368f94d534b1b5f",
+    "tests/hlsl-intrinsic/scalar-int64.slang.expected.txt": "55bde077f46cac004617a8266177281b18279ee4bbf38dcfe476d2b3055d25e2",
+    "tests/hlsl-intrinsic/scalar-uint.slang.expected.txt": "fdbe2a864e365fdc1a9ff2c7c2d76a3e3c2ccafe528bfa2a2a3bd2ab203e2721",
+    "tests/hlsl-intrinsic/scalar-uint64.slang.expected.txt": "b3014dcd96bbe4ba2b1864d27e3ddde93732a20007aed42f79d0797e4a55b8ce",
+    "tests/hlsl-intrinsic/size-of/align-of-2.slang.expected.txt": "f6f27e607eb6f31ed47149151ed7f303c6576f4b3e7eb908d211e3981af8e54b",
+    "tests/hlsl-intrinsic/size-of/align-of-3.slang.expected.txt": "7bd072ccc6a856b6404c89e2ad0994a778d540ee476b3e1dd5539b47240e8ce2",
+    "tests/hlsl-intrinsic/size-of/align-of-generic.slang.expected.txt": "453c6c99685e608fe91d31af256d9c697f0a30a28fd70015f138c7f31b985a0c",
+    "tests/hlsl-intrinsic/size-of/align-of.slang.expected.txt": "bd47eaf14fae8ed5a8eb76dcfcaaccaab915d892d420c47d63aa7e8d421fdb48",
+    "tests/hlsl-intrinsic/size-of/size-of-2.slang.expected.txt": "e2159c67deb89ee369503898d94c8a68702ad12133969025eb86d50fe09f4b73",
+    "tests/hlsl-intrinsic/size-of/size-of-3.slang.expected.txt": "d0cad6d0ed4256e738ceda398606b9ba565c8103bae3679759e22045255ed025",
+    "tests/hlsl-intrinsic/size-of/size-of-generic.slang.expected.txt": "fdc740957f883e35353291e1c2ae6e463cf7af9c312f9bf5e62c6b08e9669b3b",
+    "tests/hlsl-intrinsic/size-of/size-of.slang.expected.txt": "0f5b13cf3ae72639960e465dbd5edd190589ce51b0e2bd48e19af4ff634335fc",
+    "tests/hlsl-intrinsic/vector-dot-int.slang.expected.txt": "a9cd7ed1056a13dd38e117ca26369e0848348ffe46c92fbc4bccf4ee394de0d3",
+    "tests/hlsl-intrinsic/vector-double-reduced-intrinsic.slang.expected.txt": "0675e8c35035b99d1afe1f9dfb22f83200d073a534bdb2b750dc4836f8b1b07c",
+    "tests/hlsl-intrinsic/vector-float.slang.expected.txt": "8afa07a7ce273131fb578dda393dc2fa52a2b909043f6a89b2f0f8faed2c82e5",
+    "tests/hlsl-intrinsic/vector-int-runtime-index.slang.expected.txt": "7ce7d7e0a0ea24cf5025d1e24165fe2330ced0af70965f3c7e19581bd6f5da62",
+    "tests/hlsl-intrinsic/vector-int.slang.expected.txt": "2ddc3efb01045cf5aa3c30d8f540a3c980f2175b1e9f7d2618645a4ae867b4b3",
+    "tests/hlsl-intrinsic/wave-active-count-bits.slang.expected.txt": "deba9e142444395dc5aa8f8c860f4c6c879ba2deb2fba272c001db4899ce4012",
+    "tests/hlsl-intrinsic/wave-active-product.slang.expected.txt": "78cf2a1fdcefbb11680388680e82bccf67f6c8627ab6d1f5ecec88be4cf8ff7a",
+    "tests/hlsl-intrinsic/wave-broadcast-lane-at-vk.slang.expected.txt": "f6f27e607eb6f31ed47149151ed7f303c6576f4b3e7eb908d211e3981af8e54b",
+    "tests/hlsl-intrinsic/wave-diverge.slang.expected.txt": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+    "tests/hlsl-intrinsic/wave-equality.slang.expected.txt": "4401664a401fa70525c6debd0ddd15ffc0ad5cdd29f2165a3ac8bcfd1d0987d1",
+    "tests/hlsl-intrinsic/wave-get-lane-index.slang.expected.txt": "dd4b412532d7675ed501af65c41fe2e866c4857acf3ddf5c147b655da219b862",
+    "tests/hlsl-intrinsic/wave-is-first-lane.slang.expected.txt": "4a416431ca982291a4e3b031a77e6c44067fbb322cae4c11dc1a61ec99b4f4c3",
+    "tests/hlsl-intrinsic/wave-mask/wave-active-product.slang.expected.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests/hlsl-intrinsic/wave-mask/wave-broadcast-lane-at-vk.slang.expected.txt": "f6f27e607eb6f31ed47149151ed7f303c6576f4b3e7eb908d211e3981af8e54b",
+    "tests/hlsl-intrinsic/wave-mask/wave-broadcast-lane-at.slang.expected.txt": "be35d8feb0e4f8069bd9d744798202de415d395c3f437aad12c1d3618acd6b7c",
+    "tests/hlsl-intrinsic/wave-mask/wave-diverge.slang.expected.txt": "0b6a7220c2890cfb4af6f0fe8f67263aa4bc41dc29be94feabe0b716f9967e5b",
+    "tests/hlsl-intrinsic/wave-mask/wave-equality.slang.expected.txt": "4401664a401fa70525c6debd0ddd15ffc0ad5cdd29f2165a3ac8bcfd1d0987d1",
+    "tests/hlsl-intrinsic/wave-mask/wave-get-active.slang.expected.txt": "931f4b0ff17c1428a7018595778c6c654c0844490366ac86365611e6778516b8",
+    "tests/hlsl-intrinsic/wave-mask/wave-get-converged.slang.expected.txt": "931f4b0ff17c1428a7018595778c6c654c0844490366ac86365611e6778516b8",
+    "tests/hlsl-intrinsic/wave-mask/wave-is-first-lane.slang.expected.txt": "46e7058f3d84ec3a49b18ed18c421163baeebc332c97f022431741fe8a22e29d",
+    "tests/hlsl-intrinsic/wave-mask/wave-mask-prefix.slang.expected.txt": "182236869abb9fad8c4654130671fefdb6ee8c017ee89a5bb387d06af3efcfad",
+    "tests/hlsl-intrinsic/wave-mask/wave-matrix.slang.expected.txt": "8e40194b5d630d9e6dafe0d933929e0cbe443f1892b1667d883a39c28fc295a2",
+    "tests/hlsl-intrinsic/wave-mask/wave-prefix-product.slang.expected.txt": "59e6e8d49ba67d6eab3ce3cb7425412e6578d0e4d393ebc996607548b49a917a",
+    "tests/hlsl-intrinsic/wave-mask/wave-prefix-sum.slang.expected.txt": "eeab3614b45ca87acc8191cc2f187104c324bc0be78f153f17300569577cd8a6",
+    "tests/hlsl-intrinsic/wave-mask/wave-read-lane-at-vk.slang.expected.txt": "bfc182f377cefc58df6193d76da3425dffe2dae9323cfffea6695e41bd2602d5",
+    "tests/hlsl-intrinsic/wave-mask/wave-read-lane-at.slang.expected.txt": "b97124a74519bfb9e4a6b56cd68c93589193f87de21fac656cd45b2e0fe88df3",
+    "tests/hlsl-intrinsic/wave-mask/wave-shuffle-vk.slang.expected.txt": "a8e7a3b4b6d848047f3f70df1daa7da2b5567d699068ab814efb00e0a467e227",
+    "tests/hlsl-intrinsic/wave-mask/wave-shuffle.slang.expected.txt": "49b8bafde3f6b9b5a85d8732606d111e140c37e7309256198441eec6074bd471",
+    "tests/hlsl-intrinsic/wave-mask/wave-vector.slang.expected.txt": "565552d61a96bd7734d34aba14932b865d4880c342fc19ef6c2f6e92847d01a6",
+    "tests/hlsl-intrinsic/wave-mask/wave.slang.expected.txt": "0f226bf646c7585517efc333680c04285d6dd242b986337511e5c6b5b3f7bd4b",
+    "tests/hlsl-intrinsic/wave-matrix.slang.expected.txt": "8e40194b5d630d9e6dafe0d933929e0cbe443f1892b1667d883a39c28fc295a2",
+    "tests/hlsl-intrinsic/wave-multi/wave-multi-prefix-scalar-functional.slang.expected.txt": "aa357a4252cf2f1a08d9d89fd6533bf682de25ac34d6c88ca17e2c6e51023f17",
+    "tests/hlsl-intrinsic/wave-prefix-count-bits.slang.expected.txt": "c05a8d5102aef57662152d8821cbc15710c3a9f0f67832e8a5881c9276f62f2c",
+    "tests/hlsl-intrinsic/wave-prefix-product.slang.expected.txt": "59e6e8d49ba67d6eab3ce3cb7425412e6578d0e4d393ebc996607548b49a917a",
+    "tests/hlsl-intrinsic/wave-prefix-sum.slang.expected.txt": "eeab3614b45ca87acc8191cc2f187104c324bc0be78f153f17300569577cd8a6",
+    "tests/hlsl-intrinsic/wave-read-lane-at-vk.slang.expected.txt": "bfc182f377cefc58df6193d76da3425dffe2dae9323cfffea6695e41bd2602d5",
+    "tests/hlsl-intrinsic/wave-read-lane-at.slang.expected.txt": "b97124a74519bfb9e4a6b56cd68c93589193f87de21fac656cd45b2e0fe88df3",
+    "tests/hlsl-intrinsic/wave-shuffle-vk.slang.expected.txt": "a8e7a3b4b6d848047f3f70df1daa7da2b5567d699068ab814efb00e0a467e227",
+    "tests/hlsl-intrinsic/wave-vector.slang.expected.txt": "565552d61a96bd7734d34aba14932b865d4880c342fc19ef6c2f6e92847d01a6",
+    "tests/hlsl-intrinsic/wave.slang.expected.txt": "36989f5b114a2b9260a05a6279ad7b2a83821a243575c9bd81f6bf24d8e36869",
+    "tests/hlsl/byte-buffer-load-std430.slang.expected.txt": "0f5fe4981d7b3367631317b380f5f7524e1fc34ef6810fb9f1eff0762108f39a",
+    "tests/hlsl/packoffset.slang.expected.txt": "27308d15afbf934dfa3851f09a48fbae793a07431ae56aaaffdc5b06294bc0db",
+    "tests/language-feature/shader-params/entry-point-uniform-params.slang.expected.txt": "76894d097423ab2fd187c47aa9641cdfd433c0d975db26783d6fe146e1df03fb",
+    "tests/slang-extension/atomic-float-byte-address-buffer.slang.expected.txt": "19ca53420099d1deb7330b73081aa645c7e1311189b4da16e3234d4cdad9352c",
+    "tests/slang-extension/atomic-int64-byte-address-buffer.slang.expected.txt": "e5a20465919744256b91c3cee9a583a6c6f6c92bb5b322d3fee55325a5fd9b5b",
+    "tests/slang-extension/cas-int64-byte-address-buffer.slang.expected.txt": "a7d114aab4d202e88e2f9b476890ed8da1bc308d1142d7d0e639954c28e94698",
+    "tests/slang-extension/exchange-int64-byte-address-buffer.slang.expected.txt": "e313c69e4db989af44d9d2755a621fd7c8ad2da14c94ce2ac878a62ff4ee9f1c",
+    "tests/slang-extension/realtime-clock.slang.expected.txt": "653b021a06c93331e9958021652f5c5d82c92e28751a6b1cea5468c50bf57237",
+    "tests/compute/cbuffer-legalize.slang.expected.txt": "d686106fb27345d157f9736ea7f0be02dd20b4f90653fcecc197ba11d394a484",
+    "tests/compute/constexpr.slang.expected.txt": "f92e1cb7d45f67e47ea567c3d0d67f487405c8617cff1127921afb4551c25301",
+    "tests/compute/func-cbuffer-param.slang.expected.txt": "60fb26a0b7b95bb58a1c47004d75311e81c92b29a45d1e007b4f3a3d271b7a77",
+    "tests/compute/buffer-type-splitting.slang.expected.txt": "9e8b6621fa533a46e0599aaad53989b2b0b10f98c3f5fdded91bda613a34e6a3",
+    "tests/compute/texture-get-dimensions.slang.expected.txt": "459afbc0c966514ee022bc9d19877e52fc300aaeb18f0937c2e15bc77991841a",
+    "tests/optimization/func-resource-result/func-resource-result-complex.slang.expected.txt": "149051825acc9f70977387777097d077b40b4c368bcf075fd8e098058451694c",
+    "tests/optimization/func-resource-result/func-resource-result-simple.slang.expected.txt": "24841f43f84d169050e080d36de0a75a672db94320b6670da12d0f5b4ad300e4",
+    "tests/bugs/parameter-block-load.slang.expected.txt": "95d77daf18bf59c0877f7c2fddc7c161f1d23022dee56eed06543009bdbe7e6f",
+    "tests/compute/generic-interface-method.slang.expected.txt": "9f00673c1011e0a2ab059769b9bf3240d06071a3ea37e3f0e9440016e52c0117",
+    "tests/compute/generics-constrained.slang.expected.txt": "25b896aacd27417cafda71e78cffc3f3d4442c41325c2b5a8be147983fbd2f0b",
+    "tests/compute/nested-generics2.slang.expected.txt": "149051825acc9f70977387777097d077b40b4c368bcf075fd8e098058451694c",
+    "tests/compute/interface-shader-param.slang.expected.txt": "67e8ba86ec778722e889099990eb376a27888194234cc0690f8bf810cda1ddf7",
+    "tests/compute/multi-interface.slang.expected.txt": "59c6b2808def6e351f17a77df44dc58f37a70571eed79f86e01d5ee8d72d0e01",
+    "tests/compute/pointer-emit.slang.expected.txt": "42fa296b6f980baf2ebc16a7578b6b5db6304f5c900fa7ae203ef2e871dcdd86",
+    "tests/compute/inout.slang.expected.txt": "35a14b53d26f8ea5a9faa03ff6b63953b4a3eceeda1e27047ed5a6f75a453d87",
+    "tests/compute/struct-make.slang.expected.txt": "e169bdf59fac30d230f7d21be511d04dc8cc61e5edb1d8255758bc220ba3d4c7",
+    "tests/compute/static-const-matrix-array.slang.expected.txt": "e8ffcfe1edba61d8dd494a0a6ba573166b73c4b971f252bc955692dfb51971ba",
+    "tests/compute/non-square-column-major.slang.expected.txt": "f9455e85b4ea6f4640044708b7b281e09ce4ee2bab03bbebde3ff411edfcbce5",
+    "tests/language-feature/types/opaque/inout-param-opaque-type-in-struct.slang.expected.txt": "6fca4169ebd2604a4e9221321a8fb08b52e8b26653c313e257defdca2cf579f8",
+    "tests/language-feature/types/opaque/return-opaque-type-in-struct.slang.expected.txt": "5fdbb81d33e6415fada877a1c1b16cbae67f315b49d3ae0e99265a6c445c2b51",
+    "tests/bugs/type-legalize-bug-1.slang.expected.txt": "95bf0276faf875073950313b6efcca544c85572bd27dfc327ecdc1f0dc78818c",
+    "tests/bugs/generic-default-matrix.slang.expected.txt": "e169bdf59fac30d230f7d21be511d04dc8cc61e5edb1d8255758bc220ba3d4c7",
+    "tests/bugs/op-assignment-unify-mat.slang.expected.txt": "e0d5df89883f4eadc8923fc9766564adf10ee390c667c0f35c5f55916caa99e2",
+    "tests/compute/atomics-buffer.slang.expected.txt": "da71459e81dded48fbba76c71747fe2528a22e84f1d1dbc3bdec100fe56ad38f",
+    "tests/bugs/array-size-groupshared.slang.expected.txt": "f61d92e68ba13b2f5f2580ec92710e22f6562045cf14e793cf995f0addc01059",
+    "tests/bugs/atomic-coerce.slang.expected.txt": "7211f5ed261c38bceccf2ad2f7305406cc4049e3f817ec5c05a1640170700f18",
+    "tests/bugs/byte-address-buffer-interlocked-add-f32.slang.expected.txt": "4084453841520715d0fa926499b1dfb1f70c06ea8fca66fe25f1d0d4fc3fbb10",
+    "tests/bugs/generic-groupshared.slang.expected.txt": "352383380c87d1a1902f959b7b0b5513eb67da0982e37b5509e6a0717e1c6288",
+    "tests/bugs/addr-scope-fix.slang.expected.txt": "242e8e679b61d23bad14f4b4fae67e8387eccc7f0a8af59a57718b3b3b67a297",
+    "tests/ir/ssa-reg-alloc.slang.expected.txt": "b82611968d9ae73741b92f6215dfb52e4b0e38755f77248e8f45739d3740d7ed",
+    "tests/ir/loop-dce.slang.expected.txt": "b692935a446f9a441cdda762e29c12d2d6ab075ee10722609daef6122357a17a",
+    "tests/compute/multiple-continue-sites.slang.expected.txt": "e5976e96ff545d1acf20f6014c1fa086f636d555eb0b9e6e698440d77a48df74",
+    "tests/compute/ssa-reduce-bug.slang.expected.txt": "f2e25d7d6cecac0ceca1a5ba2c5576b089005bab0f6af1a756b0ada04db805ca",
+    "tests/bugs/mutating/mutating-call-in-loop-dce.slang.expected.txt": "1028a0b7c815a77a3e0a0ab45eba83d24adaadde3c763b224a9e39d45eb97d0f",
+    "tests/hlsl-intrinsic/wave-prefix-count-bits-cuda.slang.expected.txt": "d0c5d56cd8ed40805691571b7c49946b4b125aacedd65c489c3dce9b7bcd7b0b"
+  },
+  "oracle_evidence": {
+    "baseline_field": "current_complete_provenance",
+    "reference": {
+      "path": "build/nvvm-integration/full-after-cleanup-1/checkpoint-results/provenance.json",
+      "sha256": "a1f3e2942945e0548a924c3d5ddec08686170928780f35e96887634dcc7e1e67"
+    },
+    "meaning": "External expected-file hashes extracted verbatim from the accepted full provenance after checking its recorded SHA256; not captured from the current working tree."
+  }
+}

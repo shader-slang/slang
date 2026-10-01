@@ -83216,6 +83216,432 @@
         "https://docs.nvidia.com/cuda/archive/12.9.1/cuda-runtime-api/group__CUDART__TEXTURE__OBJECT.html"
       ],
       "remaining": "No documented complete count repair established. Do not divide every cube depth by6, fabricate descriptor-size symbols, infer allocated mip count from dimensions, or enable a partial public GetDimensions overload."
+    },
+    "nvvm-corpus-tiers": {
+      "status": "accepted-focused",
+      "scope": "Exact runtime configuration tiers over existing census/discovery plus eligible authored CUDA COMPARE_COMPUTE candidates; compile-only, rejection and custom host gates remain separate.",
+      "identity": {
+        "runtime_build": {
+          "revision": "2ba5b8f21dfe6e8a1b323a5e3abd1b3ee2d49a37",
+          "patch_sha256": "46787d890f6047a3ec4698864d2d63e9895b6dbfddb87a317e3d55022e93a670",
+          "source_sha256": {
+            "source/compiler-core/slang-nvvm-ir-builder-api.h": "d6e43e8aea8846283197734651d09088e679ded6da11c32bdb9e72a7f6b0b8bd",
+            "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "c81f2987e77048c6c88e7a2e89668b7e1479d0fa0dd2ddf972b51cbfccf71d61",
+            "source/slang/hlsl.meta.slang": "a12f3c39f541641970ac7de48ca6d0048557ee70e7e96c91689d5381fbc615ac",
+            "source/slang/slang-emit-nvvm.cpp": "cec3652a515cd6d534cf639d09af2d04a245dda1e200c6e47566f0cbf6571b3c",
+            "source/slang/slang-emit.cpp": "16fff8ad5a21a130ad0eb5a0df0bf9307555a0b9dbbcf92836b376198063883c",
+            "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "91f4acdea2fa6ac9218a304c7bf5bfb7abac674740c5c9f2f0f8fdea8336ca27",
+            "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "4470aad162ab487e8e89ebe5ad71df946761a77194a399335617f756a78dd64c",
+            "tools/slang-unit-test/unit-test-optix-multiple-definition.cpp": "75f2cd4740a67e25a29474e772e846c675df8e6201e1ace6f205a4b58a9d9649",
+            "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "dac8d3ea07e3225260cfd7d439876fdcdd05b2f209dd004f0c437feb946e2b85",
+            "tests/cuda/nvvm-optix-raygen.slang": "37cbb22ce0c5619e2b2b0507a3033564ed14626f374687dd04efcffed13818b5"
+          },
+          "runtime_sha256": {
+            "build/RelWithDebInfo/lib/libslang-compiler.so": "5e616e45760cfa17957ee5daff2f385aefa3f97d0c3db6349a900d4e89830e9f",
+            "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+            "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "053a3a16355d682c6a760cfbef435eca00ce576af515f20a795dc01ff9eac20c",
+            "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+            "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+            "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+            "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "9c1d41d87f8f2cd37b6f472b38ae8e0b2e308eb6116340f56938f586aede082d",
+            "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+            "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+            "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+            "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+            "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+            "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+            "build/RelWithDebInfo/lib/slang-core-module.bin": "ea188b1d5b92c21a33077df66330a04e970c09c800deae2764c5aa6499051d5d"
+          },
+          "configuration_sha256": {
+            "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+            "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+          },
+          "compiler_version": "2026.18.3-350-gdc0a9acc3",
+          "optix_library_sha256": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+          "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05, targetSM80",
+          "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+          "meaning": "Final raygen source and actual shared artifacts. Initial focused gate used the same production/test-host bytes but the permanent fixture had an invalid CLI flag; only its two compile cases were retried."
+        },
+        "selector_sha256": {
+          "issue-nvvm-backend/nvvm-corpus-tiers.py": "32ef88b72c3703c984f077be0b43fdc95bac5ddc9076a64cfb470e948de0d3b0",
+          "issue-nvvm-backend/corpus-tiers.json": "e10ed16e0c918b47e81d083593b7c43ee22d721280f45c3a4640c58b1f7bed2a",
+          "issue-nvvm-backend/test-nvvm-corpus-tiers.py": "da322b62a7fd245382e67c87968de373a8f89fa0d64c56a1c57f4489387a0e42",
+          "issue-nvvm-backend/nvvm-results.py": "ad9d46485e5301cd0ea0d5477422d9b208e0daf2378fa19103b229045067b321",
+          "issue-nvvm-backend/run-compute-census.py": "4b07cd94c115b6e0b91b784bd06ee6f135fe144c5992c32693ad4d7de2271944",
+          "issue-nvvm-backend/run-compute-discovery.py": "f7656eb79e5bafc6b1a0fdd8eda4d7b01fe42e6d66d9067b7a37c8684a8c8682"
+        },
+        "provenance": {
+          "path": "build/nvvm-corpus-tiers/smoke-1/provenance.json",
+          "sha256": "3ee4f5501e54b130d1077f1110ecae872bf7b9ea18842fe334bd9b08f48487d8"
+        },
+        "metadata_formatting": {
+          "tested_sha256": "e10ed16e0c918b47e81d083593b7c43ee22d721280f45c3a4640c58b1f7bed2a",
+          "current_sha256": "caaecca29a797fea2f43141421753d76efa50e2e79e795e3ee7923110462b499",
+          "meaning": "Repository JSON formatting only; parsed metadata is exactly unchanged."
+        }
+      },
+      "validation": {
+        "contracts": {
+          "path": "build/nvvm-corpus-tiers/contracts.json",
+          "sha256": "59ff1845aecee318992e69596a39b372b76e2d3b787b13c2a6ec5d3e85d1376e"
+        },
+        "contract_count": 43,
+        "smoke": {
+          "path": "build/nvvm-corpus-tiers/smoke.json",
+          "sha256": "8269cfa0be7c0022c6ee13f5caa8dce6e31434bd607e0638736c16c1a575349b"
+        },
+        "selection": {
+          "path": "build/nvvm-corpus-tiers/smoke-1/selection.json",
+          "sha256": "68b0e1510ca182553608521c52aa1df6122b8e01dac1aa450837a661230efaba"
+        },
+        "elapsed_seconds": 22.156527757644653,
+        "outcomes": [
+          {
+            "id": "cuda/nvvm-half-values.slang#cuda-1",
+            "source": "cuda/nvvm-half-values.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o0",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": true,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 1704,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o0/dfd190299b79b378fe4e3875e3f940e8a34d923a.log"
+          },
+          {
+            "id": "compute/atomics-groupshared.slang#cuda-1",
+            "source": "compute/atomics-groupshared.slang",
+            "source_line": 6,
+            "source_test_ordinal": 3,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2951,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/656c2b1b6f745f2906c4eeddc95e2f6bebb4b4a7.log"
+          },
+          {
+            "id": "compute/byte-address-buffer-array.slang#cuda-1",
+            "source": "compute/byte-address-buffer-array.slang",
+            "source_line": 3,
+            "source_test_ordinal": 1,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2833,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/b953a04ac1e46694a12023144ad230e80532ba61.log"
+          },
+          {
+            "id": "compute/rw-texture-simple.slang#cuda-1",
+            "source": "compute/rw-texture-simple.slang",
+            "source_line": 9,
+            "source_test_ordinal": 5,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2781,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/eaa4d0b428cd5b9e2deb8de5d6fbe804a134c7b6.log"
+          },
+          {
+            "id": "compute/texture-get-dimensions-cuda.slang#cuda-1",
+            "source": "compute/texture-get-dimensions-cuda.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2879,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/36b7451006d71681aa4d4e0d3f14f408e35631a2.log"
+          },
+          {
+            "id": "cuda/nvvm-conventional-global-multi-resource.slang#cuda-1",
+            "source": "cuda/nvvm-conventional-global-multi-resource.slang",
+            "source_line": 3,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2634,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/e5b17ef63c3ac5a5be698ca5c7694c9e4919f0de.log"
+          },
+          {
+            "id": "cuda/nvvm-float-matrix-values.slang#cuda-1",
+            "source": "cuda/nvvm-float-matrix-values.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": true,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2585,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/9e1b32183463b8bcdc5c788987fd72b9557cdc0c.log"
+          },
+          {
+            "id": "cuda/nvvm-half-values.slang#cuda-1",
+            "source": "cuda/nvvm-half-values.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": true,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2680,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/46771982550e2127803e88b58453423f01ecee90.log"
+          },
+          {
+            "id": "cuda/nvvm-helper-copyable-values.slang#cuda-1",
+            "source": "cuda/nvvm-helper-copyable-values.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2680,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/46513e5e9bfeba63efdd5217ab5e4ed964ac0d78.log"
+          },
+          {
+            "id": "hlsl-intrinsic/wave-mask/wave-prefix-sum.slang#cuda-1",
+            "source": "hlsl-intrinsic/wave-mask/wave-prefix-sum.slang",
+            "source_line": 6,
+            "source_test_ordinal": 4,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 1640,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/frozen/logs/nvvm-o3/ff2ac24a014e0be32a5e6b93864205dec7911141.log"
+          },
+          {
+            "id": "cuda/nvvm-aggregate-param-resource-snapshot.slang#discovery-1",
+            "source": "cuda/nvvm-aggregate-param-resource-snapshot.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o0",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 1608,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/discovery/logs/nvvm-o0/1a9e4f55b481f189ba4ca7d31e7ff29e45819b31.log"
+          },
+          {
+            "id": "bindings/nested-parameter-block-2.slang#discovery-1",
+            "source": "bindings/nested-parameter-block-2.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2407,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/discovery/logs/nvvm-o3/b40a210ae0b28ae19a9b5316f8041c211a89792a.log"
+          },
+          {
+            "id": "cuda/nvvm-aggregate-param-resource-snapshot.slang#discovery-1",
+            "source": "cuda/nvvm-aggregate-param-resource-snapshot.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2386,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/discovery/logs/nvvm-o3/5d0c954e871cc3f7a63ab27e417e9291bbe5d006.log"
+          },
+          {
+            "id": "cuda/nvvm-copyable-kernel-context.slang#discovery-1",
+            "source": "cuda/nvvm-copyable-kernel-context.slang",
+            "source_line": 1,
+            "source_test_ordinal": 0,
+            "cuda_ordinal": 1,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": false,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 2456,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/discovery/logs/nvvm-o3/44310d34bee4d3c4afd219344a93238316e5660a.log"
+          },
+          {
+            "id": "cuda/nvvm-coherent-pointer-memory.slang#cuda-2",
+            "source": "cuda/nvvm-coherent-pointer-memory.slang",
+            "source_line": 2,
+            "source_test_ordinal": 1,
+            "cuda_ordinal": 2,
+            "mode": "nvvm-o3",
+            "capability": "cuda_sm_8_0",
+            "reference_derived_from_direct": true,
+            "classification": "correct",
+            "return_code": 0,
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            },
+            "elapsed_ms": 1715,
+            "diagnostic": "",
+            "canonical_shape": "",
+            "log": "build/nvvm-corpus-tiers/smoke-1/candidate/logs/nvvm-o3/86d96ff971c481be3eb5ba778b8287c7f461633d.log"
+          }
+        ]
+      },
+      "inventory": {
+        "total": 2163,
+        "working": 1708,
+        "exploratory": 455,
+        "smoke": 15,
+        "meaning": "Inventory and admissions, not a fresh full working/exploratory run. Smoke is a subset of working. Three working descriptor-conversion configurations retain input-review-required status; none belongs to smoke."
+      },
+      "contracts": [
+        "A working failure is a regression and never automatically demoted.",
+        "Changed source/oracle stays a working expectation with explicit review required.",
+        "Focused admission maps exact directive/arguments/mode/oracle; passed feature status alone is insufficient.",
+        "Exploratory completion may contain failing cells and never automatically promotes support."
+      ],
+      "qualification": "43 CPU contracts and15 fresh runtime cells pass. Existing full baseline and every prior focused feature remain unchanged. No full campaign or performance claim;22.16s is smoke harness wall time on the current host."
     }
   }
 }

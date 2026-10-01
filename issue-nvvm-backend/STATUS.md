@@ -9,20 +9,12 @@ normalization at exact-width integer consumers. The consolidated integration che
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
-below; the four bounded items are complete and work is stopped for discussion.
+below; development has resumed with corpus tiers and an initial OptiX path.
 
-The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
-related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
-campaigns. The maintainer superseded the earlier stop-after-log request. The maintainer has resolved the
-offset scope: preserve existing NVVM restrictions and leave CUDA/CPP behavior unchanged. The final
-offset migration is accepted. The maintainer has now authorized the ordered correctness,
-integration, cleanup and Float16 work below; continue through bounded reviewed local commits,
-stopping only for a decision that actually needs human input. After all queued cleanup and Float16
-work, the maintainer additionally requests a full NVVM validation checkpoint, fixes for discovered
-issues, and resumption of feature development under the standard workflow. No push, Slack or system changes.
-On 2026-10-01 the maintainer instructed: finish the current parameter-group layout-pointer slice,
-then stop for discussion. That slice finished. The maintainer subsequently authorized the four
-items below, then another stop; this does not authorize an open-ended feature loop.
+The maintainer approved corpus tiers and initial OptiX support on 2026-10-01 and explicitly resumed
+development. Earlier stopping conditions are superseded. Use eight-job builds, related feature
+batches, focused validation and reviewed local commits. Continue until a concrete blocker requires
+human input or a new stopping instruction arrives. No push, external messages or system changes.
 Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
@@ -85,7 +77,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Twenty-one feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 64 feature objects (including the latest bounded investigation), preserving all prior objects and the full baseline. Each feature's
+now contains 65 feature objects (including the latest bounded investigation and corpus-tier validation), preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
 
@@ -96,8 +88,18 @@ These batches used eight-job builds and focused validation. The authorized seque
 4. Investigate restricted CubeArray binding and mip-query failures, implementing fixes supported
    by the findings and retaining unresolved external/semantic boundaries.
 
-**Stopped after item 4, as requested.** Approximate Half math and other feature work remain outside
-this sequence; a new resume request is required.
+**Resumed on 2026-10-01:** establish smoke/working/exploratory selection using existing runners,
+then executable OptiX raygen, triangle hit/miss and representative material paths. Smoke runs after
+implementation iterations; working runs every three to five iterations or sooner for broad changes.
+Explore application-relevant failures in bounded batches and preserve intentional semantic differences.
+The previous four-item stop is superseded. Approximate Half policies remain separate work.
+
+The tier selector is implemented and reviewed: 1,708 working configurations, 455 exploratory
+configurations and a 15-cell smoke subset. Its 43 CPU contracts and all 15 smoke cells pass;
+the first smoke run took 22.16 seconds. This inventory does not claim a fresh full working run.
+Three working descriptor-conversion cells retain changed-input review status; none is in smoke.
+Raygen production/runtime and focused provider checks pass; static SBT validation is still pending.
+The next bounded research gate is the triangle trace/payload ABI. Active plans remain uncommitted.
 
 Current additions beyond the full checkpoint are:
 
@@ -158,7 +160,9 @@ Keep these open distinctions visible:
   qualified surface contract. Dynamic component stores are non-atomic whole-texel RMW with in-range
   selectors only. Approximate Half exp2/tanh and round ties retain their separate documented policies.
 
-**All four authorized items are complete. Stopped for discussion; do not resume the general loop.**
+**Active work:** corpus tier selection, then the first executable OptiX ray-generation slice.
+Keep actual measured smoke duration and the working-suite cadence here as slices complete.
+No full checkpoint is automatically due; the prior full baseline remains authoritative for its identity.
 
 ## Retained boundaries
 

@@ -572,6 +572,7 @@ def _write_result_files(
 def add_execution_arguments(parser: argparse.ArgumentParser) -> None:
     """Share native executable, provider, and architecture settings between both corpora."""
     parser.add_argument("--jobs", type=int, default=8)
+    parser.add_argument("--cells-from", type=Path, help="exact id/source/ordinal/mode JSON selection")
     parser.add_argument("--config", choices=["Debug", "Release", "RelWithDebInfo"], default="Release")
     parser.add_argument("--bin-dir", type=Path, help="compiler/test binary directory")
     parser.add_argument("--test-runner", type=Path, help="exact native slang-test executable")
@@ -606,9 +607,39 @@ def select_architecture(workloads: list[dict[str, object]], architecture: int) -
             workload["capability"] = f"cuda_sm_{architecture // 10}_{architecture % 10}"
 
 
-def inventory_matches(results, workloads, modes) -> bool:
+def read_cell_selection(path, workloads, modes):
+    """Resolve an exact selection against discovered inputs; never trust supplied source paths."""
+    if len(set(modes)) != len(modes) or set(modes) - set(MODES):
+        raise ValueError("invalid or duplicate execution modes")
+    cells = json.loads(Path(path).read_text())
+    if not isinstance(cells, list) or not cells:
+        raise ValueError("cell selection must be a nonempty list")
+    known = {row["id"]: row for row in workloads}
+    if len(known) != len(workloads):
+        raise ValueError("duplicate discovered workload IDs")
+    selected = set()
+    for cell in cells:
+        if not isinstance(cell, dict) or set(cell) != {"id", "source", "source_test_ordinal", "mode"}:
+            raise ValueError("invalid cell selection fields")
+        row = known.get(cell["id"])
+        if row is None or cell["source"] != row["source"] or type(cell["source_test_ordinal"]) is not int or cell["source_test_ordinal"] != row["source_test_ordinal"]:
+            raise ValueError("unknown or changed source/ordinal: " + str(cell))
+        if cell["mode"] not in modes:
+            raise ValueError("selected cell contradicts --modes: " + str(cell))
+        key = (cell["id"], cell["mode"])
+        if key in selected:
+            raise ValueError("duplicate selected cell: " + str(key))
+        selected.add(key)
+    return selected
+
+
+def workloads_for_mode(workloads, mode, cells=None):
+    return [row for row in workloads if cells is None or (row["id"], mode) in cells]
+
+
+def inventory_matches(results, workloads, modes, cells=None) -> bool:
     """Require each requested workload/mode exactly once when replay is used as a strict gate."""
-    expected = {(str(workload["id"]), mode) for workload in workloads for mode in modes}
+    expected = cells if cells is not None else {(str(workload["id"]), mode) for workload in workloads for mode in modes}
     actual = [(str(result["id"]), str(result["mode"])) for result in results]
     if len(actual) != len(set(actual)) or set(actual) != expected:
         print("strict replay requires the complete selected workload/mode inventory", file=sys.stderr)
@@ -715,6 +746,16 @@ def main() -> int:
         "workloads": workloads,
         "excluded": excluded,
     }
+    cells = None
+    if args.cells_from:
+        if args.match or args.match_regex or args.classify_only:
+            raise ValueError("--cells-from cannot combine with match or classify-only")
+        if output_root.exists():
+            raise ValueError("exact cell execution requires a new output directory")
+        cells = read_cell_selection(args.cells_from, workloads, args.modes)
+        workloads = [row for row in workloads if any((row["id"], mode) in cells for mode in args.modes)]
+        manifest["selected_cells"] = sorted(cells)
+        manifest["workloads"] = workloads
     output_root.mkdir(parents=True, exist_ok=True)
     _write_text(output_root / "manifest.json", json.dumps(manifest, indent=2) + "\n")
     _write_tsv(
@@ -795,15 +836,18 @@ def main() -> int:
 
     all_results: list[dict[str, object]] = []
     for mode in args.modes:
+        mode_workloads = workloads_for_mode(run_workloads, mode, cells)
+        if not mode_workloads:
+            continue
         mode_root = output_root / "mirrors" / mode
         print(f"preparing generated {mode} mirror", flush=True)
-        prepare_mode(tests_dir, output_root, mode_root, run_workloads, mode)
+        prepare_mode(tests_dir, output_root, mode_root, mode_workloads, mode)
         all_results.extend(
             run_mode(
                 repo_root,
                 output_root,
                 mode_root,
-                run_workloads,
+                mode_workloads,
                 mode,
                 provider_path,
                 test_runner,
@@ -815,6 +859,8 @@ def main() -> int:
 
     counts = _write_result_files(output_root, all_results)
     print(json.dumps(counts, indent=2), flush=True)
+    if cells is not None and not inventory_matches(all_results, run_workloads, args.modes, cells):
+        return 2
     return result_exit_code(all_results, args.require_all_correct)
 
 
