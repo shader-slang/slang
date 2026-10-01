@@ -2,6 +2,7 @@
 #include "slang-type-layout.h"
 
 #include "compiler-core/slang-artifact-desc-util.h"
+#include "slang-ast-substitution.h"
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
@@ -5864,10 +5865,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
-        // If we are trying to get the layout of some extern type, do our best
-        // to look it up in other loaded modules and generate the type layout
-        // based on that.
-        auto resolvedType = context.lookupExternDeclRefType(declRefType);
+        // Apply the composed program's bindings before layout, including extern dependencies
+        // inside associated-type lookups and generic arguments.
+        auto resolvedType = context.resolveLinkTimeType(declRefType);
         if (resolvedType != type)
             return _createTypeLayout(context, resolvedType);
 
@@ -6586,6 +6586,99 @@ DeclRef<GenericDecl> getOuterGeneric(DeclRef<Decl> declRef)
     return DeclRef<GenericDecl>();
 }
 
+// Resolve dependencies using ordinary substitution so generic arguments, associated lookups,
+// and transitive witnesses retain their existing canonical builders and requirement keys.
+//
+// Consider this example, with the extern and export in different modules:
+//
+//     interface IRenderer { associatedtype Payload; }
+//     extern struct Renderer : IRenderer;
+//     [shader("closesthit")] void hit(inout Renderer.Payload payload) { ... }
+//
+//     struct Impl : IRenderer { typealias Payload = float; }
+//     export struct Renderer : IRenderer = Impl;
+//
+// The frontend represents Renderer.Payload as a LookupDeclRef carrying the declared proof of
+// Renderer : IRenderer. The selected export carries a checked proof of Impl : IRenderer.
+// Substitute that existing proof before LookupDeclRef performs its ordinary requirement lookup,
+// so layout sees float and records a ray-payload binding. Unwrapping Renderer to Impl first would
+// discard the wrapper's proof. TransitiveSubtypeWitness substitution handles inherited requirements
+// after this direct conformance boundary has been replaced.
+//
+// Keep these bindings out of Val::resolve(), whose cached answers are shared across compositions.
+// The ordinary substitution cache is local to this query, including recursive generic arguments.
+struct LayoutLinkTimeSubstitution : LinkTimeSubstitution
+{
+    TypeLayoutContext& context;
+
+    LayoutLinkTimeSubstitution(TypeLayoutContext& inContext)
+        : context(inContext)
+    {
+    }
+
+    Val* diagnoseCycle(Val* val) override
+    {
+        // Only binding replacements introduce cycles: they replace a named type with another
+        // named type that ultimately depends on the original declaration.
+        auto type = as<DeclRefType>(val);
+        SLANG_RELEASE_ASSERT(type);
+        if (context.sink)
+            context.sink->diagnose(
+                Diagnostics::CyclicReference{.decl = type->getDeclRef().getDecl()});
+        return context.astBuilder->getErrorType();
+    }
+
+    Val* trySubstitute(Val* val) override
+    {
+        auto astBuilder = context.astBuilder;
+        if (auto witness = as<DeclaredSubtypeWitness>(val))
+        {
+            auto inheritance = witness->getDeclRef().as<InheritanceDecl>();
+            auto source = isDeclRefTypeOf<AggTypeDecl>(witness->getSub());
+            if (inheritance && source && inheritance.getDecl()->parentDecl == source.getDecl())
+            {
+                auto selectedType =
+                    context.lookupExternDeclRefType(as<DeclRefType>(witness->getSub()));
+                if (auto selected = isDeclRefTypeOf<AggTypeDecl>(selectedType))
+                {
+                    for (auto clause : getMembersOfType<InheritanceDecl>(astBuilder, selected))
+                    {
+                        if (!clause.getDecl()->witnessVal)
+                            continue;
+                        if (!getSup(astBuilder, clause)->equals(witness->getSup()))
+                            continue;
+                        return clause.getDecl()->witnessVal->substitute(
+                            astBuilder,
+                            SubstitutionSet(selected));
+                    }
+                }
+            }
+        }
+        if (auto type = as<DeclRefType>(val))
+        {
+            auto selected = context.lookupExternDeclRefType(type);
+            if (selected != type)
+                return selected;
+            if (auto aggregate = isDeclRefTypeOf<AggTypeDecl>(type))
+                if (auto aliasedType = as<Type>(getAliasedType(astBuilder, aggregate)))
+                    return aliasedType;
+        }
+        if (auto intVal = as<IntVal>(val))
+            return context.tryResolveLinkTimeVal(intVal);
+        return val;
+    }
+};
+
+Type* TypeLayoutContext::resolveLinkTimeType(Type* type)
+{
+    LayoutLinkTimeSubstitution bindings(*this);
+    SubstitutionSet subst;
+    subst.linkTimeSubstitution = &bindings;
+    auto result = as<Type>(type->substitute(astBuilder, subst));
+    SLANG_RELEASE_ASSERT(result);
+    return result;
+}
+
 Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
 {
     const auto declRef = declRefType->getDeclRef();
@@ -6619,15 +6712,6 @@ Type* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
         }
     }
 
-    // If the type is an alias of another type, then we should create the type layout
-    // from the aliased type instead.
-    if (auto aggTypeDeclRef = isDeclRefTypeOf<AggTypeDecl>(resultType))
-    {
-        if (auto aliasedType = as<Type>(getAliasedType(astBuilder, aggTypeDeclRef)))
-        {
-            return aliasedType;
-        }
-    }
     return resultType;
 }
 

@@ -7,6 +7,16 @@
 namespace Slang
 {
 
+/// Supplies composition-dependent bindings to the ordinary semantic substitution traversal.
+/// Implementations replace a type, value, or conformance witness with an existing checked value
+/// of the same semantic category. Returning the input leaves ordinary substitution in charge.
+/// The provider and the substitution cache belong to one operation; neither is stored in a Val.
+struct LinkTimeSubstitution
+{
+    virtual Val* trySubstitute(Val* val) = 0;
+    virtual Val* diagnoseCycle(Val* val) = 0;
+};
+
 /// Caches the completed Val substitutions performed by one substitution operation.
 ///
 /// Consider `struct Node<T : IModel> : IModel {}` and a type such as
@@ -47,8 +57,10 @@ struct SubstitutionCache
         int diff = 0;
     };
 
-    SubstitutionCache(ASTBuilder* astBuilder, DeclRefBase* substitutionDeclRef)
-        : m_astBuilder(astBuilder), m_substitutionDeclRef(substitutionDeclRef)
+    SubstitutionCache(ASTBuilder* astBuilder, const SubstitutionSet& subst)
+        : m_astBuilder(astBuilder)
+        , m_substitutionDeclRef(subst.declRef)
+        , m_linkTimeSubstitution(subst.linkTimeSubstitution)
     {
     }
 
@@ -56,6 +68,7 @@ struct SubstitutionCache
     {
         SLANG_ASSERT(astBuilder == m_astBuilder);
         SLANG_ASSERT(subst.declRef == m_substitutionDeclRef);
+        SLANG_ASSERT(subst.linkTimeSubstitution == m_linkTimeSubstitution);
         SLANG_ASSERT(subst.substitutionCache == this);
     }
 
@@ -63,16 +76,23 @@ struct SubstitutionCache
 
     void add(const Key& key, const Result& result) { m_entries.add(key, result); }
 
+    // Use the same key as completed substitutions: distinct pack elements are distinct visits.
+    bool beginLinkTimeSubstitution(const Key& key) { return m_activeLinkTimeValues.add(key); }
+    void endLinkTimeSubstitution(const Key& key) { m_activeLinkTimeValues.remove(key); }
+
 private:
     ASTBuilder* m_astBuilder = nullptr;
     DeclRefBase* m_substitutionDeclRef = nullptr;
+    LinkTimeSubstitution* m_linkTimeSubstitution = nullptr;
     ShortDictionary<Key, Result> m_entries;
+    HashSet<Key> m_activeLinkTimeValues;
 };
 
 /// Dispatches a Val substitution through the operation-local cache.
 ///
-/// Entries are added only after dispatch returns, so recursive cycles retain their existing
-/// behavior. The saved diff is a delta because substituteImpl is specified to increment ioDiff.
+/// Entries are added only after dispatch returns. Ordinary generic substitutions retain their
+/// existing recursion behavior; composition bindings additionally detect cycles introduced by
+/// replacing extern declarations. The saved diff is a delta because substitution increments ioDiff.
 template<typename TDispatcher>
 Val* substituteValWithCache(
     Val* val,
@@ -83,7 +103,7 @@ Val* substituteValWithCache(
 {
     if (!subst.substitutionCache)
     {
-        SubstitutionCache cache(astBuilder, subst.declRef);
+        SubstitutionCache cache(astBuilder, subst);
         subst.substitutionCache = &cache;
         return substituteValWithCache(val, astBuilder, subst, ioDiff, dispatcher);
     }
@@ -98,8 +118,28 @@ Val* substituteValWithCache(
         return cachedResult->val;
     }
 
+    auto bindings = subst.linkTimeSubstitution;
+    if (bindings && !cache->beginLinkTimeSubstitution(key))
+    {
+        ++*ioDiff;
+        return bindings->diagnoseCycle(val);
+    }
+    SLANG_DEFER(if (bindings) cache->endLinkTimeSubstitution(key));
+
     int diff = 0;
-    auto result = dispatcher(subst, &diff);
+    Val* result = nullptr;
+    if (subst.linkTimeSubstitution)
+    {
+        auto replacement = subst.linkTimeSubstitution->trySubstitute(val);
+        if (replacement != val)
+        {
+            // Follow dependencies in the selected definition with the same bindings and cache.
+            result = replacement->substituteImpl(astBuilder, subst, &diff);
+            ++diff;
+        }
+    }
+    if (!result)
+        result = dispatcher(subst, &diff);
     cache->add(key, {result, diff});
     *ioDiff += diff;
     return result;

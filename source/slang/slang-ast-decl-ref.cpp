@@ -1195,7 +1195,7 @@ DeclRefBase* DeclRefBase::getParent()
 
 SubstitutionSet::operator bool() const
 {
-    return declRef != nullptr && !as<DirectDeclRef>(declRef);
+    return linkTimeSubstitution || (declRef != nullptr && !as<DirectDeclRef>(declRef));
 }
 
 Val::OperandView<Val> tryGetGenericArguments(SubstitutionSet substSet, Decl* genericDecl)
