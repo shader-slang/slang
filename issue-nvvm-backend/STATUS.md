@@ -123,12 +123,15 @@ unchanged negatives pass; Slang O3 explicit full/restricted views return width/c
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
 unchanged; seven feature implementations have passed focused validation since the full checkpoint.
 
-The prerequisite four-case research probe retains two completed CubeArray mismatches: explicit
-views returned depth 30/18 instead of intended cube counts 5/3. Exact descriptor echo and API success
-do not prove the assumed face-index interpretation. Older null-view cube queries returned cube
-counts, so do not add a division-by-six fallback. Next resolve explicit cube-view index units with
-independent content selection evidence before enabling cube counts. Mip-count linkage histories and
-the full dimensions corpus failure remain unresolved. No new full campaign.
+CubeArray binding remains unqualified. The first explicit-view probe returned depth 30/18
+instead of intended cube counts 5/3. A separate content probe then tested endpoint indices in cubes:
+null-full and explicit 0..4 passed both count and all source-cube samples, while restricted 1..3
+reported count 3 but sampled faces shifted by one face, not one cube. Exact observations are retained
+in the 1D feature's research history. Matching counts/getter echoes do not establish intended
+selection; neither division by six nor another endpoint guess is justified. No CubeArray admission
+change follows these failures. Continue with another qualified feature while this binding contract
+remains open. Mip-count linkage histories and the full dimensions corpus failure remain unresolved.
+No new full campaign.
 
 Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
 policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range

@@ -79618,7 +79618,23 @@
             "observed_depth": 18
           }
         },
-        "interpretation": "All explicit descriptors echoed exactly and guards survived. This does not establish cube-view index units; tested direct-depth-to-public-count hypothesis failed. Retain distinct prior null-view cube counts, no divide6fallback or alternateendpoint retry."
+        "interpretation": "All explicit descriptors echoed exactly and guards survived. This does not establish cube-view index units; tested direct-depth-to-public-count hypothesis failed. Retain distinct prior null-view cube counts, no divide6fallback or alternateendpoint retry.",
+        "content_followup": {
+          "qualification": {
+            "path": "build/nvvm-texture-cube-view-units/qualification.json",
+            "sha256": "8bed59530654a391d0b577e4ccd1564c350f4899cb0ab497c754395eae446b4e"
+          },
+          "status": "Restrictedviewcontentmismatch despite matchingcount; no CubeArray implementation qualification.",
+          "null_and_explicit_full": "Count5 and all10independentface samples pass.",
+          "restricted": {
+            "requested_view_layers": [1, 3],
+            "query_depth": 3,
+            "expected_samples": [100, 104, 200, 204, 300, 304],
+            "observed_samples": [1, 5, 101, 105, 201, 205],
+            "guards_completion_unused_slots": "pass"
+          },
+          "interpretation": "The cube-index endpoint hypothesis passes query size but fails independent content selection. Observed samples are consistent with a one-face base displacement, not a qualified general endpoint contract. Preserve original30/18 count mismatches; neither experiment supports a universal scale or metadata workaround."
+        }
       },
       "negative_boundaries": "Existing provider descriptor/no-mutation paired serialization and compiler writable/CubeArrayFloat/ordinary2Dlayer-query negatives retained. Four mip/MS cells unchanged.",
       "validation_incidents": [],

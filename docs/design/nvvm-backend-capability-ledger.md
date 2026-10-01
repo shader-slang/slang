@@ -478,7 +478,12 @@ A separate four-case probe retained two CubeArray mismatches: explicit views of 
 allocation with requested layer ranges 0..29 and 6..23 returned query depth 30/18, against intended
 public counts of 5/3 cubes. All APIs, echoed descriptors and guards passed. Echoed range fields do
 not establish their semantic units. Earlier null-view cube queries returned cube counts; these
-observations do not justify a universal division by six. Cube view interpretation remains unresolved.
+observations do not justify a universal division by six. A subsequent content probe filled each
+physical face with `100*cube+face`. Null-full and explicit 0..4 views returned count 5 and sampled
+all five source cubes correctly. Explicit 1..3 returned count 3, but +X/+Z samples were
+`1,5,101,105,201,205` instead of `100,104,200,204,300,304`. Guards and unused output slots survived.
+Thus matching query size does not establish correct cube selection. Restricted cube-view
+interpretation remains unresolved; both experiments and failed hypotheses are retained.
 
 The observed driver lookup failures for `txq.array_size` and `txq.num_mipmap_levels` are specific to
 the qualified stack; `txq.level.width` loaded and executed. No full API repair is implemented.
