@@ -598,6 +598,10 @@ void initCommandOptions(CommandOptions& options)
          "version does not recognize is silently ignored, so one option value can be shared across "
          "compiler versions that do not all define the warning; an unrecognized warning name is "
          "still reported as an error."},
+        {OptionKind::DisableNotes,
+         "-notes-disable",
+         "-notes-disable <id>[,<id>...]",
+         "Disable specific notes, given by numeric id or name."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
@@ -3198,6 +3202,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.add(
                     OptionKind::DisableWarnings,
                     operand.value.getUnownedSlice());
+                break;
+            }
+        case OptionKind::DisableNotes:
+            {
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                linkage->m_optionSet.add(OptionKind::DisableNotes, operand.value.getUnownedSlice());
                 break;
             }
         case OptionKind::DisableWarning:
