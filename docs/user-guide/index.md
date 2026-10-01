@@ -34,6 +34,7 @@ Link-time Specialization and Module Precompilation <10-link-time-specialization>
 Slang Source Packages <12-source-packages>
 Using Source Packages <12-01-source-package-workflow>
 Growing an Application with Source Packages <12-02-source-package-command-use-cases>
+Slang Package Command Reference <12-03-source-package-command-reference>
 Writing Module Files, Import, and Include <13-module-files>
 Special Topics <a1-special-topics>
 Target-specific Features <a2-target-specific-features>

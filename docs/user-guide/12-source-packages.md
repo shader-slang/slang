@@ -13,7 +13,9 @@ can additionally emit `.slang-module` files and native executables. A command-or
 using the public `video-preview` demo is in
 [Using Source Packages](source-package-workflow). Expected success and failure for each command,
 used when changing the tool, is in
-[Growing an Application with Source Packages](source-package-command-use-cases).
+[Growing an Application with Source Packages](source-package-command-use-cases). The complete
+syntax, options, side effects, and validation rules for every command are in the
+[Slang Package Command Reference](source-package-command-reference).
 
 A **package** is a directory with `slang-package.json`. Its name, exports, license files, and
 dependencies apply wherever that package appears in a graph, including as a Git pin or a path
@@ -263,7 +265,8 @@ start with `build`, which runs fetch and then update `--yes`. Use an explicit `f
 materialize without building, to pass `--clean`, or to confirm a first lock interactively.
 
 Every lock row records selection identity only: an exact `version`, plus `git`/`ref`/`commit` for a
-Git pin or `path` for a path or overlay row. Declared `exports` and `dependencies` are not copied
+Git pin, `git` and `path` for an overlay row, or `path` for a path-only row. Declared `exports`
+and `dependencies` are not copied
 into the lock. Commands reload them from an active overlay's working-tree manifest, or from the
 manifest of the locked version (Git at `commit`, or the path directory). `status` uses that live
 graph, including overlays, to check whether the current lock still satisfies every pin that cannot

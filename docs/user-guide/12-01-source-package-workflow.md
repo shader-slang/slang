@@ -110,9 +110,10 @@ git -C deps/color-convert describe --tags --exact-match
 git -C deps/color-encoding describe --tags --exact-match
 ```
 
-Status should print `lock stale, incomplete` and name the missing checkouts under `deps/`. After
-fetch, all three `describe` commands should print `v1.0.0`, even though `v1.1.0` already exists and
-even though `color-encoding` `v1.1.0` retracts `1.0.0`. Fetch never consults retractions and never
+Status should print `lock current, 3 packages, incomplete` and name the missing checkouts under
+`deps/`. The lock still matches the manifest; only its materialization is incomplete. After fetch,
+all three `describe` commands should print `v1.0.0`, even though `v1.1.0` already exists and even
+though `color-encoding` `v1.1.0` retracts `1.0.0`. Fetch never consults retractions and never
 rewrites the lock.
 
 Use fetch to materialize a committed lock without building. `build` also fetches missing locked
