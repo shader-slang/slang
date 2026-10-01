@@ -5132,6 +5132,13 @@ err(
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
 )
 
+err(
+    "conditional-has-value-not-constant",
+    40024,
+    "Conditional hasValue is not a compile-time constant",
+    span { loc = "location", message = "the 'hasValue' argument of 'Conditional<T, hasValue>' must be a compile-time constant by code generation" }
+)
+
 fatal(
     "function-never-returns-fatal",
     40030,
