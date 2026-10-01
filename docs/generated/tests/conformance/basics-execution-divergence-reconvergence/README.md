@@ -1,8 +1,8 @@
 ---
 generated: true
-model: claude-sonnet-4-6
-generated_at: 2026-06-02T07:03:42+00:00
-source_commit: 9c1a6a00ef413932805da5b813465a7a9d517fb9
+model: gpt-6
+generated_at: 2026-09-29T07:48:53+00:00
+source_commit: 3bb522221d5db85fbdf8dcf441c05ffc3b801358
 watched_paths_digest: f85ba3748551a080ccaa6925f67b24f7c66cc9a697da96cd9e36f0c365c0369b
 source_doc: docs/language-reference/basics-execution-divergence-reconvergence.md
 source_doc_digest: 5390dfefbb80dbe1826fa029f9aa83391e6d5018a0017c1187364e7d3ae0f1df
@@ -49,6 +49,9 @@ doc commits to (`OpSelectionMerge`, `OpBranchConditional`, `OpSwitch`, `OpLoopMe
 - **C10**: Not all targets support wave-tangled functions on divergent paths; when unsupported, results are undefined.
 - **C11**: When supported, wave-tangled functions on divergent paths apply only between the mutually convergent thread set (synchronization occurs only between threads on the same path).
 
+The loop-emission probe checks WGSL native `loop` headers and `for(;;)`
+on the other source targets, each with an explicit exit `break`.
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                                                                                                                                                           | Intent     | Anchor                                                                                                | Tests                                                                                                |
@@ -57,7 +60,7 @@ doc commits to (`OpSelectionMerge`, `OpBranchConditional`, `OpSwitch`, `OpLoopMe
 | C5: `if` without `else` — SPIRV `OpSelectionMerge`+`OpBranchConditional`; Metal/WGSL/CUDA/C++ emit the then-arm with implicit fall-through to the reconvergence point; HLSL/GLSL materialize the skipped path as an explicit else-arm carrying the initializer value.                                                           | boundary   | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`if-no-else-reconvergence-emission.slang`](if-no-else-reconvergence-emission.slang)                 |
 | C6: `switch` divergence — SPIRV `OpSelectionMerge`+`OpSwitch`; HLSL/GLSL/Metal/WGSL/CUDA/C++ emit a switch statement with all case arms.                                                                                                                                                                                        | functional | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`switch-divergence-reconvergence-emission.slang`](switch-divergence-reconvergence-emission.slang)   |
 | C7: Switch fall-through — SPIRV single `OpSelectionMerge`+`OpSwitch`; GLSL/Metal/CUDA/C++ preserve fall-through; HLSL and WGSL restructure by duplicating the shared case body.                                                                                                                                                 | boundary   | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`switch-fallthrough-reconvergence-emission.slang`](switch-fallthrough-reconvergence-emission.slang) |
-| C8: Loop divergence — SPIRV `OpLoopMerge`; HLSL/GLSL/Metal/WGSL/CUDA/C++ emit top-test infinite loops (`for(;;)`; WGSL spells the header `loop`) with an explicit `break` for the exit condition.                                                                                                                               | functional | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`loop-divergence-reconvergence-emission.slang`](loop-divergence-reconvergence-emission.slang)       |
+| Loop statement: SPIRV emits OpLoopMerge marking the loop merge block where all threads reconverge after the loop exits.                                                                                                                                                                                                         | functional | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`loop-divergence-reconvergence-emission.slang`](loop-divergence-reconvergence-emission.slang)       |
 | C11 (SPIRV-primary): Wave ops in a divergent `if` emit per-arm — SPIRV `GroupNonUniform*`; HLSL `WaveActiveMin/Max`; GLSL `subgroupMin/subgroupMax`; Metal `simd_min/simd_max`; CUDA prelude `WaveActiveMin_0/WaveActiveMax_0`; WGSL `subgroupMin/subgroupMax`.                                                                 | functional | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`wave-op-divergent-if-spirv-emission.slang`](wave-op-divergent-if-spirv-emission.slang)             |
 | C11 (HLSL-primary): Wave ops preserved in each if-arm — HLSL `WaveActiveMin/Max`; GLSL `subgroupMin/Max`; SPIRV `OpGroupNonUniformUMin/UMax` between the selection merge arms; Metal `simd_min/max`; CUDA prelude helpers; WGSL `subgroupMin/Max`.                                                                              | functional | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`wave-op-divergent-if-hlsl-emission.slang`](wave-op-divergent-if-hlsl-emission.slang)               |
 | C11 (GLSL-primary): Extension/enable opt-in required on GLSL (`GL_KHR_shader_subgroup_arithmetic`) and WGSL (`enable subgroups`); SPIRV spells the same opt-in as `OpCapability GroupNonUniformArithmetic`; HLSL needs none (Shader Model 6 built-ins); Metal and CUDA emit via prelude with no explicit extension declaration. | functional | [#divergence](../../../../language-reference/basics-execution-divergence-reconvergence.md#divergence) | [`wave-op-divergent-if-glsl-emission.slang`](wave-op-divergent-if-glsl-emission.slang)               |

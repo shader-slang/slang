@@ -56,7 +56,7 @@ HLSL-specific on HLSL.
   6.7 payload access qualifiers. It does not wrap a non-struct DXR
   entry-point parameter. Test the emitted HLSL rather than the pass
   names; the README's doc-gap rows list what changed, and the
-  empty-payload lesson below gives the new empty-payload shape.
+  empty-payload maintenance override below gives the new shape.
 - HLSL-specific skips: `lowerCooperativeVectors` (HLSL `break`),
   `lowerAppendConsumeStructuredBuffers` (HLSL has native types).
 - Always-on emit shapes: `[numthreads(...)]`, `register(uN)` /
@@ -295,19 +295,28 @@ These are in addition to `_common.md` and `pipeline-06-emit.md`.
 - **DCE strips locally-unused code.** Always write computed values
   to a buffer/return them, or the test pattern will fail to find
   them in the emit.
-- **An empty ray payload is not padded in place.** A `closesthit`
-  entry point compiled with `-target hlsl -profile lib_6_6` is
-  text-emit observable without a GPU. Its empty
-  payload parameter becomes `inout` of a separate one-`uint` struct
-  (currently `DummyRayPayload_<N>`), and the empty source struct does
-  not appear. Capture the struct name from its declaration and match
-  it in the `main(...)` signature rather than pinning either name or
-  the member type.
 - **`static` module-scope variables show their initializer fire
   inside `main`** (the side effect of
   `moveGlobalVarInitializationToEntryPoints`); the global itself
   becomes a plain HLSL `static T name_0` declaration but the
   initializer expression appears at function entry.
+
+## Empty-payload maintenance override
+
+The existing `legalize-empty-ray-payload-closesthit.slang` is a text-emit
+test: a closest-hit entry point compiled with `-target hlsl` needs
+neither a GPU nor DXC. Preserve that test despite the older compute-only
+guidance above. Its observable contract is a nonempty physical payload
+at the entry-point interface, not padding the original empty source type.
+
+Regenerate the test to capture the emitted `DummyRayPayload` type with
+any generated suffix, require its single `uint` dummy field, and require
+the closest-hit entry point's `inout` parameter to use the captured type.
+Do not accept an arbitrary struct plus an unrelated `main` function.
+Update the purpose and README coverage claim together. Record the
+outdated original-type padding description at
+`#legalizeemptyraypayloadsforhlsl` as a `drift-from-source` doc gap for
+the separate design-document regeneration workflow.
 
 ## Quality checklist (in addition to `_common.md`'s)
 

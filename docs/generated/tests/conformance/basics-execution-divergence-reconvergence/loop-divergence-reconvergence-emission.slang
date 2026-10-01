@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-5-5[1m]
-//META: generated_at=2026-09-29T08:41:41+00:00
-//META: source_commit=b9199bdaa48162d97fa8f9d3293e6edaf037ffb3
+//META: model=gpt-6
+//META: generated_at=2026-09-29T07:48:53+00:00
+//META: source_commit=3bb522221d5db85fbdf8dcf441c05ffc3b801358
 //META: doc_ref=docs/language-reference/basics-execution-divergence-reconvergence.md#divergence
-//META: doc_section_digest=7748f330eccf2fb718b5ba2c0f9aff0035f24f4197647463775fd43f1b5ebbb9
+//META: doc_section_digest=55e4138f7b51a582d48fae00eb4b7bca5a411cd2c22c90e424f145698370dc0a
 //META: purpose=Loop statement: SPIRV emits OpLoopMerge marking the loop merge block where all threads reconverge after the loop exits.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -53,10 +53,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK_METAL: for(;;)
 // CHECK_METAL: break
 
-// WGSL: for-loop lowered to a top-test infinite loop with a break; WGSL
-// spells the header `loop`.
-// CHECK_WGSL: {{^ *loop$}}
-// CHECK_WGSL: break
+// WGSL uses its native loop statement with the same explicit exit.
+// CHECK_WGSL: loop
+// CHECK_WGSL-NEXT: {
+// CHECK_WGSL: break;
 
 // CUDA: for-loop lowered to a top-test infinite loop with a break.
 // CHECK_CUDA: for(;;)

@@ -904,9 +904,9 @@ These are not lint-enforced, but skip them only with a
   loops lower to an unconditional header with the exit test as an
   early `break`; HLSL, GLSL, Metal, CUDA and C++ spell that header
   `for(;;)`, and WGSL spells it `loop` (only the header token
-  differs). Match the WGSL header as the whole line
-  `{{^ *loop$}}`, because a bare `loop` also matches identifiers
-  that contain it.
+  differs). Anchor a WGSL header match, either as the whole line
+  `{{^ *loop$}}` or as `loop` followed by a `-NEXT: {` check,
+  because a bare `loop` also matches identifiers that contain it.
 - **CUDA `__ldg` is memory-space-sensitive.** Top-level `uniform`
   values are fields of `SLANG_globalParams`, which CUDA emits in
   `__constant__` memory, so the immutable-load pass must leave those

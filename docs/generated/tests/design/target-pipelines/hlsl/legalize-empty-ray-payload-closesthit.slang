@@ -1,21 +1,23 @@
 //META: generated=true
-//META: model=claude-opus-5-5[1m]
-//META: generated_at=2026-09-29T08:41:41+00:00
-//META: source_commit=b9199bdaa48162d97fa8f9d3293e6edaf037ffb3
+//META: model=gpt-6
+//META: generated_at=2026-09-29T07:48:53+00:00
+//META: source_commit=3bb522221d5db85fbdf8dcf441c05ffc3b801358
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizeemptyraypayloadsforhlsl
 //META: doc_section_digest=6e1f6ab0371a9b70d69e547a9aad8768979f0a53035570a77165208b8814dd76
-//META: purpose=An empty DXR ray-payload parameter of a closesthit entry point still reaches HLSL as a non-empty inout payload struct, which DXC requires of a closesthit entry point.
+//META: purpose=An empty logical ray payload is represented by a separate one-uint physical payload in the emitted HLSL closesthit entry-point signature.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that an empty closesthit payload still reaches HLSL as the non-empty
-// `inout` struct DXC requires. Legalization leaves the source type empty and
-// emits a one-member replacement as the first struct, so its name is captured
-// rather than pinned.
+// An empty source payload still needs physical storage at the HLSL
+// closest-hit interface. Capture the separate dummy struct, require its
+// single uint field, and check that main uses that type for its inout
+// payload. This ties the nonempty storage to the receiving entry point.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -profile lib_6_6 -stage closesthit -entry main
 
+// Keep the logical source type empty; only its native interface needs
+// the separate physical representation.
 [raypayload]
 struct EmptyPayload
 {
@@ -28,8 +30,9 @@ void main(
 {
 }
 
-// CHECK: struct [[PAYLOAD:[A-Za-z_0-9]+]]
+// CHECK: struct [[PAYLOAD:DummyRayPayload[A-Za-z0-9_]*]]
 // CHECK-NEXT: {
-// CHECK-NEXT: {{[A-Za-z_0-9]+}} {{[A-Za-z_0-9]+}};
+// CHECK-NEXT: uint _slang_dummy{{[A-Za-z0-9_]*}};
 // CHECK-NEXT: };
-// CHECK: void main(inout [[PAYLOAD]] {{[A-Za-z_0-9]+}}, BuiltInTriangleIntersectionAttributes
+// CHECK: [shader("closesthit")]
+// CHECK: void main(inout [[PAYLOAD]] {{[A-Za-z0-9_]+}},

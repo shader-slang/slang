@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-5-5[1m]
-//META: generated_at=2026-09-29T08:41:41+00:00
-//META: source_commit=b9199bdaa48162d97fa8f9d3293e6edaf037ffb3
+//META: model=gpt-6
+//META: generated_at=2026-09-29T07:48:53+00:00
+//META: source_commit=3bb522221d5db85fbdf8dcf441c05ffc3b801358
 //META: doc_ref=docs/language-reference/statements.md#for-statement
-//META: doc_section_digest=b57a8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7
+//META: doc_section_digest=f87648884bd8e378e0ef1b17124f49aeae45c6cf361579e72780650010a46968
 //META: purpose=A variable declared in the for-loop init has scope limited to the for statement.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -53,10 +53,14 @@ void computeMain()
 // METAL: {{.*}} < int(5)
 
 // WGSL: fn computeMain
-// WGSL: {{^ *loop$}}
+// WGSL: loop
+// WGSL-NEXT: {
 // WGSL: {{.*}} < i32(3)
-// WGSL: {{^ *loop$}}
+// WGSL: break;
+// WGSL: loop
+// WGSL-NEXT: {
 // WGSL: {{.*}} < i32(5)
+// WGSL: break;
 
 // SPIRV: %computeMain = OpFunction
 // SPIRV: OpLoopMerge
