@@ -594,7 +594,8 @@ IRPtrTypeBase* asNVVMSupportedLayoutTransportPointerType(IRInst* type)
         pointer->getAccessQualifier() != AccessQualifier::ReadWrite ||
         pointer->getAddressSpace() != AddressSpace::UserPointer || !layout ||
         (layout->getOp() != kIROp_ScalarBufferLayoutType &&
-         layout->getOp() != kIROp_CBufferLayoutType) ||
+         layout->getOp() != kIROp_CBufferLayoutType &&
+         layout->getOp() != kIROp_Std430BufferLayoutType) ||
         !asNVVMSupportedCopyableStructType(pointer->getValueType()))
         return nullptr;
     return pointer;
@@ -1291,13 +1292,21 @@ IRArrayType* asNVVMSupportedI32ArrayType(IRInst* type, uint32_t* outElementCount
     return arrayType;
 }
 
+// Std430 currently has an address-only record representation. Ordinary memory roles must not
+// inherit that source availability until their typed storage and dereference paths are qualified.
+static bool _isNVVMOrdinaryMemoryLayoutSupported(IRType* layout)
+{
+    return !layout || layout->getOp() != kIROp_Std430BufferLayoutType;
+}
+
 static IRPtrTypeBase* _asNVVMSupportedDevicePointerType(IRInst* type, BaseType valueBaseType)
 {
     auto ptrType = as<IRPtrTypeBase>(type);
     auto valueType = ptrType ? as<IRBasicType>(ptrType->getValueType()) : nullptr;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType || !valueType ||
         valueType->getBaseType() != valueBaseType ||
-        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+        ptrType->getAddressSpace() != AddressSpace::UserPointer ||
+        !_isNVVMOrdinaryMemoryLayoutSupported(ptrType->getDataLayout()))
     {
         return nullptr;
     }
@@ -1324,7 +1333,8 @@ IRPtrTypeBase* asNVVMSupportedDeviceScalarPointerType(IRInst* type)
     if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
         !(isNVVMSupportedIntegerScalarType(ptrType->getValueType()) ||
           isNVVMFloat32Type(ptrType->getValueType())) ||
-        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+        ptrType->getAddressSpace() != AddressSpace::UserPointer ||
+        !_isNVVMOrdinaryMemoryLayoutSupported(ptrType->getDataLayout()))
     {
         return nullptr;
     }
@@ -1347,7 +1357,8 @@ IRPtrTypeBase* asNVVMSupportedDeviceNumericPointerType(IRInst* type)
     if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
         !(isNVVMSupportedIntegerScalarType(ptrType->getValueType()) ||
           isNVVMFloat32Type(ptrType->getValueType()) || isEstablishedVectorPointer) ||
-        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+        ptrType->getAddressSpace() != AddressSpace::UserPointer ||
+        !_isNVVMOrdinaryMemoryLayoutSupported(ptrType->getDataLayout()))
     {
         return nullptr;
     }
@@ -1371,7 +1382,8 @@ IRPtrTypeBase* asNVVMSupportedDeviceArrayPointerType(
     uint32_t elementCount = 0;
     if (!ptrType || ptrType->getOp() != kIROp_PtrType ||
         !(arrayType = asNVVMSupportedI32ArrayType(ptrType->getValueType(), &elementCount)) ||
-        ptrType->getAddressSpace() != AddressSpace::UserPointer)
+        ptrType->getAddressSpace() != AddressSpace::UserPointer ||
+        !_isNVVMOrdinaryMemoryLayoutSupported(ptrType->getDataLayout()))
     {
         return nullptr;
     }
@@ -1928,6 +1940,10 @@ IRParameterGroupType* asNVVMSupportedParameterGroupType(IRInst* type, IRType** o
     {
         return nullptr;
     }
+
+    if (!_isNVVMOrdinaryMemoryLayoutSupported(
+            cast<IRUniformParameterGroupType>(parameterGroupType)->getDataLayout()))
+        return nullptr;
 
     IRType* elementType = parameterGroupType->getElementType();
     if ((!as<IRStructType>(elementType) && !as<IRArrayType>(elementType)) ||

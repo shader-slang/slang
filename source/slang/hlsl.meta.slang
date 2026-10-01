@@ -50,6 +50,7 @@ __intrinsic_type($(kIROp_Std430BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
 [require(llvm)]
+[require(nvvm)]
 __magic_type(Std430DataLayoutType)
 struct Std430DataLayout : IBufferDataLayout
 {};

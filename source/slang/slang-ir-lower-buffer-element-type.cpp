@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 /// This file implements an important IR transformation pass in the Slang compiler
 /// that rewrites buffer element types into valid storage types, a.k.a physical types
@@ -1737,8 +1738,34 @@ struct LoweredElementTypeContext
         return clonedFunc;
     }
 
-    void processModule(IRModule* module)
+    void processModule(IRModule* module, DiagnosticSink* sink)
     {
+        // Std430 is available to direct NVVM, but a capability profile upgrade must not make
+        // CUDA source silently use its native C layout. Check actual, live typed uses before
+        // element-policy skips or physical lowering can hide the explicit layout operand.
+        if (isCUDATarget(target->getTargetReq()) && !target->shouldEmitNVVMDirectly())
+        {
+            for (auto inst : module->getGlobalInsts())
+            {
+                if (!inst->hasUses())
+                    continue;
+                IRType* layout = nullptr;
+                if (auto pointer = as<IRPtrTypeBase>(inst))
+                    layout = pointer->getDataLayout();
+                else if (auto buffer = as<IRHLSLStructuredBufferTypeBase>(inst))
+                    layout = buffer->getDataLayout();
+                else if (auto group = as<IRUniformParameterGroupType>(inst))
+                    layout = group->getDataLayout();
+                else if (auto storage = as<IRGLSLShaderStorageBufferType>(inst))
+                    layout = storage->getDataLayout();
+                if (layout && layout->getOp() == kIROp_Std430BufferLayoutType)
+                    sink->diagnose(Diagnostics::UnsupportedBuiltinType{
+                        .type = inst,
+                        .location = findFirstUseLoc(inst)});
+            }
+            if (sink->getErrorCount())
+                return;
+        }
         IRBuilder builder(module);
 
         // Fix the pointer types of `RWStructuredBufferGetElementPtr` and
@@ -2397,10 +2424,11 @@ struct LoweredElementTypeContext
 void lowerBufferElementTypeToStorageType(
     IRModule* module,
     TargetProgram* target,
+    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options)
 {
     LoweredElementTypeContext context(target, options);
-    context.processModule(module);
+    context.processModule(module, sink);
 }
 
 static IRTypeLayoutRuleName getTypeLayoutRuleNameFromOpAlways(
@@ -2426,7 +2454,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layout = pointerType->getDataLayout();
             if (pointerType->getAddressSpace() == AddressSpace::UserPointer && layout &&
                 (layout->getOp() == kIROp_ScalarBufferLayoutType ||
-                 layout->getOp() == kIROp_CBufferLayoutType))
+                 layout->getOp() == kIROp_CBufferLayoutType ||
+                 layout->getOp() == kIROp_Std430BufferLayoutType))
             {
                 return getTypeLayoutRuleNameFromOpAlways(
                     layout->getOp(),

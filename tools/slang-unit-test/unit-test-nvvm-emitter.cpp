@@ -5780,14 +5780,17 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
         struct C { A a; uint test1; B b; uint test2; bool c; bool d; bool e; };
         [CUDAKernel]
         void computeMain(
+            uniform LayoutPtr<C, Std430DataLayout> d,
             uniform Ptr<C, Access::ReadWrite, AddressSpace::Device, ScalarDataLayout> s,
             uniform LayoutPtr<C, CDataLayout> c,
             uniform int index, uniform Ptr<uint64_t> output)
         {
-            output[0] = uint64_t(s);
-            output[1] = uint64_t(s + index);
-            output[2] = uint64_t(c);
-            output[3] = uint64_t(c + index);
+            output[0] = uint64_t(d);
+            output[1] = uint64_t(d + index);
+            output[2] = uint64_t(s);
+            output[3] = uint64_t(s + index);
+            output[4] = uint64_t(c);
+            output[5] = uint64_t(c + index);
         }
     )SLANG";
     ComPtr<slang::IBlob> code, diagnostics;
@@ -5796,14 +5799,14 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
         getTestReporter()->message(TestMessageType::Info, _getBlobText(diagnostics).getBuffer());
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
     SLANG_CHECK(code != nullptr);
-    SLANG_CHECK_ABORT(gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() == 2);
-    SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 4);
-    const int64_t strides[] = {48, 40};
-    for (Index offset = 0; offset < 2; ++offset)
+    SLANG_CHECK_ABORT(gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() == 3);
+    SLANG_CHECK_ABORT(gFakeNVVMBuilder.storeValueRefs.getCount() == 6);
+    const int64_t strides[] = {64, 48, 40};
+    for (Index offset = 0; offset < 3; ++offset)
     {
         const auto base = gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs[offset];
         SLANG_CHECK_ABORT(base.kind == FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK_ABORT(base.index == 0 || base.index == 1);
+        SLANG_CHECK_ABORT(base.index >= 0 && base.index < 3);
         const auto scaled = gFakeNVVMBuilder.byteOffsetPointerOffsetValueRefs[offset];
         SLANG_CHECK_ABORT(scaled.kind == FakeNVVMBuilderValueKind::ScalarOperation);
         const auto& multiply = gFakeNVVMBuilder.scalarOperations[scaled.index];
@@ -5819,7 +5822,7 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersUseCheckedByteOffsets)
         SLANG_CHECK(NVVMSemantics::areSameType(widen.resultType, NVVMSemantics::kSignedI64));
         SLANG_CHECK(NVVMSemantics::areSameType(widen.operandTypes[0], NVVMSemantics::kSignedI32));
         SLANG_CHECK(widen.operands[0].kind == FakeNVVMBuilderValueKind::Parameter);
-        SLANG_CHECK(widen.operands[0].index == 2);
+        SLANG_CHECK(widen.operands[0].index == 3);
         SLANG_CHECK(widen.operands[0].functionIndex == base.functionIndex);
 
         // The stored addresses must come from this exact base and its selected byte offset.
@@ -5842,25 +5845,25 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission)
     const char* sources[] = {
         R"SLANG(
             struct R { float3 value; bool flag; };
-            [CUDAKernel] void computeMain(uniform LayoutPtr<R, CDataLayout> p,
+            [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
                 uniform Ptr<float> output) { output[0] = p[0].value.x; }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
-            [CUDAKernel] void computeMain(uniform LayoutPtr<R, CDataLayout> p,
+            [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
                 uniform float value) { p[0].value.x = value; }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
-            [__noinline] uint64_t observe(LayoutPtr<R, CDataLayout> p) { return uint64_t(p); }
-            [CUDAKernel] void computeMain(uniform LayoutPtr<R, CDataLayout> p,
+            [__noinline] uint64_t observe(LayoutPtr<R, SelectedLayout> p) { return uint64_t(p); }
+            [CUDAKernel] void computeMain(uniform LayoutPtr<R, SelectedLayout> p,
                 uniform Ptr<uint64_t> output) { output[0] = observe(p); }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
             [CUDAKernel] void computeMain(uniform uint64_t address, uniform int index,
                 uniform Ptr<uint64_t> output)
-            { output[0] = uint64_t(LayoutPtr<R, CDataLayout>(address) + index); }
+            { output[0] = uint64_t(LayoutPtr<R, SelectedLayout>(address) + index); }
         )SLANG",
         R"SLANG(
             struct R { float3 value; bool flag; };
@@ -5868,30 +5871,67 @@ SLANG_UNIT_TEST(nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission)
                 uniform Ptr<R, Access::ReadWrite, AddressSpace::GroupShared, ScalarDataLayout> p,
                 uniform Ptr<uint64_t> output) { output[0] = uint64_t(p); }
         )SLANG",
+        R"SLANG(
+            [CUDAKernel] void computeMain(uniform LayoutPtr<int, Std430DataLayout> p,
+                uniform Ptr<int> output) { output[0] = p[0]; }
+        )SLANG",
+        R"SLANG(
+            [CUDAKernel] void computeMain(uniform LayoutPtr<int2, Std430DataLayout> p,
+                uniform Ptr<int> output) { output[0] = p[0].x; }
+        )SLANG",
+        R"SLANG(
+            typedef int Pair[2];
+            [CUDAKernel] void computeMain(uniform LayoutPtr<Pair, Std430DataLayout> p,
+                uniform Ptr<int> output) { output[0] = p[0][1]; }
+        )SLANG",
+        R"SLANG(
+            struct R { int value; };
+            ConstantBuffer<R, Std430DataLayout> input;
+            RWStructuredBuffer<int> output;
+            [numthreads(1,1,1)] void computeMain() { output[0] = input.value; }
+        )SLANG",
+        R"SLANG(
+            StructuredBuffer<int, Std430DataLayout> input;
+            RWStructuredBuffer<int> output;
+            [numthreads(1,1,1)] void computeMain() { output[0] = input[0]; }
+        )SLANG",
+        R"SLANG(
+            struct R { float3 value; bool flag; };
+            [CUDAKernel] void computeMain(
+                uniform Ptr<R, Access::ReadWrite, AddressSpace::GroupShared, Std430DataLayout> p,
+                uniform Ptr<uint64_t> output) { output[0] = uint64_t(p); }
+        )SLANG",
     };
-    for (const char* source : sources)
-    {
-        _resetDirectNVVMFakes();
-        ComPtr<slang::IGlobalSession> session;
-        SLANG_CHECK_ABORT(
-            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
-        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
-        session->setSharedLibraryLoader(loader);
-        ComPtr<slang::IBlob> code, diagnostics;
-        auto result = _compileSlangWithDirectNVVM(session, source, code, diagnostics);
-        const auto text = _getBlobText(diagnostics);
-        if (SLANG_SUCCEEDED(result) || text.indexOf(toSlice("E52017")) < 0 ||
-            gFakeNVVMBuilder.createModuleCallCount != 0)
+    for (const char* sourceBody : sources)
+        for (Index variant = 0; variant < (String(sourceBody).contains("SelectedLayout") ? 2 : 1);
+             ++variant)
         {
-            getTestReporter()->message(TestMessageType::Info, source);
-            getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+            StringBuilder source;
+            source << "#define SelectedLayout " << (variant ? "Std430DataLayout" : "CDataLayout")
+                   << "\n"
+                   << sourceBody;
+            _resetDirectNVVMFakes();
+            ComPtr<slang::IGlobalSession> session;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+            ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+            session->setSharedLibraryLoader(loader);
+            ComPtr<slang::IBlob> code, diagnostics;
+            auto result =
+                _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+            const auto text = _getBlobText(diagnostics);
+            if (SLANG_SUCCEEDED(result) || text.indexOf(toSlice("E52017")) < 0 ||
+                gFakeNVVMBuilder.createModuleCallCount != 0)
+            {
+                getTestReporter()->message(TestMessageType::Info, source.getBuffer());
+                getTestReporter()->message(TestMessageType::Info, text.getBuffer());
+            }
+            SLANG_CHECK(SLANG_FAILED(result));
+            SLANG_CHECK(text.indexOf(toSlice("E52017")) >= 0);
+            SLANG_CHECK(code == nullptr);
+            SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+            SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
         }
-        SLANG_CHECK(SLANG_FAILED(result));
-        SLANG_CHECK(text.indexOf(toSlice("E52017")) >= 0);
-        SLANG_CHECK(code == nullptr);
-        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
-        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
-    }
 }
 
 SLANG_UNIT_TEST(nvvmSlangPointerOffsetUsesDirectPipeline)

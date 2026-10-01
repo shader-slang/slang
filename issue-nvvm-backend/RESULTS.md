@@ -797,31 +797,39 @@ relaxed accesses alone do not establish execution synchronization or acquire/rel
 
 ## Explicit-layout pointer transport
 
-Compile the durable Scalar/C fixture at O0/O3 and retain actual-backend Std430 rejection:
+Compile the durable Std430/Scalar/C fixtures at O0/O3 and retain actual CUDA Std430 rejection:
 
 ```bash
 build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
   slang-unit-test-tool/nvvmSlangLayoutPointersUseCheckedByteOffsets.internal \
   slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal \
   tests/cuda/nvvm-layout-pointer-transport.slang \
+  tests/cuda/nvvm-std430-pointer-transport.slang \
   tests/cuda/nvvm-layout-pointer-transport-unsupported.slang
 ```
 
-The allocated-address qualification uses the identical shader body in ignored
-`build/nvvm-layout-pointer-transport/scalar-c-pointer-transport.slang` and the existing ctypes CUDA
+The current allocated-address qualification uses the identical shader body in ignored
+`build/nvvm-std430-pointer-transport/std430-pointer-transport.slang` and the existing ctypes CUDA
 host pattern in `run-pointer-transport.py` in that directory. Compile strict NVVM PTX for both
 optimization modes, then pass each output with `--ptx` and a fresh JSON destination with `--output`.
-Do not use the earlier capability-bypass research outputs. Bind two independently initialized
-1024-byte allocations at interior offsets384/512 and a guarded output allocation at offset256.
-For indices-1/0/1/2, require byte strides48/40, exact base and shifted addresses, signed deltas,
-completion, every output guard and unchanged input allocations. The shader never dereferences the
-records. Dumped LLVM must sign-extend the index before scaling and use non-inbounds byte offsets.
+Bind three independently initialized 1024-byte allocations at interior offsets256/384/512 and a
+guarded output allocation at offset256. For indices-1/0/1/2, require byte strides64/48/40, exact base
+and shifted addresses, signed deltas, completion, every output guard and unchanged input allocations.
+Check base and shifted alignment16/8/8. The shader never dereferences the records. Dumped LLVM must
+sign-extend the index before scaling and use non-inbounds byte offsets; PTX must preserve the five
+parameters d:u64, s:u64, c:u64, index:i32, output:u64.
 
-The independent oracle follows the original pointer/data-layouts fixture: Scalar field extent44
-rounds to48, while C extent39 rounds to40. CUDA C++ instead emits40 for both and fails the three
-nonzero Scalar cases; keep these exact comparison outcomes. The original three-layout corpus test
-remains unresolved because Std430 is still excluded. Its unspecified pointer bindings are not an
-allocated-address runtime oracle. Compile-only Vulkan and CUDA controls preserve their exact outputs.
+The independent oracle follows the original pointer/data-layouts fixture: Std430 size64/alignment16,
+Scalar field extent44 rounded to48, and C extent39 rounded to40. Earlier allocated Scalar/C evidence
+under `build/nvvm-layout-pointer-transport/` retains CUDA's stride40 for both and three nonzero
+Scalar mismatches. Actual CUDA Std430 use must reject at O0/O3 and minimum optimization before
+storage lowering erases layout operands. CPP remains capability-rejected. Compile-only Vulkan,
+LLVM shader IR and Scalar/C CUDA controls preserve their exact outputs. The initial host-style
+LLVM target failure remains recorded separately from the corrected shader-IR control.
+
+The original three-layout corpus fixture remains unresolved: its generated helper parameter is
+outside entry-only transport. Its unspecified pointer bindings are not an allocated-address runtime
+oracle. Do not execute it or claim the corpus failure resolved from the dedicated positive fixture.
 
 ## Physical surface correctness
 

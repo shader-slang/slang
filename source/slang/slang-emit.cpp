@@ -2032,6 +2032,7 @@ Result linkAndOptimizeIR(
             SLANG_PASS(
                 lowerBufferElementTypeToStorageType,
                 targetProgram,
+                sink,
                 bufferElementTypeLoweringOptions);
         }
 
@@ -2162,6 +2163,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             lowerBufferElementTypeToStorageType,
             targetProgram,
+            sink,
             bufferElementTypeLoweringOptions);
     }
 
@@ -2745,6 +2747,7 @@ Result linkAndOptimizeIR(
     SLANG_PASS(
         lowerBufferElementTypeToStorageType,
         targetProgram,
+        sink,
         bufferElementTypeLoweringOptions);
 
     // If we are generating code for glsl or metal, perform address space propagation now.
@@ -2923,7 +2926,7 @@ Result linkAndOptimizeIR(
         BufferElementTypeLoweringOptions metalPtrOptions;
         metalPtrOptions.loweringPolicyKind =
             BufferElementTypeLoweringPolicyKind::MetalPointerLowering;
-        SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, metalPtrOptions);
+        SLANG_PASS(lowerBufferElementTypeToStorageType, targetProgram, sink, metalPtrOptions);
 
         // Materialize the [ForceInline] pack/unpack helpers the pass
         // creates. This is a module-wide call, but at this point in the

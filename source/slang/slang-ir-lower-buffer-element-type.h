@@ -8,6 +8,7 @@ namespace Slang
 struct IRModule;
 struct IRBuilder;
 class TargetProgram;
+class DiagnosticSink;
 struct IRTypeLayoutRules;
 struct IRType;
 struct IRPtrType;
@@ -40,6 +41,7 @@ struct BufferElementTypeLoweringOptions
 void lowerBufferElementTypeToStorageType(
     IRModule* module,
     TargetProgram* target,
+    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options = BufferElementTypeLoweringOptions());
 
 // Returns the type layout rules should be used for a buffer resource type.

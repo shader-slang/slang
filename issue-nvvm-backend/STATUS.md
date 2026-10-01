@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Fourteen bounded feature batches now pass focused validation after the full checkpoint:
+Fifteen bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -110,7 +110,7 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
 `features.nvvm-half-volume-surfaces`, `features.nvvm-coherent-pointer-memory` and
 `features.nvvm-layout-pointer-transport`, `features.nvvm-integer-surface-formats` and
-`features.nvvm-integer-array-volume-surfaces`. Fourteen
+`features.nvvm-integer-array-volume-surfaces` and `features.nvvm-std430-pointer-transport`. Fifteen
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -125,7 +125,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; fourteen feature implementations have passed focused validation since the full checkpoint.
+unchanged; fifteen feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -190,8 +190,8 @@ plugin was rebuilt for the fixture correction.
 
 Shared layout selection owns the C physical record and Scalar stride; preflight retains the exact
 stride and entry root, and emission uses non-inbounds byte offsets. Record dereferences, helpers,
-pointer storage/reconstruction and Std430 remain excluded. CUDA C++ uses stride40 for both layouts,
-failing the three nonzero Scalar cases; retain that discrepancy rather than changing the oracle.
+pointer storage/reconstruction remain excluded. Std430 entry transport is qualified below. CUDA C++
+uses stride40 for both layouts, failing the three nonzero Scalar cases; retain that discrepancy rather than changing the oracle.
 CUDA source and Vulkan SPIR-V controls are byte-identical before/after. The original three-layout
 corpus test remains unresolved. Evidence is under `build/nvvm-layout-pointer-transport/`.
 
@@ -215,12 +215,21 @@ physical cells and four retained control cells pass; nine new CUDA compile failu
 and both control CUDA failures remain exact. Four units, four diagnostics, 106 harness contracts
 and 22 report contracts pass. All 97 prior source/oracle identities are preserved. The eight-job
 build took37 seconds with no retry. Evidence is under
-`build/nvvm-integer-array-volume-surfaces/`. Fourteen feature batches are now accepted since the
+`build/nvvm-integer-array-volume-surfaces/`. Fifteen feature batches are now accepted since the
 full checkpoint; its 249 surface cells remain unchanged, with 69 new cells awaiting reviewed
 adoption at the next deliberately selected full checkpoint.
 
-Next, select the next bounded feature from the remaining physical surface/type contracts. Std430
-source admission, CubeArray restricted views and mip queries retain their separate research gaps.
+Std430 Device record pointers now share the checked address-only transport with Scalar/C.
+Eight allocated-address O0/O3 cases pass with independent64/48/40 strides, alignment16/8/8, full
+guards and unchanged input allocations. Four units and ten compile/diagnostic cells pass. Mandatory
+actual-CUDA validation rejects live Std430 types at O0/O3 and minimum optimization before layout
+information disappears; ordinary NVVM memory roles still reject Std430. Vulkan SPIR-V, LLVM shader
+IR and old Scalar/C CUDA source are byte-identical to before. The eight-job build took92 seconds.
+The original corpus fixture still rejects a helper pointer parameter and was not executed; its
+failure remains unresolved. Raw evidence is under `build/nvvm-std430-pointer-transport/`.
+
+Next, select another bounded feature from the remaining physical surface/type contracts. CubeArray
+restricted views, mip queries and broader explicit-layout memory/helper roles retain separate gaps.
 Continue focused reviewed batches; do not rerun the full checkpoint merely for this feature.
 
 The generic `requirePrelude` source-text boundary, graphics entry tests and hardware capability

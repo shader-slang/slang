@@ -81597,6 +81597,215 @@
         "last_targeted": "integer-array-volume-surfaces",
         "implementations_since_full": 14
       }
+    },
+    "nvvm-std430-pointer-transport": {
+      "status": "accepted-focused",
+      "scope": "Std430 Device ReadWrite finite copyable record entry pointers, signed32 checked offsets and one-way UInt64 address observation, alongside existing Scalar/C. Module43/providerABI46/container2 unchanged.",
+      "contract": "Canonical shared Std430 layout selects motivating stride64 (Scalar48/C40); existing checked entry/offset records and AS1 byte representation execute it. No new pointer storage/dereference/helper/inverse-cast role. Actual CUDA live Std430 rejection is mandatory before layout erasure, including minimum optimization.",
+      "identity": {
+        "revision": "895b6eaa76288b84fae35344211ad1cb0505430f",
+        "patch_sha256": "0ef8fedf1237eeb9dd2d039fe599af8bc28dbe7218dc18521c8f1f779d28387d",
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "807047b1b5871a5b0d6831504754562fd671c1a040f2e4f81834df6fb1742357",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "c9696abd407e7f576a8ea11bffc9479e654bdc152963ae63bc0ae9d0a5d1157b",
+          "source/slang/slang-emit.cpp": "ceb37cd6f57d1df19c5db104c363e04b9cfd114f852826664d5ce1e391c80a97",
+          "source/slang/slang-ir-lower-buffer-element-type.cpp": "e1026e6a87cabaaca81f4235d47ae1e3280973e3dab1ead0864a1fc36f35f97e",
+          "source/slang/slang-ir-lower-buffer-element-type.h": "19cf4d571143dfb1fbb6cefaf92f920a00130dabf8d7a9c0afb619d953e8c87a",
+          "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang": "cf07a1cdb56c59a3b379ab300f9334ce89eb5b5780952a9cbe23db3df8a397a4",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "42d807692c4b882731b977d1a24872cca78205294c92bb944731b66f255b915b",
+          "tests/cuda/nvvm-std430-pointer-transport.slang": "6d27cdf292ac9d2f7c3bb3757b6fa6a55003cd1c5d4301a505f56826e553e284"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "6ce9220c91d2161d18a836e91fbefd124090cca023c1dd4ea4d4f3154cc2c3af",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7abea19b07deecf30f9c3a431c1300ffd754b9bb1d545a369bd4e34dd4042a40",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "55bcb278dab489329f5124cc5c3d50a167c4fdfd7e4793ad8a038329380b39d8",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "7fcc819819888ff406a319511a4653b6a2398ba3bc15bae186c3c8a3d12ba13c"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ]
+      },
+      "post_validation_comment_only": {
+        "path": "source/slang/slang-emit-nvvm-type-lowering.h",
+        "sha256": "9ca287f5faf1b2e51d26f69528fee0b07174eb1e07ff2e5d0350a43349e55d24"
+      },
+      "build": {
+        "path": "build/nvvm-std430-pointer-transport/build.json",
+        "sha256": "4c8295b2749c21584e20fbff0d5a1f878e36659ee9d5ca4dd951f66229b224cc"
+      },
+      "validation": {
+        "units": {
+          "gate": {
+            "path": "build/nvvm-std430-pointer-transport/units.json",
+            "sha256": "579b5331e0b6dc892f71366aa74ee8403bfa3df9a7f328fbe4a7ff068ad6a633"
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmSlangCoherentMemoryUsesCheckedDescriptors.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLayoutPointersUseCheckedByteOffsets.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangPointerOffsetUsesDirectPipeline.internal": "passed"
+          },
+          "counts": {
+            "passed": 4
+          }
+        },
+        "compile_diagnostics": {
+          "gate": {
+            "path": "build/nvvm-std430-pointer-transport/compile-tests.json",
+            "sha256": "08cbe7b8c58acb1905f6df91353228f7274aa4622140f7510cda5314248a1327"
+          },
+          "outcomes": {
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.1": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.2": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.3": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.4": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport-unsupported.slang.5": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport.slang": "passed",
+            "tests/cuda/nvvm-layout-pointer-transport.slang.1": "passed",
+            "tests/cuda/nvvm-std430-pointer-transport.slang": "passed",
+            "tests/cuda/nvvm-std430-pointer-transport.slang.1": "passed"
+          },
+          "counts": {
+            "passed": 10
+          }
+        },
+        "runtime": {
+          "gate": {
+            "path": "build/nvvm-std430-pointer-transport/runtime.json",
+            "sha256": "84c99fbddd97ab2bc3755ed344a3284645b91509d6aeca1f204d35e25ff9b8a2"
+          },
+          "results": {
+            "path": "build/nvvm-std430-pointer-transport/runtime-results.json",
+            "sha256": "38c374b80b32c470d0b8fbc6ff2944ba06fcaa58f4fc97f8222d09f309dfea1d"
+          },
+          "passed_cases": 8,
+          "indices": [-1, 0, 1, 2],
+          "strides": [64, 48, 40],
+          "scope": "O0/O3, three initialized1024-byte allocations at offsets256/384/512, alignment16/8/8, exact11output words and all remaining guards, all3072inputbytes unchanged. No record dereference."
+        },
+        "ptx": {
+          "path": "build/nvvm-std430-pointer-transport/ptx-inspection.json",
+          "sha256": "43dbca584a97db9b54c0a59ab301f64017cf9962a97b534e04a0b1b1aa432d30"
+        },
+        "controls": {
+          "comparison": {
+            "path": "build/nvvm-std430-pointer-transport/control-comparison.json",
+            "sha256": "83ed3c645e002cf57701baf6f1eb86b3dcd66e852ab3e72fb88db6fe8806e2d3"
+          },
+          "gates": [
+            {
+              "path": "build/nvvm-std430-pointer-transport/after-vulkan.json",
+              "sha256": "21f21027c60f2a786dc0ad0767531de913fb7c802778a042c1cb24855212e92f"
+            },
+            {
+              "path": "build/nvvm-std430-pointer-transport/after-llvm-shader.json",
+              "sha256": "4dffe7df53a8205fe6235c6725f69b5576d9064b12a9a6040437f071bb094d43"
+            },
+            {
+              "path": "build/nvvm-std430-pointer-transport/after-scalar-c-cuda.json",
+              "sha256": "a5dd3c709be46d6aaf78e066b6b0fdf941532d739bf9b7d45200583893463cd9"
+            },
+            {
+              "path": "build/nvvm-std430-pointer-transport/after-cpp.json",
+              "sha256": "0c849c8827c11b684625ea162ba328e24838f55f0d2f1001ba9ba940def3c0f5"
+            },
+            {
+              "path": "build/nvvm-std430-pointer-transport/after-cuda.json",
+              "sha256": "88a143e45df64313cfdd0ac3a2b2e14c41296ea4ef12d25a5399821b0fc1c338"
+            }
+          ],
+          "scope": "Vulkan SPIR-V, LLVM shader IR and old Scalar/C CUDA source byte-identical. CPP still E36107; actual CUDA remains rejected but now E55200 after profile-upgrade warning."
+        },
+        "source": {
+          "path": "tests/cuda/nvvm-std430-pointer-transport.slang",
+          "sha256": "6d27cdf292ac9d2f7c3bb3757b6fa6a55003cd1c5d4301a505f56826e553e284"
+        },
+        "host": {
+          "path": "build/nvvm-std430-pointer-transport/run-pointer-transport.py",
+          "sha256": "0a5f98323f5a3d8c01beb0b46b043ad90ded2bf11aa53393619b8169ede94766"
+        },
+        "host_freeze": {
+          "path": "build/nvvm-std430-pointer-transport/harness-freeze.json",
+          "sha256": "54b7c2568a79dfd3162aa38fd8bf40a4490cd7994bf4da075185e52ded260ed3"
+        }
+      },
+      "resolved_failures": {
+        "new_fixture_before": {
+          "path": "build/nvvm-std430-pointer-transport/before-nvvm.json",
+          "sha256": "7cff9b61e6bae97123a1b74a0744128b6169216a00d6c04160c452b4e34ba083"
+        },
+        "transition": "Strict dedicated allocated Std430 source E36107/noPTX to successful O0/O3 compile/runtime; not original corpus resolution."
+      },
+      "retained_failures": {
+        "original_fixture": {
+          "gate": {
+            "path": "build/nvvm-std430-pointer-transport/original-nvvm-compile-only.json",
+            "sha256": "b3d6f30b9aa72b7812071fead0a8637e5287192bcad0f20c34228a37968486ab"
+          },
+          "outcome": "E52017 helper function parameter Ptr<C_std430,...Std430Layout>; original source contains unspecified pointer bindings and was not executed."
+        },
+        "llvm_control_selection": {
+          "initial": {
+            "path": "build/nvvm-std430-pointer-transport/before-llvm.json",
+            "sha256": "fd51d475d59d5875d292a0d20dc634dbefe068ffb60f54c1b0bcd66d636e11c0"
+          },
+          "corrected": {
+            "path": "build/nvvm-std430-pointer-transport/before-llvm-shader.json",
+            "sha256": "4b805a2d9c13e6447367d7d8f22e980943ceb5056eaacbc8686423b26de93a80"
+          },
+          "history": "Initial host llvm-ir target rejects compute source E99997; corrected llvm-shader-ir compile succeeds. No runtime claim."
+        },
+        "cuda_comparison": {
+          "before": {
+            "path": "build/nvvm-std430-pointer-transport/before-cuda.json",
+            "sha256": "a0d6dd6910a294da3b8f26c8034348519a034dcc0a34a7bf99ccf5e4be570df5"
+          },
+          "after": {
+            "path": "build/nvvm-std430-pointer-transport/after-cuda.json",
+            "sha256": "88a143e45df64313cfdd0ac3a2b2e14c41296ea4ef12d25a5399821b0fc1c338"
+          },
+          "history": "Source alternative can upgrade CUDA profile to nvvm; mandatory actual-backend guard preserves rejection with E55200 rather than prior E36107."
+        },
+        "scalar_cuda_stride": "Prior Scalar/C CUDA mismatch at nonzero indices remains unchanged; old focused object preserved."
+      },
+      "preservation": {
+        "prior_feature_count": 56,
+        "prior_focused_objects": "unchanged",
+        "full_baseline_and_identity": "unchanged",
+        "protected_user_file": {
+          "path": "tests/cuda/complex/tiled_brass_material_mtlx_update.slang",
+          "sha256": "c092c5e09019b403c8523ea397ba39a7c758416839f4ec7f934979f99cfd250e"
+        }
+      },
+      "limitations": [
+        "Address transport only, not record dereference, helper/storage ABI, pointer reconstruction or non-Device qualification.",
+        "Ordinary scalar/vector/array/parameter-group/structured-buffer Std430 memory roles still reject before provider mutation.",
+        "No source capability bypass, no runtime of original uninitialized-pointer fixture.",
+        "SM80 focused correctness, no fullcampaign or performanceclaim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "std430-pointer-transport",
+        "implementations_since_full": 15
+      }
     }
   }
 }
