@@ -463,22 +463,26 @@ the qualified stack; `txq.level.width` loaded and executed. No full API repair i
 NVVM surface legalization supports the existing native 32-bit signed/unsigned/Float32 scalar, two-
 and four-channel transfers in admitted 1D/2D/3D and array shapes. Native Half and annotated Half
 storage with Float32 shader values remain limited to non-array 1D/2D. Matching Float32 uses Float32
-payloads directly. Static component masks update physical channels without re-encoding untouched
-NaN payloads. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
+payloads directly. Static component masks and in-range dynamic scalar indices update physical channels without
+re-encoding untouched NaN payloads. Dynamic indices use the existing non-atomic whole-texel merge;
+there is no new out-of-range lane guarantee. Byte-X scaling and conversion are explicit IR; no runtime format discovery is added.
 
 The [physical-storage harness](../../extras/validate-nvvm-surfaces.py) independently checks 83 cases,
 including exhaustive Half loads, conversion boundaries, direct literals, written NaN classification,
 nonzero guards and zero-boundary accesses. Native signed/unsigned32 cases exercise 1D/2D scalar,
 two- and four-channel loads, whole stores and component stores with exact integer bits. Four mixed
 cases bind eight separate native Float32/r16f/rg16f/rgba16f source/result resources, checking both copy
-directions and untouched channels. All 81 supported cases pass in each NVVM mode; two dynamic-index
-negatives remain per mode. NVRTC has 52 passes, 20 compile failures and 11 rounding mismatches.
+directions and untouched channels. The last full checkpoint passed 81 cases in each NVVM mode and retained two dynamic-index
+failures per mode. Focused dynamic-component qualification now covers those two cases plus two
+static controls at O0/O3, with unchanged physical oracles and guards. The dynamic cases exercise
+all four lanes in 2D Float32/Half storage and exact untouched NaN payloads; signed/two-lane shapes
+have compiler-unit coverage, not fresh physical runtime coverage. NVRTC's full checkpoint retains
+52 passes, 20 compile failures and 11 rounding mismatches.
 The recurring checkpoint replays physical readbacks and compares all 249 obligations against the
 [current baseline](../../issue-nvvm-backend/accepted-baseline.json), preserving known failures.
 [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC
-formatted store's observed truncation. NVRTC component source, dynamic component indexing, user
-resource-helper format provenance, three-channel transfers and additional packed/normalized formats
+formatted store's observed truncation. NVRTC component writes (including dynamic indexing), user resource-helper format provenance, three-channel transfers and additional packed/normalized formats
 remain outside this qualification. The pass does not add layered helper writes or general aliases.
 
 The unannotated surface contract requires a matching physical channel width, count and scalar

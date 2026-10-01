@@ -2584,7 +2584,10 @@ static bool _isFakeNVVMBuilderVectorValue(
             expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer
                 ? operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                       operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
-                : operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
+                : (expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Half ||
+                   expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Float ||
+                   expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Double) &&
+                      operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
         return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD && isExpectedKind &&
                operation.elementType.bitWidth == expectedBitWidth &&
                operation.elementType.laneCount == expectedElementCount;

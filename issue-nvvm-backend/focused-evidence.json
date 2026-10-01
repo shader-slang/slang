@@ -78482,6 +78482,221 @@
         "last_targeted": "texture-descriptor-words",
         "implementations_since_full": 1
       }
+    },
+    "nvvm-dynamic-surface-components": {
+      "status": "accepted-focused",
+      "scope": "In-range Int32/UInt32 dynamic scalar component stores for already admitted physical vector surfaces; module43/providerABI46/container2 unchanged.",
+      "contract": {
+        "merge": "One physical load, one conversion of replacement only, per-lane typed equality/select, one whole-texel store.",
+        "untouched_channels": "Exact physical bits, including NaN payloads.",
+        "evaluation": "Reuse canonical SSA operands; one getLane call shared by all comparisons.",
+        "concurrency": "Existing non-atomic whole-texel read-modify-write.",
+        "out_of_range": "No new guarantee; invalid literal indices remain rejected."
+      },
+      "identity": {
+        "revision": "838b4b2e85dcc95e6851b553b6102d86f955f9a4",
+        "patch_sha256": "fb1e52c84ad755c1a4b05c908a2c568013b643c0405c8cc6a1f9256c2bd3774a",
+        "source_sha256": {
+          "source/slang/slang-ir-nvvm-surface-legalize.cpp": "302668142820aa39ed2e2b01af196db0f4bb34b2414fc55eabf9724d556aebd1",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "4b0d0841b41cfbca69fd4d7c95d7d51e80bb130afffffa5ffa7269cd11f2b49e",
+          "tools/slang-unit-test/unit-test-nvvm-support.h": "5a0e1489799b564090c4e0faea0a7137bf6893c8d5eb25da2ceced14f93f2b1d"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "f48bca5238c93e32b3f32df0d732bab86fca7a656046d4ac28f2e8161e13f38d",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "56f6f8c208c62f719c1c55bb1c3e7605236566f3f75806329a7ede69bd0f1bf9",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "c51b826b4080fc3690b449ecec2fcb013d7c7350f633e09e0ba6d383c177845e",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "75d3ab9556fd027a953b6c40864d124d06ad55dd46f2a601e093a2cabd2fe60c",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "e34e9035c4f49c5972f9dc41c3535837f8e8867d52cec39cc634702378623fcf",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "79cd1cd6770f49138dbb8fd040af8ba16b04e9f365887174257aca0d8c23f9b1"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-compiler.so",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so",
+          "build/RelWithDebInfo/lib/slang-core-module.bin"
+        ],
+        "test_only_changed_runtime": [
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so"
+        ]
+      },
+      "initial_validation_identity": {
+        "path": "build/nvvm-surface-dynamic/tested-identity.json",
+        "sha256": "c7e2ffb22664164069b25b8e6838ee8cacdc93130954bce0f35591d4b1f61cc0"
+      },
+      "build": {
+        "path": "build/nvvm-surface-dynamic/build.json",
+        "sha256": "7ae78983680d36ef875b25ccc9711b879c58f0bfc0044e38d140da2bf958df11"
+      },
+      "validation": {
+        "units": {
+          "passed_unique": 2,
+          "initial": {
+            "path": "build/nvvm-surface-dynamic/units.json",
+            "sha256": "38e799939e5097ef56b179da9252bb0a6bdc5c93ef9344aa15ea7b9dc50d8a5e"
+          },
+          "initial_outcomes": {
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "FAILED",
+            "slang-unit-test-tool/nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation.internal": "passed"
+          },
+          "final_retry": {
+            "path": "build/nvvm-surface-dynamic/unit-final.json",
+            "sha256": "b030a48ebde6452deb643c75fee3d6a81b8f008aa640c705df526fc0bed4de73"
+          },
+          "final_outcomes": {
+            "slang-unit-test-tool/nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion.internal": "passed"
+          },
+          "reuse": "Initial capability-denial pass retained; fake value classification and call-role assertion changes cannot reach that earlier rejection."
+        },
+        "physical": {
+          "passed": 8,
+          "gate": {
+            "path": "build/nvvm-surface-dynamic/physical.json",
+            "sha256": "70e2d53de4cc5eec8a1996536b4f17d5f6b36c473cc457ccd1b26b153be18f45"
+          },
+          "results": {
+            "path": "build/nvvm-surface-dynamic/after/results.json",
+            "sha256": "a5b2fbfa042bf50ea4350e5fb9b3923c68a19c26f8301694e3ad91ecc50e6768"
+          },
+          "validated_bytes": {
+            "path": "build/nvvm-surface-dynamic/physical-validation.json",
+            "sha256": "7aa500fa56ca95b1d4c0e463d29ef8e69cbba749002a3bbf695da546c522e2ea"
+          },
+          "scope": "Four canonical cases in NVVM O0/O3; independent existing host-oracle replay, exact inventory restricted to this subset. Four intended transitions and four static controls; no full campaign."
+        },
+        "negatives": {
+          "passed": 4,
+          "gate": {
+            "path": "build/nvvm-surface-dynamic/negatives.json",
+            "sha256": "0e860584f7d38c1a92c5903e109fcce7a11458852f9fbba3fc25711ee21ab1fb"
+          }
+        },
+        "native_signed_compile": {
+          "gate": {
+            "path": "build/nvvm-surface-dynamic/native-signed-real.json",
+            "sha256": "074d4113f3267dc881231b2019032c3f6c6e38628aba6e37967defeb0482c966"
+          },
+          "source": {
+            "path": "build/nvvm-surface-dynamic/native-signed-unit.slang",
+            "sha256": "f7484ad3ffbf2ad20d6940941f5536adf870c753efb48b8a1a6d2146f6a33c70"
+          },
+          "ptx": {
+            "path": "build/nvvm-surface-dynamic/native-signed-real.ptx",
+            "sha256": "a18130babc283eeb0d9f6bb2d8f34f55132e8fbc53b0c587019a20274bbad9b1"
+          },
+          "scope": "Real SM80 O0 compile of failing fake unit source; no additional GPU claim."
+        },
+        "cpu_contract_reuse": {
+          "gate": {
+            "path": "build/nvvm-integration/full-after-cleanup-1/surface-contracts.json",
+            "sha256": "1a7c3f7b38c01ad5990bcb633c1a978f0593e2081522e5fc283039cb5efff731"
+          },
+          "reason": "Surface runner, oracle, all six physical fixtures and canonical case descriptors unchanged."
+        }
+      },
+      "resolved_surface_cells": [
+        {
+          "id": "float32-dynamic-component",
+          "mode": "nvvm-o0",
+          "before": "compile-failed",
+          "after": "passed",
+          "source_sha256": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+          "case_sha256": "261a8ee275e8f956b86a65ee587f18c3b9a02598cc227179a5110974bbf6b676",
+          "oracle_sha256": "61c7e3496b5c91b78a6584d901842f9068b49704206fd18ca39415db1000a527"
+        },
+        {
+          "id": "float32-dynamic-component",
+          "mode": "nvvm-o3",
+          "before": "compile-failed",
+          "after": "passed",
+          "source_sha256": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+          "case_sha256": "261a8ee275e8f956b86a65ee587f18c3b9a02598cc227179a5110974bbf6b676",
+          "oracle_sha256": "61c7e3496b5c91b78a6584d901842f9068b49704206fd18ca39415db1000a527"
+        },
+        {
+          "id": "half-dynamic-component",
+          "mode": "nvvm-o0",
+          "before": "compile-failed",
+          "after": "passed",
+          "source_sha256": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+          "case_sha256": "722d3b689d1f8f60d09db55eac794501b0ed18e4b13999157b367b2cd1abbe66",
+          "oracle_sha256": "287fd036c04f2912639e3e03bab8583923f9439d8433900ab5d60abe9fd2e107"
+        },
+        {
+          "id": "half-dynamic-component",
+          "mode": "nvvm-o3",
+          "before": "compile-failed",
+          "after": "passed",
+          "source_sha256": "017f33657997638329f9b9589cb33e8e3601fd46950e31cdb772d5db62f7a716",
+          "case_sha256": "722d3b689d1f8f60d09db55eac794501b0ed18e4b13999157b367b2cd1abbe66",
+          "oracle_sha256": "287fd036c04f2912639e3e03bab8583923f9439d8433900ab5d60abe9fd2e107"
+        }
+      ],
+      "before": {
+        "path": "build/nvvm-surface-dynamic/before-surfaces.json",
+        "sha256": "9c9794b39614c434f54edff543252aa3f32012feba28d129156a575aacd5bbc2"
+      },
+      "validation_incidents": [
+        {
+          "kind": "fake surface-vector kind misclassification",
+          "initial": {
+            "path": "build/nvvm-surface-dynamic/units.json",
+            "sha256": "38e799939e5097ef56b179da9252bb0a6bdc5c93ef9344aa15ea7b9dc50d8a5e"
+          },
+          "repair": {
+            "path": "build/nvvm-surface-dynamic/fake-repair.json",
+            "sha256": "8c51daaec895e6aa38353745b158caf08e2b946c500bd19acab59513aaf59459"
+          },
+          "build": {
+            "path": "build/nvvm-surface-dynamic/build-fake-repair.json",
+            "sha256": "2b0f5b152824197d957d1e3214316eca8f9527e8e36731ec7edbb3176ab87fb9"
+          },
+          "retry": {
+            "path": "build/nvvm-surface-dynamic/unit-retry.json",
+            "sha256": "494473743fc777a58e06dc21623ddb25e4046cb820d7ec43bb96bb079be13e84"
+          },
+          "resolution": "Boolean probe formerly accepted native Float32 surface vectors; explicitly admit Half/Float/Double and preserve typed select/load/width/lane checks. Real provider already passed."
+        },
+        {
+          "kind": "overbroad total call assertion",
+          "failed_retry": {
+            "path": "build/nvvm-surface-dynamic/unit-retry.json",
+            "sha256": "494473743fc777a58e06dc21623ddb25e4046cb820d7ec43bb96bb079be13e84"
+          },
+          "build": {
+            "path": "build/nvvm-surface-dynamic/build-call-assertion.json",
+            "sha256": "993b265fab261a821822b6dc83034a413ccc834d3f517d77210c901ec3709810"
+          },
+          "retry": {
+            "path": "build/nvvm-surface-dynamic/unit-final.json",
+            "sha256": "b030a48ebde6452deb643c75fee3d6a81b8f008aa640c705df526fc0bed4de73"
+          },
+          "resolution": "Dispatch-ID composition adds nine query wrappers. Assert one getLane callee and the same Call result in every comparison; physical/conversion/rejection assertions unchanged."
+        }
+      ],
+      "limitations": [
+        "Fresh runtime covers 2D four-channel Float32/annotated Half, all four UInt32 lanes, untouched NaN payloads and guards; no fresh dynamic zero/subnormal untouched-input claim.",
+        "Signed Int32/two-lane native Float32 is compiler-unit and real-compile coverage, not additional physical runtime qualification.",
+        "Existing format/shape/provenance boundaries remain; no packed/normalized storage, arbitrary aliases, escaping component references or concurrency expansion.",
+        "Original full corpus/surface outcomes and NVRTC failures retain their identity; this focused resolution does not replace the full checkpoint.",
+        "Physical bytes and inventory were replayed before subsequent fake-only test-plugin rebuild. Production/provider/driver/fixture/oracle bytes are unchanged; retain original physical provenance. No performance claim."
+      ],
+      "cadence": {
+        "last_full": "post-cleanup-half",
+        "last_targeted": "dynamic-surface-components",
+        "implementations_since_full": 2
+      }
     }
   }
 }

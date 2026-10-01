@@ -83,26 +83,30 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-UInt2 low/high word transport for selected read-only texture descriptors is implemented and passes
-focused validation. Its existing runtime fixture passes in CUDA O3 and NVVM O0/O3; the two
-`bugs/gh-6657-nonbindless-uniform.slang#discovery-1` NVVM cells now execute correctly. Record layout
-is unchanged: fields 0/16/24, stride 32. Buffer/sampler/writable/MS roles remain excluded. The full
-baseline retains its original 36 gaps; the focused record supersedes those two NVVM failures
-without relabeling the full run. Initial grouped-unit fixture admission failed before conversion;
-its supported-input repair passes, with explicit earlier multisample diagnostics. Three distinct
-units, three descriptor runtime cells, four buffer negatives and two discovery cells pass. No
-production correction was needed.
+Two bounded feature batches now pass focused validation after the full checkpoint:
 
-Next implement in-range dynamic surface component stores under `plan.surface-dynamic-components.md`:
-keep existing physical format/provenance admission, convert only the replacement scalar, and
-preserve untouched physical lanes with typed selection. Use the two existing dynamic cases and
-two static controls in NVVM O0/O3; retain non-atomic RMW and no new out-of-range guarantee.
+- UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
+  `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
+  buffer negatives and record layout checks pass. Unsupported resource roles remain excluded.
+- In-range dynamic surface-component stores resolve four NVVM physical cells. Eight physical
+  runtime cells, two distinct units and four existing negatives pass. The merge converts only the
+  replacement and preserves untouched physical lanes. A fake Float32/Boolean classification bug
+  and an overbroad call-count assertion were fixed; original attempts remain recorded.
 
-The current feature identity is recorded in `features.nvvm-texture-descriptor-words`; the full
-identity above retains its actual earlier compiler. One implementation has landed since the full run.
+The full baseline retains its original 36 corpus gaps and four dynamic-surface failures; focused
+records supersede the affected cells without relabeling the full run. Current identities and
+precise reuse are in `features.nvvm-texture-descriptor-words` and
+`features.nvvm-dynamic-surface-components`. Two implementations have landed since the full run.
 
-Then rank local record-array out/inout references against the retained failures. Approximate Half
-exp2/tanh remain a separate accuracy/capability choice; other transcendental evaluation policies stay unchanged until supported by evidence.
+Next admit internal out/inout references to existing local record arrays under
+`plan.local-record-array-refs.md`. Include internal source array returns because canonical
+legalization uses the same OutParam/local-storage contract. Keep native array-return and external
+ABIs closed; require qualified local/internal-parameter roots at type, call and address boundaries.
+Use focused shared/static role and provenance tests plus a small independent runtime fixture.
+
+Approximate Half exp2/tanh remain a separate accuracy/capability choice; other transcendental
+policies stay unchanged until supported by evidence. Dynamic surface indices remain in-range
+qualification with non-atomic whole-texel RMW and no new out-of-range guarantee.
 
 ## Retained boundaries
 
@@ -111,8 +115,8 @@ backend. Metadata inspection and source fallback remain available. The active NV
 extension is removed; inert serialized slots and ordinary explicit intrinsic arguments remain.
 
 Preserve all 36 main gaps and focused NVRTC narrow-bit/nested-array failures and timeouts.
-Packed/normalized surfaces, general aliases, resource provenance, dynamic components and
-three-channel transfers remain outside current physical legalization. Checked address/memory plans
+Packed/normalized surfaces, general aliases, broader resource provenance and three-channel
+transfers remain outside current physical legalization. Checked address/memory plans
 remain authoritative; structured-buffer load/store conversions are planned, while other resource
 family planning and broader aggregate admission remain feature work.
 Barrier convergence, external Half ABI, numeric sweep, material-runtime and performance conclusions

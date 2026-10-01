@@ -10914,6 +10914,18 @@ static const char kSurfaceFormatLegalizationSource[] = R"SLANG(
     }
 )SLANG";
 
+// A live noinline lane producer makes duplicate evaluation observable in the recording provider.
+static const char kSurfaceDynamicComponentSource[] = R"SLANG(
+    StructuredBuffer<float> input;
+    [format("rgba16f")] RWTexture2D<float4> image;
+    [noinline] uint getLane(uint x) { return x & 3u; }
+    [shader("compute")] [numthreads(1, 1, 1)]
+    void computeMain(uint3 tid : SV_DispatchThreadID)
+    {
+        image[int2(tid.xy)][getLane(tid.x)] = input[tid.x];
+    }
+)SLANG";
+
 SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
 {
     _resetDirectNVVMFakes();
@@ -10982,12 +10994,128 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
         SLANG_CHECK(conversions == 2);
     }
     SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
+
+    const char* nativeSignedSource = R"SLANG(
+        StructuredBuffer<float> input;
+        RWTexture2D<float2> image;
+        [noinline] int getLane(uint x) { return int(x & 1u); }
+        [shader("compute")] [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            image[int2(tid.xy)][getLane(tid.x)] = input[tid.x];
+        }
+    )SLANG";
+    for (bool isHalf : {false, true})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result = _compileSlangWithDirectNVVM(
+            session,
+            isHalf ? kSurfaceDynamicComponentSource : nativeSignedSource,
+            code,
+            diagnostics);
+        if (SLANG_FAILED(result))
+        {
+            StringBuilder message;
+            message << (isHalf ? "Half4/UInt32: " : "Float2/Int32: ") << _getBlobText(diagnostics);
+            getTestReporter()->message(TestMessageType::Info, message.getBuffer());
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+        SLANG_CHECK(code != nullptr);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
+        Index loadIndex = -1, storeIndex = -1;
+        const uint32_t width = isHalf ? 16 : 32;
+        const uint32_t lanes = isHalf ? 4 : 2;
+        for (Index i = 0; i < 2; ++i)
+        {
+            const auto& access = gFakeNVVMBuilder.surfaceOperations[i];
+            SLANG_CHECK(access.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+            SLANG_CHECK(access.elementType.bitWidth == width);
+            SLANG_CHECK(access.elementType.laneCount == lanes);
+            SLANG_CHECK(access.shape == SLANG_NVVM_TEXTURE_SHAPE_2D);
+            if (access.operation == SLANG_NVVM_SURFACE_OP_LOAD)
+                loadIndex = i;
+            else if (access.operation == SLANG_NVVM_SURFACE_OP_STORE)
+                storeIndex = i;
+        }
+        SLANG_CHECK_ABORT(loadIndex >= 0 && storeIndex >= 0);
+        const auto merged = gFakeNVVMBuilder.surfaceOperationOperands[storeIndex][2];
+        SLANG_CHECK_ABORT(merged.kind == FakeNVVMBuilderValueKind::VectorConstruct);
+        SLANG_CHECK(gFakeNVVMBuilder.vectorConstructElementCounts[merged.index] == lanes);
+        const Index offset = gFakeNVVMBuilder.vectorConstructElementOffsets[merged.index];
+        // Dispatch builtins also use helper calls. Count the lane producer by its source role.
+        Index laneCall = -1;
+        for (Index i = 0; i < gFakeNVVMBuilder.callCalleeFunctionIndices.getCount(); ++i)
+        {
+            const Index callee = gFakeNVVMBuilder.callCalleeFunctionIndices[i];
+            if (gFakeNVVMBuilder.functionNames[callee].indexOf("getLane") >= 0)
+            {
+                SLANG_CHECK(laneCall == -1);
+                laneCall = i;
+            }
+        }
+        SLANG_CHECK_ABORT(laneCall >= 0);
+        FakeNVVMBuilderValueRef replacement = {};
+        for (uint32_t lane = 0; lane < lanes; ++lane)
+        {
+            const auto selected = gFakeNVVMBuilder.vectorConstructElementValueRefs[offset + lane];
+            SLANG_CHECK_ABORT(selected.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+            const auto& select = gFakeNVVMBuilder.scalarOperations[selected.index];
+            SLANG_CHECK(select.key.operation == SLANG_NVVM_VALUE_OP_SELECT);
+            SLANG_CHECK(select.resultType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
+            SLANG_CHECK(select.resultType.bitWidth == width && select.resultType.laneCount == 1);
+            SLANG_CHECK_ABORT(select.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+            const auto& equality = gFakeNVVMBuilder.scalarOperations[select.operands[0].index];
+            SLANG_CHECK(equality.key.operation == SLANG_NVVM_VALUE_OP_EQUAL);
+            SLANG_CHECK(
+                equality.operands[0].kind == FakeNVVMBuilderValueKind::Call &&
+                equality.operands[0].index == laneCall);
+            SLANG_CHECK(equality.operandTypes[0].bitWidth == 32);
+            SLANG_CHECK(
+                equality.operandTypes[0].kind == (isHalf ? SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER
+                                                         : SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER));
+            SLANG_CHECK_ABORT(
+                equality.operands[1].kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[equality.operands[1].index] == lane);
+            if (!lane)
+                replacement = select.operands[1];
+            SLANG_CHECK(
+                select.operands[1].kind == replacement.kind &&
+                select.operands[1].index == replacement.index);
+            const auto oldLane = select.operands[2];
+            SLANG_CHECK_ABORT(oldLane.kind == FakeNVVMBuilderValueKind::VectorElement);
+            SLANG_CHECK(gFakeNVVMBuilder.vectorElementIndices[oldLane.index] == lane);
+            const auto oldValue = gFakeNVVMBuilder.vectorElementBaseValueRefs[oldLane.index];
+            SLANG_CHECK(
+                oldValue.kind == FakeNVVMBuilderValueKind::SurfaceOperation &&
+                oldValue.index == loadIndex);
+        }
+        Index conversions = 0;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+            conversions += operation.key.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT;
+        SLANG_CHECK(conversions == (isHalf ? 1 : 0));
+        if (isHalf)
+        {
+            SLANG_CHECK_ABORT(replacement.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+            const auto& conversion = gFakeNVVMBuilder.scalarOperations[replacement.index];
+            SLANG_CHECK(conversion.key.operation == SLANG_NVVM_VALUE_OP_FLOAT_CONVERT);
+            SLANG_CHECK(
+                conversion.operandTypes[0].bitWidth == 32 && conversion.resultType.bitWidth == 16);
+        }
+    }
+    SLANG_CHECK(gFakeNVVMBuilder.liveLibraryCount == 0);
 }
 
 SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCreation)
 {
-    _resetDirectNVVMFakes();
+    for (const char* source : {kSurfaceFormatLegalizationSource, kSurfaceDynamicComponentSource})
     {
+        _resetDirectNVVMFakes();
         gFakeNVVMBuilder.rejectHalfSurfaceOperation = true;
         ComPtr<slang::IGlobalSession> globalSession;
         SLANG_CHECK_ABORT(
@@ -10996,11 +11124,8 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCre
         globalSession->setSharedLibraryLoader(loader);
         ComPtr<slang::IBlob> code;
         ComPtr<slang::IBlob> diagnostics;
-        SLANG_CHECK(SLANG_FAILED(_compileSlangWithDirectNVVM(
-            globalSession,
-            kSurfaceFormatLegalizationSource,
-            code,
-            diagnostics)));
+        SLANG_CHECK(
+            SLANG_FAILED(_compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
         SLANG_CHECK(code == nullptr);
         SLANG_CHECK(_getBlobText(diagnostics).contains("52018"));
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);

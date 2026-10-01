@@ -161,7 +161,8 @@ bool legalizeWholeAccess(
 // Preserves a component write in physical storage. For `image[p].xz = value`, untouched Half
 // channels are copied directly from the physical load; widening and narrowing them would lose
 // representations such as NaN payloads. A statically selected scalar component uses the same merge
-// operation.
+// operation. For `image[p][lane] = value`, a dynamic in-range lane selects the converted
+// replacement against each old physical channel without converting the untouched channels.
 bool legalizeComponentStore(IRBuilder& builder, IRInst* inst)
 {
     IRInst* address = inst->getOperand(0);
@@ -174,6 +175,7 @@ bool legalizeComponentStore(IRBuilder& builder, IRInst* inst)
         return false;
     IRInst* value = inst->getOperand(1);
     List<IRInst*> indices;
+    IRInst* dynamicIndex = nullptr;
     if (auto swizzle = as<IRSwizzledStore>(inst))
     {
         if (element)
@@ -189,10 +191,17 @@ bool legalizeComponentStore(IRBuilder& builder, IRInst* inst)
     }
     else if (element)
     {
-        auto index = as<IRIntLit>(element->getIndex());
-        if (!index || !isNVVMInteger32Type(index->getDataType()) || index->getValue() < 0 ||
-            index->getValue() >= getIRVectorElementSize(access.logicalType))
+        IRInst* index = element->getIndex();
+        if (!isNVVMInteger32Type(index->getDataType()))
             return false;
+        if (auto literal = as<IRIntLit>(index))
+        {
+            if (literal->getValue() < 0 ||
+                literal->getValue() >= getIRVectorElementSize(access.logicalType))
+                return false;
+        }
+        else
+            dynamicIndex = index;
         indices.add(index);
     }
     else
@@ -209,15 +218,33 @@ bool legalizeComponentStore(IRBuilder& builder, IRInst* inst)
                                   ? physicalScalar
                                   : builder.getVectorType(physicalScalar, indices.getCount());
     builder.setInsertBefore(inst);
+    IRBuilderSourceLocRAII sourceLoc(&builder, inst->sourceLoc);
     IRInst* coordinate = emitPhysicalCoordinate(builder, access);
     IRInst* oldValue = emitPhysicalLoad(builder, access, coordinate);
     IRInst* replacement = emitSurfaceConversion(builder, replacementType, value);
-    IRInst* merged = builder.emitSwizzleSet(
-        access.physicalType,
-        oldValue,
-        replacement,
-        indices.getCount(),
-        indices.getBuffer());
+    IRInst* merged = nullptr;
+    if (dynamicIndex)
+    {
+        List<IRInst*> lanes;
+        const auto laneCount = getIRVectorElementSize(access.physicalType);
+        for (IRIntegerValue lane = 0; lane < laneCount; ++lane)
+        {
+            IRInst* oldLane = builder.emitElementExtract(oldValue, lane);
+            IRInst* selected = builder.emitEql(
+                dynamicIndex,
+                builder.getIntValue(dynamicIndex->getDataType(), lane));
+            IRInst* operands[] = {selected, replacement, oldLane};
+            lanes.add(builder.emitIntrinsicInst(physicalScalar, kIROp_Select, 3, operands));
+        }
+        merged = builder.emitMakeVector(access.physicalType, lanes.getCount(), lanes.getBuffer());
+    }
+    else
+        merged = builder.emitSwizzleSet(
+            access.physicalType,
+            oldValue,
+            replacement,
+            indices.getCount(),
+            indices.getBuffer());
     emitPhysicalStore(builder, access, coordinate, merged);
     inst->removeAndDeallocate();
     return true;

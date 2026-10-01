@@ -764,7 +764,7 @@ local commit and stop unless further work was explicitly authorized.
 `extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. Six fixtures under
 `tests/cuda/nvvm-surface-physical-*.slang` supply 83 cases: native Float32, signed/unsigned32 and
 annotated Half, 1D/2D scalar/2/4 channels, whole/component writes, exhaustive scalar Half decode, converted NaNs,
-dynamic-component negatives, literal-rounding controls and zero-boundary operations. Four mixed-format
+dynamic-component writes, literal-rounding controls and zero-boundary operations. Four mixed-format
 cases bind eight independent native Float32/r16f/rg16f/rgba16f source/result resources and check both
 copy directions, with whole or component stores. Integer cases bind matching native 32-bit channels;
 they do not qualify packed storage. The harness generates immutable input/expected
@@ -780,9 +780,11 @@ python3 extras/validate-nvvm-surfaces.py \
 ```
 
 The full matrix returns nonzero while any requested case fails. Preserve every `(case, mode)` result;
-NVRTC component compilation failures, its observed Half truncation differences, and unsupported
-dynamic component indexing are recorded limitations, never passing cells. Compare exact before/after
-identities when accepting intended transitions. `--cases` selects exact names from `--list`, and
+NVRTC component compilation failures and its observed Half truncation differences remain recorded
+limitations, never passing cells. Dynamic-component cases preserve the original physical oracle;
+accept their intended NVVM failure-to-pass transitions only with complete physical execution.
+Qualification is in-range, non-atomic whole-texel read-modify-write and grants no new out-of-range
+lane or concurrent-write guarantee. Compare exact before/after identities when accepting transitions. `--cases` selects exact names from `--list`, and
 `--modes` supports focused runs. Each run needs a fresh output directory. Raw byte arrays, PTX,
 reflection, subprocess logs and diagnostics stay in the ignored output tree; current compact outcomes
 belong in the accepted baseline; historical format and conversion failures remain in focused evidence.

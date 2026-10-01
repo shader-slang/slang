@@ -330,9 +330,11 @@ Surface legalization runs before shared subscript expansion discards component m
 collected field's static format selects physical payload types, explicit conversion and byte-X
 coordinates; equal logical types can therefore access different formats. The provider emits typed
 operations and mechanical bitcasts, not format discovery or implicit storage conversion. Component
-updates preserve untouched raw lanes and remain non-atomic. Arbitrary resource-helper provenance,
-dynamic components, additional packed/normalized formats and general aliases remain outside the
-qualified boundary.
+updates preserve untouched raw lanes and remain non-atomic. In-range dynamic scalar components
+select the converted replacement against each old physical lane; only the replacement is converted.
+This reuses the canonical index value and adds no out-of-range or concurrent-write guarantee.
+Arbitrary resource-helper provenance, additional packed/normalized formats and general aliases
+remain outside the qualified boundary.
 
 An undecorated `RWTexture<int4>` requires matching native32 four-channel storage. An opaque CUDA
 handle does not make an RGBA8 allocation visible to the compiler, and shader reads using the same
