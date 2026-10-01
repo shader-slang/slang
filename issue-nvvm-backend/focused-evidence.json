@@ -85515,6 +85515,213 @@
         "Bounded on-demand RHI checks only, no full RHI or working corpus run.",
         "All71 prior focused objects and full accepted baseline/identity unchanged."
       ]
+    },
+    "nvvm-optix-hit-state": {
+      "status": "accepted-focused",
+      "scope": "HitKind in closest-hit and RayFlags in miss/closest-hit through exact nullary UInt32 NVVM named queries.",
+      "identity": {
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "revision": "6bf4e2ef368899871c5c1f146c199387c4184077",
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "012669d1a8d04dba6c80a5139b3b571b9bd0bd2c4848bde39d9bd601e610d6f6",
+          "source/slang/slang-emit-nvvm.cpp": "898f42fb5149fc74e61aeb4153a5a8214e9e2906b579fa7deb0598be57a16601",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "7c91c5bf24959ed788c22822f56c2655efff2c5c2e2223b765952b7b19d0d5f0",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "5ea2422027075792b4e6ea52b7177dd2b3a5492a51d1cd1838440abd030d5ba5",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "1cca706ba6379784eb26bd3f9994dda74f54df36633c9a5b2d7c49aabc4cbf52"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "7718ec6b71a3bf94ba4aaa19cf79d26719c759d158fe40d40c3f162a46b6d6be",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "7b1e4d75564ff70f62c994caa464f744dcbbbb7730f4f39b23500452f40163c0",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "9fd665329801fadbb9a6c956ee93656518e1c4c2635ed53da79613bf4da9ded3",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "7e8390edcaa4594b645e01d9020277e66385f1c76f614f4002d03f8fb96c8c54"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "patch_sha256": "a6859d35cc15020d0a0bc4f355eb7a6d065443444f0c958dd7d775dbb94f60b7",
+        "meaning": "Matching final compiler/provider and unit tool for the HitKind/RayFlags batch, captured before focused tests. Earlier exploration and NVRTC controls retain before-identity."
+      },
+      "rhi_identity": {
+        "path": "build/nvvm-rhi-ray-state/rhi-identity.json",
+        "sha256": "c0ca792c1cb5245fcff504d1049e3d9855131fec2693829fc8729954df85ffae"
+      },
+      "before_identity": {
+        "path": "build/nvvm-rhi-ray-state/before-identity.json",
+        "sha256": "f16f61a08e78ca3f7b5bf13aa44d20c721717e07e795dda99d68dc89f07ab521"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-rhi-ray-state/build.json",
+          "sha256": "9cad80fb3dbfd1f71e411849822f80f995b3c3f106565dbb788e0d7b5037427b",
+          "return_code": 0,
+          "elapsed_seconds": 89.71002054214478
+        },
+        "rhi_build": {
+          "path": "build/nvvm-rhi-ray-state/rhi-build.json",
+          "sha256": "d5cbcea4491cd92d1f63f46426a0048ca1a8eb1c7c2d789303a19a5e9020ea0e",
+          "return_code": 0,
+          "elapsed_seconds": 3.531816244125366
+        },
+        "units": {
+          "record": {
+            "path": "build/nvvm-rhi-ray-state/focused.json",
+            "sha256": "67c4f065cf418606a0c731233219e30a14e736f61a6c8251efede1581718327b",
+            "return_code": 0,
+            "elapsed_seconds": 6.8923499584198
+          },
+          "outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal": "passed",
+            "slang-unit-test-tool/nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission.internal": "passed"
+          }
+        },
+        "rhi": {
+          "record": {
+            "path": "build/nvvm-rhi-ray-state/nvvm-after.json",
+            "sha256": "7f73198b60140e387724bfe5a658fbf1b1ebfee6499ffbb5769c8c71ed43af67",
+            "return_code": 0,
+            "elapsed_seconds": 3.115271806716919
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-hit-identities.cuda": "passed",
+            "ray-tracing-intrinsics-hit-kind.cuda": "passed",
+            "ray-tracing-intrinsics-instance-id.cuda": "passed",
+            "ray-tracing-intrinsics-instance-index.cuda": "passed",
+            "ray-tracing-intrinsics-ray-flags.cuda": "passed",
+            "ray-tracing-intrinsics-ray-tcurrent.cuda": "passed",
+            "ray-tracing-intrinsics-ray-tmin.cuda": "passed",
+            "ray-tracing-intrinsics-world-ray-direction.cuda": "passed",
+            "ray-tracing-intrinsics-world-ray-origin.cuda": "passed"
+          },
+          "selected_cases": 9,
+          "passed_assertions": 387,
+          "filtered_out_cases": 920,
+          "selected_capability_skips": 0,
+          "identity_oracle_optimization_levels": [0, 3],
+          "other_cases_optimization": "Existing RHI defaults; no explicit O0/O3 claim."
+        },
+        "nvrtc_control": {
+          "record": {
+            "path": "build/nvvm-rhi-ray-state/nvrtc-before.json",
+            "sha256": "e9ffa1c068c3b11de1e05f5f36548683fbad4f5e615b391ac157ccb7de6d6ebb",
+            "return_code": 0,
+            "elapsed_seconds": 2.9328155517578125
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-rhi-ray-state/before-identity.json",
+            "sha256": "f16f61a08e78ca3f7b5bf13aa44d20c721717e07e795dda99d68dc89f07ab521"
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-hit-identities.cuda": "passed"
+          },
+          "passed_assertions": 149,
+          "optimization_levels": [0, 3],
+          "meaning": "Before-query compiler with final44-word RHI fixture; not a fresh final-compiler NVRTC run."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-rhi-ray-state/smoke.json",
+            "sha256": "76d665c71a758f82ac47606a45dd556b77ac757d26e98041d63c6d8281088509",
+            "return_code": 0,
+            "elapsed_seconds": 22.054882764816284
+          },
+          "selection": {
+            "path": "build/nvvm-rhi-ray-state/smoke-1/selection.json",
+            "sha256": "191052e55269f0be34b6afc1d247d391eb22bf9a410e88f45d8a0ebc48b4f7c9"
+          },
+          "provenance": {
+            "path": "build/nvvm-rhi-ray-state/smoke-1/provenance.json",
+            "sha256": "a3cf522a04a2f782189f2203a5e31259343c572a964945f663aa379f17f5ec6f"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        }
+      },
+      "runtime_contract": {
+        "rays": 7,
+        "payload_words": 6,
+        "output_words": 44,
+        "optimization_levels": [0, 3],
+        "flags": "Even ray indices1, odd0; final miss index6 carries1.",
+        "hit_kind": "Primitive0/1 back255, primitive2 front254 on both instances; miss sentinel0xdead0004.",
+        "oracle": "Host triangle winding and supplied flags independently establish expectations. All42 result words and both untouched guards checked; prior primitive/index/custom-ID/hit assertions retained."
+      },
+      "resolved_failures": [
+        {
+          "initial_record": {
+            "path": "build/nvvm-rhi-ray-state/explore.json",
+            "sha256": "2ea19c2abfbfb287fac4f505e1fbc7be537b6664b3f7245dfdf79814590b09c9",
+            "return_code": 1,
+            "elapsed_seconds": 1.9600434303283691
+          },
+          "identity": {
+            "path": "build/nvvm-rhi-ray-state/before-identity.json",
+            "sha256": "f16f61a08e78ca3f7b5bf13aa44d20c721717e07e795dda99d68dc89f07ab521"
+          },
+          "initial_outcomes": {
+            "ray-tracing-intrinsics-instance-id.cuda": "passed",
+            "ray-tracing-intrinsics-instance-index.cuda": "passed",
+            "ray-tracing-intrinsics-ray-tcurrent.cuda": "passed",
+            "ray-tracing-intrinsics-ray-tmin.cuda": "passed",
+            "ray-tracing-intrinsics-world-ray-direction.cuda": "passed",
+            "ray-tracing-intrinsics-world-ray-origin.cuda": "passed",
+            "ray-tracing-intrinsics-hit-kind.cuda": "backend-preflight-failure",
+            "ray-tracing-intrinsics-ray-flags.cuda": "backend-preflight-failure"
+          },
+          "diagnostics": [
+            "E52017 GenericAsm assembly=optixGetHitKind, signature=uint()",
+            "E52017 GenericAsm assembly=optixGetRayFlags, signature=uint()"
+          ],
+          "resolution": {
+            "path": "build/nvvm-rhi-ray-state/nvvm-after.json",
+            "sha256": "7f73198b60140e387724bfe5a658fbf1b1ebfee6499ffbb5769c8c71ed43af67"
+          },
+          "meaning": "The same eight existing cases now pass; earlier six passes retain their original gate identity."
+        },
+        {
+          "case": "ray-tracing-intrinsics-hit-identities.cuda",
+          "before": {
+            "path": "build/nvvm-rhi-ray-state/nvvm-before.json",
+            "sha256": "195d0b4ee3f396e6dcbf20ad738d8318c5b2186e78c51864fbc75a36fbb6bdc1",
+            "return_code": 1,
+            "elapsed_seconds": 1.411137580871582
+          },
+          "identity": {
+            "path": "build/nvvm-rhi-ray-state/before-identity.json",
+            "sha256": "f16f61a08e78ca3f7b5bf13aa44d20c721717e07e795dda99d68dc89f07ab521"
+          },
+          "diagnostic": "E52017 GenericAsm assembly=optixGetRayFlags, signature=uint()",
+          "before_optimization_executed": 0,
+          "before_optimization_not_reached": 3,
+          "resolution": {
+            "path": "build/nvvm-rhi-ray-state/nvvm-after.json",
+            "sha256": "7f73198b60140e387724bfe5a658fbf1b1ebfee6499ffbb5769c8c71ed43af67"
+          }
+        }
+      ],
+      "validation_incidents": [],
+      "qualification": [
+        "Result type and callback stage are independent: UInt32 RayFlags is valid on miss, HitKind is not.",
+        "Existing signature/paired serialization/no-mutation and forbidden-stage closure contracts retained.",
+        "No any-hit/intersection, extra trace flags, geometry index, callable, ABI or module-version expansion.",
+        "On-demand focused RHI qualification only; no full RHI or working-corpus refresh.",
+        "All72 prior feature objects and full accepted baseline/identity unchanged."
+      ],
+      "rhi_accepted_commit": "271b273821a3d12f020eb032497fbde48b543d32"
     }
   }
 }

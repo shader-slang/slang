@@ -64,12 +64,14 @@ NVVM O0 differs from CUDA in 12 bounded material words; O3 matches all words for
 This qualifies one textured normal-incidence BSDF path, not the full generated material graph or its
 packed texture-handle convention. PTX acceptance by libNVVM alone is not an OptiX execution claim.
 
-PrimitiveIndex, InstanceIndex and InstanceID are qualified in closest-hit through exact UInt32
-SDK queries. The optional sibling RHI `ray-tracing-intrinsics-hit-identities.cuda` test checks two
-instances, distinct custom IDs, primitive indices 0/1/2, one miss and all 30 words at NVVM O0/O3;
-NVRTC controls use the same independent host oracle. The original RHI triangle test also passes.
+PrimitiveIndex, InstanceIndex, InstanceID and HitKind are qualified in closest-hit through exact
+UInt32 SDK queries. RayFlags is qualified in miss/closest-hit. The optional sibling RHI `ray-tracing-intrinsics-hit-identities.cuda` test checks two
+instances, distinct custom IDs, primitive indices 0/1/2, one miss and all 44 words at NVVM O0/O3;
+NVRTC controls use the same independent host oracle. Both triangle windings and incoming flags 0/1
+are checked, including nonzero flags in miss. The original RHI triangle test also passes.
 These application tests use RHI's actual-device target policy, separate from the SM80 fixtures above.
-Compute, raygen and miss calls to raw identity helpers reject before provider module creation.
+Compute/raygen calls to ray state and compute/raygen/miss calls to hit-only helpers reject before
+provider module creation.
 See [the optional application workflow](../../issue-nvvm-backend/RESULTS.md#optional-slang-rhi-cuda-suite)
 for commands and compiler-selector scope; this does not qualify the full RHI CUDA suite.
 

@@ -21643,6 +21643,16 @@ float RayTCurrent()
     }
 }
 
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixRayFlags()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_ray_flags";
+    }
+}
+
 /// Returns the flags used when tracing the current ray.
 /// @return Combination of RAY_FLAG values used for this ray
 /// @remarks Allows shaders to modify behavior based on ray trace flags
@@ -21654,6 +21664,7 @@ uint RayFlags()
     {
     case hlsl:  __intrinsic_asm "RayFlags";
     case glsl: __intrinsic_asm "(gl_IncomingRayFlagsEXT)";
+    case nvvm: return __nvvmOptixRayFlags();
     case cuda: __intrinsic_asm "optixGetRayFlags";
     case spirv:
         return spirv_asm
@@ -22065,6 +22076,17 @@ bool IsLssHit()
 [NonUniformReturn] float3x4 WorldToObject() { return WorldToObject3x4(); }
 
 // 10.4.4 - Hit Specific System values
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixHitKind()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_hit_kind";
+    }
+}
+
 /// Returns the type of intersection that was found.
 /// @return Hit kind value (HIT_KIND_TRIANGLE_FRONT_FACE, HIT_KIND_TRIANGLE_BACK_FACE, or custom value)
 /// @remarks Available in any-hit and closest-hit shaders
@@ -22077,6 +22099,7 @@ uint HitKind()
     {
     case hlsl:  __intrinsic_asm "HitKind";
     case glsl: __intrinsic_asm "(gl_HitKindEXT)";
+    case nvvm: return __nvvmOptixHitKind();
     case cuda:  __intrinsic_asm "optixGetHitKind";
     case spirv:
         return spirv_asm

@@ -174,7 +174,8 @@ Qualify the setup with a bounded selection in separate processes:
 
 The focused `ray-tracing-intrinsics-hit-identities.cuda` case uses two instances with distinct custom
 IDs and three primitives each. It runs O0 and O3 internally through the shared compiler selector,
-checking six hits, one miss and all 30 output words. Pair it with
+checking six hits, one miss and all 44 output words, including both triangle faces and alternating
+ray flags. Pair it with
 `ray-tracing-triangle-intersection.cuda` when changing typed hit queries or conventional globals:
 
 ```bash

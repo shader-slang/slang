@@ -134,7 +134,9 @@ in miss/closest-hit. Core composes the vector queries; the provider uses Float32
 Direction retains the traced value without normalization. Current distance is the closest-hit
 distance or the original maximum in miss. Queries retain their observation position; the trace
 operation owns the callback memory clobber. Primitive index, instance index and custom instance ID
-use three exact nullary UInt32 SDK queries in closest-hit only. The instance index identifies the
+use three exact nullary UInt32 SDK queries in closest-hit only. HitKind uses the same scalar
+transport and hit-only stage policy. RayFlags is UInt32 ray state available in miss/closest-hit
+and preserves the incoming trace flags. The instance index identifies the
 entry in the instance acceleration structure; the custom ID comes from its host descriptor. Miss
 has ray state but no hit identity. This stage policy also applies to indirect helper calls.
 Unknown names, wrong signatures and invalid insertion points fail before emission. Missing trace

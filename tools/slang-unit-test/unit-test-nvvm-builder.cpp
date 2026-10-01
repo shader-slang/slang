@@ -24,6 +24,8 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
         {"_optix_read_primitive_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_instance_idx", NVVMSemantics::kUnsignedI32},
         {"_optix_read_instance_id", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_ray_flags", NVVMSemantics::kUnsignedI32},
+        {"_optix_get_hit_kind", NVVMSemantics::kUnsignedI32},
         {"_optix_get_world_ray_origin_x", NVVMSemantics::kFloat32},
         {"_optix_get_world_ray_origin_y", NVVMSemantics::kFloat32},
         {"_optix_get_world_ray_origin_z", NVVMSemantics::kFloat32},

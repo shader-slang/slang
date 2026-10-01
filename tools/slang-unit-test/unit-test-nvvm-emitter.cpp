@@ -38,27 +38,35 @@ SLANG_UNIT_TEST(nvvmSlangOptixPrimitivesRejectComputeBeforeEmission)
 // backend's complete reachable-closure check before provider module creation.
 SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
 {
+    enum class QueryStage
+    {
+        RayCallback,
+        ClosestHit
+    };
     const struct
     {
         const char* name;
-        bool hitIdentity;
+        const char* resultType;
+        QueryStage allowedStage;
     } queries[] = {
-        {"_optix_get_world_ray_origin_x", false},
-        {"_optix_get_world_ray_origin_y", false},
-        {"_optix_get_world_ray_origin_z", false},
-        {"_optix_get_world_ray_direction_x", false},
-        {"_optix_get_world_ray_direction_y", false},
-        {"_optix_get_world_ray_direction_z", false},
-        {"_optix_get_ray_tmin", false},
-        {"_optix_get_ray_tmax", false},
-        {"_optix_read_primitive_idx", true},
-        {"_optix_read_instance_idx", true},
-        {"_optix_read_instance_id", true},
+        {"_optix_get_world_ray_origin_x", "float", QueryStage::RayCallback},
+        {"_optix_get_world_ray_origin_y", "float", QueryStage::RayCallback},
+        {"_optix_get_world_ray_origin_z", "float", QueryStage::RayCallback},
+        {"_optix_get_world_ray_direction_x", "float", QueryStage::RayCallback},
+        {"_optix_get_world_ray_direction_y", "float", QueryStage::RayCallback},
+        {"_optix_get_world_ray_direction_z", "float", QueryStage::RayCallback},
+        {"_optix_get_ray_tmin", "float", QueryStage::RayCallback},
+        {"_optix_get_ray_tmax", "float", QueryStage::RayCallback},
+        {"_optix_read_primitive_idx", "uint", QueryStage::ClosestHit},
+        {"_optix_read_instance_idx", "uint", QueryStage::ClosestHit},
+        {"_optix_read_instance_id", "uint", QueryStage::ClosestHit},
+        {"_optix_get_ray_flags", "uint", QueryStage::RayCallback},
+        {"_optix_get_hit_kind", "uint", QueryStage::ClosestHit},
     };
     for (const auto& query : queries)
         for (SlangStage stage : {SLANG_STAGE_COMPUTE, SLANG_STAGE_RAY_GENERATION, SLANG_STAGE_MISS})
         {
-            if (stage == SLANG_STAGE_MISS && !query.hitIdentity)
+            if (stage == SLANG_STAGE_MISS && query.allowedStage == QueryStage::RayCallback)
                 continue;
             _resetDirectNVVMFakes();
             ComPtr<slang::IGlobalSession> globalSession;
@@ -84,7 +92,7 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
             SLANG_CHECK_ABORT(
                 SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
             StringBuilder source;
-            const char* type = query.hitIdentity ? "uint" : "float";
+            const char* type = query.resultType;
             const char* entryAttribute = stage == SLANG_STAGE_COMPUTE ? "[numthreads(1,1,1)] "
                                          : stage == SLANG_STAGE_RAY_GENERATION
                                              ? "[shader(\"raygeneration\")] "

@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-six feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 72 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Twenty-seven feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 73 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -209,8 +209,19 @@ A provider test's substring collision between instance_id and instance_idx requi
 call-token matching; the initial failure and focused retry remain recorded. The retry, existing
 raygen runtime and all 15 smoke cells pass (smoke 21.82s). No ABI/version change.
 
-**Next work:** use a bounded selection of existing RHI ray-tracing cases to choose the next
-application-relevant gap. Continue exact typed primitives and existing checked representations;
-keep custom IDs distinct from instance ordinals and preserve stage restrictions. The working
-cadence restarted at the repaired checkpoint; two implementation iterations have since passed.
-The optional full RHI suite remains on demand and the prior full baseline retains its identity.
+The next eight-case RHI probe passed six existing ray-state/identity cases and rejected HitKind
+and RayFlags. Both now use typed UInt32 queries: HitKind in closest-hit, RayFlags in miss/closest-hit.
+All nine final selected RHI cases pass (387 assertions), including the expanded two-instance oracle
+at NVVM O0/O3. It checks all 44 words, both triangle faces and flags 0/1, including nonzero flags
+in miss; the before-compiler NVRTC control passes the same oracle. The earlier 30-word identity
+qualification retains its original source/binary identity. Both affected compiler units and all
+15 smoke cells pass (22.05s). No storage or ABI expansion was needed.
+
+**Next work:** investigate a bounded any-hit path using existing RHI object-ray and traversal-control
+cases. Establish payload writeback before terminating callbacks in the shared legalization pass;
+name admission alone is insufficient. Read-only probes in `build/nvvm-anyhit-probe` show direct
+payload writes before termination removed by early redundancy elimination, in both NVVM IR and
+CUDA source. No any-hit implementation is accepted yet. Preserve nested/conditional semantics and explicit
+rejection of unsupported stages. The working cadence restarted at the repaired checkpoint; three
+implementation iterations have since passed. The optional full RHI suite remains on demand and
+the prior full baseline retains its identity.
