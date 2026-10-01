@@ -716,6 +716,13 @@ void applySettingsToDiagnosticSink(
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
+    // Preserve a previously applied format when this option set does not specify one.
+    if (options.hasOption(CompilerOptionName::DiagnosticFormat))
+    {
+        targetSink->setDiagnosticFormat(
+            (SlangDiagnosticFormat)options.getIntOption(CompilerOptionName::DiagnosticFormat));
+    }
+
     // Handle diagnostic color setting.
     // A sink may have settings applied from several option sets in sequence (e.g. a linkage option
     // set followed by a component-type option set). Only apply the color mode when this set

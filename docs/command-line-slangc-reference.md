@@ -1032,6 +1032,14 @@ Enable experimental rich diagnostics with enhanced formatting and details
 Enable machine-readable diagnostic output in tab-separated format 
 
 
+<a id="diagnostic-format"></a>
+### -diagnostic-format
+
+**-diagnostic-format &lt;default|vs&gt;**
+
+Select diagnostic formatting. 'default' preserves normal output; 'vs' uses Visual Studio headers and uncolored, indented source details. Machine-readable diagnostics take precedence.
+
+
 <a id="diagnostic-color"></a>
 ### -diagnostic-color
 

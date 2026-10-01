@@ -139,14 +139,20 @@ public:
         : m_sourceManager(sm)
         , m_lexer(sll)
         , m_options(opts)
-        , m_glyphs(opts.enableUnicode ? s_unicodeGlyphs : s_asciiGlyphs)
+        , m_glyphs(
+              (opts.enableUnicode && opts.format != SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO)
+                  ? s_unicodeGlyphs
+                  : s_asciiGlyphs)
     {
     }
 
     String render(const GenericDiagnostic& diag)
     {
         DiagnosticLayout layout = createLayout(diag);
-        return renderFromLayout(layout);
+        if (m_options.format == SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO)
+            return renderVisualStudio(layout);
+        else
+            return renderFromLayout(layout);
     }
 
 private:
@@ -279,7 +285,9 @@ private:
     // Introduce and reset a terminal color
     String color(TerminalColor c, const String& text) const
     {
-        if (!m_options.enableTerminalColors)
+        const bool useTerminalColors = m_options.enableTerminalColors &&
+                                       m_options.format != SLANG_DIAGNOSTIC_FORMAT_VISUAL_STUDIO;
+        if (!useTerminalColors)
             return text;
         const char* code = "";
         switch (c)
@@ -788,6 +796,84 @@ private:
         {
             ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
         }
+    }
+
+    // Emit a header that Visual Studio can parse, followed by indented continuation lines.
+    // For example, an undefined name starts with "shader.slang(3,5): error E30015: ...".
+    // Locations omit whitespace so VS Code's Microsoft compiler matcher can also parse them.
+    // Command-line and locationless diagnostics have no navigable source position.
+    void renderVisualStudioHeader(
+        StringBuilder& ss,
+        const DiagnosticLayout::Location& loc,
+        const String& severity,
+        Int64 code,
+        const String& message)
+    {
+        if (loc.fileName.getLength())
+        {
+            ss << loc.fileName;
+            if (loc.line > 0 && loc.pathType != PathInfo::Type::CommandLine)
+                ss << "(" << loc.line << "," << loc.col << ")";
+            ss << ": ";
+        }
+        ss << severity;
+        if (code >= 0)
+        {
+            String codeStr(code);
+            ss << " E" << repeat('0', 5 - codeStr.getLength()) << codeStr;
+        }
+        ss << ": ";
+        bool firstLine = true;
+        for (auto line : LineParser(message.getUnownedSlice()))
+        {
+            if (!firstLine)
+                ss << "    ";
+            ss << line << "\n";
+            firstLine = false;
+        }
+    }
+
+    // Reuse the source and span layout, indenting every line so source text and multiline
+    // labels cannot be mistaken for a new diagnostic by Visual Studio.
+    void renderVisualStudioSection(StringBuilder& ss, const SectionLayout& section)
+    {
+        if (!section.blocks.getCount())
+            return;
+        StringBuilder body;
+        if (sectionHasSourceAvailable(section))
+            renderSectionBody(body, section);
+        else
+        {
+            for (const auto& block : section.blocks)
+                for (const auto& line : block.lines)
+                    for (const auto& span : line.spans)
+                        if (span.label.getLength())
+                            body << span.label << "\n";
+        }
+        for (auto line : LineParser(body.getUnownedSlice()))
+        {
+            if (line.getLength())
+                ss << "    " << line << "\n";
+        }
+    }
+
+    // Keep the structured diagnostic's notes and secondary spans in the VS presentation.
+    String renderVisualStudio(const DiagnosticLayout& layout)
+    {
+        StringBuilder ss;
+        renderVisualStudioHeader(
+            ss,
+            layout.primaryLoc,
+            layout.header.severity,
+            layout.header.code,
+            layout.header.message);
+        renderVisualStudioSection(ss, layout.primarySection);
+        for (const auto& note : layout.notes)
+        {
+            renderVisualStudioHeader(ss, note.loc, "note", -1, note.message);
+            renderVisualStudioSection(ss, note.section);
+        }
+        return ss.produceString();
     }
 
     String renderFromLayout(const DiagnosticLayout& layout)
