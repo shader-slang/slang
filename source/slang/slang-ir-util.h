@@ -590,6 +590,10 @@ IRType* replaceVectorElementType(IRType* originalVectorType, IRType* t);
 
 IRParam* getParamAt(IRBlock* block, UIndex ii);
 
+/// Selects quad or linear compute derivatives, honoring explicit entry-point attributes.
+/// Without an attribute, only a literal numthreads Y extent of 1 selects linear grouping.
+bool shouldUseQuadDerivativeGroup(IRFunc* entryPoint);
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
