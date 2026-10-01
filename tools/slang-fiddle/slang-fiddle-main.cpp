@@ -4,6 +4,7 @@
 #include "slang-fiddle-diagnostics.h"
 #include "slang-fiddle-options.h"
 #include "slang-fiddle-scrape.h"
+#include "slang-fiddle-script.h"
 #include "slang-fiddle-template.h"
 
 #if 0
@@ -332,6 +333,48 @@ public:
 
     void checkModule() { fiddle::checkModule(this->logicalModule, &sink); }
 
+    void executeTestGenMode()
+    {
+        if (options.inputPaths.getCount() == 0)
+        {
+            sink.diagnose(SourceLoc(), fiddle::Diagnostics::couldNotReadInputFile, "");
+            return;
+        }
+
+        fiddle::setTestGenMode(true);
+        fiddle::setTestGenOutputDir(options.outputPathPrefix);
+
+        for (auto inputPath : options.inputPaths)
+        {
+            processTestGenInputFile(inputPath);
+            if (sink.getErrorCount())
+                return;
+        }
+    }
+
+    void processTestGenInputFile(String const& inputPath)
+    {
+        String inputText;
+        if (SLANG_FAILED(File::readAllText(inputPath, inputText)))
+        {
+            sink.diagnose(SourceLoc(), fiddle::Diagnostics::couldNotReadInputFile, inputPath);
+            return;
+        }
+
+        PathInfo inputPathInfo = PathInfo::makeFromString(inputPath);
+        SourceFile* inputSourceFile =
+            sourceManager.createSourceFileWithString(inputPathInfo, inputText);
+        SourceView* inputSourceView =
+            sourceManager.createSourceView(inputSourceFile, nullptr, SourceLoc());
+
+        RefPtr<TextTemplateFile> textTemplateFile = parseTextTemplate(inputSourceView);
+        if (!textTemplateFile || sink.getErrorCount())
+            return;
+
+        StringBuilder dummyBuilder;
+        generateTextTemplateOutputs(inputPath, textTemplateFile, dummyBuilder, &sink);
+    }
+
     void execute(int argc, char const* const* argv)
     {
         // We start by parsing any command-line options
@@ -340,6 +383,13 @@ public:
         options.parse(sink, argc, argv);
         if (sink.getErrorCount())
             return;
+
+        // Check if we're in test generation mode
+        if (options.fiddleMode == FiddleMode::TestGen)
+        {
+            executeTestGenMode();
+            return;
+        }
 
         // All of the code that get scraped will be
         // organized into a single logical module,
