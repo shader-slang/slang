@@ -555,9 +555,9 @@ extern "C"
         SlangNVVMNamedIntrinsicOperandKind kind;
     } SlangNVVMNamedIntrinsicOperandDesc;
 
-    /** An exact LLVM registry or admitted device-library name and its checked Slang signature. All
-       pointers are borrowed for the synchronous call. Emission returns a null value handle for void
-       calls. */
+    /** An exact LLVM registry, admitted SDK primitive or device-library name and checked signature.
+       All pointers are borrowed for the synchronous call. Emission returns a null value handle for
+       void calls. */
     typedef struct SlangNVVMNamedIntrinsicDesc
     {
         const char* name;

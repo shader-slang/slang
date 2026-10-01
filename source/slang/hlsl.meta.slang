@@ -21344,6 +21344,66 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixLaunchIndexX()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_launch_index_x";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixLaunchIndexY()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_launch_index_y";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixLaunchIndexZ()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_launch_index_z";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixLaunchDimensionX()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_launch_dimension_x";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixLaunchDimensionY()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_launch_dimension_y";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixLaunchDimensionZ()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_get_launch_dimension_z";
+    }
+}
+
 /// Returns the current ray dispatch coordinates.
 /// @return 3D index of the current ray being processed
 /// @remarks Available in all ray tracing shader stages
@@ -21356,6 +21416,7 @@ uint3 DispatchRaysIndex()
     {
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
     case glsl: __intrinsic_asm "(gl_LaunchIDEXT)";
+    case nvvm: return uint3(__nvvmOptixLaunchIndexX(), __nvvmOptixLaunchIndexY(), __nvvmOptixLaunchIndexZ());
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
     case spirv:
         return spirv_asm
@@ -21376,6 +21437,7 @@ uint3 DispatchRaysDimensions()
     {
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case glsl: __intrinsic_asm "(gl_LaunchSizeEXT)";
+    case nvvm: return uint3(__nvvmOptixLaunchDimensionX(), __nvvmOptixLaunchDimensionY(), __nvvmOptixLaunchDimensionZ());
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
     case spirv:
         return spirv_asm

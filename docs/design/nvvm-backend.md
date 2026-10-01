@@ -81,6 +81,7 @@ selected named interfaces, and the few primitives that require a provider implem
 | Canonical arithmetic, conversions, memory, atomics and resource IR | Compiler admission and typed provider descriptors                                        |
 | Named `llvm.*` calls                                               | Explicit admitted intrinsic families; LLVM registry signatures, overloads and attributes |
 | Named `__nv_*` calls                                               | Exact definitions in the selected immutable libdevice snapshot                           |
+| Named `_optix_*` calls                                             | Exact admitted SDK primitive signatures, constrained by the entry stage                  |
 | Qualified primitive PTX                                            | Explicit provider recipe, target requirement and focused tests                           |
 
 For example, `__intrinsic_asm "llvm.ctlz", value, false;` carries both checked operands in IR.
@@ -98,6 +99,27 @@ Compiler preflight requires qualified writable local numeric pointers; the provi
 typed AS0 pointer mapping for query and emission. LLVM registry calls do not inherit this role.
 The [compute/value ledger](nvvm-backend-capability-ledger.md#compute-values-and-memory) records the
 supported public operations, widths and pointer-output qualifications.
+
+### OptiX entry and binding ownership
+
+Ray-generation entries reuse the shared OptiX uniform-collection pass. That producer moves entry
+uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`; it leaves compute parameters
+unchanged. NVVM preflight accepts a void, parameterless raygen entry after this lowering and owns its
+`__raygen__` symbol prefix. Conventional globals retain the existing `SLANG_globalParams` launch
+parameter representation. Stage admission is explicit; accepting raygen does not admit trace or
+hit-stage operations.
+
+The core module composes launch index and dimensions from six scalar UInt32 SDK calls. The provider
+admits exactly those zero-argument signatures and the UInt64 SBT-address call, then emits the SDK's
+primitive PTX calls. Calls retain their observation position without a memory clobber or fence.
+Unknown names, wrong signatures and invalid insertion points fail before emission. This is a finite
+typed SDK interface, not an arbitrary external-call escape or CUDA text recognizer.
+
+Only canonical `GetOptiXSbtDataPtr` owns conversion of the SDK address to its validated constant-buffer
+representation. Its checked plan selects the primitive; existing field/layout and load lowering
+consume the resulting pointer. This does not admit integer-derived public pointer roots. Shader
+record fields are readonly to shader stores, but their loads are not invariant: the host may change
+the SBT between launches. The shared immutable-location policy remains the owner of that distinction.
 
 `resolveValueOperationFamily` is the single admission/diagnostic authority for numeric operation
 descriptors. Its exact catalog retains five hardware-wave signatures: active mask, ballot and

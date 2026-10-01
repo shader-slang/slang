@@ -3,6 +3,113 @@
 #include "unit-test-nvvm-library-signature-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
+SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    const char* names[] = {
+        "_optix_get_launch_index_x",
+        "_optix_get_launch_index_y",
+        "_optix_get_launch_index_z",
+        "_optix_get_launch_dimension_x",
+        "_optix_get_launch_dimension_y",
+        "_optix_get_launch_dimension_z",
+        "_optix_get_sbt_data_ptr_64"};
+    String control[2];
+    for (bool reject : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createModule(toSlice("optix-primitives"), scope.module)));
+        SlangNVVMTypeHandle voidType = nullptr, functionType = nullptr;
+        SlangNVVMValueHandle function = nullptr;
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, nullptr, 0, functionType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("__raygen__test"),
+            function)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        for (Index i = 0; i < SLANG_COUNT_OF(names); ++i)
+        {
+            const SlangNVVMNamedIntrinsicDesc desc = {
+                names[i],
+                strlen(names[i]),
+                i == 6 ? NVVMSemantics::kUnsignedI64 : NVVMSemantics::kUnsignedI32,
+                nullptr,
+                0};
+            SLANG_CHECK(builder.supportsNamedIntrinsic(desc));
+            if (reject)
+            {
+                for (int mismatch = 0; mismatch < 4; ++mismatch)
+                {
+                    auto invalid = desc;
+                    SlangNVVMNamedIntrinsicOperandDesc operand = {};
+                    operand.kind = SLANG_NVVM_NAMED_INTRINSIC_OPERAND_VALUE;
+                    operand.type = NVVMSemantics::kUnsignedI32;
+                    if (mismatch == 0)
+                        invalid.resultType.bitWidth = i == 6 ? 32 : 64;
+                    if (mismatch == 1)
+                        invalid.resultType.kind = SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+                    if (mismatch == 2)
+                    {
+                        invalid.name = "_optix_unknown";
+                        invalid.nameSize = strlen(invalid.name);
+                    }
+                    if (mismatch == 3)
+                    {
+                        invalid.operands = &operand;
+                        invalid.operandCount = 1;
+                    }
+                    SLANG_CHECK(!builder.supportsNamedIntrinsic(invalid));
+                    SlangNVVMValueHandle rejected = function;
+                    SLANG_CHECK(SLANG_FAILED(
+                        builder.emitNamedIntrinsic(scope.module, invalid, nullptr, 0, rejected)));
+                    SLANG_CHECK(rejected == nullptr);
+                }
+            }
+            SlangNVVMValueHandle value = nullptr;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.emitNamedIntrinsic(scope.module, desc, nullptr, 0, value)));
+            SLANG_CHECK(value != nullptr);
+        }
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.markFunctionAsKernel(scope.module, function)));
+        const SlangNVVMSerializationFormat formats[] = {
+            SLANG_NVVM_SERIALIZATION_FORMAT_ASSEMBLY,
+            SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY};
+        for (Index i = 0; i < 2; ++i)
+        {
+            ComPtr<ISlangBlob> blob;
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(builder.serializeModule(scope.module, formats[i], blob)));
+            const String text = _getBlobText(blob);
+            for (auto name : names)
+                SLANG_CHECK(
+                    _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(name)) == 1);
+            SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), toSlice("asm sideeffect")) == 7);
+            SLANG_CHECK(text.contains("=l"));
+            SLANG_CHECK(text.contains("=r"));
+            if (reject)
+            {
+                SLANG_CHECK(text == control[i]);
+            }
+            else
+            {
+                control[i] = text;
+            }
+        }
+    }
+}
+
 SLANG_UNIT_TEST(nvvmIRBuilderCoherentMemoryPreservesScopesAndRejectsWithoutMutation)
 {
     NVVMIRBuilder builder;

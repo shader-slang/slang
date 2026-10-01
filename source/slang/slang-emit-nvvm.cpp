@@ -3045,7 +3045,8 @@ bool _getNVVMNamedIntrinsicDesc(
 {
     outPlan = {};
     outPlan.isDeviceLibraryFunction = genericAsm->getAsm().startsWith(toSlice("__nv_"));
-    if ((!outPlan.isDeviceLibraryFunction && !genericAsm->getAsm().startsWith(toSlice("llvm."))) ||
+    if ((!outPlan.isDeviceLibraryFunction && !genericAsm->getAsm().startsWith(toSlice("llvm.")) &&
+         !genericAsm->getAsm().startsWith(toSlice("_optix_"))) ||
         !_isCanonicalNVVMIntrinsicValueHelper(genericAsm, function) ||
         !_getNVVMSemanticType(function->getResultType(), outPlan.resultType))
         return false;
@@ -4947,22 +4948,25 @@ SlangResult _validateBranchArguments(
 }
 
 // Returns the LLVM symbol chosen from the canonical linked IR for an accepted function.
-UnownedStringSlice _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
+String _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
 {
     if (function == entryPoint)
     {
         auto entryPointDecoration = function->findDecoration<IREntryPointDecoration>();
         SLANG_RELEASE_ASSERT(entryPointDecoration);
-        return entryPointDecoration->getName()->getStringSlice();
+        String name(entryPointDecoration->getName()->getStringSlice());
+        if (entryPointDecoration->getProfile().getStage() == Stage::RayGeneration)
+            return String("__raygen__") + name;
+        return name;
     }
     if (auto exportDecoration = function->findDecorationImpl(kIROp_CudaDeviceExportDecoration))
     {
         SLANG_RELEASE_ASSERT(exportDecoration->getOperandCount() == 1);
         auto exportName = as<IRStringLit>(exportDecoration->getOperand(0));
         SLANG_RELEASE_ASSERT(exportName);
-        return exportName->getStringSlice();
+        return String(exportName->getStringSlice());
     }
-    return getMangledName(function);
+    return String(getMangledName(function));
 }
 
 // Returns whether a type is an accepted canonical value in a helper result.
@@ -5454,7 +5458,7 @@ SlangResult _collectNVVMFunctionNames(
     HashSet<String> names;
     for (auto function : functions)
     {
-        UnownedStringSlice name = _getNVVMFunctionName(function, entryPoint);
+        String name = _getNVVMFunctionName(function, entryPoint);
         if (name.getLength() && !names.add(String(name)))
         {
             StringBuilder construct;
@@ -5483,7 +5487,7 @@ SlangResult _collectNVVMFunctionNames(
     Index anonymousIndex = 0;
     for (auto function : functions)
     {
-        UnownedStringSlice canonicalName = _getNVVMFunctionName(function, entryPoint);
+        String canonicalName = _getNVVMFunctionName(function, entryPoint);
         if (canonicalName.getLength())
         {
             outFunctionNames.add(String(canonicalName));
@@ -6235,6 +6239,28 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_GetOptiXSbtDataPtr:
+                {
+                    IRType* storageType = nullptr;
+                    if (entryPoint->findDecoration<IREntryPointDecoration>()
+                                ->getProfile()
+                                .getStage() != Stage::RayGeneration ||
+                        inst->getOperandCount() || !as<IRConstantBufferType>(inst->getDataType()) ||
+                        !asNVVMSupportedParameterGroupType(inst->getDataType(), &storageType) ||
+                        !_hasNVVMCompatibleAggregateStorageLayout(
+                            codeGenContext,
+                            storageType,
+                            nullptr,
+                            true))
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("OptiX SBT pointer"));
+                    NVVMPlannedNamedIntrinsic primitive;
+                    primitive.source = inst;
+                    primitive.name = "_optix_get_sbt_data_ptr_64";
+                    primitive.resultType = NVVMSemantics::kUnsignedI64;
+                    requirements.emissionPlan.namedIntrinsics.add(_Move(primitive));
+                }
+                break;
+
             case kIROp_Load:
                 break;
 
@@ -6543,6 +6569,13 @@ SlangResult _validateNVVMFunction(
                     NVVMPlannedNamedIntrinsic namedIntrinsic;
                     if (_getNVVMNamedIntrinsicDesc(genericAsm, function, namedIntrinsic))
                     {
+                        if (namedIntrinsic.name.startsWith(toSlice("_optix_")) &&
+                            entryPoint->findDecoration<IREntryPointDecoration>()
+                                    ->getProfile()
+                                    .getStage() != Stage::RayGeneration)
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("OptiX primitive stage"));
                         requirements.requiresCUDADeviceLibrary |=
                             namedIntrinsic.isDeviceLibraryFunction;
                         requirements.emissionPlan.namedIntrinsics.add(_Move(namedIntrinsic));
@@ -6724,6 +6757,7 @@ SlangResult _validateNVVMFunction(
         {
             switch (inst->getOp())
             {
+            case kIROp_GetOptiXSbtDataPtr:
             case kIROp_Var:
                 availableValues.add(inst);
                 break;
@@ -9911,8 +9945,11 @@ SlangResult validateNVVMSupportedIR(
     auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>();
     if (!entryPointDecoration)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point decoration"));
-    if (entryPointDecoration->getProfile().getStage() != Stage::Compute)
+    const auto stage = entryPointDecoration->getProfile().getStage();
+    if (stage != Stage::Compute && stage != Stage::RayGeneration)
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point stage"));
+    if (stage == Stage::RayGeneration && entryPoint->getParamCount())
+        return _diagnoseUnsupportedIR(codeGenContext, toSlice("ray-generation entry parameters"));
     if (!entryPointDecoration->getName()->getStringSlice().getLength())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point name"));
     if (!as<IRVoidType>(entryPoint->getResultType()))
@@ -10644,6 +10681,31 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 toSlice("slangLocal"),
                                 loweredStorage)));
                         valueMap[inst] = loweredStorage;
+                    }
+                    break;
+
+                case kIROp_GetOptiXSbtDataPtr:
+                    {
+                        const auto primitive = planIndex.findNamedIntrinsic(inst);
+                        SLANG_RELEASE_ASSERT(primitive);
+                        SlangNVVMValueHandle bits = nullptr, pointer = nullptr;
+                        SlangNVVMTypeHandle type = nullptr;
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "OptiX SBT address",
+                            builder.emitNamedIntrinsic(
+                                moduleScope.module,
+                                primitive->getDesc(),
+                                nullptr,
+                                0,
+                                bits)));
+                        SLANG_RETURN_ON_FAIL(
+                            typeContext.lowerType(inst->getDataType(), NVVMTypeUse::Value, type));
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "OptiX SBT pointer",
+                            builder.emitBitCast(moduleScope.module, type, bits, pointer)));
+                        valueMap[inst] = pointer;
                     }
                     break;
 

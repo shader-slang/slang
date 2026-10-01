@@ -51,6 +51,90 @@ struct LocalRecordArrayIR
 
 } // namespace
 
+// The canonical SBT opcode is the sole new pointer producer, with ordinary load flags.
+SLANG_UNIT_TEST(nvvmOptixSbtPlansKeepStageAndTypeBoundaries)
+{
+    enum class Case
+    {
+        Valid,
+        Compute,
+        Miss,
+        InvalidType,
+        EntryParameter
+    };
+    for (auto testCase :
+         {Case::Valid, Case::Compute, Case::Miss, Case::InvalidType, Case::EntryParameter})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto record = builder.createStructType();
+        auto field =
+            builder.createStructField(record, builder.createStructKey(), builder.getUIntType());
+        auto group = builder.getConstantBufferType(record, builder.getDefaultBufferLayoutType());
+        auto entry = builder.createFunc();
+        IRType* parameter = builder.getUIntType();
+        const bool hasParameter = testCase == Case::EntryParameter;
+        entry->setFullType(builder.getFuncType(
+            hasParameter ? 1 : 0,
+            hasParameter ? &parameter : nullptr,
+            builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(
+                testCase == Case::Compute ? Stage::Compute
+                : testCase == Case::Miss  ? Stage::Miss
+                                          : Stage::RayGeneration),
+            toSlice("raygenMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        if (hasParameter)
+            builder.emitParam(parameter);
+        auto sbt = builder.emitIntrinsicInst(
+            testCase == Case::InvalidType ? parameter : group,
+            kIROp_GetOptiXSbtDataPtr,
+            0,
+            nullptr);
+        IRInst* load = nullptr;
+        if (testCase != Case::InvalidType)
+            load = builder.emitLoad(builder.emitFieldAddress(
+                builder.getPtrType(builder.getUIntType()),
+                sbt,
+                field->getKey()));
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        const auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        if ((testCase == Case::Valid) != SLANG_SUCCEEDED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        if (testCase == Case::Valid)
+        {
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+            SLANG_CHECK(requirements.emissionPlan.functionNames[0] == "__raygen__raygenMain");
+            SLANG_CHECK(requirements.emissionPlan.namedIntrinsics.getCount() == 1);
+            SLANG_CHECK(requirements.emissionPlan.namedIntrinsics[0].source == sbt);
+            SLANG_CHECK(requirements.emissionPlan.loads.getCount() == 1);
+            SLANG_CHECK(requirements.emissionPlan.loads[0].source == load);
+            SLANG_CHECK(requirements.emissionPlan.loads[0].flags == SLANG_NVVM_LOAD_FLAG_NONE);
+        }
+        else
+        {
+            SLANG_CHECK(SLANG_FAILED(result));
+            SLANG_CHECK(
+                context.sink.outputBuffer.getUnownedSlice().indexOf(toSlice("E52017")) >= 0);
+        }
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
 // Explicit-layout memory uses checked field keys and scalar payload lanes, never native record GEP.
 SLANG_UNIT_TEST(nvvmLayoutPointerFieldsKeepLayoutAndProvenance)
 {

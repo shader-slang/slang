@@ -4,6 +4,7 @@
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -3303,6 +3304,31 @@ static bool _isScalarFloat32Or64Type(const SlangNVVMValueTypeDesc& type)
            (type.bitWidth == 32 || type.bitWidth == 64);
 }
 
+// These are SDK-defined scalar PTX calls, not LLVM registry names or arbitrary externals.
+// The compiler admits them only in a ray-generation closure; the provider owns their exact ABI.
+static unsigned _getOptixIntrinsicWidth(const SlangNVVMNamedIntrinsicDesc& intrinsic)
+{
+    if (!intrinsic.name || intrinsic.operandCount ||
+        intrinsic.resultType.kind != SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER ||
+        intrinsic.resultType.laneCount != 1)
+        return 0;
+    const llvm::StringRef name(intrinsic.name, intrinsic.nameSize);
+    const char* queries[] = {
+        "_optix_get_launch_index_x",
+        "_optix_get_launch_index_y",
+        "_optix_get_launch_index_z",
+        "_optix_get_launch_dimension_x",
+        "_optix_get_launch_dimension_y",
+        "_optix_get_launch_dimension_z"};
+    unsigned width = 0;
+    for (auto query : queries)
+        if (name == query)
+            width = 32;
+    if (name == "_optix_get_sbt_data_ptr_64")
+        width = 64;
+    return intrinsic.resultType.bitWidth == width ? width : 0;
+}
+
 // Resolves a borrowed signature through LLVM's registry without creating any module state.
 // Consider `llvm.ctlz` with (i32, i1): IIT matching derives the i32 overload and LLVM's ImmArg
 // attribute requires the second operand's constant guarantee. The same path handles other
@@ -3401,6 +3427,11 @@ _isNamedIntrinsicSupported(const SlangNVVMNamedIntrinsicDesc* intrinsic, uint32_
         *outSupported = 0;
     if (!intrinsic || !outSupported || (!intrinsic->operands && intrinsic->operandCount))
         return SLANG_E_INVALID_ARG;
+    if (_getOptixIntrinsicWidth(*intrinsic))
+    {
+        *outSupported = 1;
+        return SLANG_OK;
+    }
     llvm::LLVMContext context;
     llvm::FunctionType* type = nullptr;
     llvm::SmallVector<llvm::Type*, 1> overloadTypes;
@@ -3438,6 +3469,18 @@ static SlangResult SLANG_NVVM_CALL _emitNamedIntrinsic(
     if (!intrinsic || !outValue || !block || (!intrinsic->operands && intrinsic->operandCount) ||
         (!operands && operandCount) || operandCount != intrinsic->operandCount)
         return SLANG_E_INVALID_ARG;
+    if (const unsigned width = _getOptixIntrinsicWidth(*intrinsic))
+    {
+        auto type = llvm::FunctionType::get(llvm::IntegerType::get(state->context, width), false);
+        llvm::SmallString<96> assembly("call ($0), ");
+        assembly.append(llvm::StringRef(intrinsic->name, intrinsic->nameSize));
+        assembly.append(", ();");
+        // Keep the SDK observation at its execution point without advertising a memory fence.
+        // No LLVM readnone/readonly contract is inferred for these runtime-owned calls.
+        auto primitive = llvm::InlineAsm::get(type, assembly, width == 32 ? "=r" : "=l", true);
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(state->builder.CreateCall(primitive));
+        return SLANG_OK;
+    }
     llvm::FunctionType* type = nullptr;
     llvm::SmallVector<llvm::Type*, 1> overloadTypes;
     auto id = _resolveNamedIntrinsic(state->context, *intrinsic, type, overloadTypes);

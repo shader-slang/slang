@@ -3,6 +3,37 @@
 #include "unit-test-nvvm-source-fixtures.h"
 #include "unit-test-nvvm-support.h"
 
+SLANG_UNIT_TEST(nvvmSlangOptixPrimitivesRejectComputeBeforeEmission)
+{
+    for (const char* name : {"_optix_get_launch_index_x", "_optix_get_sbt_data_ptr_64"})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << "[require(nvvm)] uint64_t primitive() { __target_switch { case nvvm: "
+                  "__intrinsic_asm \""
+               << name << "\"; } } [noinline] uint64_t indirect() { return primitive(); } "
+               << "RWStructuredBuffer<uint64_t> output; [numthreads(1,1,1)] void computeMain() { "
+                  "output[0] = indirect(); }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result =
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+        if (diagnostics)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK(SLANG_FAILED(result));
+        SLANG_CHECK(!code);
+        SLANG_CHECK(diagnostics && _getBlobText(diagnostics).contains("OptiX primitive stage"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}
+
 SLANG_UNIT_TEST(nvvmSlangCoherentMemoryUsesCheckedDescriptors)
 {
     const struct TypeCase

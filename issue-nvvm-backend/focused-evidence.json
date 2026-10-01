@@ -83642,6 +83642,160 @@
         "Exploratory completion may contain failing cells and never automatically promotes support."
       ],
       "qualification": "43 CPU contracts and15 fresh runtime cells pass. Existing full baseline and every prior focused feature remain unchanged. No full campaign or performance claim;22.16s is smoke harness wall time on the current host."
+    },
+    "nvvm-optix-raygen": {
+      "status": "accepted-focused",
+      "scope": "Direct NVVM raygen entry, six launch queries, conventional globals and canonical SBT uniforms with changed bindings across launches. Other OptiX stages/trace remain excluded.",
+      "identity": {
+        "revision": "9c17101d8208caeaee961949e52a392924a78878",
+        "patch_sha256": "46787d890f6047a3ec4698864d2d63e9895b6dbfddb87a317e3d55022e93a670",
+        "source_sha256": {
+          "source/compiler-core/slang-nvvm-ir-builder-api.h": "d6e43e8aea8846283197734651d09088e679ded6da11c32bdb9e72a7f6b0b8bd",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "c81f2987e77048c6c88e7a2e89668b7e1479d0fa0dd2ddf972b51cbfccf71d61",
+          "source/slang/hlsl.meta.slang": "a12f3c39f541641970ac7de48ca6d0048557ee70e7e96c91689d5381fbc615ac",
+          "source/slang/slang-emit-nvvm.cpp": "cec3652a515cd6d534cf639d09af2d04a245dda1e200c6e47566f0cbf6571b3c",
+          "source/slang/slang-emit.cpp": "16fff8ad5a21a130ad0eb5a0df0bf9307555a0b9dbbcf92836b376198063883c",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "91f4acdea2fa6ac9218a304c7bf5bfb7abac674740c5c9f2f0f8fdea8336ca27",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "4470aad162ab487e8e89ebe5ad71df946761a77194a399335617f756a78dd64c",
+          "tools/slang-unit-test/unit-test-optix-multiple-definition.cpp": "75f2cd4740a67e25a29474e772e846c675df8e6201e1ace6f205a4b58a9d9649",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "dac8d3ea07e3225260cfd7d439876fdcdd05b2f209dd004f0c437feb946e2b85",
+          "tests/cuda/nvvm-optix-raygen.slang": "72346f3dbb9b23f512b1adfcc3a87ee80cffcca4ba88c1bc23cb26c6f5f2fa33"
+        },
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "5e616e45760cfa17957ee5daff2f385aefa3f97d0c3db6349a900d4e89830e9f",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "a7908909666110a6de58294851d6440cb49c9059a79e6b2fddd4443c477c2dfc",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "053a3a16355d682c6a760cfbef435eca00ce576af515f20a795dc01ff9eac20c",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "9c1d41d87f8f2cd37b6f472b38ae8e0b2e308eb6116340f56938f586aede082d",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "fcfd21fdef264115a00e49eab7d6756f30d3f7a4bcf53468259c95a1e5a6f622",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "ae3125523115db4114dbee78165b9fc77e4f22fd83e4f486cf6cb6395d8af0c7",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "a0943b2c4c82771faec693c5fcc65419659e4c4ef1871a430ce9bcde18d29745",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "ea188b1d5b92c21a33077df66330a04e970c09c800deae2764c5aa6499051d5d"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "optix_library_sha256": "69be01c2e2794dbf775b9664a9c641c2db49efe5383a7a56b5f29aaa0de07fc4",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05, targetSM80",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "meaning": "Final source and actual shared artifacts. The initial focused attempt has four passes and two malformed fixture CLI failures; only those two compile cells were retried. Fixture output naming subsequently changed to ignored .actual, with the same two cells rerun. No production changes after successful build.",
+        "static_sha256": {
+          "build/nvvm-local-record-arrays/static-unit-build/RelWithDebInfo/bin/slang-static-unit-test": "329867d2c254d689a249933b006cea1ca359e13678dd14648b0f049f522676c8",
+          "build/nvvm-local-record-arrays/static-unit-build/CMakeCache.txt": "e1fd59dbfc11ebed26c6c7b67a897c0cd2c9dab033b68a37f15e1ba415a8ad4e"
+        }
+      },
+      "validation": {
+        "gates": {
+          "build-com-output": {
+            "path": "build/nvvm-optix-raygen/build-com-output.json",
+            "sha256": "998c9d0cea70043d4c8938b3f206fee5a42c143dfcfcc8031733f66c08b03e86"
+          },
+          "focused": {
+            "path": "build/nvvm-optix-raygen/focused.json",
+            "sha256": "6f74a943ae45b6caae555ab1fd871373076e1d4e8938261afdc4559e85d89519"
+          },
+          "fixture-selector": {
+            "path": "build/nvvm-optix-raygen/fixture-selector.json",
+            "sha256": "03f1a81d955ebec7fb2e2ca6f9148834758acf4191a16f3c2534e1d31a3e5e51"
+          },
+          "fixture-output": {
+            "path": "build/nvvm-optix-raygen/fixture-output.json",
+            "sha256": "97232b184fabc8dd45e11b278eda6a4289b65cd645baf5e50c0de8e39aab99d9"
+          },
+          "static-build": {
+            "path": "build/nvvm-optix-raygen/static-build.json",
+            "sha256": "c36fcbdde7c8d61b408363974477be3274b1e62ed6fc573aee95247bd552dd20"
+          },
+          "static": {
+            "path": "build/nvvm-optix-raygen/static.json",
+            "sha256": "1094d2ad794e39499991bfc925772423b1e8ef6669f4e377b4e90ec4354d453f"
+          }
+        },
+        "outcomes": {
+          "tests/pipeline/ray-tracing/raygen.slang (cuda)": "passed",
+          "slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal": "passed",
+          "slang-unit-test-tool/nvvmSlangOptixPrimitivesRejectComputeBeforeEmission.internal": "passed",
+          "slang-unit-test-tool/nvvmOptixRaygenBindings.internal": "passed",
+          "tests/cuda/nvvm-optix-raygen.slang": "passed",
+          "tests/cuda/nvvm-optix-raygen.slang.1": "passed"
+        },
+        "static_outcome": {
+          "nvvmOptixSbtPlansKeepStageAndTypeBoundaries": "passed"
+        },
+        "smoke_reuse": {
+          "feature": "nvvm-corpus-tiers",
+          "meaning": "Same production/runtime artifacts;15correct/15executed cells in22.16s. No duplicate smoke or full campaign."
+        }
+      },
+      "runtime_contract": {
+        "optimizations": ["nvvm-o0", "nvvm-o3"],
+        "launches_per_mode": 2,
+        "dimensions": [
+          [4, 3, 2],
+          [3, 2, 1]
+        ],
+        "launch_base": [100, 700],
+        "sbt_bias": [13, 31],
+        "words_checked_per_launch": 170,
+        "per_invocation": "x,y,z,width,height,depth,base+bias+linear",
+        "guards_and_untouched_tail": true,
+        "same_pipeline_and_sbt_allocation": true,
+        "oracle": "Independent fixed host layouts and values; reflection checked against those constants. OptiX validation enabled. No skips."
+      },
+      "resolved_failures": {
+        "before": {
+          "path": "build/nvvm-optix-raygen/before-raygen.json",
+          "sha256": "86de0f0cf8aeae85b5b81f1e0fd0948e886cfcc7db7fdca4783cdf08cf1e6e09"
+        },
+        "meaning": "Old compiler rejects actual raygeneration entry with E52017; now actual OptiX module/program/pipeline and four Slang-generated launches pass."
+      },
+      "validation_incidents": {
+        "gates": {
+          "abi-compile": {
+            "path": "build/nvvm-optix-raygen/abi-compile.json",
+            "sha256": "89bdbd04ca6b2de4669c4775383b0ffc92c61e2e18d9084598e7f53326a923e1"
+          },
+          "abi-runtime": {
+            "path": "build/nvvm-optix-raygen/abi-runtime.json",
+            "sha256": "145a6b3fac3b5333fe7f2d6e97a861c6e47f794cab16b2a18a431d2d5d203a28"
+          },
+          "build": {
+            "path": "build/nvvm-optix-raygen/build.json",
+            "sha256": "beab6270d7e22fd33c10e49c84fa46eb42ee6fdf77cdea11439b26676ea95b2a"
+          },
+          "focused": {
+            "path": "build/nvvm-optix-raygen/focused.json",
+            "sha256": "6f74a943ae45b6caae555ab1fd871373076e1d4e8938261afdc4559e85d89519"
+          }
+        },
+        "meaning": [
+          "Raw LLVM probe initially omitted mandatory target layout; qualified retry retained.",
+          "Raw host initially omitted validation-required dummy miss record; corrected using existing RHI convention.",
+          "New unit helper used deleted &ComPtr operator; corrected to IComponentType** +detach/writeRef before build passed.",
+          "Permanent fixture used unknown -emit-cuda-via flag; corrected to -emit-cuda-via-nvvm and only two cells retried. Literal temporary output name then replaced with ignored .actual and two cells rerun."
+        ]
+      },
+      "primitive_probe": {
+        "gates": {
+          "abi-compile-layout": {
+            "path": "build/nvvm-optix-raygen/abi-compile-layout.json",
+            "sha256": "8f13f8d1a797beb16693cd7bf9bd5fe058086b0997cce4c734681cbb742733bb"
+          },
+          "abi-runtime-miss": {
+            "path": "build/nvvm-optix-raygen/abi-runtime-miss.json",
+            "sha256": "dfcd9c6ad4369b0a90c8a4ac76448218cc848403c55e5554ad1cfe767d1d7511"
+          }
+        },
+        "meaning": "Seven SDK primitive/entry/binding ABI qualified independently before production implementation; raw probe does not establish broader OptiX support."
+      },
+      "qualification": "CUDA12.9/OptiX SDK9, LLVM14, targetSM80, L4/driver595.71.05. Exact provider signatures and paired rejection/no-mutation; compiler compute-stage rejection; static SBT layout/stage/load flags; O0/O3 actual raygen execution. Existing common invalid-insertion guard reviewed, not claimed as a new OptiX-specific test. Module43/ABI46/container2 unchanged. No triangle/payload/material/performance/full-suite claim."
     }
   }
 }

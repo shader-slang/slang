@@ -1424,7 +1424,14 @@ Result linkAndOptimizeIR(
     // The direct NVVM emitter consumes the CUDA kernel signature itself. Collecting uniform
     // parameters would replace that signature with a synthetic parameter block intended for
     // shader-style emitters.
-    if (!emitNVVMDirectly)
+    if (emitNVVMDirectly)
+    {
+        // Ray-generation uniforms use the existing OptiX SBT producer. This pass leaves
+        // compute entry parameters unchanged, preserving the direct CUDA kernel ABI.
+        SLANG_PASS(collectOptiXEntryPointUniformParams);
+        validateIRModuleIfEnabled(codeGenContext, irModule);
+    }
+    else
     {
         CollectEntryPointUniformParamsOptions passOptions;
         passOptions.targetReq = targetRequest;
