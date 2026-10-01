@@ -2417,6 +2417,23 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
+    // Explicit Device pointer layouts are semantic even when NVVM otherwise uses CUDA defaults.
+    // Keep ordinary buffer layout selection and the CUDA source backend on their existing paths.
+    if (target->shouldEmitNVVMDirectly())
+    {
+        if (auto pointerType = as<IRPtrTypeBase>(bufferType))
+        {
+            auto layout = pointerType->getDataLayout();
+            if (pointerType->getAddressSpace() == AddressSpace::UserPointer && layout &&
+                (layout->getOp() == kIROp_ScalarBufferLayoutType ||
+                 layout->getOp() == kIROp_CBufferLayoutType))
+            {
+                return getTypeLayoutRuleNameFromOpAlways(
+                    layout->getOp(),
+                    IRTypeLayoutRuleName::Natural);
+            }
+        }
+    }
     if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
         if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))

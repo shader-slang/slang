@@ -183,6 +183,13 @@ key and qualified parent, not pointee type alone. Indexed children retain the pa
 access/storage proof. Constant-memory parameter-group loads remain ordinary loads; invariant global
 buffer recipes require their separate immutable-location contract.
 
+Explicit Scalar/C Device pointers to finite copyable records have an address-only role. Shared
+buffer-layout selection owns the layout; preflight queries its stride once and retains the entry
+root, exact pointer type and signed index in an offset plan. Emission uses global byte pointers,
+signed 64-bit scaling and non-inbounds byte offsets. Canonical `CastPtrToInt` observes the address
+as UInt64. The physical representation grants no record dereference, helper ABI, pointer storage
+or inverse integer conversion. Existing numeric pointer roles keep their own representations.
+
 Coherent pointer accesses retain canonical `MemoryScopeAttr` and `AlignedAttr` in checked load/store
 records. Naturally aligned Int/UInt32/64 use `ld/st.relaxed.gpu.global` for Device/global and
 `ld/st.relaxed.cta.shared` for Workgroup/shared. Existing address records, admitted entry pointers

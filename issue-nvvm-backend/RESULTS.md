@@ -795,6 +795,34 @@ retain them as compile/optimizer evidence, not runtime oracles. Unsupported scop
 remain rejected. Passing the groupshared seed does not resolve all coherent corpus failures. Scoped
 relaxed accesses alone do not establish execution synchronization or acquire/release of other data.
 
+## Explicit-layout pointer transport
+
+Compile the durable Scalar/C fixture at O0/O3 and retain actual-backend Std430 rejection:
+
+```bash
+build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -disable-retries \
+  slang-unit-test-tool/nvvmSlangLayoutPointersUseCheckedByteOffsets.internal \
+  slang-unit-test-tool/nvvmSlangLayoutPointersRejectOtherRolesBeforeEmission.internal \
+  tests/cuda/nvvm-layout-pointer-transport.slang \
+  tests/cuda/nvvm-layout-pointer-transport-unsupported.slang
+```
+
+The allocated-address qualification uses the identical shader body in ignored
+`build/nvvm-layout-pointer-transport/scalar-c-pointer-transport.slang` and the existing ctypes CUDA
+host pattern in `run-pointer-transport.py` in that directory. Compile strict NVVM PTX for both
+optimization modes, then pass each output with `--ptx` and a fresh JSON destination with `--output`.
+Do not use the earlier capability-bypass research outputs. Bind two independently initialized
+1024-byte allocations at interior offsets384/512 and a guarded output allocation at offset256.
+For indices-1/0/1/2, require byte strides48/40, exact base and shifted addresses, signed deltas,
+completion, every output guard and unchanged input allocations. The shader never dereferences the
+records. Dumped LLVM must sign-extend the index before scaling and use non-inbounds byte offsets.
+
+The independent oracle follows the original pointer/data-layouts fixture: Scalar field extent44
+rounds to48, while C extent39 rounds to40. CUDA C++ instead emits40 for both and fails the three
+nonzero Scalar cases; keep these exact comparison outcomes. The original three-layout corpus test
+remains unresolved because Std430 is still excluded. Its unspecified pointer bindings are not an
+allocated-address runtime oracle. Compile-only Vulkan and CUDA controls preserve their exact outputs.
+
 ## Physical surface correctness
 
 `extras/validate-nvvm-surfaces.py` owns the independent physical-storage contract. The original six fixtures under

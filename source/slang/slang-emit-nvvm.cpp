@@ -12,6 +12,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -1774,6 +1775,8 @@ void _addNVVMReachableStructTypes(
     IRType* pointerValueType = nullptr;
     if (asNVVMSupportedDeviceCopyableValuePointerType(type, &pointerValueType))
         type = pointerValueType;
+    else if (auto pointer = asNVVMSupportedLayoutTransportPointerType(type))
+        type = pointer->getValueType();
     IRType* parameterGroupElementType = nullptr;
     if (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType))
     {
@@ -5639,6 +5642,19 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
     return address;
 }
 
+// Address-only pointers can originate at an actual entry parameter or a checked offset from it.
+// A type-compatible block parameter, integer cast, or helper argument supplies no such proof.
+IRParam* _getNVVMLayoutPointerRoot(const NVVMEmissionPlan& plan, IRFunc* entryPoint, IRInst* value)
+{
+    if (!value || !asNVVMSupportedLayoutTransportPointerType(value->getDataType()))
+        return nullptr;
+    if (auto parameter = as<IRParam>(value))
+        return parameter->getParent() == entryPoint->getFirstBlock() ? parameter : nullptr;
+    if (auto offset = plan.layoutPointerOffsets.tryGetValue(value))
+        return offset->root;
+    return nullptr;
+}
+
 // Resolves a physical space from already checked producers. A default `Ptr<int>` kernel
 // parameter is global, but the same type in a helper can carry a local address. Preserve that
 // distinction; field/element records and planned pointer loads already own their source roles.
@@ -6336,9 +6352,18 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_CastPtrToInt:
+                if (inst->getOperandCount() != 1 ||
+                    inst->getDataType()->getOp() != kIROp_UInt64Type)
+                    return _diagnoseUnsupportedIR(
+                        codeGenContext,
+                        toSlice("pointer address conversion"));
+                break;
+
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
                     (!asNVVMSupportedDeviceNumericPointerType(inst->getDataType()) &&
+                     !asNVVMSupportedLayoutTransportPointerType(inst->getDataType()) &&
                      !asNVVMSupportedSharedHelperPointerType(inst->getDataType()) &&
                      !asNVVMSupportedSharedElementPointerType(inst->getDataType())))
                 {
@@ -6789,6 +6814,34 @@ SlangResult _validateNVVMFunction(
                 }
                 break;
 
+            case kIROp_CastPtrToInt:
+                {
+                    auto value = inst->getOperand(0);
+                    SlangNVVMAddressSpace space;
+                    const bool completeDevicePointer =
+                        asNVVMSupportedDeviceCopyableValuePointerType(value->getDataType()) &&
+                        _getNVVMScopedPointerSpace(
+                            requirements.emissionPlan,
+                            entryPoint,
+                            value,
+                            space) &&
+                        space == SLANG_NVVM_ADDRESS_SPACE_GLOBAL;
+                    if (!_getNVVMLayoutPointerRoot(requirements.emissionPlan, entryPoint, value) &&
+                        !completeDevicePointer)
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("pointer address producer"));
+                    SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                        codeGenContext,
+                        value,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    requirements.emissionPlan.pointerToIntegerValues[inst] = value;
+                    availableValues.add(inst);
+                }
+                break;
+
             case kIROp_BitCast:
                 {
                     const auto resourceBitCast =
@@ -7123,6 +7176,84 @@ SlangResult _validateNVVMFunction(
                 {
                     IRInst* basePointer = inst->getOperand(0);
                     IRInst* elementOffset = inst->getOperand(1);
+                    if (auto layoutPointer =
+                            asNVVMSupportedLayoutTransportPointerType(basePointer->getDataType()))
+                    {
+                        auto root = _getNVVMLayoutPointerRoot(
+                            requirements.emissionPlan,
+                            entryPoint,
+                            basePointer);
+                        if (!root || inst->getDataType() != layoutPointer)
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("layout pointer offset producer"));
+                        SLANG_RETURN_ON_FAIL(_validateAvailableValue(
+                            codeGenContext,
+                            basePointer,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        SLANG_RETURN_ON_FAIL(_validateI32Value(
+                            codeGenContext,
+                            elementOffset,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        IRSizeAndAlignment layout;
+                        auto rules = getTypeLayoutRuleForBuffer(
+                            codeGenContext->getTargetProgram(),
+                            layoutPointer);
+                        // Every signed 32-bit index times this stride fits in signed 64 bits.
+                        // Check the alignment addition before asking the layout for its stride.
+                        if (SLANG_FAILED(getSizeAndAlignment(
+                                codeGenContext->getTargetReq(),
+                                rules,
+                                layoutPointer->getValueType(),
+                                &layout)) ||
+                            layout.size <= 0 || layout.alignment <= 0 ||
+                            layout.size > INT64_MAX - (layout.alignment - 1) ||
+                            layout.getStride() <= 0 ||
+                            uint64_t(layout.getStride()) > (uint64_t(1) << 32) - 1)
+                            return _diagnoseUnsupportedIR(
+                                codeGenContext,
+                                toSlice("layout pointer stride"));
+                        NVVMPlannedLayoutPointerOffset selected;
+                        selected.base = basePointer;
+                        selected.index = elementOffset;
+                        selected.root = root;
+                        selected.resultType = layoutPointer;
+                        selected.stride = uint64_t(layout.getStride());
+                        const SlangNVVMValueTypeDesc wide = {
+                            SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER,
+                            64,
+                            1};
+                        const SlangNVVMValueTypeDesc products[] = {wide, wide};
+                        _setNVVMValueRecipeStep(
+                            selected.widenIndex,
+                            SLANG_NVVM_VALUE_OP_INTEGER_CONVERT,
+                            wide,
+                            &NVVMSemantics::kSignedI32,
+                            1,
+                            "layout pointer index extension");
+                        _setNVVMValueRecipeStep(
+                            selected.scaleIndex,
+                            SLANG_NVVM_VALUE_OP_MULTIPLY,
+                            wide,
+                            products,
+                            2,
+                            "layout pointer byte offset");
+                        _requireValueOperation(
+                            requirements.valueOperations,
+                            selected.widenIndex.getDesc(),
+                            selected.widenIndex.diagnosticName);
+                        _requireValueOperation(
+                            requirements.valueOperations,
+                            selected.scaleIndex.getDesc(),
+                            selected.scaleIndex.diagnosticName);
+                        requirements.emissionPlan.layoutPointerOffsets[inst] = selected;
+                        availableValues.add(inst);
+                        break;
+                    }
                     auto basePointerType =
                         basePointer
                             ? asNVVMSupportedDeviceNumericPointerType(basePointer->getDataType())
@@ -10563,6 +10694,37 @@ SlangResult emitNVVMIRFromLinkedIR(
                     }
                     break;
 
+                case kIROp_CastPtrToInt:
+                    {
+                        auto value =
+                            requirements.emissionPlan.pointerToIntegerValues.tryGetValue(inst);
+                        SLANG_RELEASE_ASSERT(value);
+                        SlangNVVMValueHandle loweredPointer = nullptr, loweredResult = nullptr;
+                        SlangNVVMTypeHandle integerType = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            *value,
+                            valueMap,
+                            typeContext,
+                            loweredPointer));
+                        SLANG_RETURN_ON_FAIL(typeContext.lowerType(
+                            inst->getDataType(),
+                            NVVMTypeUse::Value,
+                            integerType));
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "pointer address conversion",
+                            builder.emitBitCast(
+                                moduleScope.module,
+                                integerType,
+                                loweredPointer,
+                                loweredResult)));
+                        valueMap[inst] = loweredResult;
+                    }
+                    break;
+
                 case kIROp_BitCast:
                     {
                         const auto resourceBitCast = planIndex.findResourceBitCast(inst);
@@ -11164,6 +11326,52 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredElementOffset));
+                        if (auto selected =
+                                requirements.emissionPlan.layoutPointerOffsets.tryGetValue(inst))
+                        {
+                            SlangNVVMValueHandle widened = nullptr, stride = nullptr,
+                                                 byteOffset = nullptr, result = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                selected->widenIndex,
+                                &loweredElementOffset,
+                                1,
+                                widened));
+                            SLANG_RETURN_ON_FAIL(_getNVVMRecipeIntegerConstant(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                64,
+                                int64_t(selected->stride),
+                                stride));
+                            SlangNVVMValueHandle products[] = {widened, stride};
+                            SLANG_RETURN_ON_FAIL(_emitNVVMValueRecipeStep(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                selected->scaleIndex,
+                                products,
+                                2,
+                                byteOffset));
+                            SlangNVVMTypeHandle byteType = nullptr;
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "layout pointer byte type",
+                                builder.getIntegerType(moduleScope.module, 8, byteType)));
+                            SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                                codeGenContext,
+                                "layout pointer offset",
+                                builder.emitByteOffsetPointer(
+                                    moduleScope.module,
+                                    loweredBasePointer,
+                                    byteOffset,
+                                    byteType,
+                                    result)));
+                            valueMap[inst] = result;
+                            break;
+                        }
                         SlangNVVMValueHandle loweredPointer = nullptr;
                         SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                             codeGenContext,

@@ -586,6 +586,20 @@ IRArrayType* asNVVMSupportedCopyableArrayType(IRInst* type, uint32_t* outElement
     return arrayType;
 }
 
+IRPtrTypeBase* asNVVMSupportedLayoutTransportPointerType(IRInst* type)
+{
+    auto pointer = as<IRPtrTypeBase>(type);
+    auto layout = pointer ? pointer->getDataLayout() : nullptr;
+    if (!pointer || pointer->getOp() != kIROp_PtrType || pointer->getOperandCount() != 4 ||
+        pointer->getAccessQualifier() != AccessQualifier::ReadWrite ||
+        pointer->getAddressSpace() != AddressSpace::UserPointer || !layout ||
+        (layout->getOp() != kIROp_ScalarBufferLayoutType &&
+         layout->getOp() != kIROp_CBufferLayoutType) ||
+        !asNVVMSupportedCopyableStructType(pointer->getValueType()))
+        return nullptr;
+    return pointer;
+}
+
 IRPtrTypeBase* asNVVMSupportedDeviceCopyableValuePointerType(IRInst* type, IRType** outValueType)
 {
     if (outValueType)
@@ -2040,6 +2054,7 @@ bool isNVVMSupportedParameterType(IRInst* type)
            (asNVVMSupportedParameterGroupType(type, &parameterGroupElementType) &&
             hasNVVMParameterGroupStorageValueRepresentation(parameterGroupElementType)) ||
            asNVVMSupportedDeviceNumericPointerType(type) ||
+           asNVVMSupportedLayoutTransportPointerType(type) ||
            asNVVMSupportedDeviceArrayPointerType(type) ||
            getNVVMSupportedRawBufferType(type, rawBufferType);
 }
@@ -2438,6 +2453,9 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
                use == NVVMTypeUse::Storage;
 
+    if (layoutTransportPointer)
+        return use == NVVMTypeUse::EntryPointParameter || use == NVVMTypeUse::Value;
+
     // Scalar BF16 has a qualified i16 representation in local and helper roles only.
     // Do not add it to recursive copyable/storage predicates: that would also admit
     // unqualified vectors, aggregates, device pointers and resources.
@@ -2526,6 +2544,7 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
         asNVVMSupportedLocalPhysicalStoragePointerType(type, &info.localPhysicalStorageValueType);
     info.sharedHelperPointer =
         asNVVMSupportedSharedHelperPointerType(type, &info.sharedHelperPointerValueType);
+    info.layoutTransportPointer = asNVVMSupportedLayoutTransportPointerType(type);
     info.deviceCopyablePointer =
         asNVVMSupportedDeviceCopyableValuePointerType(type, &info.deviceCopyablePointerValueType);
     info.deviceHelperPointer =
@@ -2652,6 +2671,27 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // helper signature.
     if (!typeInfo.supports(use))
         return _reportUnsupportedType(use);
+
+    if (typeInfo.layoutTransportPointer)
+    {
+        // The pointer's semantic pointee and layout remain in IR. Address-only transport does
+        // not require an LLVM record representation or authorize memory access through it.
+        if (auto mappedType = m_typeMap.tryGetValue(type))
+        {
+            outType = *mappedType;
+            return SLANG_OK;
+        }
+        SlangNVVMTypeHandle byteType = nullptr;
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "layout pointer byte type",
+            m_builder.getIntegerType(m_module, 8, byteType)));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "layout pointer transport type",
+            m_builder
+                .getPointerType(m_module, byteType, SLANG_NVVM_ADDRESS_SPACE_GLOBAL, outType)));
+        m_typeMap[type] = outType;
+        return SLANG_OK;
+    }
 
     // CUDA's canonical layout producer defines `DescriptorHandle<T>` to have exactly the layout
     // of `T` on bindless targets. The selected handle families also carry the same SSA value as

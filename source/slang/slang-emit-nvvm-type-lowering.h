@@ -116,6 +116,10 @@ IRStructType* asNVVMSupportedPhysicalAggregateStorageStructType(IRInst* type);
 /// arrays, and nonempty structs.
 bool isNVVMSupportedCopyableValueType(IRInst* type);
 
+/// Returns a Scalar/C-layout Device record pointer for address transport without dereferencing.
+/// Entry-root and offset provenance is checked separately; helper and storage roles stay excluded.
+IRPtrTypeBase* asNVVMSupportedLayoutTransportPointerType(IRInst* type);
+
 /// Returns an exact nonempty struct in the recursive copyable-value algebra.
 IRStructType* asNVVMSupportedCopyableStructType(IRInst* type);
 
@@ -458,6 +462,7 @@ struct NVVMTypeInfo
     IRPtrTypeBase* sharedHelperPointer = nullptr;
     IRType* deviceCopyablePointerValueType = nullptr;
     IRPtrTypeBase* deviceCopyablePointer = nullptr;
+    IRPtrTypeBase* layoutTransportPointer = nullptr;
     IRType* deviceHelperPointerValueType = nullptr;
     IRPtrTypeBase* deviceHelperPointer = nullptr;
     IRStructType* devicePhysicalStorageValueType = nullptr;

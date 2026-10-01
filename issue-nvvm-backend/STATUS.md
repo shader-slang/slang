@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Eleven bounded feature batches now pass focused validation after the full checkpoint:
+Twelve bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -108,7 +108,8 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-local-record-array-borrows`, `features.nvvm-texture-float-dimensions`,
 `features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
 `features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
-`features.nvvm-half-volume-surfaces` and `features.nvvm-coherent-pointer-memory`. Eleven
+`features.nvvm-half-volume-surfaces`, `features.nvvm-coherent-pointer-memory` and
+`features.nvvm-layout-pointer-transport`. Twelve
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -123,7 +124,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; eleven feature implementations have passed focused validation since the full checkpoint.
+unchanged; twelve feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -178,12 +179,24 @@ production compiler checks were reused with exact identity. Optional interface6 
 tables unchanged. Other scope/space pairs, new pointer roles and volatile semantics remain excluded.
 Research and all attempts are under `build/nvvm-coherent-pointer-memory/`; no new full campaign.
 
-Next, investigate explicit-layout Device pointer arithmetic and transport. The existing Std430,
-Scalar and C layout test specifies byte strides64/48/40, but its uninitialized pointer inputs are not
-a new runtime oracle. First inspect canonical layout/storage IR, then qualify initialized allocated
-pointers and in-range offsets before admission. Reuse existing layout producers/utilities and retain
-role-specific dereference boundaries. The ignored bounded plan is
-`issue-nvvm-backend/plan.layout-pointer-transport.md`.
+Explicit Scalar/C layout Device record pointers now support entry transport, signed32 offsets and
+one-way UInt64 address observation. Eight allocated-address O0/O3 cases pass, with independent
+48/40-byte strides, guards and unchanged inputs. Four distinct units, four compile/negative cells
+and two existing coherent runtime controls pass. One negative used the nonexistent public Generic
+address-space name; its corrected GroupShared case passes with unchanged no-mutation assertions.
+The first attempt remains recorded. Compiler build took33 seconds with eight jobs; only the test
+plugin was rebuilt for the fixture correction.
+
+Shared layout selection owns the C physical record and Scalar stride; preflight retains the exact
+stride and entry root, and emission uses non-inbounds byte offsets. Record dereferences, helpers,
+pointer storage/reconstruction and Std430 remain excluded. CUDA C++ uses stride40 for both layouts,
+failing the three nonzero Scalar cases; retain that discrepancy rather than changing the oracle.
+CUDA source and Vulkan SPIR-V controls are byte-identical before/after. The original three-layout
+corpus test remains unresolved. Evidence is under `build/nvvm-layout-pointer-transport/`.
+
+Next, select the next bounded feature from the remaining physical surface/type contracts. Std430
+source admission, CubeArray restricted views and mip queries retain their separate research gaps.
+Continue focused reviewed batches; do not rerun the full checkpoint merely for this feature.
 
 The generic `requirePrelude` source-text boundary, graphics entry tests and hardware capability
 failures are separate from missing NVVM primitives.

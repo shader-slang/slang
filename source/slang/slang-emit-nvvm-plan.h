@@ -395,10 +395,24 @@ struct NVVMPlannedNamedIntrinsic
     }
 };
 
+/// Retains the authoritative storage stride and proven entry root for one address-only offset.
+struct NVVMPlannedLayoutPointerOffset
+{
+    IRInst* base = nullptr;
+    IRInst* index = nullptr;
+    IRParam* root = nullptr;
+    IRPtrTypeBase* resultType = nullptr;
+    uint64_t stride = 0;
+    NVVMValueRecipeStep widenIndex;
+    NVVMValueRecipeStep scaleIndex;
+};
+
 /// Owns stable module decisions produced by preflight and consumed without reclassification.
 struct NVVMEmissionPlan
 {
     NVVMAddressPlan addresses;
+    Dictionary<IRInst*, NVVMPlannedLayoutPointerOffset> layoutPointerOffsets;
+    Dictionary<IRInst*, IRInst*> pointerToIntegerValues;
     List<NVVMPlannedLocalStorage> localStorage;
     List<NVVMPlannedLoad> loads;
     List<NVVMPlannedStore> stores;
