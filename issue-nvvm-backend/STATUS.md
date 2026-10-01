@@ -83,7 +83,7 @@ The migration, ordered cleanup, native Half batch and requested full checkpoint 
 Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
 economical focused validation. No automatic full campaign follows each feature.
 
-Twelve bounded feature batches now pass focused validation after the full checkpoint:
+Thirteen bounded feature batches now pass focused validation after the full checkpoint:
 
 - UInt2 low/high word transport for selected read-only texture handles resolves the two NVVM
   `gh-6657-nonbindless-uniform` discovery cells. Three units, three runtime cells, four existing
@@ -109,7 +109,7 @@ precise reuse are in `features.nvvm-texture-descriptor-words`,
 `features.nvvm-texture-array-layer-counts`, `features.nvvm-texture-1d-array-layer-counts` and
 `features.nvvm-native-array-surfaces`, `features.nvvm-half-array-surfaces` and
 `features.nvvm-half-volume-surfaces`, `features.nvvm-coherent-pointer-memory` and
-`features.nvvm-layout-pointer-transport`. Twelve
+`features.nvvm-layout-pointer-transport` and `features.nvvm-integer-surface-formats`. Thirteen
 implementations have passed focused validation since the full run.
 
 Actual non-mip Texture2DArray layer counts now pass focused validation for int/uint/float outputs.
@@ -124,7 +124,7 @@ Non-mip Texture1DArray dimensions now also pass all three output scalar families
 existing scalar count query mapped to provider height. Three units, five runtime cells and four
 unchanged negatives pass; Slang O3 explicit full/restricted views return width/count 11/5 and 11/3.
 The eight-job incremental build took 35 seconds. Stable916 and module/ABI/container versions remain
-unchanged; twelve feature implementations have passed focused validation since the full checkpoint.
+unchanged; thirteen feature implementations have passed focused validation since the full checkpoint.
 
 Native32 1D-array surfaces now pass independent physical checks for Float32/SInt32/UInt32
 scalar, two- and four-channel loads/stores. The same provider change corrects existing 2D-array
@@ -193,6 +193,22 @@ pointer storage/reconstruction and Std430 remain excluded. CUDA C++ uses stride4
 failing the three nonzero Scalar cases; retain that discrepancy rather than changing the oracle.
 CUDA source and Vulkan SPIR-V controls are byte-identical before/after. The original three-layout
 corpus test remains unresolved. Evidence is under `build/nvvm-layout-pointer-transport/`.
+
+Explicit signed/unsigned 8/16-bit surface formats now pass for non-array 1D/2D, widths 1/2/4,
+with whole, static-component and in-range dynamic-component stores. Loads extend to matching
+32-bit shader values; stores saturate before narrowing. Twelve new NVVM O0/O3 physical cells,
+four units and four retained diagnostics pass. Two existing integer32/Half controls retain their
+six exact outcomes. All six new CUDA comparison cells still fail compilation because integer
+surface-conversion helpers are missing; no CUDA runtime equivalence is claimed.
+
+The harness now has 97 rows, preserving all 91 earlier input/oracle identities. Its CPU contracts
+and 22 report checks pass. The build initially caught a misspelled enum in a test assertion;
+correcting that token completed the eight-job build in21 seconds. Production needed no build fix.
+D3D's narrower-integer clamp contract owns this policy; Vulkan load interpretation agrees, while
+out-of-range storage-image encoding equivalence remains unqualified. Raw evidence is under
+`build/nvvm-integer-surface-formats/`. Unannotated packed bindings, normalized formats and narrow
+integer array/volume accesses retain their separate boundaries. Thirteen focused feature batches
+are now accepted since the full checkpoint.
 
 Next, select the next bounded feature from the remaining physical surface/type contracts. Std430
 source admission, CubeArray restricted views and mip queries retain their separate research gaps.

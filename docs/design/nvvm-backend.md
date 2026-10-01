@@ -367,7 +367,7 @@ Several implementation exceptions carry independent contracts:
 Surface legalization runs before shared subscript expansion discards component masks. The canonical
 collected field's static format selects physical payload types, explicit conversion and byte-X
 coordinates; equal logical types can therefore access different formats. The provider emits typed
-operations and mechanical bitcasts, not format discovery or implicit storage conversion. Component
+operations and mechanical register transport, not format discovery or implicit storage conversion. Component
 updates preserve untouched raw lanes and remain non-atomic. In-range dynamic scalar components
 select the converted replacement against each old physical lane; only the replacement is converted.
 This reuses the canonical index value and adds no out-of-range or concurrent-write guarantee.
@@ -377,6 +377,11 @@ coordinates, as required by LLVM's array-surface interface. The descriptor retai
 resource rank and array role; coordinate packing never disguises one resource shape as another.
 Non-array volumes retain `(byteX, y, z)` at the intrinsic boundary. Native Half and formatted
 Half storage reuse the same explicit conversion and bit-transport paths across these shapes.
+Explicit signed/unsigned8/16 formats in non-array1D/2D surfaces use matching-signedness32-bit
+shader values. Legalization widens loads and clamps stores to the destination range before ordinary
+integer narrowing. Exact format enums distinguish integer encodings from normalized formats with
+similar channel metadata. LLVM's raw8-bit surface calls transport16-bit registers; the provider
+truncates loads and zero-extends store bits, leaving signed interpretation to the canonical IR casts.
 Arbitrary resource-helper provenance, additional packed/normalized formats and general aliases
 remain outside the qualified boundary.
 
@@ -386,7 +391,7 @@ wrong convention can conceal corrupt neighboring writes. The [physical surface c
 uses independent host readback and preserves existing NVRTC compile/rounding failures. Half stores
 use RN-even, including subnormal/overflow boundaries; the NVRTC formatted-store truncation behavior
 is separate. [The resource ledger](nvvm-backend-capability-ledger.md#texture-surface-and-descriptor-contracts)
-owns exact shapes, native/Half format admissions and retained exclusions.
+owns exact shapes, format admissions and retained exclusions.
 
 Texture operations use canonical sample/fetch/gather/query IR with typed resources, samplers,
 coordinates and results. Existing ignored gather offsets and zero array-count outputs are not full

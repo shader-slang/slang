@@ -2549,7 +2549,9 @@ static bool _isFakeNVVMBuilderIntegerValue(SlangNVVMValueHandle value)
             return surfaceOperation.operation == SLANG_NVVM_SURFACE_OP_LOAD &&
                    (surfaceOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
                     surfaceOperation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
-                   surfaceOperation.elementType.bitWidth == 32 &&
+                   (surfaceOperation.elementType.bitWidth == 8 ||
+                    surfaceOperation.elementType.bitWidth == 16 ||
+                    surfaceOperation.elementType.bitWidth == 32) &&
                    surfaceOperation.elementType.laneCount == 1;
         }
     case FakeNVVMBuilderValueKind::PointerOffset:
@@ -2672,7 +2674,9 @@ static bool _isFakeNVVMBuilderVectorValue(
                    expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Double) &&
                       operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT;
         return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD && isExpectedKind &&
-               operation.elementType.bitWidth == expectedBitWidth &&
+               (operation.elementType.bitWidth == expectedBitWidth ||
+                (expectedElementTypeKind == FakeNVVMBuilderScalarTypeKind::Integer &&
+                 (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16))) &&
                operation.elementType.laneCount == expectedElementCount;
     }
     if (valueRef.kind == FakeNVVMBuilderValueKind::TextureOperation && valueRef.index >= 0 &&
@@ -6562,8 +6566,14 @@ static bool _isFakeNVVMSurfaceOperationSupported(const SlangNVVMSurfaceOperation
     {
         return false;
     }
-    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                              operation.elementType.bitWidth == 16);
+    const bool isNarrowInteger =
+        (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+        (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16) &&
+        !operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
+    return is32BitNumeric || isNarrowInteger ||
+           (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+            operation.elementType.bitWidth == 16);
 }
 
 static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderIsSurfaceOperationSupported(

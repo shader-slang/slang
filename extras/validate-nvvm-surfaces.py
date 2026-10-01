@@ -4,7 +4,8 @@
 """Compare physical CUDA surface bytes against independent, generated host expectations.
 
 This bounded harness uses 1D/2D Float32, Half and native integer32 storage with
-1/2/4 channels, including independently initialized mixed-format resources.
+1/2/4 channels, including independently initialized mixed-format resources and
+explicit signed/unsigned8/16 formats with logical32 values and saturating stores.
 It records failures as failures, including NVRTC component compilation and formatted
 store rounding differences. NaN conversions require class only; untouched bits are exact.
 Run --self-test for CPU oracle/ABI/reflection contracts without a compiler or GPU.
@@ -26,10 +27,11 @@ import time
 
 REPO = Path(__file__).resolve().parents[1]
 FIXTURES = ["matrix", "half-load", "half-nan", "boundaries", "integers", "mixed", "layered",
-            "half-layered", "half-volume"]
+            "half-layered", "half-volume", "integer-formats"]
 INTEGER_VALUES = [0, 0xFFFFFFFF, 0x80000000, 0x7FFFFFFF, 0x01020304, 0x89ABCDEF,
                   0xFFFFFF80, 0x00000080, 0xFFFF8000, 0x00008000, 0x55555555, 0xAAAAAAAA]
-FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4)}
+FORMATS = {"half": (0x10, 2), "float32": (0x20, 4), "int32": (0x0A, 4), "uint32": (0x03, 4),
+           "int8": (0x08, 1), "uint8": (0x01, 1), "int16": (0x09, 2), "uint16": (0x02, 2)}
 VALUES = [
     0x00000000, 0x80000000, 0x3F800000, 0xBF800000,
     0x3F800FFF, 0x3F801000, 0x3F801001, 0x3F803000,
@@ -177,6 +179,11 @@ def cases():
     for label, entry in (("whole", "wholeCopies"), ("components", "componentCopies")):
         add(f"half-3d-{label}", "half-volume", entry, 11, 5, 4, True, 3)
         rows[-1]["volume_depth"] = 3
+    for shape in (1, 2):
+        for operation, label in enumerate(("whole", "static-components", "dynamic-components")):
+            add(f"integer-format-{shape}d-{label}", "integer-formats", "exercise", 67,
+                1 if shape == 1 else 5, 4, False, shape,
+                dict(SURFACE_DIM=shape, SURFACE_OPERATION=operation))
     return rows
 
 
@@ -185,7 +192,8 @@ def resource_specs(row):
     def spec(name, storage, lanes, scalar="float32"):
         # Integer RW textures carry an inferred format even without a source annotation.
         # Reflection exposes checkVarDeclCommon's inferredFormatAttribute, so check it exactly.
-        suffix = {"half": "16f", "int32": "32i", "uint32": "32ui"}.get(storage)
+        suffix = {"half": "16f", "int32": "32i", "uint32": "32ui", "int8": "8i",
+                  "uint8": "8ui", "int16": "16i", "uint16": "16ui"}.get(storage)
         reflected_format = {1: "r", 2: "rg", 4: "rgba"}[lanes] + suffix if suffix else None
         return dict(name=name, storage=storage, lanes=lanes, scalar=scalar,
                     format=reflected_format)
@@ -206,6 +214,15 @@ def resource_specs(row):
                 for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
                 for prefix in ("source", "result")] + [
                     spec("sourceFloat", "float32", 4), spec("resultFloat", "float32", 4)]
+    if row["fixture"] == "integer-formats":
+        return [spec(prefix + family + suffix, storage if prefix == "surface" else scalar,
+                     lanes, scalar)
+                for family, storage, scalar in (("Signed8", "int8", "int32"),
+                                                ("Unsigned8", "uint8", "uint32"),
+                                                ("Signed16", "int16", "int32"),
+                                                ("Unsigned16", "uint16", "uint32"))
+                for suffix, lanes in (("R", 1), ("RG", 2), ("RGBA", 4))
+                for prefix in ("surface", "observed")]
     scalar = row.get("scalar", "float32")
     return [spec("surface", "half" if row["half"] else scalar, row["lanes"], scalar),
             spec("observed", scalar, row["lanes"], scalar)]
@@ -390,10 +407,76 @@ def half_surface_oracle(row):
     return dict(resources=resources)
 
 
+def integer_store_edges(bits, signed):
+    """Include both sides of each physical bound and the logical32 extremes."""
+    if signed:
+        low, high = -(1 << (bits - 1)), (1 << (bits - 1)) - 1
+        return [-(1 << 31), low - 1, low, low + 1, -2, -1, 0, 1,
+                2, high - 1, high, high + 1, 255, 256, 65536, (1 << 31) - 1]
+    high = (1 << bits) - 1
+    return [0, 1, 2, 127, 128, 255, 256, 32767, 32768, 65535, 65536,
+            high - 1, high, high + 1, 0x80000000, 0xFFFFFFFF]
+
+
+def narrow_integer(value, bits, signed):
+    """Clamp a logical32 mathematical integer before encoding the physical channel."""
+    low = -(1 << (bits - 1)) if signed else 0
+    high = (1 << (bits - int(signed))) - 1
+    return min(max(value, low), high) & ((1 << bits) - 1)
+
+
+def widen_integer(value, bits, signed):
+    """Extend the original physical bits independently of the shader's stores."""
+    if signed and value & (1 << (bits - 1)):
+        value -= 1 << bits
+    return value & 0xFFFFFFFF
+
+
+def integer_format_oracle(row):
+    """Observe original narrow inputs and independently predict saturated component stores."""
+    width, height = row["width"], row["height"]
+    operation = row["defines"]["SURFACE_OPERATION"]
+    resources = []
+    for resource, spec in enumerate(resource_specs(row)[::2]):
+        lanes, bits = spec["lanes"], FORMATS[spec["storage"]][1] * 8
+        signed = spec["scalar"] == "int32"
+        mask, midpoint = (1 << bits) - 1, 1 << (bits - 1)
+        pattern = [0, 1, midpoint - 1, midpoint, midpoint + 1, mask, mask - 1, 2,
+                   0x55, 0xAA, mask // 3, (mask // 3) * 2, 3, mask - 2, 7, mask - 7]
+        initial, expected, observed, output = [], [], [], []
+        active = 0
+        edges = integer_store_edges(bits, signed)
+        for y in range(height):
+            for x in range(width):
+                live = 1 <= x <= 64 and (row["shape"] == 1 or 1 <= y <= 3)
+                active += int(live)
+                for lane in range(lanes):
+                    raw = (pattern[(x + y * 7 + resource * 3 + lane * 5) % 16] if live else
+                           ((0x55 + resource * 13 + x * 3 + y * 7 + lane * 17) & mask) or 1)
+                    sentinel = 0x13579BDF ^ (resource << 16) ^ (y << 12) ^ (x << 4) ^ lane
+                    initial.append(raw)
+                    observed.append(sentinel)
+                    output.append(widen_integer(raw, bits, signed) if live else sentinel)
+                    selected = (operation == 0 or lanes == 1 or
+                                (operation == 1 and lane in ((1, 3) if lanes == 4 else (1,))) or
+                                (operation == 2 and lane == (x - 1) % lanes))
+                    edge = (x - 1) // 4 if operation == 2 else x - 1
+                    value = edges[(edge + y * 7 + resource * 3 + lane * 5) % 16]
+                    expected.append(narrow_integer(value, bits, signed) if live and selected else raw)
+        for before, after, size in ((initial, expected, bits // 8), (observed, output, 4)):
+            resources.append(dict(initial=b"".join(v.to_bytes(size, "little") for v in before),
+                                  expected=b"".join(v.to_bytes(size, "little") for v in after),
+                                  nan_positions=set(), active_texels=active,
+                                  guard_texels=width * height - active))
+    return dict(resources=resources)
+
+
 def oracle(row):
     """Generate physical inputs, expectations and the exact converted-NaN exception positions."""
     if row["fixture"] == "layered":
         return layered_oracle(row)
+    if row["fixture"] == "integer-formats":
+        return integer_format_oracle(row)
     if row["fixture"] in ("half-layered", "half-volume"):
         return half_surface_oracle(row)
     if row["fixture"] in ("integers", "mixed"):
@@ -749,7 +832,7 @@ def self_test():
                     "Reference oracle rejected")
     # Each added resource has independent storage, including source-only arrays and guard texels.
     for row in (x for x in cases() if x["fixture"] in
-                ("integers", "mixed", "layered", "half-layered", "half-volume")):
+                ("integers", "mixed", "layered", "half-layered", "half-volume", "integer-formats")):
         buffers = oracle(row)
         specs = resource_specs(row)
         for index, data in enumerate(resource_buffers(row, buffers)):
@@ -804,6 +887,81 @@ def self_test():
                 pass
             else:
                 raise ValueError("Surface array role substitution was ignored")
+            if row["fixture"] == "integer-formats":
+                for invalid_type in (dict(kind="scalar", scalarType="float32"),
+                                     dict(kind="scalar", scalarType="int16"),
+                                     dict(kind="scalar", scalarType=("uint32" if
+                                          specs[index]["scalar"] == "int32" else "int32"))):
+                    damaged = copy.deepcopy(reflection)
+                    result = damaged["parameters"][index]["type"]["resultType"]
+                    if specs[index]["lanes"] > 1:
+                        result["elementType"] = invalid_type
+                    else:
+                        damaged["parameters"][index]["type"]["resultType"] = invalid_type
+                    try:
+                        validate_bindings(damaged, row, ptx, 80)
+                    except ValueError:
+                        pass
+                    else:
+                        raise ValueError("Narrow format logical type substitution was ignored")
+    for value, bits, signed, expected in (
+            (128, 8, True, 0x7F), (-129, 8, True, 0x80),
+            (32768, 16, True, 0x7FFF), (-32769, 16, True, 0x8000),
+            (256, 8, False, 0xFF), (65536, 16, False, 0xFFFF),
+            (0xFFFFFFFF, 8, False, 0xFF), (0x80000000, 16, False, 0xFFFF)):
+        require(narrow_integer(value, bits, signed) == expected, "Integer saturation anchor failed")
+    for value, bits, signed, expected in (
+            (0x80, 8, True, 0xFFFFFF80), (0x80, 8, False, 0x80),
+            (0xFF, 8, True, 0xFFFFFFFF), (0xFF, 8, False, 0xFF),
+            (0x8000, 16, True, 0xFFFF8000), (0x8000, 16, False, 0x8000),
+            (0xFFFF, 16, True, 0xFFFFFFFF), (0xFFFF, 16, False, 0xFFFF)):
+        require(widen_integer(value, bits, signed) == expected, "Integer extension anchor failed")
+    for row in (x for x in cases() if x["fixture"] == "integer-formats"):
+        buffers = oracle(row)
+        specs, data = resource_specs(row), resource_buffers(row, buffers)
+        operation = row["defines"]["SURFACE_OPERATION"]
+        y = 0 if row["shape"] == 1 else 1
+        require(len(specs) == 24 and len(data) == 24, "Integer format resource inventory changed")
+        for resource in range(12):
+            spec, result = specs[resource * 2], data[resource * 2]
+            lanes, size = spec["lanes"], FORMATS[spec["storage"]][1]
+            covered = [set() for _ in range(lanes)]
+            high_bits = [set() for _ in range(lanes)]
+            untouched = []
+            for x in range(1, 65):
+                for lane in range(lanes):
+                    channel = (y * row["width"] + x) * lanes + lane
+                    position = channel * size
+                    before = result["initial"][position:position + size]
+                    high_bits[lane].add(bool(before[-1] & 0x80))
+                    selected = (operation == 0 or lanes == 1 or
+                                (operation == 1 and lane in ((1, 3) if lanes == 4 else (1,))) or
+                                (operation == 2 and lane == (x - 1) % lanes))
+                    if selected:
+                        edge = (x - 1) // 4 if operation == 2 else x - 1
+                        covered[lane].add((edge + y * 7 + resource * 3 + lane * 5) % 16)
+                    else:
+                        require(result["expected"][position:position + size] == before,
+                                "Component oracle overwrote an unselected lane")
+                        untouched.append(position)
+            for lane in range(lanes):
+                wanted = set(range(16)) if (operation != 1 or lanes == 1 or
+                            lane in ((1, 3) if lanes == 4 else (1,))) else set()
+                require(covered[lane] == wanted, "Integer edge/lane coverage incomplete")
+                require(high_bits[lane] == {False, True}, "Integer load sign-boundary coverage missing")
+            if operation and lanes > 1:
+                require(untouched, "Component row lacks preserved lanes")
+                damaged = bytearray(result["expected"])
+                damaged[untouched[0]] ^= 1
+                require(compare(row, buffers, resource * 2, damaged)["mismatch_count"] == 1,
+                        "Untouched integer lane corruption was ignored")
+            # Original input differs from independent saturated stores, and every observed
+            # array contains widened input bits rather than narrowed-store readback.
+            require(compare(row, buffers, resource * 2, result["initial"])["mismatch_count"] > 0,
+                    "Integer store oracle permits a kernel that performs no stores")
+            observed = data[resource * 2 + 1]
+            require(compare(row, buffers, resource * 2 + 1, observed["initial"])["mismatch_count"] > 0,
+                    "Integer load oracle permits a kernel that performs no loads")
     for row in (x for x in cases() if x["fixture"] == "layered"):
         buffers = oracle(row)
         specs = resource_specs(row)
@@ -1007,7 +1165,8 @@ def main():
                   provider=dict(path=str(provider / "libslang-llvm-nvvm.so"),
                                 sha256=sha((provider / "libslang-llvm-nvvm.so").read_bytes())),
                   ptxas=dict(path=str(ptxas), sha256=sha(ptxas.read_bytes())),
-                  semantic_contract="RN-even finite Half conversions; converted NaN class only; untouched bits exact",
+                  semantic_contract="RN-even finite Half conversions; converted NaN class only; "
+                                    "explicit narrow integers extend on load and saturate on store; untouched bits exact",
                   requested_cells=len(rows) * len(args.modes), cells=[])
     for row in rows:
         source = REPO / "tests/cuda" / ("nvvm-surface-physical-" + row["fixture"] + ".slang")

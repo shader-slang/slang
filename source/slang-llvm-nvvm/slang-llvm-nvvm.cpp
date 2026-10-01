@@ -4307,8 +4307,14 @@ static bool _isSurfaceOperationSupported(const SlangNVVMSurfaceOperationDesc& op
     {
         return false;
     }
-    return is32BitNumeric || (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
-                              operation.elementType.bitWidth == 16);
+    const bool isNarrowInteger =
+        (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER ||
+         operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER) &&
+        (operation.elementType.bitWidth == 8 || operation.elementType.bitWidth == 16) &&
+        !operation.isArray && operation.shape != SLANG_NVVM_TEXTURE_SHAPE_3D;
+    return is32BitNumeric || isNarrowInteger ||
+           (operation.elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT &&
+            operation.elementType.bitWidth == 16);
 }
 
 static SlangResult SLANG_NVVM_CALL
@@ -4326,6 +4332,22 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
 {
     if (!_isSurfaceOperationSupported(operation))
         return llvm::Intrinsic::not_intrinsic;
+    static const llvm::Intrinsic::ID kLoadI8[2][3] = {
+        {llvm::Intrinsic::nvvm_suld_1d_i8_zero,
+         llvm::Intrinsic::nvvm_suld_1d_v2i8_zero,
+         llvm::Intrinsic::nvvm_suld_1d_v4i8_zero},
+        {llvm::Intrinsic::nvvm_suld_2d_i8_zero,
+         llvm::Intrinsic::nvvm_suld_2d_v2i8_zero,
+         llvm::Intrinsic::nvvm_suld_2d_v4i8_zero},
+    };
+    static const llvm::Intrinsic::ID kStoreI8[2][3] = {
+        {llvm::Intrinsic::nvvm_sust_b_1d_i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_v2i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_1d_v4i8_zero},
+        {llvm::Intrinsic::nvvm_sust_b_2d_i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_v2i8_zero,
+         llvm::Intrinsic::nvvm_sust_b_2d_v4i8_zero},
+    };
     static const llvm::Intrinsic::ID kLoadI16[3][3] = {
         {llvm::Intrinsic::nvvm_suld_1d_i16_zero,
          llvm::Intrinsic::nvvm_suld_1d_v2i16_zero,
@@ -4408,6 +4430,10 @@ static llvm::Intrinsic::ID _getSurfaceIntrinsicID(const SlangNVVMSurfaceOperatio
                                                                       : 2;
     const uint32_t dimensionIndex = operation.shape - SLANG_NVVM_TEXTURE_SHAPE_1D;
     const uint32_t physicalBitWidth = operation.elementType.bitWidth;
+    if (physicalBitWidth == 8)
+        return operation.operation == SLANG_NVVM_SURFACE_OP_LOAD
+                   ? kLoadI8[dimensionIndex][laneIndex]
+                   : kStoreI8[dimensionIndex][laneIndex];
     if (physicalBitWidth == 16)
     {
         if (operation.isArray)
@@ -4472,7 +4498,7 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
     llvm::Type* semanticScalarType =
         operation->elementType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT
             ? (operation->elementType.bitWidth == 16 ? halfType : floatType)
-            : int32Type;
+            : llvm::IntegerType::get(state->context, operation->elementType.bitWidth);
     llvm::Type* semanticElementType =
         operation->elementType.laneCount == 1
             ? semanticScalarType
@@ -4490,7 +4516,7 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
 
     const uint32_t physicalBitWidth = operation->elementType.bitWidth;
     llvm::Type* physicalIntegerType =
-        physicalBitWidth == 16 ? llvm::Type::getInt16Ty(state->context) : int32Type;
+        physicalBitWidth <= 16 ? llvm::Type::getInt16Ty(state->context) : int32Type;
     llvm::Intrinsic::ID intrinsicID = _getSurfaceIntrinsicID(*operation);
     if (intrinsicID == llvm::Intrinsic::not_intrinsic)
         return SLANG_E_INVALID_ARG;
@@ -4517,7 +4543,12 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
             llvm::Value* laneValue = operation->elementType.laneCount == 1
                                          ? storedValue
                                          : state->builder.CreateExtractElement(storedValue, lane);
-            arguments.push_back(state->builder.CreateBitCast(laneValue, physicalIntegerType));
+            // LLVM NVVM transports b8 surface channels in i16 registers. Preserve only the
+            // selected byte; signedness is owned by the semantic conversion outside this call.
+            arguments.push_back(
+                physicalBitWidth == 8
+                    ? state->builder.CreateZExt(laneValue, physicalIntegerType)
+                    : state->builder.CreateBitCast(laneValue, physicalIntegerType));
         }
     }
 
@@ -4529,7 +4560,8 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
     llvm::Value* result = nullptr;
     if (operation->elementType.laneCount == 1)
     {
-        result = state->builder.CreateBitCast(call, semanticScalarType);
+        result = physicalBitWidth == 8 ? state->builder.CreateTrunc(call, semanticScalarType)
+                                       : state->builder.CreateBitCast(call, semanticScalarType);
     }
     else
     {
@@ -4537,7 +4569,9 @@ static SlangResult SLANG_NVVM_CALL _emitSurfaceOperation(
         for (uint32_t lane = 0; lane < operation->elementType.laneCount; ++lane)
         {
             llvm::Value* bits = state->builder.CreateExtractValue(call, {lane});
-            llvm::Value* laneValue = state->builder.CreateBitCast(bits, semanticScalarType);
+            llvm::Value* laneValue = physicalBitWidth == 8
+                                         ? state->builder.CreateTrunc(bits, semanticScalarType)
+                                         : state->builder.CreateBitCast(bits, semanticScalarType);
             laneValues.push_back(laneValue);
         }
         result = _createNVVMVectorConstruct(

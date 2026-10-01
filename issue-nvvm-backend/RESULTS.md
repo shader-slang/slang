@@ -888,8 +888,14 @@ coordinates and explicit spatial depth. Volumes use height/depth with no layered
 `array_layers` establishes an array role. The full host copy and report validator check these
 roles independently. The shared component body prevents both CUDA volume entries from compiling;
 keep this fixture limitation separate from CUDA whole-volume support generally.
-The current harness has 91 rows; the retained full baseline has 83. Preserve its 249 cells and use
-the focused layered evidence when reviewing the twenty-four-cell expansion at the next full checkpoint.
+Six additional integer-format rows group explicit signed/unsigned 8/16-bit storage, widths 1/2/4,
+for non-array 1D/2D whole/static/dynamic-component accesses. Each binds twelve narrow arrays and
+twelve independent native32 observation arrays. Representative signedness patterns establish load
+extension; sixteen logical store edges per selected lane establish saturation before narrowing.
+Full readback checks every untouched channel and guard. The oracle uses mathematical integer clamp,
+not shader roundtrips or CUDA output. These rows do not qualify unannotated packed bindings.
+The current harness has 97 rows; the retained full baseline has 83. Preserve its 249 cells and use
+the focused array/volume/integer evidence when reviewing the forty-two-cell expansion at the next full checkpoint.
 The four new CUDA Half-array compile failures remain explicit comparison limitations.
 
 A missing surface baseline, new/removed case, changed source/oracle, diagnostic or outcome requires

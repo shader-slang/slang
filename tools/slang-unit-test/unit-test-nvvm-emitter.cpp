@@ -11352,6 +11352,77 @@ static const char kSurfaceDynamicComponentSource[] = R"SLANG(
 
 SLANG_UNIT_TEST(nvvmSurfaceLegalizationSeparatesPhysicalAccessAndConversion)
 {
+    struct IntegerCase
+    {
+        const char* format;
+        const char* type;
+        SlangNVVMValueTypeKind kind;
+        uint32_t width;
+        uint32_t lanes;
+    };
+    for (const auto& test :
+         {IntegerCase{"rg8i", "int2", SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER, 8, 2},
+          IntegerCase{"rgba16ui", "uint4", SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER, 16, 4}})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << "[format(\"" << test.format << "\")] RWTexture2D<" << test.type
+               << "> image; RWStructuredBuffer<" << test.type << "> output;" << R"SLANG(
+            [numthreads(1,1,1)] void computeMain(uint3 tid : SV_DispatchThreadID)
+            {
+                output[0] = image.Load(int2(tid.xy));
+                image[int2(tid.xy)] = output[1];
+            })SLANG";
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result =
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+        if (SLANG_FAILED(result))
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result) && code != nullptr);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.surfaceOperations.getCount() == 2);
+        for (Index i = 0; i < 2; ++i)
+        {
+            const auto& access = gFakeNVVMBuilder.surfaceOperations[i];
+            SLANG_CHECK(
+                access.operation == (i ? SLANG_NVVM_SURFACE_OP_STORE : SLANG_NVVM_SURFACE_OP_LOAD));
+            SLANG_CHECK(access.elementType.kind == test.kind);
+            SLANG_CHECK(access.elementType.bitWidth == test.width);
+            SLANG_CHECK(access.elementType.laneCount == test.lanes);
+        }
+        bool sawWidening = false;
+        for (const auto& operation : gFakeNVVMBuilder.scalarOperations)
+            if (operation.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT &&
+                operation.operandTypes[0].bitWidth == test.width &&
+                operation.resultType.bitWidth == 32)
+            {
+                sawWidening = true;
+                SLANG_CHECK(operation.operandTypes[0].kind == test.kind);
+                SLANG_CHECK(operation.resultType.kind == test.kind);
+                SLANG_CHECK(
+                    operation.operands[0].kind == FakeNVVMBuilderValueKind::SurfaceOperation);
+            }
+        SLANG_CHECK(sawWidening);
+        const auto stored = gFakeNVVMBuilder.surfaceOperationOperands[1][2];
+        SLANG_CHECK_ABORT(stored.kind == FakeNVVMBuilderValueKind::ScalarOperation);
+        const auto& narrow = gFakeNVVMBuilder.scalarOperations[stored.index];
+        SLANG_CHECK(narrow.key.operation == SLANG_NVVM_VALUE_OP_INTEGER_CONVERT);
+        SLANG_CHECK(
+            narrow.resultType.kind == test.kind && narrow.resultType.bitWidth == test.width);
+        SLANG_CHECK(narrow.operandTypes[0].bitWidth == 32);
+        SLANG_CHECK_ABORT(narrow.operands[0].kind == FakeNVVMBuilderValueKind::ScalarOperation);
+        const auto& clamp = gFakeNVVMBuilder.scalarOperations[narrow.operands[0].index];
+        SLANG_CHECK(clamp.key.operation == SLANG_NVVM_VALUE_OP_SELECT);
+        SLANG_CHECK(clamp.resultType.bitWidth == 32 && clamp.resultType.laneCount == test.lanes);
+        SLANG_CHECK(clamp.operandTypes[0].kind == SLANG_NVVM_VALUE_TYPE_BOOL);
+        SLANG_CHECK(clamp.operandTypes[0].laneCount == test.lanes);
+    }
     _resetDirectNVVMFakes();
     {
         ComPtr<slang::IGlobalSession> session;
@@ -11635,6 +11706,46 @@ SLANG_UNIT_TEST(nvvmSurfaceLegalizationChecksPhysicalCapabilitiesBeforeModuleCre
             SLANG_FAILED(_compileSlangWithDirectNVVM(globalSession, source, code, diagnostics)));
         SLANG_CHECK(code == nullptr);
         SLANG_CHECK(_getBlobText(diagnostics).contains("52018"));
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+    struct RejectedFormat
+    {
+        const char* format;
+        const char* shape;
+        const char* type;
+        const char* coordinate;
+    };
+    for (const auto& test :
+         {RejectedFormat{"r8", "2D", "uint", "int2(0)"},
+          RejectedFormat{"r8ui", "2D", "int", "int2(0)"},
+          RejectedFormat{"r16i", "1DArray", "int", "int2(0)"},
+          RejectedFormat{"r8ui", "3D", "uint", "int3(0)"}})
+    {
+        _resetDirectNVVMFakes();
+        ComPtr<slang::IGlobalSession> session;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef())));
+        ComPtr<ISlangSharedLibraryLoader> loader(new FakeDirectNVVMLoader);
+        session->setSharedLibraryLoader(loader);
+        StringBuilder source;
+        source << "[format(\"" << test.format << "\")] RWTexture" << test.shape << "<" << test.type
+               << "> image; RWStructuredBuffer<" << test.type << "> output;"
+               << "[numthreads(1,1,1)] void computeMain() { output[0] = image.Load("
+               << test.coordinate << "); }";
+        ComPtr<slang::IBlob> code, diagnostics;
+        const auto result =
+            _compileSlangWithDirectNVVM(session, source.getBuffer(), code, diagnostics);
+        if (SLANG_SUCCEEDED(result) || !_getBlobText(diagnostics).contains("52017") ||
+            gFakeNVVMBuilder.createModuleCallCount != 0)
+        {
+            getTestReporter()->message(TestMessageType::Info, source.getBuffer());
+            getTestReporter()->message(
+                TestMessageType::Info,
+                _getBlobText(diagnostics).getBuffer());
+        }
+        SLANG_CHECK(SLANG_FAILED(result) && code == nullptr);
+        SLANG_CHECK(_getBlobText(diagnostics).contains("52017"));
         SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }

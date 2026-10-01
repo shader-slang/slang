@@ -1776,17 +1776,43 @@ bool getNVVMSupportedSurfaceField(
     if (formatInfo.channelCount != outType.elementType.laneCount)
         return false;
 
-    switch (outType.elementType.kind)
+    const bool isSigned = outType.elementType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+    if (isSigned || outType.elementType.kind == SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER)
     {
-    case SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER:
-        return formatInfo.scalarType == SLANG_SCALAR_TYPE_INT32;
-    case SLANG_NVVM_VALUE_TYPE_UNSIGNED_INTEGER:
-        return formatInfo.scalarType == SLANG_SCALAR_TYPE_UINT32;
-    case SLANG_NVVM_VALUE_TYPE_FLOATING_POINT:
-        break;
-    default:
-        return false;
+        if (formatInfo.scalarType ==
+            (isSigned ? SLANG_SCALAR_TYPE_INT32 : SLANG_SCALAR_TYPE_UINT32))
+            return true;
+        if (outType.isArray || outType.shape == SLANG_NVVM_TEXTURE_SHAPE_3D)
+            return false;
+
+        // Normalized formats also use UINT8/UINT16 metadata. Only these exact integer formats
+        // select integer conversion; matching scalar width alone would silently admit UNORM.
+        switch (formatDecoration->getFormat())
+        {
+        case ImageFormat::r8i:
+        case ImageFormat::rg8i:
+        case ImageFormat::rgba8i:
+        case ImageFormat::r8ui:
+        case ImageFormat::rg8ui:
+        case ImageFormat::rgba8ui:
+            outPhysicalType.bitWidth = 8;
+            return formatInfo.scalarType ==
+                   (isSigned ? SLANG_SCALAR_TYPE_INT8 : SLANG_SCALAR_TYPE_UINT8);
+        case ImageFormat::r16i:
+        case ImageFormat::rg16i:
+        case ImageFormat::rgba16i:
+        case ImageFormat::r16ui:
+        case ImageFormat::rg16ui:
+        case ImageFormat::rgba16ui:
+            outPhysicalType.bitWidth = 16;
+            return formatInfo.scalarType ==
+                   (isSigned ? SLANG_SCALAR_TYPE_INT16 : SLANG_SCALAR_TYPE_UINT16);
+        default:
+            return false;
+        }
     }
+    if (outType.elementType.kind != SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+        return false;
 
     if ((outType.elementType.bitWidth == 16 &&
          formatInfo.scalarType == SLANG_SCALAR_TYPE_FLOAT16) ||

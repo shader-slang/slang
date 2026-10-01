@@ -63,12 +63,21 @@ bool getSurfaceAccess(
     IRType* physicalIRType = logicalType;
     if (physicalType.bitWidth != surfaceType.elementType.bitWidth)
     {
-        SLANG_RELEASE_ASSERT(
-            physicalType.bitWidth == 16 &&
-            physicalType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT);
-        physicalIRType = builder.getHalfType();
+        if (physicalType.kind == SLANG_NVVM_VALUE_TYPE_FLOATING_POINT)
+        {
+            SLANG_RELEASE_ASSERT(physicalType.bitWidth == 16);
+            physicalIRType = builder.getHalfType();
+        }
+        else
+        {
+            SLANG_RELEASE_ASSERT(physicalType.bitWidth == 8 || physicalType.bitWidth == 16);
+            const bool isSigned = physicalType.kind == SLANG_NVVM_VALUE_TYPE_SIGNED_INTEGER;
+            physicalIRType = builder.getBasicType(
+                physicalType.bitWidth == 8 ? (isSigned ? BaseType::Int8 : BaseType::UInt8)
+                                           : (isSigned ? BaseType::Int16 : BaseType::UInt16));
+        }
         if (physicalType.laneCount != 1)
-            physicalIRType = builder.getVectorType(builder.getHalfType(), physicalType.laneCount);
+            physicalIRType = builder.getVectorType(physicalIRType, physicalType.laneCount);
     }
     outAccess = {
         resource,
@@ -100,12 +109,51 @@ IRInst* emitPhysicalCoordinate(IRBuilder& builder, const SurfaceAccess& access)
     return builder.emitSwizzleSet(coordinateType, coordinate, byteX, 1, &index);
 }
 
-// Leaves matching representations untouched and expresses the admitted Half/Float32 conversion
-// as ordinary value IR. The provider only sees the physical type selected by the surface access.
+// Converts only the selected value. Integer stores clamp in the logical 32-bit type before
+// narrowing; for example, storing 256 into r8ui writes 255, rather than wrapping to zero.
+// Loads extend according to the physical integer signedness. Half conversion remains FloatCast.
 IRInst* emitSurfaceConversion(IRBuilder& builder, IRType* type, IRInst* value)
 {
     if (isTypeEqual(type, value->getDataType()))
         return value;
+    uint32_t width = 0;
+    bool isSigned = false;
+    if (isNVVMSupportedIntegerScalarType(getIRVectorBaseType(type), &width, &isSigned))
+    {
+        if (width < 32)
+        {
+            IRType* sourceType = value->getDataType();
+            IRType* sourceScalar = getIRVectorBaseType(sourceType);
+            IRType* conditionType = builder.getBoolType();
+            const IRIntegerValue maximum = (IRIntegerValue(1) << (width - (isSigned ? 1 : 0))) - 1;
+            IRInst* upper = builder.getIntValue(sourceScalar, maximum);
+            if (as<IRVectorType>(sourceType))
+            {
+                upper = builder.emitMakeVectorFromScalar(sourceType, upper);
+                conditionType =
+                    builder.getVectorType(conditionType, getIRVectorElementSize(sourceType));
+            }
+            IRInst* upperComparison[] = {upper, value};
+            IRInst* upperOperands[] = {
+                builder.emitIntrinsicInst(conditionType, kIROp_Less, 2, upperComparison),
+                upper,
+                value};
+            value = builder.emitIntrinsicInst(sourceType, kIROp_Select, 3, upperOperands);
+            if (isSigned)
+            {
+                IRInst* lower = builder.getIntValue(sourceScalar, -maximum - 1);
+                if (as<IRVectorType>(sourceType))
+                    lower = builder.emitMakeVectorFromScalar(sourceType, lower);
+                IRInst* lowerComparison[] = {value, lower};
+                IRInst* lowerOperands[] = {
+                    builder.emitIntrinsicInst(conditionType, kIROp_Less, 2, lowerComparison),
+                    lower,
+                    value};
+                value = builder.emitIntrinsicInst(sourceType, kIROp_Select, 3, lowerOperands);
+            }
+        }
+        return builder.emitIntrinsicInst(type, kIROp_IntCast, 1, &value);
+    }
     return builder.emitIntrinsicInst(type, kIROp_FloatCast, 1, &value);
 }
 
