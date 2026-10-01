@@ -3219,7 +3219,7 @@ static bool hasExplicitInterlockInst(IRFunc* func)
 void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
 {
     HashSet<IRFunc*> fragmentShaders;
-    for (auto& [inst, entryPoints] : context->m_referencingEntryPoints)
+    for (const auto& [inst, entryPoints] : context->m_referencingEntryPoints)
     {
         if (isRasterOrderedResource(inst))
         {

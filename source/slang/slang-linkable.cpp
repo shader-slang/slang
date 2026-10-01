@@ -46,11 +46,10 @@ void ModuleDependencyList::addLeafDependency(Module* module)
 
 void ModuleDependencyList::_addDependency(Module* module)
 {
-    if (m_moduleSet.contains(module))
+    if (!m_moduleSet.add(module))
         return;
 
     m_moduleList.add(module);
-    m_moduleSet.add(module);
 }
 
 //
@@ -59,11 +58,10 @@ void ModuleDependencyList::_addDependency(Module* module)
 
 void FileDependencyList::addDependency(SourceFile* sourceFile)
 {
-    if (m_fileSet.contains(sourceFile))
+    if (!m_fileSet.add(sourceFile))
         return;
 
     m_fileList.add(sourceFile);
-    m_fileSet.add(sourceFile);
 }
 
 void FileDependencyList::addDependency(Module* module)

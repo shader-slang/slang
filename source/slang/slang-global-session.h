@@ -38,6 +38,7 @@ public:
         }
         SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
+        static constexpr bool kHasUniformHash = true;
         SLANG_FORCE_INLINE HashCode getHashCode() const
         {
             return combineHash(HashCode(source), HashCode(target));

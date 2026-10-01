@@ -2046,10 +2046,8 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     SLANG_DEFER(m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth--);
 
     // Have we already registered this type? If so we can exit now.
-    if (m_parentDifferentiableAttr->m_typeRegistrationWorkingSet.contains(type))
+    if (!m_parentDifferentiableAttr->m_typeRegistrationWorkingSet.add(type))
         return;
-
-    m_parentDifferentiableAttr->m_typeRegistrationWorkingSet.add(type);
 
     // Check for special cases such as PtrTypeBase<T> or Array<T>
     // This could potentially be handled later by simply defining extensions

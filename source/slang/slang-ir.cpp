@@ -1492,9 +1492,7 @@ IRInst* IRBuilder::replaceOperand(IRUse* use, IRInst* newValue)
     auto user = use->getUser();
     if (user->getModule())
     {
-        user->getModule()->getDeduplicationContext()->getInstReplacementMap().tryGetValue(
-            newValue,
-            newValue);
+        newValue = user->getModule()->getDeduplicationContext()->getReplacement(newValue);
     }
 
     if (!getIROpInfo(user->getOp()).isHoistable())
@@ -2017,9 +2015,7 @@ IRInst* IRBuilder::_createInst(
     Int const* listArgCounts,
     IRInst* const* const* listArgs)
 {
-    IRInst* instReplacement = type;
-    m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
-    type = (IRType*)instReplacement;
+    type = (IRType*)m_dedupContext->getReplacement(type);
 
     if (type && shouldHaveSpecConstRate(op, type, fixedArgCount, fixedArgs))
     {
@@ -2072,7 +2068,7 @@ IRInst* IRBuilder::_createInst(
         if (fixedArgs)
         {
             auto arg = fixedArgs[aa];
-            m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
+            arg = m_dedupContext->getReplacement(arg);
             operand->init(inst, arg);
         }
         else
@@ -2090,7 +2086,7 @@ IRInst* IRBuilder::_createInst(
             if (listArgs[ii])
             {
                 auto arg = listArgs[ii][jj];
-                m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
+                arg = m_dedupContext->getReplacement(arg);
                 operand->init(inst, arg);
             }
             else
@@ -2856,7 +2852,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         for (Int ii = 0; ii < fixedArgCount; ++ii)
         {
             auto arg = canonicalizedOperands[ii];
-            m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
+            arg = m_dedupContext->getReplacement(arg);
             operand->usedValue = arg;
             operand++;
         }
@@ -2866,7 +2862,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             for (UInt jj = 0; jj < listOperandCount; ++jj)
             {
                 auto arg = listArgs[ii][jj];
-                m_dedupContext->getInstReplacementMap().tryGetValue(arg, arg);
+                arg = m_dedupContext->getReplacement(arg);
                 operand->usedValue = arg;
                 operand++;
             }
@@ -9149,7 +9145,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                             existingConstant))
                     {
                         IRInst* existingVal = existingConstant;
-                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        existingVal = dedupContext->getReplacement(existingVal);
                         addToWorkList(user, existingVal);
                     }
                     else
@@ -9167,7 +9163,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                             existingVal))
                     {
                         // If existingVal has been replaced by something else, use that.
-                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        existingVal = dedupContext->getReplacement(existingVal);
                         addToWorkList(user, existingVal);
 
                         if (!user->hasUses() && (as<IRAnnotation>(user)))

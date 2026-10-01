@@ -118,18 +118,22 @@ struct IRSpecContextBase
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
     {
-        ImmutableHashedString hashedName(mangledName);
-        RefPtr<IRSpecSymbol> symbol;
-        if (shared->symbols.tryGetValue(hashedName, symbol))
-            return symbol;
+        // The symbol table is keyed by `ImmutableHashedString`, but probing it
+        // does not need one: a slice hashes and compares the same way, and
+        // building the key type here would copy the mangled name -- which is
+        // long -- on every lookup. Only the miss below has to own a key.
+        if (auto symbol = shared->symbols.tryGetValue(mangledName))
+            return *symbol;
         for (auto m : irModules)
         {
-            for (auto inst : m->findSymbolByMangledName(hashedName))
+            for (auto inst : m->findSymbolByMangledName(mangledName))
                 insertGlobalValueSymbol(shared, inst);
         }
-        if (shared->symbols.tryGetValue(hashedName, symbol))
-            return symbol;
-        shared->symbols[hashedName] = nullptr;
+        if (auto symbol = shared->symbols.tryGetValue(mangledName))
+            return *symbol;
+        // Record the miss, so that a later lookup of the same name returns
+        // null without repeating the scan above.
+        shared->symbols.add(ImmutableHashedString(mangledName), nullptr);
         return nullptr;
     }
 
@@ -1678,20 +1682,22 @@ void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv)
     if (!linkage)
         return;
 
-    auto mangledName = String(linkage->getMangledName());
+    // Hash the mangled name once and reuse it for all three lookups below;
+    // each of `symbols` and `isImportedSymbol` is keyed by this type, so
+    // passing a `String` would rehash the name for every one of them.
+    const ImmutableHashedString mangledName(linkage->getMangledName());
 
     RefPtr<IRSpecSymbol> sym = new IRSpecSymbol();
     sym->irGlobalValue = gv;
 
-    RefPtr<IRSpecSymbol> prev;
-    if (sharedContext->symbols.tryGetValue(mangledName, prev))
+    // Claim the name for `sym` if it is unclaimed; otherwise chain `sym` behind
+    // whichever symbol already holds it, leaving that one as the map's entry.
+    const auto [entry, inserted] = sharedContext->symbols.tryEmplace(mangledName, sym);
+    if (!inserted)
     {
+        RefPtr<IRSpecSymbol>& prev = *entry;
         sym->nextWithSameName = prev->nextWithSameName;
         prev->nextWithSameName = sym;
-    }
-    else
-    {
-        sharedContext->symbols.add(mangledName, sym);
     }
 
     if (as<IRImportDecoration>(linkage))
@@ -2486,10 +2492,9 @@ struct IRPrelinkContext : IRSpecContext
         // prexisting val.
         if (auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
         {
-            RefPtr<IRSpecSymbol> symbol;
-            if (shared->symbols.tryGetValue(linkage->getMangledName(), symbol))
+            if (auto symbol = shared->symbols.tryGetValue(linkage->getMangledName()))
             {
-                return symbol->irGlobalValue;
+                return (*symbol)->irGlobalValue;
             }
         }
 

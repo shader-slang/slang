@@ -156,6 +156,20 @@ option(
 )
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
+    SLANG_ENABLE_CONTAINER_STATS
+    "Record per-declaration-site container size and operation statistics (SLOW!)"
+    OFF
+)
+if(SLANG_ENABLE_CONTAINER_STATS)
+    # This must apply to the whole build rather than to individual targets. It adds a member to
+    # `Dictionary`, `List`, the `Short*` variants and `ImmutableHashedString`, which are
+    # header-only types appearing in the layout of objects passed across every target boundary, so
+    # a target compiled without it would disagree about their size -- an ODR violation rather than
+    # a mere feature difference. Anything linking against these libraries, including slang-rt, must
+    # be built with the same setting.
+    add_compile_definitions(SLANG_ENABLE_CONTAINER_STATS=1)
+endif()
+option(
     SLANG_IGNORE_ABORT_MSG
     "Ignore the system modal assert dialog while running build tools to help LLM workflow."
     OFF
@@ -407,6 +421,64 @@ enum_option(
     "Build slang-compiler as a shared library (default)"
     STATIC
     "Build slang-compiler as a static library"
+)
+
+# The hash map backing Slang::Dictionary and the hash function it uses are both
+# swappable at build time so that they can be evaluated against each other on
+# real compiler workloads. The two are independent, so any combination is valid.
+# See source/core/slang-hashmap-impl.h and source/core/slang-hash-impl.h.
+enum_option(
+    SLANG_HASHMAP
+    # Default
+    UNORDERED_DENSE
+    "Which hash map implementation backs Slang::Dictionary and Slang::HashSet:"
+    # Options
+    UNORDERED_DENSE
+    "ankerl::unordered_dense::map (default)"
+    UNORDERED_DENSE_SEGMENTED
+    "ankerl::unordered_dense::segmented_map"
+    BOOST_FLAT
+    "boost::unordered_flat_map"
+    BOOST_NODE
+    "boost::unordered_node_map"
+    BOOST_UNORDERED
+    "boost::unordered_map"
+    ABSL_FLAT
+    "absl::flat_hash_map"
+    ABSL_NODE
+    "absl::node_hash_map"
+    GTL_FLAT
+    "gtl::flat_hash_map"
+    TSL_ROBIN
+    "tsl::robin_map"
+    TSL_HOPSCOTCH
+    "tsl::hopscotch_map"
+    TSL_SPARSE
+    "tsl::sparse_map"
+    STD
+    "std::unordered_map"
+)
+
+enum_option(
+    SLANG_HASH
+    # Default
+    WYHASH
+    "Which hash function Slang::Hash falls back to for types without a getHashCode():"
+    # Options
+    WYHASH
+    "ankerl::unordered_dense::hash, i.e. wyhash (default)"
+    RAPIDHASH
+    "rapidhash, wyhash's successor"
+    KOMIHASH
+    "komihash"
+    XXH3
+    "xxHash's XXH3"
+    BOOST
+    "boost::hash"
+    ABSL
+    "absl::Hash"
+    STD
+    "std::hash"
 )
 
 set(SLANG_ENABLE_MIMALLOC_DEFAULT OFF)

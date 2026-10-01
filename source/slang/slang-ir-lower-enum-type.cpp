@@ -34,11 +34,10 @@ struct EnumTypeLoweringContext
 
     void addToWorkList(IRInst* inst)
     {
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
 
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     LoweredEnumTypeInfo* getLoweredEnumType(IRInst* type)

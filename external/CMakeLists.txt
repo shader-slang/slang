@@ -80,6 +80,339 @@ if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     endif()
 endif()
 
+# Hash map and hash function backing Slang::Dictionary and Slang::Hash.
+#
+# Both are chosen at build time (SLANG_HASHMAP, SLANG_HASH) so that they can be
+# compared against each other on real compiler workloads, and they are
+# independent of each other, so any of the 12x7 combinations is valid. The
+# `slang-hashmap` interface target below is the single place that gathers
+# whatever the selected pair needs -- headers, link libraries and the two
+# preprocessor definitions that source/core/slang-hashmap-impl.h and
+# source/core/slang-hash-impl.h switch on -- and `core` links it publicly, so
+# that every translation unit sees the same Dictionary layout.
+add_library(slang-hashmap INTERFACE)
+
+# Builds the vendored library in external/<dir> and links the CMake target it
+# defines into slang-hashmap. Most of these libraries are only checked out when
+# the configuration actually asks for them, so report a missing submodule with
+# the command that fixes it rather than letting add_subdirectory fail.
+function(slang_hashmap_use_submodule dir target)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${dir}/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "external/${dir} is missing. Run: git submodule update --init external/${dir}"
+        )
+    endif()
+    add_subdirectory(${dir} EXCLUDE_FROM_ALL ${system})
+    target_link_libraries(slang-hashmap INTERFACE ${target})
+endfunction()
+
+# Puts the vendored single-header library in external/<dir> on slang-hashmap's
+# include path.
+#
+# This is separate from slang_hashmap_use_submodule because the three hash
+# functions ship a bare header and no CMake package to consume: rapidhash and
+# komihash have no CMakeLists at all, and xxHash's (under cmake_unofficial/)
+# builds a library we do not want, since XXH_INLINE_ALL below makes it
+# header-only.
+function(slang_hashmap_use_header_only dir header)
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/${dir}/${header}")
+        message(
+            FATAL_ERROR
+            "external/${dir}/${header} is missing. Run: git submodule update --init external/${dir}"
+        )
+    endif()
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/${dir}"
+    )
+endfunction()
+
+# unordered_dense is a dependency of every configuration, not just
+# SLANG_HASHMAP=UNORDERED_DENSE: slang-hash-impl.h uses its `is_avalanching`
+# marker as the (implementation-independent) definition of which types get a
+# library-provided hash rather than a Slang-defined getHashCode().
+target_link_libraries(slang-hashmap INTERFACE unordered_dense::unordered_dense)
+
+if(SLANG_HASHMAP MATCHES "^BOOST_" OR SLANG_HASH STREQUAL "BOOST")
+    # Boost.Unordered and Boost.ContainerHash are header-only, so we add the
+    # modular boostorg repositories' include directories directly instead of
+    # using their CMakeLists, which are written to be driven by the Boost
+    # superproject and would pull in its whole build machinery.
+    add_library(slang-boost-headers INTERFACE)
+    foreach(
+        boost_module
+        IN
+        ITEMS
+            assert
+            config
+            container_hash
+            core
+            describe
+            mp11
+            predef
+            throw_exception
+            unordered
+    )
+        set(boost_module_include
+            "${CMAKE_CURRENT_LIST_DIR}/boost/${boost_module}/include"
+        )
+        if(NOT EXISTS "${boost_module_include}")
+            message(
+                FATAL_ERROR
+                "${boost_module_include} is missing. Run: git submodule update --init external/boost/${boost_module}"
+            )
+        endif()
+        target_include_directories(
+            slang-boost-headers
+            ${system}
+            INTERFACE "${boost_module_include}"
+        )
+    endforeach()
+    target_link_libraries(slang-hashmap INTERFACE slang-boost-headers)
+endif()
+
+if(SLANG_HASHMAP MATCHES "^ABSL_" OR SLANG_HASH STREQUAL "ABSL")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/abseil-cpp/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "external/abseil-cpp is missing. Run: git submodule update --init external/abseil-cpp"
+        )
+    endif()
+    set(ABSL_PROPAGATE_CXX_STD ON)
+    set(ABSL_ENABLE_INSTALL OFF)
+    set(ABSL_BUILD_TESTING OFF)
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    add_subdirectory(abseil-cpp EXCLUDE_FROM_ALL ${system})
+endif()
+
+if(SLANG_HASHMAP STREQUAL "ABSL_FLAT")
+    target_link_libraries(slang-hashmap INTERFACE absl::flat_hash_map)
+elseif(SLANG_HASHMAP STREQUAL "ABSL_NODE")
+    target_link_libraries(slang-hashmap INTERFACE absl::node_hash_map)
+elseif(SLANG_HASHMAP STREQUAL "GTL_FLAT")
+    slang_hashmap_use_submodule(gtl gtl)
+elseif(SLANG_HASHMAP STREQUAL "TSL_ROBIN")
+    slang_hashmap_use_submodule(robin-map tsl::robin_map)
+elseif(SLANG_HASHMAP STREQUAL "TSL_HOPSCOTCH")
+    slang_hashmap_use_submodule(hopscotch-map tsl::hopscotch_map)
+elseif(SLANG_HASHMAP STREQUAL "TSL_SPARSE")
+    slang_hashmap_use_submodule(sparse-map tsl::sparse_map)
+endif()
+
+# UNORDERED_DENSE_SEGMENTED needs nothing here: segmented_map lives in the same
+# header as the default map, which is already linked above.
+
+if(SLANG_HASH STREQUAL "ABSL")
+    target_link_libraries(slang-hashmap INTERFACE absl::hash)
+elseif(SLANG_HASH STREQUAL "RAPIDHASH")
+    slang_hashmap_use_header_only(rapidhash rapidhash.h)
+elseif(SLANG_HASH STREQUAL "KOMIHASH")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/komihash/komihash.h")
+        message(
+            FATAL_ERROR
+            "external/komihash/komihash.h is missing. Run: git submodule update --init external/komihash"
+        )
+    endif()
+
+    # komihash declares every function KOMIHASH_INLINE, which expands to
+    # `static inline`, so calling it straight from Slang::HashImpl::hashBytes --
+    # an inline function with external linkage -- would name an internal-linkage
+    # entity from the body of an external-linkage inline function. That is
+    # ill-formed, no diagnostic required, and it is exactly the defect that made
+    # XXH3 miscompile at -O3 and produce a Dictionary that could not find keys it
+    # had just inserted.
+    #
+    # komihash.h has no macro to make its functions external -- KOMIHASH_STATIC
+    # is defined outright rather than behind an #ifndef -- so instead the header
+    # is compiled into one translation unit that exposes a single ordinary
+    # function for Slang to call.
+    #
+    # rapidhash needs none of this: in C++ its RAPIDHASH_INLINE expands to plain
+    # `inline` with no `static`, so its functions already have external linkage.
+    # Its secrets are namespace-scope constexpr, which an inline function may
+    # name across translation units because they are const objects of literal
+    # type initialized with constant expressions.
+    set(komihash_shim_dir "${CMAKE_CURRENT_BINARY_DIR}/slang-komihash-shim")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/komihash/komihash.h"
+        "${komihash_shim_dir}/slang-komihash-impl.h"
+        COPYONLY
+    )
+    file(
+        GENERATE
+        OUTPUT "${komihash_shim_dir}/slang-komihash.h"
+        CONTENT
+            "#pragma once\n#include <stddef.h>\n#include <stdint.h>\n#ifdef __cplusplus\nextern \"C\" {\n#endif\nuint64_t slangKomihash(const void* data, size_t size);\n#ifdef __cplusplus\n}\n#endif\n"
+    )
+    # Seed 0: komihash takes a seed so a caller can decorrelate two hashes of the
+    # same data, which Slang has no need of, and a fixed seed keeps the hash
+    # reproducible across runs for anything that reaches a serialized module.
+    file(
+        GENERATE
+        OUTPUT "${komihash_shim_dir}/slang-komihash.c"
+        CONTENT
+            "#include \"slang-komihash.h\"\n#include \"slang-komihash-impl.h\"\nuint64_t slangKomihash(const void* data, size_t size)\n{\n    return komihash(data, size, 0);\n}\n"
+    )
+
+    add_library(slang-komihash STATIC "${komihash_shim_dir}/slang-komihash.c")
+    target_include_directories(slang-komihash PUBLIC "${komihash_shim_dir}")
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set_target_properties(slang-komihash PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            slang-komihash
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
+
+    target_link_libraries(slang-hashmap INTERFACE slang-komihash)
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${komihash_shim_dir}"
+    )
+elseif(SLANG_HASH STREQUAL "XXH3")
+    if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h")
+        message(
+            FATAL_ERROR
+            "external/xxHash/xxhash.h is missing. Run: git submodule update --init external/xxHash"
+        )
+    endif()
+
+    # xxHash cannot simply be put on the include path under its own name.
+    #
+    # lz4 vendors its own copy of xxhash.h, from a version predating XXH3, and
+    # exports external/lz4/lib as a usage requirement. `core` links lz4, so
+    # that directory lands on its -isystem path ahead of ours and
+    # `#include <xxhash.h>` quietly resolves to the copy without XXH3 in it.
+    # Adding ours BEFORE would not help: the two directories are usage
+    # requirements of two different targets, so their relative order comes from
+    # link order rather than from either target's own property.
+    #
+    # So give xxHash a name nothing else can claim: copy the header next to a
+    # wrapper, and include the wrapper.
+    #
+    # The wrapper reaches the copy as a plain sibling, with no absolute path and
+    # no "..", because slang-embed also walks these include directories. It
+    # inlines the #includes it finds while embedding the C++ preludes, which
+    # reach core/slang-hash.h and therefore this header, and it resolves a
+    # quoted include by gluing it onto the parent directory of the file it
+    # appears in. Handed an absolute path it builds a nonsensical one, fails to
+    # read it, and aborts on the SLANG_ASSERT in tools/slang-embed.
+    #
+    # xxHash is compiled once, into its own translation unit, rather than pulled
+    # into every translation unit with XXH_INLINE_ALL. Inlining it looked
+    # attractive -- Slang only calls XXH3_64bits, on keys of a handful of bytes,
+    # where call overhead is a real fraction of the cost -- but XXH_INLINE_ALL
+    # makes every xxHash function `static`, and
+    # Slang::HashImpl::hashBytes is an `inline` function with external linkage.
+    # An inline function whose body names an internal-linkage entity is
+    # ill-formed, no diagnostic required: each translation unit defines the same
+    # COMDAT symbol with a different callee, and the linker keeps one of them
+    # arbitrarily.
+    #
+    # That is not theoretical. At -Og the copies behaved alike and it went
+    # unnoticed; at -O3, with xxHash's always_inline SIMD kernels folded in, the
+    # surviving copy disagreed with the one that had been used to insert, and
+    # slang-spirv-embed-generator aborted with "The key does not exist in
+    # dictionary" looking up an SpvOp it had just added
+    # (tools/slang-spirv-embed-generator/spirv-embed-generator-main.cpp).
+    # Defining XXH_NO_INLINE_HINTS made it go away, which is a workaround for a
+    # miscompilation and not a fix for the linkage.
+    #
+    # Neither generated file is rewritten when its content is unchanged --
+    # configure_file and file(GENERATE) both compare first -- so reconfiguring
+    # does not rebuild all of core.
+    set(xxhash_shim_dir "${CMAKE_CURRENT_BINARY_DIR}/slang-xxhash-shim")
+    configure_file(
+        "${CMAKE_CURRENT_LIST_DIR}/xxHash/xxhash.h"
+        "${xxhash_shim_dir}/slang-xxhash-impl.h"
+        COPYONLY
+    )
+    # Declarations only: without XXH_IMPLEMENTATION or XXH_INLINE_ALL, xxhash.h
+    # declares the API with external linkage and defines nothing.
+    file(
+        GENERATE
+        OUTPUT "${xxhash_shim_dir}/slang-xxhash.h"
+        CONTENT "#pragma once\n#include \"slang-xxhash-impl.h\"\n"
+    )
+    # The one translation unit that holds the implementation.
+    #
+    # XXH_STATIC_LINKING_ONLY as well as XXH_IMPLEMENTATION: the implementation
+    # needs the state structs, and xxhash.h only defines them behind that macro.
+    # Without it the build fails on "invalid application of sizeof to incomplete
+    # type XXH32_state_t".
+    file(
+        GENERATE
+        OUTPUT "${xxhash_shim_dir}/slang-xxhash-impl.c"
+        CONTENT
+            "#define XXH_STATIC_LINKING_ONLY\n#define XXH_IMPLEMENTATION\n#include \"slang-xxhash-impl.h\"\n"
+    )
+
+    add_library(slang-xxhash STATIC "${xxhash_shim_dir}/slang-xxhash-impl.c")
+    target_include_directories(slang-xxhash PUBLIC "${xxhash_shim_dir}")
+    # `core` is a static library that ends up inside the shared slang-compiler
+    # library, so anything it links has to be position independent too.
+    set_target_properties(slang-xxhash PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    # With link-time optimization on, this recovers the cross-translation-unit
+    # inlining that XXH_INLINE_ALL used to provide, without the linkage that
+    # made it ill-formed. Slang's own targets get this from slang_add_target;
+    # this is a plain add_library, so it has to ask for it.
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            slang-xxhash
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
+
+    # XXH3's SSE2 kernels are marked always_inline, and GCC refuses to inline a
+    # function carrying __target__("sse2") into a caller without it unless it is
+    # optimizing properly -- "inlining failed in call to always_inline
+    # XXH3_accumulate_sse2", which is an error, not a warning. xxHash guards
+    # against this itself, but only by looking for __NO_INLINE__, which GCC
+    # defines at -O0 and not at -Og, and Slang's Debug configuration is -Og (see
+    # the top of the root CMakeLists.txt).
+    #
+    # PRIVATE, and only for the configuration that needs it: this is now the
+    # sole translation unit compiling xxHash, so the hint cannot differ between
+    # translation units the way it did when every one of them compiled its own
+    # copy.
+    target_compile_definitions(
+        slang-xxhash
+        PRIVATE $<$<CONFIG:Debug>:XXH_NO_INLINE_HINTS=1>
+    )
+
+    target_link_libraries(slang-hashmap INTERFACE slang-xxhash)
+    target_include_directories(
+        slang-hashmap
+        ${system}
+        INTERFACE "${xxhash_shim_dir}"
+    )
+endif()
+
+# enum_option has already checked that these name one of the implementations
+# enumerated in slang-hashmap-impl.h / slang-hash-impl.h.
+target_compile_definitions(
+    slang-hashmap
+    INTERFACE
+        SLANG_HASHMAP_IMPL=SLANG_HASHMAP_${SLANG_HASHMAP}
+        SLANG_HASH_IMPL=SLANG_HASH_${SLANG_HASH}
+)
+
+message(
+    STATUS
+    "Slang::Dictionary will use SLANG_HASHMAP=${SLANG_HASHMAP} with SLANG_HASH=${SLANG_HASH}"
+)
+
 # Miniz
 if(NOT ${SLANG_USE_SYSTEM_MINIZ})
     if(NOT SLANG_OVERRIDE_MINIZ_PATH)

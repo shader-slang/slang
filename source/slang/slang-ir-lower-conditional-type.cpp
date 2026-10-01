@@ -44,10 +44,9 @@ struct ConditionalTypeLoweringContext
 
     void addToWorkList(IRInst* inst)
     {
-        if (workListSet.contains(inst))
+        if (!workListSet.add(inst))
             return;
         workList.add(inst);
-        workListSet.add(inst);
     }
 
     // Lower `condType` on first use and cache the result; return its lowering info, or null when it

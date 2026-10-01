@@ -3,6 +3,7 @@
 
 #include "slang-allocator.h"
 #include "slang-array-view.h"
+#include "slang-container-stats.h"
 #include "slang-math.h"
 #include "slang.h"
 
@@ -33,34 +34,50 @@ private:
 public:
     typedef List ThisType;
 
-    List()
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+    List(SLANG_CONTAINER_STATS_SITE_PARAM)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0) SLANG_CONTAINER_STATS_INIT_NEXT(ThisType, T, ContainerStatsNoValue)
     {
     }
     template<typename... Args>
     List(const T& val, Args... args)
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0)
+              SLANG_CONTAINER_STATS_INIT_UNATTRIBUTED_NEXT(ThisType, T, ContainerStatsNoValue, 0)
     {
         _init(val, args...);
     }
-    List(const List<T>& list)
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+    List(const List<T>& list SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0) SLANG_CONTAINER_STATS_INIT_NEXT(ThisType, T, ContainerStatsNoValue)
     {
         this->operator=(list);
     }
-    List(List<T>&& list)
-        : m_buffer(nullptr), m_count(0), m_capacity(0)
+    List(List<T>&& list SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_buffer(nullptr)
+        , m_count(0)
+        , m_capacity(0) SLANG_CONTAINER_STATS_INIT_NEXT(ThisType, T, ContainerStatsNoValue)
     {
         this->operator=(static_cast<List<T>&&>(list));
+        // A move construction is the same logical list continuing its life at a new address, so
+        // this instance takes over what the source accumulated rather than letting the source fold
+        // a second, truncated record of its own. Move *assignment* is deliberately not treated
+        // this way: there the destination is a pre-existing list with its own declaration site.
+        SLANG_CONTAINER_STATS_TAKE_FROM(list.m_containerStatsProbe);
     }
-    List(ArrayView<T> view)
-        : List()
+    List(ArrayView<T> view SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : List(SLANG_CONTAINER_STATS_FORWARD)
     {
         addRange(view);
     }
-    static List<T> makeRepeated(const T& val, Index count)
+    static List<T> makeRepeated(const T& val, Index count SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
     {
-        List<T> rs;
+        // Braces rather than parentheses so that the disabled build, where the forwarded site
+        // expands to nothing, does not declare a function instead of a list.
+        List<T> rs{SLANG_CONTAINER_STATS_FORWARD};
         rs.setCount(count);
         for (Index i = 0; i < count; i++)
             rs[i] = val;
@@ -71,6 +88,7 @@ public:
     {
         clearAndDeallocate();
         addRange(list);
+        SLANG_CONTAINER_STATS_NOTE_OP(CopyAssign);
         return *this;
     }
 
@@ -86,9 +104,18 @@ public:
         list.m_buffer = nullptr;
         list.m_count = 0;
         list.m_capacity = 0;
+        SLANG_CONTAINER_STATS_NOTE_OP(MoveAssign);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
         return *this;
     }
 
+    // Note that these hand out a `T*`, which is a contiguous view of the elements, but they are
+    // deliberately not recorded as `ContiguousBuffer`. A range-based `for` goes through them and
+    // would work just as well over `ShortList`'s iterator, so recording them would set the
+    // disqualifying bit on very nearly every site and make it meaningless. The consequence is that
+    // the operation mask understates contiguity requirements for `List`: a candidate site still
+    // has to be read before it is converted. `getBuffer` and `getArrayView`, which exist only to
+    // hand out the buffer, are recorded.
     const T* begin() const { return m_buffer; }
     const T* end() const { return m_buffer + m_count; }
 
@@ -122,11 +149,17 @@ public:
     void removeLast()
     {
         SLANG_ASSERT(m_count > 0);
+        SLANG_CONTAINER_STATS_NOTE_OP(RemoveRange);
         m_count--;
     }
 
     inline void swapWith(List<T, TAllocator>& other)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Swap);
+#if SLANG_ENABLE_CONTAINER_STATS
+        // Both lists are affected, and the macro above only names this one's probe.
+        other.m_containerStatsProbe.noteOp(ContainerOp::Swap);
+#endif
         T* buffer = m_buffer;
         m_buffer = other.m_buffer;
         other.m_buffer = buffer;
@@ -142,6 +175,7 @@ public:
 
     T* detachBuffer()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(AttachBuffer);
         T* rs = m_buffer;
         m_buffer = nullptr;
         m_count = 0;
@@ -153,16 +187,23 @@ public:
         // Can only attach a buffer if there isn't a buffer already associated
         SLANG_ASSERT(m_buffer == nullptr);
         SLANG_ASSERT(count <= capacity);
+        SLANG_CONTAINER_STATS_NOTE_OP(AttachBuffer);
         m_buffer = buffer;
         m_count = count;
         m_capacity = capacity;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
-    inline ArrayView<T> getArrayView() const { return ArrayView<T>(m_buffer, m_count); }
+    inline ArrayView<T> getArrayView() const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
+        return ArrayView<T>(m_buffer, m_count);
+    }
 
     inline ArrayView<T> getArrayView(Index start, Index count) const
     {
         SLANG_ASSERT(start >= 0 && count >= 0 && start + count <= m_count);
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
         return ArrayView<T>(m_buffer + start, count);
     }
 
@@ -182,12 +223,16 @@ public:
     {
         _maybeReserveForAdd();
         m_buffer[m_count++] = static_cast<T&&>(obj);
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
     void add(const T& obj)
     {
         _maybeReserveForAdd();
         m_buffer[m_count++] = obj;
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
     Index getCount() const { return m_count; }
@@ -205,8 +250,16 @@ public:
     }
 
 
-    const T* getBuffer() const { return m_buffer; }
-    T* getBuffer() { return m_buffer; }
+    const T* getBuffer() const
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
+        return m_buffer;
+    }
+    T* getBuffer()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
+        return m_buffer;
+    }
 
     bool operator==(const ThisType& rhs) const
     {
@@ -230,7 +283,11 @@ public:
     }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    void insert(Index idx, const T& val) { insertRange(idx, &val, 1); }
+    void insert(Index idx, const T& val)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Insert);
+        insertRange(idx, &val, 1);
+    }
 
     void insertRange(Index idx, const T* vals, Index n)
     {
@@ -293,6 +350,12 @@ public:
             m_buffer[idx + i] = vals[i];
 
         m_count += n;
+        // `addRange` reaches here with `idx` equal to the old count, i.e. appending; anything else
+        // is an insertion partway through the list.
+        if (idx != m_count - n)
+            SLANG_CONTAINER_STATS_NOTE_OP(Insert);
+        SLANG_CONTAINER_STATS_NOTE_INSERT();
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
     }
 
     void insertRange(Index id, const List<T>& list)
@@ -309,6 +372,7 @@ public:
     void removeRange(Index idx, Index count)
     {
         SLANG_ASSERT(idx >= 0 && idx <= m_count);
+        SLANG_CONTAINER_STATS_NOTE_OP(RemoveRange);
 
         const Index actualDeleteCount = ((idx + count) >= m_count) ? (m_count - idx) : count;
         for (Index i = idx + actualDeleteCount; i < m_count; i++)
@@ -320,6 +384,7 @@ public:
 
     void remove(const T& val)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
         Index idx = indexOf(val);
         if (idx != -1)
             removeAt(idx);
@@ -327,6 +392,7 @@ public:
 
     void reverse()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(ContiguousBuffer);
         for (Index i = 0; i < (m_count >> 1); i++)
         {
             swapElements(m_buffer, i, m_count - i - 1);
@@ -335,6 +401,7 @@ public:
 
     void fastRemove(const T& val)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Remove);
         Index idx = indexOf(val);
         if (idx >= 0)
         {
@@ -345,6 +412,7 @@ public:
     void fastRemoveAt(Index idx)
     {
         SLANG_ASSERT(idx >= 0 && idx < m_count);
+        SLANG_CONTAINER_STATS_NOTE_OP(RemoveRange);
         // We do not test for idx == m_count - 1 (ie the move is to current index). With the
         // assumption that any reasonable move implementation tests and ignores this case
         if (idx != m_count - 1)
@@ -354,16 +422,26 @@ public:
         m_count--;
     }
 
-    void clear() { m_count = 0; }
+    void clear()
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(Clear);
+        m_count = 0;
+    }
 
     void clearAndDeallocate()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(ClearAndDeallocate);
         _deallocateBuffer();
         m_count = m_capacity = 0;
     }
 
     void reserve(Index size)
     {
+        // Only the operation is recorded, not `size`. The statistic being collected is how many
+        // elements a list actually holds; a `reserve` states what its caller anticipated, and
+        // folding that into the peak would overstate peaks and bias the ranking against
+        // conversion.
+        SLANG_CONTAINER_STATS_NOTE_OP(Reserve);
         // The cast for this comparison is needed, otherwise some compilers erroneously detect
         // the possiblity of a zero sized allocation (possible if m_capacity is assumed to be
         // negative).
@@ -407,6 +485,8 @@ public:
 
     void growToCount(Index count)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(SetCount);
+        SLANG_CONTAINER_STATS_NOTE_SIZE(count);
         Index newBufferCount = Index(1) << Math::Log2Ceil((unsigned int)count);
         if (m_capacity < newBufferCount)
         {
@@ -417,14 +497,21 @@ public:
 
     void setCount(Index count)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(SetCount);
         reserve(count);
+        m_count = count;
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_count);
+    }
+
+    void unsafeShrinkToCount(Index count)
+    {
+        SLANG_CONTAINER_STATS_NOTE_OP(SetCount);
         m_count = count;
     }
 
-    void unsafeShrinkToCount(Index count) { m_count = count; }
-
     void compress()
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Reserve);
         if (m_capacity > m_count && m_count > 0)
         {
             T* newBuffer = _allocate(m_count);
@@ -455,12 +542,16 @@ public:
     SLANG_FORCE_INLINE T& operator[](Index idx)
     {
         SLANG_ASSERT(idx >= 0 && idx < m_count);
+        // Unlike `Dictionary::operator[]`, this is not recorded as `IndexUpdate`: indexing a list
+        // is an ordinary element access that `ShortList` supports just as well, so it neither
+        // disqualifies a site nor says anything about its size.
         return m_buffer[idx];
     }
 
     template<typename Func>
     Index findFirstIndex(const Func& predicate) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = 0; i < m_count; i++)
         {
             if (predicate(m_buffer[i]))
@@ -472,6 +563,7 @@ public:
     template<typename T2>
     Index indexOf(const T2& val) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = 0; i < m_count; i++)
         {
             if (m_buffer[i] == val)
@@ -483,6 +575,7 @@ public:
     template<typename Func>
     Index findLastIndex(const Func& predicate) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = m_count - 1; i >= 0; i--)
         {
             if (predicate(m_buffer[i]))
@@ -494,6 +587,7 @@ public:
     template<typename T2>
     Index lastIndexOf(const T2& val) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = m_count - 1; i >= 0; i--)
         {
             if (m_buffer[i] == val)
@@ -512,6 +606,7 @@ public:
     template<typename Comparer>
     void sort(Comparer compare)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Sort);
         // insertionSort(buffer, 0, _count - 1);
         // quickSort(buffer, 0, _count - 1, compare);
         std::sort(m_buffer, m_buffer + m_count, compare);
@@ -525,6 +620,7 @@ public:
     template<typename Comparer>
     void stableSort(Comparer compare)
     {
+        SLANG_CONTAINER_STATS_NOTE_OP(Sort);
         std::stable_sort(m_buffer, m_buffer + m_count, compare);
     }
 
@@ -601,6 +697,7 @@ public:
     template<typename T2, typename Comparer>
     Index binarySearch(const T2& obj, Comparer comparer) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         Index imin = 0, imax = m_count - 1;
         while (imax >= imin)
         {
@@ -640,6 +737,7 @@ private:
                  ///< valid form for T.
     Index m_capacity; ///< The total capacity of elements
     Index m_count;    ///< The amount of elements
+    SLANG_CONTAINER_STATS_MEMBER
 
     void _deallocateBuffer()
     {

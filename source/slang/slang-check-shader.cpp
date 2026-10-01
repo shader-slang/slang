@@ -34,6 +34,48 @@ enum class SemanticDirection
 // already reported MaximumTypeNestingLevelExceeded for anything deeper.
 static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
 
+/// Return every atom that `after` has and `before` does not, comparing the two capability sets
+/// one (target, stage) pair at a time.
+///
+/// Both sets hold a conjunction of atoms per pair, and the answer we want is about the pair the
+/// entry point will actually be compiled for. Taking the first conjunction of each set, as this
+/// once did, asked the two hash maps for whichever pair they happened to yield first -- and not
+/// necessarily the same pair from each, since the two sets are separate maps. The atoms named in
+/// the resulting warning therefore changed from one run of the compiler to the next, and could
+/// name an extension belonging to a target the user was not compiling for at all: an HLSL entry
+/// point requiring `cooperative_vector` was reported as upgrading the profile to
+/// 'GL_NV_cooperative_vector' rather than 'sm_6_9'.
+///
+/// Pairing the conjunctions up by target and stage and taking the union of the differences gives
+/// the same answer whatever order the pairs are visited in.
+static CapabilityAtomSet _getAtomsAddedToCapabilities(
+    const CapabilitySet& before,
+    const CapabilitySet& after)
+{
+    CapabilityAtomSet addedAtoms;
+    for (const auto& afterTarget : after.getCapabilityTargetSets())
+    {
+        auto beforeTarget = before.getCapabilityTargetSets().tryGetValue(afterTarget.first);
+        if (!beforeTarget)
+            continue;
+
+        for (const auto& afterStage : afterTarget.second.getShaderStageSets())
+        {
+            auto beforeStage = beforeTarget->getShaderStageSets().tryGetValue(afterStage.first);
+            if (!beforeStage || !beforeStage->atomSet || !afterStage.second.atomSet)
+                continue;
+
+            CapabilityAtomSet difference;
+            CapabilityAtomSet::calcSubtract(
+                difference,
+                afterStage.second.atomSet.value(),
+                beforeStage->atomSet.value());
+            addedAtoms.add(difference);
+        }
+    }
+    return addedAtoms;
+}
+
 static bool isValidThreadDispatchIDType(Type* type)
 {
     // Can accept a single int/unit
@@ -394,9 +436,8 @@ static void validateNoPerPrimitiveSemanticsInType(
 {
     if (!type)
         return;
-    if (seenTypes.contains(type))
+    if (!seenTypes.add(type))
         return;
-    seenTypes.add(type);
 
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
@@ -1454,9 +1495,8 @@ static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
         auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
         if (structDeclRef)
         {
-            if (ctx.seenTypes.contains(type))
+            if (!ctx.seenTypes.add(type))
                 return false;
-            ctx.seenTypes.add(type);
 
             bool foundError = false;
             // Iterate the struct's fields through the DeclRef so that generic
@@ -1563,9 +1603,8 @@ static bool _typeHasSemanticImpl(
     type = unwrapConditionalType(type);
     if (!type)
         return false;
-    if (seenTypes.contains(type))
+    if (!seenTypes.add(type))
         return false;
-    seenTypes.add(type);
 
     const auto next = recursionDepth + 1;
 
@@ -2646,17 +2685,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             {
                 CapabilitySet combinedSets = targetCaps;
                 combinedSets.join(entryPointInferredCaps);
-                CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
-                {
-                    if (auto combinedSet = combinedSets.getAtomSets())
-                    {
-                        CapabilityAtomSet::calcSubtract(
-                            addedAtoms,
-                            (*combinedSet),
-                            (*targetCapSet));
-                    }
-                }
+                CapabilityAtomSet addedAtoms =
+                    _getAtomsAddedToCapabilities(targetCaps, combinedSets);
                 StringBuilder entryPointNameSb;
                 printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
                 auto atoms = addedAtoms.getElements<CapabilityAtom>();
@@ -2954,9 +2984,8 @@ void Module::_collectShaderParams(DiagnosticSink* sink)
                 // from this module to another module.
                 //
                 auto importedModule = getModule(importDecl->importedModuleDecl);
-                if (!requiredModuleSet.contains(importedModule))
+                if (requiredModuleSet.add(importedModule))
                 {
-                    requiredModuleSet.add(importedModule);
                     m_requirements.add(importedModule);
                 }
             }

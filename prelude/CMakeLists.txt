@@ -31,7 +31,7 @@ slang_add_target(
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/../include
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
-    LINK_WITH_PRIVATE unordered_dense::unordered_dense
+    LINK_WITH_PRIVATE slang-hashmap
     PUBLIC_HEADERS ${CMAKE_CURRENT_LIST_DIR}/slang*.h
     # It's an object library, so the install step only installs the headers
     INSTALL

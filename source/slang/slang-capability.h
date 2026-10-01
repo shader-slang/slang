@@ -201,6 +201,7 @@ public:
     /// Make an invalid capability set (such that no target could ever support it)
     static CapabilitySet makeInvalid();
 
+    static constexpr bool kHasUniformHash = true;
     HashCode64 getHashCode() const;
 
     /// Is this capability set empty (such that any target supports it)?
@@ -318,8 +319,21 @@ public:
             const CapabilityAtomSet* operator->() const { return &(*(*this->atomSetNode)); }
             bool operator==(const Iterator& other) const
             {
-                return other.context == this->context && other.targetNode == this->targetNode &&
-                       other.stageNode == this->stageNode;
+                if (other.context != this->context || other.targetNode != this->targetNode)
+                    return false;
+
+                // `stageNode` only names a position while `targetNode` refers to a real
+                // target set. Once `targetNode` has reached the end there is no stage set
+                // for it to point into, and both iterators hold a default-constructed one,
+                // so comparing them would compare two singular map iterators. Which map
+                // implementation backs `Dictionary` is a build option, and not all of them
+                // make that comparison meaningful -- `tsl::robin_map`'s iterator leaves its
+                // bucket pointer uninitialised when default-constructed -- so the end
+                // position is identified by `targetNode` alone.
+                if (this->targetNode == this->context->end())
+                    return true;
+
+                return other.stageNode == this->stageNode;
             }
             bool operator!=(const Iterator& other) const { return !(other == *this); }
 
@@ -335,7 +349,10 @@ public:
                             this->targetNode++;
                             if (this->targetNode == this->context->end())
                             {
-                                this->stageNode = {};
+                                // `stageNode` is deliberately left alone: it no longer
+                                // names anything, `operator==` does not read it at the
+                                // end, and default-constructing one is not meaningful for
+                                // every map implementation `Dictionary` can be built on.
                                 this->atomSetNode = {};
                                 return *this;
                             }

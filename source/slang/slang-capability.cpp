@@ -1420,14 +1420,14 @@ bool CapabilitySet::isBetterForTarget(
                     return false;
 
                 auto thisSetElements = thisSet.getElements<CapabilityAtom>();
-                auto thatSetElements = thisSet.getElements<CapabilityAtom>();
+                auto thatSetElements = thatSet.getElements<CapabilityAtom>();
                 auto shaderStageSetWeNeedElements =
                     shaderStageSetWeNeed.getElements<CapabilityAtom>();
 
                 auto thisDiffScore =
                     _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
                 auto thatDiffScore =
-                    _calcAtomListDifferenceScore(thisSetElements, shaderStageSetWeNeedElements);
+                    _calcAtomListDifferenceScore(thatSetElements, shaderStageSetWeNeedElements);
 
                 return thisDiffScore < thatDiffScore;
             }
@@ -1442,6 +1442,24 @@ bool CapabilitySet::isBetterForTarget(
 CapabilitySet::AtomSets::Iterator CapabilitySet::getAtomSets() const
 {
     return CapabilitySet::AtomSets::Iterator(&this->getCapabilityTargetSets()).begin();
+}
+
+/// Return the keys of `map` in increasing atom order.
+///
+/// The capability sets are hash maps, so walking one directly visits its targets, or the stages
+/// of one target, in whatever order their keys happened to land in the table. That order differs
+/// between builds of the compiler, and between runs of a single build whenever the hash is seeded
+/// per process. Callers that stop at the first entry to satisfy some condition would otherwise
+/// give a different answer each time.
+template<typename T>
+static List<CapabilityAtom> _getSortedAtomKeys(const Dictionary<CapabilityAtom, T>& map)
+{
+    List<CapabilityAtom> keys;
+    keys.reserve(map.getCount());
+    for (const auto& entry : map)
+        keys.add(entry.first);
+    keys.sort();
+    return keys;
 }
 
 void CapabilitySet::checkCapabilityRequirement(
@@ -1510,12 +1528,13 @@ void CapabilitySet::checkCapabilityRequirement(
 
     // if all sets in `available` are not a superset to `required` then we have an
     // error.
-    for (auto& availableTarget : availableTargetSets)
+    for (auto availableTargetAtom : _getSortedAtomKeys(availableTargetSets))
     {
-        auto reqTarget = requiredTargetSets.tryGetValue(availableTarget.first);
+        auto& availableTargetSet = *availableTargetSets.tryGetValue(availableTargetAtom);
+        auto reqTarget = requiredTargetSets.tryGetValue(availableTargetAtom);
         if (!reqTarget)
         {
-            outFailedAvailableSet.add((UInt)availableTarget.first);
+            outFailedAvailableSet.add((UInt)availableTargetAtom);
             result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
             return;
         }
@@ -1524,11 +1543,11 @@ void CapabilitySet::checkCapabilityRequirement(
         {
             // If we have a mismatch in capability-stage count we clearly have a
             // mismatch and will fail
-            auto availableStageSetsCount = availableTarget.second.getShaderStageSets().getCount();
+            auto availableStageSetsCount = availableTargetSet.getShaderStageSets().getCount();
             auto requiredStageSetsCount = reqTarget->getShaderStageSets().getCount();
             if (availableStageSetsCount != requiredStageSetsCount)
             {
-                auto availableStages = getStageAtomsInSet(availableTarget.second);
+                auto availableStages = getStageAtomsInSet(availableTargetSet);
                 auto requiredStages = getStageAtomsInSet(*reqTarget);
 
                 if (requiredStageSetsCount > availableStageSetsCount)
@@ -1547,20 +1566,22 @@ void CapabilitySet::checkCapabilityRequirement(
             }
         }
 
-        for (auto& availableStage : availableTarget.second.getShaderStageSets())
+        auto& availableStageSets = availableTargetSet.getShaderStageSets();
+        for (auto availableStageAtom : _getSortedAtomKeys(availableStageSets))
         {
-            auto reqStage = reqTarget->getShaderStageSets().tryGetValue(availableStage.first);
+            auto& availableStageEntry = *availableStageSets.tryGetValue(availableStageAtom);
+            auto reqStage = reqTarget->getShaderStageSets().tryGetValue(availableStageAtom);
             if (!reqStage)
             {
-                outFailedAvailableSet.add((UInt)availableStage.first);
+                outFailedAvailableSet.add((UInt)availableStageAtom);
                 result = CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms;
                 return;
             }
 
             const CapabilityAtomSet* lastBadStage = nullptr;
-            if (availableStage.second.atomSet)
+            if (availableStageEntry.atomSet)
             {
-                const auto& availableStageSet = availableStage.second.atomSet.value();
+                const auto& availableStageSet = availableStageEntry.atomSet.value();
                 lastBadStage = nullptr;
                 if (reqStage->atomSet)
                 {

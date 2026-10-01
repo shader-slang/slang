@@ -21,6 +21,7 @@ struct ReinterpretOptionalKey
         return srcType == other.srcType && destType == other.destType;
     }
 
+    static constexpr bool kHasUniformHash = true;
     HashCode getHashCode() const
     {
         return combineHash(Slang::getHashCode(srcType), Slang::getHashCode(destType));
@@ -34,13 +35,7 @@ struct ReinterpretLoweringContext
     IRModule* module;
     OrderedHashSet<IRInst*> workList;
 
-    void addToWorkList(IRInst* inst)
-    {
-        if (workList.contains(inst))
-            return;
-
-        workList.add(inst);
-    }
+    void addToWorkList(IRInst* inst) { workList.add(inst); }
 
     void processInst(IRInst* inst, IROp targetOp)
     {
@@ -223,13 +218,7 @@ struct ReinterpretOptionalLoweringContext
     // Cache for ReinterpretOptional helper functions, keyed by (srcType, destType) pair
     Dictionary<ReinterpretOptionalKey, IRFunc*> reinterpretOptionalFuncCache;
 
-    void addToWorkList(IRInst* inst)
-    {
-        if (workList.contains(inst))
-            return;
-
-        workList.add(inst);
-    }
+    void addToWorkList(IRInst* inst) { workList.add(inst); }
 
     void processInst(IRInst* inst, IROp targetOp)
     {

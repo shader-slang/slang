@@ -1137,10 +1137,13 @@ VMExtFunction mapInstToFunction(
                 return nullptr;
             auto funcName = (const char*)module->constants +
                             module->stringOffsets[instHeader->getOperand(1).offset];
-            VMExtFunction handler = nullptr;
-            if (!extInstHandlers.tryGetValue(funcName, handler))
+            // Probe with a slice: `funcName` points into the module's constant
+            // pool, so converting it to a `String` here would heap-allocate and
+            // copy the name on every dispatch of this instruction.
+            auto handler = extInstHandlers.tryGetValue(UnownedStringSlice(funcName));
+            if (!handler)
                 return nullptr;
-            return handler;
+            return *handler;
         }
     case VMOp::Print:
         return printHandler;

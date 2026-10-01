@@ -150,11 +150,10 @@ struct SynthesizeActiveMaskForModuleContext
     //
     void markFuncUsingActiveMask(IRFunc* func)
     {
-        if (m_funcsUsingActiveMaskSet.contains(func))
+        if (!m_funcsUsingActiveMaskSet.add(func))
             return;
 
         m_funcsUsingActiveMask.add(func);
-        m_funcsUsingActiveMaskSet.add(func);
     }
 
     // The easiest way to know that a function uses the active

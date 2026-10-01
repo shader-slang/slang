@@ -25,6 +25,7 @@ public:
             return value == other.value && size == other.size;
         }
         bool operator!=(const ConstKey& other) const { return !(*this == other); }
+        static constexpr bool kHasUniformHash = true;
         HashCode getHashCode() const { return combineHash(value, size); }
     };
     Dictionary<ConstKey, VMOperand> mapConstantIntToOperand;

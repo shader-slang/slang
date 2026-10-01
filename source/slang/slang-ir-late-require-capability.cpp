@@ -13,6 +13,50 @@
 namespace Slang
 {
 
+/// Return every atom that `after` has and `before` does not, comparing the two capability sets
+/// one (target, stage) pair at a time.
+///
+/// Both sets hold a conjunction of atoms per pair, and what this warning wants to name is the
+/// atoms added for the pair being compiled. Taking the first conjunction of each set, as this
+/// once did, asks the two hash maps for whichever pair they happen to yield first, and not
+/// necessarily the same pair from each, since they are separate maps. The atoms named then
+/// changed from one run of the compiler to the next, and could belong to a target the user was
+/// not compiling for: an HLSL entry point needing `cooperative_vector` was reported as upgrading
+/// its profile to 'GL_NV_cooperative_vector' rather than 'sm_6_9'. Pairing the conjunctions up by
+/// target and stage and taking the union of the differences gives the same answer whatever order
+/// the pairs are visited in.
+///
+/// NOTE: `slang-check-shader.cpp` has the same helper for the same reason. They belong together
+/// in `slang-capability.h`, which is left for a change that is allowed to rebuild everything
+/// that header reaches.
+static CapabilityAtomSet _getAtomsAddedToCapabilities(
+    const CapabilitySet& before,
+    const CapabilitySet& after)
+{
+    CapabilityAtomSet addedAtoms;
+    for (const auto& afterTarget : after.getCapabilityTargetSets())
+    {
+        auto beforeTarget = before.getCapabilityTargetSets().tryGetValue(afterTarget.first);
+        if (!beforeTarget)
+            continue;
+
+        for (const auto& afterStage : afterTarget.second.getShaderStageSets())
+        {
+            auto beforeStage = beforeTarget->getShaderStageSets().tryGetValue(afterStage.first);
+            if (!beforeStage || !beforeStage->atomSet || !afterStage.second.atomSet)
+                continue;
+
+            CapabilityAtomSet difference;
+            CapabilityAtomSet::calcSubtract(
+                difference,
+                afterStage.second.atomSet.value(),
+                beforeStage->atomSet.value());
+            addedAtoms.add(difference);
+        }
+    }
+    return addedAtoms;
+}
+
 struct ProcessLateRequireCapabilityInstsContext
 {
     IRModule* const m_module;
@@ -54,15 +98,7 @@ struct ProcessLateRequireCapabilityInstsContext
             return;
 
         // figure out the missing delta
-        CapabilityAtomSet addedAtoms{};
-
-        if (auto stageCapSet = stageTargetCaps.getAtomSets())
-        {
-            if (auto requiredSet = required.getAtomSets())
-            {
-                CapabilityAtomSet::calcSubtract(addedAtoms, (*requiredSet), (*stageCapSet));
-            }
-        }
+        CapabilityAtomSet addedAtoms = _getAtomsAddedToCapabilities(stageTargetCaps, required);
 
         sb.clear();
         printDiagnosticArg(sb, addedAtoms);

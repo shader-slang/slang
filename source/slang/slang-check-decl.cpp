@@ -8665,7 +8665,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
     //
     auto containerDecl = getParentDecl(synthesizedAccessorContainer);
     auto containerDeclRef = getDefaultDeclRef(containerDecl);
-    for (auto& [key, value] : mapRequiredAccessorToSynAccessor)
+    for (const auto& [key, value] : mapRequiredAccessorToSynAccessor)
     {
         witnessTable->add(
             key.getDecl(),
@@ -14476,7 +14476,7 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
         // Build up the FunctionRedefinition diagnostic struct and emit it at the end
         Diagnostics::FunctionRedefinition diagnostic;
 
-        for (auto& [target, value] : newTargets)
+        for (const auto& [target, value] : newTargets)
         {
             auto found = currentTargets.tryGetValue(target);
             if (found)
@@ -18422,7 +18422,7 @@ void SharedSemanticsContext::registerSynthesizedDeclRoot(Decl* decl)
 
 void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
 {
-    for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
+    for (const auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
     {
         auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
         list.addRange(entryValue->candidateExtensions);
@@ -22673,9 +22673,8 @@ void diagnoseMissingCapabilityProvenance(
         {
             for (auto& i : referencedDecl->capabilityRequirementProvenance)
             {
-                if (checkedDecls.contains(i.referencedNode))
+                if (!checkedDecls.add(i.referencedNode))
                     continue;
-                checkedDecls.add(i.referencedNode);
                 auto innerReferencedDecl = as<Decl>(i.referencedNode);
                 if (!(innerReferencedDecl &&
                       CapabilitySet{innerReferencedDecl->inferredCapabilityRequirements}.implies(

@@ -219,7 +219,12 @@ struct LegalCallBuilder
     IRCall* m_call = nullptr;
 
     /// The legalized arguments for the call
-    ShortList<IRInst*> m_args;
+    ///
+    /// Legalization turns one logical argument into zero or more actual ones -- a struct passed by
+    /// value becomes one argument per legalized field -- so this list is longer than the call's own
+    /// argument count and routinely holds more than the default inline capacity. Measured over a
+    /// real shader corpus it exceeded 16 in 35% of calls and needs 32 to stay inline.
+    ShortList<IRInst*, 32> m_args;
 
     /// Add a logical argument to the call (which may map to zero or mmore actual arguments)
     void addArg(LegalVal const& val)

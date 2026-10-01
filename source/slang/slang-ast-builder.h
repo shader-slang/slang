@@ -65,10 +65,16 @@ public:
 
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice);
 
-    // Look up a magic declaration by its name
-    Decl* findMagicDecl(String const& name);
+    // Look up a magic declaration by its name.
+    //
+    // The name is a `const char*` rather than a `String` because every caller has a literal --
+    // "DifferentiableType", "VectorExpressionType" -- as do `getBuiltinDeclRef` and
+    // `getSpecializedBuiltinType`, which are the two functions that reach here. Taking a
+    // `String const&` made each of those calls build a heap `String` for a compile-time constant
+    // and destroy it once the lookup returned.
+    Decl* findMagicDecl(const char* name);
 
-    Decl* tryFindMagicDecl(String const& name);
+    Decl* tryFindMagicDecl(const char* name);
 
     Decl* findBuiltinRequirementDecl(BuiltinRequirementKind kind)
     {
@@ -127,7 +133,9 @@ protected:
     Type* m_builtinTypes[Index(BaseType::CountOf)];
     Dictionary<String, Type*> m_magicEnumTypes;
 
-    Dictionary<String, Decl*> m_magicDecls;
+    // Keyed transparently so that `findMagicDecl` can probe it with a slice of the caller's string
+    // literal. Registration still stores an owned `String`, which is where the name has to live.
+    Dictionary<String, Decl*, StringSliceHash, StringSliceEqual> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
 
     Dictionary<UnownedStringSlice, SyntaxClass<NodeBase>> m_sliceToTypeMap;
@@ -153,6 +161,11 @@ protected:
 
 struct ValKey
 {
+    // The hash is `Hasher`'s result, which is already well distributed, so the map does not need
+    // to mix it again. This has to be a member of the key: `DetectAvalanchingHash` looks for
+    // `T::kHasUniformHash`, so declaring it anywhere else says nothing to the map.
+    static constexpr bool kHasUniformHash = true;
+
     Val* val;
     HashCode hashCode;
     ValKey() = default;
@@ -205,12 +218,21 @@ struct Hash<ValKey>
     auto operator()(const ValNodeDesc& k) const { return Hash<ValNodeDesc>{}(k); }
 };
 
-// A functor which can compare ValKey for equality with ValNodeDesc
+// A functor which can compare ValKey for equality with ValNodeDesc.
+//
+// Both argument orders are provided because a hash map performing a
+// heterogeneous lookup may pass the stored key and the probe key to the
+// comparator in either order, and which one it picks is an unspecified
+// implementation detail: `ankerl::unordered_dense::map` compares
+// `equal(probe, stored)` while `absl::flat_hash_map` and `tsl::robin_map`
+// compare `equal(stored, probe)`. Supplying only one order silently restricts
+// which map implementations `m_cachedNodes` can be built on.
 struct ValKeyEqual
 {
     using is_transparent = void;
     bool operator()(const Slang::ValKey& a, const Slang::ValKey& b) const { return a == b; }
     bool operator()(const Slang::ValNodeDesc& a, const Slang::ValKey& b) const { return b == a; }
+    bool operator()(const Slang::ValKey& a, const Slang::ValNodeDesc& b) const { return a == b; }
 };
 
 class ASTBuilder : public RefObject

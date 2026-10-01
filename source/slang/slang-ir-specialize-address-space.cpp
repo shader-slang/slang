@@ -63,6 +63,11 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         HashCode hashCode;
 
     public:
+        // The hash is `Hasher`'s result, which is already well distributed, so the map does not
+        // need to mix it again. This has to be a member of the key: `DetectAvalanchingHash` looks
+        // for `T::kHasUniformHash`, so declaring it inside a function says nothing to the map.
+        static constexpr bool kHasUniformHash = true;
+
         IRFunc* getFunc() const { return func; }
         ArrayView<AddressSpace> getArgAddrSpaces() const { return argAddrSpaces.getArrayView(); }
 

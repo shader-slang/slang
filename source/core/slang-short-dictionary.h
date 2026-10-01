@@ -35,9 +35,56 @@ namespace Slang
 template<typename TKey, typename TValue, int kInlineCapacity = 8>
 class ShortDictionary
 {
+    using ThisType = ShortDictionary<TKey, TValue, kInlineCapacity>;
+
 public:
+#if SLANG_ENABLE_CONTAINER_STATS
+    // In a normal build this type declares no constructors at all and relies on its members'
+    // default member initializers. The constructors below exist only so that each one can record
+    // where it was called from, and so that the site can be handed on to the overflow
+    // `Dictionary`: that member would otherwise report this header for every `ShortDictionary` in
+    // the codebase, and it is the member that says whether a promotion actually happened.
+    //
+    // The copy and move constructors have to be spelled out because `ContainerStatsProbe` is not
+    // copyable, which is deliberate -- see the comment on its deleted operations.
+    ShortDictionary(SLANG_CONTAINER_STATS_SITE_PARAM)
+        : m_overflow(slangContainerStatsSite)
+        , SLANG_CONTAINER_STATS_INIT_SHORT(ThisType, TKey, TValue, kInlineCapacity)
+    {
+    }
+
+    ShortDictionary(const ShortDictionary& rhs SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_inlineCount(rhs.m_inlineCount)
+        , m_overflowed(rhs.m_overflowed)
+        , m_overflow(rhs.m_overflow, slangContainerStatsSite)
+        , SLANG_CONTAINER_STATS_INIT_SHORT(ThisType, TKey, TValue, kInlineCapacity)
+    {
+        for (Index i = 0; i < m_inlineCount; i++)
+        {
+            m_inlineKeys[i] = rhs.m_inlineKeys[i];
+            m_inlineValues[i] = rhs.m_inlineValues[i];
+        }
+        SLANG_CONTAINER_STATS_NOTE_SIZE(m_inlineCount);
+    }
+
+    ShortDictionary(ShortDictionary&& rhs SLANG_CONTAINER_STATS_SITE_PARAM_TRAILING)
+        : m_inlineCount(rhs.m_inlineCount)
+        , m_overflowed(rhs.m_overflowed)
+        , m_overflow(std::move(rhs.m_overflow), slangContainerStatsSite)
+        , SLANG_CONTAINER_STATS_INIT_SHORT(ThisType, TKey, TValue, kInlineCapacity)
+    {
+        for (Index i = 0; i < m_inlineCount; i++)
+        {
+            m_inlineKeys[i] = std::move(rhs.m_inlineKeys[i]);
+            m_inlineValues[i] = std::move(rhs.m_inlineValues[i]);
+        }
+        SLANG_CONTAINER_STATS_TAKE_FROM(rhs.m_containerStatsProbe);
+    }
+#endif
+
     const TValue* tryGetValue(const TKey& key) const
     {
+        SLANG_CONTAINER_STATS_NOTE_LOOKUP();
         for (Index i = 0; i < m_inlineCount; i++)
         {
             if (m_inlineKeys[i] == key)
@@ -66,6 +113,7 @@ public:
                 m_inlineKeys[m_inlineCount] = key;
                 m_inlineValues[m_inlineCount] = value;
                 m_inlineCount++;
+                SLANG_CONTAINER_STATS_NOTE_ADD_ONLY_INSERT();
                 return;
             }
 
@@ -87,6 +135,7 @@ public:
         // the same guarantee at the same strength.
         SLANG_RELEASE_ASSERT(!m_overflow.tryGetValue(key));
         m_overflow.add(key, value);
+        SLANG_CONTAINER_STATS_NOTE_ADD_ONLY_INSERT();
     }
 
 private:
@@ -95,6 +144,7 @@ private:
     Index m_inlineCount = 0;
     bool m_overflowed = false;
     Dictionary<TKey, TValue> m_overflow;
+    SLANG_CONTAINER_STATS_MEMBER
 };
 
 } // namespace Slang

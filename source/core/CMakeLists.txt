@@ -5,7 +5,10 @@ slang_add_target(
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}
-    LINK_WITH_PUBLIC unordered_dense::unordered_dense
+    # Public because slang-dictionary.h and slang-hash.h are public headers of
+    # this target, and every dependent must agree on which hash map and hash
+    # function Slang::Dictionary is built from.
+    LINK_WITH_PUBLIC slang-hashmap
     INCLUDE_DIRECTORIES_PUBLIC
         ${slang_SOURCE_DIR}/source
         ${slang_SOURCE_DIR}/include
