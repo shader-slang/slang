@@ -8,7 +8,7 @@ namespace Slang
 // Expose captured primal parameters as separate arguments to internal derivative functions.
 // Autodiff deliberately packages these values into a parameter context, which can itself be a
 // field of the full backward context. Passing that package as one aggregate can make downstream
-// CUDA compilation materialize copies even when only some captured parameters are needed.
+// CUDA or Metal compilation materialize copies even when only some captured parameters are needed.
 //
 // Consider this example, written as pseudocode before aggregate parameters become references:
 //

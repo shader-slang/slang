@@ -1,7 +1,10 @@
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -validate-ir
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -line-directive-mode none -validate-ir -g
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none -validate-ir
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute -line-directive-mode none -validate-ir -g
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=NUMERIC): -cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=NUMERIC): -cpu -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=NUMERIC): -metal -compute -shaderobj -output-using-type
 
 // Exercise live nondifferentiable fields, nested call contexts, a differentiable
 // struct, and a custom reverse derivative after parameter contexts are expanded.
@@ -12,6 +15,16 @@
 // CUDA: static __device__ void s_bwdProp_objective_{{[0-9]+}}(Payload_{{[0-9]+}} *
 // CUDA-SAME: , Coefficients_{{[0-9]+}} * {{[[:alnum:]_]+}}, Inputs_{{[0-9]+}} *
 // CUDA: __global__ void computeMain(
+
+// Metal must expose the same independent arguments, retaining thread address spaces
+// when aggregate arguments become references later in lowering.
+// METAL: void s_bwdProp_cubic_{{[0-9]+}}(float
+// METAL-SAME: , float {{[[:alnum:]_]+}}, float thread* {{[[:alnum:]_]+}}, float {{[[:alnum:]_]+}})
+// METAL: void s_bwdProp_inner_{{[0-9]+}}(const Payload_{{[0-9]+}} thread*
+// METAL-SAME: , const Coefficients_{{[0-9]+}} thread* {{[[:alnum:]_]+}}, float
+// METAL: void s_bwdProp_objective_{{[0-9]+}}(const Payload_{{[0-9]+}} thread*
+// METAL-SAME: , const Coefficients_{{[0-9]+}} thread* {{[[:alnum:]_]+}}, const Inputs_{{[0-9]+}} thread*
+// METAL: {{\[\[kernel\]\]}} void computeMain(
 
 // Each case supplies x, y, scale, bias, and the reverse-mode seed at runtime.
 //TEST_INPUT:ubuffer(data=[1.0 3.0 2.0 0.5 0.5 -1.0 -0.5 -2.0 -0.5 -2.0 0.0 2.0 3.0 -1.0 1.0 1.0 2.0 3.0 1.0 0.0], stride=4):name=testInputs

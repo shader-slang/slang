@@ -9,7 +9,7 @@
 // CUDA: static __device__ void s_bwdProp_evaluate_{{[0-9]+}}(Payload_{{[0-9]+}} *
 // CUDA-SAME: , float {{[[:alnum:]_]+}}, float * {{[[:alnum:]_]+}}, float {{[[:alnum:]_]+}})
 // CUDA: __device__ void backward(Payload_{{[0-9]+}} payload_{{[0-9]+}},
-// The same input keeps its context parameter on a non-CUDA target.
+// The same input keeps its context parameter on the C++ target.
 // CPP: static void s_bwdProp_evaluate_{{[0-9]+}}(s_bwdCallableCtx_evaluate_{{[0-9]+}} *
 
 struct Payload

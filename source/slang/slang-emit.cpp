@@ -1795,10 +1795,10 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    // CUDA source lowering is shared by CUDA, PTX, and OptiX shader entry points. Expand captured
-    // parameters after tuple lowering, before aggregate parameters are converted to references.
-    // Keep the other target pipelines unchanged until this optimization is validated for them.
-    if (target == CodeGenTarget::CUDASource)
+    // Expand captured parameters for CUDA (including PTX and OptiX) and Metal after tuple
+    // lowering, before aggregate parameters are converted to references. Keep the other target
+    // pipelines unchanged until this optimization is validated for them.
+    if (target == CodeGenTarget::CUDASource || isMetalTarget(target))
     {
         SLANG_PASS(expandAutodiffParameterContexts);
     }
