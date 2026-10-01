@@ -4,6 +4,13 @@
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -entry computeMain -stage compute -dump-ir -o -
+
+// Every `read`, including the dynamic-dispatch wrappers built from it, keeps a
+// read-only (`1`) rather than read-write (`0`) reference parameter.
+// IR-NOT: func %{{[^ ]*}}read{{.*}}RefParam(Array(Int, 4 : Int), 0 : UInt64
+// IR: func %{{[^ ]*}}read{{.*}}RefParam(Array(Int, 4 : Int), 1 : UInt64
+// IR-NOT: func %{{[^ ]*}}read{{.*}}RefParam(Array(Int, 4 : Int), 0 : UInt64
 
 interface IAccumulator
 {
