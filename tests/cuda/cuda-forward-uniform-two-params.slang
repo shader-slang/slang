@@ -58,16 +58,14 @@ void computeMain(
 // Both aggregates stay by-value kernel parameters, so both keep the unchanged kernel ABI.
 // CHECK: __global__ void computeMain(Big_0 [[A:[A-Za-z0-9_]+]], Big_0 [[B:[A-Za-z0-9_]+]], RWStructuredBuffer<float>
 
-// One hoisted load per parameter, each a copy of a *different* source. Two loads of the same
-// parameter here would be the shared-load regression this test exists to catch.
-// CHECK-DAG: Big_0 [[LOADB:[A-Za-z0-9_]+]] = [[B]];
-// CHECK-DAG: Big_0 [[LOADA:[A-Za-z0-9_]+]] = [[A]];
+// Neither parameter is copied.
+// CHECK-NOT: Big_0 {{.*}}= [[A]]
+// CHECK-NOT: Big_0 {{.*}}= [[B]]
 
 // Each helper receives its own parameter's address - not the same one twice.
 // CHECK-DAG: readA_0(&[[A]],
 // CHECK-DAG: readB_0(&[[B]],
 
-// The inline reads go through the matching hoisted load: `a.v[0]` reads A's copy and `b.v[1]` reads
-// B's. Swapping these is precisely what a mixed `readUses` partition would produce.
-// CHECK: [[LOADA]].v_0[int(0)]
-// CHECK-SAME: [[LOADB]].v_0[int(1)]
+// Each inline read reads its own parameter: `a.v[0]` from A and `b.v[1]` from B.
+// CHECK: [[A]].v_0[int(0)]
+// CHECK-SAME: [[B]].v_0[int(1)]

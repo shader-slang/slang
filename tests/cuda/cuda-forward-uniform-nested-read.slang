@@ -44,10 +44,9 @@ void computeMain(
 // Kernel ABI unchanged: still a by-value aggregate parameter.
 // CHECK: __global__ void computeMain(Big_0 [[BIG:data_0]], RWStructuredBuffer<float>
 
-// The single load is hoisted into the entry block - before the branch, not inside it - so it
-// dominates the conditional read. The CHECK order is the assertion: a load sunk to the use site
-// would appear after the `if`, not before it.
-// CHECK: Big_0 [[LOADED:[A-Za-z0-9_]+]] = [[BIG]];
+// The read in the nested block loads through the parameter in place, so no whole-struct copy is
+// made anywhere in the kernel.
+// CHECK-NOT: Big_0 {{.*}}= [[BIG]]
 // CHECK: readsum_0(&[[BIG]]
 // CHECK: if{{ ?}}(
-// CHECK: [[LOADED]].v_0
+// CHECK: [[BIG]].v_0[int(0)]

@@ -52,9 +52,10 @@ void computeMain(
 // Kernel ABI unchanged: the aggregate is still a plain by-value kernel argument.
 // CHECK: __global__ void computeMain(Big_0 [[BIG:big_[0-9]*]], RWStructuredBuffer<float>
 
-// The inline read goes through one load of the parameter, not the pointer.
-// CHECK: Big_0 {{[A-Za-z0-9_]+}} = [[BIG]];
+// No whole-struct copy is made for either helper or for the inline read.
+// CHECK-NOT: Big_0 {{.*}}= [[BIG]]
 
 // Both helpers receive the parameter's address; no per-thread whole-aggregate copy is spilled.
 // CHECK-DAG: readsum_0(&[[BIG]]
 // CHECK-DAG: readmax_0(&[[BIG]]
+// CHECK: [[BIG]].v_0[int(0)]

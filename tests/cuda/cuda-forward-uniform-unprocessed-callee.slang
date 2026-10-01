@@ -55,12 +55,9 @@ void computeMain(
 // CHECK: {{.*}}float exported_read(Big_0 {{[A-Za-z0-9_]+}}, uint
 
 // CHECK: __global__ void computeMain(Big_0 [[BIG:[A-Za-z0-9_]+]], RWStructuredBuffer<float>
-// Eligibility is all-or-nothing across the parameter: because one call use (`exported_read`) is
-// declined, `big` is not forwarded to *any* callee, so even the rewritten `normal_read_0` reaches
-// it through the ordinary per-thread temp copy. Pinning the copy is what discriminates - with the
-// callee check removed, this becomes `normal_read_0(&big_0,` and no spill is emitted.
-// CHECK: Big_0 [[TMP:[A-Za-z0-9_]+]] = [[BIG]];
-// CHECK: normal_read_0(&[[TMP]],
+// The rewritten callee receives the parameter's address, with no per-thread copy.
+// CHECK-NOT: Big_0 {{.*}}= [[BIG]]
+// CHECK: normal_read_0(&[[BIG]],
 // And the declined callee must receive a value. `exported_read(&[[BIG]],` here would be the
 // miscompile: a `Big_0 *` argument reaching a by-value `Big_0` parameter.
 // CHECK: exported_read([[BIG]],

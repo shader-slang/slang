@@ -1930,6 +1930,15 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
                 auto base = ii->getBase();
                 if (isPtrToClassType(base->getDataType()))
                     emitDereferenceOperand(base, leftSide(newOuterPrec, innerPrec));
+                else if (isCudaKernelParamBorrowInType(base->getDataType()))
+                {
+                    // The by-value param `p` is the storage itself: `(&p)->f ==> p.f`.
+                    m_writer->emit(getName(base));
+                    m_writer->emit(".");
+                    m_writer->emit(getName(ii->getField()));
+                    maybeCloseParens(innerNeedClose);
+                    return;
+                }
                 else
                     emitOperand(base, leftSide(newOuterPrec, innerPrec));
                 m_writer->emit("->");
