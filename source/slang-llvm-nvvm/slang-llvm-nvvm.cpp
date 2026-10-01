@@ -3422,7 +3422,10 @@ static OptixIntrinsicKind _getOptixIntrinsicKind(const SlangNVVMNamedIntrinsicDe
         "_optix_get_launch_dimension_y",
         "_optix_get_launch_dimension_z",
         "_optix_get_attribute_0",
-        "_optix_get_attribute_1"};
+        "_optix_get_attribute_1",
+        "_optix_read_primitive_idx",
+        "_optix_read_instance_idx",
+        "_optix_read_instance_id"};
     if (!intrinsic.operandCount)
     {
         for (auto query : queries)

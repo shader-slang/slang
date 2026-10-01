@@ -133,7 +133,10 @@ World-ray origin/direction and ray-range queries use eight exact Float32 zero-ar
 in miss/closest-hit. Core composes the vector queries; the provider uses Float32 register transport.
 Direction retains the traced value without normalization. Current distance is the closest-hit
 distance or the original maximum in miss. Queries retain their observation position; the trace
-operation owns the callback memory clobber.
+operation owns the callback memory clobber. Primitive index, instance index and custom instance ID
+use three exact nullary UInt32 SDK queries in closest-hit only. The instance index identifies the
+entry in the instance acceleration structure; the custom ID comes from its host descriptor. Miss
+has ray state but no hit identity. This stage policy also applies to indirect helper calls.
 Unknown names, wrong signatures and invalid insertion points fail before emission. Missing trace
 support is diagnosed before module creation. This finite typed SDK boundary does not interpret CUDA
 text or admit arbitrary external calls. Any-hit, procedural intersection, callback tracing, callables

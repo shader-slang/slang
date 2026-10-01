@@ -21,6 +21,9 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
         {"_optix_get_sbt_data_ptr_64", NVVMSemantics::kUnsignedI64},
         {"_optix_get_attribute_0", NVVMSemantics::kUnsignedI32},
         {"_optix_get_attribute_1", NVVMSemantics::kUnsignedI32},
+        {"_optix_read_primitive_idx", NVVMSemantics::kUnsignedI32},
+        {"_optix_read_instance_idx", NVVMSemantics::kUnsignedI32},
+        {"_optix_read_instance_id", NVVMSemantics::kUnsignedI32},
         {"_optix_get_world_ray_origin_x", NVVMSemantics::kFloat32},
         {"_optix_get_world_ray_origin_y", NVVMSemantics::kFloat32},
         {"_optix_get_world_ray_origin_z", NVVMSemantics::kFloat32},
@@ -114,8 +117,11 @@ SLANG_UNIT_TEST(nvvmIRBuilderOptixPrimitivesKeepExactSignatures)
                 SLANG_SUCCEEDED(builder.serializeModule(scope.module, formats[i], blob)));
             const String text = _getBlobText(blob);
             for (const auto& query : queries)
-                SLANG_CHECK(
-                    _countOccurrences(text.getUnownedSlice(), UnownedStringSlice(query.name)) == 1);
+            {
+                StringBuilder call;
+                call << "call ($0), " << query.name << ", ();";
+                SLANG_CHECK(_countOccurrences(text.getUnownedSlice(), call.getUnownedSlice()) == 1);
+            }
             SLANG_CHECK(
                 _countOccurrences(text.getUnownedSlice(), toSlice("asm sideeffect")) ==
                 SLANG_COUNT_OF(queries));

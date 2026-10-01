@@ -21665,6 +21665,36 @@ uint RayFlags()
 
 // 10.4.3 - Primitive/Object Space System Values
 
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixInstanceIndex()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_read_instance_idx";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixInstanceID()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_read_instance_id";
+    }
+}
+
+[require(nvvm)]
+[NonUniformReturn]
+internal uint __nvvmOptixPrimitiveIndex()
+{
+    __target_switch
+    {
+    case nvvm: __intrinsic_asm "_optix_read_primitive_idx";
+    }
+}
+
 /// Returns the index of the current instance in the acceleration structure.
 /// @return Zero-based index of the current instance
 /// @remarks Available in any-hit, closest-hit, and intersection shaders
@@ -21677,6 +21707,7 @@ uint InstanceIndex()
     {
     case hlsl:  __intrinsic_asm "InstanceIndex";
     case glsl: __intrinsic_asm "(gl_InstanceID)";
+    case nvvm: return __nvvmOptixInstanceIndex();
     case cuda: __intrinsic_asm "optixGetInstanceIndex";
     case spirv:
         return spirv_asm
@@ -21698,6 +21729,7 @@ uint InstanceID()
     {
     case hlsl:  __intrinsic_asm "InstanceID";
     case glsl: __intrinsic_asm "(gl_InstanceCustomIndexEXT)";
+    case nvvm: return __nvvmOptixInstanceID();
     case cuda: __intrinsic_asm "optixGetInstanceId";
     case spirv:
         return spirv_asm
@@ -21719,6 +21751,7 @@ uint PrimitiveIndex()
     {
     case hlsl:  __intrinsic_asm "PrimitiveIndex";
     case glsl: __intrinsic_asm "(gl_PrimitiveID)";
+    case nvvm: return __nvvmOptixPrimitiveIndex();
     case cuda: __intrinsic_asm "optixGetPrimitiveIndex";
     case spirv:
         return spirv_asm

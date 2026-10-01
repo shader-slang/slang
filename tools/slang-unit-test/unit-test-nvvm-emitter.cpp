@@ -38,19 +38,28 @@ SLANG_UNIT_TEST(nvvmSlangOptixPrimitivesRejectComputeBeforeEmission)
 // backend's complete reachable-closure check before provider module creation.
 SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
 {
-    const char* names[] = {
-        "_optix_get_world_ray_origin_x",
-        "_optix_get_world_ray_origin_y",
-        "_optix_get_world_ray_origin_z",
-        "_optix_get_world_ray_direction_x",
-        "_optix_get_world_ray_direction_y",
-        "_optix_get_world_ray_direction_z",
-        "_optix_get_ray_tmin",
-        "_optix_get_ray_tmax",
+    const struct
+    {
+        const char* name;
+        bool hitIdentity;
+    } queries[] = {
+        {"_optix_get_world_ray_origin_x", false},
+        {"_optix_get_world_ray_origin_y", false},
+        {"_optix_get_world_ray_origin_z", false},
+        {"_optix_get_world_ray_direction_x", false},
+        {"_optix_get_world_ray_direction_y", false},
+        {"_optix_get_world_ray_direction_z", false},
+        {"_optix_get_ray_tmin", false},
+        {"_optix_get_ray_tmax", false},
+        {"_optix_read_primitive_idx", true},
+        {"_optix_read_instance_idx", true},
+        {"_optix_read_instance_id", true},
     };
-    for (const char* name : names)
-        for (SlangStage stage : {SLANG_STAGE_COMPUTE, SLANG_STAGE_RAY_GENERATION})
+    for (const auto& query : queries)
+        for (SlangStage stage : {SLANG_STAGE_COMPUTE, SLANG_STAGE_RAY_GENERATION, SLANG_STAGE_MISS})
         {
+            if (stage == SLANG_STAGE_MISS && !query.hitIdentity)
+                continue;
             _resetDirectNVVMFakes();
             ComPtr<slang::IGlobalSession> globalSession;
             SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -75,14 +84,16 @@ SLANG_UNIT_TEST(nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission)
             SLANG_CHECK_ABORT(
                 SLANG_SUCCEEDED(globalSession->createSession(desc, session.writeRef())));
             StringBuilder source;
-            source << "[require(nvvm)] [NonUniformReturn] float primitive() { __target_switch { "
-                      "case nvvm: __intrinsic_asm \""
-                   << name
-                   << "\"; } } [noinline] float indirect() { return primitive(); } "
-                      "RWStructuredBuffer<float> output; "
-                   << (stage == SLANG_STAGE_COMPUTE ? "[numthreads(1,1,1)] "
-                                                    : "[shader(\"raygeneration\")] ")
-                   << "void main() { output[0] = indirect(); }";
+            const char* type = query.hitIdentity ? "uint" : "float";
+            const char* entryAttribute = stage == SLANG_STAGE_COMPUTE ? "[numthreads(1,1,1)] "
+                                         : stage == SLANG_STAGE_RAY_GENERATION
+                                             ? "[shader(\"raygeneration\")] "
+                                             : "[shader(\"miss\")] ";
+            source << "[require(nvvm)] [NonUniformReturn] " << type
+                   << " primitive() { __target_switch { case nvvm: __intrinsic_asm \"" << query.name
+                   << "\"; } } [noinline] " << type
+                   << " indirect() { return primitive(); } RWStructuredBuffer<" << type
+                   << "> output; " << entryAttribute << "void main() { output[0] = indirect(); }";
             ComPtr<slang::IBlob> diagnostics, code;
             ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
                 "optixRayStateStage",

@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Twenty-five feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 71 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Twenty-six feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
+now contains 72 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -188,7 +188,7 @@ local Slang compiler/provider. The selector is committed as `318c2588` on siblin
 `nvvm-cuda-workflow`; its existing `build-all` is unchanged. Four NVVM compute/raygen cases, five
 NVRTC controls and a default compute case pass. Three malformed selectors reject; old headers
 disable explicit selection and old-runtime probes reject unsupported flags. Library tracing verifies
-the local compiler/provider. The CUDA listing has262registrations (261unique names); the full suite has **not** run
+the local compiler/provider. The initial CUDA listing had 262 registrations (261 unique names); the full suite has **not** run
 and remains on demand outside automatic smoke/working cadence. Custom device/session paths and
 internal direct NVRTC kernels retain their documented compiler owners.
 
@@ -197,11 +197,20 @@ checked storage plans. The canonical ScalarLayout field pointer retains its prod
 three-lane values occupy 12 bytes and use the existing compact-storage conversion. Six focused
 runtime cells and two compiler units pass, along with the static plan/provenance test and all
 15 smoke cells (21.75s). The new fixture's three modes are reviewed working-corpus admissions.
-The RHI triangle now passes global-vector admission and rejects the next missing operation,
-`PrimitiveIndex`; it is still a failed application test, not an accepted triangle result.
+The vector-only RHI retry advanced to the missing `PrimitiveIndex` operation. That intermediate
+failure remains recorded; the query batch below resolves it.
 
-**Next work:** add the related OptiX primitive index, instance index and custom instance ID queries
-through exact named UInt32 calls, with closest-hit stage admission. Use the existing RHI triangle
-and a small two-instance identity test so nonzero indices and distinct custom IDs are observed.
-The working cadence restarted at the repaired checkpoint; one implementation iteration has since
-passed. The optional full RHI suite remains on demand and the prior full baseline retains its identity.
+OptiX PrimitiveIndex, InstanceIndex and InstanceID now use exact UInt32 named calls with
+closest-hit admission. The sibling RHI two-instance test passes its independent 30-word oracle
+at NVVM O0/O3; the NVRTC control passes both levels. The original RHI triangle also passes:
+its retained failure history is global uint2 field admission, then PrimitiveIndex, then success.
+The grouped backend stage test covers nine new forbidden-stage cases before provider mutation.
+A provider test's substring collision between instance_id and instance_idx required only exact
+call-token matching; the initial failure and focused retry remain recorded. The retry, existing
+raygen runtime and all 15 smoke cells pass (smoke 21.82s). No ABI/version change.
+
+**Next work:** use a bounded selection of existing RHI ray-tracing cases to choose the next
+application-relevant gap. Continue exact typed primitives and existing checked representations;
+keep custom IDs distinct from instance ordinals and preserve stage restrictions. The working
+cadence restarted at the repaired checkpoint; two implementation iterations have since passed.
+The optional full RHI suite remains on demand and the prior full baseline retains its identity.

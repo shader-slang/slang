@@ -172,6 +172,17 @@ Qualify the setup with a bounded selection in separate processes:
   --cuda-compiler=nvrtc --test-case=compute-trivial.cuda
 ```
 
+The focused `ray-tracing-intrinsics-hit-identities.cuda` case uses two instances with distinct custom
+IDs and three primitives each. It runs O0 and O3 internally through the shared compiler selector,
+checking six hits, one miss and all 30 output words. Pair it with
+`ray-tracing-triangle-intersection.cuda` when changing typed hit queries or conventional globals:
+
+```bash
+"$RHI_BUILD/RelWithDebInfo/slang-rhi-tests" --select-devices=cuda --require-devices=cuda \
+  --cuda-compiler=nvvm \
+  --test-case=ray-tracing-intrinsics-hit-identities.cuda,ray-tracing-triangle-intersection.cuda
+```
+
 Only when the broader suite is requested, run the same command with `--test-case='*.cuda'`.
 Keep NVVM and NVRTC logs separate, retain initial failures, and inspect executed/failed/skipped
 counts and individual diagnostics. A zero-test filter or skipped test is not runtime qualification.

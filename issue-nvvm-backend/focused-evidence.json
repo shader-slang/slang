@@ -85259,6 +85259,262 @@
         "Existing sampler storage-only exclusions remain executable-value rejections.",
         "No full working/full corpus refresh; all 70 earlier features and full accepted baseline/identity remain unchanged."
       ]
+    },
+    "nvvm-optix-hit-identities": {
+      "status": "accepted-focused",
+      "scope": "PrimitiveIndex, InstanceIndex and InstanceID in closest-hit through exact typed NVVM queries, qualified on two instances/three primitives and the existing RHI triangle application.",
+      "identity": {
+        "revision": "e3e4bb76b11b587993657e1bbf3fe236e57e8447",
+        "source_sha256": {
+          "source/slang/hlsl.meta.slang": "05f8c2465efab88d3b81d5efd568c9f2eb825d0a282470b6011097ebdabf6c5b",
+          "source/slang/slang-emit-nvvm.cpp": "d8a59df9bdc48c6996f3f417ae662606bb939cd004e10b5190a7484295d90df3",
+          "source/slang-llvm-nvvm/slang-llvm-nvvm.cpp": "e131b2c8b9ef542451dd8d8623eaef3138efc7467e7ba51e3086014bdfd1f0ae",
+          "tools/slang-unit-test/unit-test-nvvm-builder.cpp": "ca969bdf77318ab56414d8553f51ed2b5315cd788b467d46f4ff04282022f3fe",
+          "tools/slang-unit-test/unit-test-nvvm-emitter.cpp": "bd2c5034f2d90b74c8d68d2d9d0a10af843b681998685ab8329d02be0c093064"
+        },
+        "patch_sha256": "95ad29d73bb23902c447969eabcac68a065ff950d5d3b91104a3a1982d1bc759",
+        "runtime_sha256": {
+          "build/RelWithDebInfo/lib/libslang-compiler.so": "af774b16c688ea74c661d45a73e19b5e2a5a9fc38bc0e894f57aeae02d7d7d28",
+          "build/RelWithDebInfo/lib/librender-test-tool.so": "bcc0c155a86c169ac9491352a551be9a0d6f7e972ad7d037e4afc8571f2cc491",
+          "build/RelWithDebInfo/bin/libslang-llvm-nvvm.so": "63c25a617f0ad41ab214cea0173b0458beb4b9d102aa83146b018814cf90b7f0",
+          "build/RelWithDebInfo/bin/slangc": "3ddb5e9be259894f5166666533771f28acf7c08128a1bf8499d88cbbfdd258c4",
+          "build/RelWithDebInfo/bin/slang-test": "47a235a775de5b88eea9bc4949460dc13b307cff4c6d81563c42ddf7c422b595",
+          "build/RelWithDebInfo/bin/test-server": "ae408c4965cb92b576f2038f72d9b35627243562911244cae13fbd87148ee5e7",
+          "build/RelWithDebInfo/lib/libslang-unit-test-tool.so": "144075a2752084e17306930a0520548a504d3644dadccfabb15239c0125bd767",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics.slang-module": "9d5b3079d751e1f147814f0412e7a995c5b4bd30e23ebbe392c58e58f88cf917",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/neural.slang-module": "41ef3eb41d3a46c197cf689bd0d145f86f80051ead944b6183ce2e21751c0fc0",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/experimental/workgraph.slang-module": "51a78bc5070415e3d934dc07edade51713b65684af9ccc2c332c71bb294b8356",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/differentiable.slang-module": "9c3c672cd95825f9070a1877eb5ee9c929116dd8fbdb23b45e89936dfd735874",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin.slang-module": "7e63c13cdfce1a1cdc1863378a498bb86e23932c24861a239a25c4ed314f3d35",
+          "build/RelWithDebInfo/lib/slang-standard-module-2026.16/slang/numerics/__builtin_differentiable.slang-module": "bdc2c2ddda53580cd887ded1c24c18bad41bf6004dbaecc1bb07750a7402d5bd",
+          "build/RelWithDebInfo/lib/slang-core-module.bin": "e193059f802d2714d7aa4bafe95a64eeec550988bed063cfba916e9af4674ca3"
+        },
+        "configuration_sha256": {
+          "build/CMakeCache.txt": "8a8d73beaf671ec716a1ecdd571acd9fc22c9e0410938bbfab3b4142e05f8c3b",
+          "build/nvvm-provider/RelWithDebInfo/CMakeCache.txt": "5fa122c42df1f278e70444d6423d62eaf671c95bce3c17b87bb8ac4f90f59329"
+        },
+        "compiler_version": "2026.18.3-350-gdc0a9acc3",
+        "device": "NVIDIA L4, GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736, driver595.71.05",
+        "toolkit": "CUDA12.9.2/NVRTC12.9.86, LLVM14, OptiX SDK9",
+        "rhi_identity": {
+          "path": "build/nvvm-optix-identities/rhi-identity.json",
+          "sha256": "781f15d0e00aefd127bba958cbc78440f51f7dbd06c347af530788030717b867"
+        },
+        "before_identity": {
+          "path": "build/nvvm-optix-identities/before-identity.json",
+          "sha256": "eef3505d3266b94d5c464b0e947da9bb50a4518b97b23832935ccbd981ac70e9"
+        },
+        "sdk_contract": {
+          "path": "build/nvvm-optix-identities/sdk-contract.json",
+          "sha256": "645ce760cc9eaf06a5cab8255bb9a4bf029948a404dbbdb556ee7a93ef512bbf"
+        },
+        "target_policy": "RHI follows actual CUDA device capabilities; compute smoke uses its existing SM80 selection. No inferred RHI SM80 or inspected PTX claim.",
+        "meaning": "Matching compiler/provider after three hit identity queries and final test-only exact-call assertion repair. RHI binaries and fixture bytes match their existing identity; the before gates retain their earlier compiler identity.",
+        "rhi_accepted_commit": "4a382a27e605ababfd71f3b2ecc93df0c8cf2508"
+      },
+      "validation": {
+        "build": {
+          "path": "build/nvvm-optix-identities/build.json",
+          "sha256": "d832fad64f6cad377a2eb1f6b88b63f2cbe2f063beb58a4412a306f2c6f77753",
+          "return_code": 0,
+          "elapsed_seconds": 87.14217257499695
+        },
+        "rhi_build": {
+          "path": "build/nvvm-optix-identities/rhi-build-retry.json",
+          "sha256": "eab5e89a2a45e106d2e614fd82fddb319b769b30c35094cce0e144e19d8cc9d7",
+          "return_code": 0,
+          "elapsed_seconds": 3.353907823562622
+        },
+        "units": {
+          "initial_record": {
+            "path": "build/nvvm-optix-identities/focused.json",
+            "sha256": "115df7a74085661203ff5efb5d6a3a97d3d05e86f43936cedd5ae519f66f406f",
+            "return_code": 1,
+            "elapsed_seconds": 6.358071804046631
+          },
+          "initial_outcomes": {
+            "slang-unit-test-tool/nvvmSlangOptixRayStateRejectsOtherStagesBeforeEmission.internal": "passed",
+            "slang-unit-test-tool/nvvmOptixRaygenBindings.internal": "passed",
+            "slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal": "failed-test-assertion"
+          },
+          "initial_builder_source_sha256": "0fdb100f184b974e4b8125cad1aaa4d725c61babe829d34d72da1de5e5d34776",
+          "initial_identity_meaning": "Original main-build unit plugin before test-only assertion correction. Its overwritten binary hash was not separately captured. The two passing stage/raygen results retain this original gate, not the final plugin identity. Compiler/provider and emitter-stage source unchanged by retry.",
+          "retry_build": {
+            "path": "build/nvvm-optix-identities/unit-build-retry.json",
+            "sha256": "3a0c50309188266772693583829c4b5cbde9c723640872edb7d9ea8782ef9dba",
+            "return_code": 0,
+            "elapsed_seconds": 20.1682071685791
+          },
+          "retry_record": {
+            "path": "build/nvvm-optix-identities/signature-retry.json",
+            "sha256": "266e3729667c132b93aee75072859a5b2022b8f3c57c01ab0c97072e919cef67",
+            "return_code": 0,
+            "elapsed_seconds": 1.4430391788482666
+          },
+          "retry_outcomes": {
+            "slang-unit-test-tool/nvvmIRBuilderOptixPrimitivesKeepExactSignatures.internal": "passed"
+          }
+        },
+        "rhi": {
+          "record": {
+            "path": "build/nvvm-optix-identities/nvvm-after.json",
+            "sha256": "31ed477989e436766e6df574dc14437f8d891537857204ae12a9888b64aea6e6",
+            "return_code": 0,
+            "elapsed_seconds": 2.922489643096924
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-hit-identities.cuda": "passed",
+            "ray-tracing-triangle-intersection.cuda": "passed"
+          },
+          "selected_cases": 2,
+          "passed_assertions": 179,
+          "filtered_out_cases": 927,
+          "selected_capability_skips": 0,
+          "identity_test_optimization_levels": [0, 3],
+          "triangle_optimization": "existing RHI default, no explicit O0/O3 claim"
+        },
+        "nvrtc_control": {
+          "record": {
+            "path": "build/nvvm-optix-identities/nvrtc-before.json",
+            "sha256": "3a8689ad90ac7431683729f5bd883883a700609694d4ff3c1a952f021f86d8e9",
+            "return_code": 0,
+            "elapsed_seconds": 2.8813512325286865
+          },
+          "compiler_identity": {
+            "path": "build/nvvm-optix-identities/before-identity.json",
+            "sha256": "eef3505d3266b94d5c464b0e947da9bb50a4518b97b23832935ccbd981ac70e9"
+          },
+          "outcomes": {
+            "ray-tracing-intrinsics-hit-identities.cuda": "passed"
+          },
+          "passed_assertions": 121,
+          "optimization_levels": [0, 3],
+          "meaning": "Before compiler identity and same frozen RHI fixture, not fresh final-compiler NVRTC qualification."
+        },
+        "smoke": {
+          "record": {
+            "path": "build/nvvm-optix-identities/smoke.json",
+            "sha256": "6b439b5569f1ead9d64923799f0ad90379bf9a965cc94ca9afd47f664bb45839",
+            "return_code": 0,
+            "elapsed_seconds": 21.820321321487427
+          },
+          "selection": {
+            "path": "build/nvvm-optix-identities/smoke-1/selection.json",
+            "sha256": "c5b7991bb11abe41734fd85628eb4e9d33cd0991bdc01503b4a406867c4831a7"
+          },
+          "provenance": {
+            "path": "build/nvvm-optix-identities/smoke-1/provenance.json",
+            "sha256": "538e6c9966a1a24d9a4a583996defd5931f980385e7767e5bdee58009d4c4704"
+          },
+          "correct": 15,
+          "regressions": 0,
+          "input_changes": 0
+        }
+      },
+      "runtime_contract": {
+        "instances": [
+          {
+            "ordinal": 0,
+            "custom_id": 61453,
+            "translation_x": 0
+          },
+          {
+            "ordinal": 1,
+            "custom_id": 4660,
+            "translation_x": 4
+          }
+        ],
+        "primitives": [0, 1, 2],
+        "rays": 7,
+        "output_words": 30,
+        "payload_bytes": 16,
+        "oracle": "Six interior hits return primitive/index/customID/hit; miss returns distinct sentinels. All28 result words and both untouched guards checked each optimization level, expected from host descriptors/triangle order."
+      },
+      "resolved_failures": [
+        {
+          "case": "ray-tracing-triangle-intersection.cuda",
+          "history": [
+            {
+              "record": {
+                "path": "build/nvvm-rhi-cuda/nvvm-triangle-final.json",
+                "sha256": "698592836d4340fab4c9e30136b8a204fc1d6a94bb0c0d8779b69734c97f80b9"
+              },
+              "status": "backend-preflight-failure",
+              "shape": "Ptr<vector<uint,2>, Generic, ScalarLayout> conventional-global field"
+            },
+            {
+              "record": {
+                "path": "build/nvvm-global-vectors/rhi-triangle.json",
+                "sha256": "f34c70ad9af77c8f118177cadec6de2b2267d8b49560c8a68527ac65cb9e293c"
+              },
+              "status": "backend-preflight-failure",
+              "shape": "GenericAsm assembly=optixGetPrimitiveIndex, signature=uint()"
+            },
+            {
+              "record": {
+                "path": "build/nvvm-optix-identities/nvvm-after.json",
+                "sha256": "31ed477989e436766e6df574dc14437f8d891537857204ae12a9888b64aea6e6"
+              },
+              "status": "passed"
+            }
+          ],
+          "meaning": "Earlier focused objects remain unchanged; this new record resolves the retained application chain."
+        },
+        {
+          "case": "ray-tracing-intrinsics-hit-identities.cuda",
+          "before": {
+            "path": "build/nvvm-optix-identities/nvvm-before.json",
+            "sha256": "1887f31e4785f65d0fb2e3ca0f40c0649b338d812c74baab9b3aa45f72254496",
+            "return_code": 1,
+            "elapsed_seconds": 1.3913602828979492
+          },
+          "before_identity": {
+            "path": "build/nvvm-optix-identities/before-identity.json",
+            "sha256": "eef3505d3266b94d5c464b0e947da9bb50a4518b97b23832935ccbd981ac70e9"
+          },
+          "diagnostic": "E52017 GenericAsm assembly=optixGetPrimitiveIndex, signature=uint()",
+          "before_optimization_executed": 0,
+          "before_optimization_not_reached": 3,
+          "resolution": {
+            "path": "build/nvvm-optix-identities/nvvm-after.json",
+            "sha256": "31ed477989e436766e6df574dc14437f8d891537857204ae12a9888b64aea6e6"
+          }
+        }
+      ],
+      "validation_incidents": [
+        {
+          "problem": "RHI test unsigned optimization enum narrowed into int32 option initializer.",
+          "failure": {
+            "path": "build/nvvm-optix-identities/rhi-build.json",
+            "sha256": "9691c03bb53752b6e243bbff7b9ff8b269afb849e9fdcbc479b241be106d6e3a",
+            "return_code": 1,
+            "elapsed_seconds": 4.5041890144348145
+          },
+          "resolution": "Explicit int32_t cast of known values0/3.",
+          "retry": {
+            "path": "build/nvvm-optix-identities/rhi-build-retry.json",
+            "sha256": "eab5e89a2a45e106d2e614fd82fddb319b769b30c35094cce0e144e19d8cc9d7"
+          }
+        },
+        {
+          "problem": "Substring assertion for _optix_read_instance_id also matched _optix_read_instance_idx.",
+          "failure": {
+            "path": "build/nvvm-optix-identities/focused.json",
+            "sha256": "115df7a74085661203ff5efb5d6a3a97d3d05e86f43936cedd5ae519f66f406f"
+          },
+          "resolution": "Count exact serialized call token, preserving paired serialization/no-mutation checks.",
+          "retry": {
+            "path": "build/nvvm-optix-identities/signature-retry.json",
+            "sha256": "266e3729667c132b93aee75072859a5b2022b8f3c57c01ab0c97072e919cef67"
+          }
+        }
+      ],
+      "qualification": [
+        "Closest-hit only; compute/raygen/miss helper callers rejected before provider mutation.",
+        "No any-hit/intersection, geometry-index, callable, payload aggregate, ABI or module-version expansion.",
+        "Bounded on-demand RHI checks only, no full RHI or working corpus run.",
+        "All71 prior focused objects and full accepted baseline/identity unchanged."
+      ]
     }
   }
 }
