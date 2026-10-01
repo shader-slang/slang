@@ -242,6 +242,8 @@ the provider emits pure `cvt.rzi.f16.f16` with 16-bit constraints and no unsuppo
 Mechanical Half→i16→Half bitcasts satisfy the verifier’s assembly operand rules without changing
 arithmetic precision.
 Ceil/floor/fma keep their genuine LLVM declarations. Whole-module verification remains enabled.
+The native Half instructions require SM53 or newer; this batch is qualified at SM80. The backend
+does not currently impose a separate Half architecture floor, and SM50/52 compatibility is unqualified.
 
 The fixture has four cells: CUDA O3 comparison, NVVM O0, NVVM O3 and NVVM O3 precise. Seventeen
 live input triples each exercise scalar, noinline helper and four heterogeneous vector lanes.

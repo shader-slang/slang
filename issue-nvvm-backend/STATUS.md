@@ -8,7 +8,7 @@ Module43, ABI46 and container2 are unchanged. The signed16 O3 failure is correct
 normalization at exact-width integer consumers. The consolidated integration checkpoint is accepted;
 operation dispatch, shared type-role admission, structured-buffer planning, fake-provider maintenance
 and architecture refresh are accepted. Native Half ceil/floor/trunc and single-rounded FMA are
-accepted. The requested full validation checkpoint is next.
+accepted. The requested full validation checkpoint is accepted; standard feature work resumes below.
 
 The accelerated workflow authorized on 2026-09-30 remains in effect: eight build jobs, larger
 related batches, focused compile/PTX/runtime checks and no routine module-version bumps or full
@@ -23,130 +23,76 @@ Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_upda
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
-[HISTORY](HISTORY.md) explains Git recovery. Raw current evidence is under ignored
-`build/nvvm-half-native/`; earlier cleanup evidence remains in its recorded ignored paths,
-and integration evidence remains under `build/nvvm-integration/run-1/`.
+[HISTORY](HISTORY.md) explains Git recovery. Raw full evidence is under ignored
+`build/nvvm-integration/full-after-cleanup-1/`; Half evidence remains under
+`build/nvvm-half-native/` and earlier cleanup evidence retains its recorded paths.
 Plans and reports remain uncommitted.
 
-## Latest focused acceptance
+## Current full acceptance
 
-| Evidence                                                   | Result                                                                                           |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Build                                                      | Eight-job incremental builds; matching numerics modules and isolated static executable refreshed |
-| Focused units                                              | 8 distinct pass; affected provider unit rerun after the trunc transport correction               |
-| Runtime                                                    | 9 distinct pass: directed Half 3, exact FMA 4 including precise, core composition 2              |
-| Code generation                                            | 6 PTX/ptxas cells; all four native Half operations, no Float32 promotion in NVVM                 |
-| Independent oracle                                         | Existing directed checker unchanged/pass; 17 FMA cases derived independently                     |
-| Last full / targeted / compiler implementations since full | log-family / native Half math / 13                                                               |
-| Historical evidence                                        | Full baseline/identity and all 41 earlier feature objects retained                               |
+The requested post-cleanup/Half checkpoint is accepted after independent review.
+All exact corpus and surface outcomes match the earlier full baseline:
 
-FMA now uses RN16(exact(a*b+c)); the original 3e02 double-rounding result is corrected to 3e01.
-Ceil/floor/FMA use LLVM intrinsics. LibNVVM12.9 rejects llvm.trunc.f16 and Half-typed inline
-assembly, so the provider emits exact cvt.rzi.f16.f16 with mechanical Half/i16 bit transport after
-normal validation. Both failed attempts remain recorded; whole-module verification is preserved.
-Round ties and approximate exp2/tanh remain separate documented policies. The Half helper ABI,
-role boundaries and Float32/64 paths are unchanged. CUDA remains comparison evidence.
+| Validation             | Result                                                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Main corpus            | 1,704 correct / 36 known unresolved across 1,740 cells; 21 resolved histories preserved                        |
+| Physical surfaces      | 214 pass / 24 known compile failures / 11 known NVRTC mismatches across 249 cells                              |
+| Native units           | 1,173 pass / 12 inherited skips; four stale assertions repaired and retried                                    |
+| Semantics / capability | 1,171 pass / 78 inherited skips; 106 capability tests pass                                                     |
+| Toolkit / material     | 18 toolkit, 6 material compile/assembly and 12 material runtime cells pass                                     |
+| Runtime / numerical    | Main runtime 4; supplemental 18 fresh plus mapped/reused coverage; numerical 99 fresh + 3 qualified Half cells |
+| Static / contracts     | 5 direct static units; 119 runner contracts + 83 surface contracts pass, one inherited contract skip           |
 
-The user-requested full checkpoint follows now; fix regressions and then resume standard feature
-work. Economical focused validation remains the per-batch default.
+No unexpected compiler/runtime regression remains. The full native run initially had four stale
+call/diagnostic assertions; exactly four focused retries pass after test-only corrections. One
+supplemental surface diagnostic similarly expected a deferred field error instead of the earlier
+`imageLoad` rejection; only its expected diagnostic changed, and its retry passes. Initial failures,
+exact inventory changes, test-only identity differences and unchanged no-mutation checks are retained.
+The checkpoint does not claim every backend's full repository suite or publication/CI readiness.
 
-The bounded integration checkpoint is accepted in `features.nvvm-post-migration-integration`.
-Five native failures were outdated migration assertions: early-folded size/alignment constants,
-removed SampleLevel helper call, and three AllEqual checks requiring CUDA's instruction sequence.
-Exact values, helper ABI/storage/texture checks and backend-specific PTX assertions now pass; the
-initial failures remain recorded. The other 1,167 native passes were reused without a second full
-run. Full corpus, numerical, material and performance campaigns were not repeated.
-
-Earlier core-tail qualifications remain, including Float64 modf's lack of fresh numerical
-qualification. Unsized CUDA arrays remain 16-byte pointer/count wrappers aligned to 8.
-
-This bounded checkpoint does not establish full-repository or publication/CI readiness. The inherited
-`nvvm-core-values.slang.1` O3 failure now passes with its exact original expectation. The former
-failure returned correct low16 bits but compared/widened as +32768. Canonical LLVM i16 was correct;
-the provider now enforces signed/unsigned interpretation at consumers through an explicit PTX
-widen/narrow pair that LLVM cannot remove. Half/BF16 transport and storage/helper ABI are unchanged.
-The original evidence remains in `features.nvvm-core-values-and-atomics`; its historical unresolved
-status is superseded by the new `features.nvvm-integer16-normalization` resolution record.
-CUDA WaveMaskMatch historically uses match-all while NVVM uses match-any; the shared wave fixture
-covers AllEqual without claiming differing-value Match masks agree.
+Native Half ceil/floor/trunc emit directed Half conversions. FMA uses RN16(exact(a*b+c)), correcting
+3e02 double rounding to 3e01 for the motivating inputs. LibNVVM12.9's trunc limitation requires
+checked Half/i16 transport around `cvt.rzi.f16.f16`; whole-module verification remains enabled.
+These instructions require SM53 or newer; this batch is qualified at SM80 and SM50/52 is unqualified.
+Round ties and approximate exp2/tanh remain separate documented policies. CUDA is comparison
+evidence, not an automatic oracle; retain the documented Vulkan/D3D12 contract distinctions.
 
 ## Current tested identity
 
-Revision `593a686f79ea51e3248373f9aaf47e1593140e32` plus implementation patch
-`a8d5e12e3d2b5b795d17dfbe0fcd1eb9b645fb1cc1a7cc324ef42971f0998ce8`; compiler version `2026.18.3-350-gdc0a9acc3`.
+The full run used repository revision `d35654675` after test-only repairs. Production compiler
+source is revision `593a686f79ea51e3248373f9aaf47e1593140e32` plus implementation patch
+`a8d5e12e3d2b5b795d17dfbe0fcd1eb9b645fb1cc1a7cc324ef42971f0998ce8`;
+see accepted identity for authoritative full revision/hash values. The configured compiler string
+remains `2026.18.3-350-gdc0a9acc3`; later commits do not relabel binaries.
 Compiler SHA-256: `1a9a6c04b7414f47fc74cdb0e0f13293085a2637f1e3e6ea8899af1bdd4547e9`.
 Provider SHA-256: `9ace32f8b44d19e9e09256f7f58555a24b262a429f238ce9b51576870bab83c6`.
-Source/runtime/test/configuration hashes and precise reuse are in `features.nvvm-native-half-math`.
-Earlier evidence retains its actual identity and failure history. Later commits do not relabel binaries.
 
-The [accepted baseline](accepted-baseline.json) and [accepted identity](accepted-identity.json)
-still identify the earlier **full log-family checkpoint**, not these current binaries. That full
-run preserved all 1,740 corpus and 249 surface outcomes: 1,704 correct main outcomes, 36 unresolved
-and 21 resolved histories; surfaces 214 pass, 24 compile failures and 11 NVRTC mismatches.
-It passed 1,177 native tests with 12 inherited skips and 1,170 semantic tests with 78 skips,
-plus runtime 4 / toolkit 18 / material 6. Runner checks passed 119 with one skip, plus 83 surface
-contracts. Log numerical preservation covered all 27 buffers. Earlier feature/static/material-runtime/performance claims
-retain their original identities.
+The [accepted baseline](accepted-baseline.json), [accepted identity](accepted-identity.json) and
+[focused evidence](focused-evidence.json) retain exact current outcomes, all 42 earlier feature
+objects, input/binary/configuration hashes and precise reuse. Earlier performance and other
+historical claims retain their original identities. Raw current full evidence is under
+`build/nvvm-integration/full-after-cleanup-1/`.
 
 Environment: native Ubuntu 24.04, eight logical AMD EPYC CPUs, about 30 GiB RAM, L4 SM89,
 UUID `GPU-7e9accb6-0e0f-7bb1-cafe-c1d02947b736`, driver 595.71.05, CUDA 12.9.2 / NVRTC 12.9.86,
-LLVM 14, target SM80. No performance claim follows from the upgrade.
+LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no performance claim.
 
 ## Next action
 
-The agreed migration and residual-text audit are finished. The maintainer authorized this sequence
-on 2026-09-30. Steps 1–8 are complete; the full checkpoint in step 9 is next:
+The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
+Resume bounded reviewed feature work under WORKFLOW, retaining eight-job incremental builds and
+economical focused validation. No automatic full campaign follows each feature.
 
-1. Fix the known signed16 O3 normalization failure at its responsible layer, retaining its failure
-   history and avoiding an abs-specific workaround.
-2. Run one consolidated integration checkpoint for the accumulated migrations. Reuse existing
-   runners and compare exact outcomes; no repeated numerical/material/performance campaign by default.
-3. Consolidate generic/exact operation resolution in the real and fake providers. Delete shadowed
-   arithmetic/comparison/conversion/bitcast catalog rows and unreachable Float32 helpers; retain
-   genuinely distinct canonical wave operations and independent semantic assertions.
-4. Give role-specific type admission one provider-independent analysis reusable by preflight and
-   lowering. Preserve local-storage, helper-parameter/result and resource-storage distinctions,
-   Half helper ABI transport, representation caches and rejection before provider mutation.
-5. Complete checked address/storage planning for one resource family. Child addresses reuse parent
-   facts; emission executes selected resource/storage conversions instead of rediscovering them.
-   Do not introduce a general physical-storage legalization pass for this maintenance.
-6. Separate fake-provider fixtures from recording infrastructure and reduce repetitive behavior and
-   duplicate libdevice signatures. Keep independent expectations and real-provider coverage.
-7. Refresh architecture around surviving ownership/invariants. Remove stale scalar/wave resolution
-   descriptions; keep numerical qualifications with maintained contracts/evidence and preserve histories.
-8. Address Float16 instruction selection after cleanup, using the bounded sequence below.
-9. Run the full NVVM validation checkpoint once the queued work is complete; preserve exact failure
-   outcomes and fix discovered issues, rerunning the affected checks before accepting the checkpoint.
-10. Resume bounded reviewed feature development under WORKFLOW, selecting the next concrete gap
-    from the capability ledger and retained failures. Economical per-batch validation remains in force.
+First implement UInt2 word transport for selected read-only texture descriptor handles. The fresh
+`bugs/gh-6657-nonbindless-uniform.slang#discovery-1` capability failures provide the before evidence.
+Lower the existing canonical UInt2 descriptor operations to ordinary unsigned word packing and
+existing UInt64 descriptor conversion; keep unsupported resource kinds rejected. Use independent
+low/high word checks, real bound texture loads, focused discovery and no-mutation negatives.
+The active uncommitted plan is `plan.texture-handle-words.md`.
 
-Each cleanup uses existing positive, negative and no-mutation tests with focused runtime checks
-where semantics require them. Eight-job incremental builds and economical testing remain the default.
-LLVM-dialect adaptation and the concrete ABI/layout boundaries remain intentional.
-
-### Float16 follow-up
-
-CUDA C++ is a comparison backend, not an automatic semantic oracle. Prefer Slang behavior aligned
-with Vulkan and D3D12 contracts, verify the relevant specifications, and document deliberate differences.
-The native Half batch is accepted; the following decisions and boundaries are retained:
-
-- Direct Half ceil/floor/trunc are implemented and qualified as `cvt.rpi/rmi/rzi.f16.f16` without
-  Float32 promotion. Trunc needs the checked provider dialect adaptation described above.
-- Direct Half FMA now rounds once, nearest-even. The former promoted NVVM path
-  double-rounded: a=1.0009765625, b=1.5, c=-2^-24 gives 1.501953125 through Float32 versus
-  1.5009765625 with direct Half rounding. CUDA's `__hfma` already uses the direct form.
-- Treat approximate Half `exp2`/`tanh` as a separate accuracy/capability decision. The reported
-  SM75+ PTX forms compile as inline assembly; named NVVM forms did not in the maintainer's probes.
-- Keep `round` separate: Slang documents target-dependent ties. Existing NVVM ties-away and CUDA
-  Half ties-even remain; the maintained RESULTS contract records Vulkan/D3D12 comparison limits.
-- Do not assume a Half API implies Half instructions. CUDA sqrt/rsqrt/reciprocal widen; sin/cos/log/exp
-  can require Float32 calculations and input-specific corrections. Preserve or change these policies
-  only with explicit semantic and accuracy evidence.
-
-CUDA/CPP offset helper bodies remain
-unchanged; their raw address-subtraction template does not establish a broader API contract for
-unrelated-object calls. Stable IR915 carries the original callee/arguments and exact field key as
-ordinary identity operands; no decoration-only identity or CUDA-body matching remains.
+Then rank dynamic formatted-surface component stores and local record-array out/inout references
+against the retained failures. Approximate Half exp2/tanh remain a separate accuracy/capability
+choice; other transcendental evaluation policies stay unchanged until supported by evidence.
 
 ## Retained boundaries
 

@@ -5,7 +5,7 @@
   "archive_revision": "b20a4b4f680085b9394b029d1d95ac1f1b5cb4e0",
   "baseline": {
     "path": "issue-nvvm-backend/accepted-baseline.json",
-    "sha256": "f6df540235ea04c97f6b1a49d546ffd716763123b5a57988d40dbde6a71d087b"
+    "sha256": "9b4f80c9e01ed63d9144cd4e375153faea19ae0eb823c1f9e479405dbd6ebe5c"
   },
   "features": {
     "inheritance-initialization-constants": {

@@ -27,4 +27,4 @@ void arrayMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = arrayTexture[int2(dispatchThreadID.xy)].x;
 }
 
-//ARRAY: direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<Texture1DArray, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'
+//ARRAY: direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'
