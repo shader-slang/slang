@@ -7301,12 +7301,10 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
     }
 }
 
-/// Add to `paramDecl` the modifiers that make its declared parameter-passing mode `mode`.
-///
-/// Parameters synthesized from a requirement are built from the requirement's
-/// effective mode rather than by copying its modifiers, because several
-/// spellings (`const __ref`, a legacy alias, an inferred mode) produce the same
-/// mode, and only the mode has to match.
+/// Parameters synthesized from a requirement get their modifiers from the
+/// requirement's effective mode rather than from a copy of its modifiers,
+/// because several spellings (`const __ref`, a legacy alias, an inferred mode)
+/// produce the same mode, and only the mode has to match.
 static void addModifiersForParamPassingMode(
     ASTBuilder* astBuilder,
     ParamDecl* paramDecl,
