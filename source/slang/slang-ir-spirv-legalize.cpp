@@ -3113,7 +3113,6 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
         m_sink->diagnose(Diagnostics::SnippetParsingFailed{
             .snippet = intrinsic->getDefinition(),
             .location = intrinsic->sourceLoc});
-        return nullptr;
     }
     m_parsedSpvSnippets[intrinsic] = snippet;
     return snippet;
