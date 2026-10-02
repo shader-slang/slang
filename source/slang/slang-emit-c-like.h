@@ -506,6 +506,10 @@ public:
 
     void emitForwardDeclaration(IRInst* inst);
 
+    /// Emit a forward declaration that lets `ptrType` be named before it is defined. It is used
+    /// when a pointer is on a cycle through its pointee, as in `struct N { N* next; }`.
+    virtual void emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType);
+
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
 
     void executeEmitActions(List<EmitAction> const& actions);

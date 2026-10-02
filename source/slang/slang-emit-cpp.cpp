@@ -2336,6 +2336,7 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
                 {
                 case kIROp_Func:
                 case kIROp_StructType:
+                case kIROp_PtrType:
                 case kIROp_InterfaceType:
                     emitForwardDeclaration(action.inst);
                     break;

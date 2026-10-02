@@ -40,6 +40,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     InstHashSet openInsts;
     Dictionary<IRInst*, EmitAction::Level> mapInstToLevel;
     List<EmitAction>* actions;
+
+    /// Pointer types that were forward-declared because their pointee was still being defined,
+    /// keyed by that pointee. Each one is defined as soon as its pointee is.
+    Dictionary<IRInst*, List<IRInst*>> deferredPtrDefinitions;
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -5261,21 +5265,6 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
     auto requiredLevel = EmitAction::Definition;
     switch (inst->getOp())
     {
-    case kIROp_PtrType:
-        {
-            auto ptrType = static_cast<IRPtrType*>(inst);
-            auto valueType = ptrType->getValueType();
-
-            if (ctx->openInsts.contains(valueType))
-            {
-                requiredLevel = EmitAction::ForwardDeclaration;
-            }
-            else
-            {
-                requiredLevel = EmitAction::Definition;
-            }
-            break;
-        }
     case kIROp_NativePtrType:
         requiredLevel = EmitAction::ForwardDeclaration;
         break;
@@ -5377,12 +5366,31 @@ void CLikeSourceEmitter::ensureGlobalInst(
 
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;
-    if (ctx->mapInstToLevel.tryGetValue(inst, existingLevel))
+    bool hasExistingLevel = ctx->mapInstToLevel.tryGetValue(inst, existingLevel);
+    if (hasExistingLevel && existingLevel >= requiredLevel)
+        return;
+
+    // A pointer whose pointee is still being defined is on a cycle through that pointee, as in
+    // `struct N { float v; N* next; }`. The pointee only needs the pointer type declared, so we
+    // forward-declare the pointer here and define it once the pointee is complete. Breaking the
+    // cycle at the pointer rather than the struct matters for GLSL, which can forward-declare a
+    // `buffer_reference` block but not a struct.
+    if (requiredLevel == EmitAction::Level::Definition)
     {
-        // If we've already emitted it suitably,
-        // then don't worry about it.
-        if (existingLevel >= requiredLevel)
-            return;
+        if (auto ptrType = as<IRPtrType>(inst);
+            ptrType && ctx->openInsts.contains(ptrType->getValueType()))
+        {
+            // An open pointer is already being defined and gets its definition when it closes.
+            if (!ctx->openInsts.contains(inst))
+            {
+                auto& deferred = ctx->deferredPtrDefinitions[ptrType->getValueType()];
+                if (!deferred.contains(inst))
+                    deferred.add(inst);
+            }
+            requiredLevel = EmitAction::Level::ForwardDeclaration;
+            if (hasExistingLevel && existingLevel >= requiredLevel)
+                return;
+        }
     }
 
     EmitAction action;
@@ -5418,6 +5426,17 @@ void CLikeSourceEmitter::ensureGlobalInst(
         break;
     }
     ctx->actions->add(action);
+
+    if (requiredLevel == EmitAction::Level::Definition)
+    {
+        List<IRInst*> deferredPtrs;
+        if (ctx->deferredPtrDefinitions.tryGetValue(inst, deferredPtrs))
+        {
+            ctx->deferredPtrDefinitions.remove(inst);
+            for (auto ptrType : deferredPtrs)
+                ensureGlobalInst(ctx, ptrType, EmitAction::Level::Definition);
+        }
+    }
 }
 
 void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& ioActions)
@@ -5515,6 +5534,9 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
         m_writer->emit(getName(inst));
         m_writer->emit(";\n");
         break;
+    case kIROp_PtrType:
+        emitPtrTypeForwardDeclarationImpl(cast<IRPtrType>(inst));
+        break;
     case kIROp_InterfaceType:
         {
             if (inst->findDecoration<IRComInterfaceDecoration>())
@@ -5528,6 +5550,14 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
     default:
         SLANG_UNREACHABLE("emit forward declaration");
     }
+}
+
+void CLikeSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
+{
+    // A pointer type has no declaration of its own here, so we forward-declare a struct
+    // pointee, as in `struct A; struct B { A* a; }; struct A { B* b; };`.
+    if (auto structType = as<IRStructType>(ptrType->getValueType()))
+        emitForwardDeclaration(structType);
 }
 
 void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)
