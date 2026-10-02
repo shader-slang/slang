@@ -21887,6 +21887,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                     params.force_opacity(raytracing::forced_opacity::opaque);
                 if (flags & 0x02) /* RAY_FLAG_FORCE_NON_OPAQUE */
                     params.force_opacity(raytracing::forced_opacity::non_opaque);
+                if (flags & 0x04) /* RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH */
+                    params.accept_any_intersection(true);
                 if (flags & 0x10) /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
                     params.set_triangle_cull_mode(raytracing::triangle_cull_mode::back);
                 if (flags & 0x20) /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
@@ -22890,6 +22892,9 @@ $}
                         flags |= 0x01; /* RAY_FLAG_FORCE_OPAQUE */
                     if (forced == raytracing::forced_opacity::non_opaque)
                         flags |= 0x02; /* RAY_FLAG_FORCE_NON_OPAQUE */
+
+                    if (params.should_accept_any_intersection())
+                        flags |= 0x04; /* RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH */
 
                     const auto tri_cull = params.get_triangle_cull_mode();
                     if (tri_cull == raytracing::triangle_cull_mode::back)
