@@ -41,6 +41,7 @@
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute -DFROM_PARAMETER_BLOCK
 
 //TEST:SIMPLE(filecheck=APPEND): -target glsl -entry main -stage compute -DSTORE_APPEND
+//TEST:SIMPLE(filecheck=HLSL_APPEND): -target hlsl -entry main -stage compute -DSTORE_APPEND
 //TEST:SIMPLE(filecheck=APPEND): -target wgsl -entry main -stage compute -DSTORE_APPEND
 //TEST:SIMPLE(filecheck=APPEND): -target metal -entry main -stage compute -DSTORE_APPEND -DPLAIN_MATRIX
 //TEST:SIMPLE(filecheck=APPEND): -target cuda -entry main -stage compute -DSTORE_APPEND -DPLAIN_MATRIX
@@ -93,6 +94,8 @@ RWStructuredBuffer<S> b;
 // The array member of this case hits shader-slang/slang#13380 on WGSL and is not checked here.
 // WGSL_ARRAY: b_0[i32(0)].v_0 = C_0.s_0.v_0;
 // APPEND: AppendStructuredBuffer_Append_0(
+// HLSL_APPEND: _S{{[0-9]+}}.m_0.data_{{[0-9]+}} =
+// HLSL_APPEND: b_0.Append(_S{{[0-9]+}});
 [numthreads(1, 1, 1)]
 void main()
 {

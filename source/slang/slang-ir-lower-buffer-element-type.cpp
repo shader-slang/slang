@@ -999,6 +999,8 @@ struct LoweredElementTypeContext
             return store->getVal();
         else if (auto sbStore = as<IRRWStructuredBufferStore>(storeInst))
             return sbStore->getVal();
+        else if (auto sbAppend = as<IRStructuredBufferAppend>(storeInst))
+            return sbAppend->getOperand(1);
         return nullptr;
     }
 
@@ -2103,33 +2105,15 @@ struct LoweredElementTypeContext
                         if (auto sbAppend = as<IRStructuredBufferAppend>(user))
                         {
                             builder.setInsertBefore(sbAppend);
-                            IRInst* addr = nullptr;
-                            if (originalVal->getOp() == kIROp_CastStorageToLogicalDeref)
-                            {
-                                addr = originalVal->getOperand(0);
-
-                                // `addr` should point to the same type as the lowered structure
-                                // buffer element type. There is only one case when this is not
-                                // true, that is when we are lowering for SPIRV, and `addr` may
-                                // point to a "logical storage type" that is created to work around
-                                // SPIRV restriction that physical types cannot be used to declare
-                                // local variables. However when we generate SPIRV, we should have
-                                // already lowered all Append/Consume structured buffer operations
-                                // to standard Load/Store operations, so we should not hit this case
-                                // here. Instead they will be handled by the "else" branch of the
-                                // "if (sbAppend)" statement down below.
-                                SLANG_ASSERT(isTypeEqual(
-                                    tryGetPointedToType(&builder, addr->getDataType()),
-                                    loweredElementTypeInfo.loweredType));
-                            }
-                            else
-                            {
-                                addr = builder.emitVar(loweredElementTypeInfo.loweredType);
-                                loweredElementTypeInfo.convertOriginalToLowered
-                                    .applyDestinationDriven(builder, addr, originalVal);
-                            }
-                            auto packedVal = builder.emitLoad(addr);
-                            sbAppend->setOperand(1, packedVal);
+                            auto addr = builder.emitVar(loweredElementTypeInfo.loweredType);
+                            storeLogicalValue(
+                                builder,
+                                addr,
+                                originalVal,
+                                loweredElementTypeInfo.convertOriginalToLowered,
+                                config);
+                            sbAppend->setOperand(1, builder.emitLoad(addr));
+                            builder.replaceOperand(use, ptrVal);
                         }
                         else
                         {
