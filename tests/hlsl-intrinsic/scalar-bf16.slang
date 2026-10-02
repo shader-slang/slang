@@ -33,7 +33,11 @@ void computeMain()
         BFloat16 dotResult = dot(vecBF16, vecBF16_2);
         outputBuffer[6] = (int)((float)(dotResult) * 10);
     default:
-        // Vulkan/NVIDIA currently does not support dot product.
+        // Slang's emitter produces valid OpDot under BFloat16DotProductKHR /
+        // SPV_KHR_bfloat16 (locked in by tests/hlsl-intrinsic/bf16-dot-spirv.slang),
+        // but NVIDIA's Vulkan driver does not currently advertise this capability,
+        // so the runtime path is stubbed. Flip to the real dot when driver
+        // support is broadly available.
         outputBuffer[6] = 85;
     }
 }
