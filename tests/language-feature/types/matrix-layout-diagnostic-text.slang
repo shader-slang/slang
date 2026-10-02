@@ -1,6 +1,6 @@
-// Regression for shader-slang/slang#13383: diagnostics print the layout of a matrix whose layout is
-// not the default, so two types that differ only in layout no longer read as the same type. A
-// plain matrix keeps its usual spelling.
+// Diagnostics print the layout of a matrix whose layout is not the default, so two types that
+// differ only in layout read differently; a plain matrix keeps its usual spelling
+// (shader-slang/slang#13383).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 

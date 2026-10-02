@@ -1,6 +1,5 @@
-// Regression for shader-slang/slang#13383: functions that differ only in the layout of a matrix in
-// their signature are distinct functions, so each one must keep its own body after linking. The
-// layout used to be left out of mangled names, so the linker kept one body for all of them.
+// Functions that differ only in the layout of a matrix in their signature are distinct functions,
+// so each call runs its own body after linking (shader-slang/slang#13383).
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type -Xslang -matrix-layout-row-major
