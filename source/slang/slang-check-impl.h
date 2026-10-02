@@ -2059,6 +2059,9 @@ public:
         Type* targetType,
         DiagnosticSink* diagSink);
 
+    /// Report that `overloadedExpr` refers ambiguously to the candidates in `lookupResult`,
+    /// and list each candidate. `lookupResult` must be overloaded: a single candidate is not
+    /// an ambiguity, so callers report it with the diagnostic that fits that candidate.
     void diagnoseAmbiguousReference(
         OverloadedExpr* overloadedExpr,
         LookupResult const& lookupResult);
