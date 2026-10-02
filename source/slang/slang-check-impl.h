@@ -831,8 +831,8 @@ struct SpecializeInterfaceInheritanceWitnessKey
 /// The key of the per-module conversion-cost cache. A conversion from an l-value costs an extra
 /// `kConversionCost_LValueCast`, so the key records whether the source is an l-value as well as
 /// the two types. `QualType`'s other flags are left out because conversion costs do not read
-/// them. The source expression `canCoerce` passes to `_coerce` is also left out, as it was before
-/// this key had an l-value bit.
+/// them. Source expressions are not keyed, so this cache cannot distinguish expression-dependent
+/// conversions.
 struct ConversionCostKey
 {
     Type* toType;

@@ -3213,8 +3213,6 @@ bool SemanticsVisitor::canCoerce(
             shouldAddToGlobalCache = true;
     }
 
-    // If this conversion isn't covered by the global cache, use
-    // the cache that is local to the module.
     ConversionCostKey moduleCacheKey(toType, fromType);
     if (getShared()->m_typeConversionCostCache.tryGetValue(moduleCacheKey, cost))
     {

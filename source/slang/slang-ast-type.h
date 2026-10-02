@@ -762,12 +762,11 @@ class MatrixExpressionType : public ArithmeticExpressionType
     /// to the target's default. Any non-constant layout, such as a generic parameter `L`, counts
     /// as specified even though it may later be instantiated with `Unknown`.
     ///
-    /// Matrix types that differ in their layout argument are distinct types, so every spelling
-    /// of a matrix type that leaves generic arguments out (its mangled name, its `BasicTypeKey`
-    /// and its printed form) has to include the layout whenever this returns true. Otherwise
-    /// two distinct types would share one spelling; a generic `L` is included because a
-    /// function generic over the layout is a different declaration from one taking a plain
-    /// matrix.
+    /// Matrix types that differ in their layout argument are distinct types, so a spelling of a
+    /// matrix type that leaves generic arguments out has to account for the layout whenever this
+    /// returns true. Mangled and printed names include it; `makeBasicTypeKey`, whose key has no
+    /// layout field, gives such a matrix no key. A generic `L` counts because a function generic
+    /// over the layout is a different declaration from one taking a plain matrix.
     bool hasSpecifiedLayout();
 
     Type* getRowType();

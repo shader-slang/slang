@@ -19,7 +19,7 @@ StructuredBuffer<column_major float2x3> columnBuffer;
 
 // For `pickArray`, `pickBuffer` and the `ITag` extensions, overload resolution already picks the
 // right declaration; only linkage by mangled name (of the functions and of the witness tables)
-// could run the wrong body, as it did when the name left out the layout.
+// could run the wrong body if the mangled name omits the layout.
 
 func pickArray(m : row_major float2x3[2]) -> float { return 1.0; }
 func pickArray(m : column_major float2x3[2]) -> float { return 2.0; }
