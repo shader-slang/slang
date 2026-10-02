@@ -3333,7 +3333,7 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
 
 /// Move any modifier of class `TTypeModifier` in `ioBaseModifiers` to the given `typeExpr`.
 /// `TTypeModifier` is `TypeModifier` or a subclass of it; declarators move every type modifier,
-/// and a traditional-style parameter moves only its `MatrixLayoutModifier`s.
+/// and a declaration whose modifiers precede its type moves only its `MatrixLayoutModifier`s.
 ///
 /// If any such modifiers were present, `ioBaseModifiers` will be updated
 /// to only include the remaining modifiers (if any).
@@ -5115,7 +5115,18 @@ static NodeBase* parseSemanticDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
+static Expr* _parseTypeExprWithLeadingMatrixLayout(Parser* parser, Modifiers& ioDeclModifiers);
+
+/// Parse the name, optional type, semantics and initializer of a modern-syntax declaration such
+/// as `var m: float2x3[2] = init;`. `ioLeadingModifiers` holds the modifiers written before the
+/// declaration: the parser's pending modifiers for `var`/`let`, or `decl->modifiers` for a modern
+/// parameter, which has them attached already. A matrix layout among them moves onto
+/// the declared type's leading type specifier, so `row_major var m: float2x3[2];` has the same
+/// type as `var m: row_major float2x3[2];`; the remaining modifiers stay where they are.
+static void parseModernVarDeclBaseCommon(
+    Parser* parser,
+    VarDeclBase* decl,
+    Modifiers& ioLeadingModifiers)
 {
     parser->FillPosition(decl);
     decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
@@ -5123,7 +5134,7 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
 
     if (AdvanceIf(parser, TokenType::Colon))
     {
-        decl->type = parser->ParseTypeExp();
+        decl->type = TypeExp(_parseTypeExprWithLeadingMatrixLayout(parser, ioLeadingModifiers));
     }
 
     auto modifiers = _parseOptSemantics(parser);
@@ -5137,7 +5148,8 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
 
 static void parseModernVarDeclCommon(Parser* parser, VarDecl* decl)
 {
-    parseModernVarDeclBaseCommon(parser, decl);
+    SLANG_ASSERT(parser->pendingModifiers);
+    parseModernVarDeclBaseCommon(parser, decl, *parser->pendingModifiers);
     expect(parser, TokenType::Semicolon);
 }
 
@@ -5155,8 +5167,6 @@ static NodeBase* parseVarDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-static Expr* _parseTraditionalParamTypeExpr(Parser* parser, Modifiers& ioParamModifiers);
-
 /// Parse the common structured of a traditional-style parameter declaration (excluding the
 /// trailing semicolon). The parameter's leading modifiers must already be on `decl`, because
 /// parsing the type moves its matrix layout modifiers from `decl->modifiers` onto the type.
@@ -5166,7 +5176,7 @@ static void _parseTraditionalParamDeclCommonBase(
     DeclaratorParseOptions options = kDeclaratorParseOptions_None)
 {
     DeclaratorInfo declaratorInfo;
-    declaratorInfo.typeSpec = _parseTraditionalParamTypeExpr(parser, decl->modifiers);
+    declaratorInfo.typeSpec = _parseTypeExprWithLeadingMatrixLayout(parser, decl->modifiers);
 
     InitDeclarator initDeclarator = parseInitDeclarator(parser, options);
     UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
@@ -5195,7 +5205,7 @@ static ParamDecl* parseModernParamDecl(Parser* parser)
     {
         ParamDecl* decl = parser->astBuilder->create<ModernParamDecl>();
         decl->modifiers = modifiers;
-        parseModernVarDeclBaseCommon(parser, decl);
+        parseModernVarDeclBaseCommon(parser, decl, decl->modifiers);
         return decl;
     }
     else
@@ -7852,33 +7862,34 @@ static Expr* _parseInfixTypeExpr(Parser* parser, bool allowDecl)
     return _parseInfixTypeExprSuffix(parser, leftExpr, allowDecl);
 }
 
-/// Parse the type of a traditional-style parameter, moving any matrix layout modifier in
-/// `ioParamModifiers` onto the leading type specifier.
+/// Parse the type of a declaration whose modifiers were parsed before its type, moving any matrix
+/// layout modifier in `ioDeclModifiers` onto the leading type specifier.
 ///
 /// Consider this example:
 ///
 ///     void f(row_major float2x3 m[2], no_diff float a[2]);
+///     row_major var v: float2x3[2];
 ///
-/// A traditional-style parameter parses its modifiers before its type, so they all start out on
-/// the parameter. A matrix layout qualifies the matrix element type, so we graft it onto
-/// `float2x3` before a `[N]` or `*` suffix (or the declarator's `[2]`) wraps it. The parameter
-/// `m` then has the same matrix layout in its type expression as a declarator such as the struct
-/// field `row_major float2x3 m[2];`.
+/// A traditional-style parameter, and a modern-syntax `var`, `let` or parameter, has its modifiers
+/// in front of its type, so they all start out on the declaration. A matrix layout qualifies the
+/// matrix element type, so we graft it onto `float2x3` before a `[N]` or `*` suffix (or the
+/// declarator's `[2]`) wraps it. `m` and `v` then have the same matrix layout in their type
+/// expressions as a declarator such as the struct field `row_major float2x3 m[2];`.
 ///
-/// The other type modifiers stay on the parameter because the checker reads them there:
+/// The other type modifiers stay on the declaration because the checker reads them there:
 /// `_moveNoDiffFromTypeToParamDecl` only peels `no_diff` off the top of a parameter's type, so a
 /// `no_diff` grafted under the `[2]` would be missed and `a` would no longer accept a plain
-/// `float[2]`. `unorm`/`snorm` on a parameter likewise keep their existing meaning.
+/// `float[2]`. `unorm`/`snorm` likewise keep their existing meaning.
 ///
 /// Apart from the graft, this is `Parser::ParseType()`: atomic type, then postfix suffixes, then
 /// infix suffixes, so the two must change together. In `row_major A & B` the layout applies to
 /// `A`, as it does for a declarator.
 ///
-static Expr* _parseTraditionalParamTypeExpr(Parser* parser, Modifiers& ioParamModifiers)
+static Expr* _parseTypeExprWithLeadingMatrixLayout(Parser* parser, Modifiers& ioDeclModifiers)
 {
     auto typeExpr = _parseAtomicTypeExpr(parser, false);
     typeExpr =
-        _moveTypeModifiersToTypeExpr<MatrixLayoutModifier>(parser, typeExpr, ioParamModifiers);
+        _moveTypeModifiersToTypeExpr<MatrixLayoutModifier>(parser, typeExpr, ioDeclModifiers);
     typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
     return _parseInfixTypeExprSuffix(parser, typeExpr, false);
 }

@@ -1,5 +1,6 @@
 // A matrix layout modifier on a non-matrix parameter written in traditional syntax is diagnosed
-// (E39026), the same as on a struct field (shader-slang/slang#13375). This includes a generic
+// (E39026), the same as on a struct field (shader-slang/slang#13375), and so is one written
+// before a modern-syntax declaration with an explicit type (shader-slang/slang#13390). This includes a generic
 // parameter type and a type alias for an array, whose layout would have to apply to a matrix the
 // modifier cannot reach. A parameter whose type does not resolve reports only the undefined
 // identifier, and a diagnostic on the type itself still points at the type.
@@ -36,3 +37,24 @@ float voidType(row_major void x) { return 0; }
 //CHECK:       ^^^^^^^^^ matrix layout modifier cannot be used on non-matrix type 'void'.
 //CHECK:                 ^^^^ E30009
 //CHECK:                 ^^^^ invalid type 'void'.
+
+struct ModernFields
+{
+    row_major var count: int;
+/*CHECK:
+    ^^^^^^^^^ E39026
+    ^^^^^^^^^ matrix layout modifier cannot be used on non-matrix type 'int'.
+*/
+}
+
+func modernParameter(row_major value: int) -> int
+//CHECK:             ^^^^^^^^^ E39026
+//CHECK:             ^^^^^^^^^ matrix layout modifier cannot be used on non-matrix type 'int'.
+{
+    row_major let local: int = value;
+/*CHECK:
+    ^^^^^^^^^ E39026
+    ^^^^^^^^^ matrix layout modifier cannot be used on non-matrix type 'int'.
+*/
+    return local;
+}

@@ -2165,14 +2165,13 @@ class NoDiffModifier : public TypeModifier
 // matrix element itself — including when a declarator wraps it in an array or
 // it precedes a function return type.
 //
-// A traditional-style function parameter (`void f(row_major float2x3 m[2])`)
-// gets the same graft, but only for these modifiers: its other modifiers stay
-// on the `ParamDecl`. A modern-syntax declaration whose modifiers precede its
-// name (`row_major var m: float2x3;`) keeps them on the decl, so that path
-// applies the layout via `maybeApplyLayoutModifier` (slang-check-decl.cpp)
-// instead, for a bare matrix type only (shader-slang/slang#13390). (Modern
-// `m: row_major float2x3` syntax puts the modifier on the type expression, so
-// it flows through the graft.)
+// A declaration whose modifiers precede its type, such as a traditional-style
+// parameter (`void f(row_major float2x3 m[2])`) or a modern-syntax `var`, `let`
+// or parameter (`row_major var m: float2x3[2];`), gets the same graft, but only
+// for these modifiers: its other modifiers stay on the declaration. A
+// declaration with an inferred type (`row_major var m = init;`) has no type
+// expression, so `maybeApplyLayoutModifier` (slang-check-decl.cpp) applies the
+// layout to the inferred matrix type instead.
 FIDDLE(abstract)
 class MatrixLayoutModifier : public TypeModifier
 {
