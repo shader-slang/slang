@@ -1543,18 +1543,11 @@ struct PeepholeContext : InstPassBase
                 auto resultType = as<IRVectorType>(inst->getDataType());
                 if (!resultType)
                 {
-                    if (!fromType)
-                    {
-                        inst->replaceUsesWith(inst->getOperand(0));
-                        maybeRemoveOldInst(inst);
-                        changed = true;
-                        break;
-                    }
                     IRBuilder builder(inst);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
-                    UInt index = 0;
-                    auto newInst = builder.emitSwizzle(resultType, inst->getOperand(0), 1, &index);
+                    auto newInst =
+                        builder.emitVectorReshape(inst->getDataType(), inst->getOperand(0));
                     inst->replaceUsesWith(newInst);
                     maybeRemoveOldInst(inst);
                     changed = true;

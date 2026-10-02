@@ -6093,6 +6093,7 @@ IRInst* IRBuilder::emitSwizzle(
     UInt elementCount,
     IRInst* const* elementIndices)
 {
+    SLANG_RELEASE_ASSERT(type);
     auto inst = createInstWithTrailingArgs<IRSwizzle>(
         this,
         kIROp_Swizzle,
