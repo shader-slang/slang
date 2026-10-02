@@ -41,9 +41,18 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
     Dictionary<IRInst*, EmitAction::Level> mapInstToLevel;
     List<EmitAction>* actions;
 
-    /// Pointer types that were forward-declared because their pointee was still being defined,
-    /// keyed by that pointee. Each one is defined as soon as its pointee is.
+    /// Pointer types whose definition waits for their pointee, keyed by that pointee. Each key is
+    /// open when it is added, and `ensureGlobalInst` defines the waiting pointers right after the
+    /// key's own definition, so the map is empty once the walk finishes.
     Dictionary<IRInst*, List<IRInst*>> deferredPtrDefinitions;
+
+    /// Return true if `inst` is a pointer type whose pointee is still being defined, which puts
+    /// the pointer on a cycle through that pointee, as in `struct N { float v; N* next; }`.
+    bool isPtrToOpenInst(IRInst* inst)
+    {
+        auto ptrType = as<IRPtrType>(inst);
+        return ptrType && openInsts.contains(ptrType->getValueType());
+    }
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! CLikeSourceEmitter !!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -5364,33 +5373,31 @@ void CLikeSourceEmitter::ensureGlobalInst(
         break;
     }
 
+    // A pointee being defined only needs a pointer to it declared, so we break a cycle through
+    // a pointer by forward-declaring the pointer and defining it once the pointee is complete.
+    // Breaking it at the pointer rather than the struct matters for GLSL, which can
+    // forward-declare a `buffer_reference` block but not a struct. A cycle that closes on a
+    // struct instead is still reported below, so whether a recursive type compiles can depend on
+    // where the walk enters it: `struct W { float w; N n; }; struct N { float v; W* up; }`
+    // compiles when reached through `W*`, but not through `N*`.
+    if (requiredLevel == EmitAction::Level::Definition && ctx->isPtrToOpenInst(inst))
+    {
+        // A pointer that is itself open gets its definition when it closes. Deferring it as well
+        // would define it again from the pointee's definition while it is still open, which is
+        // the circularity error.
+        if (!ctx->openInsts.contains(inst))
+            ctx->deferredPtrDefinitions[cast<IRPtrType>(inst)->getValueType()].add(inst);
+        requiredLevel = EmitAction::Level::ForwardDeclaration;
+    }
+
     // Have we already processed this instruction?
     EmitAction::Level existingLevel;
-    bool hasExistingLevel = ctx->mapInstToLevel.tryGetValue(inst, existingLevel);
-    if (hasExistingLevel && existingLevel >= requiredLevel)
-        return;
-
-    // A pointer whose pointee is still being defined is on a cycle through that pointee, as in
-    // `struct N { float v; N* next; }`. The pointee only needs the pointer type declared, so we
-    // forward-declare the pointer here and define it once the pointee is complete. Breaking the
-    // cycle at the pointer rather than the struct matters for GLSL, which can forward-declare a
-    // `buffer_reference` block but not a struct.
-    if (requiredLevel == EmitAction::Level::Definition)
+    if (ctx->mapInstToLevel.tryGetValue(inst, existingLevel))
     {
-        if (auto ptrType = as<IRPtrType>(inst);
-            ptrType && ctx->openInsts.contains(ptrType->getValueType()))
-        {
-            // An open pointer is already being defined and gets its definition when it closes.
-            if (!ctx->openInsts.contains(inst))
-            {
-                auto& deferred = ctx->deferredPtrDefinitions[ptrType->getValueType()];
-                if (!deferred.contains(inst))
-                    deferred.add(inst);
-            }
-            requiredLevel = EmitAction::Level::ForwardDeclaration;
-            if (hasExistingLevel && existingLevel >= requiredLevel)
-                return;
-        }
+        // If we've already emitted it suitably,
+        // then don't worry about it.
+        if (existingLevel >= requiredLevel)
+            return;
     }
 
     EmitAction action;
@@ -5427,6 +5434,8 @@ void CLikeSourceEmitter::ensureGlobalInst(
     }
     ctx->actions->add(action);
 
+    // Pointers deferred on `inst` are defined right after it, so each definition follows its
+    // pointee's. We take the list out of the map first because defining them may add entries.
     if (requiredLevel == EmitAction::Level::Definition)
     {
         List<IRInst*> deferredPtrs;
@@ -5520,6 +5529,7 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
             continue;
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }
+    SLANG_ASSERT(ctx.deferredPtrDefinitions.getCount() == 0);
 }
 
 void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
@@ -5554,10 +5564,24 @@ void CLikeSourceEmitter::emitForwardDeclaration(IRInst* inst)
 
 void CLikeSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
 {
-    // A pointer type has no declaration of its own here, so we forward-declare a struct
-    // pointee, as in `struct A; struct B { A* a; }; struct A { B* b; };`.
-    if (auto structType = as<IRStructType>(ptrType->getValueType()))
-        emitForwardDeclaration(structType);
+    // HLSL, Metal, CUDA and C++ spell a pointer in terms of its pointee, which only has to be
+    // declared, so we forward-declare the struct it leads to through any arrays and pointers, as
+    // in `struct A; struct B { A* a; }; struct A { B* b; };`.
+    IRInst* pointee = ptrType->getValueType();
+    for (;;)
+    {
+        if (auto arrayType = as<IRArrayTypeBase>(pointee))
+            pointee = arrayType->getElementType();
+        else if (auto innerPtrType = as<IRPtrType>(pointee))
+            pointee = innerPtrType->getValueType();
+        else
+            break;
+    }
+    // A pointer is only forward-declared when it is on a cycle through its pointee, and a type
+    // cycle can only close through a struct.
+    auto structType = as<IRStructType>(pointee);
+    SLANG_RELEASE_ASSERT(structType);
+    emitForwardDeclaration(structType);
 }
 
 void CLikeSourceEmitter::executeEmitActions(List<EmitAction> const& actions)

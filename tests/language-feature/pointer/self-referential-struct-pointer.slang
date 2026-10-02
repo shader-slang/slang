@@ -33,6 +33,8 @@ float sumList(Node* node)
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // Reading `head` keeps it in use, so the walk reaches `Ptr(Node)` through `Params`. The
+    // test binds no data to `Params`, so `head` reads as null.
     output[0] = (head == nullptr) ? 1.0 : 0.0;
 
     // We assign fields one by one: brace initialization synthesizes a `Node` constructor that

@@ -2181,7 +2181,7 @@ void GLSLSourceEmitter::emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType)
 {
     // GLSL cannot forward-declare a struct, but it can forward-declare the `buffer_reference`
     // block that represents the pointer; `emitBufferPointerTypeDefinition` defines it later.
-    if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+    if (!isUserPointerType(ptrType))
         return;
     _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
     m_writer->emit("layout(buffer_reference) buffer ");

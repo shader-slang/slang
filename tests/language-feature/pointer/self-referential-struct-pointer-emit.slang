@@ -1,13 +1,16 @@
 // The source emitters break a `Ptr(N)` → `N` → `Ptr(N)` cycle at the pointer
 // (shader-slang/slang#13396). GLSL forward-declares the pointer's `buffer_reference` block, because
-// it cannot forward-declare a struct; the C-like targets forward-declare the struct. Both entry
-// points start the walk from a different end of the cycle: `pointerFirst` reaches `Ptr(N)` through
-// the `cbuffer`, and `structFirst` reaches `N` first.
+// it cannot forward-declare a struct; HLSL, Metal, CUDA and C++ forward-declare the struct. The
+// entry points start the walk from opposite ends of the cycle: `pointerFirst` reaches `Ptr(N)`
+// through the `cbuffer`, while `structFirst` and `structOnly` reach `N` first. `structOnly` never
+// uses the pointer, so its GLSL `buffer_reference` block is defined only because `N` was.
 
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry pointerFirst -stage compute
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry structFirst -stage compute
 //TEST:SIMPLE(filecheck=VIA_GLSL): -target spirv -emit-spirv-via-glsl -entry pointerFirst -stage compute
 //TEST:SIMPLE(filecheck=VIA_GLSL): -target spirv -emit-spirv-via-glsl -entry structFirst -stage compute
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry structOnly -stage compute
+//TEST:SIMPLE(filecheck=VIA_GLSL): -target spirv -emit-spirv-via-glsl -entry structOnly -stage compute
 //TEST:SIMPLE(filecheck=CLIKE): -target hlsl -entry pointerFirst -stage compute
 //TEST:SIMPLE(filecheck=CLIKE): -target hlsl -entry structFirst -stage compute
 //TEST:SIMPLE(filecheck=CLIKE): -target metal -entry pointerFirst -stage compute
@@ -49,6 +52,12 @@ void structFirst()
     output[0] = n.next->v;
 }
 
+[numthreads(1, 1, 1)]
+void structOnly()
+{
+    output[0] = n.v;
+}
+
 // GLSL: layout(buffer_reference) buffer [[PTR:BufferPointer_N_[0-9_]+]];
 // GLSL: struct [[N:N_[0-9]+]]
 // GLSL: [[PTR]] next_0;
@@ -66,5 +75,5 @@ void structFirst()
 // WGSL only checks that emission no longer aborts: the `ptr<, N_0>` member it emits is not valid
 // WGSL (shader-slang/slang#13399).
 // WGSL-NOT: struct N_0;
-// WGSL: struct N_0
+// WGSL: struct N_0{{$}}
 // WGSL: next_0 : ptr<

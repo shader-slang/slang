@@ -499,6 +499,9 @@ public:
 
     void ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst);
 
+    /// Schedule `inst`, and whatever it depends on, to be emitted at `requiredLevel` or higher.
+    /// A pointer type requested as a definition while its pointee is being defined is only
+    /// forward-declared here; its definition is scheduled right after the pointee's.
     void ensureGlobalInst(
         ComputeEmitActionsContext* ctx,
         IRInst* inst,
@@ -506,8 +509,9 @@ public:
 
     void emitForwardDeclaration(IRInst* inst);
 
-    /// Emit a forward declaration that lets `ptrType` be named before it is defined. It is used
-    /// when a pointer is on a cycle through its pointee, as in `struct N { N* next; }`.
+    /// Emit whatever lets `ptrType` be named before its definition, which follows once its pointee
+    /// is defined. It is used when a pointer is on a cycle through its pointee, as in
+    /// `struct N { N* next; }`. The default forward-declares the struct the pointer leads to.
     virtual void emitPtrTypeForwardDeclarationImpl(IRPtrType* ptrType);
 
     void computeEmitActions(IRModule* module, List<EmitAction>& ioActions);
