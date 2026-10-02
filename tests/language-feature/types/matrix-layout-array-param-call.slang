@@ -3,14 +3,15 @@
 // argument converts element by element (shader-slang/slang#13376), so the logical values survive.
 // Other modifiers on array parameters (`no_diff`, `unorm`) stay on the parameter and keep
 // accepting plain arrays. A forward declaration and a definition whose layouts differ are one
-// function: the call converts to the declaration's layout and the body reads its own, as in HLSL.
+// function for now (shader-slang/slang#13383): the call uses the declaration's layout and the body
+// reads its own. That holds for by-value, `__ref` and `out` parameters.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 
-//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
 RWStructuredBuffer<float> output;
 
 // Matrix `k` holds the logical values `m[r][c] == 1 + 6*k + 3*r + c`.
@@ -42,6 +43,8 @@ void addHundred(inout row_major float2x3 m[2])
 
 float countDeclaredRowMajorMismatches(row_major float2x3 m[2]);
 float readDeclaredRowMajor(row_major float2x3 m);
+void addTenDeclaredRowMajor(__ref row_major float2x3 m[2]);
+void fillDeclaredRowMajor(out row_major float2x3 m[2]);
 
 [Differentiable]
 float scaleAndOffset(no_diff float coefficients[2], float x)
@@ -80,9 +83,24 @@ void computeMain()
     float4 colors[2] = { float4(0.25), float4(0.5) };
     output[6] = readUNorm(colors);
 
-    // `plain[0]` was not changed by `addHundred`, so the mismatch count covers only `plain[1]`.
-    output[7] = countDeclaredRowMajorMismatches(plain);
-    output[8] = readDeclaredRowMajor(plain[0]);
+    float2x3 fresh[2];
+    for (int k = 0; k < 2; k++)
+        for (int r = 0; r < 2; r++)
+            for (int c = 0; c < 3; c++)
+                fresh[k][r][c] = 1 + 6 * k + 3 * r + c;
+    output[7] = countDeclaredRowMajorMismatches(fresh);
+    output[8] = readDeclaredRowMajor(fresh[0]);
+
+    // A `__ref` argument must already have the declared layout. `[0][1][2]` holds logical 6, and
+    // the `column_major` body adds 10 to it.
+    row_major float2x3 rowMajorFresh[2] = fresh;
+    addTenDeclaredRowMajor(rowMajorFresh);
+    output[9] = rowMajorFresh[0][1][2];
+    output[10] = countMismatches(rowMajorFresh);
+
+    float2x3 filled[2];
+    fillDeclaredRowMajor(filled);
+    output[11] = countMismatches(filled);
 }
 
 float countDeclaredRowMajorMismatches(column_major float2x3 m[2])
@@ -95,6 +113,19 @@ float readDeclaredRowMajor(column_major float2x3 m)
     return m[1][2];
 }
 
+void addTenDeclaredRowMajor(__ref column_major float2x3 m[2])
+{
+    m[0][1][2] += 10;
+}
+
+void fillDeclaredRowMajor(out column_major float2x3 m[2])
+{
+    for (int k = 0; k < 2; k++)
+        for (int r = 0; r < 2; r++)
+            for (int c = 0; c < 3; c++)
+                m[k][r][c] = 1 + 6 * k + 3 * r + c;
+}
+
 // CHECK: type: float
 // CHECK-NEXT: 0.0
 // CHECK-NEXT: 0.0
@@ -103,5 +134,8 @@ float readDeclaredRowMajor(column_major float2x3 m)
 // CHECK-NEXT: 13.0
 // CHECK-NEXT: 2.0
 // CHECK-NEXT: 0.5
-// CHECK-NEXT: 1.0
+// CHECK-NEXT: 0.0
 // CHECK-NEXT: 6.0
+// CHECK-NEXT: 16.0
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 0.0

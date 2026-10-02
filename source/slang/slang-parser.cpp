@@ -7814,6 +7814,8 @@ static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
 /// A postfix type expression is an atomic type expression followed
 /// by zero or more postfix suffixes like array brackets.
 ///
+/// `_parseTypeExprWithLeadingMatrixLayout` repeats this composition, with a matrix layout graft
+/// between the atomic type and its suffixes, so a change here needs the same change there.
 static Expr* _parsePostfixTypeExpr(Parser* parser, bool allowDecl)
 {
     auto typeExpr = _parseAtomicTypeExpr(parser, allowDecl);

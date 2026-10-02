@@ -13986,7 +13986,8 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
 /// parameter produces: a matrix, an array of them (sized or unsized, compared by count), and a
 /// pointer to them (`PtrType`, compared on every other operand). A matrix elsewhere, such as in a
 /// struct field or a generic argument like `StructuredBuffer<row_major float2x3>`, makes the types
-/// different.
+/// different. This is structural identity for signatures; `isMatrixLayoutConversion` is the
+/// narrower value conversion, which needs a sized array and cannot go through a pointer.
 static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
 {
     if (a->equals(b))
@@ -14005,9 +14006,7 @@ static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
                ptrA->getDataLayout()->equals(ptrB->getDataLayout()) &&
                isSameTypeUpToMatrixLayout(ptrA->getValueType(), ptrB->getValueType());
     }
-    auto matrixA = as<MatrixExpressionType>(a);
-    auto matrixB = as<MatrixExpressionType>(b);
-    return matrixA && matrixB && isMatrixLayoutConversion(a, b);
+    return as<MatrixExpressionType>(a) && isMatrixLayoutConversion(a, b);
 }
 
 /// Return whether `a` and `b`, which are the same up to matrix layout, differ in the layout of a
@@ -14016,16 +14015,18 @@ static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
 /// reached through a pointer does not.
 static bool doesMatrixLayoutDifferBehindPointer(Type* a, Type* b)
 {
+    SLANG_ASSERT(isSameTypeUpToMatrixLayout(a, b));
     if (a->equals(b))
         return false;
     if (auto arrayA = as<ArrayExpressionType>(a))
     {
         auto arrayB = as<ArrayExpressionType>(b);
-        SLANG_ASSERT(arrayB);
         return doesMatrixLayoutDifferBehindPointer(
             arrayA->getElementType(),
             arrayB->getElementType());
     }
+    // Two unequal types that are the same up to matrix layout are either matrices, which differ
+    // by value, or pointers whose pointees differ in layout.
     return as<PtrType>(a) != nullptr;
 }
 
@@ -14067,10 +14068,11 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
         auto sndParam = sndParams[ii];
 
         // Matrix layout alone does not distinguish two signatures, so a second definition of
-        // `f(row_major float2x3 m[2])` next to `f(column_major float2x3 m[2])` is a redefinition.
-        // This is an interim rule: mangled names do not encode matrix layout
-        // (shader-slang/slang#13383), so the two would share one linkage name and silently call
-        // the same body. It goes away once mangling distinguishes them.
+        // `f(row_major float2x3 m[2])` next to `f(column_major float2x3 m[2])` is a redefinition,
+        // and a prototype and a definition that differ only in layout are one function. Both are
+        // interim: mangled names do not encode matrix layout (shader-slang/slang#13383), so two
+        // such functions would share one linkage name. Once mangling distinguishes them, this
+        // comparison becomes `equals` and `doPointerParamLayoutsDiffer` has nothing left to reject.
         if (!isSameTypeUpToMatrixLayout(
                 getType(m_astBuilder, fstParam),
                 getType(m_astBuilder, sndParam)))
@@ -14580,9 +14582,11 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     }
 
     // Signatures match up to matrix layout, but calls are checked against the primary
-    // declaration while the body is lowered with its own parameter types. Nothing converts
-    // between two pointee layouts, so a forward declaration that differs from its definition in
-    // a matrix layout behind a pointer is a conflict.
+    // declaration while each body is lowered with its own parameter types. A by-value matrix or
+    // array, and an `inout`/`out`/`__ref`/`__constref` one, is passed through a layout-converting
+    // copy, so the mismatch is harmless. Nothing converts between two pointee layouts, so two
+    // declarations whose pointer parameters differ in a pointee's matrix layout conflict. This
+    // runs after the two-bodies check so that two definitions still report a redefinition.
     if (doPointerParamLayoutsDiffer(newDeclRef, oldDeclRef))
     {
         getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});

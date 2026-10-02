@@ -3040,9 +3040,10 @@ public:
         GenericDecl* right,
         DeclRef<Decl>* outSpecializedRightInner);
 
-    // Check if two functions have the same signature for the purposes
-    // of overload resolution. Parameter types are compared up to matrix layout, so two
-    // functions that differ only in a parameter's matrix layout are redeclarations.
+    // Check if two functions have the same signature, so that one redeclares the other.
+    // Parameter types are compared up to the matrix layout of a matrix, array of matrices or
+    // pointer to them, an interim rule until mangled names encode the layout
+    // (shader-slang/slang#13383).
     bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
 
     Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);
