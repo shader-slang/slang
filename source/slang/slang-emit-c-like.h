@@ -484,6 +484,9 @@ public:
     void emitParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
     void emitVar(IRVar* varDecl);
+    /// Emit an expression for the storage that the address `inst` points to, at precedence
+    /// `outerPrec`. The expression is an l-value, so loads, stores and atomics all emit their
+    /// address operand through this function.
     virtual void emitDereferenceOperand(IRInst* inst, EmitOpInfo const& outerPrec);
 
     void emitGlobalVar(IRGlobalVar* varDecl);
@@ -567,9 +570,10 @@ protected:
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);
     virtual bool doesTargetSupportPtrTypes() { return false; }
-    /// Return true if a value of pointer type `ptrType` can be held in a temporary on a target
-    /// where `doesTargetSupportPtrTypes()` is false. Such a value is otherwise always folded into
-    /// its use sites.
+    /// Return true if a value of pointer type `ptrType` can be held in a temporary even though
+    /// `doesTargetSupportPtrTypes()` is false. `shouldFoldInstIntoUseSites` consults this only
+    /// for instructions it does not already fold by opcode; `FieldAddress` and `GetElementPtr`
+    /// are always folded, so a `true` answer covers only the remaining values of the type.
     virtual bool canHoldPtrTypeInTemporary(IRType* ptrType)
     {
         SLANG_UNUSED(ptrType);

@@ -2239,7 +2239,8 @@ void GLSLSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& o
 
 bool GLSLSourceEmitter::canHoldPtrTypeInTemporary(IRType* ptrType)
 {
-    // A `UserPointer` is a `buffer_reference` block handle, which is an ordinary GLSL value.
+    // A `UserPointer` value that is not an access path into a pointee is a `buffer_reference`
+    // block handle, which is an ordinary GLSL value.
     return isUserPointerType(ptrType);
 }
 
@@ -2292,8 +2293,10 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_FieldAddress:
     case kIROp_GetElementPtr:
         {
-            // GLSL has no handle for a sub-object of a pointee, so we emit an access path into one
-            // as the l-value it designates, which is what its dereferencing consumers expect.
+            // GLSL has no handle for a sub-object of a pointee, so an access path into one can
+            // only be emitted as the l-value it designates. Dereferencing consumers reach that
+            // through `emitDereferenceOperand` directly; this arm serves callers that emit the
+            // address with `emitOperand`, such as a built-in's `out` argument (`modf(x, p->y)`).
             if (!isBufferReferenceAccessPath(inst))
                 return false;
             emitDereferenceOperand(inst, inOuterPrec);

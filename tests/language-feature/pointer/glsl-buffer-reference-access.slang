@@ -33,7 +33,13 @@ struct C2
     float v;
 }
 
-// A call whose `T*` result is unused still has to run.
+struct K
+{
+    float x;
+    int counter;
+}
+
+// A call whose `T*` result is unused still has to run (shader-slang/slang#13414).
 [noinline]
 int* bump(int* p)
 {
@@ -50,6 +56,8 @@ cbuffer C
     int* pi;
     W* pw;
     Ptr<C2[2]> arr;
+    K* pk;
+    Atomic<int>* pa;
 }
 
 RWStructuredBuffer<float*> ptrs;
@@ -99,6 +107,25 @@ void computeMain()
     // GLSL: atomicExchange((C_0.pi_0 + 1)._data, 5)
     InterlockedExchange(pi[1], 5, old);
     outI[1] = old;
+
+    // GLSL: atomicCompSwap(C_0.pi_0._data, 0, 7)
+    InterlockedCompareExchange(*pi, 0, 7, old);
+    outI[2] = old;
+
+    // GLSL: atomicOr((C_0.pi_0 + 2)._data, 3)
+    InterlockedOr(pi[2], 3, old);
+    outI[3] = old;
+
+    // GLSL: atomicMax((C_0.pi_0 + 2)._data, 9)
+    InterlockedMax(pi[2], 9, old);
+    outI[4] = old;
+
+    // GLSL: atomicAdd(C_0.pk_0._data.counter_0, 2)
+    InterlockedAdd(pk->counter, 2, old);
+    outI[5] = old;
+
+    // GLSL: atomicAdd(C_0.pa_0._data, int(-1))
+    outI[6] = pa->decrement();
 
     // GLSL: (C_0.pf_0 + 2)._data = 9.0;
     *(pf + 2) = 9.0;
