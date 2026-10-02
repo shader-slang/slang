@@ -9597,10 +9597,7 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     }
     else
     {
-        // TODO: more complete error message here
-        getSink()->diagnose(Diagnostics::Unexpected{
-            .message = "unknown type modifier in semantic checking",
-            .location = modifier->loc});
+        getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
         return nullptr;
     }
 }

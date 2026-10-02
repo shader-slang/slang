@@ -2526,6 +2526,11 @@ local insts = {
 			{ loopCounterUpdateDecoration = {} },
 			{ ParamsContextDecoration = { operands = {"value"} } },
 			{
+				AutodiffParameterContextTypeDecoration = {
+					-- Marks a context whose fields are captured primal parameters.
+				},
+			},
+			{
 				AutodiffInstDecoration = {
 					-- Auto-diff inst decorations
 					{
