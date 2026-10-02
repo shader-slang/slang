@@ -216,8 +216,19 @@ void emitType(ManglingContext* context, Type* type)
     }
     else if (auto matType = dynamicCast<MatrixExpressionType>(type))
     {
+        // A matrix with an unspecified layout keeps the `m<R>x<C><T>` spelling. A specified layout
+        // makes a different type, so we emit `L` and the layout value between the row count and
+        // the `x`, as in `m2Lk1x3f` for `row_major float2x3`. Only a count can appear there, so
+        // within a matrix spelling the layout cannot be confused with the element type, which may
+        // be a raw `__extern_cpp` name such as `Lk1f`, or with the layout of a nested matrix
+        // element. A raw `__extern_cpp` name can still spell a whole type; see `emitQualifiedName`.
         emitRaw(context, "m");
         emitSimpleIntVal(context, matType->getRowCount());
+        if (matType->hasSpecifiedLayout())
+        {
+            emitRaw(context, "L");
+            emitVal(context, matType->getLayout());
+        }
         emitRaw(context, "x");
         emitSimpleIntVal(context, matType->getColumnCount());
         emitType(context, matType->getElementType());

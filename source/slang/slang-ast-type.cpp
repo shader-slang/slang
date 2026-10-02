@@ -278,7 +278,10 @@ BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",")
-        << getColumnCount() << toSlice(">");
+        << getColumnCount();
+    if (hasSpecifiedLayout())
+        out << toSlice(",") << getLayout();
+    out << toSlice(">");
 }
 
 BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
@@ -304,6 +307,13 @@ IntVal* MatrixExpressionType::getColumnCount()
 IntVal* MatrixExpressionType::getLayout()
 {
     return as<IntVal>(_getGenericTypeArg(this, 3));
+}
+
+bool MatrixExpressionType::hasSpecifiedLayout()
+{
+    SLANG_ASSERT(getLayout());
+    auto constantLayout = as<ConstantIntVal>(getLayout());
+    return !constantLayout || constantLayout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 }
 
 Type* MatrixExpressionType::getRowType()

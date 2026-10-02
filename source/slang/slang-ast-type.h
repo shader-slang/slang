@@ -757,6 +757,18 @@ class MatrixExpressionType : public ArithmeticExpressionType
     IntVal* getColumnCount();
     IntVal* getLayout();
 
+    /// Return whether the layout argument is anything other than the constant
+    /// `MatrixLayoutMode.Unknown`, the unspecified layout that `specializeMatrixLayout` resolves
+    /// to the target's default. Any non-constant layout, such as a generic parameter `L`, counts
+    /// as specified even though it may later be instantiated with `Unknown`.
+    ///
+    /// Matrix types that differ in their layout argument are distinct types, so a spelling of a
+    /// matrix type that leaves generic arguments out has to account for the layout whenever this
+    /// returns true. Mangled and printed names include it; `makeBasicTypeKey`, whose key has no
+    /// layout field, gives such a matrix no key. A generic `L` counts because a function generic
+    /// over the layout is a different declaration from one taking a plain matrix.
+    bool hasSpecifiedLayout();
+
     Type* getRowType();
 
     // Overrides should be public so base classes can access
