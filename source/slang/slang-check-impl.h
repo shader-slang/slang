@@ -170,9 +170,11 @@ inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
     }
     else if (auto matrixType = as<MatrixExpressionType>(typeIn))
     {
-        // Matrices that differ only in layout convert at different costs, and the key records only
-        // the shape. A matrix with a specified layout, including a generic one, therefore gets no
-        // key; its costs go to the per-module cache, which is keyed by the types themselves.
+        // The cost of converting between two matrices depends on whether their layouts match,
+        // and the key does not record the layout. A matrix with a specified layout, including a
+        // generic one, therefore gets no key, and its costs go to the per-module cache, which is
+        // keyed by the types themselves. Every matrix that does get a key has layout `Unknown`,
+        // so two such matrices with the same key are the same type.
         if (matrixType->hasSpecifiedLayout())
             return BasicTypeKey::invalid();
         if (auto elemCount1 = as<ConstantIntVal>(matrixType->getRowCount()))
@@ -828,7 +830,9 @@ struct SpecializeInterfaceInheritanceWitnessKey
 
 /// The key of the per-module conversion-cost cache. A conversion from an l-value costs an extra
 /// `kConversionCost_LValueCast`, so the key records whether the source is an l-value as well as
-/// the two types.
+/// the two types. `QualType`'s other flags are left out because conversion costs do not read
+/// them. The source expression `canCoerce` passes to `_coerce` is also left out, as it was before
+/// this key had an l-value bit.
 struct ConversionCostKey
 {
     Type* toType;

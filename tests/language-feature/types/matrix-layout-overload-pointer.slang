@@ -1,7 +1,7 @@
 // Pointer overloads that differ only in the pointee's matrix layout are distinct functions
 // (shader-slang/slang#13383). This runs only under render-test's row-major default: under a
 // column-major default the CPU target fails to compile `&plain` for a plain `Ptr<float2x3>`
-// parameter, with or without overloads.
+// parameter, with or without overloads (shader-slang/slang#13405).
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 

@@ -17,8 +17,9 @@ StructuredBuffer<row_major float2x3> rowBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=24):name=columnBuffer
 StructuredBuffer<column_major float2x3> columnBuffer;
 
-// `pickArray`, `pickBuffer` and the `ITag` extensions differ only in the mangled names of
-// functions and witness tables; without the layout in the name, every call runs one body.
+// For `pickArray`, `pickBuffer` and the `ITag` extensions, overload resolution already picks the
+// right declaration; only linkage by mangled name (of the functions and of the witness tables)
+// could run the wrong body, as it did when the name left out the layout.
 
 func pickArray(m : row_major float2x3[2]) -> float { return 1.0; }
 func pickArray(m : column_major float2x3[2]) -> float { return 2.0; }

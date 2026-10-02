@@ -221,10 +221,13 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "x");
         emitSimpleIntVal(context, matType->getColumnCount());
         // A matrix with an unspecified layout keeps the `m<R>x<C><T>` spelling. A specified layout
-        // makes a different type, so we emit `L` and the layout value. No built-in type code
-        // starts with `L` (raw `__extern_cpp` names can, see `emitQualifiedName`). The layout
-        // goes before the element type because after it, `m2x3m2x3Lk1ff` and `m2x3Lk1m2x3ff`
-        // would both spell `m2x3m2x3fLk1f`.
+        // makes a different type, so we emit `L` and the layout value. The layout goes before the
+        // element type: after it, `matrix<matrix<float,2,3,RowMajor>,2,3>` and
+        // `matrix<matrix<float,2,3>,2,3,RowMajor>` (`m2x3m2x3Lk1f` and `m2x3Lk1m2x3f`) would
+        // both spell `m2x3m2x3fLk1`. No built-in type code starts with `L`, so the token cannot
+        // be read as the start of the element type. A raw `__extern_cpp` type name (see
+        // `emitQualifiedName`) can start with `L`; such names are emitted without a prefix and
+        // can already collide with other productions, so this spelling does not make that worse.
         if (matType->hasSpecifiedLayout())
         {
             emitRaw(context, "L");

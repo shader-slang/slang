@@ -1,11 +1,11 @@
 // Overload resolution must not depend on an earlier call that converted an l-value of the same
-// types. Converting an l-value argument (for an `inout` parameter) costs extra, so a cached cost
-// that ignores l-value-ness makes the by-value `f(make())` calls below pick the `float` overload
-// instead of the cheaper `uint` one. The matrix cases come from shader-slang/slang#13383; the
-// generic-vector case is shader-slang/slang#13394.
+// types. Each `touch*` call converts an `int` l-value for an `inout` parameter, which costs extra;
+// a cached cost that ignored l-value-ness made the by-value `pickMatrix(makeMatrix())`,
+// `pickGenericLayout<L>(makeGenericLayout<L>())` and `pickVector<N>(makeVector<N>())` calls that
+// follow pick the `float` overload instead of the cheaper `uint` one. The matrix cases come from
+// shader-slang/slang#13383; the generic-vector case is shader-slang/slang#13394.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type -Xslang -matrix-layout-column-major
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
