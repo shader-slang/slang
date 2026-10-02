@@ -276,6 +276,12 @@ IRFunc* createDispatchFunc(
     Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping,
     TargetRequest* targetReq)
 {
+    // Both target-dependent choices below dereference `targetReq` (force-inline via
+    // `isCPUTargetViaLLVM`, the default-arm terminator via
+    // `doesTargetSupportUnreachableTerminator`), so a null request is a contract violation, not a
+    // "skip".
+    SLANG_RELEASE_ASSERT(targetReq);
+
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
 
@@ -317,7 +323,19 @@ IRFunc* createDispatchFunc(
     // Create default block
     auto defaultBlock = builder.emitBlock();
     builder.setInsertInto(defaultBlock);
-    if (resultType->getOp() == kIROp_VoidType)
+    if (doesTargetSupportUnreachableTerminator(targetReq))
+    {
+        // Every tag produced by a closed-set source -- `GetTagOfElementInSet`, the set->set remap,
+        // and the in-set-clamped `GetTagFromSequentialID` -- has a `case`, so none of them selects
+        // this arm. We mark it `unreachable` so the backend drops the range check;
+        // `SLANG_PRELUDE_UNREACHABLE` lowers to a no-return in release and to a loud trap in debug.
+        // One producer is not in that set: force-unwrapping a `none` `Optional<Interface>` lowers
+        // to an unclamped `GetTagForSubSet`, which can carry an out-of-set tag here; the debug trap
+        // catches that case if it occurs. Targets without the spelling keep the defined default
+        // below.
+        builder.emitUnreachable();
+    }
+    else if (resultType->getOp() == kIROp_VoidType)
     {
         builder.emitReturn();
     }
