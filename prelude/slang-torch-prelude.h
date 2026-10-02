@@ -163,6 +163,14 @@ TensorView make_tensor_view(
     bool isEmpty = (val.numel() == 0);
     for (int i = 0; i < val.dim(); ++i)
     {
+        // Address calculations can exceed 4 GiB, but the view's metadata must still fit its
+        // 32-bit fields. Check byte strides before multiplying to avoid overflow here too.
+        if (uint64_t(val.size(i)) > UINT32_MAX)
+            throw std::runtime_error(
+                std::string(name).append(": tensor dimension size exceeds 32-bit limit."));
+        if (uint64_t(val.stride(i)) > UINT32_MAX / elementSize)
+            throw std::runtime_error(
+                std::string(name).append(": tensor byte stride exceeds 32-bit limit."));
         res.sizes[i] = val.size(i);
         res.strides[i] = val.stride(i) * elementSize;
         if (!isEmpty && res.strides[i] == 0)
