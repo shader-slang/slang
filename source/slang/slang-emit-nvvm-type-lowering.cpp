@@ -1224,37 +1224,46 @@ IRPtrTypeBase* asNVVMSupportedLocalCopyableArrayPointerType(
     return pointerType;
 }
 
-IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
-    IRInst* type,
-    IRStructType** outValueType)
+IRPtrTypeBase* asNVVMSupportedLocalResourceValuePointerType(IRInst* type, IRType** outValueType)
 {
     if (outValueType)
         *outValueType = nullptr;
     auto pointerType = as<IRPtrTypeBase>(type);
-    auto valueType =
-        pointerType ? asNVVMSupportedResourceStructType(pointerType->getValueType()) : nullptr;
-    IRType* dataLayout = pointerType ? pointerType->getDataLayout() : nullptr;
-    const bool isLocalPointer =
-        pointerType && pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 1;
-    const bool isMutableBorrow = pointerType &&
-                                 pointerType->getOp() == kIROp_BorrowInOutParamType &&
-                                 pointerType->getOperandCount() == 1;
-    // Consider `void set(inout Outer value)`: the helper receives `BorrowInOutParam<Outer>`, while
-    // its caller passes the `Ptr<Outer>` produced by a local `var`. Both point at the same selected
-    // resource-capable aggregate representation. Explicit-global-context lowering adds the complete
-    // CUDA thread-local pointer spelling. For example, `static bool flag` becomes a Bool field in
-    // the entry-local context, and helpers receive its address. Reuse the existing copyable-value
-    // representation for that field and for nested value state, while excluding resource fields.
+    IRType* valueType = pointerType ? pointerType->getValueType() : nullptr;
+    NVVMRawBufferType rawBuffer;
+    NVVMReadOnlyTextureType texture;
+    NVVMSurfaceType surface;
+    const bool isResourceValue = asNVVMSupportedResourceStructType(valueType) ||
+                                 asNVVMSupportedResourceArrayType(valueType) ||
+                                 getNVVMSupportedRawBufferType(valueType, rawBuffer) ||
+                                 getNVVMSupportedReadOnlyTextureType(valueType, texture) ||
+                                 getNVVMSupportedSurfaceType(valueType, surface) ||
+                                 asNVVMSupportedSamplerValueType(valueType);
+    if (!pointerType || !isResourceValue)
+        return nullptr;
+    IRType* dataLayout = pointerType->getDataLayout();
+    const auto op = pointerType->getOp();
+    const bool isCompactLocal =
+        pointerType->getOperandCount() == 1 &&
+        (op == kIROp_PtrType || op == kIROp_OutParamType || op == kIROp_BorrowInOutParamType);
+    const bool isReference = pointerType->getOperandCount() == 4 &&
+                             pointerType->getAddressSpace() == AddressSpace::Generic &&
+                             dataLayout && dataLayout->getOp() == kIROp_DefaultBufferLayoutType &&
+                             ((op == kIROp_BorrowInParamType &&
+                               pointerType->getAccessQualifier() == AccessQualifier::Read) ||
+                              (op == kIROp_RefParamType &&
+                               pointerType->getAccessQualifier() == AccessQualifier::ReadWrite));
+    // Consider `void initialize(out Texture2D t)`: the caller's local Ptr and the callee's
+    // OutParam own the same handle storage. Readonly borrowing preserves that address but cannot
+    // grant writes. The explicit thread-local context form remains limited to numeric records.
     const bool isThreadLocalContextPointer =
-        asNVVMSupportedCopyableStructType(valueType) && pointerType &&
-        pointerType->getOp() == kIROp_PtrType && pointerType->getOperandCount() == 4 &&
+        asNVVMSupportedCopyableStructType(valueType) && op == kIROp_PtrType &&
+        pointerType->getOperandCount() == 4 &&
         pointerType->getAccessQualifier() == AccessQualifier::ReadWrite &&
         pointerType->getAddressSpace() == AddressSpace::ThreadLocal && dataLayout &&
         dataLayout->getOp() == kIROp_DefaultBufferLayoutType;
-    if (!valueType || (!isLocalPointer && !isMutableBorrow && !isThreadLocalContextPointer))
-    {
+    if (!isCompactLocal && !isReference && !isThreadLocalContextPointer)
         return nullptr;
-    }
     if (outValueType)
         *outValueType = valueType;
     return pointerType;
@@ -2409,7 +2418,8 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
         supportedType = use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage
                             ? asNVVMSupportedAggregateStorageArrayType(type, &elementCount)
                             : asNVVMSupportedHelperArrayType(type, &elementCount);
-        if (!supportedType && use == NVVMTypeUse::Value)
+        if (!supportedType && (use == NVVMTypeUse::Value || use == NVVMTypeUse::HelperParameter ||
+                               use == NVVMTypeUse::HelperResult))
             supportedType = asNVVMSupportedResourceArrayType(type, &elementCount);
         if (!supportedType && (use == NVVMTypeUse::Value || use == NVVMTypeUse::Storage ||
                                use == NVVMTypeUse::HelperParameter))
@@ -2734,17 +2744,19 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
     case NVVMTypeUse::EntryPointResult:
         return isVoid;
     case NVVMTypeUse::HelperResult:
-        return isVoid || isHelperValue || resourceStructType || localCopyablePointer ||
-               localHelperPointer || isRawBuffer || isSampledTexture || isSurface || samplerValue;
+        return isVoid || isHelperValue || resourceStructType || fixedResourceArrayType ||
+               localCopyablePointer || localHelperPointer || isRawBuffer || isSampledTexture ||
+               isSurface || samplerValue;
     case NVVMTypeUse::EntryPointParameter:
         return isCopyableValue || resourceStructType || deviceNumericPointer ||
                deviceArrayPointer || isRawBuffer || isSampledTexture || isSurface || samplerValue ||
                (parameterGroup && hasParameterGroupValueRepresentation);
     case NVVMTypeUse::HelperParameter:
-        return isHelperValue || resourceStructType || localResourceStructPointer ||
-               localCopyablePointer || localHelperPointer || helperReferencePointer ||
-               physicalStorageReferencePointer || localPhysicalStoragePointer ||
-               sharedHelperPointer || isRawBuffer || isSurface || isSampledTexture || samplerValue;
+        return isHelperValue || resourceStructType || fixedResourceArrayType ||
+               localResourceValuePointer || localCopyablePointer || localHelperPointer ||
+               helperReferencePointer || physicalStorageReferencePointer ||
+               localPhysicalStoragePointer || sharedHelperPointer || isRawBuffer || isSurface ||
+               isSampledTexture || samplerValue;
     case NVVMTypeUse::HelperValue:
         return isHelperValue;
     case NVVMTypeUse::Value:
@@ -2811,8 +2823,8 @@ NVVMTypeInfo classifyNVVMType(IRType* type)
     info.scalarStructType = asNVVMSupportedScalarStructType(type);
     info.resourceStructType = asNVVMSupportedResourceStructType(type);
     info.physicalArrayStructType = asNVVMSupportedPhysicalArrayStructType(type);
-    info.localResourceStructPointer =
-        asNVVMSupportedLocalResourceStructPointerType(type, &info.localResourceStructValueType);
+    info.localResourceValuePointer =
+        asNVVMSupportedLocalResourceValuePointerType(type, &info.localResourceValueType);
     info.localCopyablePointer =
         asNVVMSupportedLocalCopyableValuePointerType(type, &info.localCopyablePointerValueType);
     info.localHelperPointer =
@@ -2960,8 +2972,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     IRStructType* structType = typeInfo.structType;
     IRStructType* resourceStructType = typeInfo.resourceStructType;
     IRStructType* physicalArrayStructType = typeInfo.physicalArrayStructType;
-    IRStructType* localResourceStructValueType = typeInfo.localResourceStructValueType;
-    IRPtrTypeBase* localResourceStructPointer = typeInfo.localResourceStructPointer;
+    IRType* localResourceValueType = typeInfo.localResourceValueType;
+    IRPtrTypeBase* localResourceValuePointer = typeInfo.localResourceValuePointer;
     IRType* localCopyablePointerValueType = typeInfo.localCopyablePointerValueType;
     IRPtrTypeBase* localCopyablePointer = typeInfo.localCopyablePointer;
     IRType* localHelperPointerValueType = typeInfo.localHelperPointerValueType;
@@ -3337,11 +3349,11 @@ SlangResult NVVMTypeLoweringContext::lowerType(
             false);
     }
 
-    if (use == NVVMTypeUse::HelperParameter && localResourceStructPointer)
+    if (use == NVVMTypeUse::HelperParameter && localResourceValuePointer)
     {
         return _lowerPointerType(
             type,
-            localResourceStructValueType,
+            localResourceValueType,
             SLANG_NVVM_ADDRESS_SPACE_GENERIC,
             outType);
     }

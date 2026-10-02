@@ -260,6 +260,36 @@ IRPtrTypeBase* _getNVVMHitObjectPointer(const NVVMAddressPlan& addresses, IRInst
     return nullptr;
 }
 
+// Returns a local resource reference only from a variable/helper root or its checked child.
+// For `initialize(out wrapper.textures[i])`, the explicit child pointer spelling is not sufficient:
+// the address plan must retain the local wrapper root and its access restriction.
+IRPtrTypeBase* _getNVVMLocalResourceReference(
+    const NVVMAddressPlan& addresses,
+    IRInst* value,
+    bool* outIsReadOnly = nullptr)
+{
+    if (!value)
+        return nullptr;
+    auto field = addresses.findFieldAddress(value);
+    auto element = addresses.findElementAddress(value);
+    if ((value->getOp() == kIROp_FieldAddress && !field) ||
+        (value->getOp() == kIROp_GetElementPtr && !element))
+        return nullptr;
+    auto root = addresses.getRoot(value);
+    auto rootPointer = asNVVMSupportedLocalResourceValuePointerType(root->getDataType());
+    auto block = as<IRBlock>(root->getParent());
+    auto function = block ? as<IRFunc>(block->getParent()) : nullptr;
+    if (!rootPointer || !function ||
+        (root->getOp() != kIROp_Var && (!as<IRParam>(root) || block != function->getFirstBlock() ||
+                                        function->findDecoration<IREntryPointDecoration>() ||
+                                        function->findDecoration<IRCudaKernelDecoration>())))
+        return nullptr;
+    if (outIsReadOnly)
+        *outIsReadOnly = rootPointer->getAccessQualifier() == AccessQualifier::Read ||
+                         (field && !field->selection.isMutable) || (element && element->isReadOnly);
+    return as<IRPtrTypeBase>(value->getDataType());
+}
+
 struct NVVMSequentialElementPointer
 {
     IRInst* base = nullptr;
@@ -363,13 +393,15 @@ bool _getNVVMStructFieldAddress(
             outAddress.isMutable = true;
         }
     }
-    else if (asNVVMSupportedLocalResourceStructPointerType(
-                 fieldAddress->getBase()->getDataType(),
-                 &structType))
+    else if (
+        auto resourceReference =
+            asNVVMSupportedLocalResourceValuePointerType(fieldAddress->getBase()->getDataType()))
     {
-        // A canonical BorrowInOutParam is not itself a local Ptr, but it shares the exact selected
-        // resource-capable struct pointee and mutable field contract established for helpers.
-        outAddress.isMutable = true;
+        structType = as<IRStructType>(resourceReference->getValueType());
+        if (!structType)
+            return false;
+        outAddress.isMutable =
+            resourceReference->getAccessQualifier() == AccessQualifier::ReadWrite;
     }
     else
     {
@@ -537,7 +569,8 @@ bool _getNVVMStructFieldAddress(
                !asNVVMSupportedUnsizedSamplerArrayStorageType(fieldType);
     }
 
-    if (outAddress.isMutable || outAddress.isLocalSubstandardRecordStorage)
+    if (outAddress.isMutable || outAddress.isLocalSubstandardRecordStorage ||
+        _getNVVMLocalResourceReference(addresses, fieldAddress->getBase()))
     {
         return _getNVVMExecutableValueAlignment(fieldType) != 0 ||
                (outAddress.isLocalSubstandardRecordStorage && asNVVMBFloat16VectorType(fieldType));
@@ -1011,6 +1044,15 @@ bool _getNVVMSequentialElementPointer(
         if (!arrayType)
             baseType = nullptr;
     }
+    if (!baseType && base)
+    {
+        auto resource = asNVVMSupportedLocalResourceValuePointerType(base->getDataType());
+        if (resource && (arrayType = asNVVMSupportedResourceArrayType(resource->getValueType())))
+        {
+            baseType = resource;
+            isImmutable = resource->getAccessQualifier() == AccessQualifier::Read;
+        }
+    }
     if (!baseType)
     {
         auto object = _getNVVMHitObjectPointer(addresses, base);
@@ -1049,6 +1091,9 @@ bool _getNVVMSequentialElementPointer(
         if (parentElement && parentElement->kind == NVVMElementAddressKind::Sequential)
         {
             arrayType = asNVVMSupportedHelperArrayType(parentElement->resultType->getValueType());
+            if (!arrayType)
+                arrayType =
+                    asNVVMSupportedResourceArrayType(parentElement->resultType->getValueType());
             if (arrayType)
             {
                 baseType = parentElement->resultType;
@@ -1078,6 +1123,9 @@ bool _getNVVMSequentialElementPointer(
                         ? asNVVMSupportedHelperArrayType(field->selection.field->getFieldType())
                         : asNVVMSupportedAggregateStorageArrayType(
                               field->selection.field->getFieldType());
+                if (!arrayType && _getNVVMLocalResourceReference(addresses, base))
+                    arrayType =
+                        asNVVMSupportedResourceArrayType(field->selection.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
                 isImmutable = !field->selection.isMutable;
                 isParameterGroupStorage = field->selection.isParameterGroupStorage;
@@ -1263,7 +1311,8 @@ bool _hasNVVMCompatibleStructLayout(CodeGenContext* codeGenContext, IRStructType
         IRType* fieldType = field->getFieldType();
         if ((asNVVMSupportedResourceStructType(fieldType) ||
              asNVVMSupportedHelperStructType(fieldType) ||
-             asNVVMSupportedHelperArrayType(fieldType)) &&
+             asNVVMSupportedHelperArrayType(fieldType) ||
+             asNVVMSupportedResourceArrayType(fieldType)) &&
             !_hasNVVMCompatibleHelperValueLayout(codeGenContext, fieldType))
             return false;
     }
@@ -1281,7 +1330,10 @@ bool _hasNVVMCompatibleHelperValueLayout(CodeGenContext* codeGenContext, IRType*
         return _hasNVVMCompatibleStructLayout(codeGenContext, structType);
     if (auto structType = asNVVMSupportedResourceStructType(type))
         return _hasNVVMCompatibleStructLayout(codeGenContext, structType);
-    if (auto arrayType = asNVVMSupportedHelperArrayType(type))
+    auto arrayType = asNVVMSupportedHelperArrayType(type);
+    if (!arrayType)
+        arrayType = asNVVMSupportedResourceArrayType(type);
+    if (arrayType)
     {
         IRSizeAndAlignment cudaLayout;
         IRSizeAndAlignment llvmLayout;
@@ -1300,8 +1352,14 @@ bool _hasNVVMCompatibleHelperValueLayout(CodeGenContext* codeGenContext, IRType*
     }
     if (asNVVMSupportedDeviceHelperValuePointerType(type))
         return true;
+    NVVMRawBufferType rawBuffer;
+    NVVMReadOnlyTextureType texture;
+    NVVMSurfaceType surface;
     if (!isNVVMSupportedNumericValueType(type) && !isNVVMBFloat16Type(type) &&
-        !asNVVMSupportedDescriptorHandleType(type))
+        !asNVVMSupportedDescriptorHandleType(type) &&
+        !getNVVMSupportedRawBufferType(type, rawBuffer) &&
+        !getNVVMSupportedReadOnlyTextureType(type, texture) &&
+        !getNVVMSupportedSurfaceType(type, surface) && !asNVVMSupportedSamplerValueType(type))
         return false;
 
     // Structured-buffer and aggregate-storage pointer arithmetic use the provider type's physical
@@ -5277,7 +5335,7 @@ SlangResult _validatePointerValue(
                                    : nullptr;
     auto localRecordArrayPtrType = _getNVVMLocalSubstandardRecordArrayPointer(value);
     auto localStructPtrType =
-        value ? asNVVMSupportedLocalResourceStructPointerType(value->getDataType()) : nullptr;
+        _getNVVMLocalResourceReference(requirements.emissionPlan.addresses, value);
     auto localHelperPtrType =
         value ? asNVVMSupportedLocalHelperValuePointerType(value->getDataType()) : nullptr;
     // A local `var T` and module-scope groupshared storage can both expose `Ptr<T>`. Only a local
@@ -5365,8 +5423,29 @@ SlangResult _validatePointerValue(
             codeGenContext,
             toSlice("read-only structured-buffer element access"));
     }
+    bool isReadOnlyResourceUse = false;
+    if (_getNVVMLocalResourceReference(requirements.emissionPlan.addresses, value))
+    {
+        auto childField = requirements.emissionPlan.addresses.findFieldAddress(consumer);
+        isReadOnlyResourceUse = hasSequentialChild || (childField && childField->base == value);
+        if (auto call = as<IRCall>(consumer))
+        {
+            if (auto callee = as<IRFunc>(call->getCallee()))
+            {
+                isReadOnlyResourceUse = true;
+                for (UInt i = 0; i < call->getArgCount(); ++i)
+                    if (call->getArg(i) == value)
+                    {
+                        auto parameter =
+                            asNVVMSupportedLocalResourceValuePointerType(callee->getParamType(i));
+                        if (!parameter || parameter->getAccessQualifier() != AccessQualifier::Read)
+                            isReadOnlyResourceUse = false;
+                    }
+            }
+        }
+    }
     if (fieldPtrType && !plannedField->selection.isMutable &&
-        (consumer->getOp() != kIROp_Load || requireWriteAccess))
+        ((consumer->getOp() != kIROp_Load && !isReadOnlyResourceUse) || requireWriteAccess))
     {
         StringBuilder construct;
         construct << "immutable struct field access: consumer="
@@ -5374,7 +5453,7 @@ SlangResult _validatePointerValue(
         return _diagnoseUnsupportedIR(codeGenContext, construct.getUnownedSlice());
     }
     if (sequentialElementPtrType && plannedElement->isReadOnly &&
-        (consumer->getOp() != kIROp_Load || requireWriteAccess))
+        ((consumer->getOp() != kIROp_Load && !isReadOnlyResourceUse) || requireWriteAccess))
     {
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("read-only sequential element load"));
     }
@@ -5625,17 +5704,14 @@ bool _isSupportedNVVMHelperArgument(
         }
     }
 
-    IRStructType* argumentValueType = nullptr;
-    IRStructType* parameterValueType = nullptr;
-    auto argumentPointer =
-        asNVVMSupportedLocalResourceStructPointerType(argumentType, &argumentValueType);
+    IRType* parameterValueType = nullptr;
+    bool isReadOnlyResource = false;
+    auto argumentPointer = _getNVVMLocalResourceReference(addresses, argument, &isReadOnlyResource);
+    IRType* argumentValueType = argumentPointer ? argumentPointer->getValueType() : nullptr;
     auto parameterPointer =
-        asNVVMSupportedLocalResourceStructPointerType(parameterType, &parameterValueType);
-    const bool isMutableStructParameter =
-        parameterPointer && (parameterPointer->getOp() == kIROp_BorrowInOutParamType ||
-                             parameterPointer->getAddressSpace() == AddressSpace::ThreadLocal);
-    if (argumentPointer && argumentPointer->getOp() == kIROp_PtrType &&
-        argumentPointer->getOperandCount() == 1 && isMutableStructParameter &&
+        asNVVMSupportedLocalResourceValuePointerType(parameterType, &parameterValueType);
+    if (argumentPointer && parameterPointer &&
+        (parameterPointer->getAccessQualifier() == AccessQualifier::Read || !isReadOnlyResource) &&
         isTypeEqual(argumentValueType, parameterValueType))
     {
         return true;
@@ -6153,10 +6229,10 @@ SlangResult _planNVVMLocalStorage(
     }
     else
     {
-        IRStructType* valueType = nullptr;
-        if (!asNVVMSupportedLocalResourceStructPointerType(inst->getDataType(), &valueType))
+        IRType* valueType = nullptr;
+        if (!asNVVMSupportedLocalResourceValuePointerType(inst->getDataType(), &valueType))
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("var"));
-        if (!_hasNVVMCompatibleStructLayout(codeGenContext, valueType))
+        if (!_hasNVVMCompatibleHelperValueLayout(codeGenContext, valueType))
         {
             return _diagnoseUnsupportedIR(codeGenContext, toSlice("local resource-struct layout"));
         }
@@ -8039,8 +8115,9 @@ SlangResult _validateNVVMFunction(
                         }
                         else if (
                             _getNVVMLocalSubstandardRecordArrayPointer(argument) ||
-                            asNVVMSupportedLocalResourceStructPointerType(
-                                argument->getDataType()) ||
+                            _getNVVMLocalResourceReference(
+                                requirements.emissionPlan.addresses,
+                                argument) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedLocalHelperValuePointerType(argument->getDataType()) ||
                             asNVVMSupportedDeviceHelperValuePointerType(argument->getDataType()) ||
@@ -11065,8 +11142,8 @@ SlangResult validateNVVMSupportedIR(
                     codeGenContext,
                     toSlice("structured-buffer element layout"));
             }
-            IRStructType* pointerValueType = nullptr;
-            if (asNVVMSupportedLocalResourceStructPointerType(
+            IRType* pointerValueType = nullptr;
+            if (asNVVMSupportedLocalResourceValuePointerType(
                     parameter->getDataType(),
                     &pointerValueType))
             {
@@ -11105,8 +11182,8 @@ SlangResult validateNVVMSupportedIR(
                 {
                     _addNVVMReachableStructTypes(localValueType, selectedReachableStructTypes);
                 }
-                IRStructType* localResourceValueType = nullptr;
-                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalResourceStructPointerType(
+                IRType* localResourceValueType = nullptr;
+                if (inst->getOp() == kIROp_Var && asNVVMSupportedLocalResourceValuePointerType(
                                                       inst->getDataType(),
                                                       &localResourceValueType))
                 {

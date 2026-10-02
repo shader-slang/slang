@@ -247,11 +247,11 @@ IRPtrTypeBase* asNVVMSupportedLocalCopyableArrayPointerType(
     IRArrayType** outValueType = nullptr,
     uint32_t* outElementCount = nullptr);
 
-/// Returns an exact local, borrowed mutable, or thread-local pointer to a selected
-/// resource-capable struct.
-IRPtrTypeBase* asNVVMSupportedLocalResourceStructPointerType(
+/// Returns a canonical local reference to an admitted resource leaf, array, or record.
+/// Resource references retain their own storage role instead of becoming device-pointer values.
+IRPtrTypeBase* asNVVMSupportedLocalResourceValuePointerType(
     IRInst* type,
-    IRStructType** outValueType = nullptr);
+    IRType** outValueType = nullptr);
 
 /// Returns the natural byte alignment of one selected numeric value, or zero when unsupported.
 uint32_t getNVVMNumericValueAlignment(IRInst* type);
@@ -502,8 +502,8 @@ struct NVVMTypeInfo
     IRStructType* scalarStructType = nullptr;
     IRStructType* resourceStructType = nullptr;
     IRStructType* physicalArrayStructType = nullptr;
-    IRStructType* localResourceStructValueType = nullptr;
-    IRPtrTypeBase* localResourceStructPointer = nullptr;
+    IRType* localResourceValueType = nullptr;
+    IRPtrTypeBase* localResourceValuePointer = nullptr;
     IRType* localCopyablePointerValueType = nullptr;
     IRPtrTypeBase* localCopyablePointer = nullptr;
     IRType* localHelperPointerValueType = nullptr;

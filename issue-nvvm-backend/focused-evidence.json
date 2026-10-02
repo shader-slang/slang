@@ -91029,6 +91029,268 @@
         "Source and fixture formatting changed after final build/run only in whitespace; compiler source hashes and binary identities retained separately."
       ],
       "accepted_rhi_commit": "ed95db5f0522d1aad564e6171c1c526e79f42508"
+    },
+    "nvvm-resource-helper-transport": {
+      "status": "accepted-focused",
+      "identity": {
+        "path": "build/nvvm-resource-helpers/identity.json",
+        "sha256": "cd7fd7865bc271ca3094c33246f63d883c9257621cc4340e971c1d5b1ed4f08c",
+        "formatting_note": "After validation, clang-format joined one array-pointee assertion line in unit-test-nvvm-emitter.cpp; semantics unchanged. Tested source hashes remain in identity.json.",
+        "formatted_unit_source_sha256": "9c51d792085d41bf3be48be938528fb60760726b4c8a16a9eff4485c151d8247"
+      },
+      "scope": "Local resource helper value/reference family plus shared CPU/CUDA byte-buffer descriptor layout. Exact roles and provenance retained.",
+      "validation": {
+        "build-1": {
+          "path": "build/nvvm-resource-helpers/build-1.json",
+          "sha256": "4e5194f2c8534a6dfb8388291cb7b14b763b15984134ddc6823a6c993f8669ef",
+          "return_code": 0,
+          "elapsed_seconds": 35.616896629333496
+        },
+        "build-2": {
+          "path": "build/nvvm-resource-helpers/build-2.json",
+          "sha256": "a7ceab92e26b34429db27bf6f469973bb6e94c216a11559ea14cb6b5f42d765a",
+          "return_code": 1,
+          "elapsed_seconds": 26.072325944900513
+        },
+        "build-3": {
+          "path": "build/nvvm-resource-helpers/build-3.json",
+          "sha256": "764db2b97d15d184bbf287f810e98a98fe000dd7d85460c1e38c93e61464340b",
+          "return_code": 1,
+          "elapsed_seconds": 17.905637502670288
+        },
+        "build-4": {
+          "path": "build/nvvm-resource-helpers/build-4.json",
+          "sha256": "e0bc99dece336840f8b324b208a7560fb71e78bae55fc73d3c5e682911ea399c",
+          "return_code": 0,
+          "elapsed_seconds": 21.914113759994507
+        },
+        "build-final": {
+          "path": "build/nvvm-resource-helpers/build-final.json",
+          "sha256": "a14ed35b70e6af47382198d5cce8a2bcf5d158fbc76368a93b26c6cd620609dc",
+          "return_code": 0,
+          "elapsed_seconds": 32.248058795928955
+        },
+        "handles-1": {
+          "path": "build/nvvm-resource-helpers/handles-1.json",
+          "sha256": "f15630d28d00dd73e9aca0bb508a1aadac5a718d7e7cae94d0c33ae01282510f",
+          "return_code": 1,
+          "elapsed_seconds": 2.202425241470337
+        },
+        "handles-2": {
+          "path": "build/nvvm-resource-helpers/handles-2.json",
+          "sha256": "edaa21e85c02cdaacdcb38702c3e14ed66f4db54fa6f176faf7883b7de1543b2",
+          "return_code": 0,
+          "elapsed_seconds": 24.26686382293701
+        },
+        "runtime-1": {
+          "path": "build/nvvm-resource-helpers/runtime-1.json",
+          "sha256": "4bc207b2e5d477e640843834d0c87d14d0bbee45bc97005ba37d859a21309488",
+          "return_code": 1,
+          "elapsed_seconds": 2.7870638370513916
+        },
+        "runtime-2": {
+          "path": "build/nvvm-resource-helpers/runtime-2.json",
+          "sha256": "2c012c6a461a57535df4ac6879e9b034b7f0d2436c9ca8608cc2293d7f4cc44f",
+          "return_code": 0,
+          "elapsed_seconds": 3.423586368560791
+        },
+        "runtime-final": {
+          "path": "build/nvvm-resource-helpers/runtime-final.json",
+          "sha256": "09bd5987f4fec970e7e6876042467865eedc20648512573be9a7aabe9b8bd491",
+          "return_code": 0,
+          "elapsed_seconds": 3.298755407333374
+        },
+        "slangpy-1": {
+          "path": "build/nvvm-resource-helpers/slangpy-1.json",
+          "sha256": "efacc6a74df94284e8b7395c49acf80278fd6fac300876d8e246fb69ce8b1148",
+          "return_code": 1,
+          "elapsed_seconds": 4.528229713439941
+        },
+        "slangpy-final": {
+          "path": "build/nvvm-resource-helpers/slangpy-final.json",
+          "sha256": "a1735226d045867a8361f76b07a30f1e71f2e22f4516f8f632ae0eeec1d99f73",
+          "return_code": 1,
+          "elapsed_seconds": 14.565154790878296
+        },
+        "smoke-gate": {
+          "path": "build/nvvm-resource-helpers/smoke-gate.json",
+          "sha256": "bc80c85ba30c03d149b47bac3f10299e246eeeac6ba053900e57d8246e1164d7",
+          "return_code": 0,
+          "elapsed_seconds": 22.500266551971436
+        },
+        "static-build-1": {
+          "path": "build/nvvm-resource-helpers/static-build-1.json",
+          "sha256": "f0acef8f39996e7616e9235c93a9310ce343c27054574bce9b12563230609827",
+          "return_code": 1,
+          "elapsed_seconds": 18.50753688812256
+        },
+        "static-build-2": {
+          "path": "build/nvvm-resource-helpers/static-build-2.json",
+          "sha256": "a73380a6439610c3a89079048e0804f598df003b686688496a439e6d80b3501d",
+          "return_code": 0,
+          "elapsed_seconds": 17.855477333068848
+        },
+        "static-build-final-2": {
+          "path": "build/nvvm-resource-helpers/static-build-final-2.json",
+          "sha256": "ccfc1c690caa73fbb2330dadb0083ca35473b098262f2b6af7ba77d03d9e3d1d",
+          "return_code": 0,
+          "elapsed_seconds": 14.18929934501648
+        },
+        "static-build-final": {
+          "path": "build/nvvm-resource-helpers/static-build-final.json",
+          "sha256": "6829eb9df8a46635fe8b101f3b585704ee69555c1ca0a7b3a117c5280178d522",
+          "return_code": 1,
+          "elapsed_seconds": 15.73435664176941
+        },
+        "static-nvvmRawBufferLayoutMatchesCpuCudaDescriptors": {
+          "path": "build/nvvm-resource-helpers/static-nvvmRawBufferLayoutMatchesCpuCudaDescriptors.json",
+          "sha256": "37ac79b36c8e97727dd406e0ff3eeb130e065be5da84c6dbadefa06ab77ddb48",
+          "return_code": 0,
+          "elapsed_seconds": 0.28209710121154785
+        },
+        "static-nvvmResourceEntriesRetainCheckedPackingAndQueries": {
+          "path": "build/nvvm-resource-helpers/static-nvvmResourceEntriesRetainCheckedPackingAndQueries.json",
+          "sha256": "97aa836c464c712d4a8ec1b2f531a007317af41ff9da77ecf378bc9f8fea4787",
+          "return_code": 0,
+          "elapsed_seconds": 0.25209474563598633
+        },
+        "static-nvvmResourceEntryFormatsRequireDeclaredOwners": {
+          "path": "build/nvvm-resource-helpers/static-nvvmResourceEntryFormatsRequireDeclaredOwners.json",
+          "sha256": "4da35abf971feb14f5e248d0c5dc4aaaa6f9d0646880aa9e5801d3c6bb3208d1",
+          "return_code": 0,
+          "elapsed_seconds": 0.263718843460083
+        },
+        "static-nvvmResourceHelperRolesPreserveStorageAndAccess": {
+          "path": "build/nvvm-resource-helpers/static-nvvmResourceHelperRolesPreserveStorageAndAccess.json",
+          "sha256": "4a6c1c0cb24e1fa40496a5441f64d64f0d71351719a2a437a6d70b96014cc5f8",
+          "return_code": 0,
+          "elapsed_seconds": 7.057116508483887
+        },
+        "static-nvvmResourceReferencesPreserveDerivedReadOnlyAccess": {
+          "path": "build/nvvm-resource-helpers/static-nvvmResourceReferencesPreserveDerivedReadOnlyAccess.json",
+          "sha256": "67e41ec63d5c6a57e239f2c84866def00457193d508760a7ae7d4e12929f17e3",
+          "return_code": 0,
+          "elapsed_seconds": 0.2749786376953125
+        },
+        "static-nvvmTypedBufferBindingsStayStorageOnly": {
+          "path": "build/nvvm-resource-helpers/static-nvvmTypedBufferBindingsStayStorageOnly.json",
+          "sha256": "58913579b0effeee6e7f33b4a791c606ca42b6057708870938eab9e497115a8c",
+          "return_code": 0,
+          "elapsed_seconds": 0.25505948066711426
+        },
+        "unit-build-final-2": {
+          "path": "build/nvvm-resource-helpers/unit-build-final-2.json",
+          "sha256": "33e456cd40c02a0ac97fa5cdde1c586ff0e3af07d181be9f5e2e9d0f5817034d",
+          "return_code": 0,
+          "elapsed_seconds": 21.12292504310608
+        },
+        "unit-build-final": {
+          "path": "build/nvvm-resource-helpers/unit-build-final.json",
+          "sha256": "d0962343fafe1d80eb1866e5d681246e2efadb1fef9d3feb169b88a35f73d93c",
+          "return_code": 0,
+          "elapsed_seconds": 23.902918815612793
+        },
+        "units-final-2": {
+          "path": "build/nvvm-resource-helpers/units-final-2.json",
+          "sha256": "1674fcf24a1a59b30d61718966e0f905ccec0c1bd8794b84b9b5d6aeb4b9fa4b",
+          "return_code": 0,
+          "elapsed_seconds": 8.728917837142944
+        },
+        "units-final": {
+          "path": "build/nvvm-resource-helpers/units-final.json",
+          "sha256": "79b933ad12a5502eb7ad8ff57cdaddc7db9e1863e7ab992382c60c5f247ea402",
+          "return_code": 1,
+          "elapsed_seconds": 8.670491218566895
+        }
+      },
+      "outcomes": {
+        "buffer_runtime": {
+          "passed": 3,
+          "modes": ["nvrtc-o3", "nvvm-o0", "nvvm-o3"],
+          "source": "tests/cuda/nvvm-resource-helper-transport.slang"
+        },
+        "handle_runtime": {
+          "passed": 40,
+          "shapes": 20,
+          "modes": ["nvvm-o0", "nvvm-o3"],
+          "source": "tests/cuda/nvvm-resource-helper-handles.slang",
+          "scope": "Synthetic64-bit handle transport; no sampling of synthetic handles. Live buffer operations and SlangPy2D/3D sampling have separate oracles."
+        },
+        "units": {
+          "passed": 8
+        },
+        "static": {
+          "passed": 6,
+          "includes": "Readonly root/child stores and mutable forwarding reject before provider mutation; role/cache order, CPU/CUDA/nulltarget/SPIR-V layout and retained format/storage controls."
+        },
+        "slangpy": {
+          "selected": 62,
+          "passed": 46,
+          "failed": 16,
+          "previous_failures_resolved": 9,
+          "previous_pass_sentinels": 37
+        },
+        "smoke": {
+          "passed": 16,
+          "regressions": 0,
+          "selection": {
+            "path": "build/nvvm-resource-helpers/smoke/selection.json",
+            "sha256": "d1c92e124c5f58e9c49939c3815634107a2601196181df3def58f1b861e75d1f"
+          }
+        }
+      },
+      "contracts": [
+        "Resource-only local classifier remains separate from generic helper/user-pointer values and resource memory roles. No new acceleration-handle, device/shared resource reference or pointer-result admission.",
+        "Field/element references require checked parent records and a local variable/helper root. Readonly descendants forward only to explicitly readonly resource formals; mutability never grows.",
+        "Fixed resource arrays share Value/HelperParameter/HelperResult representation with admission before cache access. Explicit layouts and entry roles remain separate.",
+        "Shared IR ByteAddressBuffer/RWByteAddressBuffer sizing is16bytes/alignment8 on CPU/CUDA, matching pointer+count preludes. Targetless fresh queries and SPIR-V natural layout retain rejection.",
+        "Legacy fake byval setter now accepts matching array carriers as already required by prior numeric-entry migration. Unit retains offsets0/8,size16,alignment8 and invariant source-buffer load; no production fallback."
+      ],
+      "failure_history": [
+        {
+          "attempt": "runtime-1",
+          "status": "resolved",
+          "detail": "NVVM exposed omitted byte-buffer descriptor layout. NVRTC completed but extra raw-buffer output FileCheck lines were not emitted by harness; typed output now reads both raw guards independently."
+        },
+        {
+          "attempts": ["build-2", "build-3"],
+          "status": "resolved",
+          "detail": "Initial target-before-shape branch dereferenced null during core bootstrap. Shape-first fixed bootstrap; explicit nullable-target guard and CPU/CUDA/unknown-target controls now cover the resource case."
+        },
+        {
+          "attempts": ["static-build-1", "static-build-final"],
+          "status": "resolved-test-only",
+          "detail": "Corrected generated IR opcode, layout header and assertion-macro if/else braces. Final six static tests pass."
+        },
+        {
+          "attempt": "handles-1",
+          "status": "open-separate",
+          "detail": "Combined generic specializations expose duplicate transport helper symbol. All20 isolated handle shapes pass both optimization levels; no claim mixed generic specializations coexist.",
+          "source": {
+            "path": "build/nvvm-resource-helpers/handles-combined.slang",
+            "sha256": "c8eed65443343f7afbdd335fb6cdcbe47f86eac2e3923942c6b3b9880483d6e5"
+          }
+        },
+        {
+          "attempt": "units-final",
+          "status": "resolved-test-only",
+          "detail": "7/8pass; old numeric-entry fake/test assumed scalar-struct byval. Matching byte-array byval and exact offset/size/load assertions repaired;8/8finalpass."
+        },
+        {
+          "attempt": "slangpy-final",
+          "status": "open-separate",
+          "detail": "Shader-cache node advances from resource layout rejection to CUDA_ERROR_INVALID_PTX on second-device cache reload. First dispatch passes. Retained exact JUnit and failing node in SlangPy manifest."
+        }
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Accepted after provenance correction: 88 prior feature objects and prior SlangPy histories preserved; exact2400 nodes,9gains,0lost passes;39 raw references verified. Initial application attempt labeled historical build-1 without unavailable binary hashes. Production, boundary tests and fake repair independently reviewed."
+      },
+      "limits": [
+        "Not a new full SlangPy/RHI/compiler checkpoint or automatic corpus-tier promotion.",
+        "Pointer-bearing entry aggregates, remaining local mixed-layout resource records, normalized formats and intrinsic TensorView remain separate families.",
+        "Complete selected handle bit transport does not establish texture sampling, format provenance or external helper ABI semantics."
+      ]
     }
   }
 }

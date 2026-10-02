@@ -543,8 +543,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         break;
     }
 
-    // Handle StructuredBuffer types
-    if (as<IRHLSLStructuredBufferTypeBase>(type))
+    // CPU/CUDA byte-address buffers carry a pointer and byte count just like structured buffers.
+    // For example, a record with two ByteAddressBuffer fields needs two 16-byte descriptors;
+    // treating them as opaque 8-byte handles would make every following field offset incorrect.
+    if (as<IRHLSLStructuredBufferTypeBase>(type) ||
+        (as<IRByteAddressBufferTypeBase>(type) && targetReq &&
+         (isCPUTarget(targetReq) || isCUDATarget(targetReq))))
     {
         // On CPU and CUDA, StructuredBuffer is a struct with a pointer and a count
         // (T* data + size_t count = 16 bytes, 8-byte alignment)

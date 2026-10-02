@@ -9,8 +9,9 @@ recovery; current design must be understandable without reading completed slice 
 
 **Application feature work resumed on 2026-10-02:** the maintainer approved continuing the
 SlangPy-derived priorities. Fixed numeric aggregate entry ABI and byval entry-record forwarding
-are accepted together; continue with resource/helper transport and checked address/layout families,
-then normalized surfaces and intrinsic TensorView. The legacy HitObject decision remains parked.
+are accepted together, as is local resource/helper transport. Repair the exposed RHI cached-PTX
+boundary, then continue with pointer-bearing entry aggregates and checked address/layout families,
+normalized surfaces and intrinsic TensorView. The legacy HitObject decision remains parked.
 Use affected application selections plus smoke between deliberately chosen full checkpoints.
 
 **Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout

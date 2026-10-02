@@ -3053,3 +3053,103 @@ SLANG_UNIT_TEST(nvvmConventionalGlobalLayoutProofsKeepRepresentationRoles)
         SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
     }
 }
+
+// The checked resource root keeps readonly permissions through fields, elements and helper calls.
+SLANG_UNIT_TEST(nvvmResourceReferencesPreserveDerivedReadOnlyAccess)
+{
+    enum class Case
+    {
+        Read,
+        StoreRoot,
+        StoreChild,
+        MutableCall,
+        ReadOnlyCall
+    };
+    for (auto testCase :
+         {Case::Read, Case::StoreRoot, Case::StoreChild, Case::MutableCall, Case::ReadOnlyCall})
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto buffer = builder.getType(kIROp_HLSLByteAddressBufferType);
+        auto array = builder.getArrayType(buffer, builder.getIntValue(builder.getIntType(), 2));
+        auto record = builder.createStructType();
+        auto field = builder.createStructField(record, builder.createStructKey(), array);
+        auto readonlyRecord = builder.getBorrowInParamType(record, AddressSpace::Generic);
+        auto leafReference = testCase == Case::MutableCall
+                                 ? builder.getPtrType(kIROp_OutParamType, buffer)
+                                 : builder.getBorrowInParamType(buffer, AddressSpace::Generic);
+        auto callee = builder.createFunc();
+        IRType* leafParameters[] = {leafReference};
+        callee->setFullType(builder.getFuncType(1, leafParameters, builder.getVoidType()));
+        builder.setInsertInto(callee);
+        builder.emitBlock();
+        builder.emitParam(leafReference);
+        builder.emitReturn();
+        builder.setInsertInto(module);
+        auto helper = builder.createFunc();
+        IRType* parameters[] = {readonlyRecord};
+        helper->setFullType(builder.getFuncType(1, parameters, builder.getVoidType()));
+        builder.setInsertInto(helper);
+        builder.emitBlock();
+        auto value = builder.emitParam(readonlyRecord);
+        auto arrayPointer = builder.getPtrType(
+            array,
+            AccessQualifier::Read,
+            AddressSpace::Generic,
+            builder.getType(kIROp_ScalarBufferLayoutType));
+        auto bufferPointer = builder.getPtrType(
+            buffer,
+            AccessQualifier::Read,
+            AddressSpace::Generic,
+            builder.getType(kIROp_ScalarBufferLayoutType));
+        auto fieldAddress = builder.emitFieldAddress(arrayPointer, value, field->getKey());
+        auto element = builder.emitElementAddress(
+            bufferPointer,
+            fieldAddress,
+            builder.getIntValue(builder.getIntType(), 1));
+        auto loaded = builder.emitLoad(buffer, element);
+        if (testCase == Case::StoreRoot)
+            builder.emitStore(value, builder.emitLoad(record, value));
+        if (testCase == Case::StoreChild)
+            builder.emitStore(element, loaded);
+        if (testCase == Case::MutableCall || testCase == Case::ReadOnlyCall)
+        {
+            IRInst* arguments[] = {element};
+            builder.emitCallInst(builder.getVoidType(), callee, 1, arguments);
+        }
+        builder.emitReturn();
+        builder.setInsertInto(module);
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        auto local = builder.emitVar(record);
+        IRInst* arguments[] = {local};
+        builder.emitCallInst(builder.getVoidType(), helper, 1, arguments);
+        builder.emitReturn();
+        // Only reachable functions belong to executable IR; the unused callee is unnecessary.
+        if (testCase != Case::MutableCall && testCase != Case::ReadOnlyCall)
+            callee->removeAndDeallocate();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        const bool shouldPass = testCase == Case::Read || testCase == Case::ReadOnlyCall;
+        if (SLANG_SUCCEEDED(result) != shouldPass)
+            getTestReporter()->message(
+                TestMessageType::Info,
+                context.sink.outputBuffer.getBuffer());
+        SLANG_CHECK(SLANG_SUCCEEDED(result) == shouldPass);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}

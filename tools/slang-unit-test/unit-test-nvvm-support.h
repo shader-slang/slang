@@ -4030,10 +4030,13 @@ static SlangResult SLANG_NVVM_CALL _fakeNVVMBuilderSetFunctionParameterAttribute
         return SLANG_E_INVALID_ARG;
     const Index parameterTypeIndex =
         gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex] + parameterIndex;
-    if (flags != SLANG_NVVM_PARAMETER_FLAG_BY_VALUE ||
-        gFakeNVVMBuilder.functionParameterTypeKinds[parameterTypeIndex] !=
-            FakeNVVMBuilderParameterTypeKind::ScalarStructPointer ||
-        pointeeType != _getFakeNVVMBuilderScalarStructType() || !alignment ||
+    const auto parameterKind = gFakeNVVMBuilder.functionParameterTypeKinds[parameterTypeIndex];
+    const bool hasMatchingPointee =
+        (parameterKind == FakeNVVMBuilderParameterTypeKind::ScalarStructPointer &&
+         pointeeType == _getFakeNVVMBuilderScalarStructType()) ||
+        (parameterKind == FakeNVVMBuilderParameterTypeKind::ArrayPointer &&
+         pointeeType == _getFakeNVVMBuilderArrayType());
+    if (flags != SLANG_NVVM_PARAMETER_FLAG_BY_VALUE || !hasMatchingPointee || !alignment ||
         (alignment & (alignment - 1)))
     {
         return SLANG_E_INVALID_ARG;

@@ -31,6 +31,22 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
+## Local resource helper transport
+
+Existing buffer/texture/surface/sampler leaves, records and fixed arrays support value parameters
+and results plus local mutable and readonly references. Checked child addresses preserve local
+provenance and access. [Live buffers](../../tests/cuda/nvvm-resource-helper-transport.slang) pass
+NVRTC O3 and NVVM O0/O3; [handle transport](../../tests/cuda/nvvm-resource-helper-handles.slang)
+passes all 20 selected shapes at NVVM O0/O3 using synthetic bits that are never sampled.
+The affected SlangPy selection supplies live 2D/3D texture evidence: 9 failures resolved and all
+37 prior passing controls preserved. Six static checks cover role/cache order, descriptor layout,
+readonly rejection before mutation and retained resource-format/storage restrictions.
+
+This does not admit arbitrary pointer-bearing entries, external helper ABI, normalized surface
+formats or acceleration handles. Combined generic handle specializations still expose a duplicate
+symbol; per-shape success is not qualification of their coexistence. Shader cache reload now reaches
+a separate RHI PTX-termination failure. Both histories remain in the maintained manifests.
+
 ## Explicit OptiX versions
 
 `OptixVersion` / `-optix-version 80000|80100|90000` selects an SDK contract independent of CUDA

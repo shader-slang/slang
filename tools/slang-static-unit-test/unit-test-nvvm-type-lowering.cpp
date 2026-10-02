@@ -5,6 +5,7 @@
 #include "nvvm-static-test-context.h"
 #include "slang-unit-test/unit-test-nvvm-support.h"
 #include "slang/slang-emit-nvvm-type-lowering.h"
+#include "slang/slang-ir-layout.h"
 
 using namespace Slang;
 
@@ -498,4 +499,108 @@ SLANG_UNIT_TEST(nvvmNumericAggregateEntryLayoutsRejectMismatchedStrides)
         &context.codeGen,
         ir.getArrayType(ir.getDoubleType(), ir.getIntValue(ir.getIntType(), UINT32_MAX)),
         layout));
+}
+
+SLANG_UNIT_TEST(nvvmResourceHelperRolesPreserveStorageAndAccess)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    auto buffer = ir.getType(kIROp_HLSLByteAddressBufferType);
+    auto pair = ir.getArrayType(buffer, ir.getIntValue(ir.getIntType(), 2));
+    auto numeric = ir.getFloatType();
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    for (auto firstRole :
+         {NVVMTypeUse::HelperParameter, NVVMTypeUse::HelperResult, NVVMTypeUse::Value})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &provider;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(provider.createModule(toSlice("resource-helper-roles"), scope.module)));
+        NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+        SlangNVVMTypeHandle first = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(pair, firstRole, first)));
+        for (auto role :
+             {NVVMTypeUse::HelperParameter, NVVMTypeUse::HelperResult, NVVMTypeUse::Value})
+        {
+            SlangNVVMTypeHandle next = nullptr;
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(pair, role, next)));
+            SLANG_CHECK(next == first);
+        }
+        SLANG_CHECK(!classifyNVVMType(pair).supports(NVVMTypeUse::EntryPointParameter));
+        SLANG_CHECK(!classifyNVVMType(pair).supports(NVVMTypeUse::HelperValue));
+    }
+    for (auto value : {buffer, static_cast<IRType*>(pair)})
+    {
+        for (auto op : {kIROp_PtrType, kIROp_OutParamType, kIROp_BorrowInOutParamType})
+        {
+            auto reference = ir.getPtrType(op, value);
+            SLANG_CHECK(asNVVMSupportedLocalResourceValuePointerType(reference));
+            SLANG_CHECK(classifyNVVMType(reference).supports(NVVMTypeUse::HelperParameter));
+            SLANG_CHECK(!classifyNVVMType(reference).supports(NVVMTypeUse::HelperResult));
+        }
+        auto readonly = ir.getBorrowInParamType(value, AddressSpace::Generic);
+        SLANG_CHECK(asNVVMSupportedLocalResourceValuePointerType(readonly));
+        SLANG_CHECK(readonly->getAccessQualifier() == AccessQualifier::Read);
+        SLANG_CHECK(asNVVMSupportedLocalResourceValuePointerType(
+            ir.getRefParamType(value, AddressSpace::Generic)));
+        for (auto space :
+             {AddressSpace::GroupShared, AddressSpace::UserPointer, AddressSpace::ThreadLocal})
+            SLANG_CHECK(!asNVVMSupportedLocalResourceValuePointerType(ir.getPtrType(value, space)));
+    }
+    SLANG_CHECK(!asNVVMSupportedLocalResourceValuePointerType(ir.getPtrType(numeric)));
+    IRSizeAndAlignment layout;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getSizeAndAlignment(
+        context.codeGen.getTargetReq(),
+        IRTypeLayoutRules::getCUDA(),
+        buffer,
+        &layout)));
+    SLANG_CHECK(layout.size == 16 && layout.alignment == 8);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(getSizeAndAlignment(
+        context.codeGen.getTargetReq(),
+        IRTypeLayoutRules::getLLVM(),
+        pair,
+        &layout)));
+    SLANG_CHECK(layout.size == 32 && layout.alignment == 8);
+}
+
+SLANG_UNIT_TEST(nvvmRawBufferLayoutMatchesCpuCudaDescriptors)
+{
+    for (auto format : {SLANG_PTX, SLANG_CPP_SOURCE, SLANG_SPIRV})
+    {
+        NVVMStaticTestContext context(unitTestContext);
+        slang::TargetDesc desc = {};
+        desc.format = format;
+        auto linkage = context.owner->getLinkage();
+        linkage->addTarget(desc);
+        auto target = linkage->targets.getLast();
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder ir(module);
+        ir.setInsertInto(module);
+        for (auto op : {kIROp_HLSLByteAddressBufferType, kIROp_HLSLRWByteAddressBufferType})
+        {
+            auto buffer = ir.getType(op);
+            IRSizeAndAlignment layout;
+            // Targetless IR queries cannot choose a CPU/CUDA descriptor representation.
+            SLANG_CHECK(SLANG_FAILED(
+                getSizeAndAlignment(nullptr, IRTypeLayoutRules::getNatural(), buffer, &layout)));
+            auto result =
+                getSizeAndAlignment(target, IRTypeLayoutRules::getNatural(), buffer, &layout);
+            if (format == SLANG_SPIRV)
+            {
+                SLANG_CHECK(SLANG_FAILED(result));
+            }
+            else
+            {
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(result));
+                SLANG_CHECK(layout.size == 16 && layout.alignment == 8);
+                auto pair = ir.getArrayType(buffer, ir.getIntValue(ir.getIntType(), 2));
+                SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                    getSizeAndAlignment(target, IRTypeLayoutRules::getNatural(), pair, &layout)));
+                SLANG_CHECK(layout.size == 32 && layout.alignment == 8);
+            }
+        }
+    }
 }

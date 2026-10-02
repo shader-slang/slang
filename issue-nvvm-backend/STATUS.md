@@ -60,10 +60,24 @@ outside numeric admission. The maintained mixed-age inventory is **1,084 pass / 
 3 expected failures**; the full run above retains its original identity and counts. This was a focused
 rerun, not a fresh full application checkpoint. Exact transitions and evidence are in the manifest.
 
-Next complete families: resource helper wrappers/arrays and checked address/layout, normalized
-surface conversions (50 imageStore failures), then intrinsic TensorView/DiffTensorView ABI and
-operations. Reduce the remaining entry and pointer shapes before widening admission. Preserve type
-roles and address provenance.
+Local resource helper transport is now accepted for existing buffer, texture, surface and sampler
+leaves, records and fixed arrays. Value inputs/results and local out/inout/readonly references retain
+checked parent provenance, exact pointee identity and access restrictions. Shared CPU/CUDA layout
+now sizes byte-buffer descriptors as pointer plus count, including nested records and arrays.
+
+Focused qualification passes 3 live buffer cells, 40 handle-transport cells (20 shapes at O0/O3),
+8 units, 6 static checks and all 16 smoke cells. Synthetic handle tests qualify bit transport;
+SlangPy supplies separate live 2D/3D sampling evidence. The affected application selection is
+**46 pass / 16 fail**, resolving **9 previous failures** and preserving all 37 prior passing controls.
+Current mixed-age inventory is **1,093 pass / 497 fail / 807 skip / 3 expected failures**.
+The full checkpoint above is unchanged. Evidence is under `build/nvvm-resource-helpers/`.
+
+Next: repair the newly exposed shared RHI cached-PTX termination boundary, then pointer-bearing
+entry records/arrays and checked addressing, normalized surface conversions (50 imageStore
+failures), and intrinsic TensorView/DiffTensorView. Remaining resource mixed-layout records need
+reduction. The combined generic handle fixture also retains a duplicate-symbol failure; isolated
+shape qualification does not establish mixed-specialization coexistence. Do not widen type roles
+or discard address provenance to bypass these failures.
 
 Open shared issue: column-major entry matrix reflection disagrees with CUDA's row-array physical
 representation. Both routes fail 11 lanes per optimization in the retained mixed-matrix fixture;
@@ -124,7 +138,7 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
 Subsequent implementations have passed focused review; [focused evidence](focused-evidence.json)
-now contains 88 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+now contains 89 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:

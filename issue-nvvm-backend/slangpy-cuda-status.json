@@ -223,12 +223,60 @@
         "path": "build/nvvm-entry-aggregate/identity.json",
         "sha256": "d498fda61b1689e3111063e978aa303f16ab9d1fc70d6ed70de020180be0ffbb"
       }
+    },
+    "resource-helpers-slangpy-1": {
+      "gate": {
+        "path": "build/nvvm-resource-helpers/slangpy-1.json",
+        "sha256": "efacc6a74df94284e8b7395c49acf80278fd6fac300876d8e246fb69ce8b1148"
+      },
+      "log": {
+        "path": "build/nvvm-resource-helpers/slangpy-1.log",
+        "sha256": "36673a90bf113b3502f09b6472a3927eca130e58e6077ea044cda12a5acfd72e"
+      },
+      "junit": {
+        "path": "build/nvvm-resource-helpers/slangpy-1.xml",
+        "sha256": "fbadfd05f86caef3694489dfd2c2e3a045df5b62bcc0fd61fb9ee6290f09a759"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 4.528229713439941,
+      "test_counts": {
+        "failed": 15,
+        "passed": 5
+      },
+      "identity": {
+        "build": "build/nvvm-resource-helpers/build-1.json",
+        "note": "Historical initial implementation before build-4 and final fixes; historical binary hashes were not captured. Final identity.json does not identify this attempt."
+      }
+    },
+    "resource-helpers-slangpy-final": {
+      "gate": {
+        "path": "build/nvvm-resource-helpers/slangpy-final.json",
+        "sha256": "a1735226d045867a8361f76b07a30f1e71f2e22f4516f8f632ae0eeec1d99f73"
+      },
+      "log": {
+        "path": "build/nvvm-resource-helpers/slangpy-final.log",
+        "sha256": "17babc1dc6cd92c94e709d6094b794ba9fade26a2aa7d9275288fc2e069ae77d"
+      },
+      "junit": {
+        "path": "build/nvvm-resource-helpers/slangpy-final.xml",
+        "sha256": "cc7b86a5232066e8192de14a225c50f5bc531d9d4d202c12dbc156da1be94b4d"
+      },
+      "return_code": 1,
+      "elapsed_seconds": 14.565154790878296,
+      "test_counts": {
+        "passed": 46,
+        "failed": 16
+      },
+      "identity": {
+        "path": "build/nvvm-resource-helpers/identity.json",
+        "sha256": "cd7fd7865bc271ca3094c33246f63d883c9257621cc4340e971c1d5b1ed4f08c"
+      }
     }
   },
   "current_counts": {
     "skipped": 807,
-    "passed": 1084,
-    "failed": 506,
+    "passed": 1093,
+    "failed": 497,
     "xfailed": 3
   },
   "collection_skips": [
@@ -1401,7 +1449,16 @@
     "slangpy/tests/slangpy_tests/test_simple_function_call.py::test_pass_int_field[uint-DeviceType.cuda]",
     "slangpy/tests/slangpy_tests/test_simple_function_call.py::test_pass_int_field[uint16_t-DeviceType.cuda]",
     "slangpy/tests/slangpy_tests/test_simple_function_call.py::test_pass_int_field[uint64_t-DeviceType.cuda]",
-    "slangpy/tests/slangpy_tests/test_simple_function_call.py::test_pass_int_field[uint8_t-DeviceType.cuda]"
+    "slangpy/tests/slangpy_tests/test_simple_function_call.py::test_pass_int_field[uint8_t-DeviceType.cuda]",
+    "slangpy/tests/device/test_module_cache.py::test_module_cache[DeviceType.cuda]",
+    "slangpy/tests/device/test_print.py::test_print[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_buffers.py::test_unstructured_buffer[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_buffers.py::test_byte_address_buffer_read[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_buffers.py::test_byte_address_buffer_write[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_broadcast[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast_with_scalar[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_thread_count_dispatch[DeviceType.cuda]"
   ],
   "failures_by_first_diagnostic": {
     "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<cbuffer<SLANG_ParameterGroup_data>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'": [
@@ -1429,11 +1486,6 @@
       "slangpy/tests/device/test_link_time.py::test_link_time_type[DeviceType.cuda-SubOp]",
       "slangpy/tests/device/test_link_time.py::test_link_time_type[DeviceType.cuda-MulOp]",
       "slangpy/tests/slangpy_tests/test_linking.py::test_prelude_defines_link_time_type[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'conventional resource-struct layout'": [
-      "slangpy/tests/device/test_module_cache.py::test_module_cache[DeviceType.cuda]",
-      "slangpy/tests/device/test_print.py::test_print[DeviceType.cuda]",
-      "slangpy/tests/device/test_shader_cache.py::test_shader_cache[DeviceType.cuda]"
     ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'global_param'": [
       "slangpy/tests/device/test_shader_cursor.py::test_shader_cursor[False-DeviceType.cuda]",
@@ -1793,7 +1845,17 @@
       "slangpy/tests/slangpy_tests/test_vector_function_call.py::test_float_buffer_against_vector[DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_vector_function_call.py::test_float_buffer_against_vector_readwrite[DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_vector_function_call.py::test_float_buffer_against_vector_diffpair[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_vectorizing.py::test_broadcast_vector[DeviceType.cuda]"
+      "slangpy/tests/slangpy_tests/test_vectorizing.py::test_broadcast_vector[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_array.py::test_vectorize_struct_with_resource_array[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_array.py::test_array_of_structured_buffers[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_array.py::test_array_of_rw_structured_buffers[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_2d_with_call_groups[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_reduce_with_call_groups[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_3d_with_call_groups[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_both_buffers_defined[tupe-data_shape0-DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_both_buffers_defined[list-data_shape1-DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_undersized_output[tupe-data_shape0-DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_undersized_output[list-data_shape1-DeviceType.cuda]"
     ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'sequential element pointer: Ptr<int, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'": [
       "slangpy/tests/slangpy_tests/test_generics.py::test_generic_matrix[2-buffer-DeviceType.cuda]",
@@ -1832,36 +1894,10 @@
       "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_basic_output_transform[data_type1-DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_broadcast_from_buffer[data_type1-DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_broadcast_from_buffer_2[data_type1-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_broadcast_from_diff_buffer[data_type1-DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Val>'": [
-      "slangpy/tests/slangpy_tests/test_array.py::test_vectorize_struct_with_resource_array[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Array<StructuredBuffer<int>, 4>'": [
-      "slangpy/tests/slangpy_tests/test_array.py::test_array_of_structured_buffers[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Array<RWStructuredBuffer<int>, 4>'": [
-      "slangpy/tests/slangpy_tests/test_array.py::test_array_of_rw_structured_buffers[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<float>>'": [
-      "slangpy/tests/slangpy_tests/test_buffers.py::test_unstructured_buffer[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<ByteAddressBuffer>'": [
-      "slangpy/tests/slangpy_tests/test_buffers.py::test_byte_address_buffer_read[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWByteAddressBuffer>'": [
-      "slangpy/tests/slangpy_tests/test_buffers.py::test_byte_address_buffer_write[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_custom_types.py::test_rand_float_uniformity[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture2D>'": [
-      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_2d_with_call_groups[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_reduce_with_call_groups[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_broadcast[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture3D>'": [
-      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_3d_with_call_groups[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast_with_scalar[DeviceType.cuda]"
+      "slangpy/tests/slangpy_tests/test_transforms.py::test_add_vectors_matrix_broadcast_from_diff_buffer[data_type1-DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_custom_types.py::test_rand_float_uniformity[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_vectorized_grid_dispatch[DeviceType.cuda]",
+      "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_vectorized_call_group_dispatch[DeviceType.cuda]"
     ],
     "assert [2675, 2665] == [2675]": [
       "slangpy/tests/slangpy_tests/test_command_buffer.py::test_command_buffer[False-DeviceType.cuda]"
@@ -1879,11 +1915,6 @@
     "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: _t__result'": [
       "slangpy/tests/slangpy_tests/test_instances.py::test_loose_instance_soa[DeviceType.cuda]"
     ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWStructuredBuffer<uint>>'": [
-      "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_vectorized_grid_dispatch[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_vectorized_call_group_dispatch[DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_thread_count_dispatch[DeviceType.cuda]"
-    ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: StructuredBufferType'": [
       "slangpy/tests/slangpy_tests/test_pointers.py::test_raw_buffer_of_pointers[DeviceType.cuda]"
     ],
@@ -1897,12 +1928,6 @@
     ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: RaytracingAccelerationStructureType'": [
       "slangpy/tests/slangpy_tests/test_raytracing.py::test_raytracing[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<vector<float,4>>>'": [
-      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_both_buffers_defined[tupe-data_shape0-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_both_buffers_defined[list-data_shape1-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_undersized_output[tupe-data_shape0-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_undersized_output[list-data_shape1-DeviceType.cuda]"
     ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: TensorView'": [
       "slangpy/tests/slangpy_tests/test_tensorview.py::test_tensorview_copy_slangpy_tensor[DeviceType.cuda]",
@@ -1969,6 +1994,9 @@
       "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
       "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[False-DeviceType.cuda]",
       "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]"
+    ],
+    "RuntimeError: m_device->rhi_device()->createComputePipeline(rhi_desc, (rhi::IComputePipeline**)m_rhi_pipeline.writeRef()) failed with error: -2147467259 (SLANG_FAIL)": [
+      "slangpy/tests/device/test_shader_cache.py::test_shader_cache[DeviceType.cuda]"
     ]
   },
   "skips_by_reason": {
@@ -3645,14 +3673,140 @@
       },
       "unchanged_selected_failures": 353,
       "detail": "All12 previous value-call failures resolve; numeric array admission reveals37 sequential element pointer rejections. Remaining353 selected entry failures require pointer/resource shape analysis. No outcomes outside the427-node selection replaced. Initial JUnit moved from nvvm-entry-aggregate/ to ignored build evidence without changing bytes."
+    },
+    "resource_helper_transport": {
+      "transitions": [
+        {
+          "node": "slangpy/tests/device/test_module_cache.py::test_module_cache[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'conventional resource-struct layout'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/device/test_print.py::test_print[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'conventional resource-struct layout'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/device/test_shader_cache.py::test_shader_cache[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'conventional resource-struct layout'",
+          "current": "RuntimeError: m_device->rhi_device()->createComputePipeline(rhi_desc, (rhi::IComputePipeline**)m_rhi_pipeline.writeRef()) failed with error: -2147467259 (SLANG_FAIL)"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_array.py::test_vectorize_struct_with_resource_array[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Val>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_array.py::test_array_of_structured_buffers[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Array<StructuredBuffer<int>, 4>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_array.py::test_array_of_rw_structured_buffers[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: Array<RWStructuredBuffer<int>, 4>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_buffers.py::test_unstructured_buffer[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<float>>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_buffers.py::test_byte_address_buffer_read[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<ByteAddressBuffer>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_buffers.py::test_byte_address_buffer_write[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWByteAddressBuffer>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_custom_types.py::test_rand_float_uniformity[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWByteAddressBuffer>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'sequential element pointer: Ptr<int, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_2d_with_call_groups[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture2D>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_reduce_with_call_groups[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture2D>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_broadcast[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture2D>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_3d_with_call_groups[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture3D>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture3D>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_broadcast_with_scalar[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<Texture3D>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_vectorized_grid_dispatch[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWStructuredBuffer<uint>>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'sequential element pointer: Ptr<int, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_vectorized_call_group_dispatch[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWStructuredBuffer<uint>>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'sequential element pointer: Ptr<int, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_large_dispatches.py::test_large_thread_count_dispatch[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<RWStructuredBuffer<uint>>'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_both_buffers_defined[tupe-data_shape0-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<vector<float,4>>>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_both_buffers_defined[list-data_shape1-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<vector<float,4>>>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_undersized_output[tupe-data_shape0-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<vector<float,4>>>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_shapes.py::test_copyatindex_undersized_output[list-data_shape1-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'helper function parameter: OutParam<StructuredBuffer<vector<float,4>>>'",
+          "current": "direct NVVM lowering does not support Slang IR instruction or shape 'entry-point parameter'"
+        }
+      ],
+      "resolved": 9,
+      "changed_failure_diagnostics": 14,
+      "selection": {
+        "path": "build/nvvm-resource-helpers/slangpy-final-selection.txt",
+        "sha256": "68365a7c413fd30bafef84a55a03703bc51545cfa7e85c6c3a47de03300afd53"
+      },
+      "detail": "62nodes:46pass16fail, including37existing pass sentinels. Remaining10entry,3sequential pointer,2local resource-layout and1cached-PTX pipeline failure. Cached shader test now executes first dispatch successfully, but second device reload reports CUDA_ERROR_INVALID_PTX; diagnostic transition retained, not a regression from a previously passing node."
     }
   },
   "next_complete_families": [
     {
       "priority": 3,
-      "family": "Resource helper transport and layout",
-      "evidence": "OutParam resource wrappers, fixed resource arrays, value wrappers, DebugPrinter layout and field-address diagnostics. Exact lowered shapes need reduced IR evidence. After numeric aggregate admission:353 selected entry failures and37 sequential Ptr<int,ScalarLayout> address failures remain; reduce these canonical shapes before expanding roles.",
-      "scope": "Input/output/inout/return wrappers for structured and byte-address buffers, textures and resource arrays; preserve address provenance and separate ABI/storage roles."
+      "family": "Pointer-bearing entry aggregates and checked addressing",
+      "evidence": "353original tensor-like entry failures plus10newly exposed cases; SlangPy CUDA StorageTraits selects T* with shape/stride/offset records. Sequential failures include37previous and3new cases; reduce const-array borrow roots and explicit thread-local call-shape fields.",
+      "scope": "Finite user-pointer-bearing entry records/arrays, explicit launch AS1 to helper AS0 conversion, preserved checked parent facts. Keep intrinsic TensorView separate and do not treat pointers as buffer descriptors. Remaining2local resource-layout cases and cached-PTX failure retain separate histories."
     },
     {
       "priority": 4,
@@ -3675,7 +3829,7 @@
       "scope": "Reduce producer IR before expanding admission. Five unsupported RGB texture creation failures are shared application/RHI limitations, not evidence of NVVM lowering failure."
     }
   ],
-  "current_evidence": "Mixed-age: full-nvvm-2 remains the complete2400-node run; entry-aggregate-slangpy-affected-1 supersedes exactly427 selected outcomes. Compiler unchanged-path reuse across final explicit-stride rejection guard is recorded in focused identity. No new full application run.",
+  "current_evidence": "Mixed-age: full-nvvm-2 is the complete2400-node run; numeric-entry427 and resource-helper62 focused selections supersede exactly their tested nodes. Source/binary reuse is explicit in focused identities. No new full application run.",
   "completed_families": [
     {
       "priority": 1,
@@ -3692,6 +3846,12 @@
       "scope": "Materialize semantic values for all admitted entry records while retaining checked address pointers for field access.",
       "code": "source/slang/slang-emit-nvvm.cpp: entryNumericParameters and _emitNVVMEntryNumericDecode materialize canonical values",
       "status": "accepted-focused"
+    },
+    {
+      "family": "Local resource helper transport",
+      "scope": "Existing buffer/texture/surface/sampler leaves, numeric/resource records and fixed resource arrays; value input/results, local out/inout/ref/readonly and planned child references. Separate from pointer-bearing entry records, special TensorView, resource format provenance and incompatible numeric/resource storage layouts.",
+      "status": "accepted-focused",
+      "evidence": "features.nvvm-resource-helper-transport in focused-evidence.json"
     }
   ]
 }

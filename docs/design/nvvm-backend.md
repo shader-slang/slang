@@ -408,6 +408,18 @@ slots. Combined textures remain one fused handle; core sample composition projec
 sampler without splitting the launch ABI. Admitting a handle does not grant arbitrary surface
 format provenance or unsupported resource operations.
 
+Local resource helper transport has its own recursive admission owner for existing buffer,
+texture, surface and sampler leaves, records and positive fixed arrays. It does not add resources
+to generic helper/user-pointer values. Value parameters/results lower resource arrays through the
+canonical Value representation independently of cache order. Local Ptr/OutParam/BorrowInOut and
+explicit generic readonly BorrowIn or mutable Ref parameters share this resource pointee contract.
+Field/element references require checked address records rooted in a local variable or helper
+parameter. Every child retains the parent's access restriction; readonly references can only
+forward to explicitly readonly formals. No device/shared reference or pointer-result permission
+follows from local transport. Physical layout compatibility remains a separate proof. CPU/CUDA
+byte-address descriptors use the same pointer-plus-count size/alignment as structured buffers in
+the shared IR layout calculator, including nested fields and array stride.
+
 Half helper parameters/results use physical i16 scalars or `<N x i16>` vectors for admitted widths
 2–4, while body values remain canonical Half. Callers encode arguments, callees decode parameters,
 returns encode results and callers decode them, using bit-preserving reinterpretation.

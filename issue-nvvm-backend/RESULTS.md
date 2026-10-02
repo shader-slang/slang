@@ -1679,3 +1679,16 @@ selection resolves 30 original failures. Do not relabel unchanged full-run outco
 The original mixed column-major matrix fixtures and both failed route logs remain under the same
 raw-evidence directory. They identify a shared entry reflection/physical-layout mismatch; current
 qualification uses explicit row-major matrices. No full campaign was rerun for this batch.
+
+### Local resource helper qualification
+
+Run `tests/cuda/nvvm-resource-helper-transport.slang` through the ordinary slang-test runner for
+its three route/optimization cells. The handle fixture has 40 explicit NVVM cells selecting 20
+resource shapes; it checks transport bits without sampling synthetic handles. Static controls
+`nvvmResourceHelperRolesPreserveStorageAndAccess`,
+`nvvmResourceReferencesPreserveDerivedReadOnlyAccess` and
+`nvvmRawBufferLayoutMatchesCpuCudaDescriptors` own role/cache, access and shared layout boundaries.
+Current commands, exact application selection, initial failures and final binary identities are
+under `build/nvvm-resource-helpers/`; the maintained focused and SlangPy manifests own outcomes.
+The 62-node application selection passes 46, resolves 9 old failures and retains 16 failures.
+All 16 smoke cells pass. This is focused evidence, not a new full checkpoint.

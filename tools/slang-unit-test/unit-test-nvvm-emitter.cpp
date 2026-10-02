@@ -7451,7 +7451,7 @@ SLANG_UNIT_TEST(nvvmSlangAggregateAndReadOnlyResourceUsesDirectPipeline)
         const Index parameterKindOffset =
             gFakeNVVMBuilder.functionTypeParameterKindOffsets[functionTypeIndex];
         const FakeNVVMBuilderParameterTypeKind expectedParameterKinds[] = {
-            FakeNVVMBuilderParameterTypeKind::ScalarStructPointer,
+            FakeNVVMBuilderParameterTypeKind::ArrayPointer,
             FakeNVVMBuilderParameterTypeKind::ResourceView,
             FakeNVVMBuilderParameterTypeKind::ResourceView,
             FakeNVVMBuilderParameterTypeKind::Integer,
@@ -7471,31 +7471,33 @@ SLANG_UNIT_TEST(nvvmSlangAggregateAndReadOnlyResourceUsesDirectPipeline)
         SLANG_CHECK(
             gFakeNVVMBuilder.parameterAttributeFlags[0] == SLANG_NVVM_PARAMETER_FLAG_BY_VALUE);
         SLANG_CHECK(
-            gFakeNVVMBuilder.parameterAttributePointeeTypes[0] ==
-            _getFakeNVVMBuilderScalarStructType());
+            gFakeNVVMBuilder.parameterAttributePointeeTypes[0] == _getFakeNVVMBuilderArrayType());
         SLANG_CHECK(gFakeNVVMBuilder.parameterAttributeAlignments[0] == 8);
+        SLANG_CHECK(gFakeNVVMBuilder.arrayElementCount == 16);
 
-        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount == 2);
-        const uint32_t expectedAggregateFieldIndices[] = {0, 1};
-        for (Index fieldIndex = 0; fieldIndex < SLANG_COUNT_OF(expectedAggregateFieldIndices);
-             ++fieldIndex)
+        // Numeric launch records decode checked CUDA byte offsets into canonical values.
+        SLANG_CHECK(gFakeNVVMBuilder.emitStructFieldPointerCallCount == 0);
+        SLANG_CHECK_ABORT(gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs.getCount() == 2);
+        const int64_t expectedOffsets[] = {0, 8};
+        for (Index i = 0; i < 2; ++i)
         {
-            const FakeNVVMBuilderValueRef base =
-                gFakeNVVMBuilder.structFieldPointerBaseValueRefs[fieldIndex];
+            const auto base = gFakeNVVMBuilder.byteOffsetPointerBaseValueRefs[i];
             SLANG_CHECK(base.kind == FakeNVVMBuilderValueKind::Parameter);
-            SLANG_CHECK(base.functionIndex == 0);
-            SLANG_CHECK(base.index == 0);
-            SLANG_CHECK(
-                gFakeNVVMBuilder.structFieldPointerIndices[fieldIndex] ==
-                expectedAggregateFieldIndices[fieldIndex]);
+            SLANG_CHECK(base.functionIndex == 0 && base.index == 0);
+            const auto offset = gFakeNVVMBuilder.byteOffsetPointerOffsetValueRefs[i];
+            SLANG_CHECK_ABORT(offset.kind == FakeNVVMBuilderValueKind::IntegerConstant);
+            SLANG_CHECK(gFakeNVVMBuilder.integerConstantValues[offset.index] == expectedOffsets[i]);
         }
-
-        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 2);
+        SLANG_CHECK(gFakeNVVMBuilder.emitAggregateElementExtractCallCount == 4);
         bool sawDestinationView = false;
         bool sawSourceView = false;
         for (const FakeNVVMBuilderValueRef base : gFakeNVVMBuilder.aggregateElementBaseValueRefs)
         {
-            SLANG_CHECK(base.kind == FakeNVVMBuilderValueKind::Parameter);
+            if (base.kind != FakeNVVMBuilderValueKind::Parameter)
+            {
+                SLANG_CHECK(base.kind == FakeNVVMBuilderValueKind::AggregateConstruct);
+                continue;
+            }
             SLANG_CHECK(base.functionIndex == 0);
             sawDestinationView = sawDestinationView || base.index == 1;
             sawSourceView = sawSourceView || base.index == 2;
@@ -7506,8 +7508,9 @@ SLANG_UNIT_TEST(nvvmSlangAggregateAndReadOnlyResourceUsesDirectPipeline)
         SLANG_CHECK(gFakeNVVMBuilder.emitPointerOffsetCallCount == 2);
         SLANG_CHECK(gFakeNVVMBuilder.emitLoadCallCount == 3);
         SLANG_CHECK(gFakeNVVMBuilder.loadFlags.getCount() == 3);
-        for (SlangNVVMLoadFlags flags : gFakeNVVMBuilder.loadFlags)
-            SLANG_CHECK(flags == SLANG_NVVM_LOAD_FLAG_INVARIANT);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[0] == SLANG_NVVM_LOAD_FLAG_NONE);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[1] == SLANG_NVVM_LOAD_FLAG_NONE);
+        SLANG_CHECK(gFakeNVVMBuilder.loadFlags[2] == SLANG_NVVM_LOAD_FLAG_INVARIANT);
         SLANG_CHECK(gFakeNVVMBuilder.emitStoreCallCount == 1);
         SLANG_CHECK(gFakeNVVMBuilder.storeAlignment == 4);
         SLANG_CHECK(gFakeNVVMBuilder.markFunctionAsKernelCallCount == 1);
