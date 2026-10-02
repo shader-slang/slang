@@ -2564,8 +2564,9 @@ void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
     // Matrix layout modifiers are `TypeModifier`s, so for declarators and traditional-style
     // parameters the parser moves them onto the type expression and `visitModifiedTypeExpr`
     // bakes in the layout. A modern-syntax declaration whose modifiers precede its name
-    // (`row_major var m: float2x3;`, `row_major let m = init;`) keeps them on the decl, so this
-    // decl-side branch remains the applier for that path.
+    // (`row_major var m: float2x3;`, `row_major let m = init;`) keeps them on the decl, and this
+    // branch applies them, but only when the declared type is a bare matrix: on that path an
+    // array of matrices keeps the default layout (shader-slang/slang#13390).
     if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
     {
         if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
@@ -13978,9 +13979,15 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
     return true;
 }
 
-/// Return whether `a` and `b` are the same type except for the layout of the matrices they contain,
-/// directly or as the element of an array or the pointee of a pointer. For example,
-/// `row_major float2x3[2]` and `column_major float2x3[2]` are the same type up to matrix layout.
+/// Return whether parameter types `a` and `b` are the same except for the layout of the matrices
+/// they contain, for the purpose of matching function signatures. For example,
+/// `row_major float2x3[2]` and `column_major float2x3[2]` match up to matrix layout.
+///
+/// The relation looks through exactly the shapes a leading `row_major`/`column_major` on a
+/// parameter produces: a matrix, an array of them (sized or unsized, compared by count), and a
+/// pointer to them (`PtrType`, compared on every other operand). A matrix elsewhere, such as in a
+/// struct field or a generic argument like `StructuredBuffer<row_major float2x3>`, makes the types
+/// different.
 static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
 {
     if (a->equals(b))
@@ -13999,7 +14006,46 @@ static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
                ptrA->getDataLayout()->equals(ptrB->getDataLayout()) &&
                isSameTypeUpToMatrixLayout(ptrA->getValueType(), ptrB->getValueType());
     }
-    return isMatrixLayoutConversion(a, b);
+    auto matrixA = as<MatrixExpressionType>(a);
+    auto matrixB = as<MatrixExpressionType>(b);
+    return matrixA && matrixB && isMatrixLayoutConversion(a, b);
+}
+
+/// Return whether `a` and `b`, which are the same up to matrix layout, differ in the layout of a
+/// matrix behind a pointer, as in `row_major float2x3*` vs `column_major float2x3*` or arrays of
+/// such pointers. A matrix or array of matrices passed by value converts between layouts; memory
+/// reached through a pointer does not.
+static bool doesMatrixLayoutDifferBehindPointer(Type* a, Type* b)
+{
+    if (a->equals(b))
+        return false;
+    if (auto arrayA = as<ArrayExpressionType>(a))
+    {
+        auto arrayB = as<ArrayExpressionType>(b);
+        SLANG_ASSERT(arrayB);
+        return doesMatrixLayoutDifferBehindPointer(
+            arrayA->getElementType(),
+            arrayB->getElementType());
+    }
+    return as<PtrType>(a) != nullptr;
+}
+
+/// Return whether `fst` and `snd`, whose signatures match up to matrix layout, have a parameter
+/// whose types differ in the layout of a matrix behind a pointer.
+static bool doPointerParamLayoutsDiffer(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto fstParams = getParameters(astBuilder, fst).toArray();
+    auto sndParams = getParameters(astBuilder, snd).toArray();
+    SLANG_ASSERT(fstParams.getCount() == sndParams.getCount());
+    for (Index ii = 0; ii < fstParams.getCount(); ++ii)
+    {
+        if (doesMatrixLayoutDifferBehindPointer(
+                getType(astBuilder, fstParams[ii]),
+                getType(astBuilder, sndParams[ii])))
+            return true;
+    }
+    return false;
 }
 
 bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
@@ -14021,11 +14067,11 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
         auto fstParam = fstParams[ii];
         auto sndParam = sndParams[ii];
 
-        // Matrix layout alone does not distinguish two signatures, as in HLSL: a second
-        // definition of `f(row_major float2x3 m[2])` next to `f(column_major float2x3 m[2])` is a
-        // redefinition. Mangled names do not encode matrix layout (shader-slang/slang#13383), so
-        // two such overloads would otherwise share one linkage name and silently call the same
-        // body.
+        // Matrix layout alone does not distinguish two signatures, so a second definition of
+        // `f(row_major float2x3 m[2])` next to `f(column_major float2x3 m[2])` is a redefinition.
+        // This is an interim rule: mangled names do not encode matrix layout
+        // (shader-slang/slang#13383), so the two would share one linkage name and silently call
+        // the same body. It goes away once mangling distinguishes them.
         if (!isSameTypeUpToMatrixLayout(
                 getType(m_astBuilder, fstParam),
                 getType(m_astBuilder, sndParam)))
@@ -14532,6 +14578,17 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
             getSink()->diagnose(diagnostic);
             return SLANG_FAIL;
         }
+    }
+
+    // Signatures match up to matrix layout, but calls are checked against the primary
+    // declaration while the body is lowered with its own parameter types. Nothing converts
+    // between two pointee layouts, so a forward declaration that differs from its definition in
+    // a matrix layout behind a pointer is a conflict.
+    if (doPointerParamLayoutsDiffer(newDeclRef, oldDeclRef))
+    {
+        getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
+        getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
+        return SLANG_FAIL;
     }
 
     // At this point we've processed the redeclaration and

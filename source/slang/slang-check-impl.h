@@ -3041,7 +3041,8 @@ public:
         DeclRef<Decl>* outSpecializedRightInner);
 
     // Check if two functions have the same signature for the purposes
-    // of overload resolution.
+    // of overload resolution. Parameter types are compared up to matrix layout, so two
+    // functions that differ only in a parameter's matrix layout are redeclarations.
     bool doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd);
 
     Result checkRedeclaration(Decl* newDecl, Decl* oldDecl);

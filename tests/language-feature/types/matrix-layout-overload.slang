@@ -1,10 +1,13 @@
-// Two functions whose parameter types differ only in matrix layout have the same signature, as in
-// HLSL, so a second body is a redefinition. This holds for both parameter spellings, which
-// produce the same type, and for a layout on a matrix inside an array or behind a pointer.
+// Two functions whose parameter types differ only in matrix layout have the same signature, so a
+// second body is a redefinition. This holds for both parameter spellings, which produce the same
+// type, for a bare matrix, and for a layout on a matrix inside an array or behind a pointer.
 // Mangled names do not encode matrix layout (shader-slang/slang#13383), so accepting these as
-// overloads would emit one function for both.
+// overloads would emit one function for both. A forward declaration whose pointee layout differs
+// from the definition's is a conflicting declaration: nothing converts the memory a pointer
+// refers to.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -profile cs_6_0 -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
 
 float traditionalSpelling(row_major float2x3 m[2]) { return 1; }
 /*CHECK:
@@ -54,6 +57,46 @@ float unsizedArray(column_major float2x3 m[]) { return 2; }
 /*CHECK:
       ^^^^^^^^^^^^ E30201
       ^^^^^^^^^^^^ redeclared here
+*/
+
+float bareMatrix(row_major float2x3 m) { return 1; }
+/*CHECK:
+      ^^^^^^^^^^ see previous definition of 'bareMatrix'
+*/
+float bareMatrix(column_major float2x3 m) { return 2; }
+/*CHECK:
+      ^^^^^^^^^^ E30201
+      ^^^^^^^^^^ redeclared here
+*/
+
+func bareMatrixModern(m: row_major float2x3) -> float { return 1; }
+/*CHECK:
+     ^^^^^^^^^^^^^^^^ see previous definition of 'bareMatrixModern'
+*/
+func bareMatrixModern(m: float2x3) -> float { return 2; }
+/*CHECK:
+     ^^^^^^^^^^^^^^^^ E30201
+     ^^^^^^^^^^^^^^^^ redeclared here
+*/
+
+float pointeeDeclared(row_major float2x3* p);
+/*CHECK:
+      ^^^^^^^^^^^^^^^ see previous declaration of 'pointeeDeclared'
+*/
+float pointeeDeclared(column_major float2x3* p) { return 2; }
+/*CHECK:
+      ^^^^^^^^^^^^^^^ E30200
+      ^^^^^^^^^^^^^^^ declaration of 'pointeeDeclared' conflicts with existing declaration
+*/
+
+func pointeeArrayDeclared(p: row_major float2x3*[2]) -> float;
+/*CHECK:
+     ^^^^^^^^^^^^^^^^^^^^ see previous declaration of 'pointeeArrayDeclared'
+*/
+func pointeeArrayDeclared(p: column_major float2x3*[2]) -> float { return 2; }
+/*CHECK:
+     ^^^^^^^^^^^^^^^^^^^^ E30200
+     ^^^^^^^^^^^^^^^^^^^^ declaration of 'pointeeArrayDeclared' conflicts with existing declaration
 */
 
 // A layout difference does not hide a real difference elsewhere in the type.

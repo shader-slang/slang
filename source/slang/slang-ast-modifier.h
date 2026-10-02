@@ -2170,8 +2170,9 @@ class NoDiffModifier : public TypeModifier
 // on the `ParamDecl`. A modern-syntax declaration whose modifiers precede its
 // name (`row_major var m: float2x3;`) keeps them on the decl, so that path
 // applies the layout via `maybeApplyLayoutModifier` (slang-check-decl.cpp)
-// instead. (Modern `m: row_major float2x3` syntax puts the modifier on the
-// type expression, so it flows through the graft.)
+// instead, for a bare matrix type only (shader-slang/slang#13390). (Modern
+// `m: row_major float2x3` syntax puts the modifier on the type expression, so
+// it flows through the graft.)
 FIDDLE(abstract)
 class MatrixLayoutModifier : public TypeModifier
 {

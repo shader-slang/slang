@@ -2,14 +2,15 @@
 // matrices with an explicit layout accepts a plain array argument, by value and by `inout`. The
 // argument converts element by element (shader-slang/slang#13376), so the logical values survive.
 // Other modifiers on array parameters (`no_diff`, `unorm`) stay on the parameter and keep
-// accepting plain arrays.
+// accepting plain arrays. A forward declaration and a definition whose layouts differ are one
+// function: the call converts to the declaration's layout and the body reads its own, as in HLSL.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 
-//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
 RWStructuredBuffer<float> output;
 
 // Matrix `k` holds the logical values `m[r][c] == 1 + 6*k + 3*r + c`.
@@ -38,6 +39,9 @@ void addHundred(inout row_major float2x3 m[2])
 {
     m[1][1][0] += 100;
 }
+
+float countDeclaredRowMajorMismatches(row_major float2x3 m[2]);
+float readDeclaredRowMajor(row_major float2x3 m);
 
 [Differentiable]
 float scaleAndOffset(no_diff float coefficients[2], float x)
@@ -75,6 +79,20 @@ void computeMain()
 
     float4 colors[2] = { float4(0.25), float4(0.5) };
     output[6] = readUNorm(colors);
+
+    // `plain[0]` was not changed by `addHundred`, so the mismatch count covers only `plain[1]`.
+    output[7] = countDeclaredRowMajorMismatches(plain);
+    output[8] = readDeclaredRowMajor(plain[0]);
+}
+
+float countDeclaredRowMajorMismatches(column_major float2x3 m[2])
+{
+    return countMismatches(m);
+}
+
+float readDeclaredRowMajor(column_major float2x3 m)
+{
+    return m[1][2];
 }
 
 // CHECK: type: float
@@ -85,3 +103,5 @@ void computeMain()
 // CHECK-NEXT: 13.0
 // CHECK-NEXT: 2.0
 // CHECK-NEXT: 0.5
+// CHECK-NEXT: 1.0
+// CHECK-NEXT: 6.0

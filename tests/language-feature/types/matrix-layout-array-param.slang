@@ -64,8 +64,8 @@ void defaultArray(uniform float2x3 values[2], uniform float trailingValue)
     outputBuffer[0] = values[0][0][0] + trailingValue;
 }
 
-// A 2-D array keeps the layout at every level: the inner row is 60 bytes with a 64-byte stride,
-// so the whole array is 64 + 60 = 124 bytes.
+// A 2-D array keeps the layout at every level: each inner array `row_major float2x3[2]` is 60
+// bytes with a 64-byte stride, so the whole array is 64 + 60 = 124 bytes.
 // COL: "name": "rowMajorArray2D"
 // COL: "name": "values"
 // COL: "offset": 0, "size": 124, "elementStride": 64
@@ -106,6 +106,21 @@ func rowMajorArrayInModernFunc(uniform row_major float2x3 values[2], uniform tra
     -> void
 {
     outputBuffer[0] = values[0][0][0] + trailingValue;
+}
+
+// When a parameter carries both layouts, the last one applies, as it does for a struct field:
+// `row_major column_major float2x3` is column-major, 40 bytes under either default.
+// COL: "name": "conflictingLayouts"
+// COL: "name": "value"
+// COL: "offset": 0, "size": 40
+// ROW: "name": "conflictingLayouts"
+// ROW: "name": "value"
+// ROW: "offset": 0, "size": 40
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void conflictingLayouts(uniform row_major column_major float2x3 value)
+{
+    outputBuffer[0] = value[0][0];
 }
 
 // The layout reaches the SPIR-V element decorations: Slang `row_major` maps to SPIR-V `ColMajor`
