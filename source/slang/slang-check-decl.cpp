@@ -5469,6 +5469,15 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
             if (getParamPassingMode(requiredParam.getDecl()) !=
                 getParamPassingMode(satisfyingParam.getDecl()))
                 return false;
+            // `__ref`, `groupshared` and `const groupshared` all pass by `ref`, but `groupshared`
+            // also promises the callee group-shared storage and `const` promises no writes, so a
+            // direct match needs the same qualifiers. A synthesized witness can still forward
+            // between them where the call type-checks.
+            if (requiredParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() !=
+                    satisfyingParam.getDecl()->hasModifier<HLSLGroupSharedModifier>() ||
+                isReadOnlyGroupSharedParam(requiredParam.getDecl()) !=
+                    isReadOnlyGroupSharedParam(satisfyingParam.getDecl()))
+                return false;
             auto requiredParamType = getType(m_astBuilder, requiredParam);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
 
@@ -7350,13 +7359,17 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             }
             else if (
                 as<InOutModifier>(modifier) || as<OutModifier>(modifier) ||
-                as<BorrowModifier>(modifier) || as<RefModifier>(modifier))
+                as<BorrowModifier>(modifier) || as<RefModifier>(modifier) ||
+                as<HLSLGroupSharedModifier>(modifier) || as<ConstModifier>(modifier))
             {
+                // A `groupshared` parameter's passing mode depends on `groupshared` and `const` as
+                // well as the explicit mode modifier, so all of them are cloned; otherwise the
+                // synthesized parameter would forward non-group-shared storage (E30711).
                 auto clonedModifier =
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
                 clonedModifier->keywordName = modifier->keywordName;
                 addModifier(synParamDecl, clonedModifier);
-                if (as<BorrowModifier>(modifier))
+                if (as<BorrowModifier>(modifier) || as<ConstModifier>(modifier))
                     paramType.isLeftValue = false;
             }
         }
@@ -14711,6 +14724,38 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    // A `groupshared` parameter names one thread-group-shared storage location and is therefore
+    // passed by reference, so the copy-direction modifiers are not applicable to it. Reject them at
+    // the producer rather than letting lowering revert to a per-thread copy -- the #10641 defect.
+    // `InOutModifier` derives from `OutModifier`, so it is checked first to report the most
+    // specific keyword.
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<OutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<InModifier>();
+        if (directionModifier)
+            getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
+                .modifier = directionModifier});
+
+        // Every `groupshared` parameter takes the `ref` passing mode, which passes the argument's
+        // own address and, unlike a borrow, has no copy-in fallback: a copy would leave a callee
+        // that reads after a group barrier looking at a stale snapshot. `__constref` asks for a
+        // borrow, so it is an error; we drop every `__constref` after reporting so that the rest of
+        // checking sees a well-formed `ref` parameter.
+        if (auto borrowModifier = paramDecl->findModifier<BorrowModifier>())
+        {
+            getSink()->diagnose(
+                Diagnostics::GroupsharedParameterCannotBeConstref{.modifier = borrowModifier});
+            while (auto extraBorrowModifier = paramDecl->findModifier<BorrowModifier>())
+                removeModifier(paramDecl, extraBorrowModifier);
+        }
+        if (!paramDecl->hasModifier<RefModifier>())
+            addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());
+    }
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
@@ -15708,6 +15753,27 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
+            // A differentiable `groupshared` parameter is passed by reference, and current autodiff
+            // lowering has no backward-diff signature for a by-reference differentiable value, so
+            // it is rejected here rather than failing later in lowering. `no_diff` (excluded from
+            // differentiation) and a non-differentiable element type (no derivative expected) need
+            // no gradient through the parameter, so this check skips them. The diagnostic is
+            // spanned on the `groupshared` modifier the user wrote, because the reference modifier
+            // is injected during parameter checking and carries no source location.
+            if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
+            {
+                if (isTypeDifferentiable(paramDecl->type.type) &&
+                    !paramDecl->hasModifier<NoDiffModifier>())
+                {
+                    getSink()->diagnose(
+                        Diagnostics::CannotUseGroupsharedOnDifferentiableFunctionParameter{
+                            .spelling = paramDecl->hasModifier<ConstModifier>()
+                                            ? UnownedStringSlice("const groupshared")
+                                            : UnownedStringSlice("groupshared"),
+                            .modifier = groupSharedModifier});
+                    continue;
+                }
+            }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {
                 if (auto modifier = paramDecl->findModifier<BorrowModifier>())
@@ -16355,6 +16421,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     maybeInferPrefixModifierForOperator(decl);
+
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;

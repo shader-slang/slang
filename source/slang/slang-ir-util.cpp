@@ -255,7 +255,8 @@ std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRTyp
         return {
             ParameterDirectionInfo(
                 ParameterDirectionInfo::Kind::Ref,
-                as<IRRefParamType>(paramType)->getAddressSpace()),
+                as<IRRefParamType>(paramType)->getAddressSpace(),
+                as<IRRefParamType>(paramType)->getAccessQualifier()),
             as<IRRefParamType>(paramType)->getValueType()};
     else if (as<IRBorrowInParamType>(paramType))
         return {
@@ -281,7 +282,7 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
     case ParameterDirectionInfo::Kind::BorrowIn:
         return builder->getBorrowInParamType(type, info.addressSpace);
     case ParameterDirectionInfo::Kind::Ref:
-        return builder->getRefParamType(type, info.addressSpace);
+        return builder->getRefParamType(type, info.accessQualifier, info.addressSpace);
     default:
         SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
     }

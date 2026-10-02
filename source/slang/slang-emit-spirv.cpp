@@ -12317,7 +12317,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return;
         requireVariableBufferCapabilityIfNeeded(funcType->getResultType());
         for (UInt i = 0; i < funcType->getParamCount(); i++)
-            requireVariableBufferCapabilityIfNeeded(funcType->getParamType(i));
+        {
+            // A `groupshared` parameter's type is its `Workgroup` pointer wrapped in the
+            // group-shared rate.
+            auto paramType = funcType->getParamType(i);
+            if (auto rateQualifiedType = as<IRRateQualifiedType>(paramType))
+                paramType = rateQualifiedType->getValueType();
+            requireVariableBufferCapabilityIfNeeded(paramType);
+        }
     }
 
     // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpExecutionMode

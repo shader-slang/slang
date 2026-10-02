@@ -3487,6 +3487,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRPtrTypeBase* getPtrTypeWithAddressSpace(IRType* valueType, IRPtrTypeBase* ptrWithAddrSpace);
 
     IRRefParamType* getRefParamType(IRType* valueType, AddressSpace addrSpace);
+    IRRefParamType* getRefParamType(
+        IRType* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace);
     IRBorrowInParamType* getBorrowInParamType(IRType* valueType, AddressSpace addrSpace);
     IRPtrType* getPtrType(
         IROp op,

@@ -2381,19 +2381,8 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
                                                                     : nullptr;
         SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
 
-        auto valueType = paramType;
-        if (auto outType = as<IROutParamTypeBase>(valueType))
-        {
-            valueType = outType->getValueType();
-        }
-        else if (auto refType = as<IRRefParamType>(valueType))
-        {
-            valueType = refType->getValueType();
-        }
-        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
-        {
-            valueType = constRefType->getValueType();
-        }
+        auto [directionInfo, valueType] = splitParameterDirectionAndType(paramType);
+        SLANG_UNUSED(directionInfo);
 
         m_writer->emit(prefix);
         emitType(valueType, paramName);
@@ -2461,6 +2450,21 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 
     if (emitMeshOutputParam())
         return;
+
+    // A `groupshared` parameter reaching HLSL emit is one the inliner could not remove, so its
+    // function keeps a call boundary. HLSL cannot pass thread-group-shared memory across a boundary
+    // -- DXC rejects it with error 0043 -- so this is the case we genuinely cannot lower. Diagnose
+    // it here rather than handing DXC code we already know it rejects. A mesh-shader input payload
+    // shares the group-shared rate but crosses the boundary legitimately via HLSL's dedicated
+    // `in payload` syntax (emitted by `emitMeshOutputParam` above), and being read-only it never
+    // forms this illegal pairing, so it is excluded.
+    if (as<IRGroupSharedRate>(param->getRate()) &&
+        !param->findDecoration<IRHLSLMeshPayloadDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{
+            .location = param->sourceLoc});
+        return;
+    }
 
     Super::emitSimpleFuncParamImpl(param);
 }

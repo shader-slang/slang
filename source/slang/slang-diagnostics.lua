@@ -3906,6 +3906,41 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "groupshared-parameter-cannot-have-direction-modifier",
+    30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
+    "a 'groupshared' parameter is passed by reference; 'in'/'out'/'inout' cannot be used with 'groupshared' -- use bare 'groupshared' for a read-write reference or 'const groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
+err(
+    "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
+    30708,
+    "a 'groupshared' parameter cannot be passed across a function boundary when targeting HLSL",
+    span { loc = "location", message = "this function keeps a call boundary that could not be inlined away, and HLSL cannot pass thread-group-shared memory across one" }
+)
+
+warning(
+    "groupshared-argument-to-copied-parameter",
+    30709,
+    "argument names thread-group-shared memory, which other invocations can access during the call, but '~param' is an 'out' or 'inout' parameter, which assumes its argument is not aliased -- declare the parameter 'groupshared' to pass the shared memory by reference",
+    span { loc = "arg:Expr" }
+)
+
+err(
+    "groupshared-argument-must-be-groupshared-lvalue",
+    30711,
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage" }
+)
+
+err(
+    "groupshared-parameter-cannot-be-constref",
+    30712,
+    "'__constref' cannot be used with 'groupshared' -- use 'const groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
 --
 -- 308xx: inheritance
 --
@@ -4692,6 +4727,13 @@ err(
     38034,
     "'borrow in' on differentiable parameter",
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
+)
+
+err(
+    "cannot-use-groupshared-on-differentiable-function-parameter",
+    38038,
+    "'~spelling' on a parameter of a differentiable function",
+    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative can be propagated back through it; mark it 'no_diff' to exclude it from differentiation." }
 )
 
 err(
