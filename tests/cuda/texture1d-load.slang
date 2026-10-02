@@ -9,11 +9,11 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute
 
-//TEST_INPUT: Texture1D(size=4, content=gradient, mipMaps=1):name tex4
+//TEST_INPUT: Texture1D(format=RGBA8Unorm, size=4, content=gradient, mipMaps=1):name tex4
 Texture1D<float4> tex4;
-//TEST_INPUT: Texture1D(size=4, content=gradient, mipMaps=1):name tex2
+//TEST_INPUT: Texture1D(format=RGBA8Unorm, size=4, content=gradient, mipMaps=1):name tex2
 Texture1D<float2> tex2;
-//TEST_INPUT: Texture1D(size=4, content=gradient, mipMaps=1):name tex1
+//TEST_INPUT: Texture1D(format=RGBA8Unorm, size=4, content=gradient, mipMaps=1):name tex1
 Texture1D<float> tex1;
 //TEST_INPUT: Texture1D(format=RGBA32Uint, size=4, content=gradient, mipMaps=1):name texU
 Texture1D<uint4> texU;
@@ -29,7 +29,8 @@ void store4(int base, float4 v)
     outputBuffer[base + 3] = v.w;
 }
 
-// Each 1D load is a 2D texel fetch at row 0.
+// The PTX checks below match the prelude's lowering: each 1D load is a 2D texel fetch at row 0.
+// The second component of each `Load` location below is the mip level, not a row.
 //PTX: tex.level.2d.v4.f32.s32
 //PTX: tex.level.2d.v4.u32.s32
 

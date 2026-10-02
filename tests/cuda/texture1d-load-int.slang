@@ -13,6 +13,8 @@ Texture1D<int4> texI;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// The PTX check below matches the prelude's lowering: the 1D load is a 2D texel fetch at row 0.
+// The second component of each `Load` location below is the mip level, not a row.
 //PTX: tex.level.2d.v4.s32.s32
 
 [numthreads(1, 1, 1)]

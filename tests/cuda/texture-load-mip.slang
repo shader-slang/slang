@@ -1,14 +1,14 @@
 // Read-only `Load` on CUDA must read the mip level given in the last component of the location
 // (#12630). With `content=gradient` each level is generated at its own size, so texel 1 of a size-4
-// texture holds 1/3 at level 0 (size 4) and 1 at level 1 (size 2). A fetch that ignores the level
-// reads 1/3 for both. `mipMaps=2` makes slang-rhi back the 1D texture with a mipmapped CUDA array.
-// The CPU backend ignores the level, so this runs on CUDA only.
+// RGBA8Unorm texture holds 1/3 at level 0 (size 4) and 1 at level 1 (size 2). A fetch that ignores
+// the level reads 1/3 for both. `mipMaps=2` makes slang-rhi back the 1D texture with a mipmapped
+// CUDA array. The CPU backend ignores the level, so this runs on CUDA only.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
-//TEST_INPUT: Texture1D(size=4, content=gradient, mipMaps=2):name t1
+//TEST_INPUT: Texture1D(format=RGBA8Unorm, size=4, content=gradient, mipMaps=2):name t1
 Texture1D<float4> t1;
-//TEST_INPUT: Texture2D(size=4, content=gradient, mipMaps=2):name t2
+//TEST_INPUT: Texture2D(format=RGBA8Unorm, size=4, content=gradient, mipMaps=2):name t2
 Texture2D<float4> t2;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
