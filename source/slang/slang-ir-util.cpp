@@ -1415,6 +1415,14 @@ bool isPtrLikeOrHandleType(IRInst* type)
     return false;
 }
 
+bool isGroupSharedAddr(IRInst* addr)
+{
+    if (as<IRGroupSharedRate>(addr->getRate()))
+        return true;
+    auto ptrType = as<IRPtrTypeBase>(addr->getDataType());
+    return ptrType && ptrType->getAddressSpace() == AddressSpace::GroupShared;
+}
+
 bool canInstHaveSideEffectAtAddress(
     IRGlobalValueWithCode* func,
     IRInst* inst,
@@ -1437,15 +1445,24 @@ bool canInstHaveSideEffectAtAddress(
         {
             auto call = as<IRCall>(inst);
 
+            // Groupshared memory can be a function-local variable on targets that
+            // materialize it in the entry point (see `introduceExplicitGlobalContext`),
+            // yet callees still read and write it through the kernel context, and a
+            // barrier call orders it against other threads. We therefore treat any call,
+            // including one without side effects, as reading and writing it.
+            auto rootAddr = getRootAddr(addr);
+            if (isGroupSharedAddr(rootAddr))
+                return true;
+
             // If addr is a global variable, calling a function may change its value.
             // So we need to return true here to be conservative.
-            if (!isChildInstOf(getRootAddr(addr), func))
+            if (!isChildInstOf(rootAddr, func))
             {
                 auto callee = call->getCallee();
                 if (callee && !doesCalleeHaveSideEffect(callee, calleeSideEffectCache))
                 {
-                    // An exception is if the callee is side-effect free and is not reading from
-                    // memory.
+                    // An exception is if the callee is side-effect free: it may read the
+                    // global but cannot write it.
                 }
                 else
                 {
