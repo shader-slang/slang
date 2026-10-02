@@ -279,7 +279,7 @@ void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("matrix<") << getElementType() << toSlice(",") << getRowCount() << toSlice(",")
         << getColumnCount();
-    if (hasNonDefaultLayout())
+    if (hasSpecifiedLayout())
         out << toSlice(",") << getLayout();
     out << toSlice(">");
 }
@@ -309,8 +309,9 @@ IntVal* MatrixExpressionType::getLayout()
     return as<IntVal>(_getGenericTypeArg(this, 3));
 }
 
-bool MatrixExpressionType::hasNonDefaultLayout()
+bool MatrixExpressionType::hasSpecifiedLayout()
 {
+    SLANG_ASSERT(getLayout());
     auto constantLayout = as<ConstantIntVal>(getLayout());
     return !constantLayout || constantLayout->getValue() != SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 }

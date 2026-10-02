@@ -1,7 +1,7 @@
-// The mangled name of a matrix type includes its layout when the layout is not the default, so
-// declarations that differ only in a matrix layout get distinct names. A plain matrix keeps the
-// `m<R>x<C><T>` spelling, and the layout is placed before the element type, so the two `nested`
-// overloads below are told apart (shader-slang/slang#13383).
+// The mangled name of a matrix type includes its layout when the layout is specified, so
+// declarations that differ only in a matrix layout get distinct names. A matrix with an
+// unspecified layout keeps the `m<R>x<C><T>` spelling, and the layout is placed before the element
+// type, so the two `nested` overloads below are told apart (shader-slang/slang#13383).
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -no-codegen -dump-ir
 

@@ -100,7 +100,7 @@ inline int getIntValueBitSize(IntegerLiteralValue val)
 // the maximum supported value of 64 is returned instead.
 int getMaximumTypeBitSize(Type* t);
 
-// A flat representation of basic types (scalars, vectors and matrices)
+// A flat representation of basic types (scalars, vectors, and matrices with an unspecified layout)
 // that can be used as lookup key in caches
 struct BasicTypeKey
 {
@@ -170,9 +170,10 @@ inline BasicTypeKey makeBasicTypeKey(QualType typeIn, Expr* exprIn = nullptr)
     }
     else if (auto matrixType = as<MatrixExpressionType>(typeIn))
     {
-        // The key has no room for the layout, and matrices that differ only in layout convert
-        // at different costs, so only a plain matrix gets a key.
-        if (matrixType->hasNonDefaultLayout())
+        // Matrices that differ only in layout convert at different costs, and the key records only
+        // the shape. A matrix with a specified layout, including a generic one, therefore gets no
+        // key; its costs go to the per-module cache, which is keyed by the types themselves.
+        if (matrixType->hasSpecifiedLayout())
             return BasicTypeKey::invalid();
         if (auto elemCount1 = as<ConstantIntVal>(matrixType->getRowCount()))
         {
@@ -825,6 +826,32 @@ struct SpecializeInterfaceInheritanceWitnessKey
     }
 };
 
+/// The key of the per-module conversion-cost cache. A conversion from an l-value costs an extra
+/// `kConversionCost_LValueCast`, so the key records whether the source is an l-value as well as
+/// the two types.
+struct ConversionCostKey
+{
+    Type* toType;
+    Type* fromType;
+    bool fromIsLValue;
+    ConversionCostKey(Type* toType, QualType fromType)
+        : toType(toType), fromType(fromType.type), fromIsLValue(fromType.isLeftValue)
+    {
+    }
+    HashCode getHashCode() const
+    {
+        return combineHash(
+            Slang::getHashCode(toType),
+            Slang::getHashCode(fromType),
+            (HashCode32)fromIsLValue);
+    }
+    bool operator==(const ConversionCostKey& other) const
+    {
+        return toType == other.toType && fromType == other.fromType &&
+               fromIsLValue == other.fromIsLValue;
+    }
+};
+
 /// Cached information about how to convert between two types.
 struct ImplicitCastMethod
 {
@@ -1010,7 +1037,7 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
-    Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+    Dictionary<ConversionCostKey, ConversionCost> m_typeConversionCostCache;
 
     Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 

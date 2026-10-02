@@ -757,11 +757,12 @@ class MatrixExpressionType : public ArithmeticExpressionType
     IntVal* getColumnCount();
     IntVal* getLayout();
 
-    /// Return whether this matrix has a layout other than the default `MatrixLayoutMode.Unknown`,
-    /// either an explicit `row_major`/`column_major` or a generic layout parameter. Such a matrix
-    /// is a different type from the plain one, so code that names or caches types must tell
-    /// them apart.
-    bool hasNonDefaultLayout();
+    /// Return whether the layout argument is anything other than the constant
+    /// `MatrixLayoutMode.Unknown`: an explicit `row_major`/`column_major`, or a generic layout
+    /// parameter. `Unknown` is the unspecified layout that `specializeMatrixLayout` later
+    /// resolves to the target's default. Until then, front-end type identity and mangled names
+    /// treat a matrix with a specified layout as a different type from the unspecified one.
+    bool hasSpecifiedLayout();
 
     Type* getRowType();
 

@@ -220,10 +220,12 @@ void emitType(ManglingContext* context, Type* type)
         emitSimpleIntVal(context, matType->getRowCount());
         emitRaw(context, "x");
         emitSimpleIntVal(context, matType->getColumnCount());
-        // A plain matrix keeps the `m<R>x<C><T>` spelling. Any other layout is a different type,
-        // so we emit `L` and the layout value. No type mangling starts with `L`, and placing the
-        // layout before the element type keeps a matrix of matrices unambiguous.
-        if (matType->hasNonDefaultLayout())
+        // A matrix with an unspecified layout keeps the `m<R>x<C><T>` spelling. A specified layout
+        // makes a different type, so we emit `L` and the layout value. No built-in type code
+        // starts with `L` (raw `__extern_cpp` names can, see `emitQualifiedName`). The layout
+        // goes before the element type because after it, `m2x3m2x3Lk1ff` and `m2x3Lk1m2x3ff`
+        // would both spell `m2x3m2x3fLk1f`.
+        if (matType->hasSpecifiedLayout())
         {
             emitRaw(context, "L");
             emitVal(context, matType->getLayout());

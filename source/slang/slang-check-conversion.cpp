@@ -3215,7 +3215,7 @@ bool SemanticsVisitor::canCoerce(
 
     // If this type pair isn't covered by the global cache, use
     // the cache that is local to the module.
-    if (getShared()->m_typeConversionCostCache.tryGetValue(TypePair{toType, fromType.type}, cost))
+    if (getShared()->m_typeConversionCostCache.tryGetValue(ConversionCostKey(toType, fromType), cost))
     {
         if (outCost)
             *outCost = cost;
@@ -3227,7 +3227,7 @@ bool SemanticsVisitor::canCoerce(
     // checking for coercion between toType and fromType requires checking itself again via
     // extensions/overloads.
     getShared()->m_typeConversionCostCache.add(
-        TypePair{toType, fromType.type},
+        ConversionCostKey(toType, fromType),
         kConversionCost_Impossible);
 
     // If there was no suitable entry in the cache,
@@ -3257,11 +3257,11 @@ bool SemanticsVisitor::canCoerce(
     if (shouldAddToGlobalCache)
     {
         typeCheckingCache->conversionCostCache[cacheKey] = cost;
-        getShared()->m_typeConversionCostCache.remove(TypePair{toType, fromType.type});
+        getShared()->m_typeConversionCostCache.remove(ConversionCostKey(toType, fromType));
     }
     else
     {
-        getShared()->m_typeConversionCostCache[TypePair{toType, fromType.type}] = cost;
+        getShared()->m_typeConversionCostCache[ConversionCostKey(toType, fromType)] = cost;
     }
 
     return rs;
