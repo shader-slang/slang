@@ -1703,3 +1703,19 @@ The focused SlangPy62-node rerun is47pass/15fail, with the cache failure resolve
 route gates are included. NVRTC cache plus those five gates pass6/6. Exact commands, negative
 revert drill, fixture main-name investigation and identities are under `build/nvvm-cached-ptx/`.
 Compiler/provider hashes are unchanged, so this RHI-only repair reuses resource-family smoke.
+
+### Pointer-bearing value qualification
+
+The sibling `pointer-aggregate-entry-abi.cuda` fixture runs O0/O3 internally; select it with each
+explicit `--cuda-compiler=nvvm` and `--cuda-compiler=nvrtc` route. Both pass 155 assertions, checking
+all output/guard words, nested launch pointers, pointer-to-record/array/pointer, distinct out/inout
+updates, readonly forwarding, Half call transport and pointer/Bool/Half parameter-group decoding.
+Run `tests/cuda/nvvm-static-context-array-addressing.slang` plus the existing
+`tests/spirv/address-space-specialize.slang` control: all five cells pass. The isolated static
+`nvvm` filter passes 32 tests and `irAddressPropagation` passes one additional test.
+
+The exact 452-node application selection under `build/nvvm-pointer-entry/selection-final.txt`
+passes 263/fails 189, resolving 216 old failures and preserving 47 prior passes. All 16 smoke cells pass.
+The maintained manifests preserve original full counts, every diagnostic transition and unsuccessful
+reductions. The compact raw-pointer layout failures remain queued, and the 17-minute working corpus
+was not rerun for each intermediate fix. It is due by the next implementation batch.

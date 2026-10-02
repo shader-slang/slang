@@ -84,11 +84,30 @@ Compiler smoke evidence is reused unchanged; no full rerun. Raw evidence: `build
 The refreshed RHI inventory includes the prior numeric fixture and new cache fixture: 283 registrations
 (282 unique), mixed-age NVVM272/1/10 and NVRTC268/5/10. Full checkpoint identities remain unchanged.
 
-Next: pointer-bearing entry records/arrays and checked addressing, normalized surface conversions
-(50 imageStore failures), and intrinsic TensorView/DiffTensorView. Remaining resource mixed-layout records need
-reduction. The combined generic handle fixture also retains a duplicate-symbol failure; isolated
-shape qualification does not establish mixed-specialization coexistence. Do not widen type roles
-or discard address provenance to bypass these failures.
+Pointer-bearing entry/helper transport is now qualified. One CUDA layout decoder handles finite
+pointer-bearing launch records/arrays and whole parameter-group values; pointer leaves cross AS1
+storage to AS0 executable values. Half call transport retains its own cache. Checked local child
+references preserve readonly/mutable access. Global-context replacement now propagates address
+spaces through nested arrays and fields. Typed raw offsets require proven CUDA/LLVM layout agreement.
+
+The 452-node SlangPy selection is **263 pass / 189 fail**, resolving **216 old failures** and preserving
+all 47 prior passing controls. Current mixed-age inventory is **1,310 pass / 280 fail / 807 skip /
+3 expected failures**. The original full checkpoint is unchanged. Both-route O0/O3 ABI checks pass
+155 assertions each,32 NVVM static tests and the address-propagation test pass, five CUDA/SPIR-V
+address controls pass, and all 16 smoke cells pass. One stale Callable transform expectation was
+corrected to the already-supported production contract. Raw evidence: `build/nvvm-pointer-entry/`.
+RHI now has 284 registrations (283 unique), with mixed-age NVVM 273/1/10 and NVRTC 269/5/10.
+
+Next: finish the **compact raw pointer storage family**. Seventy-three selected cases reach the
+CUDA/LLVM layout boundary (notably float3 stride 12 versus 16 and half3 padding); seven further pointer
+offset shapes, three local helper-layout cases and seven retained field-address failures need
+canonical producer/storage handling. Reuse existing storage legalization and preserve local/global
+aliasing; do not pack temporary pointees around helper calls. This is a remaining family, not an
+accepted compact-memory feature. Working-corpus cadence is due by the next implementation batch.
+Then address normalized/narrow surfaces (108 imageStore and 38 imageLoad first diagnostics), intrinsic
+TensorView/DiffTensorView, and remaining representation/specialization failures. Combined generic
+handle specializations retain their duplicate-symbol failure. All exact failures and transitions
+remain in the manifests; no automatic demotion or full-suite freshness claim.
 
 Open shared issue: column-major entry matrix reflection disagrees with CUDA's row-array physical
 representation. Both routes fail 11 lanes per optimization in the retained mixed-matrix fixture;

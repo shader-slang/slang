@@ -394,9 +394,20 @@ Fixed numeric arrays and records extend this entry plan recursively. Arrays reta
 and their CUDA stride; records retain child plans and checked field offsets. Explicit array strides
 must match the selected CUDA layout. Aggregates use exactly sized byval byte carriers with CUDA
 alignment. Entry decoding reads only semantic lanes and constructs canonical SSA arrays/records
-before helper calls or field extraction. The existing copyable-value classifier owns numeric
-admission; resource-bearing entries keep their separate checked pointer representation. A physical
-entry address is never used as an ordinary aggregate value.
+before helper calls or field extraction. The existing helper-value classifier also admits finite records and arrays with canonical
+UserPointer and descriptor leaves. `NVVMCUDAValueLayout` retains CUDA offsets; launch pointer leaves
+are AS1 and decode to canonical AS0 helper pointers. The same checked decoder handles whole
+pointer-bearing values loaded from parameter-group storage. This prevents nested storage pointers
+from leaking into ordinary SSA. Resource-bearing entries retain their separate representation.
+A physical entry address is never used as an ordinary aggregate value.
+
+Ordinary raw pointer offsets require a compatible CUDA/LLVM pointee layout before typed GEP
+emission. Finite numeric records, arrays and pointer leaves can use that identity representation.
+Compact mismatches such as float3 stride12 versus LLVM16 remain rejected; broadening arithmetic
+alone would be incorrect. Global-context replacement propagates the new address space through
+existing child addresses and phi edges while preserving each child's opcode, access and layout.
+Checked local field/element references reuse their root proof for helper forwarding, including
+readonly-to-readonly calls; an explicit pointer spelling alone grants no local provenance.
 
 Byte/structured buffer entry values retain pointer-plus-count storage, with bytes for byte buffers
 and elements for structured buffers. A checked equivalent-structured-view plan selects the element
@@ -424,12 +435,12 @@ Half helper parameters/results use physical i16 scalars or `<N x i16>` vectors f
 2–4, while body values remain canonical Half. Callers encode arguments, callees decode parameters,
 returns encode results and callers decode them, using bit-preserving reinterpretation.
 `getNVVMHalfHelperABILaneCount` selects leaf shapes; `hasNVVMHalfHelperABITransport` extends the
-same transport recursively to numeric arrays and records containing Half. Aggregate crossings
+same transport recursively to helper arrays and records containing Half, including pointer leaves. Aggregate crossings
 extract and reconstruct values, converting only Half leaves and retaining non-Half children.
-The helper ABI cache remains separate from canonical Value and Storage representations. Preflight
+The physical helper ABI cache remains separate from canonical Value, HelperValue and Storage caches. Preflight
 requires both exact conversion directions before provider mutation. This avoids qualified libNVVM
 O3 Half-vector and nested Half-record call-transfer defects without changing arithmetic or storage
-admission. Resource-bearing records are outside this numeric transport contract.
+admission. Resource-bearing records remain outside this helper-value transport contract.
 
 Exported Half helpers retain the tested direct-NVVM PTX symbols and layout, including a half4-to-half3
 boundary. The independent PTX caller checks semantic lanes and ignores unspecified return padding.

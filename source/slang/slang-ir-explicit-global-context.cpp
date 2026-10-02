@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -682,6 +683,7 @@ struct IntroduceExplicitGlobalContextPass
         // being careful to defend against the use/def information
         // being changed while we walk it.
         //
+        List<IRInst*> replacementPointers;
         IRUse* nextUse = nullptr;
         for (IRUse* use = globalVar->firstUse; use; use = nextUse)
         {
@@ -706,7 +708,13 @@ struct IntroduceExplicitGlobalContextPass
             if (fieldInfo.needDereference)
                 ptr = builder.emitLoad(ptr);
             use->set(ptr);
+            replacementPointers.add(ptr);
         }
+
+        // Consider `static int values[2]; values[i] = x;` inside a helper. The new context
+        // field is ThreadLocal, but the existing indexed address still has the old global's
+        // Generic type. Propagate the replacement pointer before consumers inspect its children.
+        propagateAddressSpaceFromInsts(_Move(replacementPointers));
 
         // We've replaced all uses of the global var so we should remove it.
         // We leave decorations on the global var above, so if we do not remove it

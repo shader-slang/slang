@@ -398,8 +398,8 @@ SLANG_UNIT_TEST(nvvmNumericEntryCarriersPreserveCudaPacking)
             const auto expectedAlignment = half && lanes >= 3 ? 4u
                                            : lanes == 3       ? bytes[kind]
                                                               : Math::Min(16u, lanes * bytes[kind]);
-            NVVMEntryNumericLayout layout;
-            SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, type, layout));
+            NVVMCUDAValueLayout layout;
+            SLANG_CHECK_ABORT(getNVVMCUDAValueLayout(&context.codeGen, type, layout));
             SLANG_CHECK(layout.size == expectedSize && layout.alignment == expectedAlignment);
             SLANG_CHECK(layout.laneCount == lanes && layout.storageLaneCount == storedLanes);
             SLANG_CHECK(layout.scalarBitWidth == bytes[kind] * 8);
@@ -461,8 +461,8 @@ SLANG_UNIT_TEST(nvvmNumericEntryCarriersPreserveCudaPacking)
           ir.getType(kIROp_FloatE4M3Type),
           ir.getType(kIROp_FloatE5M2Type)})
     {
-        NVVMEntryNumericLayout layout;
-        SLANG_CHECK(!getNVVMEntryNumericLayout(&context.codeGen, type, layout));
+        NVVMCUDAValueLayout layout;
+        SLANG_CHECK(!getNVVMCUDAValueLayout(&context.codeGen, type, layout));
         SLANG_CHECK(!isNVVMSupportedParameterType(type));
     }
 }
@@ -477,25 +477,25 @@ SLANG_UNIT_TEST(nvvmNumericAggregateEntryLayoutsRejectMismatchedStrides)
     auto count = ir.getIntValue(ir.getIntType(), 2);
     auto float3 = ir.getVectorType(ir.getFloatType(), 3);
     auto compact = ir.getArrayType(float3, count);
-    NVVMEntryNumericLayout layout;
-    SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, compact, layout));
+    NVVMCUDAValueLayout layout;
+    SLANG_CHECK_ABORT(getNVVMCUDAValueLayout(&context.codeGen, compact, layout));
     SLANG_CHECK(layout.size == 24 && layout.alignment == 4 && layout.elementStride == 12);
     SLANG_CHECK(layout.elementCount == 2 && layout.children.getCount() == 1);
     SLANG_CHECK(layout.children[0].laneCount == 3);
     auto padded = ir.getArrayType(float3, count, ir.getIntValue(ir.getIntType(), 16));
     SLANG_CHECK(isNVVMSupportedCopyableValueType(padded));
-    SLANG_CHECK(!getNVVMEntryNumericLayout(&context.codeGen, padded, layout));
+    SLANG_CHECK(!getNVVMCUDAValueLayout(&context.codeGen, padded, layout));
     auto scalar = ir.getArrayType(ir.getFloatType(), count, ir.getIntValue(ir.getIntType(), 4));
-    SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, scalar, layout));
+    SLANG_CHECK_ABORT(getNVVMCUDAValueLayout(&context.codeGen, scalar, layout));
     SLANG_CHECK(layout.size == 8 && layout.elementStride == 4);
     auto nested = ir.getArrayType(compact, count);
-    SLANG_CHECK_ABORT(getNVVMEntryNumericLayout(&context.codeGen, nested, layout));
+    SLANG_CHECK_ABORT(getNVVMCUDAValueLayout(&context.codeGen, nested, layout));
     SLANG_CHECK(layout.size == 48 && layout.elementStride == 24);
-    SLANG_CHECK(!getNVVMEntryNumericLayout(
+    SLANG_CHECK(!getNVVMCUDAValueLayout(
         &context.codeGen,
         ir.getArrayType(ir.getFloatType(), ir.getIntValue(ir.getIntType(), 0)),
         layout));
-    SLANG_CHECK(!getNVVMEntryNumericLayout(
+    SLANG_CHECK(!getNVVMCUDAValueLayout(
         &context.codeGen,
         ir.getArrayType(ir.getDoubleType(), ir.getIntValue(ir.getIntType(), UINT32_MAX)),
         layout));
@@ -602,5 +602,106 @@ SLANG_UNIT_TEST(nvvmRawBufferLayoutMatchesCpuCudaDescriptors)
                 SLANG_CHECK(layout.size == 32 && layout.alignment == 8);
             }
         }
+    }
+}
+
+SLANG_UNIT_TEST(nvvmPointerEntryLayoutsKeepLaunchAndHelperRolesSeparate)
+{
+    NVVMStaticTestContext context(unitTestContext);
+    auto module = IRModule::create(context.env.getSessionImpl());
+    IRBuilder ir(module);
+    ir.setInsertInto(module);
+    auto pointer = ir.getPtrType(
+        kIROp_PtrType,
+        ir.getIntType(),
+        AccessQualifier::ReadWrite,
+        AddressSpace::UserPointer,
+        ir.getDefaultBufferLayoutType());
+    auto record = ir.createStructType();
+    ir.createStructField(record, ir.createStructKey(), ir.getUInt8Type());
+    ir.createStructField(record, ir.createStructKey(), pointer);
+    auto array = ir.getArrayType(record, ir.getIntValue(ir.getIntType(), 2));
+    NVVMCUDAValueLayout layout;
+    SLANG_CHECK_ABORT(getNVVMCUDAValueLayout(&context.codeGen, array, layout));
+    SLANG_CHECK(layout.elementCount == 2 && layout.elementStride == 16);
+    SLANG_CHECK(layout.children[0].fieldOffsets[1] == 8);
+    auto& leaf = layout.children[0].children[1];
+    SLANG_CHECK(leaf.isUserPointer && leaf.size == 8 && leaf.alignment == 8);
+    auto halfRecord = ir.createStructType();
+    ir.createStructField(halfRecord, ir.createStructKey(), pointer);
+    ir.createStructField(halfRecord, ir.createStructKey(), ir.getHalfType());
+    SLANG_CHECK(hasNVVMHalfHelperABITransport(halfRecord));
+    NVVMIRBuilder provider;
+    _requireRealNVVMBuilder(unitTestContext, provider);
+    for (bool entryFirst : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &provider;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(provider.createModule(toSlice("pointer-entry"), scope.module)));
+        NVVMTypeLoweringContext lowering(&context.codeGen, provider, scope.module);
+        SlangNVVMTypeHandle entry = nullptr, value = nullptr, after = nullptr;
+        if (!entryFirst)
+            SLANG_CHECK_ABORT(
+                SLANG_SUCCEEDED(lowering.lowerType(array, NVVMTypeUse::Value, value)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(lowering.lowerType(array, NVVMTypeUse::EntryPointParameter, entry)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(lowering.lowerType(array, NVVMTypeUse::Value, after)));
+        SLANG_CHECK(entry != after);
+        if (value)
+            SLANG_CHECK(value == after);
+        SlangNVVMTypeHandle launchPointer = nullptr, storage = nullptr, helperPointer = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(lowering.lowerCUDAValueType(leaf, launchPointer, storage)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            lowering.lowerType(pointer, NVVMTypeUse::HelperParameter, helperPointer)));
+        SLANG_CHECK(launchPointer == storage && launchPointer != helperPointer);
+        SlangNVVMTypeHandle integer = nullptr, expectedGlobal = nullptr, expectedGeneric = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getIntegerType(scope.module, 32, integer)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+            scope.module,
+            integer,
+            SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+            expectedGlobal)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getPointerType(
+            scope.module,
+            integer,
+            SLANG_NVVM_ADDRESS_SPACE_GENERIC,
+            expectedGeneric)));
+        SLANG_CHECK(launchPointer == expectedGlobal && helperPointer == expectedGeneric);
+        SlangNVVMTypeHandle ordinaryHalfRecord = nullptr, physicalHalfRecord = nullptr;
+        if (!entryFirst)
+            SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+                lowering.lowerType(halfRecord, NVVMTypeUse::Value, ordinaryHalfRecord)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            lowering.lowerType(halfRecord, NVVMTypeUse::HelperParameter, physicalHalfRecord)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            lowering.lowerType(halfRecord, NVVMTypeUse::Value, ordinaryHalfRecord)));
+        SlangNVVMTypeHandle half = nullptr, bits = nullptr, expectedValue = nullptr,
+                            expectedABI = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getFloatingPointType(scope.module, 16, half)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(provider.getIntegerType(scope.module, 16, bits)));
+        SlangNVVMTypeHandle valueFields[] = {expectedGeneric, half};
+        SlangNVVMTypeHandle abiFields[] = {expectedGeneric, bits};
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(provider.getStructType(scope.module, valueFields, 2, expectedValue)));
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(provider.getStructType(scope.module, abiFields, 2, expectedABI)));
+        SLANG_CHECK(ordinaryHalfRecord == expectedValue && physicalHalfRecord == expectedABI);
+        SLANG_CHECK(ordinaryHalfRecord != physicalHalfRecord);
+    }
+    for (auto addressSpace :
+         {AddressSpace::Generic, AddressSpace::GroupShared, AddressSpace::ThreadLocal})
+    {
+        auto denied = ir.createStructType();
+        auto reference = ir.getPtrType(
+            kIROp_PtrType,
+            ir.getIntType(),
+            AccessQualifier::ReadWrite,
+            addressSpace,
+            ir.getDefaultBufferLayoutType());
+        ir.createStructField(denied, ir.createStructKey(), reference);
+        SLANG_CHECK(!isNVVMSupportedParameterType(denied));
+        SLANG_CHECK(!getNVVMCUDAValueLayout(&context.codeGen, denied, layout));
     }
 }

@@ -582,7 +582,7 @@ bool hasNVVMHalfHelperABITransport(IRInst* type)
 {
     if (getNVVMHalfHelperABILaneCount(type))
         return true;
-    if (!isNVVMSupportedCopyableValueType(type))
+    if (!isNVVMSupportedHelperValueType(type))
         return false;
     if (auto array = as<IRArrayType>(type))
         return hasNVVMHalfHelperABITransport(array->getElementType());
@@ -2181,13 +2181,10 @@ IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type)
     return ptrType;
 }
 
-bool getNVVMEntryNumericLayout(
-    CodeGenContext* context,
-    IRType* type,
-    NVVMEntryNumericLayout& outLayout)
+bool getNVVMCUDAValueLayout(CodeGenContext* context, IRType* type, NVVMCUDAValueLayout& outLayout)
 {
     outLayout = {};
-    if (!context || !isNVVMSupportedCopyableValueType(type))
+    if (!context || !isNVVMSupportedHelperValueType(type))
         return false;
     IRSizeAndAlignment aggregateLayout;
     auto rules = IRTypeLayoutRules::getCUDA();
@@ -2200,8 +2197,8 @@ bool getNVVMEntryNumericLayout(
     outLayout.alignment = uint32_t(aggregateLayout.alignment);
     if (auto array = as<IRArrayType>(type))
     {
-        NVVMEntryNumericLayout element;
-        if (!getNVVMEntryNumericLayout(context, array->getElementType(), element))
+        NVVMCUDAValueLayout element;
+        if (!getNVVMCUDAValueLayout(context, array->getElementType(), element))
             return false;
         auto elementLayout =
             rules->alignCompositeElement(IRSizeAndAlignment(element.size, int(element.alignment)));
@@ -2225,9 +2222,9 @@ bool getNVVMEntryNumericLayout(
     {
         for (auto field : record->getFields())
         {
-            NVVMEntryNumericLayout child;
+            NVVMCUDAValueLayout child;
             IRIntegerValue offset = 0;
-            if (!getNVVMEntryNumericLayout(context, field->getFieldType(), child) ||
+            if (!getNVVMCUDAValueLayout(context, field->getFieldType(), child) ||
                 SLANG_FAILED(getOffset(context->getTargetReq(), rules, field, &offset)) ||
                 offset < 0 || uint64_t(offset) + child.size > outLayout.size)
                 return false;
@@ -2235,6 +2232,15 @@ bool getNVVMEntryNumericLayout(
             outLayout.fieldOffsets.add(uint32_t(offset));
         }
         return outLayout.isAggregate();
+    }
+    // Kernel arguments contain device addresses, whereas ordinary helper values can also carry
+    // local addresses. Record that boundary explicitly; decoding casts each AS1 leaf to AS0.
+    outLayout.isUserPointer = asNVVMSupportedDeviceHelperValuePointerType(type) != nullptr;
+    outLayout.isDescriptor = asNVVMSupportedDescriptorHandleType(type) != nullptr;
+    if (outLayout.isUserPointer || outLayout.isDescriptor)
+    {
+        outLayout.scalarType = type;
+        return true;
     }
     auto vector = asNVVMSupportedValueVectorType(type);
     IRType* scalar = vector ? vector->getElementType() : type;
@@ -2392,7 +2398,7 @@ SlangResult NVVMTypeLoweringContext::_lowerArrayType(
     outType = nullptr;
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperABIRepresentationMap
+    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperValueTypeMap
                     : use == NVVMTypeUse::StructuredBufferStorage ? m_structuredBufferStorageTypeMap
                     : isAggregateStorage                          ? m_aggregateStorageTypeMap
                                                                   : m_typeMap;
@@ -2454,7 +2460,7 @@ SlangResult NVVMTypeLoweringContext::_lowerStructType(
     outType = nullptr;
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperABIRepresentationMap
+    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperValueTypeMap
                     : use == NVVMTypeUse::StructuredBufferStorage ? m_structuredBufferStorageTypeMap
                     : isAggregateStorage                          ? m_aggregateStorageTypeMap
                                                                   : m_typeMap;
@@ -2748,8 +2754,10 @@ bool NVVMTypeInfo::supports(NVVMTypeUse use) const
                localCopyablePointer || localHelperPointer || isRawBuffer || isSampledTexture ||
                isSurface || samplerValue;
     case NVVMTypeUse::EntryPointParameter:
-        return isCopyableValue || resourceStructType || deviceNumericPointer ||
-               deviceArrayPointer || isRawBuffer || isSampledTexture || isSurface || samplerValue ||
+        return isCopyableValue ||
+               (isHelperValue && (structType || as<IRArrayType>(canonicalType))) ||
+               resourceStructType || deviceNumericPointer || deviceArrayPointer || isRawBuffer ||
+               isSampledTexture || isSurface || samplerValue ||
                (parameterGroup && hasParameterGroupValueRepresentation);
     case NVVMTypeUse::HelperParameter:
         return isHelperValue || resourceStructType || fixedResourceArrayType ||
@@ -2895,11 +2903,32 @@ NVVMTypeInfo NVVMTypeLoweringContext::_getTypeInfo(IRType* type)
 // Consider `kernel(uniform double3 value, uniform uint tail)`. CUDA places the tail after
 // 24 bytes, whereas LLVM's vector storage would consume 32. A byval scalar array carries the
 // reflected bytes and explicit parameter alignment; only entry emission decodes it to vector SSA.
-SlangResult NVVMTypeLoweringContext::lowerEntryNumericType(
-    const NVVMEntryNumericLayout& layout,
+SlangResult NVVMTypeLoweringContext::lowerCUDAValueType(
+    const NVVMCUDAValueLayout& layout,
     SlangNVVMTypeHandle& outParameterType,
     SlangNVVMTypeHandle& outStorageType)
 {
+    if (layout.isUserPointer)
+    {
+        auto pointer = cast<IRPtrTypeBase>(layout.type);
+        SlangNVVMTypeHandle pointee = nullptr;
+        SLANG_RETURN_ON_FAIL(lowerType(pointer->getValueType(), NVVMTypeUse::Value, pointee));
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            "entry device pointer",
+            m_builder.getPointerType(
+                m_module,
+                pointee,
+                SLANG_NVVM_ADDRESS_SPACE_GLOBAL,
+                outStorageType)));
+        outParameterType = outStorageType;
+        return SLANG_OK;
+    }
+    if (layout.isDescriptor)
+    {
+        SLANG_RETURN_ON_FAIL(lowerType(layout.type, NVVMTypeUse::Value, outStorageType));
+        outParameterType = outStorageType;
+        return SLANG_OK;
+    }
     if (layout.isAggregate())
     {
         // CUDA offsets need not match LLVM's value layout (for example float3 fields).
@@ -3084,7 +3113,8 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // canonical producer proves global-memory provenance.
     if ((use == NVVMTypeUse::HelperParameter || use == NVVMTypeUse::HelperResult ||
          use == NVVMTypeUse::Value) &&
-        isPointerBearingHelperValue && !deviceCopyablePointer)
+        isPointerBearingHelperValue && !deviceCopyablePointer &&
+        (use == NVVMTypeUse::Value || !hasNVVMHalfHelperABITransport(type)))
     {
         return lowerType(type, NVVMTypeUse::HelperValue, outType);
     }
@@ -3135,7 +3165,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     }
 
     if ((use == NVVMTypeUse::EntryPointParameter || use == NVVMTypeUse::Storage ||
-         use == NVVMTypeUse::Value) &&
+         (use == NVVMTypeUse::Value && !deviceHelperPointer)) &&
         devicePhysicalStoragePointer)
     {
         return _lowerPointerType(
@@ -3232,13 +3262,15 @@ SlangResult NVVMTypeLoweringContext::lowerType(
     // NVPTX represents an aggregate kernel parameter as a generic pointer carrying `byval`, while
     // the same canonical Slang struct remains a first-class LLVM struct in ordinary value roles.
     // Keep this physical ABI representation separate from the canonical value-type cache.
-    if (use == NVVMTypeUse::EntryPointParameter && typeInfo.isCopyableValue)
+    if (use == NVVMTypeUse::EntryPointParameter &&
+        (typeInfo.isCopyableValue ||
+         (typeInfo.isHelperValue && (typeInfo.structType || as<IRArrayType>(type)))))
     {
-        NVVMEntryNumericLayout layout;
-        if (!getNVVMEntryNumericLayout(m_codeGenContext, type, layout))
+        NVVMCUDAValueLayout layout;
+        if (!getNVVMCUDAValueLayout(m_codeGenContext, type, layout))
             return SLANG_E_INVALID_ARG;
         SlangNVVMTypeHandle storageType = nullptr;
-        return lowerEntryNumericType(layout, outType, storageType);
+        return lowerCUDAValueType(layout, outType, storageType);
     }
 
     if (use == NVVMTypeUse::EntryPointParameter && resourceStructType)
@@ -3368,7 +3400,7 @@ SlangResult NVVMTypeLoweringContext::lowerType(
 
     const bool isAggregateStorage =
         use == NVVMTypeUse::Storage || use == NVVMTypeUse::ParameterGroupStorage;
-    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperABIRepresentationMap
+    auto& typeMap = use == NVVMTypeUse::HelperValue               ? m_helperValueTypeMap
                     : use == NVVMTypeUse::StructuredBufferStorage ? m_structuredBufferStorageTypeMap
                     : isAggregateStorage                          ? m_aggregateStorageTypeMap
                                                                   : m_typeMap;

@@ -709,15 +709,6 @@ void specializeAddressSpace(
 void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
 {
     HashSet<IRInst*> visited;
-    auto addUserToWorkList = [&](IRInst* inst)
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (visited.add(user))
-                workList.add(user);
-        }
-    };
     for (auto item : workList)
     {
         visited.add(item);
@@ -757,12 +748,21 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
                     auto valueType = tryGetPointedToType(&builder, user->getDataType());
                     if (!valueType)
                         continue;
-                    auto newType = builder.getPtrTypeWithAddressSpace(valueType, instPtrType);
-                    if (newType != user->getDataType())
-                    {
+                    auto oldType = cast<IRPtrTypeBase>(user->getDataType());
+                    auto newType = builder.getPtrType(
+                        oldType->getOp(),
+                        valueType,
+                        oldType->getAccessQualifier(),
+                        instPtrType->getAddressSpace(),
+                        oldType->getDataLayout());
+                    const bool changed = newType != oldType;
+                    if (changed)
                         user->setFullType(newType);
-                        addUserToWorkList(user);
-                    }
+                    // Traverse a correct intermediate once too: one of its children may still
+                    // need repair. Revisit changed phi parameters to propagate through backedges.
+                    const bool firstVisit = visited.add(user);
+                    if (changed || firstVisit)
+                        workList.add(user);
                     break;
                 }
             }

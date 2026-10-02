@@ -405,8 +405,8 @@ bool isNVVMSupportedConventionalGlobalFieldType(IRStructField* field);
 /// Returns the canonical pointer produced by selected structured-buffer element addressing.
 IRPtrTypeBase* asNVVMSupportedRWStructuredBufferElementPointerType(IRInst* type);
 
-/// Records CUDA launch storage independently of the ordinary numeric SSA representation.
-struct NVVMEntryNumericLayout
+/// Records CUDA memory layout independently of the ordinary SSA representation.
+struct NVVMCUDAValueLayout
 {
     IRType* type = nullptr;
     IRType* scalarType = nullptr;
@@ -418,8 +418,10 @@ struct NVVMEntryNumericLayout
     bool isVector = false;
     bool isBoolean = false;
     bool isHalf = false;
+    bool isUserPointer = false;
+    bool isDescriptor = false;
     // Arrays retain one element plan and a stride; records retain one plan per semantic field.
-    List<NVVMEntryNumericLayout> children;
+    List<NVVMCUDAValueLayout> children;
     List<uint32_t> fieldOffsets;
     uint32_t elementCount = 0;
     uint32_t elementStride = 0;
@@ -428,11 +430,9 @@ struct NVVMEntryNumericLayout
     bool isByValue() const { return isVector || isAggregate(); }
 };
 
-/// Selects a finite numeric entry carrier using the same CUDA layout rules as reflection.
-bool getNVVMEntryNumericLayout(
-    CodeGenContext* context,
-    IRType* type,
-    NVVMEntryNumericLayout& outLayout);
+/// Selects a finite CUDA value layout using the same rules as launch and parameter-group
+/// reflection.
+bool getNVVMCUDAValueLayout(CodeGenContext* context, IRType* type, NVVMCUDAValueLayout& outLayout);
 
 /// Returns whether `type` has an accepted direct CUDA launch-parameter representation.
 bool isNVVMSupportedParameterType(IRType* type);
@@ -570,8 +570,8 @@ public:
     SlangResult lowerType(IRType* type, NVVMTypeUse use, SlangNVVMTypeHandle& outType);
 
     /// Materializes an already-checked entry carrier; vectors use a byval scalar array.
-    SlangResult lowerEntryNumericType(
-        const NVVMEntryNumericLayout& layout,
+    SlangResult lowerCUDAValueType(
+        const NVVMCUDAValueLayout& layout,
         SlangNVVMTypeHandle& outParameterType,
         SlangNVVMTypeHandle& outStorageType);
 
@@ -625,6 +625,7 @@ private:
     Dictionary<IRType*, SlangNVVMTypeHandle> m_aggregateStorageTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_structuredBufferStorageTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_entryParameterRepresentationMap;
+    Dictionary<IRType*, SlangNVVMTypeHandle> m_helperValueTypeMap;
     Dictionary<IRType*, SlangNVVMTypeHandle> m_helperABIRepresentationMap;
     Dictionary<PointerTypeKey, SlangNVVMTypeHandle> m_pointerRepresentationMap;
     Dictionary<IRType*, NVVMTypeInfo> m_typeInfoMap;

@@ -275,6 +275,7 @@ struct NVVMLayoutStorage
 /// Owns a load's storage conversion, alignment, flags and resulting pointer provenance.
 struct NVVMPlannedLoad
 {
+    NVVMCUDAValueLayout cudaValueLayout;
     IRInst* source = nullptr;
     IRInst* pointer = nullptr;
     NVVMPlannedStorageConversion conversion;
@@ -474,7 +475,7 @@ struct NVVMPlannedLayoutPointerOffset
 struct NVVMEmissionPlan
 {
     NVVMAddressPlan addresses;
-    Dictionary<IRInst*, NVVMEntryNumericLayout> entryNumericParameters;
+    Dictionary<IRInst*, NVVMCUDAValueLayout> entryValueParameters;
     Dictionary<IRInst*, NVVMPlannedEquivalentStructuredBuffer> equivalentStructuredBuffers;
     Dictionary<IRInst*, NVVMPlannedLayoutPointerOffset> layoutPointerOffsets;
     Dictionary<IRInst*, IRInst*> pointerToIntegerValues;

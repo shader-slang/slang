@@ -91455,6 +91455,422 @@
         "Original full application baseline and historical feature evidence unchanged."
       ],
       "rhi_commit": "aec3e12ac581840ed0081690e2c9620b3a436a72"
+    },
+    "nvvm-pointer-entry-values": {
+      "status": "accepted-focused",
+      "identity": {
+        "path": "build/nvvm-pointer-entry/identity.json",
+        "sha256": "2658bbf4b5cde81b4aea0f028c858a284b3ea3dbf7a9312c20873f7634390e3b",
+        "source_sha256": {
+          "source/slang/slang-emit-nvvm-plan.h": "9f44f3d0e1163578a4776adc1b005e517b5b501d44d64cb1b6931e117148aa25",
+          "source/slang/slang-emit-nvvm-type-lowering.cpp": "6b6584bd1ef2e028ad03ca1c8df2f9ffeb3305d0278772ab1972e109b9f240ad",
+          "source/slang/slang-emit-nvvm-type-lowering.h": "81e8fc94b7d8d8227165cde21f48ee2549b787c38cdaab0bb5033ed421579e95",
+          "source/slang/slang-emit-nvvm.cpp": "59f581fb613937956208f363393812886dcc6d397661866539bed3fe1250213f",
+          "source/slang/slang-ir-explicit-global-context.cpp": "e3def2af87a3f1899b6d3cf032b945a8551ae2c280ab016e0c5ab059fb1c014f",
+          "source/slang/slang-ir-specialize-address-space.cpp": "d600dcef46bba2b6035106e4a578eec593cdef5d86d4d742dc4d4ab071dddd99",
+          "tools/slang-static-unit-test/unit-test-nvvm-local-record-arrays.cpp": "ace49411c49211ce998b3cb70e852f86939b1ada5d5056fb6fa6c4626b6c7df2",
+          "tools/slang-static-unit-test/unit-test-nvvm-type-lowering.cpp": "9c67e13d5df4ba8b6359a0d41ecc2a7dfd5df3d86cb91ab62d0f8e55126dce74",
+          "tests/cuda/nvvm-static-context-array-addressing.slang": "2fb9113a0080498fc2d08ff7853c20aa7f95970f0d75a631584d74704378d14a"
+        }
+      },
+      "scope": "Finite pointer-bearing launch values, Half helper boundary, cbuffer-to-SSA decode, checked local references and static context address propagation. Compatible raw offsets only; compact physical memory remains queued.",
+      "validation": {
+        "address-ir-2": {
+          "path": "build/nvvm-pointer-entry/address-ir-2.json",
+          "sha256": "d90eaad96b956e451207b9dd4648e4cf98a41e4a3b1d5ca61d8734923d6d7614",
+          "return_code": 255,
+          "elapsed_seconds": 0.2830080986022949
+        },
+        "address-ir": {
+          "path": "build/nvvm-pointer-entry/address-ir.json",
+          "sha256": "5847677b11460053145c433e5ba85f944246e531f3f81cc0055001be03f83397",
+          "return_code": 1,
+          "elapsed_seconds": 0.27118849754333496
+        },
+        "address-runtime-final": {
+          "path": "build/nvvm-pointer-entry/address-runtime-final.json",
+          "sha256": "a7a3c2c19f2593d326b407b0a413cb4147871343aaed311fb7d30f8a3c2becbc",
+          "return_code": 0,
+          "elapsed_seconds": 3.320052146911621
+        },
+        "build-1": {
+          "path": "build/nvvm-pointer-entry/build-1.json",
+          "sha256": "52a40001a9d152ce17c4a46465bd7f4a0a7e0fa249a6c253f66948e87c6cca19",
+          "return_code": 0,
+          "elapsed_seconds": 33.72434616088867
+        },
+        "build-2": {
+          "path": "build/nvvm-pointer-entry/build-2.json",
+          "sha256": "2bf6fe843ca9958d691bfbacf8c4f83efebdc4b3bc56c554cacd24ddd042d07d",
+          "return_code": 0,
+          "elapsed_seconds": 22.393182516098022
+        },
+        "build-3": {
+          "path": "build/nvvm-pointer-entry/build-3.json",
+          "sha256": "a4f5076d9e0524e8406e6b3ddfc727f4e04b8b00b5598fe92dd03423541cea1d",
+          "return_code": 0,
+          "elapsed_seconds": 22.627222061157227
+        },
+        "build-4": {
+          "path": "build/nvvm-pointer-entry/build-4.json",
+          "sha256": "538fb305739501f46523b31553fcda5974dad7ddf7bd9ef36df21befa9bd4c80",
+          "return_code": 0,
+          "elapsed_seconds": 33.154343605041504
+        },
+        "build-5": {
+          "path": "build/nvvm-pointer-entry/build-5.json",
+          "sha256": "79dc08884eb8e5322fff53c03687b511a848640859a48bd5914d9b4caf8c7102",
+          "return_code": 0,
+          "elapsed_seconds": 38.9325315952301
+        },
+        "build-6": {
+          "path": "build/nvvm-pointer-entry/build-6.json",
+          "sha256": "718fcc432174bf7e34e29b13243b591a598c5f8a56b04d4c50089c55468270e0",
+          "return_code": 0,
+          "elapsed_seconds": 27.386923789978027
+        },
+        "build-7": {
+          "path": "build/nvvm-pointer-entry/build-7.json",
+          "sha256": "a23971f6940646144bc668bf69fb0c7ef0f86e37ab74b1b17ada9997a7dc6067",
+          "return_code": 0,
+          "elapsed_seconds": 40.391013383865356
+        },
+        "build-8": {
+          "path": "build/nvvm-pointer-entry/build-8.json",
+          "sha256": "8b2dc134d65d57fe5c1e23f4bac0d6e93471780a114f015ad8e6c65dbcd72c77",
+          "return_code": 0,
+          "elapsed_seconds": 38.96392798423767
+        },
+        "build-final": {
+          "path": "build/nvvm-pointer-entry/build-final.json",
+          "sha256": "5816e91fd2ae4fa433d2ebac118732851278e018b7d6ac4dd1e3e4283113dae8",
+          "return_code": 0,
+          "elapsed_seconds": 38.37834715843201
+        },
+        "inventory": {
+          "path": "build/nvvm-pointer-entry/inventory.json",
+          "sha256": "0d0d212d8b215a990e57765c54b96c0a75c4723e64a249102c6679b400b1fdbd",
+          "return_code": 0,
+          "elapsed_seconds": 0.2865419387817383
+        },
+        "packed-ir-1": {
+          "path": "build/nvvm-pointer-entry/packed-ir-1.json",
+          "sha256": "6aa378d216ea5ff316ebbf163746550dbfd6b8c5b08e947d13ed36d9510bd999",
+          "return_code": 0,
+          "elapsed_seconds": 2.319847345352173
+        },
+        "packed-ir-2": {
+          "path": "build/nvvm-pointer-entry/packed-ir-2.json",
+          "sha256": "b0f89124625795198dfe445c79cd5d9604f8c8cebe728cda08cac1ab4679438f",
+          "return_code": 0,
+          "elapsed_seconds": 2.2754909992218018
+        },
+        "packed-ir-3": {
+          "path": "build/nvvm-pointer-entry/packed-ir-3.json",
+          "sha256": "4eb2f690592de10a5d285e71291cf6b11d30cd6f939f725c13e0d162aa6854d9",
+          "return_code": 0,
+          "elapsed_seconds": 2.531604766845703
+        },
+        "provider-debug-build": {
+          "path": "build/nvvm-pointer-entry/provider-debug-build.json",
+          "sha256": "e3f41ec88de797074a4a5ce63b69b0f18a666ad9666480c92f4d5757c17b1322",
+          "return_code": 0,
+          "elapsed_seconds": 11.146472692489624
+        },
+        "rhi-build-1": {
+          "path": "build/nvvm-pointer-entry/rhi-build-1.json",
+          "sha256": "33ba25abee50dc2b8fea66990f350339edd534b4ba23244c1d017406c50775ca",
+          "return_code": 0,
+          "elapsed_seconds": 4.222653388977051
+        },
+        "rhi-build-2": {
+          "path": "build/nvvm-pointer-entry/rhi-build-2.json",
+          "sha256": "e9c9f784d822ee2cd0ecf56a4e707ba88c3399f215af48e3bbc88cc940752fe5",
+          "return_code": 0,
+          "elapsed_seconds": 4.968083381652832
+        },
+        "rhi-build-3": {
+          "path": "build/nvvm-pointer-entry/rhi-build-3.json",
+          "sha256": "08470b4a9299575e7e94f3b63966c069cdb54d806407ed0f9f3aac91b69d832b",
+          "return_code": 0,
+          "elapsed_seconds": 5.087301254272461
+        },
+        "rhi-nvrtc-1": {
+          "path": "build/nvvm-pointer-entry/rhi-nvrtc-1.json",
+          "sha256": "d6717593cb466060b8de954102411e93e0e949e90f3293ef330802e7a78d770b",
+          "return_code": 0,
+          "elapsed_seconds": 2.5530788898468018
+        },
+        "rhi-nvrtc-final": {
+          "path": "build/nvvm-pointer-entry/rhi-nvrtc-final.json",
+          "sha256": "baeb550d25a4052bfe5df39374d8cb3abfce89e2e08796e4ae4d93f9a0a90a0f",
+          "return_code": 0,
+          "elapsed_seconds": 2.62528657913208
+        },
+        "rhi-nvrtc-reviewed": {
+          "path": "build/nvvm-pointer-entry/rhi-nvrtc-reviewed.json",
+          "sha256": "e32f6763864aaab0476c79c96d85db5bc9bbe933da5685e40176401e78b9d940",
+          "return_code": 0,
+          "elapsed_seconds": 2.607048749923706
+        },
+        "rhi-nvvm-1": {
+          "path": "build/nvvm-pointer-entry/rhi-nvvm-1.json",
+          "sha256": "638185ae661049394dbfb52920eaf38c7304d11f8efa1eb48eed4c0e9100c0f9",
+          "return_code": 1,
+          "elapsed_seconds": 1.362907886505127
+        },
+        "rhi-nvvm-2": {
+          "path": "build/nvvm-pointer-entry/rhi-nvvm-2.json",
+          "sha256": "72e14f8c319ebfd81848e9a93284d27a32eecdfdee1f5b2aa3f95b169c6f1bb0",
+          "return_code": 1,
+          "elapsed_seconds": 1.3488576412200928
+        },
+        "rhi-nvvm-3": {
+          "path": "build/nvvm-pointer-entry/rhi-nvvm-3.json",
+          "sha256": "ae18388e1b7c9e802ac324a4578398375ec392d067d4b48c8592b68334854e9b",
+          "return_code": 1,
+          "elapsed_seconds": 1.3787462711334229
+        },
+        "rhi-nvvm-4": {
+          "path": "build/nvvm-pointer-entry/rhi-nvvm-4.json",
+          "sha256": "5786264bd426afa17e1b140a5d771fd34c12d95bff9184ddc5d41a93c6dd8b5a",
+          "return_code": 0,
+          "elapsed_seconds": 2.4082939624786377
+        },
+        "rhi-nvvm-final": {
+          "path": "build/nvvm-pointer-entry/rhi-nvvm-final.json",
+          "sha256": "b4c84340bb0124bcb14aed8fa82c7f90c3bcf3f844353bc39603b8f22ab02fc1",
+          "return_code": 0,
+          "elapsed_seconds": 2.4729273319244385
+        },
+        "rhi-nvvm-reviewed": {
+          "path": "build/nvvm-pointer-entry/rhi-nvvm-reviewed.json",
+          "sha256": "638b571ad058f4fec226fb19f79ed36ea4e3c32cbb2e879c0f606079c5f992f9",
+          "return_code": 0,
+          "elapsed_seconds": 2.4849319458007812
+        },
+        "slangpy-1": {
+          "path": "build/nvvm-pointer-entry/slangpy-1.json",
+          "sha256": "d32eddba93e7e4f08684b04243b15df2058eb7abdd26f914847e2b39d2bae202",
+          "return_code": 1,
+          "elapsed_seconds": 3.9133028984069824
+        },
+        "slangpy-2": {
+          "path": "build/nvvm-pointer-entry/slangpy-2.json",
+          "sha256": "ad36ea78d94804dae015db837d47924c3f06648a693eaca78a84ae8d1b5172dc",
+          "return_code": 1,
+          "elapsed_seconds": 4.044771671295166
+        },
+        "slangpy-family-1": {
+          "path": "build/nvvm-pointer-entry/slangpy-family-1.json",
+          "sha256": "bcac82201ae334c51377617d46a15246476abb48807faf0053fcce0d322cca1b",
+          "return_code": 1,
+          "elapsed_seconds": 39.16591787338257
+        },
+        "slangpy-family-2": {
+          "path": "build/nvvm-pointer-entry/slangpy-family-2.json",
+          "sha256": "e0d80ca449a2ce8fd2c5d90c2e960f3dccf166f04005ba6e6ff98719d503ab95",
+          "return_code": 1,
+          "elapsed_seconds": 43.12981200218201
+        },
+        "slangpy-final": {
+          "path": "build/nvvm-pointer-entry/slangpy-final.json",
+          "sha256": "9beed6fdb5c73c245504cbe84f7a8cf225ea17bc964e3e88bdfeb60ceae8ad2a",
+          "return_code": 1,
+          "elapsed_seconds": 61.187896966934204
+        },
+        "slangpy-representation-1": {
+          "path": "build/nvvm-pointer-entry/slangpy-representation-1.json",
+          "sha256": "207d9606674b25d0f8ebb17f52e6c3324f9c6aa9cf0203f796f01245b9d0cff8",
+          "return_code": 1,
+          "elapsed_seconds": 4.0901477336883545
+        },
+        "slangpy-representation-2": {
+          "path": "build/nvvm-pointer-entry/slangpy-representation-2.json",
+          "sha256": "4766d69b699a1534133d1511da1af403340ad3d63196d838600070c98a74e370",
+          "return_code": 0,
+          "elapsed_seconds": 4.083808422088623
+        },
+        "slangpy-store-debug": {
+          "path": "build/nvvm-pointer-entry/slangpy-store-debug.json",
+          "sha256": "3bb3df2569cce4024e290ade65db81d2312d90798913747c008308600e637525",
+          "return_code": 1,
+          "elapsed_seconds": 4.074956655502319
+        },
+        "static-address-1": {
+          "path": "build/nvvm-pointer-entry/static-address-1.json",
+          "sha256": "96d984229359d7a12aa1089808e783a5e9b4a0ea8ce61455f77b413a6b2b3272",
+          "return_code": 1,
+          "elapsed_seconds": 0.2620365619659424
+        },
+        "static-address-2": {
+          "path": "build/nvvm-pointer-entry/static-address-2.json",
+          "sha256": "3dde5eb82f764f5322679405cb7ad8836efe38963eddc039e4dcda25813f4935",
+          "return_code": 0,
+          "elapsed_seconds": 0.29155564308166504
+        },
+        "static-address-3": {
+          "path": "build/nvvm-pointer-entry/static-address-3.json",
+          "sha256": "5b182fbbe9122c273b21980744c8b55392138228eac3850bdadab7c06cfd3526",
+          "return_code": 0,
+          "elapsed_seconds": 0.29491734504699707
+        },
+        "static-build-1": {
+          "path": "build/nvvm-pointer-entry/static-build-1.json",
+          "sha256": "4be683f601b2c9016b2d4b832e384c04f08bdaf5337433df1e9684458d68f8ea",
+          "return_code": 1,
+          "elapsed_seconds": 19.25998616218567
+        },
+        "static-build-2": {
+          "path": "build/nvvm-pointer-entry/static-build-2.json",
+          "sha256": "3445cd27ee814a2d4599f6a38a25f9c37d6fd0bb21bd965d635097aa83c2c687",
+          "return_code": 0,
+          "elapsed_seconds": 19.909645080566406
+        },
+        "static-build-3": {
+          "path": "build/nvvm-pointer-entry/static-build-3.json",
+          "sha256": "f7445b7e5a1372b3ea125e7c7d1e9fcaf0be76bcf65693683dd59dc0c56f0aeb",
+          "return_code": 0,
+          "elapsed_seconds": 36.581143379211426
+        },
+        "static-build-4": {
+          "path": "build/nvvm-pointer-entry/static-build-4.json",
+          "sha256": "5a41ad06b0cf761d2df26450c8ccd528f042c2b48e0506d5f2aa363c12ab76d0",
+          "return_code": 0,
+          "elapsed_seconds": 36.04743933677673
+        },
+        "static-build-5": {
+          "path": "build/nvvm-pointer-entry/static-build-5.json",
+          "sha256": "a6019f9a241fef8a8ca515afa42336c1c576cd8c11c4f85b9bba23e03d89c3de",
+          "return_code": 0,
+          "elapsed_seconds": 33.9088990688324
+        },
+        "static-focused-1": {
+          "path": "build/nvvm-pointer-entry/static-focused-1.json",
+          "sha256": "053214b5791ba54b7fda3b82c3d33d10c168e9a5b5ede98914d45c59715ea540",
+          "return_code": 0,
+          "elapsed_seconds": 7.178359270095825
+        },
+        "static-nvvm-1": {
+          "path": "build/nvvm-pointer-entry/static-nvvm-1.json",
+          "sha256": "0d3ecb91c65fd41b3b8ea255463a353855fbdb1705ed84901f3fbca20fa7bd62",
+          "return_code": 1,
+          "elapsed_seconds": 8.440842151641846
+        },
+        "static-nvvm-2": {
+          "path": "build/nvvm-pointer-entry/static-nvvm-2.json",
+          "sha256": "57e6f1d3c7bc25934ed3b2cdf3e10395af5eed4462d4e6377cf52c962712a6b1",
+          "return_code": 0,
+          "elapsed_seconds": 8.648985385894775
+        },
+        "static-runtime-1": {
+          "path": "build/nvvm-pointer-entry/static-runtime-1.json",
+          "sha256": "6f6c8e658a4f14c606043ad146710baa2e4b4ee300a64dd5234f3c055f2b4427",
+          "return_code": 0,
+          "elapsed_seconds": 3.340911865234375
+        }
+      },
+      "outcomes": {
+        "rhi_nvvm": {
+          "passed": 1,
+          "assertions": 155,
+          "optimizations": ["O0", "O3"]
+        },
+        "rhi_nvrtc": {
+          "passed": 1,
+          "assertions": 155,
+          "optimizations": ["O0", "O3"]
+        },
+        "static_nvvm": {
+          "passed": 32
+        },
+        "static_address": {
+          "passed": 1
+        },
+        "runtime_and_spirv": {
+          "passed": 5
+        },
+        "slangpy": {
+          "selected": 452,
+          "passed": 263,
+          "failed": 189,
+          "resolved": 216,
+          "previous_passes_preserved": 47
+        },
+        "smoke": {
+          "passed": 16,
+          "regressions": 0,
+          "selection": {
+            "path": "build/nvvm-pointer-entry/smoke-final/selection.json",
+            "sha256": "a1bdb5ba747c307c21fc43e3e25cf09af91424ed16510f216d36caac4da2f6b1"
+          }
+        },
+        "runtime_cells": {
+          "tests/cuda/nvvm-static-context-array-addressing.slang (cuda)": "passed",
+          "tests/cuda/nvvm-static-context-array-addressing.slang.1 (cuda)": "passed",
+          "tests/cuda/nvvm-static-context-array-addressing.slang.2 (cuda)": "passed"
+        }
+      },
+      "contracts": [
+        "NVVMCUDAValueLayout extends the existing numeric plan; reflected offsets and semantic lanes own decode. Pointer leaves are AS1 in launch storage and AS0 in helper SSA.",
+        "Whole pointer-bearing parameter-group loads use the same checked CUDA byte decoder, with Bool/Half operations required before provider mutation.",
+        "HelperValue and physical Half ABI caches are separate; only Half leaves change bits representation at call boundaries.",
+        "Derived local references retain checked root and access, exact pointee identity and readonly formals. Explicit ScalarLayout types do not grant provenance.",
+        "GetOffsetPtr admits finite helper pointees only with independent CUDA/LLVM layout agreement. Compact raw storage needs a separate producer legalization.",
+        "Global context replacement propagates address space through immediate children, correct intermediates and phi/backedges, preserving opcode/access/layout."
+      ],
+      "failure_history": [
+        {
+          "attempts": ["static-build-1"],
+          "status": "resolved-test-only",
+          "detail": "Two old static field names missed the numeric-plan rename; fixed together."
+        },
+        {
+          "attempts": ["static-address-1"],
+          "status": "resolved-test-only",
+          "detail": "IRBuilder eagerly propagated parent layout while constructing the intended stale graph. Fixture now explicitly models post-layout-legalization child types before testing later root propagation."
+        },
+        {
+          "attempts": ["rhi-nvvm-1"],
+          "status": "open-separate",
+          "detail": "Whole local Payload with compact float3/Half3 reaches independent local helper-layout proof. Fixture now isolates entry transport from raw compact storage and retains full mixed launch fields."
+        },
+        {
+          "attempts": ["rhi-nvvm-2", "rhi-nvvm-3"],
+          "status": "resolved",
+          "detail": "Identity-layout raw offsets and derived local helper out/inout arguments were missing; parent-plan/root/access proof now owns forwarding."
+        },
+        {
+          "attempts": ["slangpy-family-2", "slangpy-representation-1"],
+          "status": "resolved",
+          "detail": "Matrix pointer Value role overlapped AS1 physical storage; executable helper pointers now own Value role. Packed tensor-array load retained AS1 leaves from cbuffer into AS0 out-parameter; checked decoder repairs storage-to-value boundary."
+        },
+        {
+          "attempts": ["packed-ir-1", "packed-ir-2", "packed-ir-3"],
+          "status": "non-reproducing-cli-controls",
+          "detail": "CLI first missed CUDA define, then did not reconstruct SlangPy cbuffer binding. Real application provider recording proved exact AS1/AS0 store mismatch; instrumentation removed."
+        },
+        {
+          "attempts": ["static-nvvm-1"],
+          "status": "resolved-test-only",
+          "detail": "Old transform-row static expectation omitted existing Callable saved-handle support. Updated expected stage outcome; production stage policy unchanged."
+        },
+        {
+          "attempts": ["slangpy-final"],
+          "status": "open-separate",
+          "detail": "189selected failures remain, principally compact pointer memory and surface load/store. Original failure transitions are preserved in the application manifest."
+        }
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Accepted after production and evidence review: readonly gate fixed; stronger out/inout and cbuffer Bool/Half tests pass on both routes. All prior 90 feature objects, 12 SlangPy runs and 43 RHI runs/283 old registration rows retained. Final hashes, 452-node transitions and 284-registration inventory reconcile."
+      },
+      "limits": [
+        "No full application or working corpus rerun. Working cadence is due by the next implementation batch.",
+        "Synthetic ABI inputs qualify listed shapes and guards, not all arbitrary pointee layouts.",
+        "Remaining raw compact-memory family must preserve local/global aliases; it is not marked complete."
+      ],
+      "rhi_commit": "c7d26fe9477ecd297ea348835e69f9b792c2e8d2"
     }
   }
 }

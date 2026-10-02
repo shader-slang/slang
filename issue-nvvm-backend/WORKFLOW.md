@@ -12,7 +12,11 @@ SlangPy-derived priorities. Fixed numeric aggregate entry ABI and byval entry-re
 are accepted together, as are local resource/helper transport and the shared RHI cached-PTX
 consumer repair. Continue with pointer-bearing entry aggregates and checked address/layout families,
 normalized surfaces and intrinsic TensorView. The legacy HitObject decision remains parked.
-Use affected application selections plus smoke between deliberately chosen full checkpoints.
+Pointer-bearing launch/helper transport and static-context address propagation are now qualified.
+Continue with the exposed compact raw pointer storage family before normalized surfaces and intrinsic
+TensorView; preserve local/global aliasing through canonical storage legalization. Working corpus is
+due by the next implementation batch. Use affected application selections plus smoke between
+deliberately chosen full checkpoints.
 
 **Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout
 against local Slang and RHI, verify explicit NVVM execution, run its complete CUDA-selected Python

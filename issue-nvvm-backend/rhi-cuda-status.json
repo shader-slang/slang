@@ -1211,6 +1211,36 @@
         "sha256": "3ab6745ce632accae7b0301e0f48eb2f7b76d7f4e8716afa7f15a23f7627b5ce"
       },
       "scope": "Focused exact registration; full baseline unchanged."
+    },
+    "pointer-entry-nvvm": {
+      "gate": {
+        "path": "build/nvvm-pointer-entry/rhi-nvvm-reviewed.json",
+        "sha256": "638b571ad058f4fec226fb19f79ed36ea4e3c32cbb2e879c0f606079c5f992f9"
+      },
+      "log": {
+        "path": "build/nvvm-pointer-entry/rhi-nvvm-reviewed.log",
+        "sha256": "8a3c50b7a9be0a8ad1f6fb1be9963e7c25a1337c045e5ae9f8a4bae207f3c102"
+      },
+      "identity": {
+        "path": "build/nvvm-pointer-entry/identity.json",
+        "sha256": "2658bbf4b5cde81b4aea0f028c858a284b3ea3dbf7a9312c20873f7634390e3b"
+      },
+      "scope": "Focused pointer-entry ABI fixture O0/O3;155assertions. No full refresh."
+    },
+    "pointer-entry-nvrtc": {
+      "gate": {
+        "path": "build/nvvm-pointer-entry/rhi-nvrtc-reviewed.json",
+        "sha256": "e32f6763864aaab0476c79c96d85db5bc9bbe933da5685e40176401e78b9d940"
+      },
+      "log": {
+        "path": "build/nvvm-pointer-entry/rhi-nvrtc-reviewed.log",
+        "sha256": "685415b78888aa2565b452e7ef1b092f1dcbc7896eac1b5d1bd0f82c6d62789d"
+      },
+      "identity": {
+        "path": "build/nvvm-pointer-entry/identity.json",
+        "sha256": "2658bbf4b5cde81b4aea0f028c858a284b3ea3dbf7a9312c20873f7634390e3b"
+      },
+      "scope": "Focused pointer-entry ABI fixture O0/O3;155assertions. No full refresh."
     }
   },
   "reconciliation": {
@@ -20692,20 +20722,46 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "pointer-aggregate-entry-abi.cuda#occurrence-1",
+      "name": "pointer-aggregate-entry-abi.cuda",
+      "occurrence": 1,
+      "source_registrations": [
+        {
+          "source": "../slang-rhi/tests/test-resource-parameter-abi.cpp"
+        }
+      ],
+      "current_status": {
+        "nvvm": "passed",
+        "nvrtc": "passed"
+      },
+      "history": [
+        {
+          "run": "pointer-entry-nvvm",
+          "compiler_selection": "nvvm",
+          "status": "passed"
+        },
+        {
+          "run": "pointer-entry-nvrtc",
+          "compiler_selection": "nvrtc",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "current_known_outcomes": {
-    "registration_count": 283,
-    "unique_name_count": 282,
-    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite. Numeric-entry and exact-span PTX cache fixtures add two passing registrations per route with their own focused identities; no full rerun.",
+    "registration_count": 284,
+    "unique_name_count": 283,
+    "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity. Subsequent version-targeting qualification adds one passing regression and refreshes11 NVVM/2 NVRTC SDK9 cases. Version8 focused results are separate; not another full suite. Numeric-entry and exact-span PTX cache fixtures add two passing registrations per route with their own focused identities; no full rerun. Pointer-entry fixture adds one passing registration per route with O0/O3 focused evidence; no full rerun.",
     "by_compiler": {
       "nvvm": {
-        "passed": 272,
+        "passed": 273,
         "failed": 1,
         "skipped": 10
       },
       "nvrtc": {
-        "passed": 268,
+        "passed": 269,
         "skipped": 10,
         "failed": 5
       }
@@ -20731,17 +20787,17 @@
   "initial_full_checkpoint_fields": "scope, identity, inventory, reconciliation and original nvvm-full/nvrtc-full runs retain the initial269-registration identity. Current focused histories and current_known_outcomes are separately scoped.",
   "current_inventory": {
     "gate": {
-      "path": "build/nvvm-cached-ptx/inventory.json",
-      "sha256": "633c9804fe2a8c935f65ea7bcb7c3f96e5e8862bc5fc39a15eb75356a7acd1d1"
+      "path": "build/nvvm-pointer-entry/inventory.json",
+      "sha256": "0d0d212d8b215a990e57765c54b96c0a75c4723e64a249102c6679b400b1fdbd"
     },
     "listing": {
-      "path": "build/nvvm-cached-ptx/inventory.log",
-      "sha256": "bdc8e9597467210a97d0f9f2837240df037ec3ce91ff0cab9aabce3c46ad0f11"
+      "path": "build/nvvm-pointer-entry/inventory.log",
+      "sha256": "0a4811b94f91c96547fd15de3c22f29f06a3a8e0bdc785d111dcef929ed1be48"
     },
-    "registration_count": 283,
-    "unique_name_count": 282,
+    "registration_count": 284,
+    "unique_name_count": 283,
     "manifest_multiset_matches": true,
-    "scope": "Adds prior numeric-entry fixture and current exact-span PTX cache fixture; original duplicate retained. Mixed-age focused qualification."
+    "scope": "Adds pointer aggregate ABI fixture; prior duplicate and histories retained. Mixed-age focused qualification."
   },
   "current_reconciliation": {
     "raw": {

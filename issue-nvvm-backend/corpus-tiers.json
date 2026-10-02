@@ -286,6 +286,54 @@
         "tests/cuda/nvvm-global-constant-expressions.slang"
       ],
       "rationale": "Exact authored ordinal1, matching shaderobj SM80 options and independent30-word oracle. Other adapted modes remain exploratory; no NVRTC runtime qualification."
+    },
+    {
+      "id": "cuda/nvvm-static-context-array-addressing.slang#cuda-1",
+      "mode": "nvrtc-o3",
+      "feature": "nvvm-pointer-entry-values",
+      "outcome_path": [
+        "outcomes",
+        "runtime_cells",
+        "tests/cuda/nvvm-static-context-array-addressing.slang (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-static-context-array-addressing.slang"
+      ],
+      "rationale": "Same source and independent eight-word oracle; mutable nested static arrays retain per-thread address provenance on all authored modes."
+    },
+    {
+      "id": "cuda/nvvm-static-context-array-addressing.slang#cuda-1",
+      "mode": "nvvm-o0",
+      "feature": "nvvm-pointer-entry-values",
+      "outcome_path": [
+        "outcomes",
+        "runtime_cells",
+        "tests/cuda/nvvm-static-context-array-addressing.slang.1 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-static-context-array-addressing.slang"
+      ],
+      "rationale": "Same source and independent eight-word oracle; mutable nested static arrays retain per-thread address provenance on all authored modes."
+    },
+    {
+      "id": "cuda/nvvm-static-context-array-addressing.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "feature": "nvvm-pointer-entry-values",
+      "outcome_path": [
+        "outcomes",
+        "runtime_cells",
+        "tests/cuda/nvvm-static-context-array-addressing.slang.2 (cuda)"
+      ],
+      "source_hash_path": [
+        "identity",
+        "source_sha256",
+        "tests/cuda/nvvm-static-context-array-addressing.slang"
+      ],
+      "rationale": "Same source and independent eight-word oracle; mutable nested static arrays retain per-thread address provenance on all authored modes."
     }
   ],
   "smoke": [

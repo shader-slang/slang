@@ -31,6 +31,22 @@ Current broad qualification is on native Ubuntu 24.04, L4 SM89, driver 580.126.0
 CUDA 12.9.2/NVRTC 12.9.86 and LLVM 14. Other historical toolkits/devices retain their own provenance.
 The installed compiler can be older than Git HEAD; source revision alone does not identify loaded code.
 
+## Pointer-bearing entry values and checked local addresses
+
+Finite helper records and fixed arrays now decode canonical UserPointer leaves from CUDA launch
+storage into generic executable pointers. Nested numeric/Half fields retain CUDA packing and the
+integer Half call transport. Pointer-bearing parameter-group aggregate loads use the same checked
+decoder. The sibling `pointer-aggregate-entry-abi` fixture exercises nested arrays, pointer-to-record,
+pointer-to-array, pointer-to-pointer, value/out/inout/readonly forwarding, Half3/Bool/float3 launch
+fields, cbuffer loads and guarded writes at O0/O3 on both routes (155 assertions per route).
+
+Ordinary typed offsets require matching CUDA/LLVM pointee layout. Compact raw memory remains a
+separate missing representation family; float3/half3 and related nested layouts are not admitted by
+this change. [Static context addressing](../../tests/cuda/nvvm-static-context-array-addressing.slang)
+qualifies deep field/index chains and per-thread isolation on three routes. Static tests cover
+layout/cache ownership, denied launch roles and readonly forwarding; existing SPIR-V address-space
+specialization controls remain passing.
+
 ## Local resource helper transport
 
 Existing buffer/texture/surface/sampler leaves, records and fixed arrays support value parameters

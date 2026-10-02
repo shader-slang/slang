@@ -260,10 +260,10 @@ IRPtrTypeBase* _getNVVMHitObjectPointer(const NVVMAddressPlan& addresses, IRInst
     return nullptr;
 }
 
-// Returns a local resource reference only from a variable/helper root or its checked child.
+// Returns a local value reference only from a variable/helper root or its checked child.
 // For `initialize(out wrapper.textures[i])`, the explicit child pointer spelling is not sufficient:
 // the address plan must retain the local wrapper root and its access restriction.
-IRPtrTypeBase* _getNVVMLocalResourceReference(
+IRPtrTypeBase* _getNVVMLocalValueReference(
     const NVVMAddressPlan& addresses,
     IRInst* value,
     bool* outIsReadOnly = nullptr)
@@ -277,6 +277,12 @@ IRPtrTypeBase* _getNVVMLocalResourceReference(
         return nullptr;
     auto root = addresses.getRoot(value);
     auto rootPointer = asNVVMSupportedLocalResourceValuePointerType(root->getDataType());
+    if (!rootPointer)
+        rootPointer = asNVVMSupportedLocalHelperValuePointerType(root->getDataType());
+    if (!rootPointer)
+        rootPointer = asNVVMSupportedLocalCopyableValuePointerType(root->getDataType());
+    if (!rootPointer)
+        rootPointer = asNVVMSupportedHelperReferencePointerType(root->getDataType());
     auto block = as<IRBlock>(root->getParent());
     auto function = block ? as<IRFunc>(block->getParent()) : nullptr;
     if (!rootPointer || !function ||
@@ -570,7 +576,7 @@ bool _getNVVMStructFieldAddress(
     }
 
     if (outAddress.isMutable || outAddress.isLocalSubstandardRecordStorage ||
-        _getNVVMLocalResourceReference(addresses, fieldAddress->getBase()))
+        _getNVVMLocalValueReference(addresses, fieldAddress->getBase()))
     {
         return _getNVVMExecutableValueAlignment(fieldType) != 0 ||
                (outAddress.isLocalSubstandardRecordStorage && asNVVMBFloat16VectorType(fieldType));
@@ -1123,7 +1129,7 @@ bool _getNVVMSequentialElementPointer(
                         ? asNVVMSupportedHelperArrayType(field->selection.field->getFieldType())
                         : asNVVMSupportedAggregateStorageArrayType(
                               field->selection.field->getFieldType());
-                if (!arrayType && _getNVVMLocalResourceReference(addresses, base))
+                if (!arrayType && _getNVVMLocalValueReference(addresses, base))
                     arrayType =
                         asNVVMSupportedResourceArrayType(field->selection.field->getFieldType());
                 baseType = as<IRPtrTypeBase>(base->getDataType());
@@ -4558,6 +4564,30 @@ void _requireNVVMHalfHelperABIOperations(
     _requireValueOperation(requirements, decode.getDesc(), "canonical Half helper ABI decoding");
 }
 
+// Registers all scalar decode operations before a CUDA memory carrier is read. The same checked
+// layout serves launch aggregates and pointer-bearing values copied from parameter groups.
+void _requireNVVMCUDAValueDecodeOperations(
+    NVVMValueOperationRequirements& requirements,
+    const NVVMCUDAValueLayout& layout)
+{
+    List<const NVVMCUDAValueLayout*> pending;
+    pending.add(&layout);
+    while (pending.getCount())
+    {
+        auto node = pending.getLast();
+        pending.removeLast();
+        if (node->isBoolean)
+            _requireValueOperation(
+                requirements,
+                kNVVMStructuredBoolLoadOperation,
+                "numeric entry Boolean decode");
+        if (node->isHalf)
+            _requireNVVMHalfHelperABIOperations(requirements, node->scalarType);
+        for (const auto& child : node->children)
+            pending.add(&child);
+    }
+}
+
 
 void _requireNVVMUInt64WordConstructionOperations(
     NVVMValueOperationRequirements& requirements,
@@ -5335,7 +5365,7 @@ SlangResult _validatePointerValue(
                                    : nullptr;
     auto localRecordArrayPtrType = _getNVVMLocalSubstandardRecordArrayPointer(value);
     auto localStructPtrType =
-        _getNVVMLocalResourceReference(requirements.emissionPlan.addresses, value);
+        _getNVVMLocalValueReference(requirements.emissionPlan.addresses, value);
     auto localHelperPtrType =
         value ? asNVVMSupportedLocalHelperValuePointerType(value->getDataType()) : nullptr;
     // A local `var T` and module-scope groupshared storage can both expose `Ptr<T>`. Only a local
@@ -5424,7 +5454,7 @@ SlangResult _validatePointerValue(
             toSlice("read-only structured-buffer element access"));
     }
     bool isReadOnlyResourceUse = false;
-    if (_getNVVMLocalResourceReference(requirements.emissionPlan.addresses, value))
+    if (_getNVVMLocalValueReference(requirements.emissionPlan.addresses, value))
     {
         auto childField = requirements.emissionPlan.addresses.findFieldAddress(consumer);
         isReadOnlyResourceUse = hasSequentialChild || (childField && childField->base == value);
@@ -5438,6 +5468,9 @@ SlangResult _validatePointerValue(
                     {
                         auto parameter =
                             asNVVMSupportedLocalResourceValuePointerType(callee->getParamType(i));
+                        if (!parameter)
+                            parameter =
+                                asNVVMSupportedHelperReferencePointerType(callee->getParamType(i));
                         if (!parameter || parameter->getAccessQualifier() != AccessQualifier::Read)
                             isReadOnlyResourceUse = false;
                     }
@@ -5670,9 +5703,15 @@ bool _isSupportedNVVMHelperArgument(
             argumentPointer = asNVVMSupportedRWStructuredBufferElementPointerType(argumentType);
             argumentValueType = argumentPointer ? argumentPointer->getValueType() : nullptr;
         }
+        bool isReadOnlyLocal = false;
+        if (!argumentPointer)
+        {
+            argumentPointer = _getNVVMLocalValueReference(addresses, argument, &isReadOnlyLocal);
+            argumentValueType = argumentPointer ? argumentPointer->getValueType() : nullptr;
+        }
         const bool hasRequiredAccess =
             parameterReference->getAccessQualifier() == AccessQualifier::Read ||
-            (argumentPointer &&
+            (argumentPointer && !isReadOnlyLocal &&
              argumentPointer->getAccessQualifier() == AccessQualifier::ReadWrite);
         if (argumentPointer && hasRequiredAccess &&
             isTypeEqual(argumentValueType, parameterReferenceValueType))
@@ -5706,7 +5745,7 @@ bool _isSupportedNVVMHelperArgument(
 
     IRType* parameterValueType = nullptr;
     bool isReadOnlyResource = false;
-    auto argumentPointer = _getNVVMLocalResourceReference(addresses, argument, &isReadOnlyResource);
+    auto argumentPointer = _getNVVMLocalValueReference(addresses, argument, &isReadOnlyResource);
     IRType* argumentValueType = argumentPointer ? argumentPointer->getValueType() : nullptr;
     auto parameterPointer =
         asNVVMSupportedLocalResourceValuePointerType(parameterType, &parameterValueType);
@@ -5747,14 +5786,22 @@ bool _isSupportedNVVMHelperArgument(
     IRType* parameterHelperType = nullptr;
     auto argumentHelperPointer =
         asNVVMSupportedLocalHelperValuePointerType(argumentType, &argumentHelperType);
+    bool isReadOnlyHelper = false;
+    if (!argumentHelperPointer)
+    {
+        argumentHelperPointer = _getNVVMLocalValueReference(addresses, argument, &isReadOnlyHelper);
+        argumentHelperType =
+            argumentHelperPointer ? argumentHelperPointer->getValueType() : nullptr;
+    }
     auto parameterHelperPointer =
         asNVVMSupportedLocalHelperValuePointerType(parameterType, &parameterHelperType);
     const bool isMutableHelperParameter =
         parameterHelperPointer && (parameterHelperPointer->getOp() == kIROp_OutParamType ||
                                    parameterHelperPointer->getOp() == kIROp_BorrowInOutParamType);
-    // Pointer-bearing helper aggregates use the same forwarding rule. Their local classifier
-    // also requires one operand and generic storage, independently of any pointer-valued fields.
-    if (argumentHelperPointer && isMutableHelperParameter &&
+    // Pointer-bearing helper aggregates use the same forwarding rule. A derived child retains
+    // its checked local root and access; its explicit pointer spelling alone is insufficient.
+    if (argumentHelperPointer && isMutableHelperParameter && !isReadOnlyHelper &&
+        argumentHelperPointer->getAccessQualifier() == AccessQualifier::ReadWrite &&
         isTypeEqual(argumentHelperType, parameterHelperType))
     {
         return true;
@@ -6273,6 +6320,7 @@ struct NVVMMemoryAddress
     IRVectorType* localBFloat16Vector = nullptr;
     IRVectorType* compactVector = nullptr;
     bool isConventionalGlobal = false;
+    bool isParameterGroupStorage = false;
 };
 
 NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* pointer)
@@ -6303,6 +6351,7 @@ NVVMMemoryAddress _getNVVMMemoryAddress(const NVVMEmissionPlan& plan, IRInst* po
                             element->isParameterGroupStorage && element->isReadOnly &&
                             asNVVMSupportedAggregateStorageArrayType(element->aggregateType);
     }
+    address.isParameterGroupStorage = hasCompactStorage;
     if (hasCompactStorage)
     {
         auto pointerType = cast<IRPtrTypeBase>(pointer->getDataType());
@@ -6585,6 +6634,21 @@ SlangResult _planNVVMLoad(
                                       _getNVVMConventionalGlobalParams(groupField->base, globals);
     }
     const auto address = _getNVVMMemoryAddress(requirements.emissionPlan, load->getPtr());
+    // Consider a ConstantBuffer record containing Tensor<float> fields. Its device pointer
+    // leaves are AS1 in memory, but a whole-record load becomes an ordinary AS0 helper value.
+    // Decode from the checked CUDA offsets rather than leaking storage types into SSA.
+    if (address.isParameterGroupStorage && isNVVMSupportedHelperValueType(load->getDataType()) &&
+        !isNVVMSupportedCopyableValueType(load->getDataType()) &&
+        (as<IRStructType>(load->getDataType()) || as<IRArrayType>(load->getDataType())))
+    {
+        if (!getNVVMCUDAValueLayout(codeGenContext, load->getDataType(), outLoad.cudaValueLayout))
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("parameter-group value layout"));
+        _requireNVVMCUDAValueDecodeOperations(
+            requirements.valueOperations,
+            outLoad.cudaValueLayout);
+        outLoad.alignment = outLoad.cudaValueLayout.alignment;
+        return SLANG_OK;
+    }
     IRType* storageType = address.structuredStorageType;
     auto localBFloat16Vector = address.localBFloat16Vector;
     const uint32_t physicalAlignment =
@@ -6776,30 +6840,15 @@ SlangResult _validateNVVMFunction(
                 usesKernelParameters ? toSlice("entry-point parameter")
                                      : toSlice("helper function parameter"));
         }
-        if (usesKernelParameters && isNVVMSupportedCopyableValueType(param->getDataType()))
+        if (usesKernelParameters && (isNVVMSupportedCopyableValueType(param->getDataType()) ||
+                                     asNVVMSupportedHelperStructType(param->getDataType()) ||
+                                     asNVVMSupportedHelperArrayType(param->getDataType())))
         {
-            NVVMEntryNumericLayout layout;
-            if (!getNVVMEntryNumericLayout(codeGenContext, param->getDataType(), layout))
+            NVVMCUDAValueLayout layout;
+            if (!getNVVMCUDAValueLayout(codeGenContext, param->getDataType(), layout))
                 return _diagnoseUnsupportedIR(codeGenContext, toSlice("numeric entry layout"));
-            requirements.emissionPlan.entryNumericParameters[param] = layout;
-            List<const NVVMEntryNumericLayout*> pending;
-            pending.add(&layout);
-            while (pending.getCount())
-            {
-                auto node = pending.getLast();
-                pending.removeLast();
-                if (node->isBoolean)
-                    _requireValueOperation(
-                        requirements.valueOperations,
-                        kNVVMStructuredBoolLoadOperation,
-                        "numeric entry Boolean decode");
-                if (node->isHalf)
-                    _requireNVVMHalfHelperABIOperations(
-                        requirements.valueOperations,
-                        node->scalarType);
-                for (const auto& child : node->children)
-                    pending.add(&child);
-            }
+            requirements.emissionPlan.entryValueParameters[param] = layout;
+            _requireNVVMCUDAValueDecodeOperations(requirements.valueOperations, layout);
         }
         NVVMRawBufferType rawBufferType;
         if (usesKernelParameters &&
@@ -6811,7 +6860,7 @@ SlangResult _validateNVVMFunction(
                 toSlice("structured-buffer element layout"));
         }
         if (usesKernelParameters && asNVVMSupportedResourceStructType(param->getDataType()) &&
-            !requirements.emissionPlan.entryNumericParameters.containsKey(param))
+            !requirements.emissionPlan.entryValueParameters.containsKey(param))
         {
             uint32_t alignment = 0;
             if (!_getNVVMByValueParameterAlignment(codeGenContext, param->getDataType(), alignment))
@@ -7377,6 +7426,7 @@ SlangResult _validateNVVMFunction(
             case kIROp_GetOffsetPtr:
                 if (inst->getOperandCount() != 2 ||
                     (!asNVVMSupportedDeviceNumericPointerType(inst->getDataType()) &&
+                     !asNVVMSupportedDeviceHelperValuePointerType(inst->getDataType()) &&
                      !asNVVMSupportedLayoutTransportPointerType(inst->getDataType()) &&
                      !asNVVMSupportedSharedHelperPointerType(inst->getDataType()) &&
                      !asNVVMSupportedSharedElementPointerType(inst->getDataType())))
@@ -8115,7 +8165,7 @@ SlangResult _validateNVVMFunction(
                         }
                         else if (
                             _getNVVMLocalSubstandardRecordArrayPointer(argument) ||
-                            _getNVVMLocalResourceReference(
+                            _getNVVMLocalValueReference(
                                 requirements.emissionPlan.addresses,
                                 argument) ||
                             asNVVMSupportedLocalCopyableValuePointerType(argument->getDataType()) ||
@@ -8409,6 +8459,15 @@ SlangResult _validateNVVMFunction(
                         basePointer
                             ? asNVVMSupportedDeviceNumericPointerType(basePointer->getDataType())
                             : nullptr;
+                    if (!basePointerType && basePointer)
+                        basePointerType =
+                            asNVVMSupportedDeviceHelperValuePointerType(basePointer->getDataType());
+                    if (basePointerType && !_hasNVVMCompatibleHelperValueLayout(
+                                               codeGenContext,
+                                               basePointerType->getValueType()))
+                        return _diagnoseUnsupportedIR(
+                            codeGenContext,
+                            toSlice("user pointer element layout"));
                     if (!basePointerType && basePointer)
                         basePointerType =
                             asNVVMSupportedSharedHelperPointerType(basePointer->getDataType());
@@ -9863,15 +9922,29 @@ SlangResult _emitNVVMLayoutByteAddress(
 
 // Decodes only logical lanes from the checked CUDA entry carrier. Padding (notably Half3's
 // fourth storage lane) never becomes a semantic value, and helpers see canonical SSA values.
-SlangResult _emitNVVMEntryNumericDecode(
+SlangResult _emitNVVMCUDAValueDecode(
     CodeGenContext* context,
     const NVVMIRBuilder& builder,
     SlangNVVMModuleHandle module,
     NVVMTypeLoweringContext& types,
-    const NVVMEntryNumericLayout& layout,
+    const NVVMCUDAValueLayout& layout,
     SlangNVVMValueHandle parameter,
     SlangNVVMValueHandle& outValue)
 {
+    if (layout.isUserPointer)
+    {
+        SlangNVVMTypeHandle executableType = nullptr;
+        SLANG_RETURN_ON_FAIL(types.lowerType(layout.type, NVVMTypeUse::Value, executableType));
+        return _requireBuilderOperation(
+            context,
+            "entry UserPointer decode",
+            builder.emitPointerAddressSpaceCast(module, executableType, parameter, outValue));
+    }
+    if (layout.isDescriptor)
+    {
+        outValue = parameter;
+        return SLANG_OK;
+    }
     if (layout.isAggregate())
     {
         List<SlangNVVMValueHandle> elements;
@@ -9884,7 +9957,7 @@ SlangResult _emitNVVMEntryNumericDecode(
                 layout.elementCount ? i * layout.elementStride : layout.fieldOffsets[i];
             SlangNVVMTypeHandle childParameterType = nullptr, childStorageType = nullptr;
             SLANG_RETURN_ON_FAIL(
-                types.lowerEntryNumericType(child, childParameterType, childStorageType));
+                types.lowerCUDAValueType(child, childParameterType, childStorageType));
             SlangNVVMValueHandle address = nullptr;
             SLANG_RETURN_ON_FAIL(_emitNVVMLayoutByteAddress(
                 context,
@@ -9907,7 +9980,7 @@ SlangResult _emitNVVMEntryNumericDecode(
                         input)));
             SlangNVVMValueHandle value = nullptr;
             SLANG_RETURN_ON_FAIL(
-                _emitNVVMEntryNumericDecode(context, builder, module, types, child, input, value));
+                _emitNVVMCUDAValueDecode(context, builder, module, types, child, input, value));
             elements.add(value);
         }
         SlangNVVMTypeHandle valueType = nullptr;
@@ -11557,11 +11630,11 @@ SlangResult emitNVVMIRFromLinkedIR(
         for (auto param : function->getParams())
         {
             SlangNVVMTypeHandle parameterType = nullptr;
-            if (auto numeric = requirements.emissionPlan.entryNumericParameters.tryGetValue(param))
+            if (auto numeric = requirements.emissionPlan.entryValueParameters.tryGetValue(param))
             {
                 SlangNVVMTypeHandle storageType = nullptr;
                 SLANG_RETURN_ON_FAIL(
-                    typeContext.lowerEntryNumericType(*numeric, parameterType, storageType));
+                    typeContext.lowerCUDAValueType(*numeric, parameterType, storageType));
             }
             else
             {
@@ -11609,13 +11682,13 @@ SlangResult emitNVVMIRFromLinkedIR(
             for (auto parameter : function->getParams())
             {
                 auto numeric =
-                    requirements.emissionPlan.entryNumericParameters.tryGetValue(parameter);
+                    requirements.emissionPlan.entryValueParameters.tryGetValue(parameter);
                 if (numeric && numeric->isByValue())
                 {
                     SlangNVVMTypeHandle parameterType = nullptr;
                     SlangNVVMTypeHandle storageType = nullptr;
                     SLANG_RETURN_ON_FAIL(
-                        typeContext.lowerEntryNumericType(*numeric, parameterType, storageType));
+                        typeContext.lowerCUDAValueType(*numeric, parameterType, storageType));
                     SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                         codeGenContext,
                         "numeric entry byval attributes",
@@ -11672,7 +11745,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                     parameter)));
             valueMap[param] = parameter;
             if (function == entryPoint && asNVVMSupportedResourceStructType(param->getDataType()) &&
-                !requirements.emissionPlan.entryNumericParameters.containsKey(param))
+                !requirements.emissionPlan.entryValueParameters.containsKey(param))
             {
                 entryAggregatePointerMap[param] = parameter;
             }
@@ -11714,9 +11787,9 @@ SlangResult emitNVVMIRFromLinkedIR(
 
         IRBlock* entryBlock = function->getFirstBlock();
         bool hasHalfParameter = false;
-        const bool hasEntryNumericParameters =
+        const bool hasEntryValueParameters =
             function == entryPoint &&
-            requirements.emissionPlan.entryNumericParameters.getCount() != 0;
+            requirements.emissionPlan.entryValueParameters.getCount() != 0;
         bool hasEntryAggregateValueParameter = false;
         for (auto param : function->getParams())
         {
@@ -11727,9 +11800,9 @@ SlangResult emitNVVMIRFromLinkedIR(
                 hasEntryAggregateValueParameter ||
                 (function == entryPoint &&
                  asNVVMSupportedResourceStructType(param->getDataType()) &&
-                 !requirements.emissionPlan.entryNumericParameters.containsKey(param));
+                 !requirements.emissionPlan.entryValueParameters.containsKey(param));
         }
-        if (hasHalfParameter || hasEntryAggregateValueParameter || hasEntryNumericParameters)
+        if (hasHalfParameter || hasEntryAggregateValueParameter || hasEntryValueParameters)
         {
             SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
                 codeGenContext,
@@ -11737,15 +11810,15 @@ SlangResult emitNVVMIRFromLinkedIR(
                                  : "aggregate entry-parameter block selection",
                 builder.setInsertBlock(moduleScope.module, blockMap.getValue(entryBlock))));
         }
-        if (hasEntryNumericParameters)
+        if (hasEntryValueParameters)
         {
             for (auto param : function->getParams())
             {
-                auto numeric = requirements.emissionPlan.entryNumericParameters.tryGetValue(param);
+                auto numeric = requirements.emissionPlan.entryValueParameters.tryGetValue(param);
                 if (!numeric)
                     continue;
                 SlangNVVMValueHandle decoded = nullptr;
-                SLANG_RETURN_ON_FAIL(_emitNVVMEntryNumericDecode(
+                SLANG_RETURN_ON_FAIL(_emitNVVMCUDAValueDecode(
                     codeGenContext,
                     builder,
                     moduleScope.module,
@@ -11785,7 +11858,7 @@ SlangResult emitNVVMIRFromLinkedIR(
             for (auto param : function->getParams())
             {
                 if (!asNVVMSupportedResourceStructType(param->getDataType()) ||
-                    requirements.emissionPlan.entryNumericParameters.containsKey(param))
+                    requirements.emissionPlan.entryValueParameters.containsKey(param))
                     continue;
 
                 SlangNVVMValueHandle loweredPointer = valueMap.getValue(param);
@@ -12110,6 +12183,20 @@ SlangResult emitNVVMIRFromLinkedIR(
                             valueMap,
                             typeContext,
                             loweredPointer));
+                        if (load->cudaValueLayout.type)
+                        {
+                            SlangNVVMValueHandle result = nullptr;
+                            SLANG_RETURN_ON_FAIL(_emitNVVMCUDAValueDecode(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                typeContext,
+                                load->cudaValueLayout,
+                                loweredPointer,
+                                result));
+                            valueMap[inst] = result;
+                            break;
+                        }
                         if (load->layoutStorage.valueType)
                         {
                             SlangNVVMValueHandle result = nullptr;
