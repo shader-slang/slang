@@ -2561,11 +2561,11 @@ ImageFormat inferImageFormatFromTextureType(
 
 void SemanticsDeclHeaderVisitor::maybeApplyLayoutModifier(VarDeclBase* varDecl)
 {
-    // Matrix layout modifiers are `TypeModifier`s, so for ordinary declarators the parser
-    // moves them onto the type expression and `visitModifiedTypeExpr` bakes in the layout.
-    // A traditional-style function parameter (leading-modifier syntax), however, parses its
-    // modifiers before its type and keeps them on the decl, so this decl-side branch remains
-    // the applier for that path.
+    // Matrix layout modifiers are `TypeModifier`s, so for declarators and traditional-style
+    // parameters the parser moves them onto the type expression and `visitModifiedTypeExpr`
+    // bakes in the layout. A modern-syntax declaration whose modifiers precede its name
+    // (`row_major var m: float2x3;`, `row_major let m = init;`) keeps them on the decl, so this
+    // decl-side branch remains the applier for that path.
     if (auto matrixType = as<MatrixExpressionType>(varDecl->type.type))
     {
         if (auto matrixLayoutModifier = varDecl->findModifier<MatrixLayoutModifier>())
@@ -13978,6 +13978,30 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
     return true;
 }
 
+/// Return whether `a` and `b` are the same type except for the layout of the matrices they contain,
+/// directly or as the element of an array or the pointee of a pointer. For example,
+/// `row_major float2x3[2]` and `column_major float2x3[2]` are the same type up to matrix layout.
+static bool isSameTypeUpToMatrixLayout(Type* a, Type* b)
+{
+    if (a->equals(b))
+        return true;
+    if (auto arrayA = as<ArrayExpressionType>(a))
+    {
+        auto arrayB = as<ArrayExpressionType>(b);
+        return arrayB && arrayA->getElementCount()->equals(arrayB->getElementCount()) &&
+               isSameTypeUpToMatrixLayout(arrayA->getElementType(), arrayB->getElementType());
+    }
+    if (auto ptrA = as<PtrType>(a))
+    {
+        auto ptrB = as<PtrType>(b);
+        return ptrB && ptrA->getAccessQualifier()->equals(ptrB->getAccessQualifier()) &&
+               ptrA->getAddressSpace()->equals(ptrB->getAddressSpace()) &&
+               ptrA->getDataLayout()->equals(ptrB->getDataLayout()) &&
+               isSameTypeUpToMatrixLayout(ptrA->getValueType(), ptrB->getValueType());
+    }
+    return isMatrixLayoutConversion(a, b);
+}
+
 bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<FuncDecl> snd)
 {
 
@@ -13997,8 +14021,14 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
         auto fstParam = fstParams[ii];
         auto sndParam = sndParams[ii];
 
-        // If a given parameter type doesn't match, then signatures don't match
-        if (!getType(m_astBuilder, fstParam)->equals(getType(m_astBuilder, sndParam)))
+        // Matrix layout alone does not distinguish two signatures, as in HLSL: a second
+        // definition of `f(row_major float2x3 m[2])` next to `f(column_major float2x3 m[2])` is a
+        // redefinition. Mangled names do not encode matrix layout (shader-slang/slang#13383), so
+        // two such overloads would otherwise share one linkage name and silently call the same
+        // body.
+        if (!isSameTypeUpToMatrixLayout(
+                getType(m_astBuilder, fstParam),
+                getType(m_astBuilder, sndParam)))
             return false;
 
         // If one parameter is `out` and the other isn't, then they don't match

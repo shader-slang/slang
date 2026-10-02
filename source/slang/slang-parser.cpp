@@ -3318,6 +3318,7 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
         // one here and make it be the home for our `typeModifiers`.
         //
         ModifiedTypeExpr* modifiedTypeExpr = parser->astBuilder->create<ModifiedTypeExpr>();
+        modifiedTypeExpr->loc = typeExpr->loc;
         modifiedTypeExpr->base.exp = typeExpr;
         modifiedTypeExpr->modifiers = modifiers;
         return modifiedTypeExpr;
@@ -3330,13 +3331,14 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
-/// Move any type modifier in `ioBaseModifiers` to the given `typeExpr`.
+/// Move any modifier of class `TTypeModifier` in `ioBaseModifiers` to the given `typeExpr`.
 ///
-/// If any type modifiers were present, `ioBaseModifiers` will be updated
-/// to only include those modifiers that were not type modifiers (if any).
+/// If any such modifiers were present, `ioBaseModifiers` will be updated
+/// to only include the remaining modifiers (if any).
 ///
-/// If no type modifiers were present, `ioBaseModifiers` will remain unchanged.
+/// If no such modifiers were present, `ioBaseModifiers` will remain unchanged.
 ///
+template<typename TTypeModifier>
 static Expr* _moveTypeModifiersToTypeExpr(
     Parser* parser,
     Expr* typeExpr,
@@ -3367,7 +3369,7 @@ static Expr* _moveTypeModifiersToTypeExpr(
     {
         // We want to detect whether we have a type modifier or not.
         //
-        auto typeModifier = as<TypeModifier>(baseModifier);
+        auto typeModifier = as<TTypeModifier>(baseModifier);
 
         // The easy case is when we *don't* have a type modifier.
         //
@@ -3428,7 +3430,8 @@ static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Mod
         // and any modifiers that logically belong to the declaration to
         // the declaration.
         //
-        typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
+        typeSpec.expr =
+            _moveTypeModifiersToTypeExpr<TypeModifier>(parser, typeSpec.expr, modifiers);
 
         // Any remaining modifiers should instead be applied to the declaration.
         _addModifiers(decl, modifiers);
@@ -3675,7 +3678,7 @@ static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     // or which of them might be type modifiers, so we will delegate
     // figuring that out to a subroutine.
     //
-    typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
+    typeSpec.expr = _moveTypeModifiersToTypeExpr<TypeModifier>(parser, typeSpec.expr, ioModifiers);
 
     return typeSpec;
 }
@@ -5153,6 +5156,8 @@ static NodeBase* parseVarDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
+static Expr* _parseTraditionalParamTypeExpr(Parser* parser, Modifiers& ioParamModifiers);
+
 /// Parse the common structured of a traditional-style parameter declaration (excluding the
 /// trailing semicolon)
 static void _parseTraditionalParamDeclCommonBase(
@@ -5161,7 +5166,7 @@ static void _parseTraditionalParamDeclCommonBase(
     DeclaratorParseOptions options = kDeclaratorParseOptions_None)
 {
     DeclaratorInfo declaratorInfo;
-    declaratorInfo.typeSpec = parser->ParseType();
+    declaratorInfo.typeSpec = _parseTraditionalParamTypeExpr(parser, decl->modifiers);
 
     InitDeclarator initDeclarator = parseInitDeclarator(parser, options);
     UnwrapDeclarator(parser, initDeclarator, &declaratorInfo);
@@ -7845,6 +7850,29 @@ static Expr* _parseInfixTypeExpr(Parser* parser, bool allowDecl)
 {
     auto leftExpr = _parsePostfixTypeExpr(parser, allowDecl);
     return _parseInfixTypeExprSuffix(parser, leftExpr, allowDecl);
+}
+
+/// Parse the type of a traditional-style parameter, moving any matrix layout modifier in
+/// `ioParamModifiers` onto the leading type specifier.
+///
+/// Consider this example:
+///
+///     void f(row_major float2x3 m[2], no_diff float a[2]);
+///
+/// A traditional-style parameter parses its modifiers before its type, so they all start out on
+/// the parameter. A matrix layout qualifies the matrix element type, so we graft it onto
+/// `float2x3` before a `[N]` or `*` suffix (or the declarator's `[2]`) wraps it. The parameter
+/// `m` then has the same type expression as a declarator such as the struct field
+/// `row_major float2x3 m[2];`. Other type modifiers, such as `no_diff`, keep their meaning as
+/// modifiers of the parameter, so they stay where they are.
+///
+static Expr* _parseTraditionalParamTypeExpr(Parser* parser, Modifiers& ioParamModifiers)
+{
+    auto typeExpr = _parseAtomicTypeExpr(parser, false);
+    typeExpr =
+        _moveTypeModifiersToTypeExpr<MatrixLayoutModifier>(parser, typeExpr, ioParamModifiers);
+    typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
+    return _parseInfixTypeExprSuffix(parser, typeExpr, false);
 }
 
 Expr* Parser::ParseType()
