@@ -44,13 +44,16 @@ void SerialWriter::_initialize(ChunkBuilder* chunk)
     //
     Fossil::Header header;
     memcpy(header.magic, Fossil::Header::kMagic, sizeof(Fossil::Header::kMagic));
-    header.totalSizeIncludingHeader = 0;
     header.flags = 0;
 
     headerChunk->writeData(&header.magic, sizeof(header.magic));
-    headerChunk->writeData(
-        &header.totalSizeIncludingHeader,
-        sizeof(header.totalSizeIncludingHeader));
+
+    // The total size of the blob is not known until every chunk has been laid
+    // out, so this field is filled in when the blob is written, the same way
+    // the relative pointer below is.
+    //
+    headerChunk->writeTotalBlobSize<decltype(header.totalSizeIncludingHeader)>();
+
     headerChunk->writeData(&header.flags, sizeof(header.flags));
 
     // The main reason we are writing the fields manually is

@@ -398,6 +398,18 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     return Super::calcTypeName(type, target, out);
 }
 
+void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+{
+    Super::emitFrontMatterImpl(targetReq);
+
+    // Must precede the prelude, which is emitted immediately after this front
+    // matter and gates its transcendental wrappers on this define.
+    if (getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Fast)
+    {
+        m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
+    }
+}
+
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
     IRInst* inst,
     char const* uniformSemanticSpelling,
@@ -429,13 +441,50 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     SLANG_UNUSED(entryPointDecor);
 }
 
+static bool _isCudaDeviceFunctionDefinitionExported(IRFunc* func)
+{
+    // Slang visibility controls IR linking, not linkage between emitted CUDA translation units.
+    // A public definition can be included in multiple separately emitted CUDA modules, so giving
+    // all public device functions external CUDA linkage can cause multiple-definition errors when
+    // those modules are linked together.
+    //
+    // Give non-entry-point __device__ function definitions internal linkage by default. Only give
+    // them external linkage when their IR carries one of the export decorations recognized below.
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_HLSLExportDecoration:
+        case kIROp_CudaDeviceExportDecoration:
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
         return;
-    if (inst->findDecoration<IREntryPointDecoration>())
+
+    if (auto entryPointDecor = inst->findDecoration<IREntryPointDecoration>())
     {
-        m_writer->emit("extern \"C\" __global__ ");
+        m_writer->emit("extern \"C\" ");
+
+        // Emit OptiX callables as __device__, which follows OptiX best
+        // practices and keeps pointer parameters for generated functions in the
+        // generic address space, allowing callees to write to them.
+        if (entryPointDecor->getProfile().getStage() == Stage::Callable)
+        {
+            m_writer->emit("__device__ ");
+        }
+        else
+        {
+            m_writer->emit("__global__ ");
+        }
+
         return;
     }
 
@@ -449,6 +498,15 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
+        // Forward declarations of definitions also pass through this hook and satisfy
+        // isDefinition(), giving their declarations and definitions matching internal linkage. A
+        // declaration-only function may be defined in another CUDA translation unit and must
+        // remain externally linkable.
+        if (auto func = as<IRFunc>(inst);
+            func && func->isDefinition() && !_isCudaDeviceFunctionDefinitionExported(func))
+        {
+            m_writer->emit("static ");
+        }
         m_writer->emit("__device__ ");
 
         // `__noinline__` is a declaration specifier, so it belongs in this specifier
@@ -463,9 +521,8 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    // We have an entry-point function in the IR module, which we
-    // will want to emit as a `__global__` function in the generated
-    // CUDA C++.
+    // We have an entry-point function in the IR module and need to
+    // generate the name of the corresponding CUDA C++ function.
     //
     // The most common case will be a compute kernel, in which case
     // we will emit the function more or less as-is, including
@@ -1376,6 +1433,35 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             {
                 m_writer->emit("()");
             }
+            return true;
+        }
+    case kIROp_ReportOptiXIntersection:
+        {
+            // optixReportIntersection(tHit, hitKind, a0..aN). The CUDA legalization pass has
+            // already flattened the aggregate into scalar leaves (operands 2..N), one per attribute
+            // register. A float leaf is bit-reinterpreted with `__float_as_uint`, the exact inverse
+            // of the reader's `__int_as_float(optixGetAttribute_N())`, because CUDA lowers
+            // `IRBitCast` as a numeric C cast, not a bit cast.
+            m_writer->emit("optixReportIntersection(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            for (UInt i = 2; i < inst->getOperandCount(); ++i)
+            {
+                m_writer->emit(", ");
+                auto leaf = inst->getOperand(i);
+                if (leaf->getDataType()->getOp() == kIROp_FloatType)
+                {
+                    m_writer->emit("__float_as_uint(");
+                    emitOperand(leaf, getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                }
+                else
+                {
+                    emitOperand(leaf, getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
             return true;
         }
     case kIROp_GetOptiXSbtDataPtr:

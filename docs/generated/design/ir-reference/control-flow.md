@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T14:11:35Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: 2618bd52bfca9d3879090fe3ee903ad4df708c0b4b35c68a904ad3f0c4c855a2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -27,17 +27,17 @@ The control-flow opcodes live in three places in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua):
 `block` is declared at line 944 alongside the other module-level
 parent opcodes, `param` at line 1170, and `TerminatorInst` plus its
-children occupy lines 1450-1535. `discard` follows immediately at
-line 1536, the backend-hint group (`RequirePrelude`,
+children occupy lines 1454-1535. `discard` follows immediately at
+line 1540, the backend-hint group (`RequirePrelude`,
 `RequireTargetExtension`, `RequireComputeDerivative`,
 `StaticAssert`, `Printf`, `Abort`, `RequireMaximallyReconverges`,
-`RequireQuadDerivatives`) at lines 1537-1547, and `gpuForeach` at
-line 1642.
+`RequireQuadDerivatives`) at lines 1541-1547, and `gpuForeach` at
+line 1646.
 
 The C++ wrappers for the terminators are hand-written in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)
 (`IRReturn` line 2032 through `IRDefer` line 2193, plus
-`IRGenericAsm` line 2911 and the `IRRequire*` / `IRStaticAssert`
+`IRGenericAsm` line 2920 and the `IRRequire*` / `IRStaticAssert`
 wrappers that follow it), because they need `IRUse` members and
 index arithmetic the generator cannot derive. Wrappers that are not
 written out there — `IRUnreachableBase`, `IRMissingReturn`,
@@ -52,15 +52,15 @@ for how that generation works.
 [slang-ir.h](../../../../source/slang/slang-ir.h); `IRBuilder`
 itself is only forward-declared there and is declared in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) at
-line 3158. `emitBlock` is defined in
-[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 5447;
+line 3167. `emitBlock` is defined in
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 5456;
 the return and branch emitters (`emitBranch`, `emitLoop`,
 `emitIfElse`, `emitSwitch`, ...) are in the same file at lines
 6331-6560.
 
 Lowering from the AST is driven by the statement-level visitors in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
-`lowerStmt` (line 9970) dispatches to `visitBlockStmt` (8821),
+`lowerStmt` (line 10054) dispatches to `visitBlockStmt` (8821),
 `visitIfStmt` (8280), `visitForStmt` (8410), `visitWhileStmt`
 (8544), `visitDoWhileStmt` (8629), `visitSwitchStmt` (9495),
 `visitStageSwitchStmt` (9329), `visitTargetSwitchStmt` (9425),
@@ -129,42 +129,42 @@ terminator.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `block` | `IRBlock` | — | P | — (structural container) | Basic block; its *children*, not its operands, are the instructions it owns. |
-| `param` | `IRParam` | — | | `ParamDecl`, plus `SelectExpr` / `LogicOperatorShortCircuitExpr` / `TryExpr` result parameters introduced by `visitSelectExpr` (line 7989) and its peers on blocks opened by `startBlock` (line 8193) | Block-level parameter; always the first N children of its parent block. Slang IR's replacement for SSA `phi` nodes. |
+| `param` | `IRParam` | — | | `ParamDecl`, plus `SelectExpr` / `LogicOperatorShortCircuitExpr` / `TryExpr` result parameters introduced by `visitSelectExpr` (line 7127) and its peers on blocks opened by `startBlock` (line 8235) | Block-level parameter; always the first N children of its parent block. Slang IR's replacement for SSA `phi` nodes. |
 
 ### Terminators: returns and yields
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `return_val` | `IRReturn` | `val` | | `ReturnStmt` via `visitReturnStmt` (line 8831) | Function return; always carries exactly one operand, the void value for a `void` return. |
-| `yield` | `IRYield` | `val` | | `ExpandExpr` via `visitExpandExpr` (line 6565) | Terminates the single block inside an `expand` instruction with that iteration's pattern value. |
+| `return_val` | `IRReturn` | `val` | | `ReturnStmt` via `visitReturnStmt` (line 8873) | Function return; always carries exactly one operand, the void value for a `void` return. |
+| `yield` | `IRYield` | `val` | | `ExpandExpr` via `visitExpandExpr` (line 6578) | Terminates the single block inside an `expand` instruction with that iteration's pattern value. |
 
 ### Terminators: unconditional branches
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `unconditionalBranch` | `IRUnconditionalBranch` | `target, args...` (`min=1`) | | `BreakStmt`, `ContinueStmt` via `visitBreakStmt` (line 9059) and `visitContinueStmt` (9077), plus fall-through between lowered statements | Jumps to a target block; operands after the first are bound to the target's `param`s. |
-| `loop` | `IRLoop` | `target, breakBlock, continueBlock, args...` (`min=3`) | | `ForStmt`, `WhileStmt`, `DoWhileStmt`, `CatchStmt` via `visitForStmt` (line 8410), `visitWhileStmt` (8544), `visitDoWhileStmt` (8629), `visitCatchStmt` (8967) | Loop entry; the break and continue labels are explicit operands, and any further operands are target-block arguments. |
+| `unconditionalBranch` | `IRUnconditionalBranch` | `target, args...` (`min=1`) | | `BreakStmt`, `ContinueStmt` via `visitBreakStmt` (line 9101) and `visitContinueStmt` (9077), plus fall-through between lowered statements | Jumps to a target block; operands after the first are bound to the target's `param`s. |
+| `loop` | `IRLoop` | `target, breakBlock, continueBlock, args...` (`min=3`) | | `ForStmt`, `WhileStmt`, `DoWhileStmt`, `CatchStmt` via `visitForStmt` (line 8452), `visitWhileStmt` (8544), `visitDoWhileStmt` (8629), `visitCatchStmt` (8967) | Loop entry; the break and continue labels are explicit operands, and any further operands are target-block arguments. |
 
 ### Terminators: conditional branches
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `conditionalBranch` | `IRConditionalBranch` | `condition, trueBlock, falseBlock` (`min=3`) | | (synthesized) | Two-way branch with no structured join operand and no target arguments. |
-| `ifElse` | `IRIfElse` | `condition, trueBlock, falseBlock, afterBlock` (`min=4`) | | `IfStmt` via `visitIfStmt` (line 8280), plus `SelectExpr`, `LogicOperatorShortCircuitExpr`, and every loop condition test | Structured two-way branch whose fourth operand records the reconvergence point. |
+| `ifElse` | `IRIfElse` | `condition, trueBlock, falseBlock, afterBlock` (`min=4`) | | `IfStmt` via `visitIfStmt` (line 8322), plus `SelectExpr`, `LogicOperatorShortCircuitExpr`, and every loop condition test | Structured two-way branch whose fourth operand records the reconvergence point. |
 
 ### Terminators: switches
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `switch` | `IRSwitch` | `condition, breakLabel, defaultLabel, caseValue/caseLabel pairs...` (`min=3`) | | `SwitchStmt` (`switch`), `StageSwitchStmt` (`__stage_switch`) via `visitSwitchStmt` (line 9495) and `visitStageSwitchStmt` (9329) | Multi-way switch; the case list is a set of (value, label) pairs reached through `getCaseValue` / `getCaseLabel`. |
-| `targetSwitch` | `IRTargetSwitch` | `breakBlock, caseValue/caseBlock pairs...` (`min=1`) | | `TargetSwitchStmt` (`__target_switch`) via `visitTargetSwitchStmt` (line 9425) | Compile-time switch on the code-generation target; case values are `CapabilityName` integers, not runtime values. |
+| `switch` | `IRSwitch` | `condition, breakLabel, defaultLabel, caseValue/caseLabel pairs...` (`min=3`) | | `SwitchStmt` (`switch`), `StageSwitchStmt` (`__stage_switch`) via `visitSwitchStmt` (line 9573) and `visitStageSwitchStmt` (9329) | Multi-way switch; the case list is a set of (value, label) pairs reached through `getCaseValue` / `getCaseLabel`. |
+| `targetSwitch` | `IRTargetSwitch` | `breakBlock, caseValue/caseBlock pairs...` (`min=1`) | | `TargetSwitchStmt` (`__target_switch`) via `visitTargetSwitchStmt` (line 9500) | Compile-time switch on the code-generation target; case values are `CapabilityName` integers, not runtime values. |
 
 ### Terminators: error flow
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `throw` | `IRThrow` | `value` | | `ThrowStmt` via `visitThrowStmt` (line 8942) | Throws the operand as an error value, terminating the current block. |
-| `tryCall` | `IRTryCall` | `successBlock, failureBlock, callee, args...` (`min=3`) | | `TryExpr` via `visitTryExpr` (line 8020) | Calls `callee` and branches to `successBlock` on a normal return or `failureBlock` on a throw. |
+| `throw` | `IRThrow` | `value` | | `ThrowStmt` via `visitThrowStmt` (line 8984) | Throws the operand as an error value, terminating the current block. |
+| `tryCall` | `IRTryCall` | `successBlock, failureBlock, callee, args...` (`min=3`) | | `TryExpr` via `visitTryExpr` (line 7230) | Calls `callee` and branches to `successBlock` on a normal return or `failureBlock` on a throw. |
 
 ### Terminators: no-continuation
 
@@ -177,8 +177,8 @@ terminator.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `defer` | `IRDefer` | `deferBlock, mergeBlock, scopeBlock` | | `DeferStmt` via `visitDeferStmt` (line 8919) | Records a deferred-action block whose body must run before the surrounding scope exits. |
-| `GenericAsm` | `IRGenericAsm` | `asmText, args...` (`min=1`) | | `IntrinsicAsmStmt`, written as the statement `__intrinsic_asm "<text>";`, via `visitIntrinsicAsmStmt` (line 9470) | Inline target-specific text whose semantics include terminating control flow; `getAsm()` reads operand 0 as a string literal. |
+| `defer` | `IRDefer` | `deferBlock, mergeBlock, scopeBlock` | | `DeferStmt` via `visitDeferStmt` (line 8961) | Records a deferred-action block whose body must run before the surrounding scope exits. |
+| `GenericAsm` | `IRGenericAsm` | `asmText, args...` (`min=1`) | | `IntrinsicAsmStmt`, written as the statement `__intrinsic_asm "<text>";`, via `visitIntrinsicAsmStmt` (line 9548) | Inline target-specific text whose semantics include terminating control flow; `getAsm()` reads operand 0 as a string literal. |
 
 ### Other control-flow opcodes
 
@@ -188,8 +188,8 @@ appear as ordinary instructions inside a block.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `discard` | `IRDiscard` (generated) | — | | `DiscardStmt` via `visitDiscardStmt` (line 9053) | HLSL `discard` for fragment shaders; ends pixel processing. |
-| `gpuForeach` | `IRGpuForeach` (generated) | `device, gridDims, kernel, args...` (`min=3`) | | `GpuForeachStmt` via `visitGpuForeachStmt` (line 8739) | Host-side GPU dispatch loop; pairs with a backend-specific kernel launch. |
+| `discard` | `IRDiscard` (generated) | — | | `DiscardStmt` via `visitDiscardStmt` (line 9095) | HLSL `discard` for fragment shaders; ends pixel processing. |
+| `gpuForeach` | `IRGpuForeach` (generated) | `device, gridDims, kernel, args...` (`min=3`) | | `GpuForeachStmt` via `visitGpuForeachStmt` (line 8781) | Host-side GPU dispatch loop; pairs with a backend-specific kernel launch. |
 | `RequirePrelude` | `IRRequirePrelude` | `preludeText` (`min=1`) | | Call to `__requirePrelude` (`core.meta.slang`) | Requires that a target-specific prelude snippet be emitted. |
 | `RequireTargetExtension` | `IRRequireTargetExtension` | `extension` | | Call to `__requireTargetExtension` (`core.meta.slang`, `hlsl.meta.slang`) | Requires that a named target extension be enabled. |
 | `RequireComputeDerivative` | `IRRequireComputeDerivative` | — | | Call to `__requireComputeDerivative` (`core.meta.slang`) | Marks an entry point as needing compute-shader derivative support. |
@@ -210,7 +210,7 @@ between the last visitor and the dump — `lowerErrorHandling` (line
 15578), `lowerDefer` (15581), `constructSSA` (15605),
 `applySparseConditionalConstantPropagation` (15606), `simplifyCFG`
 (15611), `eliminateDeadCode` (15624) and mandatory early inlining
-(15664) — and dumps only afterwards, at line 15797 of
+(15664) — and dumps only afterwards, at line 15985 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
 Three of the callouts below turn on that ordering: `throw`,
 `tryCall`, and `defer` are emitted by lowering but are already gone
@@ -261,14 +261,14 @@ statement's `uniqueID`, which is how `visitBreakStmt` and
 `visitContinueStmt` find the right label without walking the CFG.
 
 The three loop statements fill those operands differently.
-`visitForStmt` creates a dedicated continue block (line 8435), so
+`visitForStmt` creates a dedicated continue block (line 8471), so
 target, `continueBlock`, and `breakBlock` are three distinct blocks.
 `visitWhileStmt` uses the loop head itself as the continue label
-(line 8568) and passes it as both the target and the continue
+(line 8604) and passes it as both the target and the continue
 operand, so *every* `while` has `target == continueBlock`.
-`visitDoWhileStmt` uses the trailing test block instead (line 8653)
-and inverts the predicate — `emitNot` at line 8689, then
-`emitIfElse(not(cond), breakBlock, merge, merge)` at line 8734 — so a
+`visitDoWhileStmt` uses the trailing test block instead (line 8684)
+and inverts the predicate — `emitNot` at line 8725, then
+`emitIfElse(not(cond), breakBlock, merge, merge)` at line 8770 — so a
 `do`-`while` leaves the loop when the *negated* test is true. A
 `while (true)` keeps the shared head-and-continue block and leaves
 its break block without a predecessor, which is why that block
@@ -295,7 +295,7 @@ assumes the four operands are four distinct blocks will be wrong on
 both.
 
 A third collapsed shape is not the emitters' doing. `visitIfStmt`
-gives an `if`/`else` three fresh blocks (lines 8303-8309) however
+gives an `if`/`else` three fresh blocks (lines 8345-8351) however
 empty its arms are, but the mandatory `simplifyCFG` folds away an arm
 that does nothing except branch to the merge block. An `if` whose
 *then* arm is empty and whose `else` arm is not therefore reaches a
@@ -333,7 +333,7 @@ place needs the `IRUse` slot so that `IRUse::set` can unregister
 the old operand from its use list and register the new one;
 `legalizeBoolSwitch` in
 [slang-ir-glsl-legalize.cpp](../../../../source/slang/slang-ir-glsl-legalize.cpp)
-(line 5107) is the motivating consumer.
+(line 5104) is the motivating consumer.
 
 The condition may be a `bool` as far as the IR is concerned, but
 some targets require an integer switch. The pass
@@ -344,11 +344,20 @@ condition has `IRBoolType` it inserts a bool-to-int cast, points
 the matching `IRIntLit` (`true` to 1, `false` to 0). It release-
 asserts that each case key is a bool-typed `IRConstant`, because a
 `switch` on an `enum : bool` reaches this point with `IRIntLit`
-case keys of bool type rather than `IRBoolLit`. The pass is
-selected per target in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp); see
-[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) for
-where it sits in the pipeline.
+case keys of bool type rather than `IRBoolLit`.
+
+Which targets run it is decided by a `switch (target)` in
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp), and only
+two of its arms call the pass. The `GLSL` / `SPIRV` /
+`SPIRVAssembly` arm does (line 2366) and so does the `WGSL` /
+`WGSLSPIRV` / `WGSLSPIRVAssembly` arm (line 2404); the comments at
+both sites give the same reason, that these targets require an
+integer `switch` selector. Every other target — HLSL, Metal, CUDA and
+the C++ family among them — falls through without the pass, so a
+`switch` on a `bool` survives to the emitted code with its
+`case true:` / `case false:` labels intact. See
+[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) for where
+the pass sits in the pipeline.
 
 `targetSwitch` is the compile-time variant: `IRTargetSwitch` reads
 operand 0 as the break block and then `(caseValue, caseBlock)`
@@ -362,7 +371,7 @@ case value is the integer `CapabilityName` recorded by
 one of two successor blocks depending on whether the callee returns
 or throws, and `IRTryCall::getArgs()` skips the three leading
 operands to reach the call arguments. Lowering emits it from
-`emitCallToVal` (line 846 of
+`emitCallToVal` (line 852 of
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp))
 when the call has `TryClauseType::Standard`, then puts a `param` at
 the top of the success block to receive the result value and, if
@@ -373,7 +382,7 @@ one is, it emits an `unconditionalBranch` to the handler block
 carrying the error value as a block argument.
 
 Both opcodes are short-lived. `lowerErrorHandling`, called from
-`generateIRForTranslationUnit` at line 15578 — before the first
+`generateIRForTranslationUnit` at line 15878 — before the first
 `-dump-ir` snapshot — rewrites a throwing function into one that
 returns a `Result<T, E>` value and turns each `tryCall` into an
 ordinary `call` plus an `ifElse`. A surface program's error flow
@@ -394,7 +403,7 @@ statement into `deferBlock`, and terminates it with a branch to
 was, which is how the deferred body learns which enclosing scope it
 belongs to. `lowerDefer` then rewrites the construct so that later
 passes need not be aware of it; it runs inside
-`generateIRForTranslationUnit` at line 15581, ahead of the first
+`generateIRForTranslationUnit` at line 15881, ahead of the first
 `-dump-ir` snapshot, so `defer` is not visible even there.
 
 ### `missingReturn` and `unreachable`
@@ -404,10 +413,10 @@ difference is which one the compiler is allowed to complain about.
 When `lowerFuncDeclInContext` finishes a function body and the
 final block is still unterminated, a `void`-returning function gets
 an implicit `return_val` of the void value, but a value-returning
-function gets `missingReturn` (line 14361) precisely so a later
+function gets `missingReturn` (line 14670) precisely so a later
 dataflow check can report the missing `return` if that block turns
 out to be reachable. That check is `checkForMissingReturns`, run from
-`generateIRForTranslationUnit` at line 15706 with the target left as
+`generateIRForTranslationUnit` at line 16006 with the target left as
 `CodeGenTarget::None` and warnings enabled, and run again per target
 during emit. It reports at the `missingReturn`'s own source location,
 which lands on the function signature rather than on the body:
@@ -453,7 +462,7 @@ pixel's *runtime* processing, it is *not* an IR terminator: its
 opcode is one past `kIROp_LastTerminatorInst`, so `as<IRTerminatorInst>`
 rejects it, and it sits as an ordinary instruction inside a block
 that ends with whatever real terminator follows. `visitDiscardStmt`
-(line 9059) emits nothing but the `discard`, so in the common
+(line 9101) emits nothing but the `discard`, so in the common
 `if (...) discard;` shape the hosting block reads `discard` followed
 by the `unconditionalBranch` to the post-`if` merge block.
 
@@ -480,7 +489,7 @@ Whether a pass may delete or relocate one of these instructions is
 governed by `IRInst::mightHaveSideEffects`, declared in
 [slang-ir.h](../../../../source/slang/slang-ir.h) at line 778 and
 defined in
-[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 9394.
+[slang-ir.cpp](../../../../source/slang/slang-ir.cpp) at line 9456.
 It now takes two defaulted parameters: a `SideEffectAnalysisOptions
 options`, and a `Dictionary<IRInst*, bool>* calleeSideEffectCache`.
 
@@ -521,7 +530,7 @@ line 79), so each iteration also picks up the purity facts
 - [structure.md](structure.md) — the `func` parent that owns the
   blocks, and `generic`, whose body is a single block terminated by
   `return_val` (`findGenericReturnVal` in
-  [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9888
+  [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9950
   looks for exactly that).
 - [misc.md](misc.md) — `expand` / `Each`, whose single block is the
   one place `yield` terminates.

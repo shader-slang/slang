@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-5[1m]
-//META: generated_at=2026-08-04T00:00:00+00:00
-//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: model=gpt-5.6-sol
+//META: generated_at=2026-09-17T06:27:35Z
+//META: source_commit=9f55ec61a25834c304d71fd1e9a58bf72b3864b3
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#the-builtin-operator-fast-path
-//META: doc_section_digest=1c3af19385b1b45e53fc2911de4a5495ab14067ddf0d2925bb4569db9c7887aa
+//META: doc_section_digest=16e17f0dd7f2f633f3f55fe47544e0f4c04b1b5b2ce0bf083439c29eeb4a3acc
 //META: purpose=In GLSL operator scope the fast path declines matrix operands, so mat * mat resolves through the glsl module's overload to an algebraic matrix product.
 //META: intent=boundary
 //META: pipeline_stage=check
@@ -15,7 +15,7 @@
 // by the identity leaves the off-diagonal entries intact; CHECK asserts 2 and 3
 // in the buffer, whereas a component-wise fast-path multiply would give 0.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -allow-glsl -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 import glsl;
 

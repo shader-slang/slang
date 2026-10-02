@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:27:10Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: c244a6019beee1148173c93511a0ee3629fcfc32ea9a4177931dcbaec0efa2d2
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: f30d49ef0d87069e0353fa37a8bf5dc081d64322bb28e6a8a343c0f548e06e32
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -124,11 +124,11 @@ Detail: [04-ast-to-ir.md](04-ast-to-ir.md).
 ### IR passes
 
 The `linkAndOptimizeIR` function in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 970 at
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 1000 at
 `source_commit`) drives a long, target-sensitive sequence of IR
 transformations between lowering and emit. The
-[source/slang/](../../../../source/slang) directory contains roughly
-160 `slang-ir-*.cpp` files implementing analyses, validations,
+[source/slang/](../../../../source/slang) directory contains 163
+`slang-ir-*.cpp` files implementing analyses, validations,
 specializations, legalizations, and target-specific lowerings.
 
 *Target-sensitive* means the pass list itself branches, not merely
@@ -156,7 +156,7 @@ Detail: [05-ir-passes.md](05-ir-passes.md).
 
 `CodeGenContext::emitEntryPoints` selects a dispatch path per
 `TargetRequest`. Textual targets go to `emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2746 at
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2889 at
 `source_commit`), which picks a C-like source emitter — HLSL, GLSL,
 Metal, WGSL, C++, CUDA, or Torch glue. Torch glue is the exception in
 that list: the PyTorch binding target generates C++ wrappers only for

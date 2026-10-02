@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-13T00:00:00+00:00
 //META: source_commit=c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#loweredvalinfo-and-the-lowering-environment
-//META: doc_section_digest=9127ecfc310ffdc4aecbad1b96d176cf66095ac4dcbdc84a1ac4106e6bf98dd2
+//META: doc_section_digest=b811ef439a253bd37ab607f1ac1de7706df1cebe7013e2fd2ae6c1702a518c0c
 //META: purpose=A matrix swizzle in l-value position (`m._m00_m11 = ...`) stays symbolic as the `SwizzledMatrixLValue` flavor and resolves at the write site to a single `matrixSwizzleStore` carrying the row/column index pair per selected component.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -20,7 +20,7 @@
 // not folded away, and the matrix is read back into the output buffer so the
 // store survives dead-code elimination.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 RWStructuredBuffer<float> outputBuffer;
 uniform float a;

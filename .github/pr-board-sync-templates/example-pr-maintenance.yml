@@ -53,6 +53,11 @@ jobs:
     if: >-
       github.event_name != 'pull_request_review' ||
       github.event.pull_request.head.repo.fork == false
+    # Repo-scoped writes (assignees, review requests, comments) use
+    # github-actions[bot]; org-team reads and ProjectsV2 writes still use the PAT.
+    permissions:
+      issues: write
+      pull-requests: write
     uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
     secrets:
       SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

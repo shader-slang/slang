@@ -17,7 +17,7 @@
 // follows the `if` and sits in the merge block, past the two arm blocks. The
 // CHECKs anchor at `func %main` first so nothing in the core module can match.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute -g1
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute -g1
 
 uniform RWStructuredBuffer<float> gOut;
 

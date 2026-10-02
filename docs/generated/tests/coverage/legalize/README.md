@@ -105,7 +105,7 @@ builtin names, so they are treated as verified — no test in this bundle carrie
   claim. Its `AmbiguousReferenceIr` arm (a dynamic-resource parameter with
   surviving uses after rewriting) is the only part that test misses, and I
   could not construct a `.as<T>()`-free use that survived the front end.
-- **`getGLSLSystemValueInfo` `nv_x_right` / `nv_viewport_mask`** (`:876-905`) —
+- **`getGLSLSystemValueInfo` `nv_x_right` / `nv_viewport_mask`** (`:879-924`) —
   the NVX multi-view-per-view attribute path. The source comment records it as
   a known-incomplete hack tracked by shader-slang/slang#109 ("This doesn't seem
   to work correctly on its own between hlsl/glsl"), so pinning current output
@@ -153,3 +153,24 @@ builtin names, so they are treated as verified — no test in this bundle carrie
 | [#legalizeentrypointsforglsl-despite-the-name](../../../design/target-pipelines/spirv.md#legalizeentrypointsforglsl-despite-the-name) | missing-surface       | The doc describes the GLSL legalizer pass but does not enumerate the system-value-semantic to gl\_\* builtin mapping table (SV_DispatchThreadID->gl_GlobalInvocationID, SV_Position(fragment)->gl_FragCoord, SV_IsFrontFace->gl_FrontFacing, etc.) nor the E49999 it raises for an unknown SV\_\* semantic. | Add a mapping table of the recognized SV\_\* semantics to their gl\_\* builtins per stage, and note that an unrecognized SV\_\* semantic is rejected with error 49999 "unknown system-value semantic".                                                       |
 | [#entry-point-and-parameter-handling](../../../design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling)                    | missing-surface       | The section does not mention that a hull entry point is rewritten to call its `[patchconstantfunc]` inline, behind a control barrier and an `invocation id == 0` guard, with the OutputPatch argument materialized from the control-point output array — the largest structural rewrite in the pass.        | Add a short subsection on hull-stage legalization describing the barrier + single-invocation guard, and note that the two patch kinds are supplied from different places (the entry point's own InputPatch parameter vs a materialized control-point array). |
 | [#entry-point-and-parameter-handling](../../../design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling)                    | missing-surface       | Ray-tracing entry points get a rewrite the section does not describe: a second (or later) `inout` varying parameter causes all of them to be merged into one anonymous struct in a single payload variable at location 0, and payloads left without an explicit location are numbered per kind afterwards.  | Document the `consolidateRayTracingParameters` / `assignRayPayloadHitObjectAttributeLocations` pair: when consolidation kicks in (two or more inout varying params), and that ray, callable and hit-object-attribute locations are numbered independently.   |
+
+## Drift review
+
+Reviewed at `d592afa9b9` against `ef1068b548`, the commit this bundle was
+generated from. 16 commits touched its watched paths in between; all
+23 existing tests still pass.
+
+One diagnostic new since the base commit is raised from this
+bundle's `coverage_targets`: E55214, for a shader-terminating intrinsic reached
+through a call that could not be inlined. It already has a hand-written test
+(`tests/cuda/optix-terminate-nested-recursion.slang`). No test was added.
+
+One citation had drifted: the `nv_x_right` / `nv_viewport_mask` arms of
+`getGLSLSystemValueInfo` are at `:879-924`, not `:876-905`. The other line
+citations in this bundle (`:518` for `sv_clipdistance`, `:543` for
+`sv_coverage`) were re-checked and are still exact.
+
+Note that `5ed83a468c` (#12182), which added CUDA/OptiX callable shader support,
+falls in this window; its effect on the ray-tracing entry-point parameter
+diagnostic is handled in `design/pipeline/04c-layout-ir`, where the doc claim
+and its test were retargeted.

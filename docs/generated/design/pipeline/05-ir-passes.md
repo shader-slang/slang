@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-5
-generated_at: 2026-08-03T13:35:56Z
-source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-watched_paths_digest: 66d53e154eb63196d1c2ca1ee3a1c040e363e14dfbc86e6fad3f9c19cd0f9d21
+model: claude-opus-5[1m]
+generated_at: 2026-09-11T00:00:00Z
+source_commit: 48c746dc1eda1c6e2aa98c17bbdb7a645c24a048
+watched_paths_digest: bb2a1f9f5f1c6f0452419496335c11f61c5d4969a71458ba659c9755e84ba5ec
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -25,15 +25,15 @@ points only where a reader would otherwise miss them.
 
 The orchestrator is `linkAndOptimizeIR` in
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (defined at
-line 970 and ending at line 2744 at `source_commit`). Its body holds
-180 `SLANG_PASS(...)` call sites; that macro, defined at line 979,
+line 1000 and ending at line 2887 at `source_commit`). Its body holds
+180 `SLANG_PASS(...)` call sites; that macro, defined at line 1009,
 wraps each pass call in `wrapPass` so that IR dumping and profiling
 apply uniformly to every pass. The callers are
-`CodeGenContext::emitEntryPointsSourceFromIR` (defined at line 2746;
-the call is at line 2890) and the three entry points used for
+`CodeGenContext::emitEntryPointsSourceFromIR` (defined at line 2889;
+the call is at line 3033) and the three entry points used for
 non-textual output: `emitSPIRVForEntryPointsDirectly` (call at line
-3508), `emitHostVMCode` (call at line 3549), and
-`emitLLVMForEntryPoints` (call at line 3603). The function:
+3508), `emitHostVMCode` (call at line 3719), and
+`emitLLVMForEntryPoints` (call at line 3773). The function:
 
 1. Links the per-translation-unit IR modules together with `linkIR`
    ([slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp)),
@@ -53,7 +53,7 @@ inside `linkAndOptimizeIR`. `legalizeIRForSPIRV` in
 `simplifyIRForSpirvLegalization` fixed point) is invoked from the
 SPIR-V emit backend after `linkAndOptimizeIR` returns, so that it can
 run after address-space specialization — the reason is stated in the
-comment at lines 2482-2483 of `slang-emit.cpp`.
+comment at lines 2625-2626 of `slang-emit.cpp`.
 
 That call is a direct one rather than a `SLANG_PASS(...)`, so the
 SPIR-V legalization never goes through `wrapPass`, and no
@@ -70,11 +70,11 @@ The pipeline is **not** a fixed list — different targets, different
 optimization levels, and the presence of differentiation or coverage
 instrumentation all change the sequence. Most optional passes are
 gated on a `RequiredLoweringPassSet` flag; that set is computed by
-`calcRequiredLoweringPassSet` at line 1049 (immediately after linking)
-and recomputed at line 1520 (after specialization and the first round
+`calcRequiredLoweringPassSet` at line 1070 (immediately after linking)
+and recomputed at line 1644 (after specialization and the first round
 of type lowering), and its flags accumulate rather than being reset
 between the two scans. Compiling for `CodeGenTarget::HostVM` returns
-early at lines 1666-1671, after `performForceInlining` and a final
+early at lines 1686-1691, after `performForceInlining` and a final
 `simplifyIR`, skipping every target-dependent pass below that point.
 
 ### Phase skeleton of `linkAndOptimizeIR`
@@ -107,7 +107,7 @@ above. Several passes appear more than once at different points —
 `legalizeEmptyTypes`, `eliminatePhis`,
 `lowerBufferElementTypeToStorageType` (three configurations for
 Metal), and `specializeFuncsForBufferLoadArgs` (a second SPIR-V-only
-invocation at line 2507).
+invocation at line 2530).
 
 One pass in that skeleton has no row in the category tables below
 because its source falls outside this page's watched paths:
@@ -233,7 +233,7 @@ concrete IR consumed by emit.
 | Specialize target switch | [slang-ir-specialize-target-switch.cpp](../../../../source/slang/slang-ir-specialize-target-switch.cpp) | Resolves `[target]`-conditional code |
 | Specialize higher-order parameters | [slang-ir-defunctionalization.cpp](../../../../source/slang/slang-ir-defunctionalization.cpp) | `specializeHigherOrderParameters`: rewrites calls that pass a global function to a higher-order function into calls to a specialized variant that references the global directly (the filename is aspirational; no tagged-union conversion happens) |
 | Bind existentials | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | Resolves dynamic-dispatch interface bindings |
-| AnyValue inference | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | Determines `AnyValue` size for existentials (`inferAnyValueSizeWhereNecessary`); the size it settles on is the `N` that shows up in the marshalling function names below. The same file also holds `diagnoseCircularConformances`, which runs before specialization so a self-referential or cross-interface conformance cycle is diagnosed rather than reaching a pass that cannot represent it |
+| AnyValue inference | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | Determines `AnyValue` size for existentials (`inferAnyValueSizeWhereNecessary`); the size it settles on is the `N` that shows up in the marshalling function names below. The same file also holds `diagnoseCircularConformances`, which runs before specialization so a conformance cycle is diagnosed rather than reaching a pass that cannot represent it. Note the word *conformance*: it walks (interface, impl) pairs and asks whether an implementation's own `AnyValue` size depends on the interface it implements (`implCreatesCircularConformance`), which is a shape later transformations can produce. An ordinary source-level *inheritance* cycle such as `interface IA : IB` / `interface IB : IA` never reaches it — the front end rejects that during semantic checking with E39999, *cyclic reference in inheritance graph*. Read this pass as a backstop for the IR, not as the diagnostic a user meets for a written cycle |
 | AnyValue marshalling | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | Pack / unpack values into `AnyValue`: synthesizes one `packAnyValue<N>` / `unpackAnyValue<N>` function per size and replaces every `PackAnyValue` / `UnpackAnyValue` inst with a call to it, so those two names are what a dynamic-dispatch shader shows in the emitted source |
 | Lower dynamic-dispatch insts | [slang-ir-lower-dynamic-dispatch-insts.cpp](../../../../source/slang/slang-ir-lower-dynamic-dispatch-insts.cpp) | Lowers the instructions that back dynamic dispatch: `lowerExistentials` (existential extraction, `InterfaceType`, `RTTIHandleType`), `lowerTaggedUnionTypes` / `lowerUntaggedUnionTypes`, and the tag family (`lowerTagTypes`, `lowerTagInsts`, `lowerSequentialIDTagCasts`) |
 | Lower expand type | [slang-ir-lower-expand-type.cpp](../../../../source/slang/slang-ir-lower-expand-type.cpp) | Variadic-pack expansion |
@@ -316,7 +316,7 @@ expect.
 | Legalize binary operator | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | Per-target binary-op legalization |
 | Legalize composite select | [slang-ir-legalize-composite-select.cpp](../../../../source/slang/slang-ir-legalize-composite-select.cpp) | Lowers `select` on composites |
 | Legalize empty array | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | Avoids zero-length arrays |
-| Legalize global values | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | Legalizes module-scope values: `inlineGlobalValuesAndRemoveIfUnused` clones each global inst the target cannot hold at module scope into every function body that uses it and deletes the global if that leaves it unused, so the global declaration disappears from the emit and its value reappears at each use site. `inlineGlobalConstantsForLegalization` does the same for resource-typed global constants, ahead of resource legalization. Each target supplies its own legality predicates by deriving from `GlobalInstInliningContextGeneric` |
+| Legalize global values | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | Legalizes module-scope values: `inlineGlobalValuesAndRemoveIfUnused` clones each global inst the target cannot hold at module scope into every function body that uses it and deletes the global if that leaves it unused, so the global declaration disappears from the emit and its value reappears at each use site. `inlineGlobalConstantsForLegalization` does the same for resource-typed global constants, ahead of resource legalization. Each target supplies its own legality predicates by deriving from `GlobalInstInliningContextGeneric`. Note that plain constant data is *not* what this is about — a `static const int kTable[4] = {...}` is holdable at module scope on HLSL, WGSL and Metal alike and survives unchanged. What moves is a global whose *value* the target has no module-scope form for; the resource-typed global constants that `inlineGlobalConstantsForLegalization` handles ahead of resource legalization are the clearest case, since a target that has no module-scope representation for a resource handle must reconstruct it inside each function that uses it |
 | Legalize image subscript | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | Rewrites image indexing |
 | Legalize matrix types | [slang-ir-legalize-matrix-types.cpp](../../../../source/slang/slang-ir-legalize-matrix-types.cpp) | Per-target matrix shape adjustments |
 | Legalize mesh outputs | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | Mesh-shader output rewriting |
@@ -434,7 +434,7 @@ which skips locations already claimed by an explicit annotation.
 | Translate global varying var | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | Stage-varying globals |
 | Late require capability | [slang-ir-late-require-capability.cpp](../../../../source/slang/slang-ir-late-require-capability.cpp) | `processLateRequireCapabilityInsts` processes and eliminates the deferred `LateRequireCapability` instructions, diagnosing missing capabilities as warnings or errors depending on `-restrictive-capability-check` |
 | User type hint | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `addUserTypeHintDecorations` records each global param's original type name in a `UserTypeNameDecoration` before type lowering can erase it. The SPIR-V backend turns that into an `OpDecorateString ... UserTypeGOOGLE` annotation (requiring `SPV_GOOGLE_user_type`), which is how `-fspv-reflect` reports user-friendly parameter type names |
-| Metadata | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | Fills in the `ArtifactPostEmitMetadata` at the end of the pipeline: `collectMetadata` for binding and exported-function data, `collectCooperativeMetadata` for cooperative-matrix / cooperative-vector types that survive target lowering. None of it reaches the generated source; it is attached to the compiled artifact as `IArtifactPostEmitMetadata` and read back through the compile API, so a test observes it through the host rather than through the emit |
+| Metadata | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | Fills in the `ArtifactPostEmitMetadata` at the end of the pipeline: `collectMetadata` for binding and exported-function data, `collectCooperativeMetadata` for cooperative-matrix / cooperative-vector types that survive target lowering. None of it reaches the generated source; it is attached to the compiled artifact as `IArtifactPostEmitMetadata`, and the invocable surface is `IComponentType::getTargetMetadata` / `getEntryPointMetadata` ([slang.h](../../../../include/slang.h) lines 5619 and 5630), which hand back an `IMetadata` (line 4750). That interface is deliberately small — `isParameterLocationUsed(category, spaceIndex, registerIndex, outUsed)` for the binding data and `getDebugBuildIdentifier()` — so a test checks a *specific* binding rather than dumping the whole table, and there is no `slangc` flag that prints it. So a test observes it through the host rather than through the emit |
 | String hash | [slang-ir-string-hash.cpp](../../../../source/slang/slang-ir-string-hash.cpp) | Manages the module's global hashed-string-literal pool (`findGlobalHashedStringLiterals` / `addGlobalHashedStringLiterals`) and validates that every `getStringHash` operand is a string literal (`checkGetStringHashInsts`) |
 
 ### Loop transformations
@@ -473,7 +473,7 @@ them runs on every target in two different modes; its row says so.
 
 | Pass | File | Purpose |
 | --- | --- | --- |
-| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Synthesizes a `__slang_coverage` buffer (`RWStructuredBuffer<uint64_t>` by default, `uint` when the caller opts down via the validated `counterByteWidth` of `{4, 8}`) and rewrites marker ops into atomic adds; honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control, and `-trace-coverage-boolean` to record execution as a non-atomic store of `1` instead of an exact count. For Metal targets `linkAndOptimizeIR` caps counting-mode counters at 4 bytes before invoking the pass, because MSL has no 64-bit atomic fetch-add; an explicitly requested 64-bit width is capped with a warning, and boolean mode is exempt because it stores rather than accumulates. Two things have to line up for any of this to happen: the linked module must contain coverage marker opcodes (`IncrementCoverageCounter`, `IncrementFunctionCoverageCounter`, `IncrementBranchCoverageCounter`), which is what sets the `coverageTracing` flag in `RequiredLoweringPassSet`, and the pass's `enabled` argument comes from `CodeGenContext::shouldTraceAnyCoverage()`, true when any of the line, function, or branch coverage modes is on. The "caller" that picks `counterByteWidth` is a named user surface: `-trace-coverage-counter-width` on the command line, spelled in bits (`32` or `64`) and validated there, or `CompilerOptionName::TraceCoverageCounterByteWidth` through the API, spelled in bytes (`4` or `8`); with neither set the width is 8 |
+| Coverage instrument | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | Enabled by `-trace-coverage` ([slang-options.cpp](../../../../source/slang/slang-options.cpp) line 627); the `-trace-coverage-*` options below refine an already-enabled mode rather than turning one on, so `-trace-coverage-boolean` alone emits nothing. Synthesizes a `__slang_coverage` buffer — that spelling is the internal one and survives verbatim only on SPIR-V (as `OpName %__slang_coverage`); source-language targets run it through the usual identifier mangling, so the declaration to grep for in HLSL or GLSL output is `_slang_coverage_0` (one leading underscore, plus the disambiguating suffix) — (`RWStructuredBuffer<uint64_t>` by default, `uint` when the caller opts down via the validated `counterByteWidth` of `{4, 8}`) and rewrites marker ops into atomic adds; honors `-trace-coverage-binding` / `-trace-coverage-reserved-space` for binding-slot control, and `-trace-coverage-boolean` to record execution as a non-atomic store of `1` instead of an exact count. For Metal targets `linkAndOptimizeIR` caps counting-mode counters at 4 bytes before invoking the pass, because MSL has no 64-bit atomic fetch-add; an explicitly requested 64-bit width is capped with a warning, and boolean mode is exempt because it stores rather than accumulates. Two things have to line up for any of this to happen: the linked module must contain coverage marker opcodes (`IncrementCoverageCounter`, `IncrementFunctionCoverageCounter`, `IncrementBranchCoverageCounter`), which is what sets the `coverageTracing` flag in `RequiredLoweringPassSet`, and the pass's `enabled` argument comes from `CodeGenContext::shouldTraceAnyCoverage()`, true when any of the line, function, or branch coverage modes is on. The "caller" that picks `counterByteWidth` is a named user surface: `-trace-coverage-counter-width` on the command line, spelled in bits (`32` or `64`) and validated there, or `CompilerOptionName::TraceCoverageCounterByteWidth` through the API, spelled in bytes (`4` or `8`); with neither set the width is 8 |
 | Finalize coverage metadata | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `finalizeCoverageInstrumentationMetadata`; runs after global / entry-point uniform packing to fill in CPU/CUDA uniform-marshaling fields determined by the final post-packing layout |
 | Insert debug value store | [slang-ir-insert-debug-value-store.cpp](../../../../source/slang/slang-ir-insert-debug-value-store.cpp) | Debug-info preservation across optimization |
 | Liveness | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | Liveness analysis used by debug info |

@@ -15,7 +15,7 @@
 // into the module; the CHECK pins the string `"pow"` and wildcards the
 // capability-set reference, whose inst id is unstable.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o - -entry main -stage compute
 
 uniform RWStructuredBuffer<float> buf;
 

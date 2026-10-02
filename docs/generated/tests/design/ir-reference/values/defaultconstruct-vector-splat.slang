@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#defaultconstruct
-//META: doc_section_digest=6c9e23cc7f3c01023f15f82c811288b4c32f6278bb00c875134897b51fe05502
+//META: doc_section_digest=4df637a420e20a9809c679bd1353de4587a5558bbbab7fdfbd1d02ac4c82b3f2
 //META: purpose=Default-initialising a vector or matrix does not emit `defaultConstruct`; lowering decomposes the result type first and builds the concrete aggregate (`MakeVectorFromScalar` / `makeMatrixFromScalar`) from a zero literal.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -18,7 +18,7 @@
 // does not appear at all — the absence is what proves the decomposition
 // happened rather than a fallback.
 
-//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
 
 uniform RWStructuredBuffer<float> buf;
 

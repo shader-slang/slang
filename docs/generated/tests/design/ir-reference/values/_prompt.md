@@ -251,11 +251,11 @@ Value-opcode claims are best observed through one of two mechanisms.
    standard form used here is:
 
    ```
-   //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+   //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o - -stage compute -entry main
    ```
 
    Per the universal `_common.md` rule: combine `-dump-ir` with
-   **`-target <text-target>`** AND **`-o /dev/null`** so the IR dump
+   **`-target <text-target>`** AND **`-o -`** so the IR dump
    goes to stdout uncontaminated by target text.
 
    Anchor patterns at `func %main` (or a user-named helper) to cut
@@ -279,7 +279,7 @@ Do not use any GPU-only directive.
       `ir-reference/values.md` (or one of the listed secondary
       docs).
 - [ ] Every `-dump-ir` test uses `-target <text-target> -dump-ir
--o /dev/null -stage compute -entry main` per CLAUDE.md.
+-o - -stage compute -entry main` per CLAUDE.md.
 - [ ] Outputs escape DCE: write to an `RWStructuredBuffer<T>` so
       the value observation survives to the dump's first stage.
 - [ ] Operands are non-constant (`uniform` globals or values
@@ -306,7 +306,10 @@ These are restated from `_common.md` because they bite hard in
 value-opcode observation tests:
 
 - `-dump-ir` requires `-target <X>` (else compile stops early) and
-  `-o /dev/null` (else target text mixes with IR on stdout).
+  `-o -` (an absolute path such as `/dev/null` is rejected as
+  non-portable; the target text lands in the trailing `standard
+  output` block, after the IR dump, so it cannot disturb an ordered
+  `CHECK`).
 - Constant folding collapses arithmetic on literals. To observe
   `add(%a, %b)` or any binary opcode, both operands must be non-
   constant: read them from `uniform` globals or compute them from
@@ -324,10 +327,10 @@ value-opcode observation tests:
   block-parameter, **not** to the `select` opcode. The doc says
   `select` "lowers from `SelectExpr` and ternary `?:`" but the
   observed lowering of `?:` uses `ifElse`; record as a doc gap.
-- CUDA factors `__ldg(&uniform)` reads into temporaries, splitting
-  compound expressions on uniform operands. To observe a binary
-  expression on CUDA, derive operands from `SV_DispatchThreadID`
-  rather than from `uniform` globals.
+- CUDA emits top-level `uniform` values in the `__constant__`
+  `SLANG_globalParams` object, so those reads must not use `__ldg`.
+  Positive `__ldg` checks need an eligible global-memory source such
+  as `StructuredBuffer<T>` or `ConstantBuffer<T>`.
 - Trivial scalar locals are eliminated during lowering. The `var`
   opcode survives in IR when the local is a struct accessed by
   field address (or an array indexed elementwise).

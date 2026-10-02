@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#core-module-syntax-declarations
-//META: doc_section_digest=61eae4cb09aaf55ca13e1b5adcdbe1bcd8d876e194e57de10e1861ffeb9396c7
+//META: doc_section_digest=12582dfa01eb81163b717e59e208875fece8e3cb827d3738a483bbc260d0c7d8
 //META: purpose=`hlsl.meta.slang` contributes the descriptor-heap vocabulary, and the `__subscript` on the resource-heap type turns an index into an untyped handle that converts to a concrete resource on each target in the `glsl_hlsl_spirv_wgsl` gate.
 //META: intent=functional
 //META: pipeline_stage=emit
