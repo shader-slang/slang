@@ -709,9 +709,17 @@ Surface legalization runs before shared subscript expansion discards component m
 validator reads the canonical resource type and optional format metadata from a collected field,
 first-block entry formal or exact descriptor-to-resource conversion. Typed field/fixed-array selectors
 retain their declared keys through entry value aggregates and synthesized global parameter groups.
-A selector rooted in an ordinary helper parameter or raw entry pointer supplies no format proof. That checked owner selects
-physical payload types, explicit conversion and byte-X coordinates; equal logical types can
-therefore access different formats. The provider emits typed
+Required surface-helper inlining runs before storage layout legalization. It follows writable
+texture leaves through finite value records/arrays and parameter references, and overrides
+`noinline` because the CUDA handle ABI carries no runtime format. Existing SSA simplification,
+local memory forwarding and snapshot-preserving load deferral expose the caller's binding selectors;
+small surface aggregates bypass only deferral's profitability threshold. Memory-scope/alignment and
+intervening-write checks remain mandatory. Recursion checks precede expansion even when optional
+validation is disabled. This can increase code size; it is a legality rule, not a performance claim.
+
+The format owner still rejects unresolved helper roots, raw entry pointers and runtime selections
+between incompatible formats. It selects physical payload types, explicit conversion and byte-X
+coordinates; equal logical types can therefore access different formats. The provider emits typed
 operations and mechanical register transport, not format discovery or implicit storage conversion. Component
 updates preserve untouched raw lanes and remain non-atomic. In-range dynamic scalar components
 select the converted replacement against each old physical lane; only the replacement is converted.

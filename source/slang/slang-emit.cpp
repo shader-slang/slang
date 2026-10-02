@@ -2175,6 +2175,10 @@ Result linkAndOptimizeIR(
             SLANG_PASS(resolveVaryingInputRef);
         SLANG_PASS(fixEntryPointCallsites);
         SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink(), true);
+        // Expose binding values before storage lowering assigns concrete layouts to child
+        // addresses. Later reconstruction would mix default and physical pointer types.
+        SLANG_RETURN_ON_FAIL(
+            SLANG_PASS(performNVVMSurfaceFunctionInlining, codeGenContext, targetProgram, sink));
     }
 
     if (isCPUTargetViaLLVM(targetRequest) || emitNVVMDirectly)
@@ -2570,7 +2574,9 @@ Result linkAndOptimizeIR(
 
     // Preserve component masks while making the direct route's physical accesses explicit.
     if (emitNVVMDirectly)
+    {
         SLANG_PASS(legalizeNVVMSurfaceOperations);
+    }
 
     // Legalize `ImageSubscript` loads.
     switch (target)

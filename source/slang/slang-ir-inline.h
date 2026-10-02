@@ -7,6 +7,7 @@
 namespace Slang
 {
 struct IRModule;
+struct CodeGenContext;
 struct IRCall;
 struct IRGlobalValueWithCode;
 class DiagnosticSink;
@@ -34,6 +35,14 @@ bool performPreAutoDiffForceInlining(IRModule* module);
 /// Inline calls to functions that returns a resource/sampler via either return value or output
 /// parameter.
 void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram);
+
+/// Inline writable-texture value/reference helpers so physical format selection retains caller
+/// binding provenance. This is required NVVM legalization, independent of optimization hints.
+Result performNVVMSurfaceFunctionInlining(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink);
 
 /// Inline simple intrinsic functions whose definition is a single asm block.
 void performIntrinsicFunctionInlining(IRModule* module);

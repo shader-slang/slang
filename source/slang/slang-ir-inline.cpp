@@ -2,9 +2,12 @@
 #include "slang-ir-inline.h"
 
 #include "core/slang-performance-profiler.h"
+#include "slang-ir-check-recursion.h"
+#include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-target-program.h"
 
 // This file provides general facilities for inlining function calls.
 
@@ -1270,6 +1273,92 @@ void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* 
         changed = pass.considerAllCallSites();
         simplifyIR(module, nullptr, IRSimplificationOptions::getFast(targetProgram));
     }
+}
+
+// Writable texture handles do not carry a runtime physical format in the CUDA ABI. Keep helper
+// calls in the caller's binding context until surface legalization has selected that format.
+// For example, read(image) called with r16f and rgba8 bindings must produce two independently
+// checked conversions, even though both handles have floating logical element types.
+struct NVVMSurfaceFunctionInliningPass : InliningPassBase
+{
+    Dictionary<IRType*, bool> surfaceTypes;
+
+    NVVMSurfaceFunctionInliningPass(IRModule* module)
+        : InliningPassBase(module)
+    {
+    }
+
+    // Only value containment and parameter references carry the caller's surface bindings.
+    // Raw pointer pointees are separate memory objects and establish no binding provenance.
+    bool containsSurfaceBinding(IRType* type)
+    {
+        bool result = false;
+        if (surfaceTypes.tryGetValue(type, result))
+            return result;
+        if (auto texture = as<IRTextureTypeBase>(type))
+            result = texture->getAccess() == SLANG_RESOURCE_ACCESS_READ_WRITE;
+        else if (auto array = as<IRArrayType>(type))
+            result = containsSurfaceBinding(array->getElementType());
+        else if (auto record = as<IRStructType>(type))
+        {
+            for (auto field : record->getFields())
+                if (containsSurfaceBinding(field->getFieldType()))
+                {
+                    result = true;
+                    break;
+                }
+        }
+        else if (
+            as<IROutParamTypeBase>(type) || as<IRRefParamType>(type) ||
+            as<IRBorrowInParamType>(type))
+            result = containsSurfaceBinding(cast<IRPtrTypeBase>(type)->getValueType());
+        surfaceTypes.add(type, result);
+        return result;
+    }
+
+    bool shouldInline(CallSiteInfo const& info)
+    {
+        if (containsSurfaceBinding(info.callee->getResultType()))
+            return true;
+        for (auto param : info.callee->getParams())
+            if (containsSurfaceBinding(param->getDataType()))
+                return true;
+        return false;
+    }
+};
+
+Result performNVVMSurfaceFunctionInlining(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
+{
+    // Required inlining must terminate even when optional validation is disabled. These existing
+    // checks own recursive types/functions; reject before expanding any calls.
+    checkForRecursiveTypes(module, sink);
+    checkForRecursiveFunctions(module, targetProgram->getTargetReq(), sink);
+    if (sink->getErrorCount())
+        return SLANG_FAIL;
+    NVVMSurfaceFunctionInliningPass pass(module);
+    auto options = IRSimplificationOptions::getFast(targetProgram);
+    // Inlined out/inout aggregate helpers leave field stores. Existing memory forwarding must
+    // expose their binding values before physical format selection, including at O0.
+    options.removeRedundancy = true;
+    Func<bool, IRType*> requiredTypes(
+        &pass,
+        &NVVMSurfaceFunctionInliningPass::containsSurfaceBinding);
+    while (pass.considerAllCallSites())
+    {
+        simplifyIR(module, targetProgram, options);
+        pass.surfaceTypes.clear();
+        // Returning a record can leave a whole-record load followed by field/array extracts.
+        // Expose those leaves with the existing snapshot-preserving load transformation even
+        // for small records, then forward the resulting local loads to their binding values.
+        deferBufferLoad(module, codeGenContext, &requiredTypes);
+        simplifyIR(module, targetProgram, options);
+        pass.surfaceTypes.clear();
+    }
+    return SLANG_OK;
 }
 
 struct IntrinsicFunctionInliningPass : InliningPassBase

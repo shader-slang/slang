@@ -1,4 +1,5 @@
 // Distinguish a possible memory effect from proof of a known shader exit.
+#include "slang/slang-ir-defer-buffer-load.h"
 #include "slang/slang-ir-util.h"
 #include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
@@ -56,4 +57,66 @@ SLANG_UNIT_TEST(irShaderTerminationSeparatesUnknownEffectsFromKnownExits)
     addedCall->removeAndDeallocate();
     SLANG_CHECK(!mayInvokeShaderTerminatingIntrinsic(a, known));
     SLANG_CHECK(!mayInvokeShaderTerminatingIntrinsic(b, known));
+}
+
+SLANG_UNIT_TEST(irImageAccessPreservesLocalStorage)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder fixture(env.getSessionImpl());
+    IRBuilder builder(fixture.getModule());
+    builder.setInsertInto(fixture.getModule());
+    auto zero = builder.getIntValue(builder.getIntType(), 0);
+    auto one = builder.getIntValue(builder.getIntType(), 1);
+    auto texture = builder.getTextureType(
+        builder.getUIntType(),
+        builder.getType(kIROp_TextureShape1DType),
+        zero,
+        zero,
+        zero,
+        one,
+        zero,
+        zero,
+        zero);
+    auto array =
+        builder.getArrayType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+    auto record = builder.createStructType();
+    auto field = builder.createStructField(record, builder.createStructKey(), array);
+    auto global = builder.createGlobalVar(builder.getUIntType());
+    auto function = builder.createFunc();
+    IRType* params[] = {texture, builder.getPtrType(builder.getUIntType())};
+    function->setFullType(builder.getFuncType(2, params, builder.getVoidType()));
+    builder.setInsertInto(function);
+    builder.emitBlock();
+    auto image = builder.emitParam(texture);
+    auto pointer = builder.emitParam(params[1]);
+    auto local = builder.emitVar(record);
+    auto fieldAddress = builder.emitFieldAddress(local, field->getKey());
+    auto elementAddress = builder.emitElementAddress(fieldAddress, zero);
+    ShortList<IRInst*> args;
+    args.add(image);
+    args.add(zero);
+    auto read = builder.emitImageLoad(builder.getUIntType(), args);
+    args.add(builder.getIntValue(builder.getUIntType(), 7));
+    auto write = builder.emitImageStore(builder.getVoidType(), args);
+    auto snapshot = builder.emitLoad(local);
+    auto beforeWrite = builder.emitFieldExtract(array, snapshot, field->getKey());
+    auto store = builder.emitStore(elementAddress, args[2]);
+    auto afterWrite = builder.emitFieldExtract(array, snapshot, field->getKey());
+    builder.emitReturn();
+
+    // A required aggregate-leaf rewrite must still preserve a value loaded before mutation.
+    SLANG_CHECK(isMemoryLocationUnmodifiedBetweenLoadAndUser(nullptr, snapshot, beforeWrite));
+    SLANG_CHECK(!isMemoryLocationUnmodifiedBetweenLoadAndUser(nullptr, snapshot, afterWrite));
+
+    for (auto access : {read, write})
+    {
+        // Texel memory and local aggregate storage are distinct. This does not assert that
+        // different texture handles, globals or arbitrary caller addresses cannot alias.
+        for (IRInst* address : {static_cast<IRInst*>(local), fieldAddress, elementAddress})
+            SLANG_CHECK(!canInstHaveSideEffectAtAddress(function, access, address, nullptr));
+        for (IRInst* address : {static_cast<IRInst*>(global), static_cast<IRInst*>(pointer)})
+            SLANG_CHECK(canInstHaveSideEffectAtAddress(function, access, address, nullptr));
+    }
+    SLANG_CHECK(canInstHaveSideEffectAtAddress(function, store, elementAddress, nullptr));
+    SLANG_CHECK(canInstHaveSideEffectAtAddress(function, store, local, nullptr));
 }

@@ -92881,6 +92881,275 @@
         "FourNVRTC compile failures do not establish numerical behavior.",
         "No new full SlangPy/RHI/working run; RHI inventory unchanged."
       ]
+    },
+    "nvvm-surface-helper-formats": {
+      "status": "accepted-focused",
+      "identity": {
+        "path": "build/nvvm-surface-helpers/identity.json",
+        "sha256": "be3ad31d6a38d89d465a5fe0906a6ddeec840a502ed5979140e718dde344395e"
+      },
+      "scope": "Required surface helper binding preservation before physical storage lowering.",
+      "validation": {
+        "helper-ir1": {
+          "path": "build/nvvm-surface-helpers/helper-ir1.json",
+          "sha256": "0390603160d85f3a010423b39ca13d12365fa6f560da261c01d6f6c6617c5267",
+          "return_code": 255,
+          "elapsed_seconds": 0.33858561515808105
+        },
+        "helper-ir3": {
+          "path": "build/nvvm-surface-helpers/helper-ir3.json",
+          "sha256": "f302c9a563c6cf5c554a0a4829eed2edf035a0b86fc43af1464a3d5259875319",
+          "return_code": 255,
+          "elapsed_seconds": 0.3250856399536133
+        },
+        "slangpy1": {
+          "path": "build/nvvm-surface-helpers/slangpy1.json",
+          "sha256": "f418595ead37a87724fed421ca0ea52b773f55b7f60b3ddf8cff3ba614685a92",
+          "return_code": 0,
+          "elapsed_seconds": 54.6875684261322
+        },
+        "build4": {
+          "path": "build/nvvm-surface-helpers/build4.json",
+          "sha256": "7327672162f7f400c5e694341f956878f2864f6e7662e0c0ea42c8b6ff79bc2b",
+          "return_code": 0,
+          "elapsed_seconds": 24.23001503944397
+        },
+        "static-termination1": {
+          "path": "build/nvvm-surface-helpers/static-termination1.json",
+          "sha256": "0495588ea3bd200aae9e48444000ff7e3f23c4017db9da322ede19ad1f5ae91d",
+          "return_code": 0,
+          "elapsed_seconds": 7.776458501815796
+        },
+        "fake7": {
+          "path": "build/nvvm-surface-helpers/fake7.json",
+          "sha256": "6ef6526a20a8ce81e9c5e6fcde8b5fcdb8803f69aa597cb038acca2fbbdd6d20",
+          "return_code": 0,
+          "elapsed_seconds": 6.733503341674805
+        },
+        "static-build2": {
+          "path": "build/nvvm-surface-helpers/static-build2.json",
+          "sha256": "c8a5a40e156ba3c7359af5844e62ed7799efc87b3d836b714748fbb6b33c6430",
+          "return_code": 0,
+          "elapsed_seconds": 54.0675094127655
+        },
+        "build6": {
+          "path": "build/nvvm-surface-helpers/build6.json",
+          "sha256": "dd5c7e4b68e34fac6a5d1d267cd7678fac2f42195c1fe2b288adefc916a23f30",
+          "return_code": 0,
+          "elapsed_seconds": 27.20197868347168
+        },
+        "build7": {
+          "path": "build/nvvm-surface-helpers/build7.json",
+          "sha256": "34377479dcce19bc3fbdc36bd3cd0595e6b9c73b0828bd5c1de218d1c0b75f6f",
+          "return_code": 0,
+          "elapsed_seconds": 58.407796144485474
+        },
+        "cpu2": {
+          "path": "build/nvvm-surface-helpers/cpu2.json",
+          "sha256": "fe1c8d482bb03c27f7eb9be38fecc197003dbc01792d74378652e02b90f5e3d5",
+          "return_code": 0,
+          "elapsed_seconds": 34.69386911392212
+        },
+        "recursion11": {
+          "path": "build/nvvm-surface-helpers/recursion11.json",
+          "sha256": "1176967f027857eda5070ad622223b1f29ebe02e21dab4cf824bed0682e4ddfa",
+          "return_code": 0,
+          "elapsed_seconds": 1.4235436916351318
+        },
+        "build2": {
+          "path": "build/nvvm-surface-helpers/build2.json",
+          "sha256": "322bfd6ee7208a8766f8b1d7817f778de4f7e3634c5fbc09a2a2b38cbf8de0fb",
+          "return_code": 0,
+          "elapsed_seconds": 22.444528818130493
+        },
+        "build5": {
+          "path": "build/nvvm-surface-helpers/build5.json",
+          "sha256": "8e5c3044b223be28457b93e4db13e70a20c50033912222cd770a2793bf0db80d",
+          "return_code": 0,
+          "elapsed_seconds": 23.024304628372192
+        },
+        "helper-ir2": {
+          "path": "build/nvvm-surface-helpers/helper-ir2.json",
+          "sha256": "d5da7354821ca4f44a891ca0c77e73051182813dbc27226cd6bf5cfe2e64e583",
+          "return_code": 255,
+          "elapsed_seconds": 0.328033447265625
+        },
+        "recursion9": {
+          "path": "build/nvvm-surface-helpers/recursion9.json",
+          "sha256": "1a9487806859aebda708052ef0e3cbee75831f58b12ac1813b7e2bda88d05b7a",
+          "return_code": 1,
+          "elapsed_seconds": 1.4602108001708984
+        },
+        "application-ir1": {
+          "path": "build/nvvm-surface-helpers/application-ir1.json",
+          "sha256": "9c0f08d8ac848c3efcd328adc73beaac310553ba586e71ba536635e152ebf9e2",
+          "return_code": 0,
+          "elapsed_seconds": 1.848165512084961
+        },
+        "build3": {
+          "path": "build/nvvm-surface-helpers/build3.json",
+          "sha256": "d5fa83a8414946ddbe30b50b45c72481ae8194ddf248a3508545db3ae8cc0f52",
+          "return_code": 0,
+          "elapsed_seconds": 24.19094967842102
+        },
+        "static-image1": {
+          "path": "build/nvvm-surface-helpers/static-image1.json",
+          "sha256": "c41791d098fcbeea0fd17b063bcbd269e6e580f165a05a0fd7159c71c447b4da",
+          "return_code": 0,
+          "elapsed_seconds": 7.826841592788696
+        },
+        "build1": {
+          "path": "build/nvvm-surface-helpers/build1.json",
+          "sha256": "bbdc747bb9987c7030adc956db6fe55bdd8ff7f54abbb8a0f895be9ed318b8f0",
+          "return_code": 0,
+          "elapsed_seconds": 56.113388538360596
+        },
+        "slangpy2": {
+          "path": "build/nvvm-surface-helpers/slangpy2.json",
+          "sha256": "f42b1cece67e11ba5a48ef2861d9a13181fc5ad7a34f11926e83f3d1c481540d",
+          "return_code": 0,
+          "elapsed_seconds": 59.899861574172974
+        },
+        "recursion10": {
+          "path": "build/nvvm-surface-helpers/recursion10.json",
+          "sha256": "d07eb2841142ea65d32e7dd0fc0f40d33f626644d9be2c770cfa3690513348f5",
+          "return_code": 1,
+          "elapsed_seconds": 2.6506636142730713
+        },
+        "source8": {
+          "path": "build/nvvm-surface-helpers/source8.json",
+          "sha256": "6ed8388547467ef57f5e786c0a9cb0d57ea351ec8fd1d0a785e27b34b03f94a0",
+          "return_code": 1,
+          "elapsed_seconds": 7.104306936264038
+        },
+        "mixed-ir7": {
+          "path": "build/nvvm-surface-helpers/mixed-ir7.json",
+          "sha256": "278c71a370a13e164e750601ade936f9f4f860b89df532f3956e200cf6c93495",
+          "return_code": 255,
+          "elapsed_seconds": 0.2984910011291504
+        },
+        "build8": {
+          "path": "build/nvvm-surface-helpers/build8.json",
+          "sha256": "b1a2ec251091f7d7c5b49283528833621ff100bc36e5156cc74d7c628a6005d2",
+          "return_code": 0,
+          "elapsed_seconds": 28.492665767669678
+        },
+        "mixed-ir6": {
+          "path": "build/nvvm-surface-helpers/mixed-ir6.json",
+          "sha256": "b78dd77cf7d9c331840a2b47081755804d8a0b30813c911dd84fd2f07084b7eb",
+          "return_code": 255,
+          "elapsed_seconds": 0.29849839210510254
+        },
+        "source7": {
+          "path": "build/nvvm-surface-helpers/source7.json",
+          "sha256": "4a27d2320136dc4e258b924a6577ed117171344e3ddd74ede05bc3bb38e94978",
+          "return_code": 1,
+          "elapsed_seconds": 1.5331828594207764
+        },
+        "static-build1": {
+          "path": "build/nvvm-surface-helpers/static-build1.json",
+          "sha256": "f1d5cba20f2b7a04af482da52642d6431ca847ad9b6f346f981f7dd99ce13286",
+          "return_code": 1,
+          "elapsed_seconds": 19.155220985412598
+        }
+      },
+      "surface_runs": {
+        "family8": {
+          "results": {
+            "path": "build/nvvm-surface-helpers/family8/results.json",
+            "sha256": "e9b36fc3b22f6e91f43ea9275fac9ff7beeb6380cdab3b6f23e64264a6f7867f"
+          },
+          "provenance": {
+            "path": "build/nvvm-surface-helpers/family8/provenance.json",
+            "sha256": "21019c6c4fad19c3bf0572b7bc9b972587445db1a7a2cd4424ef723e095bf0f0"
+          },
+          "counts": {
+            "passed": 12
+          }
+        }
+      },
+      "outcomes": {
+        "surface_nvvm": {
+          "cells": 12,
+          "normalized_cells": 8,
+          "native_half_cells": 4
+        },
+        "units": {
+          "passed": 3
+        },
+        "static_units": {
+          "passed": 2
+        },
+        "formatted_helper_ptx": {
+          "passed": 2
+        },
+        "required_recursion_rejection": {
+          "passed": 1
+        },
+        "cpu_contracts": {
+          "passed": true,
+          "cases": 157
+        },
+        "slangpy": {
+          "selected": 484,
+          "passed": 484,
+          "failed": 0,
+          "resolved": 96,
+          "previous_passes_preserved": 388
+        },
+        "smoke": {
+          "passed": 16,
+          "selection": {
+            "path": "build/nvvm-surface-helpers/smoke1/selection.json",
+            "sha256": "fcfb9fc2efd768476c119f0f88c37ce1ba9d5a04de79f7a6fb95fd120442103b"
+          }
+        }
+      },
+      "contracts": [
+        "Writable surface value containment has one classifier; raw pointers do not carry caller binding provenance.",
+        "Required helper inlining precedes physical storage layout assignment, preserving canonical child pointer types. Recursion is rejected even when optional validation is disabled.",
+        "Shared local memory forwarding distinguishes texel accesses from function-local storage; nonlocal addresses remain conservative.",
+        "Existing load deferral exposes aggregate leaves; required types bypass only profitability and retain snapshot/attribute safety.",
+        "Local whole/field/array transport, actual handle overwrite, different formats through one helper and12*111observable effects are independently checked.",
+        "Original full checkpoints and working inventory retain identities; no automatic corpus adoption."
+      ],
+      "failure_history": [
+        {
+          "attempts": ["family1", "family2", "family3"],
+          "status": "resolved",
+          "detail": "Partial local resource stores needed existing memory forwarding; both image reads and writes initially blocked that proof. Shared local-only effect analysis now handles both."
+        },
+        {
+          "attempts": ["family5", "mixed-ir6", "mixed7", "mixed-ir7"],
+          "status": "resolved",
+          "detail": "Whole-record result loads required existing safe deferral independent of size. Running before physical storage lowering prevents default/ScalarLayout child pointer mismatch."
+        },
+        {
+          "attempts": ["static-build1"],
+          "status": "resolved-test",
+          "detail": "Static fixture array count must be IRIntLit, not C++int."
+        },
+        {
+          "attempts": ["source7", "source8", "recursion9", "recursion10"],
+          "status": "resolved-test",
+          "detail": "Recursion correctly rejected; exhaustive annotations needed both emitted diagnostic messages."
+        },
+        {
+          "attempts": ["slangpy1"],
+          "status": "superseded-preliminary",
+          "detail": "Initial484passes preceded complete aggregate result qualification; finalslangpy2 repeatsall484 on acceptedbuild8."
+        }
+      ],
+      "review": {
+        "reviewer": "/root/remaining_rhi_analysis",
+        "result": "Approved final source/evidence: exact484application passes,12GPUcells,16smoke, identities and all prior feature/run/history objects preserved."
+      },
+      "limits": [
+        "Required inlining can increase code size; no performance claim.",
+        "Unproven runtime format selection, raw pointer binding provenance and unsupported recursion remain rejected.",
+        "No new full SlangPy/RHI/working checkpoint. Cadence2implementations since compact-pointer working run; due full checkpoint remains queued.",
+        "Existing NVRTC normalized compile failures retain their earlier evidence; no new NVRTC numerical qualification."
+      ]
     }
   }
 }

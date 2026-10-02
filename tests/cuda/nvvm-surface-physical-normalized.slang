@@ -77,6 +77,75 @@ typealias Unsigned16RGBA = vector<Scalar, 4>;
 [format("rgba16")] Surface<Unsigned16RGBA> surfaceUnsigned16RGBA;
 Surface<float4> observedUnsigned16RGBA;
 
+#ifndef SURFACE_HELPERS
+#define SURFACE_HELPERS 0
+#endif
+#if SURFACE_HELPERS
+Surface<uint> observedEffects;
+struct SurfaceBundle<T : ITexelElement> { Surface<T> handles[2]; }
+[noinline] Surface<T> returnSurface<T : ITexelElement>(__constref SurfaceBundle<T> bundle)
+{
+    return bundle.handles[1];
+}
+[noinline] void prepare<T : ITexelElement>(Surface<T> source, out SurfaceBundle<T> bundle)
+{
+    bundle.handles[0] = source;
+    bundle.handles[1] = source;
+}
+[noinline] void forwardSurface<T : ITexelElement>(inout SurfaceBundle<T> bundle, out Surface<T> result)
+{
+    bundle.handles[0] = bundle.handles[1];
+    result = returnSurface(bundle);
+}
+[noinline] uint3 effectCoordinate(uint3 tid, inout uint effects)
+{
+    effects += 10;
+    return tid;
+}
+[noinline] T readSurface<T : ITexelElement>(__constref SurfaceBundle<T> bundle, uint3 tid, inout uint effects)
+{
+    effects += 100;
+    return returnSurface(bundle)[COORD];
+}
+[noinline] void storeSurface<T : ITexelElement>(Surface<T> image, uint3 tid, T value)
+{
+    image[COORD] = value;
+}
+[noinline] void writeR(inout SurfaceBundle<Scalar> bundle, uint3 tid, Scalar value, inout uint effects)
+{
+    effects += 1;
+    Surface<Scalar> image;
+    forwardSurface(bundle, image);
+    storeSurface(image, tid, value);
+}
+[noinline] void writeRG(inout SurfaceBundle<vector<Scalar,2>> bundle, uint3 tid, vector<Scalar,2> value, inout uint effects)
+{
+    effects += 1;
+    Surface<vector<Scalar,2>> image;
+    forwardSurface(bundle, image);
+#if SURFACE_OPERATION == 0
+    storeSurface(image, tid, value);
+#elif SURFACE_OPERATION == 1
+    image[COORD].y = value.y;
+#else
+    image[COORD][(tid.x - 1) % 2] = value[(tid.x - 1) % 2];
+#endif
+}
+[noinline] void writeRGBA(inout SurfaceBundle<vector<Scalar,4>> bundle, uint3 tid, vector<Scalar,4> value, inout uint effects)
+{
+    effects += 1;
+    Surface<vector<Scalar,4>> image;
+    forwardSurface(bundle, image);
+#if SURFACE_OPERATION == 0
+    storeSurface(image, tid, value);
+#elif SURFACE_OPERATION == 1
+    image[COORD].yw = value.yw;
+#else
+    image[COORD][(tid.x - 1) % 4] = value[(tid.x - 1) % 4];
+#endif
+}
+#endif
+
 float inputValue(uint index)
 {
     switch (index % 64)
@@ -168,12 +237,36 @@ void exercise(uint3 tid : SV_DispatchThreadID)
     uint index = tid.x - 1 + tid.y * 7 + tid.z * 5;
 #endif
 
+#if SURFACE_HELPERS
+    uint effects = 0;
+#endif
+#if SURFACE_HELPERS
+    SurfaceBundle<Signed8R> bundleSigned8R;
+    prepare(surfaceSigned8R, bundleSigned8R);
+    uint3 coordinateSigned8R = effectCoordinate(tid, effects);
+    storeSurface(observedSigned8R, tid, float(readSurface(bundleSigned8R, coordinateSigned8R, effects)));
+#else
     observedSigned8R[COORD] = float(surfaceSigned8R[COORD]);
+#endif
     Signed8R valueSigned8R = Scalar(inputValue(index + 0));
+#if SURFACE_HELPERS
+    writeR(bundleSigned8R, coordinateSigned8R, valueSigned8R, effects);
+#else
     surfaceSigned8R[COORD] = valueSigned8R;
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Signed8RG> bundleSigned8RG;
+    prepare(surfaceSigned8RG, bundleSigned8RG);
+    uint3 coordinateSigned8RG = effectCoordinate(tid, effects);
+    storeSurface(observedSigned8RG, tid, float2(readSurface(bundleSigned8RG, coordinateSigned8RG, effects)));
+#else
     observedSigned8RG[COORD] = float2(surfaceSigned8RG[COORD]);
+#endif
     Signed8RG valueSigned8RG = Signed8RG(Scalar(inputValue(index + 3)), Scalar(inputValue(index + 8)));
+#if SURFACE_HELPERS
+    writeRG(bundleSigned8RG, coordinateSigned8RG, valueSigned8RG, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceSigned8RG[COORD] = valueSigned8RG;
 #elif SURFACE_OPERATION == 1
@@ -181,9 +274,20 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceSigned8RG[COORD][(tid.x - 1) % 2] = valueSigned8RG[(tid.x - 1) % 2];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Signed8RGBA> bundleSigned8RGBA;
+    prepare(surfaceSigned8RGBA, bundleSigned8RGBA);
+    uint3 coordinateSigned8RGBA = effectCoordinate(tid, effects);
+    storeSurface(observedSigned8RGBA, tid, float4(readSurface(bundleSigned8RGBA, coordinateSigned8RGBA, effects)));
+#else
     observedSigned8RGBA[COORD] = float4(surfaceSigned8RGBA[COORD]);
+#endif
     Signed8RGBA valueSigned8RGBA = Signed8RGBA(Scalar(inputValue(index + 6)), Scalar(inputValue(index + 11)), Scalar(inputValue(index + 16)), Scalar(inputValue(index + 21)));
+#if SURFACE_HELPERS
+    writeRGBA(bundleSigned8RGBA, coordinateSigned8RGBA, valueSigned8RGBA, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceSigned8RGBA[COORD] = valueSigned8RGBA;
 #elif SURFACE_OPERATION == 1
@@ -191,13 +295,35 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceSigned8RGBA[COORD][(tid.x - 1) % 4] = valueSigned8RGBA[(tid.x - 1) % 4];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Unsigned8R> bundleUnsigned8R;
+    prepare(surfaceUnsigned8R, bundleUnsigned8R);
+    uint3 coordinateUnsigned8R = effectCoordinate(tid, effects);
+    storeSurface(observedUnsigned8R, tid, float(readSurface(bundleUnsigned8R, coordinateUnsigned8R, effects)));
+#else
     observedUnsigned8R[COORD] = float(surfaceUnsigned8R[COORD]);
+#endif
     Unsigned8R valueUnsigned8R = Scalar(inputValue(index + 9));
+#if SURFACE_HELPERS
+    writeR(bundleUnsigned8R, coordinateUnsigned8R, valueUnsigned8R, effects);
+#else
     surfaceUnsigned8R[COORD] = valueUnsigned8R;
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Unsigned8RG> bundleUnsigned8RG;
+    prepare(surfaceUnsigned8RG, bundleUnsigned8RG);
+    uint3 coordinateUnsigned8RG = effectCoordinate(tid, effects);
+    storeSurface(observedUnsigned8RG, tid, float2(readSurface(bundleUnsigned8RG, coordinateUnsigned8RG, effects)));
+#else
     observedUnsigned8RG[COORD] = float2(surfaceUnsigned8RG[COORD]);
+#endif
     Unsigned8RG valueUnsigned8RG = Unsigned8RG(Scalar(inputValue(index + 12)), Scalar(inputValue(index + 17)));
+#if SURFACE_HELPERS
+    writeRG(bundleUnsigned8RG, coordinateUnsigned8RG, valueUnsigned8RG, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceUnsigned8RG[COORD] = valueUnsigned8RG;
 #elif SURFACE_OPERATION == 1
@@ -205,9 +331,20 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceUnsigned8RG[COORD][(tid.x - 1) % 2] = valueUnsigned8RG[(tid.x - 1) % 2];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Unsigned8RGBA> bundleUnsigned8RGBA;
+    prepare(surfaceUnsigned8RGBA, bundleUnsigned8RGBA);
+    uint3 coordinateUnsigned8RGBA = effectCoordinate(tid, effects);
+    storeSurface(observedUnsigned8RGBA, tid, float4(readSurface(bundleUnsigned8RGBA, coordinateUnsigned8RGBA, effects)));
+#else
     observedUnsigned8RGBA[COORD] = float4(surfaceUnsigned8RGBA[COORD]);
+#endif
     Unsigned8RGBA valueUnsigned8RGBA = Unsigned8RGBA(Scalar(inputValue(index + 15)), Scalar(inputValue(index + 20)), Scalar(inputValue(index + 25)), Scalar(inputValue(index + 30)));
+#if SURFACE_HELPERS
+    writeRGBA(bundleUnsigned8RGBA, coordinateUnsigned8RGBA, valueUnsigned8RGBA, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceUnsigned8RGBA[COORD] = valueUnsigned8RGBA;
 #elif SURFACE_OPERATION == 1
@@ -215,13 +352,35 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceUnsigned8RGBA[COORD][(tid.x - 1) % 4] = valueUnsigned8RGBA[(tid.x - 1) % 4];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Signed16R> bundleSigned16R;
+    prepare(surfaceSigned16R, bundleSigned16R);
+    uint3 coordinateSigned16R = effectCoordinate(tid, effects);
+    storeSurface(observedSigned16R, tid, float(readSurface(bundleSigned16R, coordinateSigned16R, effects)));
+#else
     observedSigned16R[COORD] = float(surfaceSigned16R[COORD]);
+#endif
     Signed16R valueSigned16R = Scalar(inputValue(index + 18));
+#if SURFACE_HELPERS
+    writeR(bundleSigned16R, coordinateSigned16R, valueSigned16R, effects);
+#else
     surfaceSigned16R[COORD] = valueSigned16R;
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Signed16RG> bundleSigned16RG;
+    prepare(surfaceSigned16RG, bundleSigned16RG);
+    uint3 coordinateSigned16RG = effectCoordinate(tid, effects);
+    storeSurface(observedSigned16RG, tid, float2(readSurface(bundleSigned16RG, coordinateSigned16RG, effects)));
+#else
     observedSigned16RG[COORD] = float2(surfaceSigned16RG[COORD]);
+#endif
     Signed16RG valueSigned16RG = Signed16RG(Scalar(inputValue(index + 21)), Scalar(inputValue(index + 26)));
+#if SURFACE_HELPERS
+    writeRG(bundleSigned16RG, coordinateSigned16RG, valueSigned16RG, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceSigned16RG[COORD] = valueSigned16RG;
 #elif SURFACE_OPERATION == 1
@@ -229,9 +388,20 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceSigned16RG[COORD][(tid.x - 1) % 2] = valueSigned16RG[(tid.x - 1) % 2];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Signed16RGBA> bundleSigned16RGBA;
+    prepare(surfaceSigned16RGBA, bundleSigned16RGBA);
+    uint3 coordinateSigned16RGBA = effectCoordinate(tid, effects);
+    storeSurface(observedSigned16RGBA, tid, float4(readSurface(bundleSigned16RGBA, coordinateSigned16RGBA, effects)));
+#else
     observedSigned16RGBA[COORD] = float4(surfaceSigned16RGBA[COORD]);
+#endif
     Signed16RGBA valueSigned16RGBA = Signed16RGBA(Scalar(inputValue(index + 24)), Scalar(inputValue(index + 29)), Scalar(inputValue(index + 34)), Scalar(inputValue(index + 39)));
+#if SURFACE_HELPERS
+    writeRGBA(bundleSigned16RGBA, coordinateSigned16RGBA, valueSigned16RGBA, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceSigned16RGBA[COORD] = valueSigned16RGBA;
 #elif SURFACE_OPERATION == 1
@@ -239,13 +409,35 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceSigned16RGBA[COORD][(tid.x - 1) % 4] = valueSigned16RGBA[(tid.x - 1) % 4];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Unsigned16R> bundleUnsigned16R;
+    prepare(surfaceUnsigned16R, bundleUnsigned16R);
+    uint3 coordinateUnsigned16R = effectCoordinate(tid, effects);
+    storeSurface(observedUnsigned16R, tid, float(readSurface(bundleUnsigned16R, coordinateUnsigned16R, effects)));
+#else
     observedUnsigned16R[COORD] = float(surfaceUnsigned16R[COORD]);
+#endif
     Unsigned16R valueUnsigned16R = Scalar(inputValue(index + 27));
+#if SURFACE_HELPERS
+    writeR(bundleUnsigned16R, coordinateUnsigned16R, valueUnsigned16R, effects);
+#else
     surfaceUnsigned16R[COORD] = valueUnsigned16R;
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Unsigned16RG> bundleUnsigned16RG;
+    prepare(surfaceUnsigned16RG, bundleUnsigned16RG);
+    uint3 coordinateUnsigned16RG = effectCoordinate(tid, effects);
+    storeSurface(observedUnsigned16RG, tid, float2(readSurface(bundleUnsigned16RG, coordinateUnsigned16RG, effects)));
+#else
     observedUnsigned16RG[COORD] = float2(surfaceUnsigned16RG[COORD]);
+#endif
     Unsigned16RG valueUnsigned16RG = Unsigned16RG(Scalar(inputValue(index + 30)), Scalar(inputValue(index + 35)));
+#if SURFACE_HELPERS
+    writeRG(bundleUnsigned16RG, coordinateUnsigned16RG, valueUnsigned16RG, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceUnsigned16RG[COORD] = valueUnsigned16RG;
 #elif SURFACE_OPERATION == 1
@@ -253,14 +445,29 @@ void exercise(uint3 tid : SV_DispatchThreadID)
 #else
     surfaceUnsigned16RG[COORD][(tid.x - 1) % 2] = valueUnsigned16RG[(tid.x - 1) % 2];
 #endif
+#endif
 
+#if SURFACE_HELPERS
+    SurfaceBundle<Unsigned16RGBA> bundleUnsigned16RGBA;
+    prepare(surfaceUnsigned16RGBA, bundleUnsigned16RGBA);
+    uint3 coordinateUnsigned16RGBA = effectCoordinate(tid, effects);
+    storeSurface(observedUnsigned16RGBA, tid, float4(readSurface(bundleUnsigned16RGBA, coordinateUnsigned16RGBA, effects)));
+#else
     observedUnsigned16RGBA[COORD] = float4(surfaceUnsigned16RGBA[COORD]);
+#endif
     Unsigned16RGBA valueUnsigned16RGBA = Unsigned16RGBA(Scalar(inputValue(index + 33)), Scalar(inputValue(index + 38)), Scalar(inputValue(index + 43)), Scalar(inputValue(index + 48)));
+#if SURFACE_HELPERS
+    writeRGBA(bundleUnsigned16RGBA, coordinateUnsigned16RGBA, valueUnsigned16RGBA, effects);
+#else
 #if SURFACE_OPERATION == 0
     surfaceUnsigned16RGBA[COORD] = valueUnsigned16RGBA;
 #elif SURFACE_OPERATION == 1
     surfaceUnsigned16RGBA[COORD].yw = valueUnsigned16RGBA.yw;
 #else
     surfaceUnsigned16RGBA[COORD][(tid.x - 1) % 4] = valueUnsigned16RGBA[(tid.x - 1) % 4];
+#endif
+#endif
+#if SURFACE_HELPERS
+    observedEffects[COORD] = effects;
 #endif
 }

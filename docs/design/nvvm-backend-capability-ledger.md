@@ -785,8 +785,8 @@ Float3 sampling, extra access modes and query-level admission remain excluded.
 
 Writable dimension queries cover 1D/2D/3D/1DArray/2DArray and use surface queries, preserving
 existing scalar kinds and widths1/2/4. Global fields, entry formals or exact descriptor conversions
-own writable format; arbitrary helper format provenance and normalized/mismatched memory accesses
-remain rejected. The sibling `surface-dimensions` fixture checks native Float shapes and a formatted
+own writable format; required helper inlining preserves those binding selectors. Unproven runtime
+format selections and mismatched memory accesses remain rejected. The sibling `surface-dimensions` fixture checks native Float shapes and a formatted
 Half surface at O0/O3. Direct CUDA array probes qualify height as 1DArray layer count and depth as
 2DArray layer count on the tested driver/toolkit. This is an empirical CUDA representation contract,
 not a universal PTX rule: isolated `suq.array_size` fails module loading with CUDA801. CUDA C++ gives
@@ -914,8 +914,9 @@ That full baseline still owns its original 249 cells; the sixty-nine added array
 reviewed adoption at the next full checkpoint.
 [Ordinary Half conversion](../../tests/cuda/nvvm-half-narrow-conversion.slang)
 has a separate three-mode regression. Half stores use RN-even; this differs from the existing NVRTC
-formatted store's observed truncation. NVRTC component writes (including dynamic indexing), user resource-helper format provenance, three-channel transfers and additional packed formats
-remain outside this qualification. The pass does not add layered helper writes or general aliases.
+formatted store's observed truncation. NVRTC component writes (including dynamic indexing), three-channel transfers and additional packed
+formats remain outside this qualification. Required helper legalization is qualified separately below;
+component stores do not add atomicity or concurrent-alias guarantees.
 
 The complete `r/rg/rgba`8/16-bit UNORM/SNORM family supports Half/Float logical values, whole
 loads/stores and static/dynamic component stores across1D/2D/3D and1DArray/2DArray surfaces.
@@ -932,10 +933,17 @@ Four selected NVRTC comparisons fail compilation at missing surface read-convers
 component generation; they provide no numerical qualification. Exact failures remain in focused evidence.
 
 [Wrapper provenance](../../tests/cuda/nvvm-surface-wrapper-provenance.slang) qualifies declared fields
-and fixed arrays rooted in entry value bindings or collected globals. Ordinary resource helper
-parameters still lack caller format provenance and reject; the remaining96SlangPy texture failures
-reach that distinct boundary. All50normalized texture-loader failures resolve, including sRGB cases.
-This is focused application evidence, not an updated full surface/application checkpoint.
+and fixed arrays rooted in entry value bindings or collected globals. Required helper inlining
+preserves these bindings through value inputs/results, out/inout/readonly references and nested
+record/array transport. Twelve O0/O3 GPU cells cover normalized whole/static/dynamic operations,
+native Float32 and formatted Half callers, actual local handle overwrites and observable side effects.
+The same helper can access distinct formats; runtime choices lacking a single proven format still
+reject before provider mutation. Raw-pointer provenance and recursion remain rejected. The shared
+load-deferral proof preserves snapshots across mutation. Required inlining can increase code size.
+
+The484-node application selection passes completely:96helper-format failures resolve and388prior
+passes remain. The earlier50normalized-format resolutions are preserved. This is focused evidence,
+not an updated full surface/application checkpoint.
 
 The unannotated surface contract requires a matching physical channel width, count and scalar
 interpretation. A focused host-readback experiment binds the same `RWTexture1D<int4>` kernels to

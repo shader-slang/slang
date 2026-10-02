@@ -1403,6 +1403,16 @@ bool canInstHaveSideEffectAtAddress(
         if (canAddressesPotentiallyAlias(func, as<IRSwizzledStore>(inst)->getDest(), addr))
             return true;
         break;
+    case kIROp_ImageLoad:
+    case kIROp_ImageStore:
+        {
+            // Consider `handles[1] = image; image[p] = value; use(handles[1]);`.
+            // Accessing texels cannot change the local storage containing a handle. Keep those
+            // stores available to memory forwarding, while remaining conservative about other
+            // addresses: distinct texture handle values may still refer to the same image.
+            auto root = getRootAddr(addr);
+            return !(as<IRVar>(root) && isChildInstOf(root, func));
+        }
     case kIROp_Call:
         {
             auto call = as<IRCall>(inst);

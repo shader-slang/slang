@@ -213,6 +213,13 @@ def cases():
                          SURFACE_OPERATION=operation, SURFACE_LOGICAL_HALF=int(half)))
                 if is_array or shape == 3:
                     rows[-1]["array_layers" if is_array else "volume_depth"] = 4
+    for base in ("mixed-1d-wholeCopies", "mixed-2d-wholeCopies",
+                 "normalized-1d-whole-float", "normalized-2d-static-components-half",
+                 "normalized-2d-array-dynamic-components-float", "normalized-3d-dynamic-components-half"):
+        row = copy.deepcopy(next(x for x in rows if x["case"] == base))
+        row["case"] += "-helpers"
+        row["defines"]["SURFACE_HELPERS"] = 1
+        rows.append(row)
     return rows
 
 
@@ -263,6 +270,8 @@ def resource_specs(row):
                 surface = spec("surface" + family + name, storage, lanes, logical)
                 surface["format"] = {1: "r", 2: "rg", 4: "rgba"}[lanes] + suffix
                 result += [surface, spec("observed" + family + name, "float32", lanes)]
+        if row["defines"].get("SURFACE_HELPERS"):
+            result.append(spec("observedEffects", "uint32", 1, "uint32"))
         return result
     scalar = row.get("scalar", "float32")
     return [spec("surface", "half" if row["half"] else scalar, row["lanes"], scalar),
@@ -564,7 +573,7 @@ def normalized_oracle(row):
     half = row["defines"]["SURFACE_LOGICAL_HALF"]
     inputs = normalized_inputs()
     resources = []
-    for resource, spec in enumerate(resource_specs(row)[::2]):
+    for resource, spec in enumerate(resource_specs(row)[:24:2]):
         lanes, bits = spec["lanes"], FORMATS[spec["storage"]][1] * 8
         signed = spec["storage"].startswith("int")
         mask, midpoint = (1 << bits) - 1, 1 << (bits - 1)
@@ -609,6 +618,22 @@ def normalized_oracle(row):
                                   expected=b"".join(v.to_bytes(size, "little") for v in after),
                                   nan_positions=set(), active_texels=active,
                                   guard_texels=width * height * depth - active))
+    if row["defines"].get("SURFACE_HELPERS"):
+        initial, expected = [], []
+        active = 0
+        for z in range(depth):
+            for y in range(height):
+                for x in range(width):
+                    live = (1 <= x <= 256 and (row["shape"] == 1 or 1 <= y <= 3) and
+                            (not spatial or 1 <= z <= 2))
+                    active += int(live)
+                    sentinel = 0x13579BDF
+                    initial.append(sentinel)
+                    expected.append(12 * 111 if live else sentinel)
+        resources.append(dict(initial=b"".join(v.to_bytes(4, "little") for v in initial),
+                              expected=b"".join(v.to_bytes(4, "little") for v in expected),
+                              nan_positions=set(), active_texels=active,
+                              guard_texels=width * height * depth - active))
     return dict(resources=resources)
 
 
@@ -1090,7 +1115,7 @@ def self_test():
             require(encode_normalized(0.5, bits, signed) == (maximum + 1) // 2,
                     "Ties-away conversion failed")
     normalized_rows = [x for x in cases() if x["fixture"] == "normalized"]
-    require(len(normalized_rows) == 30, "Incomplete normalized geometry/operation/type family")
+    require(len(normalized_rows) == 34, "Incomplete normalized geometry/operation/type family")
     # Each input reaches every dynamic component, even though different lanes see shifted inputs.
     for resource in range(12):
         for lanes in (1, 2, 4):

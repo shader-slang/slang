@@ -456,12 +456,36 @@
         "passed": 388,
         "failed": 96
       }
+    },
+    "surface-helper-formats": {
+      "gate": {
+        "path": "build/nvvm-surface-helpers/slangpy2.json",
+        "sha256": "f42b1cece67e11ba5a48ef2861d9a13181fc5ad7a34f11926e83f3d1c481540d"
+      },
+      "log": {
+        "path": "build/nvvm-surface-helpers/slangpy2.log",
+        "sha256": "988703809615d8bb57b922f54dd9a0aa79ba31117e6c8ce8e4a47e4d1de0c719"
+      },
+      "junit": {
+        "path": "build/nvvm-surface-helpers/slangpy2.xml",
+        "sha256": "70dc6639336f2046737a0a1cd8b84841d8afd04e8d840f7016694286495674c1"
+      },
+      "identity": {
+        "path": "build/nvvm-surface-helpers/identity.json",
+        "sha256": "be3ad31d6a38d89d465a5fe0906a6ddeec840a502ed5979140e718dde344395e"
+      },
+      "return_code": 0,
+      "elapsed_seconds": 59.899861574172974,
+      "test_counts": {
+        "passed": 484,
+        "failed": 0
+      }
     }
   },
   "current_counts": {
     "skipped": 807,
-    "passed": 1435,
-    "failed": 155,
+    "passed": 1531,
+    "failed": 59,
     "xfailed": 3
   },
   "collection_skips": [
@@ -1985,7 +2009,103 @@
     "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint8-DeviceType.cuda]",
     "slangpy/tests/utils/test_texture_loader.py::test_srgb_mode[SRGBMode.srgb-True-PixelFormat.rgba-uint16-DeviceType.cuda]",
     "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[False-DeviceType.cuda]",
-    "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]"
+    "slangpy/tests/utils/test_texture_loader.py::test_max_mip_count_bitmap[True-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-int8_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-int16_t]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-1-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-2-float]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-3-float]",
+    "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_2d_with_call_groups[DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape0-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape1-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape2-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape3-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape0-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape1-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape2-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape3-DeviceType.cuda]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_3d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-4-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-4-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_3d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-4-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-4-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_3d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-4-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-4-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
+    "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-4-TextureType.texture_2d]"
   ],
   "failures_by_first_diagnostic": {
     "direct NVVM lowering does not support Slang IR instruction or shape 'struct field address result: Ptr<cbuffer<SLANG_ParameterGroup_data>, addressSpace=2147483647, access=0, operands=4, layout=ScalarLayout>'": [
@@ -2067,66 +2187,6 @@
       "slangpy/tests/slangpy_tests/test_type_resolution.py::test_type_resolution_texture[func_int3_Texture1D<Format.rgb32_sint>-DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_type_resolution.py::test_type_resolution_texture[func_vector3_generic_Texture1D<Format.rgb32_sint>-DeviceType.cuda]"
     ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'": [
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-int8_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-int16_t]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-1-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-2-float]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-3-float]",
-      "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_2d_with_call_groups[DeviceType.cuda]"
-    ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'updateElement'": [
       "slangpy/tests/slangpy_tests/test_array_return_arrays.py::test_diff_array_of_vectors_bwds[DeviceType.cuda]",
       "slangpy/tests/slangpy_tests/test_tensor_with_grads.py::test_differentiable_interface_parameters[DeviceType.cuda]",
@@ -2148,46 +2208,6 @@
     ],
     "direct NVVM lowering does not support Slang IR instruction or shape 'bitCast type: Ptr<float, addressSpace=4294967297, access=0, operands=4, layout=ScalarLayout> -> uint64_t'": [
       "slangpy/tests/slangpy_tests/test_pointers.py::test_atomic_float_in_struct_access[DeviceType.cuda]"
-    ],
-    "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'": [
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape0-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape1-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape2-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape3-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape0-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape1-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape2-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape3-DeviceType.cuda]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_3d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-4-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-4-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_3d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-4-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-4-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_3d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-4-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-4-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
-      "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-4-TextureType.texture_2d]"
     ]
   },
   "skips_by_reason": {
@@ -6701,16 +6721,500 @@
         "sha256": "eb810f9baf9bfa9da7bbb2bed3a1495512bcbe3b6c01eb1ef32039a893471ece"
       },
       "detail": "All50normalized texture-loader/sRGB/mipmap first failures resolve. Remaining96texture cases (58stores/38loads) execute in ordinary helper parameters, whose caller format provenance is not represented. Direct entry/global wrapper selectors qualify separately; helper format specialization is next."
+    },
+    "surface_helper_formats": {
+      "transitions": [
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-1-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-2-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-1-3-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-1-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-2-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-2-3-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-1-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-2-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-int8_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-int16_t]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value[DeviceType.cuda-4-3-uint]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-1-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-2-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_return_value_str[DeviceType.cuda-4-3-float]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_call_group_integrations.py::test_texture_2d_with_call_groups[DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageStore'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape0-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape1-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape2-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_2d_shapes[shape3-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape0-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape1-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape2-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_texture_3d_shapes[shape3-DeviceType.cuda]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-1-TextureType.texture_3d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-4-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-1-4-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_all_uav_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-1-TextureType.texture_3d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-4-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-1-4-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_mip_values_with_resource_views[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-1-TextureType.texture_3d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-4-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-1-4-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-1-TextureType.texture_3d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-4-TextureType.texture_1d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        },
+        {
+          "node": "slangpy/tests/slangpy_tests/test_textures.py::test_copy_value[DeviceType.cuda-4294967295-4-TextureType.texture_2d]",
+          "previous": "direct NVVM lowering does not support Slang IR instruction or shape 'imageLoad'",
+          "current": "passed"
+        }
+      ],
+      "resolved": 96,
+      "previous_passes_preserved": 388,
+      "selection": {
+        "path": "build/nvvm-normalized-surfaces/selection.txt",
+        "sha256": "eb810f9baf9bfa9da7bbb2bed3a1495512bcbe3b6c01eb1ef32039a893471ece"
+      },
+      "detail": "All58imageStore/38imageLoad helper failures resolve. Required type-based inlining preserves declared caller bindings before storage lowering; shared memory forwarding and snapshot-preserving aggregate load deferral expose record/array leaves. No runtime format guessing."
     }
   },
   "next_complete_families": [
-    {
-      "priority": 4,
-      "family": "Surface helper format specialization",
-      "evidence": "Actual generated SlangPy IR has resource field extracts rooted in ordinary __slangpy method parameters.58imageStore/38imageLoad failures remain;50normalized cases resolved.",
-      "scope": "Preserve exact physical format contracts across helper input/output and aggregate transport; specialize by checked caller contract rather than infer native format from a helper resource type. Retain mixed-format callers and failure-before-mutation.",
-      "code": "source/slang/slang-ir-nvvm-surface-legalize.cpp and existing resource/function specialization producers"
-    },
     {
       "priority": 5,
       "family": "Intrinsic TensorView and DiffTensorView ABI",
@@ -6725,7 +7229,7 @@
       "scope": "Reduce producer IR before expanding admission. Five unsupported RGB texture creation failures are shared application/RHI limitations, not evidence of NVVM lowering failure."
     }
   ],
-  "current_evidence": "Mixed-age: original full-nvvm-2 remains the2400-node checkpoint. Normalized surfaces484selection:388pass/96fail,50resolved and338prior passes preserved. Current1435pass/155fail/807skip/3xfail. No new full application run.",
+  "current_evidence": "Mixed-age: original full-nvvm-2 remains the2400-node checkpoint. Surface helper484selection passes completely,96resolved and388prior passes preserved. Current1531pass/59fail/807skip/3xfail. No new full application run.",
   "completed_families": [
     {
       "priority": 1,
@@ -6772,6 +7276,12 @@
       "scope": "All12formats,1/2/4channels,Half/Float,1D/2D/3D/1DArray/2DArray,whole/static/dynamic stores and loads. Declared entry/global value selectors; arbitrary helper/pointer provenance stays rejected.",
       "status": "accepted-focused",
       "evidence": "features.nvvm-normalized-surfaces in focused-evidence.json"
+    },
+    {
+      "family": "Surface helper format preservation",
+      "scope": "Writable texture leaves in finite records/arrays, direct/value/result/out/inout/readonly helper forms; nested noinline calls and native/Half/normalized callers. Runtime mixed-format choices/raw-pointer roots remain rejected.",
+      "status": "accepted-focused",
+      "evidence": "features.nvvm-surface-helper-formats in focused-evidence.json"
     }
   ]
 }

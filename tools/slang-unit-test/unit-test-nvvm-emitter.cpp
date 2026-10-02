@@ -12215,11 +12215,12 @@ SLANG_UNIT_TEST(nvvmSurfaceAggregateBindingsRejectUnprovenFormats)
             }
         )SLANG",
              R"SLANG(
-            struct Wrapper { RWTexture2D<float4> image; }
-            [noinline] float4 read(Wrapper value) { return value.image.Load(int2(0)); }
+            [format("rgba8")] RWTexture2D<float4> normalized;
+            RWTexture2D<float4> native;
+            [noinline] float4 read(RWTexture2D<float4> value) { return value.Load(int2(0)); }
             RWStructuredBuffer<float4> output;
-            [numthreads(1,1,1)] void computeMain(uniform Wrapper value) {
-                output[0] = read(value);
+            [numthreads(1,1,1)] void computeMain(uniform bool chooseNative) {
+                output[0] = read(chooseNative ? native : normalized);
             }
         )SLANG"})
     {

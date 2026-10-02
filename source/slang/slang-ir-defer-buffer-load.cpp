@@ -211,6 +211,7 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
 struct DeferBufferLoadContext
 {
     CodeGenContext* codeGenContext;
+    const Func<bool, IRType*>* requiredTypes = nullptr;
 
     // Shared across every function in the module and never cleared for this pass's lifetime (see
     // `IRDeadCodeEliminationOptions::calleeSideEffectCache` in slang-ir-dce.h for the authoritative
@@ -239,7 +240,8 @@ struct DeferBufferLoadContext
 
         // Don't defer the load anymore if the type is simple.
         if (failDueToAttributeFound ||
-            !isTypePreferrableToDeferLoad(codeGenContext, loadInst->getDataType()))
+            (!(requiredTypes && (*requiredTypes)(loadInst->getDataType())) &&
+             !isTypePreferrableToDeferLoad(codeGenContext, loadInst->getDataType())))
         {
             return;
         }
@@ -388,10 +390,14 @@ struct DeferBufferLoadContext
     }
 };
 
-void deferBufferLoad(IRModule* module, CodeGenContext* codeGenContext)
+void deferBufferLoad(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    const Func<bool, IRType*>* requiredTypes)
 {
     DeferBufferLoadContext context;
     context.codeGenContext = codeGenContext;
+    context.requiredTypes = requiredTypes;
     for (auto childInst : module->getGlobalInsts())
     {
         if (auto code = as<IRGlobalValueWithCode>(childInst))

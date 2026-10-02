@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/slang-func-ptr.h"
+
 namespace Slang
 {
 
@@ -24,7 +26,12 @@ struct CodeGenContext;
 struct IRInst;
 class TargetRequest;
 
-void deferBufferLoad(IRModule* module, CodeGenContext* context);
+// A required-type predicate bypasses only profitability; attribute and memory-stability checks
+// still apply. Use it when a target needs aggregate leaves exposed for representation legalization.
+void deferBufferLoad(
+    IRModule* module,
+    CodeGenContext* context,
+    const Func<bool, IRType*>* requiredTypes = nullptr);
 
 // Returns true if the type is suitable for defer-load optimization.
 // Generally, we want to defer loading large structs or composites that contain arrays.

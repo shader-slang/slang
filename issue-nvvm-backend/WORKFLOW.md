@@ -13,10 +13,10 @@ are accepted together, as are local resource/helper transport and the shared RHI
 consumer repair. Continue with pointer-bearing entry aggregates and checked address/layout families,
 normalized surfaces and intrinsic TensorView. The legacy HitObject decision remains parked.
 Pointer-bearing launch/helper transport and static-context address propagation are now qualified.
-Compact raw pointer storage is now qualified with canonical local/device aliasing. Continue with
-checked surface helper-format specialization, then intrinsic TensorView. The complete normalized
-surface family and direct aggregate binding selectors are qualified; ordinary resource helpers still
-need caller format provenance. The 1,716-cell working checkpoint plus eight exact repairs resets the working cadence. Use affected application selections plus smoke between
+Compact raw pointer storage is qualified with canonical local/device aliasing. Normalized surfaces,
+aggregate binding selectors and surface helper format preservation are also qualified. Continue with
+intrinsic TensorView/DiffTensorView, then the remaining recorded representation families. The1,716-cell
+working checkpoint plus eight exact repairs owns the cadence baseline; two implementations followed it. Use affected application selections plus smoke between
 deliberately chosen full checkpoints.
 
 **Application checkpoint authorized on 2026-10-02:** qualify the sibling SlangPy checkout

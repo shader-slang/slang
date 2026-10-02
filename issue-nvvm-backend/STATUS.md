@@ -67,10 +67,23 @@ all338prior controls remain passing. Current mixed-age inventory is **1,435 pass
 call ordinary helper methods whose resource parameters lack format provenance; direct entry/global
 wrapper selectors now work, but do not establish an arbitrary helper's physical format.
 
-**Next:** carry checked surface formats through helper specialization, then TensorView/DiffTensorView
-and remaining representation families. The working cadence is one implementation since the compact
-pointer checkpoint; use focused application selections and smoke. A full checkpoint follows the
-queued families. Legacy OptiX8HitObject semantics remain parked independently.
+Surface helper format preservation is now qualified. Required type-based inlining exposes caller
+bindings before physical storage lowering; existing memory forwarding and safe load deferral handle
+local records/arrays without a new resource ABI. Twelve GPU cells pass atO0/O3, including native and
+Half storage, normalized operations, aggregate returns, out/inout/readonly references, actual handle
+overwrites and side effects. Three provider units, two static memory/snapshot checks, two formatted
+helper PTX checks, required recursion rejection,157CPU cases and16smoke cells pass.
+
+The484-node application selection now passes completely: **96failures resolve and388prior passes
+remain**. Current mixed-age inventory is **1,531 pass /59 fail /807 skip /3 expected failures**.
+Raw evidence: `build/nvvm-surface-helpers/`. Original full checkpoints and RHI counts remain unchanged.
+Required inlining may increase code size; runtime incompatible-format selections, unproven pointer
+bindings and recursion remain rejected. Failed prototype/annotation attempts remain recorded.
+
+**Next:** intrinsic TensorView/DiffTensorView and remaining representation families. Working cadence
+is two implementations since the compact-pointer checkpoint; use focused application selections
+and smoke. A full checkpoint follows queued families, or the working cadence threshold. Legacy
+OptiX8HitObject semantics remain parked independently.
 
 ## SlangPy application checkpoint
 
