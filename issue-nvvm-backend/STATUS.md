@@ -11,11 +11,11 @@ and architecture refresh are accepted. Native Half ceil/floor/trunc and single-r
 accepted. The requested full validation checkpoint is accepted. Subsequent feature work is recorded
 below; development has resumed with corpus tiers and an initial OptiX path.
 
-The maintainer approved corpus tiers and initial OptiX support on 2026-10-01 and explicitly resumed
-development. Earlier stopping conditions are superseded. Use eight-job builds, related feature
-batches, focused validation and reviewed local commits. Continue until a concrete blocker requires
-human input or a new stopping instruction arrives. No push, external messages or system changes.
-Preserve the user's untracked `tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
+The callable family and requested RHI/working integration are complete. **Stopped for maintainer
+discussion on 2026-10-02**, as requested; do not start the next feature family without a resume.
+Use eight-job builds and economical focused validation when work resumes. No push, external
+messages or system changes. Preserve the user's untracked
+`tests/cuda/complex/tiled_brass_material_mtlx_update.slang` unchanged.
 
 Read [WORKFLOW](WORKFLOW.md), [architecture](../docs/design/nvvm-backend.md),
 [feature matrix](../docs/design/nvvm-backend-capability-ledger.md) and [RESULTS](RESULTS.md).
@@ -76,8 +76,8 @@ LLVM 14, target SM80. CPU-only checks overlapped the main GPU checkpoint; no per
 ## Current feature and next action
 
 The migration, ordered cleanup, native Half batch and requested full checkpoint are complete.
-Thirty-six feature implementations have since passed focused review; [focused evidence](focused-evidence.json)
-now contains 83 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
+Subsequent implementations have passed focused review; [focused evidence](focused-evidence.json)
+now contains 86 feature objects (including corpus tiers and OptiX raygen/triangle/material paths),
 preserving all prior objects and the full baseline. Each feature's
 identity owns its tested source/binaries; the configured compiler string still does not track HEAD.
 These batches used eight-job builds and focused validation. The authorized sequence is complete:
@@ -93,10 +93,11 @@ These batches used eight-job builds and focused validation. The authorized seque
 then executable OptiX raygen, triangle hit/miss and representative material paths. Smoke runs after
 implementation iterations; working runs every three to five iterations or sooner for broad changes.
 Explore application-relevant failures in bounded batches and preserve intentional semantic differences.
-The previous four-item stop is superseded. Approximate Half policies remain separate work.
+That earlier four-item stop was superseded; the new stop after callable closeout now applies.
+Approximate Half policies remain separate work.
 
 The tier selector is implemented and reviewed: 1,713 working configurations, 459 exploratory
-configurations and a 15-cell smoke subset. Its 43 CPU contracts and all 15 smoke cells pass;
+configurations and a 16-cell smoke subset. Its original 43 CPU contracts and 15 smoke cells passed;
 the first smoke run took 22.16 seconds. The integration run below and reviewed focused admissions qualify this inventory.
 The three descriptor-conversion input changes are reviewed: their stronger UInt2/guard oracle
 preserves the original UInt64 checks, and all three current configurations pass.
@@ -347,7 +348,8 @@ HitObject and current-matrix families resolved 54 original failures. The current
 resolves five more: sphere/LSS queries and payload layout, cluster ID, nested pointer records and
 unused typed-buffer bindings. Current exact counts and comparison differences are maintained in
 [rhi-cuda-status.json](rhi-cuda-status.json); focused updates are not another full-suite run.
-Only callable ABI and the agreed arbitrary MakeHit exclusion remain from the original failures.
+The callable closeout below resolves the final supported original failure; only the agreed arbitrary
+MakeHit exclusion remains.
 Existing shaders/oracles were not weakened and no failure was demoted.
 
 **HitObject feasibility gate:** both explicit SDK8.1 MakeHit constructors compile through
@@ -412,10 +414,37 @@ fails 32 guard-byte assertions; restoring the fix passes. Current mixed-age inve
 registrations (277 unique): NVVM 266 pass / 2 fail / 10 skip; NVRTC 264 pass / 4 fail / 10 skip. The five new
 fixtures stay in RHI, not the compiler corpus. Exact identities, attempts and independent review
 are under `build/nvvm-rhi-data-families`; this is the fourth implementation since the 1,713-cell working checkpoint.
-Next: finish the distinct callable ABI family, run the due working corpus and requested complete
-RHI suite, preserve exact failures, then resume normal feature/corpus cadence.
+The callable family is now accepted: typed calls and callable device entries share the private
+NVVM value ABI, including recursive numeric payloads, mutable out/inout, dynamic nested calls,
+and recursively empty payload effects. The three RHI callable fixtures pass 1,046 assertions at
+O0/O3. Static stage/signature checks, provider no-mutation checks and four source/PTX cells pass.
+Module43/providerABI46/container2 remain unchanged. Cross-backend callable ABI and pointer/resource
+payloads remain outside the qualified contract.
 
-Raw SDK object-ray queries remain AnyHit/Intersection-only, and GeometryIndex is distinct from SBT
-record index. Callable ABI, unsupported payload leaves and recursive callback tracing remain separate
-until qualified. Custom RHI devices/sessions and internal NVRTC kernels retain their documented
-compiler ownership. Preserve the historical full baseline and all unresolved/resolved histories.
+RHI reuses commit `81d5ded4` (Configure OptiX callable stack sizes) from the locally available remote
+branch, with device graph-depth and deferred descriptor ownership adaptations. PR merge status was
+not verified. The full suite executes 280 registrations (279 unique): **NVVM 269 pass / 1 fail /
+10 skip**. All 60 supported original failures are resolved; arbitrary MakeHit is the remaining
+agreed OptiX9 exclusion. NVRTC coverage is complete across an interrupted 158-case run and the
+exact 122-case remainder: **265 pass / 5 fail / 10 skip**. Its retained differences are singleton
+payload matrices, the new callable singleton-matrix fixture, HitObject lifecycle, padded attributes,
+and surface dimensions. The lifecycle process abort and all unrun/remainder evidence remain visible.
+
+The due working run executed all 1,713 configurations with zero input changes: 1,705 passed and eight
+regressed (four resource/interface shaders at O0/O3). The previous data batch had applied a second
+aggregate-layout proof to lowered resource/value carriers whose binding keys retain source layouts.
+Exclusive routing through their existing physical record proof repairs all eight exact configurations;
+storage-only aggregates retain their canonical layout checks. This is a full run plus focused repairs,
+not a fresh all-green full run on the repaired compiler. The positive/negative preflight unit and
+eight provider/source controls pass; 15 related RHI cases pass 51,020 assertions on the repair.
+Smoke now includes append-buffer carrier coverage: all **16 cells pass in 22.05 seconds**.
+Exact identities, original failures, retries and comparisons are maintained in
+[focused evidence](focused-evidence.json), [RHI status](rhi-cuda-status.json) and ignored
+`build/nvvm-optix-callable`. The original full baseline remains unchanged.
+
+**Next action: discuss priorities before resuming.** A concrete candidate is immutable global
+aggregate initialization (the retained synthesized record-constructor failure). Exploratory ranking
+also needs to distinguish untested directive variants from real gaps and intentional CUDA boundaries.
+Neither item has been started. Raw SDK object-ray queries remain AnyHit/Intersection-only;
+unsupported payload leaves and recursive callback tracing remain separate until qualified. Custom
+RHI devices/sessions and internal NVRTC kernels retain their documented compiler ownership.

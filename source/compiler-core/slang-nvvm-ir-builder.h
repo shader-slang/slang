@@ -120,6 +120,17 @@ public:
                                                                   : nullptr;
     }
 
+    bool supportsCallable() const { return m_callableOperations.emitCall != nullptr; }
+    SlangResult emitCallable(
+        SlangNVVMModuleHandle module,
+        SlangNVVMValueHandle index,
+        SlangNVVMValueHandle payload,
+        SlangNVVMValueHandle& outValue) const;
+    const SlangNVVMBuilderCallableOperationsAPI* getCallableOperationsAPI() const
+    {
+        return supportsCallable() ? &m_callableOperations : nullptr;
+    }
+
     bool supportsInstanceTransform(const SlangNVVMInstanceTransformDesc& operation) const;
     SlangResult emitInstanceTransform(
         SlangNVVMModuleHandle module,
@@ -478,6 +489,7 @@ private:
     SlangNVVMBuilderTraceOperationsAPI m_traceOperations = {};
     SlangNVVMBuilderInstanceTransformOperationsAPI m_instanceTransformOperations = {};
     SlangNVVMBuilderCurrentTransformOperationsAPI m_currentTransformOperations = {};
+    SlangNVVMBuilderCallableOperationsAPI m_callableOperations = {};
     SlangNVVMBuilderHitObjectOperationsAPI m_hitObjectOperations = {};
     SlangNVVMBuilderSurfaceOperationsAPI m_surfaceOperations = {};
     SlangNVVMBuilderTextureOperationsAPI m_textureOperations = {};

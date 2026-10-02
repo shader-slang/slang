@@ -247,6 +247,23 @@ static bool _hasRequiredTextureOperations(const SlangNVVMBuilderTextureOperation
         hitObjectOperations = candidate;
     }
 
+    SlangNVVMBuilderCallableOperationsAPI callableOperations = {};
+    const void* callableRaw = nullptr;
+    const auto callableResult =
+        api.queryInterface(SLANG_NVVM_BUILDER_INTERFACE_CALLABLE_OPERATIONS, &callableRaw);
+    if (callableResult != SLANG_E_NO_INTERFACE)
+    {
+        SLANG_RETURN_ON_FAIL(callableResult);
+        if (!callableRaw)
+            return SLANG_E_NO_INTERFACE;
+        const auto& candidate =
+            *static_cast<const SlangNVVMBuilderCallableOperationsAPI*>(callableRaw);
+        if (candidate.structureSize != sizeof(candidate) ||
+            candidate.version != SLANG_NVVM_CALLABLE_OPERATIONS_VERSION || !candidate.emitCall)
+            return SLANG_E_NO_INTERFACE;
+        callableOperations = candidate;
+    }
+    outBuilder.m_callableOperations = callableOperations;
     outBuilder.m_api = api;
     outBuilder.m_foundation = foundation;
     outBuilder.m_construction = construction;
@@ -622,6 +639,21 @@ SlangResult NVVMIRBuilder::emitInstanceTransform(
         m_instanceTransformOperations
             .emitOperation(module, &operation, operands, operandCount, &outValue),
         outValue);
+}
+
+SlangResult NVVMIRBuilder::emitCallable(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle index,
+    SlangNVVMValueHandle payload,
+    SlangNVVMValueHandle& outValue) const
+{
+    outValue = nullptr;
+    if (!isInitialized())
+        return SLANG_E_UNINITIALIZED;
+    if (!supportsCallable())
+        return SLANG_E_NOT_AVAILABLE;
+    const auto result = m_callableOperations.emitCall(module, index, payload, &outValue);
+    return payload ? _validateHandleResult(result, outValue) : result;
 }
 
 bool NVVMIRBuilder::supportsCurrentTransform(const SlangNVVMInstanceTransformDesc& operation) const

@@ -20930,6 +20930,11 @@ int __callablePayloadLocation(__ref Payload payload);
 // targets, which maps the generic HLSL operation into the non-generic
 // GLSL equivalent.
 //
+__generic<Payload>
+[require(nvvm)]
+__intrinsic_op($(kIROp_OptixCallShader))
+internal Payload __nvvmCallShader(uint shaderIndex, Payload payload);
+
 /// Executes a callable shader with the specified payload.
 /// @param shaderIndex Index of the callable shader to execute
 /// @param payload Data structure to pass to and receive from the callable shader
@@ -20943,6 +20948,7 @@ void CallShader(uint shaderIndex, inout Payload payload)
     {
     // $0 is the shader index, and $1 is the already-pointer-typed inout payload, matching the
     // callee's pointer parameter. CallShader always returns void; results flow back through $1.
+    case nvvm: payload = __nvvmCallShader(shaderIndex, payload);
     case cuda: __intrinsic_asm "optixDirectCall<void>($0, $1)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:

@@ -442,6 +442,14 @@ struct NVVMPlannedHitObjectOperation
     List<IRInst*> operands;
 };
 
+/// Retains the checked callable index and optional numeric copy-in/out payload.
+struct NVVMPlannedCallable
+{
+    IRInst* source = nullptr;
+    IRInst* index = nullptr;
+    IRInst* payload = nullptr;
+};
+
 /// Retains a checked affine row; a null handle selects the current ray's complete transform list.
 struct NVVMPlannedInstanceTransform
 {
@@ -483,6 +491,7 @@ struct NVVMEmissionPlan
     List<NVVMPlannedTraceRay> traceRays;
     List<NVVMPlannedHitObjectOperation> hitObjectOperations;
     List<NVVMPlannedInstanceTransform> instanceTransforms;
+    List<NVVMPlannedCallable> callables;
     List<NVVMPlannedUInt64WordConstruction> uint64WordConstructions;
     List<NVVMPlannedNumericTruthiness> numericTruthinessOperations;
     List<NVVMPlannedFloatingRemainder> floatingRemainderOperations;
@@ -549,6 +558,7 @@ public:
     const NVVMPlannedTraceRay* findTraceRay(IRInst* source) const;
     const NVVMPlannedHitObjectOperation* findHitObjectOperation(IRInst* source) const;
     const NVVMPlannedInstanceTransform* findInstanceTransform(IRInst* source) const;
+    const NVVMPlannedCallable* findCallable(IRInst* source) const;
     const NVVMPlannedValueOperation* findValueOperation(IRInst* source) const;
     const NVVMPlannedUInt64WordConstruction* findUInt64WordConstruction(IRInst* source) const;
     const NVVMPlannedNumericTruthiness* findNumericTruthiness(IRInst* source) const;
@@ -572,6 +582,7 @@ private:
     Dictionary<IRInst*, Index> m_traceRays;
     Dictionary<IRInst*, Index> m_hitObjectOperations;
     Dictionary<IRInst*, Index> m_instanceTransforms;
+    Dictionary<IRInst*, Index> m_callables;
     Dictionary<IRInst*, Index> m_uint64WordConstructions;
     Dictionary<IRInst*, Index> m_numericTruthinessOperations;
     Dictionary<IRInst*, Index> m_floatingRemainderOperations;

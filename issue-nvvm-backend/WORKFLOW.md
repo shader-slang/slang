@@ -7,6 +7,10 @@ recovery; current design must be understandable without reading completed slice 
 
 ## Authority and ownership
 
+**Current stop:** on 2026-10-02 the maintainer requested finishing callable work and then stopping
+for discussion. That closeout, including the RHI checkpoint and focused working-corpus repairs,
+is complete. The general feature loop below requires an explicit resume before another family starts.
+
 The maintainer approved the corpus-tier and OptiX proposal and explicitly resumed development on
 2026-10-01. The earlier stop after four bounded items is superseded. First organize smoke, working
 and exploratory selection using existing inventories and runners. Then establish executable OptiX

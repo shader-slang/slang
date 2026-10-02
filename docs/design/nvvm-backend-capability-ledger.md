@@ -71,9 +71,33 @@ SDK9 documents restoration from prior opaque traversal data, not arbitrary hit c
 [The SDK9 construction contract](https://raytracing-docs.nvidia.com/optix9/guide/optix_guide.250130.A4.pdf)
 and [DXR object semantics](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#hitobject)
 explain the distinction. The maintainer approved the supported OptiX9 lifecycle with arbitrary
-MakeHit explicitly rejected. FromRayQuery, callable stages and general pointer payloads remain
+MakeHit explicitly rejected. FromRayQuery, HitObject use in callable stages and general pointer payloads remain
 separate work. GeometryIndex exposes the SBT GAS index, which equals a geometry ordinal only under
 the one-record-per-build-input convention without per-primitive SBT offsets.
+
+## OptiX callable shaders
+
+The typed callable path admits dynamic UInt32 indices and copy-in/out of recursive copyable
+numeric/bool values, vectors, positive fixed arrays, records and legalized matrices. Raygen,
+closest-hit, miss and callable callers share the same checked operation. Callable entries accept
+one canonical mutable inout/out payload, or no parameter after canonical empty-type erasure.
+Pointer/resource payloads and arbitrary function pointers remain excluded. This private NVVM ABI
+uses the existing value representation on both sides; cross-backend callable interoperability is
+unqualified.
+
+The sibling `ray-tracing-callable-family.cuda` fixture observes all 27 aggregate leaves at O0/O3,
+including float3/float4 padding, arrays, row/column and singleton matrices, Half2, Double, Boolean
+and a nonzero high word in Int64. Dynamic nested calls run from raygen/closest-hit/miss; empty,
+recursively empty and out payloads have independent effects. Its deferred pipeline changes the
+application's original stack descriptor before binding and checks that owned settings survive.
+The original callable test and the imported nested-call stack regression remain separate controls.
+NVRTC rejects the singleton matrix shape; its failure does not invalidate the independent oracle.
+
+The RHI stack setup reuses commit `81d5ded4` with the current motion-graph depth bound and owned
+deferred settings. Default one-level direct calls and explicit depth-two calls are exercised;
+arbitrary recursion depth, traversal-stage direct calls and cross-SDK runtime coverage are not
+claimed. Static checks retain rejected stages/signatures, and the real provider checks rejection
+without module mutation. Exact current acceptance is owned by the maintained focused/RHI manifests.
 
 ## OptiX ray generation and triangle tracing
 

@@ -102,6 +102,7 @@ extern "C"
 #define SLANG_NVVM_BUILDER_INTERFACE_INSTANCE_TRANSFORM_OPERATIONS ((SlangNVVMBuilderInterfaceID)8u)
 #define SLANG_NVVM_BUILDER_INTERFACE_HIT_OBJECT_OPERATIONS ((SlangNVVMBuilderInterfaceID)9u)
 #define SLANG_NVVM_BUILDER_INTERFACE_CURRENT_TRANSFORM_OPERATIONS ((SlangNVVMBuilderInterfaceID)10u)
+#define SLANG_NVVM_BUILDER_INTERFACE_CALLABLE_OPERATIONS ((SlangNVVMBuilderInterfaceID)11u)
 
     /** Semantic scalar and fixed-vector categories used by operation signatures. */
     typedef uint32_t SlangNVVMValueTypeKind;
@@ -709,6 +710,22 @@ extern "C"
     typedef SlangNVVMBuilderInstanceTransformOperationsAPI
         SlangNVVMBuilderCurrentTransformOperationsAPI;
 #define SLANG_NVVM_CURRENT_TRANSFORM_OPERATIONS_VERSION 1u
+
+    /** Optional private callable ABI. Index is UInt32. A non-null numeric aggregate payload
+        is copied into provider-local Value(T) storage, passed as a generic pointer and returned
+        after the call. Null payload selects void() and returns null. No function pointer escapes.
+        Both caller and callable definition must use the NVVM value representation. */
+    typedef struct SlangNVVMBuilderCallableOperationsAPI
+    {
+#define SLANG_NVVM_CALLABLE_OPERATIONS_VERSION 1u
+        uint32_t structureSize;
+        uint32_t version;
+        SlangNVVMResult(SLANG_NVVM_CALL* emitCall)(
+            SlangNVVMModuleHandle module,
+            SlangNVVMValueHandle index,
+            SlangNVVMValueHandle payload,
+            SlangNVVMValueHandle* outValue);
+    } SlangNVVMBuilderCallableOperationsAPI;
 
     /** Finite operations on independently owned OptiX9 hit-object snapshots. */
     typedef uint32_t SlangNVVMHitObjectOperation;

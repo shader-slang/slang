@@ -3106,7 +3106,7 @@ bool _isCanonicalNVVMIntrinsicValueHelper(IRInst* terminator, IRFunc* function)
 bool _isNVVMOptixStage(Stage stage)
 {
     return stage == Stage::RayGeneration || stage == Stage::Miss || stage == Stage::ClosestHit ||
-           stage == Stage::AnyHit || stage == Stage::Intersection;
+           stage == Stage::AnyHit || stage == Stage::Intersection || stage == Stage::Callable;
 }
 
 bool _isNVVMOptixPrimitiveStage(UnownedStringSlice name, Stage stage)
@@ -5414,6 +5414,8 @@ String _getNVVMFunctionName(IRFunc* function, IRFunc* entryPoint)
             return String("__anyhit__") + name;
         case Stage::Intersection:
             return String("__intersection__") + name;
+        case Stage::Callable:
+            return String("__direct_callable__") + name;
         default:
             break;
         }
@@ -6575,6 +6577,7 @@ SlangResult _validateNVVMFunction(
     const bool isEntryPoint = function == entryPoint;
     const auto selectedStage =
         entryPoint->findDecoration<IREntryPointDecoration>()->getProfile().getStage();
+    const bool usesKernelParameters = isEntryPoint && selectedStage != Stage::Callable;
     const bool permitsHitObject = selectedStage == Stage::RayGeneration ||
                                   selectedStage == Stage::Miss ||
                                   selectedStage == Stage::ClosestHit;
@@ -6617,17 +6620,17 @@ SlangResult _validateNVVMFunction(
     for (auto param : function->getParams())
     {
         const bool isSupportedType =
-            isEntryPoint ? isNVVMSupportedParameterType(param->getDataType())
-                         : _isSupportedNVVMHelperParameterType(param->getDataType());
+            usesKernelParameters ? isNVVMSupportedParameterType(param->getDataType())
+                                 : _isSupportedNVVMHelperParameterType(param->getDataType());
         if (actualParamCount >= function->getParamCount() || !isSupportedType ||
             !isTypeEqual(param->getDataType(), function->getParamType(actualParamCount)))
         {
             return _diagnoseUnsupportedIR(
                 codeGenContext,
-                isEntryPoint ? toSlice("entry-point parameter")
-                             : toSlice("helper function parameter"));
+                usesKernelParameters ? toSlice("entry-point parameter")
+                                     : toSlice("helper function parameter"));
         }
-        if (isEntryPoint && isNVVMSupportedValueType(param->getDataType()))
+        if (usesKernelParameters && isNVVMSupportedValueType(param->getDataType()))
         {
             NVVMEntryNumericLayout layout;
             if (!getNVVMEntryNumericLayout(codeGenContext, param->getDataType(), layout))
@@ -6644,14 +6647,15 @@ SlangResult _validateNVVMFunction(
                     layout.scalarType);
         }
         NVVMRawBufferType rawBufferType;
-        if (isEntryPoint && getNVVMSupportedRawBufferType(param->getDataType(), rawBufferType) &&
+        if (usesKernelParameters &&
+            getNVVMSupportedRawBufferType(param->getDataType(), rawBufferType) &&
             !_hasNVVMCompatibleRawBufferElementLayout(codeGenContext, param->getDataType()))
         {
             return _diagnoseUnsupportedIR(
                 codeGenContext,
                 toSlice("structured-buffer element layout"));
         }
-        if (isEntryPoint && asNVVMSupportedResourceStructType(param->getDataType()))
+        if (usesKernelParameters && asNVVMSupportedResourceStructType(param->getDataType()))
         {
             uint32_t alignment = 0;
             if (!_getNVVMByValueParameterAlignment(codeGenContext, param->getDataType(), alignment))
@@ -6670,7 +6674,7 @@ SlangResult _validateNVVMFunction(
             }
         }
         IRType* parameterGroupElementType = nullptr;
-        if (isEntryPoint &&
+        if (usesKernelParameters &&
             asNVVMSupportedParameterGroupType(param->getDataType(), &parameterGroupElementType) &&
             !_hasNVVMCompatibleAggregateStorageLayout(
                 codeGenContext,
@@ -6747,6 +6751,22 @@ SlangResult _validateNVVMFunction(
                             UnownedStringSlice(getIROpInfo(inst->getOp()).name));
                     }
                     requirements.emissionPlan.ephemeralValues.add(value);
+                }
+                break;
+
+            case kIROp_OptixCallShader:
+                {
+                    const bool empty = inst->getDataType()->getOp() == kIROp_VoidType;
+                    if ((selectedStage != Stage::RayGeneration && selectedStage != Stage::Miss &&
+                         selectedStage != Stage::ClosestHit && selectedStage != Stage::Callable) ||
+                        inst->getOperandCount() != (empty ? 1u : 2u) ||
+                        inst->getOperand(0)->getDataType()->getOp() != kIROp_UIntType ||
+                        (!empty &&
+                         (!isNVVMSupportedCopyableValueType(inst->getDataType()) ||
+                          !isTypeEqual(inst->getDataType(), inst->getOperand(1)->getDataType()))))
+                        return _diagnoseUnsupportedIR(codeGenContext, toSlice("OptiX callable"));
+                    requirements.emissionPlan.callables.add(
+                        {inst, inst->getOperand(0), empty ? nullptr : inst->getOperand(1)});
                 }
                 break;
 
@@ -7361,6 +7381,30 @@ SlangResult _validateNVVMFunction(
         {
             switch (inst->getOp())
             {
+            case kIROp_OptixCallShader:
+                {
+                    const auto call =
+                        _findPlannedNVVMOperation(requirements.emissionPlan.callables, inst);
+                    SLANG_RELEASE_ASSERT(call);
+                    SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                        codeGenContext,
+                        call->index,
+                        inst,
+                        availableValues,
+                        dominatorTree));
+                    if (call->payload)
+                    {
+                        SLANG_RETURN_ON_FAIL(_validateSelectedValue(
+                            codeGenContext,
+                            call->payload,
+                            inst,
+                            availableValues,
+                            dominatorTree));
+                        availableValues.add(inst);
+                    }
+                }
+                break;
+
             case kIROp_AllocateOpaqueHandle:
             case kIROp_OptixHitObjectMakeNop:
             case kIROp_OptixHitObjectMakeMiss:
@@ -10714,8 +10758,28 @@ SlangResult validateNVVMSupportedIR(
     const auto stage = entryPointDecoration->getProfile().getStage();
     if (stage != Stage::Compute && !_isNVVMOptixStage(stage))
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point stage"));
-    if (_isNVVMOptixStage(stage) && entryPoint->getParamCount())
+    if (_isNVVMOptixStage(stage) && stage != Stage::Callable && entryPoint->getParamCount())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("OptiX entry parameters"));
+    if (stage == Stage::Callable)
+    {
+        // Callable payloads are canonical mutable references. Empty-type legalization removes
+        // both the formal and caller's payload, yielding the same zero-argument ABI.
+        if (entryPoint->getParamCount() > 1)
+            return _diagnoseUnsupportedIR(codeGenContext, toSlice("callable parameter count"));
+        if (entryPoint->getParamCount())
+        {
+            auto type = entryPoint->getParamType(0);
+            auto pointer = as<IRPtrTypeBase>(type);
+            if (!pointer ||
+                (type->getOp() != kIROp_BorrowInOutParamType &&
+                 type->getOp() != kIROp_OutParamType) ||
+                !isNVVMSupportedCopyableValueType(pointer->getValueType()) ||
+                !_isSupportedNVVMHelperParameterType(type))
+                return _diagnoseUnsupportedIR(
+                    codeGenContext,
+                    toSlice("callable payload parameter"));
+        }
+    }
     if (!entryPointDecoration->getName()->getStringSlice().getLength())
         return _diagnoseUnsupportedIR(codeGenContext, toSlice("entry-point name"));
     if (!as<IRVoidType>(entryPoint->getResultType()))
@@ -10763,9 +10827,15 @@ SlangResult validateNVVMSupportedIR(
                     "conventional global field",
                     fieldType);
             }
+            auto resourceStruct = asNVVMSupportedResourceStructType(fieldType);
             auto storageArray = asNVVMSupportedAggregateStorageArrayType(fieldType);
             auto storageStruct = asNVVMSupportedAggregateStorageStructType(fieldType);
-            if (storageArray || storageStruct)
+            // Resource-value records already have a layout proof below using their lowered
+            // fields. For example, AppendStructuredBuffer becomes an elements/counter record,
+            // while its binding key retains the source StructuredBufferTypeLayout. That source
+            // layout must not be interpreted as the carrier's StructTypeLayout. Storage-only
+            // records and arrays still require the distinct aggregate-storage proof.
+            if (storageArray || (storageStruct && !resourceStruct))
             {
                 auto fieldVarLayout = findVarLayout(field->getKey());
                 if (!_hasNVVMCompatibleAggregateStorageLayout(
@@ -10804,7 +10874,7 @@ SlangResult validateNVVMSupportedIR(
                     true);
             }
             IRStructType* elementStruct = _getNVVMRawBufferAggregateElementType(fieldType);
-            if (auto resourceStruct = asNVVMSupportedResourceStructType(fieldType))
+            if (resourceStruct)
             {
                 if (!_hasNVVMCompatibleStructLayout(codeGenContext, resourceStruct))
                 {
@@ -11080,6 +11150,8 @@ SlangResult emitNVVMIRFromLinkedIR(
                     "OptiX HitObject operation",
                     SLANG_E_NOT_AVAILABLE);
     }
+    if (requirements.emissionPlan.callables.getCount() && !builder.supportsCallable())
+        return _requireBuilderOperation(codeGenContext, "OptiX callable", SLANG_E_NOT_AVAILABLE);
     for (const auto& transform : requirements.emissionPlan.instanceTransforms)
     {
         if (!(transform.handle ? builder.supportsInstanceTransform(transform.desc)
@@ -11245,6 +11317,10 @@ SlangResult emitNVVMIRFromLinkedIR(
     {
         IRFunc* function = functions[functionIndex];
         const bool isEntryPoint = function == entryPoint;
+        const bool usesKernelParameters =
+            isEntryPoint &&
+            entryPoint->findDecoration<IREntryPointDecoration>()->getProfile().getStage() !=
+                Stage::Callable;
         SlangNVVMTypeHandle resultType = nullptr;
         SLANG_RETURN_ON_FAIL(typeContext.lowerType(
             function->getResultType(),
@@ -11265,7 +11341,8 @@ SlangResult emitNVVMIRFromLinkedIR(
             {
                 SLANG_RETURN_ON_FAIL(typeContext.lowerType(
                     param->getDataType(),
-                    isEntryPoint ? NVVMTypeUse::EntryPointParameter : NVVMTypeUse::HelperParameter,
+                    usesKernelParameters ? NVVMTypeUse::EntryPointParameter
+                                         : NVVMTypeUse::HelperParameter,
                     parameterType));
             }
             parameterTypes.add(parameterType);
@@ -11300,7 +11377,7 @@ SlangResult emitNVVMIRFromLinkedIR(
                 flags,
                 functionNames[functionIndex].getUnownedSlice(),
                 loweredFunction)));
-        if (isEntryPoint)
+        if (usesKernelParameters)
         {
             size_t parameterIndex = 0;
             for (auto parameter : function->getParams())
@@ -11565,6 +11642,37 @@ SlangResult emitNVVMIRFromLinkedIR(
                                 toSlice("slangLocal"),
                                 loweredStorage)));
                         valueMap[inst] = loweredStorage;
+                    }
+                    break;
+
+                case kIROp_OptixCallShader:
+                    {
+                        const auto call = planIndex.findCallable(inst);
+                        SLANG_RELEASE_ASSERT(call);
+                        SlangNVVMValueHandle index = nullptr, payload = nullptr, result = nullptr;
+                        SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                            codeGenContext,
+                            builder,
+                            moduleScope.module,
+                            call->index,
+                            valueMap,
+                            typeContext,
+                            index));
+                        if (call->payload)
+                            SLANG_RETURN_ON_FAIL(_getLoweredNVVMValue(
+                                codeGenContext,
+                                builder,
+                                moduleScope.module,
+                                call->payload,
+                                valueMap,
+                                typeContext,
+                                payload));
+                        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+                            codeGenContext,
+                            "OptiX callable",
+                            builder.emitCallable(moduleScope.module, index, payload, result)));
+                        if (result)
+                            valueMap[inst] = result;
                     }
                     break;
 
@@ -13685,10 +13793,12 @@ SlangResult emitNVVMIRFromLinkedIR(
         }
     }
 
-    SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
-        codeGenContext,
-        "kernel annotation",
-        builder.markFunctionAsKernel(moduleScope.module, functionMap.getValue(entryPoint))));
+    if (entryPoint->findDecoration<IREntryPointDecoration>()->getProfile().getStage() !=
+        Stage::Callable)
+        SLANG_RETURN_ON_FAIL(_requireBuilderOperation(
+            codeGenContext,
+            "kernel annotation",
+            builder.markFunctionAsKernel(moduleScope.module, functionMap.getValue(entryPoint))));
 
     ComPtr<ISlangBlob> serializedIR;
     String verifierDiagnostics;

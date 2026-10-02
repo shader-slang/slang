@@ -2881,3 +2881,175 @@ SLANG_UNIT_TEST(nvvmCurrentHitQueriesKeepStageAndShapeBoundaries)
                 SLANG_CHECK(valid == SLANG_SUCCEEDED(status));
             }
 }
+
+SLANG_UNIT_TEST(nvvmCallablePlansKeepStageAndPayloadBoundaries)
+{
+    for (auto stage :
+         {Stage::RayGeneration,
+          Stage::ClosestHit,
+          Stage::Miss,
+          Stage::Callable,
+          Stage::AnyHit,
+          Stage::Intersection,
+          Stage::Compute})
+        for (int shape = 0; shape < 6; ++shape)
+        {
+            NVVMStaticTestContext context(unitTestContext);
+            auto module = IRModule::create(context.env.getSessionImpl());
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            auto entry = builder.createFunc();
+            entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+            builder
+                .addEntryPointDecoration(entry, Profile(stage), toSlice("probe"), toSlice("test"));
+            builder.setInsertInto(entry);
+            builder.emitBlock();
+            List<IRInst*> args;
+            args.add(builder.getIntValue(
+                shape == 2 ? static_cast<IRType*>(builder.getIntType()) : builder.getUIntType(),
+                0));
+            IRType* result =
+                shape == 0 ? static_cast<IRType*>(builder.getVoidType()) : builder.getUIntType();
+            if (shape != 0)
+                args.add(builder.getIntValue(
+                    shape == 3 ? static_cast<IRType*>(builder.getIntType()) : builder.getUIntType(),
+                    7));
+            if (shape == 4)
+                args.add(args[0]);
+            if (shape == 5)
+            {
+                auto pointer = builder.emitVar(builder.getUIntType());
+                result = pointer->getDataType();
+                args[1] = pointer;
+            }
+            builder.emitIntrinsicInst(
+                result,
+                kIROp_OptixCallShader,
+                args.getCount(),
+                args.getBuffer());
+            builder.emitReturn();
+            LinkedIR linked = {};
+            linked.module = module;
+            linked.entryPoints.add(entry);
+            NVVMOperationRequirements requirements;
+            const bool valid =
+                shape < 2 && (stage == Stage::RayGeneration || stage == Stage::ClosestHit ||
+                              stage == Stage::Miss || stage == Stage::Callable);
+            SLANG_CHECK(
+                valid ==
+                SLANG_SUCCEEDED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+            if (valid)
+            {
+                SLANG_CHECK(requirements.emissionPlan.callables.getCount() == 1);
+                SLANG_CHECK(bool(requirements.emissionPlan.callables[0].payload) == (shape == 1));
+            }
+        }
+    // Front-end out and inout both produce valid mutable payload formals. Plain values,
+    // const references and multiple payloads must never be mistaken for compute parameters.
+    for (int shape = 0; shape < 6; ++shape)
+    {
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        IRType* type = builder.getUIntType();
+        if (shape == 0 || shape == 4)
+            type = builder.getBorrowInOutParamType(type);
+        else if (shape == 1)
+            type = builder.getOutParamType(type);
+        else if (shape == 2)
+            type = builder.getBorrowInParamType(type, AddressSpace::Generic);
+        else if (shape == 5)
+            type = builder.getBorrowInOutParamType(builder.getPtrType(type));
+        IRType* params[] = {type, type};
+        UInt count = shape == 4 ? 2 : 1;
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(count, params, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Callable),
+            toSlice("probe"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        for (UInt i = 0; i < count; ++i)
+            builder.emitParam(type);
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        SLANG_CHECK(
+            (shape < 2) ==
+            SLANG_SUCCEEDED(validateNVVMSupportedIR(&context.codeGen, linked, requirements)));
+    }
+}
+
+// Lowered value carriers may retain source binding layouts; storage arrays still prove strides.
+SLANG_UNIT_TEST(nvvmConventionalGlobalLayoutProofsKeepRepresentationRoles)
+{
+    for (int testCase = 0; testCase < 3; ++testCase)
+    {
+        _resetDirectNVVMFakes();
+        NVVMStaticTestContext context(unitTestContext);
+        auto module = IRModule::create(context.env.getSessionImpl());
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        IRTypeLayout::Builder scalarLayoutBuilder(&builder);
+        scalarLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, 4);
+        scalarLayoutBuilder.addAlignment(LayoutResourceKind::Uniform, 4);
+        auto scalarLayout = scalarLayoutBuilder.build();
+        IRType* fieldType = nullptr;
+        IRTypeLayout* fieldLayout = nullptr;
+        if (testCase == 0)
+        {
+            // An interface binding can specialize to a numeric record while its key retains
+            // the source binding layout instead of a physical record's field topology.
+            auto carrier = builder.createStructType();
+            builder.createStructField(carrier, builder.createStructKey(), builder.getUIntType());
+            fieldType = carrier;
+            fieldLayout = scalarLayout;
+        }
+        else
+        {
+            fieldType = builder.getArrayType(
+                builder.getUIntType(),
+                builder.getIntValue(builder.getIntType(), 2));
+            IRArrayTypeLayout::Builder arrayLayoutBuilder(&builder, scalarLayout);
+            arrayLayoutBuilder.addResourceUsage(
+                LayoutResourceKind::Uniform,
+                testCase == 1 ? 8 : 16);
+            arrayLayoutBuilder.addAlignment(LayoutResourceKind::Uniform, testCase == 1 ? 4 : 8);
+            fieldLayout = arrayLayoutBuilder.build();
+        }
+        auto globals = builder.createStructType();
+        builder.addSynthesizedParameterGroupDecoration(globals);
+        auto key = builder.createStructKey();
+        builder.createStructField(globals, key, fieldType);
+        IRVarLayout::Builder variableLayoutBuilder(&builder, fieldLayout);
+        builder.addLayoutDecoration(key, variableLayoutBuilder.build());
+        builder.createGlobalParam(builder.getType(kIROp_ConstantBufferType, globals));
+        auto entry = builder.createFunc();
+        entry->setFullType(builder.getFuncType(0, nullptr, builder.getVoidType()));
+        builder.addEntryPointDecoration(
+            entry,
+            Profile(Stage::Compute),
+            toSlice("computeMain"),
+            toSlice("test"));
+        builder.setInsertInto(entry);
+        builder.emitBlock();
+        builder.emitReturn();
+        LinkedIR linked = {};
+        linked.module = module;
+        linked.entryPoints.add(entry);
+        NVVMOperationRequirements requirements;
+        auto result = validateNVVMSupportedIR(&context.codeGen, linked, requirements);
+        SLANG_CHECK(SLANG_SUCCEEDED(result) == (testCase != 2));
+        if (testCase == 2)
+            SLANG_CHECK(
+                context.sink.outputBuffer.getUnownedSlice().indexOf(
+                    toSlice("aggregate storage layout")) >= 0);
+        SLANG_CHECK(gFakeNVVMBuilder.createModuleCallCount == 0);
+        SLANG_CHECK(gFakeNVVM.createProgramCallCount == 0);
+    }
+}

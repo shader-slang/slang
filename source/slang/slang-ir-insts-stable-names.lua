@@ -905,5 +905,6 @@ return {
 	["optixHitObjectAttributes"] = 929,
 	["optixHitObjectPayload"] = 930,
 	["optixCurrentTransformRow"] = 931,
-	["optixCurrentHitQuery"] = 932
+	["optixCurrentHitQuery"] = 932,
+	["optixCallShader"] = 933
 }

@@ -363,6 +363,11 @@
       "id": "cuda/nvvm-aggregate-param-resource-snapshot.slang#discovery-1",
       "mode": "nvvm-o0",
       "rationale": "Unoptimized lowering control for an O3 smoke contract."
+    },
+    {
+      "id": "hlsl/append-structured-buffer.slang#cuda-1",
+      "mode": "nvvm-o3",
+      "rationale": "Lowered resource carrier retains source binding layout; counter atomics and buffer dimensions."
     }
   ],
   "exploratory_priority": {

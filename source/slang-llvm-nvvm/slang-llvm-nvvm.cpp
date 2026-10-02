@@ -1263,6 +1263,89 @@ static SlangResult SLANG_NVVM_CALL _emitCurrentTransform(
 }
 
 
+// The callable ABI carries only private numeric values. In particular, an aggregate containing
+// a pointer must not turn the SDK's indirect call into an unrestricted pointer transport path.
+static bool _isCallablePayloadType(llvm::Type* type)
+{
+    if (!type || !type->isSized())
+        return false;
+    if (type->isIntegerTy())
+    {
+        auto width = type->getIntegerBitWidth();
+        return width == 1 || width == 8 || width == 16 || width == 32 || width == 64;
+    }
+    if (type->isHalfTy() || type->isFloatTy() || type->isDoubleTy())
+        return true;
+    if (auto vector = llvm::dyn_cast<llvm::FixedVectorType>(type))
+        return vector->getNumElements() >= 2 && vector->getNumElements() <= 4 &&
+               _isCallablePayloadType(vector->getElementType());
+    if (auto array = llvm::dyn_cast<llvm::ArrayType>(type))
+        return array->getNumElements() && _isCallablePayloadType(array->getElementType());
+    if (auto record = llvm::dyn_cast<llvm::StructType>(type))
+    {
+        if (!record->getNumElements())
+            return false;
+        for (auto field : record->elements())
+            if (!_isCallablePayloadType(field))
+                return false;
+        return true;
+    }
+    return false;
+}
+
+// Mirror optixDirectCall<void>(index, &payload), keeping the SDK address and temporary private.
+// The callee uses the same LLVM Value(T), so CUDA external buffer padding is irrelevant here.
+static SlangResult SLANG_NVVM_CALL _emitCallable(
+    SlangNVVMModuleHandle module,
+    SlangNVVMValueHandle index,
+    SlangNVVMValueHandle payload,
+    SlangNVVMValueHandle* outValue)
+{
+    if (outValue)
+        *outValue = nullptr;
+    auto state = _getModule(module);
+    auto block = _getValidInsertionBlock(state);
+    auto llvmIndex = _getValue(index);
+    auto llvmPayload = _getValue(payload);
+    if (!outValue || !block || !_isValueUsableAtInsertionPoint(state, block, llvmIndex) ||
+        !llvmIndex->getType()->isIntegerTy(32) ||
+        (payload && (!_isValueUsableAtInsertionPoint(state, block, llvmPayload) ||
+                     !_isCallablePayloadType(llvmPayload->getType()))))
+        return SLANG_E_INVALID_ARG;
+
+    // No instructions, globals or type declarations are created before all inputs are checked.
+    auto voidType = llvm::Type::getVoidTy(state->context);
+    auto addressType = llvm::Type::getInt64Ty(state->context);
+    auto lookupType = llvm::FunctionType::get(addressType, {llvmIndex->getType()}, false);
+    auto lookup = llvm::InlineAsm::get(
+        lookupType,
+        "call ($0), _optix_call_direct_callable, ($1);",
+        "=l,r",
+        true);
+    auto address = state->builder.CreateCall(lookup, {llvmIndex});
+    llvm::SmallVector<llvm::Value*, 1> arguments;
+    llvm::SmallVector<llvm::Type*, 1> parameters;
+    llvm::AllocaInst* storage = nullptr;
+    if (llvmPayload)
+    {
+        auto function = block->getParent();
+        llvm::IRBuilder<> entryBuilder(
+            &function->getEntryBlock(),
+            function->getEntryBlock().begin());
+        storage = entryBuilder.CreateAlloca(llvmPayload->getType(), nullptr, "callable.payload");
+        state->builder.CreateStore(llvmPayload, storage);
+        arguments.push_back(storage);
+        parameters.push_back(storage->getType());
+    }
+    auto signature = llvm::FunctionType::get(voidType, parameters, false);
+    auto callee = state->builder.CreateIntToPtr(address, signature->getPointerTo());
+    state->builder.CreateCall(signature, callee, arguments);
+    if (storage)
+        *outValue = reinterpret_cast<SlangNVVMValueHandle>(
+            state->builder.CreateLoad(llvmPayload->getType(), storage));
+    return SLANG_OK;
+}
+
 static SlangResult SLANG_NVVM_CALL _emitAtomicOperation(
     SlangNVVMModuleHandle module,
     const SlangNVVMAtomicOperationDesc* operation,
@@ -5519,8 +5602,17 @@ _queryBuilderInterface(SlangNVVMBuilderInterfaceID interfaceID, const void** out
         _emitCurrentTransform,
     };
 
+    static const SlangNVVMBuilderCallableOperationsAPI callableOperations = {
+        sizeof(SlangNVVMBuilderCallableOperationsAPI),
+        SLANG_NVVM_CALLABLE_OPERATIONS_VERSION,
+        _emitCallable,
+    };
+
     switch (interfaceID)
     {
+    case SLANG_NVVM_BUILDER_INTERFACE_CALLABLE_OPERATIONS:
+        *outInterface = &callableOperations;
+        return SLANG_OK;
     case SLANG_NVVM_BUILDER_INTERFACE_CURRENT_TRANSFORM_OPERATIONS:
         *outInterface = &currentTransformOperations;
         return SLANG_OK;

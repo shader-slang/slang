@@ -292,6 +292,14 @@ ray flags. Pair it with
   --test-case=ray-tracing-intrinsics-hit-identities.cuda,ray-tracing-triangle-intersection.cuda
 ```
 
+The callable family selection is `ray-tracing-callable-family.cuda`,
+`ray-tracing-intrinsics-call-shader.cuda` and `ray-tracing-intrinsics-nested-call-shader.cuda`.
+The family runs O0/O3, checks recursive numeric payloads, dynamic chaining, RG/CH/miss callers,
+empty effects and deferred descriptor ownership. Chain RHI's `OptixRayTracingPipelineDesc` through
+`RayTracingPipelineDesc::next` to declare callable nesting depth independently of trace recursion.
+The default permits one state-shader callable frame; the nested fixture explicitly requests two.
+NVRTC's singleton-matrix rejection is comparison evidence, not an NVVM acceptance failure.
+
 The focused AnyHit controls are `ray-tracing-intrinsics-payload-termination.cuda`,
 `ray-tracing-intrinsics-object-ray-origin.cuda` and
 `ray-tracing-intrinsics-object-ray-direction.cuda`. Each runs O0/O3 internally. The payload test

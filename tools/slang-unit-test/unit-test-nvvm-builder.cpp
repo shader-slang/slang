@@ -14176,3 +14176,86 @@ SLANG_UNIT_TEST(nvvmIRBuilderCurrentHitQueriesKeepIncomingState)
         }
     }
 }
+
+SLANG_UNIT_TEST(nvvmIRBuilderCallableRejectsBeforeMutation)
+{
+    NVVMIRBuilder builder;
+    _requireRealNVVMBuilder(unitTestContext, builder);
+    auto api = builder.getCallableOperationsAPI();
+    SLANG_CHECK_ABORT(api);
+    String control;
+    for (bool reject : {false, true})
+    {
+        ScopedNVVMBuilderModule scope;
+        scope.builder = &builder;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.createModule(toSlice("callable"), scope.module)));
+        SlangNVVMTypeHandle voidType = nullptr, intType = nullptr, functionType = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getVoidType(scope.module, voidType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.getIntegerType(scope.module, 32, intType)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.getFunctionType(scope.module, voidType, nullptr, 0, functionType)));
+        SlangNVVMValueHandle function = nullptr;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.declareFunction(
+            scope.module,
+            functionType,
+            SLANG_NVVM_LINKAGE_EXTERNAL,
+            SLANG_NVVM_FUNCTION_FLAG_NONE,
+            toSlice("main"),
+            function)));
+        SlangNVVMBlockHandle block = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.createBlock(scope.module, function, toSlice("entry"), block)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.setInsertBlock(scope.module, block)));
+        SlangNVVMValueHandle index = nullptr, pointer = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.getIntegerConstant(scope.module, intType, 1, index)));
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+            builder.emitLocalStorage(scope.module, intType, 4, toSlice("local"), pointer)));
+        if (reject)
+        {
+            for (auto invalidIndex : {SlangNVVMValueHandle(nullptr), pointer, function})
+            {
+                SlangNVVMValueHandle result = function;
+                SLANG_CHECK(
+                    SLANG_FAILED(api->emitCall(scope.module, invalidIndex, index, &result)));
+                SLANG_CHECK(!result);
+            }
+            SlangNVVMValueHandle result = function;
+            SLANG_CHECK(SLANG_FAILED(api->emitCall(scope.module, index, pointer, &result)));
+            SLANG_CHECK(!result);
+            SLANG_CHECK(SLANG_FAILED(api->emitCall(scope.module, index, index, nullptr)));
+        }
+        SlangNVVMValueHandle result = nullptr;
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitCallable(scope.module, index, index, result)));
+        SLANG_CHECK(result);
+        SLANG_CHECK_ABORT(
+            SLANG_SUCCEEDED(builder.emitCallable(scope.module, index, nullptr, result)));
+        SLANG_CHECK(!result);
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.emitReturnVoid(scope.module)));
+        if (reject)
+        {
+            result = function;
+            SLANG_CHECK(SLANG_FAILED(api->emitCall(scope.module, index, index, &result)));
+            SLANG_CHECK(!result);
+        }
+        ComPtr<ISlangBlob> blob;
+        SLANG_CHECK_ABORT(SLANG_SUCCEEDED(builder.serializeModule(
+            scope.module,
+            SLANG_NVVM_SERIALIZATION_FORMAT_NVVM_IR_2_0_ASSEMBLY,
+            blob)));
+        auto text = _getBlobText(blob);
+        SLANG_CHECK(text.contains("_optix_call_direct_callable"));
+        SLANG_CHECK(text.contains("to void (i32*)*"));
+        SLANG_CHECK(text.contains("to void ()*"));
+        SLANG_CHECK(text.contains("alloca i32"));
+        if (reject)
+        {
+            SLANG_CHECK(text == control);
+        }
+        else
+        {
+            control = text;
+        }
+    }
+}

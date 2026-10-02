@@ -2131,6 +2131,25 @@ static LegalVal legalizeInst(
         result = legalizeStore(context, args[0], args[1]);
         break;
 
+    case kIROp_OptixCallShader:
+        {
+            // Consider CallShader(index, Empty()). Removing the payload must not remove
+            // the invoked shader's effects. The same legalization removes its empty formal,
+            // so preserve a void operation with only the index for that zero-argument ABI.
+            SLANG_RELEASE_ASSERT(type.flavor == LegalType::Flavor::none);
+            SLANG_RELEASE_ASSERT(
+                args.getCount() == 2 && args[0].flavor == LegalVal::Flavor::simple &&
+                args[1].flavor == LegalVal::Flavor::none);
+            IRInst* index = args[0].getSimple();
+            auto call = context->builder->emitIntrinsicInst(
+                context->builder->getVoidType(),
+                kIROp_OptixCallShader,
+                1,
+                &index);
+            call->sourceLoc = inst->sourceLoc;
+            inst->transferDecorationsTo(call);
+            return LegalVal();
+        }
     case kIROp_Call:
         result = legalizeCall(context, (IRCall*)inst);
         break;

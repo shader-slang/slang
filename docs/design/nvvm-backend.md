@@ -110,10 +110,11 @@ supported public operations, widths and pointer-output qualifications.
 
 ### OptiX entry and binding ownership
 
-Ray-generation, miss, closest-hit, any-hit and intersection entries reuse the shared OptiX uniform-collection pass.
+Ray-generation, miss, closest-hit, any-hit, intersection and callable entries reuse the shared OptiX uniform-collection pass.
 That producer moves entry uniforms into a shader record and emits canonical `GetOptiXSbtDataPtr`;
 it leaves compute parameters unchanged. After payload/varying legalization, NVVM preflight accepts
-void, parameterless entries and owns their stage-specific SDK symbol prefixes. Conventional globals
+void, parameterless ray callbacks and owns their stage-specific SDK symbol prefixes. Callable entries
+retain their canonical mutable payload reference under a separate device-function ABI. Conventional globals
 retain `SLANG_globalParams`. Acceleration structures are opaque UInt64 transport values with explicit
 value, local-storage and helper-parameter roles; this does not admit integer conversions, pointer
 roots or recursive resource aggregates.
@@ -123,6 +124,27 @@ alone owns conversion of the SDK address to a validated constant-buffer represen
 selects the primitive; existing field/layout and load lowering consume the pointer. Shader records
 are readonly to shader stores, but loads are not invariant because hosts can change SBT data between
 launches. The shared immutable-location policy owns that distinction.
+
+`CallShader` selects an effectful typed value-in/value-out operation. Its checked plan admits a
+UInt32 shader-table index and recursive copyable numeric payloads in raygen, closest-hit, miss and
+callable closures. The optional callable interface (ID11, ABI46 unchanged) privately obtains the
+SDK direct-callable address, stores the value in local `Value(T)` storage, invokes `void(T*)`, and
+loads the updated value. Neither the callable address nor a payload pointer becomes a general
+executable value. Ordinary helper calls remain direct and module-owned.
+
+Callable definitions use `__direct_callable__` external device symbols, with canonical
+`BorrowInOutParam<T>` or `OutParam<T>` lowered through the existing helper-parameter role. They
+are selected entries for closure validation but are not kernels and receive no compute byval
+attributes. Caller and callee share the private NVVM value representation; this is not a promise
+of mixed NVRTC/NVVM callable layout compatibility. Pointer/resource payloads remain excluded.
+Existing empty-type legalization removes empty formals and rebuilds an empty-result call as an
+effectful void operation retaining its index, so both sides use `void()` and shader effects survive.
+
+The sibling RHI integration owns OptiX stack allocation. Its existing `OptixRayTracingPipelineDesc`
+extension supplies separate direct-call depths from state and traversal, independent of trace
+recursion. Linked program stack requirements, SDK-local accumulation, and a traversable-depth
+bound determine allocation. Deferred pipelines copy the recognized extension at construction;
+application-owned descriptor memory is not retained until later compilation.
 
 `TraceRay` constructs a typed IR operation with explicit ray fields and the original payload type.
 CUDA payload values admit nonempty Int32/UInt32/Float32 scalars, vectors, matrices,
@@ -395,6 +417,13 @@ whole-record loads or helpers. Unused Buffer/RWBuffer bindings have only an eigh
 storage role; actual typed-buffer operations remain rejected. RHI must not append a raw-buffer
 count into the following reflected field. Binding qualification does not imply typed access or
 null-resource dereference semantics.
+
+Conventional global layout validation follows the selected representation. Resource/value records
+use the existing lowered-record size and keyed-offset proof: an append buffer becomes an
+`elements`/`counter` carrier while its binding key retains source `StructuredBufferTypeLayout`.
+Specialized interface bindings similarly retain source layout metadata. That metadata is not a
+physical record topology. Storage-only records and arrays retain their distinct canonical aggregate
+layout and stride proof; admission must not apply both proofs to a resource/value carrier.
 
 Explicit Std430/Scalar/C Device pointers to finite copyable records use a byte-address representation.
 Shared buffer-layout selection owns the layout; preflight queries its stride once and retains the

@@ -84678,9 +84678,449 @@
         "Runtime working tier only; exploratory failures/untested cells remain separate.",
         "No new numerical/material-performance/physical-surface/OptiX qualification is inferred from this corpus run."
       ],
-      "cadence": {
-        "last_full_unchanged": true,
-        "meaning": "Working-tier integration does not replace the accepted full checkpoint."
+      "cadence": "Integration completed with eight focused repairs; stop for maintainer discussion. On resume, run smoke each iteration and working every three to five implementation batches.",
+      "current_checkpoint": {
+        "identity": {
+          "path": "build/nvvm-optix-callable/identity-final.json",
+          "sha256": "6450c19045f5dfe2f7a99fe7dc999d68145ba3c89e32c275660b81c6fe900fe0"
+        },
+        "provenance": {
+          "path": "build/nvvm-optix-callable/working-1/provenance.json",
+          "sha256": "26661d6f4c06ad68d5b4ea34f0ada96f65887d7c17befc99ed03b10e7b0b1ad0"
+        },
+        "selection": {
+          "path": "build/nvvm-optix-callable/working-1/selection.json",
+          "sha256": "61639f2762c0abf24f6c01937be24f39b3e2c25eeab352d1238bf69d7a02706f"
+        },
+        "gate": {
+          "path": "build/nvvm-optix-callable/working.json",
+          "sha256": "58ada64a25230f16565ecb7b99e87e81c9ff26ec0abaf667da4315428b906c0b",
+          "return_code": 1,
+          "elapsed_seconds": 1060.0538635253906
+        },
+        "selected_count": 1713,
+        "status": "accepted-with-focused-repair",
+        "initial_passed": 1705,
+        "initial_regressions": [
+          {
+            "id": "compute/simple-interface-parameter.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "compute/simple-interface-parameter.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/append-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/append-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "compute/interface-shader-param.slang#discovery-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "compute/interface-shader-param.slang#discovery-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          }
+        ],
+        "input_changes": [],
+        "repair": {
+          "identity": {
+            "path": "build/nvvm-optix-callable/identity-closeout.json",
+            "sha256": "94877861d97be0da9f9cdd62fc3b1097727ce766220fede8fcc43c048d4ad62e"
+          },
+          "gates": {
+            "layout-build": {
+              "path": "build/nvvm-optix-callable/layout-build.json",
+              "sha256": "582da7cceda35b1a06d692c3032b195639cebbe1526703f12775ffce507476bb",
+              "return_code": 0,
+              "elapsed_seconds": 38.130542278289795
+            },
+            "layout-static-build-2": {
+              "path": "build/nvvm-optix-callable/layout-static-build-2.json",
+              "sha256": "b0a148cb7760583a5f1fc17a0bd5dc7fd2de34d09e3a5778564d61c5ee0e22bb",
+              "return_code": 0,
+              "elapsed_seconds": 18.030031442642212
+            },
+            "layout-static": {
+              "path": "build/nvvm-optix-callable/layout-static.json",
+              "sha256": "87e04bb68a1814eb8ff0f643e5ebda9f4e007d4f8f76be473023668eed4ba219",
+              "return_code": 0,
+              "elapsed_seconds": 7.098065614700317
+            },
+            "layout-controls": {
+              "path": "build/nvvm-optix-callable/layout-controls.json",
+              "sha256": "1fd3763d2e1159d0c046ff2281ec1fa2d736b3cb9bac3f5c52ffd65979621096",
+              "return_code": 0,
+              "elapsed_seconds": 6.326030015945435
+            },
+            "layout-rhi": {
+              "path": "build/nvvm-optix-callable/layout-rhi.json",
+              "sha256": "0791e47255bed4e4993899947bcd80e55bd639ac02bcee228819ab4410a3a29f",
+              "return_code": 0,
+              "elapsed_seconds": 7.462679386138916
+            },
+            "smoke-closeout": {
+              "path": "build/nvvm-optix-callable/smoke-closeout.json",
+              "sha256": "1b88a58a445040316110fbdc620d4e1929fc72ad6f3aa1161f0f110252709fe0",
+              "return_code": 0,
+              "elapsed_seconds": 22.051498651504517
+            },
+            "layout-frozen": {
+              "path": "build/nvvm-optix-callable/layout-frozen.json",
+              "sha256": "48eb47c47f484e90f92743d820e3a74133257abb0938cfca29e0e1d19980c89b",
+              "return_code": 0,
+              "elapsed_seconds": 7.471645355224609
+            },
+            "layout-discovery": {
+              "path": "build/nvvm-optix-callable/layout-discovery.json",
+              "sha256": "a5e85938d78fb17ca884710d84d9ba1e2180fe3bd85d5d3605566c8856104d90",
+              "return_code": 0,
+              "elapsed_seconds": 3.5110700130462646
+            }
+          },
+          "results": {
+            "layout-frozen": {
+              "path": "build/nvvm-optix-callable/layout-frozen/results.json",
+              "sha256": "48e75922691171e253b09ec4d4b2af72a19b5dfdc923132edd10fc6dfddc1eb9"
+            },
+            "layout-discovery": {
+              "path": "build/nvvm-optix-callable/layout-discovery/results.json",
+              "sha256": "4d4ddd3ee0a24a15a73639d1a28109fe5799d5e4ff9d3d86782a901f1d0dbd68"
+            }
+          },
+          "initial_regressions": [
+            {
+              "id": "compute/simple-interface-parameter.slang#cuda-1",
+              "mode": "nvvm-o0",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "compute/simple-interface-parameter.slang#cuda-1",
+              "mode": "nvvm-o3",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "hlsl/append-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o0",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "hlsl/append-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o3",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o0",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o3",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "compute/interface-shader-param.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            },
+            {
+              "id": "compute/interface-shader-param.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "actual": {
+                "classification": "preflight",
+                "return_code": 1,
+                "execution_counts": {
+                  "passed": 0,
+                  "executed": 1,
+                  "ignored": 0,
+                  "other_summary_status": 0
+                },
+                "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+                "canonical_shape": "aggregate storage layout"
+              }
+            }
+          ],
+          "repaired_cells": [
+            {
+              "id": "compute/simple-interface-parameter.slang#cuda-1",
+              "mode": "nvvm-o0",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "hlsl/append-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o0",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o0",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "compute/simple-interface-parameter.slang#cuda-1",
+              "mode": "nvvm-o3",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "hlsl/append-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o3",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+              "mode": "nvvm-o3",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "compute/interface-shader-param.slang#discovery-1",
+              "mode": "nvvm-o0",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            },
+            {
+              "id": "compute/interface-shader-param.slang#discovery-1",
+              "mode": "nvvm-o3",
+              "classification": "correct",
+              "execution_counts": {
+                "passed": 1,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              }
+            }
+          ],
+          "unresolved": [],
+          "scope": "Reuse the established resource/value record proof. Storage-only records and arrays retain canonical aggregate layout checks. Eight exact runtime retries, one positive/negative static test, eight provider/source controls, related RHI controls, and all 16 smoke configurations pass."
+        },
+        "scope": "All 1,713 working cells executed: 1,705 pass and eight layout regressions. The exact eight pass on the repaired compiler; all original failures and the previous BF16 history remain intact. This is not a fresh full pass on the repair identity."
       }
     },
     "nvvm-rhi-cuda-workflow": {
@@ -87706,7 +88146,7 @@
       "scope": "Complete registered CUDA application suite in the tested sibling RHI binary, across all registered feature areas. Initial full NVVM/NVRTC comparison and maintained failure inventory; not full NVVM acceptance.",
       "manifest": {
         "path": "issue-nvvm-backend/rhi-cuda-status.json",
-        "sha256": "82f8fbc8199dde808d4a23e2b95d08d2f8b4953183914edb7aecf32a678d02f8"
+        "sha256": "66a35d61222db93e531f4a9779652f9a3ce3f7f613ad244724c899acfafebb4f"
       },
       "identity": {
         "path": "build/nvvm-rhi-full/identity.json",
@@ -87818,28 +88258,37 @@
       ],
       "failure_family_counts_scope": "Initial full checkpoint; current focused resolution is separate.",
       "current_focused_resolution": {
-        "registration_count": 278,
-        "unique_name_count": 277,
-        "scope": "Original full inventory plus nine focused fixtures. Unselected registrations retain their own tested identity; not another full-suite run.",
+        "registration_count": 280,
+        "unique_name_count": 279,
+        "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity.",
         "by_compiler": {
           "nvvm": {
-            "passed": 266,
-            "failed": 2,
+            "passed": 269,
+            "failed": 1,
             "skipped": 10
           },
           "nvrtc": {
-            "passed": 264,
-            "failed": 4,
+            "passed": 265,
+            "failed": 5,
             "skipped": 10
           }
         },
-        "original_nvvm_failures_resolved": 59,
-        "original_nvvm_failures_remaining": 2,
+        "original_nvvm_failures_resolved": 60,
+        "original_nvvm_failures_remaining": 1,
         "new_fixture_nvrtc_differences": [
           "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
           "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged",
           "array-payload-singleton-matrices: CUDA source rejects matrices with one row/column (E39999), NVVM O0/O3 independent oracle passes",
-          "hitobject-padded-attributes: CUDA sizeof-based helper rejects48-byte record; NVVM passes8dense-leaf ReportHit/GetAttributes/Invoke oracle atO0/O3"
+          "hitobject-padded-attributes: CUDA sizeof-based helper rejects48-byte record; NVVM passes8dense-leaf ReportHit/GetAttributes/Invoke oracle atO0/O3",
+          "callable-family: CUDA source rejects singleton matrices with E39999 at deferred binding; the NVVM numeric/empty/deferred oracle passes at O0/O3."
+        ],
+        "nvvm_failures": ["ray-tracing-hitobject-make-hit.cuda"],
+        "nvrtc_failures": [
+          "surface-dimensions.cuda",
+          "ray-tracing-hitobject-lifecycle.cuda",
+          "ray-tracing-array-payload-singleton-matrices.cuda",
+          "ray-tracing-hitobject-padded-attributes.cuda",
+          "ray-tracing-callable-family.cuda"
         ]
       },
       "current_failure_family_counts": {
@@ -87850,10 +88299,200 @@
         "typed_buffer_global": 0,
         "hitobject_representation": 1,
         "cluster_query": 0,
-        "callable_abi": 1,
+        "callable_abi": 0,
         "trace_payload_boundary": 0,
         "intersection_stage": 0,
         "active_list_matrix_composition": 0
+      },
+      "current_full_checkpoint": {
+        "identity": {
+          "path": "build/nvvm-optix-callable/identity-final.json",
+          "sha256": "6450c19045f5dfe2f7a99fe7dc999d68145ba3c89e32c275660b81c6fe900fe0"
+        },
+        "runs": {
+          "nvvm-full": {
+            "path": "build/nvvm-optix-callable/nvvm-full.json",
+            "sha256": "84816dd46b266b63eca309247895d46ac93b33d0b747318c93e46fd67ee53602",
+            "return_code": 1,
+            "elapsed_seconds": 42.676897048950195
+          },
+          "nvrtc-full": {
+            "path": "build/nvvm-optix-callable/nvrtc-full.json",
+            "sha256": "27e3df155b0a17dc3156bb8db68e046fcf8dd4637fc2d44b854635a5810c1bb3",
+            "return_code": -6,
+            "elapsed_seconds": 34.35888147354126
+          },
+          "nvrtc-remainder": {
+            "path": "build/nvvm-optix-callable/nvrtc-remainder.json",
+            "sha256": "2c9ae8694444e80d2577343a3a154050e8ca443dd5cab0f2e022d945b8c1b823",
+            "return_code": 1,
+            "elapsed_seconds": 68.23591828346252
+          }
+        },
+        "reconciliation": {
+          "raw": {
+            "path": "build/nvvm-optix-callable/reconciliation.json",
+            "sha256": "38fdad35348bd4d4ae0c03d2e27e4a7b17e80bb1a12ac653a7d980bb594e5eaa"
+          },
+          "exact_nvvm_terminal_multiset": true,
+          "exact_combined_nvrtc_terminal_multiset": true,
+          "nvvm_unrun": [],
+          "nvrtc_full_unrun": [
+            "ray-tracing-hitobject-load-local-root-table-constant.cuda",
+            "ray-tracing-hitobject-make-hit.cuda",
+            "ray-tracing-hitobject-make-miss.cuda",
+            "ray-tracing-hitobject-make-motion-hit.cuda",
+            "ray-tracing-hitobject-make-motion-miss.cuda",
+            "ray-tracing-hitobject-padded-attributes.cuda",
+            "ray-tracing-hitobject-query-hit-kind-back-face.cuda",
+            "ray-tracing-hitobject-query-hit-kind-custom.cuda",
+            "ray-tracing-hitobject-query-hit-kind-front-face.cuda",
+            "ray-tracing-hitobject-query-instance-id.cuda",
+            "ray-tracing-hitobject-query-invoke-hit-ch.cuda",
+            "ray-tracing-hitobject-query-invoke-hit-ms.cuda",
+            "ray-tracing-hitobject-query-invoke-hit-rg.cuda",
+            "ray-tracing-hitobject-query-invoke-miss-ch.cuda",
+            "ray-tracing-hitobject-query-invoke-miss-ms.cuda",
+            "ray-tracing-hitobject-query-invoke-miss-rg.cuda",
+            "ray-tracing-hitobject-query-invoke-nop-ch.cuda",
+            "ray-tracing-hitobject-query-invoke-nop-ms.cuda",
+            "ray-tracing-hitobject-query-invoke-nop-rg.cuda",
+            "ray-tracing-hitobject-query-ray-desc.cuda",
+            "ray-tracing-hitobject-set-and-get-shader-table-index.cuda",
+            "ray-tracing-hitobject-trace-motion-ray.cuda",
+            "ray-tracing-instance-matrix.cuda",
+            "ray-tracing-intrinsics-accept-hit-and-end-search.cuda",
+            "ray-tracing-intrinsics-anyhit-state.cuda",
+            "ray-tracing-intrinsics-call-shader.cuda",
+            "ray-tracing-intrinsics-hit-identities.cuda",
+            "ray-tracing-intrinsics-hit-kind.cuda",
+            "ray-tracing-intrinsics-ignore-hit.cuda",
+            "ray-tracing-intrinsics-instance-id.cuda",
+            "ray-tracing-intrinsics-instance-index.cuda",
+            "ray-tracing-intrinsics-nested-call-shader.cuda",
+            "ray-tracing-intrinsics-object-ray-direction.cuda",
+            "ray-tracing-intrinsics-object-ray-origin.cuda",
+            "ray-tracing-intrinsics-payload-termination.cuda",
+            "ray-tracing-intrinsics-ray-current-time.cuda",
+            "ray-tracing-intrinsics-ray-flags.cuda",
+            "ray-tracing-intrinsics-ray-tcurrent.cuda",
+            "ray-tracing-intrinsics-ray-tmin.cuda",
+            "ray-tracing-intrinsics-world-ray-direction.cuda",
+            "ray-tracing-intrinsics-world-ray-origin.cuda",
+            "ray-tracing-lss-intersection.cuda",
+            "ray-tracing-lss-intrinsics-hit-object.cuda",
+            "ray-tracing-lss-intrinsics-inline-ray-query.cuda",
+            "ray-tracing-lss-intrinsics.cuda",
+            "ray-tracing-native-primitive-flags.cuda",
+            "ray-tracing-raygen-entrypoint-2.cuda",
+            "ray-tracing-raygen-entrypoint-resources.cuda",
+            "ray-tracing-raygen-entrypoint.cuda",
+            "ray-tracing-reorder-hint.cuda",
+            "ray-tracing-reorder-hit-obj-and-hint.cuda",
+            "ray-tracing-reorder-hit-obj.cuda",
+            "ray-tracing-shader-table-multi-pipeline.cuda",
+            "ray-tracing-sphere-intersection.cuda",
+            "ray-tracing-sphere-intrinsics-hit-object.cuda",
+            "ray-tracing-sphere-intrinsics.cuda",
+            "ray-tracing-transform-hitobject-object-to-world.cuda",
+            "ray-tracing-transform-hitobject-world-to-object.cuda",
+            "ray-tracing-transform-list.cuda",
+            "ray-tracing-transform-object-to-world-3x4.cuda",
+            "ray-tracing-transform-object-to-world-4x3.cuda",
+            "ray-tracing-transform-world-to-object-3x4.cuda",
+            "ray-tracing-transform-world-to-object-4x3.cuda",
+            "ray-tracing-triangle-intersection-matrix-motion.cuda",
+            "ray-tracing-triangle-intersection-nonzero-rg-idx.cuda",
+            "ray-tracing-triangle-intersection-srt-motion.cuda",
+            "ray-tracing-triangle-intersection-vertex-motion.cuda",
+            "ray-tracing-triangle-intersection.cuda",
+            "resource-parameter-abi.cuda",
+            "root-shader-parameter.cuda",
+            "sampler-border-black-opaque.cuda",
+            "sampler-border-black-transparent.cuda",
+            "sampler-border-custom-color.cuda",
+            "sampler-border-white-opaque.cuda",
+            "sampler-filter-linear.cuda",
+            "sampler-filter-point.cuda",
+            "serial-pipeline-creation.cuda",
+            "shader-object-from-type-layout-not-cached.cuda",
+            "shader-object-resource-tracking.cuda",
+            "staging-heap-alloc-free.cuda",
+            "staging-heap-allocation-alignment.cuda",
+            "staging-heap-handles.cuda",
+            "staging-heap-large-page.cuda",
+            "staging-heap-mutithreading.cuda",
+            "staging-heap-realloc.cuda",
+            "staging-heap-shared-pages.cuda",
+            "staging-heap-threadlock-pages.cuda",
+            "staging-heap-unlockpage-1.cuda",
+            "staging-heap-unlockpage-2.cuda",
+            "surface-dimensions.cuda",
+            "texture-allocation-info-2d-mips.cuda",
+            "texture-allocation-info-2d.cuda",
+            "texture-allocation-info-3d.cuda",
+            "texture-allocation-info-array.cuda",
+            "texture-allocation-info-bc7.cuda",
+            "texture-create.cuda",
+            "texture-layout-1d-mips.cuda",
+            "texture-layout-1d-nomip.cuda",
+            "texture-layout-1d-region.cuda",
+            "texture-layout-2d-array-mips.cuda",
+            "texture-layout-2d-array-nomip.cuda",
+            "texture-layout-2d-mip.cuda",
+            "texture-layout-2d-nomip.cuda",
+            "texture-layout-2d-region.cuda",
+            "texture-layout-3d-mip.cuda",
+            "texture-layout-3d-nomip.cuda",
+            "texture-layout-3d-region.cuda",
+            "texture-layout-cube-array-mips.cuda",
+            "texture-layout-cube-array-nomip.cuda",
+            "texture-layout-cube-mip.cuda",
+            "texture-layout-cube-nomip.cuda",
+            "texture-view-3d.cuda",
+            "texture-view-host-write-read.cuda",
+            "texture-view-load-ro-all-layers-all-mips.cuda",
+            "texture-view-load-ro-all-layers-single-mip.cuda",
+            "texture-view-load-ro-single.cuda",
+            "texture-view-load-rw-all-layers-single-mip.cuda",
+            "texture-view-load-rw-single.cuda",
+            "texture-view-store-all-layers-single-mip.cuda",
+            "texture-view-store-single.cuda",
+            "typed-buffer-binding-neighbors.cuda",
+            "uint16-structured-buffer.cuda"
+          ],
+          "nvrtc_unrun_after_remainder": [],
+          "nvvm_counts": {
+            "passed": 269,
+            "failed": 1,
+            "skipped": 10
+          },
+          "nvrtc_combined_counts": {
+            "passed": 265,
+            "failed": 5,
+            "skipped": 10
+          },
+          "same_runtime_skip_names": true,
+          "hidden_nvvm_assertion_failures": [],
+          "nvrtc_abort": "Known lifecycle OptiX compile-error callback abort; the crash record is not an assertion. No unrun case is classified as passed.",
+          "nvvm_assertions": {
+            "total": 72014666,
+            "passed": 72014664,
+            "failed": 2
+          },
+          "nvrtc_assertions_by_process": {
+            "nvrtc-full": {
+              "total": 66318815,
+              "passed": 66318810,
+              "failed": 5
+            },
+            "nvrtc-remainder": {
+              "total": 5693684,
+              "passed": 5693678,
+              "failed": 6
+            }
+          }
+        }
       }
     },
     "nvvm-resource-parameters": {
@@ -89229,6 +89868,613 @@
           "detail": "Two intentionalcomparisonboundaries: singletonmatrixE39999 andsizeof-basedsavedattributehelper; exactindependentNVVMoraclesunchanged."
         }
       ]
+    },
+    "nvvm-optix-callable": {
+      "status": "accepted-focused-with-integration",
+      "scope": "Selected private callable value ABI, canonical empty-call effects, all public caller stages, dynamic chaining, mutable inout/out, and the reused RHI stack fix with owned deferred options.",
+      "identity": {
+        "path": "build/nvvm-optix-callable/identity-final.json",
+        "sha256": "6450c19045f5dfe2f7a99fe7dc999d68145ba3c89e32c275660b81c6fe900fe0"
+      },
+      "validation": {
+        "build-2": {
+          "path": "build/nvvm-optix-callable/build-2.json",
+          "sha256": "855cb5e12a8d9955b2fed5ad2d2e7b3cbb5a06d00c9d15499111d6710890945b",
+          "return_code": 0,
+          "elapsed_seconds": 89.83367228507996
+        },
+        "static-build-2": {
+          "path": "build/nvvm-optix-callable/static-build-2.json",
+          "sha256": "870f9d3423ab889519e36f8f8dda7cfb55e1f25ef033a02a46dc0109d11a8463",
+          "return_code": 0,
+          "elapsed_seconds": 304.87303137779236
+        },
+        "static": {
+          "path": "build/nvvm-optix-callable/static.json",
+          "sha256": "377a54c294d6395a24b29977ff1c90ead5567d1dc1ff85be725d12ab9165f69b",
+          "return_code": 0,
+          "elapsed_seconds": 7.400320529937744
+        },
+        "rhi-build-4": {
+          "path": "build/nvvm-optix-callable/rhi-build-4.json",
+          "sha256": "39b5d79c9f0a3d37fb1a84c005bc14109a4c6739a3eb1cd20038118188061f6e",
+          "return_code": 0,
+          "elapsed_seconds": 65.0282850265503
+        },
+        "rhi-final": {
+          "path": "build/nvvm-optix-callable/rhi-final.json",
+          "sha256": "edf4fb4409902589a4c807fae17d0ae6416d52364299e7d45ce0515a75c8c776",
+          "return_code": 0,
+          "elapsed_seconds": 3.0885465145111084
+        },
+        "units-final": {
+          "path": "build/nvvm-optix-callable/units-final.json",
+          "sha256": "4d868e1d274b5a35b1e2574ae34b2df31a6060747d6ebdf50e2b08df7a13da81",
+          "return_code": 0,
+          "elapsed_seconds": 1.512174129486084
+        },
+        "smoke": {
+          "path": "build/nvvm-optix-callable/smoke.json",
+          "sha256": "ac38230b37dac7c5e54272fbccdacb16b86e62c02d2d9857ffb76019926f1092",
+          "return_code": 0,
+          "elapsed_seconds": 21.948785543441772
+        },
+        "working": {
+          "path": "build/nvvm-optix-callable/working.json",
+          "sha256": "58ada64a25230f16565ecb7b99e87e81c9ff26ec0abaf667da4315428b906c0b",
+          "return_code": 1,
+          "elapsed_seconds": 1060.0538635253906
+        },
+        "rhi-inventory": {
+          "path": "build/nvvm-optix-callable/rhi-inventory.json",
+          "sha256": "2668b62ddadb1d6b909e6eca3e922f9cde2a8357b2b75db9806a9a7e92c69b35",
+          "return_code": 0,
+          "elapsed_seconds": 0.26447558403015137
+        },
+        "nvvm-full": {
+          "path": "build/nvvm-optix-callable/nvvm-full.json",
+          "sha256": "84816dd46b266b63eca309247895d46ac93b33d0b747318c93e46fd67ee53602",
+          "return_code": 1,
+          "elapsed_seconds": 42.676897048950195
+        },
+        "nvrtc-full": {
+          "path": "build/nvvm-optix-callable/nvrtc-full.json",
+          "sha256": "27e3df155b0a17dc3156bb8db68e046fcf8dd4637fc2d44b854635a5810c1bb3",
+          "return_code": -6,
+          "elapsed_seconds": 34.35888147354126
+        },
+        "nvrtc-remainder": {
+          "path": "build/nvvm-optix-callable/nvrtc-remainder.json",
+          "sha256": "2c9ae8694444e80d2577343a3a154050e8ca443dd5cab0f2e022d945b8c1b823",
+          "return_code": 1,
+          "elapsed_seconds": 68.23591828346252
+        }
+      },
+      "outcomes": {
+        "static": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        },
+        "provider_and_source": {
+          "passed": 5,
+          "failed": 0
+        },
+        "rhi_focused": {
+          "passed": 3,
+          "failed": 0,
+          "assertions": 1046
+        },
+        "smoke": {
+          "passed": 15,
+          "regressions": 0,
+          "input_changes": 0
+        },
+        "working": {
+          "initial_passed": 1705,
+          "initial_regressions": 8,
+          "repaired": 8,
+          "unresolved": 0,
+          "input_changes": 0,
+          "scope": "Full run followed by exact focused repair; not a fresh all-green full run."
+        },
+        "rhi_full": {
+          "registration_count": 280,
+          "unique_name_count": 279,
+          "scope": "Fresh full NVVM run plus complete NVRTC coverage across the interrupted 158-case run and exact 122-case remainder. Prior full baseline and histories retained; this is not a full Slang multi-suite checkpoint. A subsequent focused 15-case run passes on the layout-repair compiler; the full runs retain their pre-repair identity.",
+          "by_compiler": {
+            "nvvm": {
+              "passed": 269,
+              "failed": 1,
+              "skipped": 10
+            },
+            "nvrtc": {
+              "passed": 265,
+              "failed": 5,
+              "skipped": 10
+            }
+          },
+          "original_nvvm_failures_resolved": 60,
+          "original_nvvm_failures_remaining": 1,
+          "new_fixture_nvrtc_differences": [
+            "surface-dimensions: zero array layer counts at O0/O3, authored3/4 unchanged",
+            "hitobject-lifecycle: illegal incoming ObjectRayOrigin call in raygeneration aborts module compilation; owned-state oracle unchanged",
+            "array-payload-singleton-matrices: CUDA source rejects matrices with one row/column (E39999), NVVM O0/O3 independent oracle passes",
+            "hitobject-padded-attributes: CUDA sizeof-based helper rejects48-byte record; NVVM passes8dense-leaf ReportHit/GetAttributes/Invoke oracle atO0/O3",
+            "callable-family: CUDA source rejects singleton matrices with E39999 at deferred binding; the NVVM numeric/empty/deferred oracle passes at O0/O3."
+          ],
+          "nvvm_failures": ["ray-tracing-hitobject-make-hit.cuda"],
+          "nvrtc_failures": [
+            "surface-dimensions.cuda",
+            "ray-tracing-hitobject-lifecycle.cuda",
+            "ray-tracing-array-payload-singleton-matrices.cuda",
+            "ray-tracing-hitobject-padded-attributes.cuda",
+            "ray-tracing-callable-family.cuda"
+          ]
+        }
+      },
+      "contracts": [
+        "Typed opcode 933 and optional interface 11 preserve module43/ABI46/container2; ordinary function calls remain direct and module-owned.",
+        "Copyable value roles include recursive numeric/bool arrays, records and legalized matrices. Callable entries use the canonical mutable helper-pointer ABI and external device symbols. Cross-backend ABI and pointer/resource payloads are excluded.",
+        "The existing empty-type legalizer preserves side effects and erases caller/callee parameters together, including recursively empty records.",
+        "RHI reuses existing OptiX stack fix 81d5ded4, retaining its backend extension, SDK-local accumulation and cleanup. Graph depth uses the device limit for current motion graphs.",
+        "The descriptor producer owns the recognized OptiX extension through StructHolder. The deferred fixture changes original depth 2 to 0 and asserts owned depth 2 before binding.",
+        "All 60 supported original RHI failures are resolved; arbitrary MakeHit remains the agreed exclusion. Five NVRTC comparison differences remain visible."
+      ],
+      "failure_history": [
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/build-1.json",
+            "sha256": "d6079b6c6a632e7087a55a2182eb39856cabeb0fc15a52f0806c981fa80bbf2a",
+            "return_code": 1,
+            "elapsed_seconds": 329.0558383464813
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/build-1.log",
+            "sha256": "8f82198fd1c4048c65531cf5fae6419387f5c159a5cb5a88f4cb15e6daaccdb0"
+          },
+          "detail": "The internal helper stage capability conflicted with the CUDA target switch; the existing NVVM-only internal declaration pattern fixes the build."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/static-build.json",
+            "sha256": "27455cd726c7ce3ffe913570bc5dc6d59854dd240186821f219a844fe51c2cdc",
+            "return_code": 1,
+            "elapsed_seconds": 77.78174757957458
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/static-build.log",
+            "sha256": "f07ef07de1a4df2c8cb880f3716398d39d516e146463f577bdae53d9151a5afa"
+          },
+          "detail": "New test conditional expressions needed explicit IRType base casts; production was unchanged."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/rhi-1.json",
+            "sha256": "54f861c90314157ddcb019ccf3606ba102780eeb0bc23029ae0aa33c7e20349c",
+            "return_code": -6,
+            "elapsed_seconds": 1.9175994396209717
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/rhi-1.log",
+            "sha256": "1327d9a9164d987cd6e6445fc633e9b4f7adf62ce4eac171408868d97bf7545a"
+          },
+          "detail": "Nested callable execution failed with CUDA 700 because RHI omitted direct-call stack allocation; the original leaf passed and a single aggregate call executed."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/nvrtc-1.json",
+            "sha256": "580580c657d5d42e5d8af002f6fd6ec066c94adb14edaca79197b8e59276ee66",
+            "return_code": 1,
+            "elapsed_seconds": 1.52115797996521
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/nvrtc-1.log",
+            "sha256": "47279e69b48dc482bc0b846b4d8e1de3d6bf59293f939857345ce59ead994ab3"
+          },
+          "detail": "Singleton matrix E39999 comparison failure; no GPU execution."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/working.json",
+            "sha256": "58ada64a25230f16565ecb7b99e87e81c9ff26ec0abaf667da4315428b906c0b",
+            "return_code": 1,
+            "elapsed_seconds": 1060.0538635253906
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/working.log",
+            "sha256": "a444b672e56853cb167f8432cd4ec75a8538b6cf8269487be08f4a41fe484ffc"
+          },
+          "detail": "Eight previously passing cells rejected due to duplicate aggregate layout validation; exact focused retries pass after representation-role routing repair."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/layout-static-build.json",
+            "sha256": "0c7f177d4a28bf4b7706431cc9c2c995d897c79d1db2034d315f17e854e1d809",
+            "return_code": 1,
+            "elapsed_seconds": 15.435461282730103
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/layout-static-build.log",
+            "sha256": "b782db27caed1e24bf4b3790b86226d69173f5edcd03c0f580f36c85efa7d004"
+          },
+          "detail": "The new test initially passed an integer instead of an IR array-count operand; production was unchanged."
+        },
+        {
+          "gate": {
+            "path": "build/nvvm-optix-callable/nvrtc-full.json",
+            "sha256": "27e3df155b0a17dc3156bb8db68e046fcf8dd4637fc2d44b854635a5810c1bb3",
+            "return_code": -6,
+            "elapsed_seconds": 34.35888147354126
+          },
+          "log": {
+            "path": "build/nvvm-optix-callable/nvrtc-full.log",
+            "sha256": "30025b1346bad936a79210c68369e84880950bfa373393bc9ec3002458dff5e3"
+          },
+          "detail": "The known illegal incoming object-ray query in raygen aborts at registration 158; the exact 122 unrun cases execute separately."
+        }
+      ],
+      "reused_rhi_commit": "81d5ded4b757aa8532bc3d71533d74ba68085d0e",
+      "intermediate_evidence": {
+        "provisional_fix": {
+          "path": "build/nvvm-optix-callable/provisional-rhi.patch",
+          "sha256": "7f51937b28cb711615003d236b8256cafb57be43fa552f04bbbcf793c37af23f"
+        },
+        "provisional_pass": {
+          "path": "build/nvvm-optix-callable/rhi-2.json",
+          "sha256": "edfbe1a59b9dabe3b7ac5450fa22bb91425fa50db54d8134171a6fdde71d48f1",
+          "return_code": 0,
+          "elapsed_seconds": 3.0876681804656982
+        },
+        "integrated_before_deferred": {
+          "path": "build/nvvm-optix-callable/rhi-3.json",
+          "sha256": "fa22516e56341722c6a4d21da3925a8cb8b3666d9c73a1c7d01d3d84c0b592eb",
+          "return_code": 0,
+          "elapsed_seconds": 3.164543628692627
+        },
+        "isolation": {
+          "direct": {
+            "gate": {
+              "path": "build/nvvm-optix-callable/isolate-direct.json",
+              "sha256": "a096216c5cd57dbadd57a7f1b5d86c46330b9ffa8677464a7d8e3bec76cc3d00",
+              "return_code": -6,
+              "elapsed_seconds": 1.8223176002502441
+            },
+            "source": {
+              "path": "build/nvvm-optix-callable/isolate-direct-source.slang",
+              "sha256": "7a074bbd9a7a71741db4e4d6c1fb811b2ed0264fb05b18bd7b56eae51ffa152a"
+            }
+          },
+          "no-empty": {
+            "gate": {
+              "path": "build/nvvm-optix-callable/isolate-no-empty.json",
+              "sha256": "39f0f345b25497958b7eda3afed937d464988728c33d8dfa98375c471161c705",
+              "return_code": -6,
+              "elapsed_seconds": 1.7540481090545654
+            },
+            "source": {
+              "path": "build/nvvm-optix-callable/isolate-no-empty-source.slang",
+              "sha256": "88e85735d0d48b65ac32d64a3b44a8eba481e3fc7ad60968c15f69638950dfd7"
+            }
+          },
+          "single": {
+            "gate": {
+              "path": "build/nvvm-optix-callable/isolate-single.json",
+              "sha256": "1299a4e6d24cd9931adc01acfe3f0b136a15731cf78c2045cc0467448e1553ef",
+              "return_code": 1,
+              "elapsed_seconds": 2.570187568664551
+            },
+            "source": {
+              "path": "build/nvvm-optix-callable/isolate-single-source.slang",
+              "sha256": "3f5e3b1e599e50d24df29a6b26df73628f1552e3107b533462abfa9d1705a658"
+            }
+          }
+        }
+      },
+      "closeout_repair": {
+        "identity": {
+          "path": "build/nvvm-optix-callable/identity-closeout.json",
+          "sha256": "94877861d97be0da9f9cdd62fc3b1097727ce766220fede8fcc43c048d4ad62e"
+        },
+        "gates": {
+          "layout-build": {
+            "path": "build/nvvm-optix-callable/layout-build.json",
+            "sha256": "582da7cceda35b1a06d692c3032b195639cebbe1526703f12775ffce507476bb",
+            "return_code": 0,
+            "elapsed_seconds": 38.130542278289795
+          },
+          "layout-static-build-2": {
+            "path": "build/nvvm-optix-callable/layout-static-build-2.json",
+            "sha256": "b0a148cb7760583a5f1fc17a0bd5dc7fd2de34d09e3a5778564d61c5ee0e22bb",
+            "return_code": 0,
+            "elapsed_seconds": 18.030031442642212
+          },
+          "layout-static": {
+            "path": "build/nvvm-optix-callable/layout-static.json",
+            "sha256": "87e04bb68a1814eb8ff0f643e5ebda9f4e007d4f8f76be473023668eed4ba219",
+            "return_code": 0,
+            "elapsed_seconds": 7.098065614700317
+          },
+          "layout-controls": {
+            "path": "build/nvvm-optix-callable/layout-controls.json",
+            "sha256": "1fd3763d2e1159d0c046ff2281ec1fa2d736b3cb9bac3f5c52ffd65979621096",
+            "return_code": 0,
+            "elapsed_seconds": 6.326030015945435
+          },
+          "layout-rhi": {
+            "path": "build/nvvm-optix-callable/layout-rhi.json",
+            "sha256": "0791e47255bed4e4993899947bcd80e55bd639ac02bcee228819ab4410a3a29f",
+            "return_code": 0,
+            "elapsed_seconds": 7.462679386138916
+          },
+          "smoke-closeout": {
+            "path": "build/nvvm-optix-callable/smoke-closeout.json",
+            "sha256": "1b88a58a445040316110fbdc620d4e1929fc72ad6f3aa1161f0f110252709fe0",
+            "return_code": 0,
+            "elapsed_seconds": 22.051498651504517
+          },
+          "layout-frozen": {
+            "path": "build/nvvm-optix-callable/layout-frozen.json",
+            "sha256": "48eb47c47f484e90f92743d820e3a74133257abb0938cfca29e0e1d19980c89b",
+            "return_code": 0,
+            "elapsed_seconds": 7.471645355224609
+          },
+          "layout-discovery": {
+            "path": "build/nvvm-optix-callable/layout-discovery.json",
+            "sha256": "a5e85938d78fb17ca884710d84d9ba1e2180fe3bd85d5d3605566c8856104d90",
+            "return_code": 0,
+            "elapsed_seconds": 3.5110700130462646
+          }
+        },
+        "results": {
+          "layout-frozen": {
+            "path": "build/nvvm-optix-callable/layout-frozen/results.json",
+            "sha256": "48e75922691171e253b09ec4d4b2af72a19b5dfdc923132edd10fc6dfddc1eb9"
+          },
+          "layout-discovery": {
+            "path": "build/nvvm-optix-callable/layout-discovery/results.json",
+            "sha256": "4d4ddd3ee0a24a15a73639d1a28109fe5799d5e4ff9d3d86782a901f1d0dbd68"
+          }
+        },
+        "initial_regressions": [
+          {
+            "id": "compute/simple-interface-parameter.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "compute/simple-interface-parameter.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/append-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/append-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "compute/interface-shader-param.slang#discovery-1",
+            "mode": "nvvm-o0",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          },
+          {
+            "id": "compute/interface-shader-param.slang#discovery-1",
+            "mode": "nvvm-o3",
+            "actual": {
+              "classification": "preflight",
+              "return_code": 1,
+              "execution_counts": {
+                "passed": 0,
+                "executed": 1,
+                "ignored": 0,
+                "other_summary_status": 0
+              },
+              "diagnostic": "direct NVVM lowering does not support Slang IR instruction or shape 'aggregate storage layout'",
+              "canonical_shape": "aggregate storage layout"
+            }
+          }
+        ],
+        "repaired_cells": [
+          {
+            "id": "compute/simple-interface-parameter.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "hlsl/append-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o0",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "compute/simple-interface-parameter.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "hlsl/append-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "hlsl/consume-structured-buffer.slang#cuda-1",
+            "mode": "nvvm-o3",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "compute/interface-shader-param.slang#discovery-1",
+            "mode": "nvvm-o0",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          },
+          {
+            "id": "compute/interface-shader-param.slang#discovery-1",
+            "mode": "nvvm-o3",
+            "classification": "correct",
+            "execution_counts": {
+              "passed": 1,
+              "executed": 1,
+              "ignored": 0,
+              "other_summary_status": 0
+            }
+          }
+        ],
+        "unresolved": [],
+        "scope": "Reuse the established resource/value record proof. Storage-only records and arrays retain canonical aggregate layout checks. Eight exact runtime retries, one positive/negative static test, eight provider/source controls, related RHI controls, and all 16 smoke configurations pass.",
+        "rhi_outcomes": {
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0,
+          "assertions": 51020
+        },
+        "smoke_outcomes": {
+          "passed": 16,
+          "regressions": 0,
+          "input_changes": 0,
+          "selection": {
+            "path": "build/nvvm-optix-callable/smoke-2/selection.json",
+            "sha256": "da5f1ae9b2a7952e09df1167f6d4dd9bfca920dd0fe291d9fdce656bd7188a7d"
+          }
+        }
+      },
+      "accepted_rhi_commit": "382b6e71e9e19e4397e78fcc0c8c48fc3bb34185"
     }
   }
 }
