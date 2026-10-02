@@ -5,7 +5,7 @@
 // Vulkan execution of this shape is covered by `glsl-stale-pointer-load.slang`, which reads
 // the pointer from a structured buffer instead: when a pointer is stored into a field behind a
 // pointer, the bundled glslang marks the 8-byte store `Aligned 4`, which fails SPIR-V
-// validation (fixed upstream in KhronosGroup/glslang#4123).
+// validation (shader-slang/slang#13407, fixed upstream in KhronosGroup/glslang#4123).
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
