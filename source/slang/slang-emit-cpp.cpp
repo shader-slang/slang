@@ -1176,8 +1176,16 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
     case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            PtrDeclaratorInfo refDeclarator(declarator);
-            _emitType(ptrType->getValueType(), &refDeclarator);
+            // A forwarded entry-point uniform keeps its by-value kernel signature `T p`.
+            if (isCudaKernelParamBorrowInType(ptrType))
+            {
+                _emitType(ptrType->getValueType(), declarator);
+            }
+            else
+            {
+                PtrDeclaratorInfo refDeclarator(declarator);
+                _emitType(ptrType->getValueType(), &refDeclarator);
+            }
         }
         break;
     case kIROp_ArrayType:
@@ -2097,6 +2105,14 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
     if (shouldFoldInstIntoUseSites(inst))
     {
         emitInstExpr(inst, outerPrec);
+        return;
+    }
+
+    // A forwarded entry-point uniform is declared by value, so, as for a local `Var`, its value as
+    // a pointer is `&p`.
+    if (inst->getOp() == kIROp_Param && isCudaKernelParamBorrowInType(inst->getDataType()))
+    {
+        emitVarExpr(inst, outerPrec);
         return;
     }
 
