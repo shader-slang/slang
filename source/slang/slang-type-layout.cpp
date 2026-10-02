@@ -1670,20 +1670,22 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             {
-                // It's a ptr and a count of the amount of elements
-                const size_t size =
-                    _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+                // CUDA buffer references contain only the device pointer.
+                return SimpleLayoutInfo(
+                    LayoutResourceKind::Uniform,
+                    sizeof(CUDAPtr),
+                    sizeof(CUDAPtr));
             }
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
             {
-                // It's a ptr and a count of the amount of elements
-                const size_t size =
-                    _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+                // CUDA buffer references contain only the device pointer.
+                return SimpleLayoutInfo(
+                    LayoutResourceKind::Uniform,
+                    sizeof(CUDAPtr),
+                    sizeof(CUDAPtr));
             }
         case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::AccelerationStructure:

@@ -47,8 +47,8 @@ void computeMain(
 // REFLECT: "name": "little",
 // REFLECT: "binding": {"kind": "uniform", "offset": 8, "size": 2
 // REFLECT: "name": "input",
-// REFLECT: "binding": {"kind": "uniform", "offset": 16, "size": 16
+// REFLECT: "binding": {"kind": "uniform", "offset": 16, "size": 8
 // REFLECT: "name": "output",
-// REFLECT: "binding": {"kind": "uniform", "offset": 32, "size": 16
+// REFLECT: "binding": {"kind": "uniform", "offset": 24, "size": 8
 // REFLECT: "name": "count",
-// REFLECT: "binding": {"kind": "uniform", "offset": 48, "size": 4
+// REFLECT: "binding": {"kind": "uniform", "offset": 32, "size": 4

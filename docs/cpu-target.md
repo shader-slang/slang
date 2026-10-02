@@ -624,9 +624,9 @@ Note that '[] 'would be turned into the `at` function, which takes the default v
 
 If bounds checking is wanted in order to avoid undefined behavior and limit how memory is accessed `zero indexed` bounds checking might be appropriate. When enabled if an access is out of bounds the value at the zero index is returned. This is quite different behavior than the typical GPU behavior, but is fairly efficient and simple to implement. Importantly it means behavior is well defined and always 'in range' assuming there is an element.
 
-To enable zero indexing bounds checking pass in the define `SLANG_ENABLE_BOUND_ZERO_INDEX` to a Slang compilation. This define is passed down to C++ and CUDA compilations, and the code in the CUDA and C++ preludes implement the feature. Note that zero indexed bounds checking will slow down accesses that are checked.
+To enable zero indexing bounds checking pass in the define `SLANG_ENABLE_BOUND_ZERO_INDEX` to a Slang compilation. This define is passed down to C++ and CUDA compilations, and their preludes implement the feature. On CUDA, it applies only to fixed-size and unsized arrays; buffer references carry no length and their accesses are unchecked. Note that zero indexed bounds checking will slow down accesses that are checked.
 
-The C++ implementation of the feature can be seen by looking at the file "prelude/slang-cpp-types.h". For CUDA "prelude/slang-cuda-prelude.h".
+The C++ implementation of the macros is in "prelude/slang-cpp-types-core.h", with buffer accessors in "prelude/slang-cpp-types.h". The CUDA implementation is in "prelude/slang-cuda-prelude.h".
 
 The bounds checking macros are guarded such it is possible to replace the implementations, without directly altering the prelude.
 

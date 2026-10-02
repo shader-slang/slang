@@ -1,6 +1,6 @@
 // Test reinterpret_cast of RWStructuredBuffer<half> to RWStructuredBuffer<half2>.
 // Verifies that AnyValue marshalling correctly handles the full size of
-// StructuredBuffer on CUDA (16 bytes: T* data + size_t count).
+// StructuredBuffer on CUDA (8 bytes: T* data).
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 

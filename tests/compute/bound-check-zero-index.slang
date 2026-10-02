@@ -1,9 +1,7 @@
 // bound-check-zero-index.slang
 
-// Check 'zero indexing' bound check feature, supported by CPU and CUDA
+// Check 'zero indexing' bounds checking for CPU buffers and arrays.
 
-// Currently zero index bound checking doesn't appear to be working properly for CUDA.
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj -Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -Xslang... -DSLANG_ENABLE_BOUND_ZERO_INDEX -X.
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4]):name=byteAddressBuffer

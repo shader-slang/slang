@@ -341,6 +341,14 @@ alias cpp_cuda_glsl_hlsl_spirv_wgsl = cpp | cuda | glsl | hlsl | spirv | wgsl;
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv_wgsl_llvm = cpp | cuda | glsl | hlsl | spirv | wgsl | llvm;
 
+/// CPP, GLSL, HLSL, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_spirv_wgsl_llvm = cpp | glsl | hlsl | spirv | wgsl | llvm;
+
+/// CPP, GLSL, HLSL, SPIRV and LLVM code-gen targets
+/// [Compound]
+alias cpp_glsl_hlsl_spirv_llvm = cpp | glsl | hlsl | spirv | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv;

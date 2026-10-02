@@ -95,10 +95,10 @@ SLANG_UNIT_TEST(CudaEntryPointParamSizeWithoutPadding)
     // Get the size of the parameter struct (this is what CUDA kernel launch uses)
     size_t paramStructSize = elementTypeLayout->getSize();
 
-    // The parameter struct should be 36 bytes:
-    //   - input:  offset 0,  size 16 (CUDA buffer handle)
-    //   - output: offset 16, size 16 (CUDA buffer handle)
-    //   - count:  offset 32, size 4  (uint32_t)
-    // Total: 36 bytes (no trailing padding)
-    SLANG_CHECK(paramStructSize == 36);
+    // The parameter struct should be 20 bytes:
+    //   - input:  offset 0,  size 8 (CUDA buffer handle)
+    //   - output: offset 8,  size 8 (CUDA buffer handle)
+    //   - count:  offset 16, size 4  (uint32_t)
+    // Total: 20 bytes (no trailing padding)
+    SLANG_CHECK(paramStructSize == 20);
 }

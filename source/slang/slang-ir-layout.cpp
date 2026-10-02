@@ -532,19 +532,29 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     // Handle StructuredBuffer types
     if (as<IRHLSLStructuredBufferTypeBase>(type))
     {
-        // On CPU and CUDA, StructuredBuffer is a struct with a pointer and a count
+        // On CPU, StructuredBuffer is a struct with a pointer and a count
         // (T* data + size_t count = 16 bytes, 8-byte alignment)
-        if (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+        if (isCPUTarget(targetReq))
         {
             *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
             return SLANG_OK;
         }
-        // On other targets (including Metal), use default resource size (8 bytes)
+        if (isCUDATarget(targetReq) && (as<IRHLSLAppendStructuredBufferType>(type) ||
+                                        as<IRHLSLConsumeStructuredBufferType>(type)))
+        {
+            // Consider `sizeof(AppendStructuredBuffer<float>)`: layout queries can run before
+            // lowerAppendConsumeStructuredBuffers replaces this type with a struct containing
+            // the elements buffer and the counter buffer. Both fields are device pointers.
+            *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+            return SLANG_OK;
+        }
+        // CUDA and Metal buffer references contain only a pointer (8 bytes).
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
         return SLANG_OK;
     }
 
-    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
+        (as<IRByteAddressBufferTypeBase>(type) && targetReq && isCUDATarget(targetReq)))
     {
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
         return SLANG_OK;
