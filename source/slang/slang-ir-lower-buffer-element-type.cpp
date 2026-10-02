@@ -2411,6 +2411,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
     auto targetReq = target->getTargetReq();
+    // Every WGSL-family target emits the same WGSL and shares the WGSL reflection rules, so all of
+    // them take the `-target wgsl` path here; the overrides in this block are Khronos/LLVM-only.
     if (!isWGPUTarget(targetReq))
     {
         if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))

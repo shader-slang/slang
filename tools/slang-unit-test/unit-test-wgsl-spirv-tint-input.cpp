@@ -11,10 +11,11 @@
 
 using namespace Slang;
 
-// The `wgsl-spirv` and `wgsl-spirv-asm` targets emit WGSL and hand it to Tint. That WGSL must be
-// the same WGSL that `-target wgsl` produces, because all three targets share one reflection
-// layout (see issue #13391). Separately, `wgsl-spirv` must reach Tint like `wgsl-spirv-asm` does,
-// rather than fail with an "unhandled code generation target" internal error (see issue #8323).
+// The `wgsl-spirv` and `wgsl-spirv-asm` targets are WGSL emission followed by Tint, so the WGSL
+// they hand to Tint must be exactly the `-target wgsl` output. Identical text is what guarantees
+// that every buffer gets the layout WGSL reflection reports for all three targets (see issue
+// #13391). Separately, `wgsl-spirv` must reach Tint like `wgsl-spirv-asm` does, rather than fail
+// with an "unhandled code generation target" internal error (see issue #8323).
 //
 // `slang-tint` is only fetched for Windows x64, so a `.slang` test cannot see the WGSL that Tint
 // receives anywhere else. These tests install a fake loader through `setSharedLibraryLoader`, so a
@@ -23,6 +24,9 @@ using namespace Slang;
 namespace
 {
 
+// Written by `fakeTintCompile`. Each test resets them before the compile it inspects. A successful
+// result is cached per target on a linked program, so only the first request for a target reaches
+// Tint, and each test therefore requests each target at most once.
 String gTintInputWgsl;
 bool gFakeTintWasCalled = false;
 
@@ -44,6 +48,7 @@ void fakeTintFreeResult(tint_CompileResult* result)
     SLANG_UNUSED(result);
 }
 
+// A `slang-tint` that exists only as the two symbols `TintDownstreamCompiler::init` looks up.
 class FakeTintLibrary : public RefObject, public ISlangSharedLibrary
 {
 public:
@@ -75,6 +80,12 @@ protected:
     }
 };
 
+enum class FakeTint
+{
+    Available,
+    Missing,
+};
+
 // Answers every `slang-tint` request, either with the fake library or with "not found", so a real
 // `slang-tint` is never loaded. Every other library comes from the default loader, which keeps the
 // rest of the toolchain (e.g. the SPIR-V disassembler) as it normally is.
@@ -83,8 +94,8 @@ class FakeTintLoader : public RefObject, public ISlangSharedLibraryLoader
 public:
     SLANG_REF_OBJECT_IUNKNOWN_ALL
 
-    explicit FakeTintLoader(bool tintAvailable)
-        : m_tintAvailable(tintAvailable)
+    explicit FakeTintLoader(FakeTint tint)
+        : m_tint(tint)
     {
     }
 
@@ -94,7 +105,7 @@ public:
         if (UnownedStringSlice(path).indexOf(UnownedStringSlice("slang-tint")) < 0)
             return DefaultSharedLibraryLoader::getSingleton()->loadSharedLibrary(path, outLibrary);
 
-        if (!m_tintAvailable)
+        if (m_tint == FakeTint::Missing)
             return SLANG_E_NOT_FOUND;
 
         ComPtr<ISlangSharedLibrary> library(new FakeTintLibrary());
@@ -111,18 +122,28 @@ protected:
                    : nullptr;
     }
 
-    bool m_tintAvailable;
+    FakeTint m_tint;
 };
 
-// The repro from #13391. The constant buffer's scalar array must use the std140 element stride of
-// 16 bytes, which the WGSL emitter spells as an array of `vec4<f32>`.
+// The repro from #13391, widened to every buffer kind whose layout rule the fix changed: a
+// constant buffer and a `ParameterBlock` (std140), and structured buffers of a struct and of a
+// matrix (std430). Under `Natural`, each of them lowers to different WGSL.
 const char* kShaderSource = R"SLANG(
+    struct S { float f; float3 v; float g[2]; }
     cbuffer C { float a[2]; float b; }
+    ParameterBlock<S> pb;
+    RWStructuredBuffer<S> sb;
+    RWStructuredBuffer<float2x2> mats;
     RWStructuredBuffer<float> o;
 
     [shader("compute")]
     [numthreads(1, 1, 1)]
-    void main() { o[0] = a[1] + b; }
+    void main()
+    {
+        o[0] = a[1] + b + pb.g[1] + mats[0][1][0];
+        sb[0].v = pb.v;
+        mats[1] = float2x2(1, 2, 3, 4);
+    }
 )SLANG";
 
 const SlangCompileTarget kTargets[] = {SLANG_WGSL, SLANG_WGSL_SPIRV_ASM, SLANG_WGSL_SPIRV};
@@ -137,6 +158,8 @@ struct EntryPointCodeOutcome
     String diagnostics;
 };
 
+// Copies every byte of `blob`. `StringUtil::getString` drops a trailing zero byte, which would
+// truncate binary SPIR-V such as `kFakeSpirv`.
 String blobToString(slang::IBlob* blob)
 {
     if (!blob)
@@ -156,13 +179,13 @@ struct LinkedProgram
 
 // All of `kTargets` share one session, so the WGSL comparison sees one program and one reflection
 // layout, and the outputs can differ only because of the target.
-void linkProgram(LinkedProgram& outLinked, bool tintAvailable)
+void linkProgram(LinkedProgram& outLinked, FakeTint tint)
 {
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, outLinked.globalSession.writeRef()) ==
         SLANG_OK);
 
-    ComPtr<ISlangSharedLibraryLoader> loader(new FakeTintLoader(tintAvailable));
+    ComPtr<ISlangSharedLibraryLoader> loader(new FakeTintLoader(tint));
     outLinked.globalSession->setSharedLibraryLoader(loader);
 
     slang::TargetDesc targetDescs[SLANG_COUNT_OF(kTargets)] = {};
@@ -213,7 +236,9 @@ EntryPointCodeOutcome getEntryPointCode(slang::IComponentType* program, SlangInt
     return outcome;
 }
 
-String getTintInputWgsl(slang::IComponentType* program, SlangInt targetIndex)
+// The compile result after Tint is deliberately ignored: for `wgsl-spirv-asm` it depends on
+// disassembling the fake SPIR-V, which is not what these tests check.
+String compileAndCaptureTintInput(slang::IComponentType* program, SlangInt targetIndex)
 {
     gFakeTintWasCalled = false;
     gTintInputWgsl = String();
@@ -227,22 +252,28 @@ String getTintInputWgsl(slang::IComponentType* program, SlangInt targetIndex)
 SLANG_UNIT_TEST(wgslSpirvTintInputMatchesWgslTarget)
 {
     LinkedProgram linked;
-    linkProgram(linked, true);
+    linkProgram(linked, FakeTint::Available);
     slang::IComponentType* program = linked.program;
 
     EntryPointCodeOutcome wgsl = getEntryPointCode(program, kWgslTargetIndex);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(wgsl.result));
-    // Without this, two equally wrong layouts would still compare equal.
+    // The reference itself must use std140/std430, or two equally wrong layouts would compare
+    // equal. The lowered type names carry the layout rule they were built for.
     SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("array<vec4<f32>, i32(2)>")) >= 0);
+    SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("S_std140")) >= 0);
+    SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("S_std430")) >= 0);
+    SLANG_CHECK(wgsl.code.indexOf(UnownedStringSlice("_MatrixStorage_float2x2std430")) >= 0);
 
-    SLANG_CHECK(getTintInputWgsl(program, kWgslSpirvAsmTargetIndex) == wgsl.code);
-    SLANG_CHECK(getTintInputWgsl(program, kWgslSpirvTargetIndex) == wgsl.code);
+    SLANG_CHECK(compileAndCaptureTintInput(program, kWgslSpirvAsmTargetIndex) == wgsl.code);
+    SLANG_CHECK(compileAndCaptureTintInput(program, kWgslSpirvTargetIndex) == wgsl.code);
 }
 
+// The test above only inspects what Tint receives. Here we check that `wgsl-spirv` also hands
+// Tint's output back to the caller, which is the result #8323 could not get.
 SLANG_UNIT_TEST(wgslSpirvTargetReturnsTintOutput)
 {
     LinkedProgram linked;
-    linkProgram(linked, true);
+    linkProgram(linked, FakeTint::Available);
     slang::IComponentType* program = linked.program;
 
     gFakeTintWasCalled = false;
@@ -259,7 +290,7 @@ SLANG_UNIT_TEST(wgslSpirvTargetReturnsTintOutput)
 SLANG_UNIT_TEST(wgslSpirvTargetWithoutTintReportsDiagnostic)
 {
     LinkedProgram linked;
-    linkProgram(linked, false);
+    linkProgram(linked, FakeTint::Missing);
     slang::IComponentType* program = linked.program;
 
     EntryPointCodeOutcome spirv = getEntryPointCode(program, kWgslSpirvTargetIndex);

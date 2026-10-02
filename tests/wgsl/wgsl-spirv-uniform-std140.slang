@@ -1,5 +1,6 @@
+// The `-target wgsl` row pins the reference std140 layout and runs everywhere. The Tint rows, which
+// fail without the fix, run on CI where `slang-tint` is available and are ignored where it is absent.
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry main -stage compute
-// The Tint rows run on CI where `slang-tint` is available, and are ignored where it is absent.
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv-asm -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPV): -target wgsl-spirv -entry main -stage compute
 
@@ -22,6 +23,7 @@ cbuffer C
 
 RWStructuredBuffer<float> o;
 
+// `data_0` is the field of the std140 array wrapper that stands in for `a`.
 // WGSL: @align(16) data_0 : array<vec4<f32>, i32(2)>
 // WGSL: @align(16) b_0 : f32
 
