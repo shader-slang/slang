@@ -4,15 +4,22 @@
 // Other modifiers on array parameters (`no_diff`, `unorm`) stay on the parameter and keep
 // accepting plain arrays. A forward declaration and a definition whose layouts differ are one
 // function for now (shader-slang/slang#13383): the call uses the declaration's layout and the body
-// reads its own. That holds for by-value, `__ref` and `out` parameters.
+// reads its own. That holds for by-value, `__ref`, `__constref` and `out` parameters, including a
+// `__ref`/`__constref` argument held in a buffer or in `groupshared` memory, where the storage
+// layout is observable.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-row-major
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj -xslang -matrix-layout-column-major
 
-//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
+//TEST_INPUT:ubuffer(data=[-1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1], stride=4):out,name output
 RWStructuredBuffer<float> output;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=32):name stored
+RWStructuredBuffer<row_major float2x3> stored;
+
+groupshared row_major float2x3 shared;
 
 // Matrix `k` holds the logical values `m[r][c] == 1 + 6*k + 3*r + c`.
 float countMismatches(float2x3 m[2])
@@ -45,6 +52,8 @@ float countDeclaredRowMajorMismatches(row_major float2x3 m[2]);
 float readDeclaredRowMajor(row_major float2x3 m);
 void addTenDeclaredRowMajor(__ref row_major float2x3 m[2]);
 void fillDeclaredRowMajor(out row_major float2x3 m[2]);
+void addHundredDeclaredRowMajor(__ref row_major float2x3 m);
+float readBorrowedDeclaredRowMajor(__constref row_major float2x3 m);
 
 [Differentiable]
 float scaleAndOffset(no_diff float coefficients[2], float x)
@@ -101,6 +110,18 @@ void computeMain()
     float2x3 filled[2];
     fillDeclaredRowMajor(filled);
     output[11] = countMismatches(filled);
+
+    // `[0][1]` holds 2 and `[1][0]` holds 4. The `column_major` bodies must read and write the
+    // same logical elements of the `row_major` storage.
+    stored[0] = float2x3(1, 2, 3, 4, 5, 6);
+    addHundredDeclaredRowMajor(stored[0]);
+    output[12] = stored[0][0][1];
+    output[13] = readBorrowedDeclaredRowMajor(stored[0]);
+
+    shared = float2x3(1, 2, 3, 4, 5, 6);
+    addHundredDeclaredRowMajor(shared);
+    output[14] = shared[0][1];
+    output[15] = readBorrowedDeclaredRowMajor(shared);
 }
 
 float countDeclaredRowMajorMismatches(column_major float2x3 m[2])
@@ -116,6 +137,16 @@ float readDeclaredRowMajor(column_major float2x3 m)
 void addTenDeclaredRowMajor(__ref column_major float2x3 m[2])
 {
     m[0][1][2] += 10;
+}
+
+void addHundredDeclaredRowMajor(__ref column_major float2x3 m)
+{
+    m[0][1] += 100;
+}
+
+float readBorrowedDeclaredRowMajor(__constref column_major float2x3 m)
+{
+    return m[1][0];
 }
 
 void fillDeclaredRowMajor(out column_major float2x3 m[2])
@@ -139,3 +170,7 @@ void fillDeclaredRowMajor(out column_major float2x3 m[2])
 // CHECK-NEXT: 16.0
 // CHECK-NEXT: 1.0
 // CHECK-NEXT: 0.0
+// CHECK-NEXT: 102.0
+// CHECK-NEXT: 4.0
+// CHECK-NEXT: 102.0
+// CHECK-NEXT: 4.0

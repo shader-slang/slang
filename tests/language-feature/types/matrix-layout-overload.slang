@@ -4,7 +4,8 @@
 // Mangled names do not encode matrix layout (shader-slang/slang#13383), so accepting these as
 // overloads would emit one function for both. A forward declaration whose pointee layout differs
 // from the definition's is a conflicting declaration: nothing converts the memory a pointer
-// refers to.
+// refers to. Return types are compared exactly, so a return type that differs only in layout is
+// a return type mismatch.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -profile cs_6_0 -entry main
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -entry main -stage compute
@@ -97,6 +98,16 @@ func pointeeArrayDeclared(p: column_major float2x3*[2]) -> float { return 2; }
 /*CHECK:
      ^^^^^^^^^^^^^^^^^^^^ E30200
      ^^^^^^^^^^^^^^^^^^^^ declaration of 'pointeeArrayDeclared' conflicts with existing declaration
+*/
+
+row_major float2x3 returnDeclared(row_major float2x3 m);
+/*CHECK:
+                   ^^^^^^^^^^^^^^ see previous declaration of 'returnDeclared'
+*/
+column_major float2x3 returnDeclared(column_major float2x3 m) { return m; }
+/*CHECK:
+                      ^^^^^^^^^^^^^^ E30202
+                      ^^^^^^^^^^^^^^ function 'returnDeclared' declared to return
 */
 
 // A layout difference does not hide a real difference elsewhere in the type.

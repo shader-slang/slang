@@ -3331,9 +3331,9 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
-/// Move any modifier of class `TTypeModifier` in `ioBaseModifiers` to the given `typeExpr`.
-/// `TTypeModifier` is `TypeModifier` or a subclass of it; declarators move every type modifier,
-/// and a declaration whose modifiers precede its type moves only its `MatrixLayoutModifier`s.
+/// Move every modifier of class `TTypeModifier` in `ioBaseModifiers` onto `typeExpr`, wrapping
+/// it in a `ModifiedTypeExpr`, and leave every other modifier where it is. `TTypeModifier` is
+/// `TypeModifier` or a subclass of it, such as `MatrixLayoutModifier`.
 ///
 /// If any such modifiers were present, `ioBaseModifiers` will be updated
 /// to only include the remaining modifiers (if any).
@@ -3356,7 +3356,7 @@ static Expr* _moveTypeModifiersToTypeExpr(
     // by `typeExpr`. Any remaining modifiers will be left in the
     // `ioBaseModifiers` list.
     //
-    // The type modifiers will be collected into their own `Modifiers` list,
+    // The moved modifiers will be collected into their own `Modifiers` list,
     // and we will retain a poiner to the final pointer in the linked list
     // (the one that is null), so that we can append to the end.
     //
@@ -3381,18 +3381,18 @@ static Expr* _moveTypeModifiersToTypeExpr(
         }
         else
         {
-            // If we have a type modifier, we need to graft it onto
-            // the list of type modifiers. This is done by writing
-            // a pointer to the type modifier into the "link" for
-            // the type modifier list, and updating the link to point
+            // If we have a modifier to move, we need to graft it onto
+            // the list of moved modifiers. This is done by writing
+            // a pointer to the modifier into the "link" for
+            // the moved-modifier list, and updating the link to point
             // to the `next` field of the current modifier (since that
-            // will be the location any further type modifiers need
+            // will be the location any further moved modifiers need
             // to be linked).
             //
             *typeModifierLink = typeModifier;
             typeModifierLink = &typeModifier->next;
 
-            // The above logic puts `typeModifier` into the type modifer
+            // The above logic puts `typeModifier` into the moved-modifier
             // list, but it doesn't remove it from the base modifier list.
             // In order to do that we must replace the pointer to `typeModifer`
             // with a pointer to whatever is next in the base list, and also
@@ -3409,9 +3409,6 @@ static Expr* _moveTypeModifiersToTypeExpr(
         }
     }
 
-    // If we ended up finding any type modifiers, we want to apply them
-    // to the type expression.
-    //
     return _applyModifiersToTypeExpr(parser, typeExpr, typeModifiers);
 }
 
@@ -7814,8 +7811,6 @@ static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
 /// A postfix type expression is an atomic type expression followed
 /// by zero or more postfix suffixes like array brackets.
 ///
-/// `_parseTypeExprWithLeadingMatrixLayout` repeats this composition, with a matrix layout graft
-/// between the atomic type and its suffixes, so a change here needs the same change there.
 static Expr* _parsePostfixTypeExpr(Parser* parser, bool allowDecl)
 {
     auto typeExpr = _parseAtomicTypeExpr(parser, allowDecl);
@@ -7858,6 +7853,9 @@ static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr, bool allo
 /// operator for forming interface conjunctions and the `->` operator
 /// for functions.
 ///
+/// `_parseTypeExprWithLeadingMatrixLayout` repeats this composition, with a matrix layout graft
+/// between the atomic type and its suffixes, so a change here needs the same change there.
+///
 static Expr* _parseInfixTypeExpr(Parser* parser, bool allowDecl)
 {
     auto leftExpr = _parsePostfixTypeExpr(parser, allowDecl);
@@ -7881,7 +7879,8 @@ static Expr* _parseInfixTypeExpr(Parser* parser, bool allowDecl)
 /// The other type modifiers stay on the declaration because the checker reads them there:
 /// `_moveNoDiffFromTypeToParamDecl` only peels `no_diff` off the top of a parameter's type, so a
 /// `no_diff` grafted under the `[2]` would be missed and `a` would no longer accept a plain
-/// `float[2]`. `unorm`/`snorm` likewise keep their existing meaning.
+/// `float[2]`. Likewise, `unorm float4 v[2]` keeps accepting a plain `float4[2]`, because a
+/// `unorm` grafted under the `[2]` would make the element type `unorm float4`.
 ///
 /// Apart from the graft, this is `Parser::ParseType()`: atomic type, then postfix suffixes, then
 /// infix suffixes, so the two must change together. In `row_major A & B` the layout applies to
