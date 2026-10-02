@@ -2197,6 +2197,10 @@ void GLSLSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& o
     // A `T*` is emitted as a `buffer_reference` block whose only member is `T _data`
     // (see `emitBufferPointerTypeDefinition`). `_data` has no counterpart in the IR, so we
     // spell "the value a `UserPointer` address designates" here.
+    //
+    // An access path is itself `UserPointer`-typed, so we test for it before the general
+    // `UserPointer` case: that case emits the value with `emitOperand`, whose `FieldAddress` and
+    // `GetElementPtr` arms call back into this function.
     if (isBufferReferenceAccessPath(inst))
     {
         auto base = inst->getOperand(0);

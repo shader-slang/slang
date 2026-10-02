@@ -33,10 +33,11 @@ void computeMain()
     slots[0] = oldTarget;
     int seen = *q;
 
-    // CHECK: 3
+    // CHECK: type: int32_t
+    // CHECK-NEXT: 3
     outputBuffer[0] = *oldTarget;
-    // CHECK: 0
+    // CHECK-NEXT: 0
     outputBuffer[1] = *newTarget;
-    // CHECK: 0
+    // CHECK-NEXT: 0
     outputBuffer[2] = seen;
 }

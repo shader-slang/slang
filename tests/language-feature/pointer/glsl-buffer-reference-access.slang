@@ -33,6 +33,14 @@ struct C2
     float v;
 }
 
+// A call whose `T*` result is unused still has to run.
+[noinline]
+int* bump(int* p)
+{
+    *p = *p + 1;
+    return p + 1;
+}
+
 cbuffer C
 {
     float* pf;
@@ -100,4 +108,7 @@ void computeMain()
 
     // GLSL: = (C_0.arr_0 + 0)._data[1].v_{{[0-9]+}};
     outF[3] = arr[0][1].v;
+
+    // GLSL: = bump_0(C_0.pi_0);
+    bump(pi);
 }
