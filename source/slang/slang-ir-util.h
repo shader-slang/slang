@@ -131,6 +131,13 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
+// True if `type` is `ConstRef<T, CudaKernelParam>`, the type of a forwarded entry-point uniform
+// aggregate parameter, which the CUDA emitter declares as `T p` and references as `&p`.
+//
+// The check matches an `IRBorrowInParamType` carrying that address space, not the address space
+// alone, because the emitter's `kIROp_RefParamType` case shares the same code path.
+bool isCudaKernelParamBorrowInType(IRInst* type);
+
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
@@ -533,6 +540,10 @@ IRBlock* getBlock(IRInst* inst);
 ///
 
 IRVarLayout* findVarLayout(IRInst* value);
+
+/// Return true if `param` is a by-value uniform `struct` or sized-array parameter of an entry
+/// point, i.e. one that `transformParamsToConstRef` forwards by address on CUDA (#11774).
+bool isEntryPointByValueUniformAggregateParam(IRParam* param);
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);

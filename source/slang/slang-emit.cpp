@@ -2468,7 +2468,7 @@ Result linkAndOptimizeIR(
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             SLANG_PASS(introduceExplicitGlobalContext, target);
-        SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+        SLANG_PASS(transformParamsToConstRef, targetRequest, codeGenContext->getSink());
         break;
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
@@ -2478,11 +2478,12 @@ Result linkAndOptimizeIR(
         // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with
         // direct pointers
         SLANG_PASS(undoParameterCopy);
-        // Transform struct parameters to use ConstRef for better performance
+        // Transform struct parameters to use ConstRef for better performance. On the CUDA family
+        // the pass also forwards entry-point uniform aggregates by address (#11774).
         if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest) ||
             isMetalTarget(targetRequest))
         {
-            SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
+            SLANG_PASS(transformParamsToConstRef, targetRequest, codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
         [[fallthrough]];

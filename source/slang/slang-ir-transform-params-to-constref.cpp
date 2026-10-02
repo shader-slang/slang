@@ -3,6 +3,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -14,8 +15,18 @@ struct TransformParamsToConstRefContext
     IRBuilder builder;
     bool changed = false;
 
-    TransformParamsToConstRefContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), builder(module)
+    // Set on CUDA targets, where entry-point uniform aggregates are forwarded by address; see
+    // `retypeEntryPointUniformAggregateParams`.
+    bool forwardEntryPointUniformAddress;
+
+    TransformParamsToConstRefContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        bool forwardEntryPointUniformAddress)
+        : module(module)
+        , sink(sink)
+        , builder(module)
+        , forwardEntryPointUniformAddress(forwardEntryPointUniformAddress)
     {
     }
 
@@ -397,8 +408,53 @@ struct TransformParamsToConstRefContext
         functionsToProcess.add(root);
     }
 
+    // Retype each entry-point by-value uniform aggregate parameter to
+    // `ConstRef<T, CudaKernelParam>` and rewrite its value uses into loads through it.
+    //
+    // Consider this example:
+    //
+    //     [noinline] float readsum(Big b, uint i);           // `b` becomes `borrow in`
+    //     [CudaDeviceExport] float exported(Big b, uint i);  // keeps its by-value signature
+    //     void computeMain(uniform Big big, ...) { readsum(big, i) + exported(big, i) + big.v[0]; }
+    //
+    // After this function runs, each use of `big` is `load(big)`, a load from an immutable address.
+    // When `updateCallSites` later rebuilds the `readsum` call, `isLoadFromImmutableAddress` passes
+    // `big` itself instead of copying it into a per-thread temporary (#11774), while `exported`
+    // keeps receiving the loaded value. The CUDA emitter still declares the parameter as the
+    // by-value `Big_0 big_0`, so the kernel emits `readsum_0(&big_0, i)` and `exported(big_0, i)`.
+    void retypeEntryPointUniformAggregateParams()
+    {
+        for (auto inst : module->getModuleInst()->getChildren())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func || !func->findDecoration<IREntryPointDecoration>())
+                continue;
+            bool retyped = false;
+            for (auto param = func->getFirstParam(); param; param = param->getNextParam())
+            {
+                if (!isEntryPointByValueUniformAggregateParam(param))
+                    continue;
+                param->setFullType(builder.getBorrowInParamType(
+                    param->getDataType(),
+                    AddressSpace::CudaKernelParam));
+                rewriteValueUsesToAddrUses(param);
+                retyped = true;
+            }
+            if (retyped)
+            {
+                fixUpFuncType(func);
+                changed = true;
+            }
+        }
+    }
+
     SlangResult processModule()
     {
+        // The retype runs before any callee is processed so that `updateCallSites` sees the
+        // entry-point arguments as loads from an immutable address.
+        if (forwardEntryPointUniformAddress)
+            retypeEntryPointUniformAggregateParams();
+
         // Collect all functions that need processing.
         // Process all callee's before callers; otherwise we introduce bugs
 
@@ -422,16 +478,24 @@ struct TransformParamsToConstRefContext
     }
 };
 
-SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
+SlangResult transformParamsToConstRef(
+    IRModule* module,
+    TargetRequest* targetReq,
+    DiagnosticSink* sink)
 {
-    TransformParamsToConstRefContext context(module, sink);
+    // Only the CUDA family copies a by-value kernel parameter into per-thread local memory when
+    // its address is taken, so the entry-point uniform forward is enabled only there.
+    TransformParamsToConstRefContext context(module, sink, isCUDATarget(targetReq));
     return context.processModule();
 }
 
 struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContext
 {
     EntryPointInParamToBorrowContext(IRModule* module, DiagnosticSink* sink)
-        : TransformParamsToConstRefContext(module, sink)
+        : TransformParamsToConstRefContext(
+              module,
+              sink,
+              /* forwardEntryPointUniformAddress */ false)
     {
     }
     virtual bool shouldProcessFunction(IRFunc* func) override
