@@ -1443,6 +1443,13 @@ err(
 )
 
 err(
+    "invalid-ref-param-access",
+    30032,
+    "invalid access for a reference parameter type",
+    span { loc = "typeExp:Expr", message = "'~access:Int' is not a valid access for '~type:Type'; expected 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'." }
+)
+
+err(
     "non-addressable-type-in-structured-buffer",
     30031,
     "non-addressable type cannot be used in StructuredBuffer",

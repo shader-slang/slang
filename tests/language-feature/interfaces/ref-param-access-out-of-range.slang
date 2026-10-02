@@ -1,11 +1,19 @@
-// An `Access` argument on `RefParam` other than `Read` or `Immutable` leaves the
-// reference read-write, so the type is diagnosed rather than causing an internal error.
+// A constant access on `RefParam` that is not an `Access` value is diagnosed,
+// whether the type names a parameter or a struct field.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+
+void f(RefParam<int, (Access)7> x) {}
+/*CHECK:
+       ^^^^^^^^ E30032
+       ^^^^^^^^ '7' is not a valid access for 'ref int'; expected 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'.
+*/
 
 struct S
 {
     RefParam<float, (Access)7> p;
-//CHECK:                       ^ reference type cannot be used as struct field
-//CHECK:                       ^ 'ref float' cannot be used as a struct field; reference types can only be used for function parameters and return values.
+/*CHECK:
+    ^^^^^^^^ E30032
+    ^^^^^^^^ '7' is not a valid access for 'ref float'; expected 'Access.ReadWrite', 'Access.Read' or 'Access.Immutable'.
+*/
 }

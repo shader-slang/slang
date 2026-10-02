@@ -1436,9 +1436,8 @@ void RefParamType::_toTextOverride(StringBuilder& out)
 ParamPassingMode RefParamType::getParamPassingMode()
 {
     // Only a constant `Read` or `Immutable` access makes the reference read-only.
-    // A symbolic or out-of-range access (as in `RefParam<int, A>` or
-    // `RefParam<int, (Access)7>`), which only code naming `RefParam` directly can
-    // produce, does not promise read-only access, so we treat it as read-write.
+    // Any other access is symbolic (as in `RefParam<int, A>`) or out of range;
+    // neither promises read-only access, so we treat it as read-write.
     auto accessQualifier = tryGetAccessQualifierValue();
     if (!accessQualifier)
         return ParamPassingMode::RefReadWrite;
